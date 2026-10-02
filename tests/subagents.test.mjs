@@ -13,7 +13,9 @@ const { state, review } = await import('./helpers/apiStub.mjs');
 const { runAgent } = await import('../src/agent/agent.ts');
 const { createSubagentHost } = await import('../src/agent/subagents.ts');
 const { Scheduler } = await import('../src/agent/scheduler.ts');
-const { getRuns, resetAgentRuns, stopRun } = await import('../src/agent/agentRuns.ts');
+const { getRuns, resetAgentRuns, stopRun, getAgentUsage } = await import('../src/agent/agentRuns.ts');
+const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings } = await import('../src/agent/agentSettings.ts');
+const { localDayKey } = await import('../src/lib/budgets.ts');
 const { saveRulesConfig } = await import('../src/agent/rulesStore.ts');
 const { DEFAULT_RULES, normalizeRulesConfig } = await import('../src/agent/rules.ts');
 
@@ -56,13 +58,13 @@ function fakeReviews(root) {
  * Runs the main agent over `parentScript`; children are answered by `child(title-prompt text, input)`, a function that
  * returns the next scripted turn for that child (per-prompt queues keep parallel children independent).
  */
-async function run({ root, parentScript, children = {}, hostCfg = {}, access = 'auto', approve, signal, parentTools = true } = {}) {
+async function run({ root, parentScript, children = {}, hostCfg = {}, access = 'auto', approve, signal, parentTools = true, resolve, chatId } = {}) {
   state.reset();
   saveRulesConfig(hostCfg.rules ?? DEFAULT_RULES);
   resetAgentRuns();
   const ctl = new AbortController();
   if (signal) signal(ctl);
-  const seen = { parentTools: [], childTools: {}, childSystems: {}, childMessages: {}, tokens: [], approvals: [], live: 0, maxLive: 0 };
+  const seen = { parentTools: [], childTools: {}, childSystems: {}, childMessages: {}, childModels: {}, tokens: [], approvals: [], live: 0, maxLive: 0 };
   const queues = new Map(Object.entries(children).map(([k, v]) => [k, [...v]]));
   let pi = 0;
   const adapter = {
@@ -75,7 +77,9 @@ async function run({ root, parentScript, children = {}, hostCfg = {}, access = '
         seen.parentTools.push(input.tools.map((t) => t.name));
         return parentScript[pi++] ?? say('parent done');
       }
-      const key = input.messages[0].parts[0].text;
+      // First line only: delegate_tasks appends the reports of dependencies below the prompt.
+      const key = input.messages[0].parts[0].text.split('\n')[0];
+      seen.childModels[key] = input.model;
       seen.childTools[key] = input.tools.map((t) => t.name);
       seen.childSystems[key] = input.system;
       seen.childMessages[key] = input.messages;
@@ -93,9 +97,11 @@ async function run({ root, parentScript, children = {}, hostCfg = {}, access = '
     },
   };
   const outputs = [];
-  const host = createSubagentHost({ projectRoot: root, recordTokens: (p, m, u) => seen.tokens.push([p, m, u]), ...hostCfg });
+  const resolveModel = resolve && (async (ref) => (resolve(ref) ? { adapter, supportsTools: true } : null));
+  const host = createSubagentHost({ projectRoot: root, recordTokens: (p, m, u) => seen.tokens.push([p, m, u]), settings: DEFAULT_AGENT_SETTINGS, ...(resolveModel ? { resolveModel } : {}), ...hostCfg });
   await runAgent({
     root,
+    ...(chatId !== undefined ? { chatId } : {}),
     history: [{ role: 'user', parts: [{ type: 'text', text: 'do the thing' }] }],
     adapter,
     providerId: 'p',
@@ -402,4 +408,150 @@ test('tokens of subagents are recorded through the provided hook with provider a
   const r = await run({ root, parentScript: [use(spawn('Counter', 'count')), say('ok')], children: { count: [say('x')] } });
   assert.ok(r.seen.tokens.some(([p, m, u]) => p === 'p' && m === 'm' && u.input === 10 && u.output === 5));
   assert.equal(r.runs[0].tokens, 15);
+});
+
+test('subagent tokens go to the budget ledger for the day and the parent chat; runs carry the chat id', async () => {
+  const root = project();
+  const r = await run({ root, chatId: 42, parentScript: [use(spawn('Counter', 'count')), say('ok')], children: { count: [use(call('list_dir', {})), say('x')] } });
+  assert.equal(r.runs[0].chatId, 42);
+  const l = getAgentUsage();
+  assert.equal(l.days[localDayKey(Date.now())], 30);
+  assert.equal(l.chats.c42, 30);
+});
+
+// ---- agent types: default model per type, allow-list ----
+
+test('a type with a configured default model runs on it; tokens and the run name that model', async () => {
+  const root = project();
+  const settings = normalizeAgentSettings({ models: { explore: { providerId: 'q', model: 'cheap' } } });
+  const r = await run({
+    root,
+    resolve: () => true,
+    parentScript: [use(spawn('Finder', 'find'), spawn('Writer', 'write', 'general')), say('ok')],
+    hostCfg: { settings, prepare: fakeReviews(root).prepare },
+  });
+  assert.equal(r.seen.childModels.find, 'cheap');
+  assert.equal(r.seen.childModels.write, 'm', 'types without a default use the parent model');
+  assert.equal(r.runs.find((x) => x.title === 'Finder').model, 'cheap');
+  assert.equal(r.runs.find((x) => x.title === 'Finder').providerId, 'q');
+  assert.ok(r.seen.tokens.some(([p, m]) => p === 'q' && m === 'cheap'));
+});
+
+test('an unusable default model falls back to the parent model with a note', async () => {
+  const root = project();
+  const settings = normalizeAgentSettings({ models: { explore: { providerId: 'q', model: 'gone' } } });
+  const r = await run({ root, resolve: () => false, hostCfg: { settings }, parentScript: [use(spawn('Finder', 'find')), say('ok')] });
+  assert.equal(r.seen.childModels.find, 'm');
+  assert.match(r.outputs[0].output, /q\/gone is not available/);
+  assert.ok(r.runs[0].transcript.some((s) => s.kind === 'note' && /not available/.test(s.text)));
+});
+
+test('an explicit model must be on the allow-list; allowed models are named in the tool description', async () => {
+  const root = project();
+  const settings = normalizeAgentSettings({ allowedModels: [{ providerId: 'q', model: 'strong' }] });
+  const r = await run({
+    root,
+    resolve: () => true,
+    hostCfg: { settings },
+    parentScript: [use(call('spawn_agent', { title: 'A', prompt: 'a', type: 'explore', model: 'evil/model' }), call('spawn_agent', { title: 'B', prompt: 'b', type: 'explore', model: 'strong' })), say('ok')],
+  });
+  assert.equal(r.outputs[0].isError, true);
+  assert.match(r.outputs[0].output, /not allowed/);
+  assert.equal(r.outputs[1].isError, false);
+  assert.equal(r.seen.childModels.b, 'strong');
+  assert.equal(r.runs.length, 1, 'a refused call registers no run');
+});
+
+test('budget defaults from the agent settings apply when the host has no overrides', async () => {
+  const root = project();
+  const settings = normalizeAgentSettings({ budgets: { explore: { maxToolCalls: 1 } } });
+  const r = await run({ root, hostCfg: { settings }, parentScript: [use(spawn('Busy', 'busy')), say('ok')], children: { busy: [use(call('list_dir', {}), call('list_dir', {})), say('never')] } });
+  assert.equal(r.runs[0].status, 'limit');
+  assert.match(r.outputs[0].output, /tool call limit \(1\)/);
+  assert.ok(r.runs[0].transcript.some((s) => s.kind === 'note' && /Stopped at its tool call limit/.test(s.text)));
+});
+
+// ---- orchestration ----
+
+const delegate = (tasks, extra = {}) => use(call('delegate_tasks', { tasks, ...extra }));
+
+test('delegate_tasks is offered next to spawn_agent and runs a plan with dependencies into one summary', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    parentScript: [
+      delegate([
+        { id: 'scan', title: 'Scan', prompt: 'scan', type: 'explore' },
+        { id: 'check', title: 'Check', prompt: 'check', type: 'review' },
+        { id: 'plan', title: 'Plan', prompt: 'plan it', type: 'plan', dependsOn: ['scan', 'check'] },
+      ]),
+      say('ok'),
+    ],
+    children: { scan: [say('found a.txt')], check: [say('looks fine')] },
+  });
+  assert.ok(r.seen.parentTools[0].includes('delegate_tasks'));
+  assert.ok(r.seen.parentTools[0].includes('spawn_agent'));
+  const out = r.outputs[0];
+  assert.equal(out.name, 'delegate_tasks');
+  assert.match(out.output, /^Plan finished: 3 task\(s\); 3 completed\./);
+  assert.match(out.output, /- plan "Plan" \(plan, after scan, check\): completed/);
+  assert.match(out.output, /### plan: Plan\n.*report for plan it/s);
+  const planPrompt = r.seen.childMessages['plan it'][0].parts[0].text;
+  assert.match(planPrompt, /--- scan "Scan" \(completed\) ---[\s\S]*found a\.txt/);
+  assert.match(planPrompt, /looks fine/);
+  assert.equal(r.runs.length, 3);
+});
+
+test('delegate_tasks: a failed task cancels its dependants; overlapping writers are queued, not run together', async () => {
+  const root = project();
+  const fake = fakeReviews(root);
+  let live = 0;
+  let peak = 0;
+  const writer = (file) => async () => {
+    live++;
+    peak = Math.max(peak, live);
+    await sleep(20);
+    live--;
+    return use(call('write_file', { path: file, content: 'x\n' }));
+  };
+  const r = await run({
+    root,
+    hostCfg: { prepare: fake.prepare },
+    parentScript: [
+      delegate([
+        { id: 'w1', title: 'W1', prompt: 'w1', type: 'general', files: ['a.txt'] },
+        { id: 'w2', title: 'W2', prompt: 'w2', type: 'general', files: ['a.txt'] },
+        { id: 'bad', title: 'Bad', prompt: 'bad', type: 'explore' },
+        { id: 'after', title: 'After', prompt: 'after', type: 'explore', dependsOn: ['bad'] },
+      ]),
+      say('ok'),
+    ],
+    children: { w1: [writer('a.txt'), say('w1 done')], w2: [writer('a.txt'), say('w2 done')], bad: [() => Promise.reject(new Error('model exploded'))] },
+  });
+  const out = r.outputs[0].output;
+  assert.equal(peak, 1, 'w1 and w2 own the same file and never overlap');
+  assert.match(out, /- bad "Bad" \(explore\): failed/);
+  assert.match(out, /- after "After" \(explore, after bad\): skipped/);
+  assert.match(out, /Not run: task "bad" did not complete/);
+  assert.match(out, /- w1 "W1" \(general\): completed/);
+  assert.ok(!('after' in r.seen.childMessages), 'the dependant never ran');
+});
+
+test('delegate_tasks with an invalid plan or a disallowed model is a tool error and starts nothing', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    parentScript: [
+      use(
+        call('delegate_tasks', { tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore', dependsOn: ['b'] }, { id: 'b', title: 'B', prompt: 'b', type: 'explore', dependsOn: ['a'] }] }),
+        call('delegate_tasks', { tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }, { id: 'b', title: 'B', prompt: 'b', type: 'explore', model: 'x/y' }] }),
+      ),
+      say('ok'),
+    ],
+  });
+  assert.equal(r.outputs[0].isError, true);
+  assert.match(r.outputs[0].output, /cycle/);
+  assert.equal(r.outputs[1].isError, true);
+  assert.match(r.outputs[1].output, /not allowed/);
+  assert.equal(r.runs.length, 0);
 });
