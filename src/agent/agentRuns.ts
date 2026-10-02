@@ -45,6 +45,9 @@ const change = (next: AgentRun[], now = false) => {
   schedule(now);
 };
 
+/** Resolves once the persisted runs are loaded (active ones marked interrupted). */
+export const loadAgentRuns = () => load();
+
 export type NewRun = Pick<AgentRun, "title" | "type" | "providerId" | "model" | "projectRoot"> & { chatId?: number };
 
 /** Registers a queued run; `stop` is called by `stopRun` and must make the run end soon. */
