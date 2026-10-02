@@ -11,6 +11,7 @@ import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { BudgetsSection } from "./Budgets";
+import { CommandRules } from "./CommandRules";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
@@ -423,21 +424,11 @@ function Mcp() {
 
 function GitPage() {
   const t = useT();
-  const app = useApp();
-  const [text, setText] = useState(app.allowlist.join("\n"));
   return (
     <>
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
-      <h4>{t("allowlist")}</h4>
-      <p className="h4-sub">{t("allowlistDesc")}</p>
-      <textarea
-        className="input"
-        style={{ height: 160, padding: 10, fontFamily: "var(--mono)", fontSize: 12.5 }}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => app.setAllowlist(text.split("\n").map((s) => s.trim()).filter(Boolean))}
-      />
+      <CommandRules />
     </>
   );
 }

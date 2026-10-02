@@ -1,0 +1,48 @@
+/* Command rules editor and agent action log (Settings, Git & commands). */
+.rules-form { flex-wrap: wrap; gap: 8px; }
+.rules-form .input { width: auto; height: 30px; flex: none; }
+.rules-form .rules-pattern { flex: 1 1 200px; min-width: 160px; font-family: var(--mono); font-size: 12.5px; }
+.rules-form select.input { padding: 0 6px; }
+.rules-error { color: var(--red); font-size: 12.5px; padding: 0 14px 10px; }
+
+.rule-badge { flex: none; min-width: 66px; text-align: center; font-size: 11px; font-weight: 600; border-radius: 5px; padding: 1px 7px; line-height: 17px; border: 1px solid transparent; }
+.rule-badge.allow { color: var(--green); background: #4ec27a14; border-color: #4ec27a44; }
+.rule-badge.ask { color: var(--warn); background: #e9a23b14; border-color: #e9a23b44; }
+.rule-badge.deny { color: var(--red); background: #ef6b6b14; border-color: #ef6b6b44; }
+.rule-pattern { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; user-select: text; }
+.rule-meta { color: var(--text-2); font-size: 12px; }
+.card-row.rule-row { min-height: 42px; padding-top: 8px; padding-bottom: 8px; }
+.card-row .rule-pattern { flex: 1; min-width: 0; }
+.rule-builtin-example { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+
+.rules-try .input { height: 32px; }
+.try-verdict { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.try-verdict.run { color: var(--green); }
+.try-verdict.ask { color: var(--warn); }
+.try-verdict.block { color: var(--red); }
+.try-segments { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.try-segments li { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.try-segments code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; user-select: text; }
+
+.log-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.log-bar .seg { margin: 0; }
+.log-bar .grow { flex: 1; }
+.log-day { padding: 6px 14px; font-size: 11.5px; color: var(--text-3); background: #1c1c1c; border-top: 1px solid var(--border); }
+.log-day:first-child { border-top: 0; }
+.card-row.log-row { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
+.log-time { flex: none; width: 58px; color: var(--text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.log-icon { flex: none; margin-top: 3px; color: var(--text-2); }
+.log-main { flex: 1; min-width: 0; }
+.log-head { display: flex; align-items: baseline; gap: 8px; }
+.log-tool { flex: none; font-weight: 500; }
+.log-summary { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.log-sub { color: var(--text-3); font-size: 11.5px; margin-top: 2px; overflow-wrap: anywhere; user-select: text; }
+.log-sub.problem { color: #f3a3a3; }
+.log-status { flex: none; font-size: 11px; color: var(--text-2); }
+.log-status.success { color: var(--green); }
+.log-status.error, .log-status.blocked { color: var(--red); }
+.log-status.declined, .log-status.cancelled, .log-status.interrupted { color: var(--warn); }
+.log-note { color: var(--warn); font-size: 11.5px; margin-top: 3px; }
+.log-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.log-actions .btn-soft { height: 24px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.log-actions .done { color: var(--text-3); font-size: 11.5px; }

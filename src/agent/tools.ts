@@ -39,7 +39,7 @@ export const WRITE_TOOLS: ToolDef[] = [
   },
   {
     name: "run_command",
-    description: "Run a shell command (zsh) in the project root. Returns combined stdout/stderr and exit code.",
+    description: "Run a shell command (zsh) in the project root. Returns combined stdout/stderr and exit code. The user's command rules may block a command or ask them first; a blocked command must not be retried or reworded.",
     parameters: obj({ command: str("Command line"), timeout_ms: int("Timeout, default 120000") }, ["command"]),
   },
 ];

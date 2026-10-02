@@ -16,7 +16,7 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | Path | Role |
 | --- | --- |
 | `App.tsx`, `state.tsx` | Root component and global app state |
-| `components/` | UI: `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding` |
+| `components/` | UI: `CommandRules`/`ActionLog` (settings), `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding` |
 | `lib/api.ts` | Typed wrappers over Tauri `invoke` |
 | `lib/exportChats.ts` | Pure chat export/import: whitelisted, secret-scrubbed JSON bundle (`mcode-chats` v1), Markdown renderer, JSON parser/sanitizer and `importBundle` over an injected `ChatStore`; UI glue (save dialog, file input, SQLite store) is in `components/ImportPanel.tsx` |
 | `lib/data.ts` | Persistence helpers over SQLite (projects, chats, messages, settings, composer drafts via `loadDraft` and the shared `draftSaver`) |
@@ -25,7 +25,8 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | `lib/context.ts` | Token estimate, context compression |
 | `lib/checkpoints.ts` | Shadow checkpoints / rollback |
 | `providers/` | One module per backend: `anthropic`, `openaiCompatible`, `openaiResponses`, CLI bridges (`cli`, `claudeCli`, `cursor`), plus `usage`, `limits`, `activities`, `computerBridge` |
-| `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools |
+| `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools; `rules.ts` is the pure command parser, allow/ask/deny rules and built-in protections (`rulesStore.ts` persists them under `commandRules`); `actionLog.ts` (pure) and `actionLogStore.ts` keep the action log under `actionLog` |
+| `lib/fileUndo.ts` | Pure per-edit undo over injected git/file primitives; `checkpoints.ts` binds it to the shadow repo |
 | `canvas/` | Sandboxed TSX preview runtime (generated bundle in `canvas/generated`, git-ignored) |
 | `i18n/` | Translations, validated by `scripts/check-i18n.mjs` |
 

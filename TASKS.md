@@ -28,7 +28,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Chat branching**: fork a conversation from any message.
 - [ ] **Model comparison**: send one prompt to several models side by side.
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
-- [ ] **Command allow/deny rules** and a unified agent action log with undo.
+- [x] **Command allow/deny rules** (allow/ask/deny prefix and glob rules, global or per project, parsed-command evaluation, built-in deny defaults, rules editor) and a **unified agent action log** with undo of file edits (`rules.ts`, `actionLog.ts`, `fileUndo.ts`). Command execution itself cannot be undone; the UI was not smoke-tested in `tauri dev`.
 - [ ] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
 - [ ] **Per-project system prompt / instructions file** (`AGENTS.md` / `CLAUDE.md` auto-load).
 - [ ] **Message actions**: edit and resend, regenerate, copy, delete.
