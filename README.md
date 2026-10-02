@@ -97,6 +97,12 @@ Press Cmd+K (or use the search-lines button in the sidebar header) to search the
 - Only message text is indexed: image data, tool calls and results, `@file` contents attached to a prompt and context summaries are not. Text beyond 100,000 characters in one message is not searchable.
 - The index is a SQLite FTS5 table (`messages_fts`) kept in sync by database triggers, and is built from existing messages the first time the app starts after this feature (a few seconds for tens of thousands of messages). Nothing is sent anywhere; FTS5 is included in the bundled SQLite, no extra setup. Details are in [Architecture](docs/ARCHITECTURE.md#full-text-search-dbrs).
 
+### Theme and keyboard shortcuts
+
+Settings > General has an Appearance section: Light, Dark or System (follows the OS live) and an accent color (presets or any hex). Colors are CSS variables in `src/styles/theme.css`; `src/lib/theme.ts` sets `data-theme` and the accent variables on the root, and the choice is stored in the app settings (`theme`, `accent`). Pure logic (mode resolution, hex validation, contrast checks) is in `src/lib/themeUtil.ts`. Canvas artifacts are always rendered as a light document.
+
+All shortcuts are defined in `src/lib/shortcuts.ts` and listed read-only under Settings > General: Cmd+, settings, Cmd+N new chat, Cmd+K search, Esc closes settings, Cmd+Shift+Esc stops the agent (global). App-level shortcuts always need Cmd so they never take text-editing keys from the composer. `npm test` covers both modules in `tests/theme.test.mjs`.
+
 ## Actions, context, and file review
 
 Native Codex/Claude/Cursor CLI actions are stored separately from executable API tool calls. Cards show readable names, output and error status; a missing native result is shown as unknown instead of successful. Nonzero API shell exits are tool errors. Existing imported text-only history cannot reconstruct missing tool outputs.

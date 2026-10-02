@@ -10,6 +10,7 @@ import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
+import { matches, shortcut } from "./lib/shortcuts";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -18,19 +19,20 @@ function Shell({ app }: { app: AppState }) {
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key === ",") (e.preventDefault(), app.openSettings());
-      if (e.metaKey && e.key.toLowerCase() === "n" && !e.shiftKey) (e.preventDefault(), app.newChat());
+      if (matches(e, "settings")) (e.preventDefault(), app.openSettings());
+      if (matches(e, "newChat")) (e.preventDefault(), app.newChat());
       if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching(open => !open));
-      if (e.key === "Escape" && app.view === "settings") app.setView("chat");
+      if (matches(e, "closeSettings") && app.view === "settings") app.setView("chat");
     };
     addEventListener("keydown", k);
     return () => removeEventListener("keydown", k);
   }, [app.view, app.ready, app.onboarded]);
 
   useEffect(() => {
+    const accelerator = shortcut("stopAgent").accelerator!;
     let disposed = false;
-    register("CommandOrControl+Shift+Escape", () => dispatchEvent(new Event("mcode-stop"))).then(() => { if (disposed) unregister("CommandOrControl+Shift+Escape"); }).catch(() => {});
-    return () => { disposed = true; unregister("CommandOrControl+Shift+Escape").catch(() => {}); };
+    register(accelerator, () => dispatchEvent(new Event("mcode-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
+    return () => { disposed = true; unregister(accelerator).catch(() => {}); };
   }, []);
   if (!app.ready) return null;
   if (!app.onboarded) return <Onboarding />;

@@ -10,11 +10,13 @@ import { deleteProvider, PRESETS, saveProvider } from "../providers";
 import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { BudgetsSection } from "./Budgets";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
+import { ShortcutsSettings } from "./ShortcutsSettings";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
   {
@@ -60,15 +62,8 @@ function General() {
           <button className="btn-soft" onClick={() => app.setOnboarded(false)}>{t("runAgain")}</button>
         </div>
       </div>
-      <h4>{t("shortcuts")}</h4>
-      <div className="card">
-        {[["⌘,", t("settings")], ["↵", t("send")], ["⇧↵", t("newLine")], ["⌘1–9", t("pickModel")], ["⌘⇧Esc", t("stopAgent")]].map(([k, l]) => (
-          <div key={k} className="card-row" style={{ minHeight: 40 }}>
-            <div className="grow">{l}</div>
-            <span className="kbd-chip">{k}</span>
-          </div>
-        ))}
-      </div>
+      <AppearanceSettings />
+      <ShortcutsSettings />
     </>
   );
 }
