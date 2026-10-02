@@ -12,7 +12,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Split `ChatView.tsx`** into composer (`components/chat/Composer`, `ContextChip`), turn list (`TurnView`), live status (`LiveStatus`, `ApprovalCard`) and the run hook `lib/useChatRun.ts`.
 - [ ] **UI tests** for Sidebar, Settings and ChatView (Vitest + Testing Library or Playwright against `npm run dev`).
 - [ ] **Build pipeline**: run `npm --prefix sidecar ci` in `beforeBuildCommand`; Developer ID signing and notarization instead of ad-hoc `-`.
-- [ ] **First commit and branch protection**; PR template.
+- [x] **First commit** (done); branch protection and PR template still open.
 - [ ] **README cleanup**: move the changelog-like sections into `docs/`, keep README to setup, structure and providers.
 
 ## P1
@@ -29,11 +29,19 @@ Items were drafted from the README and code layout; verify against the code befo
   5. Tests for arg building and prompt text (`cliArgs.test.mjs`); update the README sentence about unsupported CLI attachments.
   Done in `attachments.rs`, `cli.ts`, `cliArgs.ts`, `claudeCli.ts`. Codex uses `--image=<file>` (the `-i` option is variadic); Claude gets `--add-dir=<dir>` plus the prompt line, Cursor Agent `--add-dir <dir>` plus the prompt line. Not verified against real CLIs end to end: `codex exec --help` (bundled ChatGPT app binary) and `claude --help` / `cursor-agent --help` confirm the flags exist; actual image reading is untested. `images: true` is set for every CLI model (model vision is not detectable). Native Claude `stream-json` image blocks are still a later option.
 
+## P1.6 — Computer Use reliability and speed
+- [~] **Verified Computer Use loop**: screenshot → inspect → small batch → verification screenshot → confirmed result.
+  1. CLI providers get screenshots as real images through the attachment pipeline (codex `--image`, claude/cursor path + `--add-dir`) instead of a bare "inspect this file" line; API providers keep inline images.
+  2. Tool results carry facts, not "OK": frontmost app and window title, whether the screen changed, cursor position, failed step index.
+  3. Automatic verification screenshot after every action batch (settle by waiting for the screen to stabilise, bounded), so no extra turn is needed.
+  4. Fast primitives: `open_app` (by name, via `open -a`) and adaptive waits; prompt rules: batch actions, no filler messages, claim success only when the screenshot shows it, say when unsure.
+  5. Approvals: in Full access ask only for likely-irreversible steps (Enter/Return right after typing in a messaging app, delete/quit shortcuts), with "allow for this task"; keep the existing confirmation flow otherwise.
+
 ## P2
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
-- [ ] **`@file` / `@folder` mentions** in the composer with autocomplete.
+- [x] **`@file` mentions** in the composer with autocomplete (already existed; `@folder` not supported).
 - [x] **Chat branching**: "Branch from here" on any message copies the history up to it into a new chat (`branchChat` in `lib/data.ts`).
 - [x] **Model comparison**: send one prompt to 2-4 models side by side (`lib/compare.ts`, `Compare.tsx`): parallel read-only runs, per-column stop/run again, live and reported tokens, classified errors, "Continue in chat". Nothing is persisted except a continued chat; not smoke-tested in `tauri dev`. Not done: budget gauge does not count un-continued comparison tokens (it reads stored messages); system prompt and reasoning level are fixed.
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
