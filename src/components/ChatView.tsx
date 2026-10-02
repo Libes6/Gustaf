@@ -11,6 +11,7 @@ import { checkpoint, restoreAll } from "../lib/checkpoints";
 import { db } from "../lib/api";
 import { addMessage, createChat, deleteMessagesFrom, loadMessages, type StoredMsg } from "../lib/data";
 import { getAdapter } from "../providers";
+import { retryNoticeVars } from "../providers/retry";
 import { textOf, type Msg, type ProviderConfig, type Part, type TokenUsage } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { useComposerDraft } from "../lib/useComposerDraft";
@@ -180,6 +181,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const activityRef = useRef<Extract<Part, { type: "activity" }>[]>([]);
   const reviewRef = useRef<Review | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const [retryNotice, setRetryNotice] = useState("");
   const contextRef = useRef<HTMLDivElement>(null);
   const live = useRef<LiveStats>({ start: 0, chars: 0, input: 0 });
   useEffect(() => {
@@ -332,7 +334,8 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         allowlist: app.allowlist,
         signal: ctl.signal,
         onLimits: windows => app.recordLimits(activeProvider.id, windows),
-        onText: (d) => { live.current.chars += d.length; setStream((s) => (s ?? "") + d); },
+        onRetry: info => setRetryNotice(t("retryingIn", retryNoticeVars(info))),
+        onText: (d) => { live.current.chars += d.length; setRetryNotice(""); setStream((s) => (s ?? "") + d); },
         onToolResult: result => setToolResults(rs => [...rs.filter(r => r.id !== result.id), result]),
         onActivity: a => {
           activityRef.current = [...activityRef.current.filter(p => p.id !== a.id), a];
@@ -377,6 +380,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       if (reviewRef.current && !retryRef.current) { await review.finish(reviewRef.current.id).catch(e => setError(String(e))); reviewRef.current = null; }
       abortRef.current = null;
       setRunning(false);
+      setRetryNotice("");
       app.setSessionBusy(session.key, false);
       setStream(null);
       setActivities([]);
@@ -512,7 +516,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
                   <Markdown text={stream} />
                 </div>
               ) : (
-                !approval && <div className="thinking"><span>{t("thinking")}</span> <LiveMeter stats={live.current} /></div>
+                !approval && <div className="thinking"><span>{retryNotice || t("thinking")}</span> <LiveMeter stats={live.current} /></div>
               ))}
             {stream && !approval && <div className="thinking"><LiveMeter stats={live.current} /></div>}
             {approval && visible && <ApprovalCard req={approval.req} onAnswer={approval.resolve} />}

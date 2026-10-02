@@ -32,7 +32,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
 - [ ] **Per-project system prompt / instructions file** (`AGENTS.md` / `CLAUDE.md` auto-load).
 - [ ] **Message actions**: edit and resend, regenerate, copy, delete.
-- [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a visible "Retrying in Ns…" notice needs a one-line `onRetry` hookup in `ChatView`).
+- [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a "Retrying in Ns…" notice is shown in the chat).
 - [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.
 
 ## P3
