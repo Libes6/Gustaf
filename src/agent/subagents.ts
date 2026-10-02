@@ -1,33 +1,56 @@
 import { review } from "../lib/api";
 import { prepareShadowCopy } from "../lib/reviewSetupStore";
-import { textOf, type Msg, type Part, type TokenUsage } from "../providers/types";
+import { textOf, type Adapter, type Msg, type Part, type TokenUsage, type ToolDef } from "../providers/types";
 import { summarizeCall } from "./actionLog";
-import { createRun, recordStep, updateRun, getRun } from "./agentRuns";
+import { createRun, recordAgentTokens, recordStep, updateRun, getRun } from "./agentRuns";
 import { clip, runTokens, MAX_SUMMARY, type RunStatus } from "./agentRunsModel";
+import { allowedRefs, refKey, sameRef, selectModel, type AgentSettings, type ModelRef } from "./agentSettings";
+import { loadAgentSettings } from "./agentSettingsStore";
 import { runAgent, type RunOptions } from "./agent";
+import { DELEGATE_TOOL_NAME, delegateToolFor, dependencyContext, mergeReports, parsePlanArgs, runPlan, type Outcome } from "./orchestrator";
 import { Scheduler, isAbortError } from "./scheduler";
 import {
-  allowedToolNames, breachMessage, budgetBreach, buildReport, findOverlaps, isReadOnlyType, overlapWarning, parseSpawnArgs, resolveBudget, subagentSystem,
-  type BudgetBreach, type BudgetOverrides, type FileSet,
+  SPAWN_TOOL_NAME, allowedToolNames, breachMessage, budgetBreach, buildReport, findOverlaps, isReadOnlyType, overlapWarning, parseSpawnArgs, resolveBudget, spawnToolFor, subagentSystem,
+  type BudgetBreach, type BudgetOverrides, type FileSet, type SpawnArgs,
 } from "./subagentCore";
 
-// Subagent runtime: `spawn_agent` runs a separate runAgent loop (own history, own tool allowlist and budget, same
-// provider/model as the parent) and hands the parent a bounded report. Pure parts are in subagentCore.ts and scheduler.ts.
+// Subagent runtime: `spawn_agent` runs a separate runAgent loop (own history, own tool allowlist and budget, model from
+// the agent settings or the parent's) and hands the parent a bounded report; `delegate_tasks` runs a plan of such tasks
+// with dependencies and write ownership (orchestrator.ts) and returns one merged summary. Pure parts are in
+// subagentCore.ts, agentSettings.ts, orchestrator.ts and scheduler.ts.
 
 export type SubagentHost = {
+  /** The agent tools offered to the main loop (spawn_agent, delegate_tasks), with the allowed models named. */
+  tools(parent: ModelRef): Promise<ToolDef[]>;
+  handles(name: string): boolean;
+  /** Runs an agent tool call. Rejects only for invalid arguments. */
+  call(name: string, args: unknown, parent: RunOptions): Promise<string>;
   /** Runs one subagent to completion (waiting for a free slot first) and returns its report. Rejects only for invalid arguments. */
   spawn(args: unknown, parent: RunOptions): Promise<string>;
+  /** Runs a delegate_tasks plan and returns the merged summary. Rejects only for an invalid plan. */
+  delegate(args: unknown, parent: RunOptions): Promise<string>;
 };
+
+/** What a subagent needs to run on another model than the parent's. `null` = not usable for subagents. */
+export type ResolvedModel = { adapter: Adapter; supportsTools?: boolean } | null;
 
 export type HostConfig = {
   /** The original project folder; writing subagents get their shadow copy of it. */
   projectRoot: string;
   recordTokens: (providerId: string, model: string, usage?: TokenUsage) => void;
   scheduler?: Scheduler;
+  /** Budget overrides; default: the per-type budgets from the agent settings. */
   budgets?: BudgetOverrides;
+  /** Agent settings; default: the stored ones (agentSettingsStore). */
+  settings?: AgentSettings;
+  /** Resolves a configured model to an adapter; without it subagents always use the parent's model. */
+  resolveModel?: (ref: ModelRef) => Promise<ResolvedModel>;
   prepare?: typeof prepareShadowCopy;
   now?: () => number;
 };
+
+type Result = { status: RunStatus; report: string };
+type Runner = { adapter: Adapter; providerId: string; model: string; supportsTools?: boolean; note?: string };
 
 /** One limit for the whole app: several chats share the slots. */
 export const globalScheduler = new Scheduler();
@@ -43,17 +66,63 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
   const now = cfg.now ?? Date.now;
   const prepare = cfg.prepare ?? prepareShadowCopy;
 
+  const settingsNow = async () => cfg.settings ?? (await loadAgentSettings());
+  const parentRef = (p: Pick<RunOptions, "providerId" | "model">): ModelRef => ({ providerId: p.providerId, model: p.model });
+
+  /** The chosen model as something runnable; an unusable model falls back to the parent's with a note. */
+  async function runnerFor(ref: ModelRef, parent: RunOptions): Promise<Runner> {
+    const own: Runner = { adapter: parent.adapter, providerId: parent.providerId, model: parent.model, supportsTools: parent.supportsTools };
+    if (sameRef(ref, parentRef(parent))) return own;
+    const r = cfg.resolveModel ? await cfg.resolveModel(ref).catch(() => null) : null;
+    if (!r || r.supportsTools === false) return { ...own, note: `Model ${refKey(ref)} is not available for subagents (missing, disabled, a CLI provider or without tool support); used ${refKey(parentRef(parent))}.` };
+    return { adapter: r.adapter, providerId: ref.providerId, model: ref.model, supportsTools: r.supportsTools };
+  }
+
+  /** Picks the model (explicit request from the allow-list, type default, parent). Throws for a model that is not allowed. */
+  function chooseModel(args: SpawnArgs, settings: AgentSettings, parent: RunOptions): ModelRef {
+    const choice = selectModel(args.type, settings, parentRef(parent), args.model);
+    if (!choice.ok) throw new Error(choice.error);
+    return choice.ref;
+  }
+
   async function spawn(rawArgs: unknown, parent: RunOptions): Promise<string> {
     const parsed = parseSpawnArgs(rawArgs);
     if (!parsed.ok) throw new Error(parsed.error);
-    const { title, prompt, type, files } = parsed.value;
+    const settings = await settingsNow();
+    const ref = chooseModel(parsed.value, settings, parent);
+    return (await runTask(parsed.value, ref, settings, parent)).report;
+  }
+
+  async function delegate(rawArgs: unknown, parent: RunOptions): Promise<string> {
+    const settings = await settingsNow();
+    const parsed = parsePlanArgs(rawArgs, { cancelDependents: settings.cancelDependents });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const plan = parsed.value;
+    // Every model is checked before anything starts: a plan either runs as a whole or not at all.
+    const refs = new Map(plan.tasks.map((t) => [t.id, chooseModel(t, settings, parent)]));
+    const outcomes = await runPlan(plan, {
+      limit: scheduler.concurrency,
+      signal: parent.signal,
+      run: async (task, deps) => {
+        const r = await runTask({ ...task, prompt: task.prompt + dependencyContext(deps) }, refs.get(task.id)!, settings, parent);
+        return { status: r.status === "interrupted" || r.status === "queued" || r.status === "running" ? "failed" : r.status, report: r.report } satisfies Outcome;
+      },
+    });
+    return mergeReports(plan, outcomes);
+  }
+
+  async function runTask(args: SpawnArgs, ref: ModelRef, settings: AgentSettings, parent: RunOptions): Promise<Result> {
+    const { title, prompt, type, files } = args;
     const writing = !isReadOnlyType(type);
-    const budget = resolveBudget(type, cfg.budgets);
+    const budget = resolveBudget(type, cfg.budgets ?? settings.budgets);
+    const runner = await runnerFor(ref, parent);
+    const sameProvider = runner.providerId === parent.providerId;
     const ctl = new AbortController();
     const onParentAbort = () => ctl.abort();
     parent.signal.addEventListener("abort", onParentAbort, { once: true });
     if (parent.signal.aborted) ctl.abort();
-    const id = createRun({ title, type, providerId: parent.providerId, model: parent.model, projectRoot: cfg.projectRoot }, () => ctl.abort());
+    const id = createRun({ title, type, providerId: runner.providerId, model: runner.model, projectRoot: cfg.projectRoot, ...(parent.chatId !== undefined ? { chatId: parent.chatId } : {}) }, () => ctl.abort());
+    if (runner.note) recordStep(id, { at: now(), kind: "note", text: runner.note });
     const finish = (status: RunStatus, patch: Parameters<typeof updateRun>[1] = {}) => updateRun(id, { status, endedAt: now(), currentStep: "", ...patch });
 
     try {
@@ -62,16 +131,16 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       // Cancelled while queued (the scheduler rejects with an AbortError) or an unexpected failure outside the run.
       if (isAbortError(e)) {
         finish("cancelled");
-        return buildReport({ title, type, status: "cancelled", text: "Cancelled before it started." });
+        return { status: "cancelled", report: buildReport({ title, type, status: "cancelled", text: "Cancelled before it started." }) };
       }
       const message = String((e as Error)?.message ?? e);
       finish("failed", { error: clip(message, 1000) });
-      return buildReport({ title, type, status: "failed", text: "", reason: message });
+      return { status: "failed", report: buildReport({ title, type, status: "failed", text: "", reason: message }) };
     } finally {
       parent.signal.removeEventListener("abort", onParentAbort);
     }
 
-    async function execute(): Promise<string> {
+    async function execute(): Promise<Result> {
       const startedAt = now();
       updateRun(id, { status: "running", startedAt });
       let workspace = parent.root;
@@ -96,7 +165,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       } catch (e) {
         const message = String((e as Error)?.message ?? e);
         finish("failed", { error: clip(message, 1000) });
-        return buildReport({ title, type, status: "failed", text: "", reason: `could not prepare a private copy: ${message}` });
+        return { status: "failed", report: buildReport({ title, type, status: "failed", text: "", reason: `could not prepare a private copy: ${message}` }) };
       }
 
       const use = { steps: 0, toolCalls: 0, tokens: 0, startedAt };
@@ -117,12 +186,13 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           root: workspace,
           reviewMode,
           reviewLinked: linked,
-          supportsTools: parent.supportsTools,
+          supportsTools: runner.supportsTools,
           history: [{ role: "user", parts: [{ type: "text", text: prompt }] }],
-          adapter: parent.adapter,
-          providerId: parent.providerId,
-          model: parent.model,
-          reasoning: parent.reasoning,
+          adapter: runner.adapter,
+          providerId: runner.providerId,
+          model: runner.model,
+          // Reasoning level and quota windows belong to the parent's provider.
+          reasoning: sameProvider ? parent.reasoning : undefined,
           access: writing ? parent.access : "readonly",
           computerUse: false,
           allowlist: parent.allowlist,
@@ -130,16 +200,25 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           maxSteps: budget.maxSteps,
           toolNames: allowedToolNames(type),
           systemExtra: subagentSystem(type, files),
-          onLimits: parent.onLimits,
+          onLimits: sameProvider ? parent.onLimits : undefined,
           onText: () => {},
-          approve: (req) => parent.approve({ ...req, agent: title }),
+          approve: async (req) => {
+            // Shown in the panel while it waits (the chat's approval card and sidebar badge come from the parent's approve).
+            recordStep(id, null, {}, "Waiting for approval");
+            try {
+              return await parent.approve({ ...req, agent: title });
+            } finally {
+              recordStep(id, null, {}, "");
+            }
+          },
           onMessage: async (m) => {
             lastRole = m.role;
             if (m.role === "assistant") {
               const usage = m.meta?.usage;
               use.steps++;
               use.tokens += runTokens(usage);
-              cfg.recordTokens(parent.providerId, parent.model, usage);
+              recordAgentTokens(parent.chatId, runTokens(usage));
+              cfg.recordTokens(runner.providerId, runner.model, usage);
               const calls = m.parts.filter((p): p is ToolCall => p.type === "tool_call");
               use.toolCalls += calls.length;
               const said = textOf(m).trim();
@@ -192,13 +271,25 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
 
       const status: RunStatus = stopReason ? "limit" : failure ? "failed" : ctl.signal.aborted ? "cancelled" : "completed";
       const reason = stopReason ? breachMessage(stopReason, budget) : failure;
+      if (runner.note) warnings.push(runner.note);
+      if (stopReason) recordStep(id, { at: now(), kind: "note", text: `Stopped at its ${reason}.`, error: true });
       const report = buildReport({ title, type, status, text: lastText, reason, changed, warnings });
       finish(status, { summary: clip(lastText, MAX_SUMMARY), ...(failure ? { error: clip(failure, 1000) } : stopReason ? { error: `Stopped at its ${reason}` } : {}), ...(changed.length ? { changed } : {}), ...(warnings.length ? { warnings } : {}) });
-      return report;
+      return { status, report };
     }
   }
 
-  return { spawn };
+  const NAMES = new Set([SPAWN_TOOL_NAME, DELEGATE_TOOL_NAME]);
+  return {
+    async tools(parent) {
+      const allowed = allowedRefs(await settingsNow(), parent).map(refKey);
+      return [spawnToolFor(allowed), delegateToolFor(allowed)];
+    },
+    handles: (name) => NAMES.has(name),
+    call: (name, args, parent) => (name === DELEGATE_TOOL_NAME ? delegate(args, parent) : spawn(args, parent)),
+    spawn,
+    delegate,
+  };
 }
 
 const ownerLabel = (reviewId: string) => {

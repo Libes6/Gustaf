@@ -2,7 +2,7 @@ import { computer, fsx, type CuAction } from "../lib/api";
 import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
-import { SPAWN_TOOL, SPAWN_TOOL_NAME, serializeCalls } from "./subagentCore";
+import { serializeCalls } from "./subagentCore";
 import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
@@ -165,7 +165,7 @@ async function runLoop(o: RunOptions) {
   let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly";
-  if (canSpawn) tools = [...tools, SPAWN_TOOL];
+  if (canSpawn) tools = [...tools, ...(await o.subagents!.tools({ providerId: o.providerId, model: o.model }))];
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
   let computerSteps = 0;
@@ -201,11 +201,11 @@ async function runLoop(o: RunOptions) {
 
     const results: Part[] = [];
     let halted = false;
-    // spawn_agent calls of one turn start together (the scheduler limits how many run at once); results are collected in order.
+    // spawn_agent / delegate_tasks calls of one turn start together (the scheduler limits how many run at once); results are collected in order.
     const spawned = new Map<string, Promise<{ v: string } | { e: unknown }>>();
     if (canSpawn && !o.signal.aborted)
       for (const c of calls)
-        if (c.name === SPAWN_TOOL_NAME && !c.computer) spawned.set(c.id, o.subagents!.spawn(c.args, o).then((v) => ({ v }), (e) => ({ e })));
+        if (o.subagents!.handles(c.name) && !c.computer) spawned.set(c.id, o.subagents!.call(c.name, c.args, o).then((v) => ({ v }), (e) => ({ e })));
     const lastComputer = calls.filter((c) => c.computer).pop();
     for (const call of calls) {
       const res = { type: "tool_result" as const, id: call.id, name: call.name, output: "", computer: !!call.computer };
