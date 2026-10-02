@@ -26,6 +26,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             db::db_select,
             db::db_execute,
+            db::search_messages,
+            db::search_models,
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,
