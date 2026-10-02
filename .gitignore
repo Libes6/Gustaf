@@ -29,3 +29,4 @@ src/canvas/generated/
 # Local tooling artifacts
 .playwright-mcp/
 *.playwright-mcp.log
+.claude/worktrees/
