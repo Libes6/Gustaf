@@ -46,7 +46,7 @@ export function actionKind(tool: string): ActionKind {
   return tool === "computer" ? "computer" : "other";
 }
 
-type Computer = { actions: { type: string; x?: number; y?: number; text?: string; keys?: string[] }[] };
+type Computer = { actions: { type: string; x?: number; y?: number; text?: string; keys?: string[]; name?: string }[] };
 
 /** One readable, secret-free line describing a tool call. */
 export function summarizeCall(name: string, args: unknown, computer?: Computer): string {
@@ -54,7 +54,7 @@ export function summarizeCall(name: string, args: unknown, computer?: Computer):
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   let text: string;
   if (computer) {
-    text = computer.actions.map((x) => (typeof x.x === "number" && typeof x.y === "number" ? `${x.type} ${x.x},${x.y}` : x.type === "type" ? `type "${str(x.text).slice(0, 30)}"` : x.type === "keypress" ? (x.keys ?? []).join("+") : x.type)).join(" · ");
+    text = computer.actions.map((x) => (typeof x.x === "number" && typeof x.y === "number" ? `${x.type} ${x.x},${x.y}` : x.type === "type" ? `type "${str(x.text).slice(0, 30)}"` : x.type === "keypress" ? (x.keys ?? []).join("+") : x.type === "open_app" ? `open_app "${str(x.name).slice(0, 40)}"` : x.type)).join(" · ");
   } else if (name === "run_command") text = str(a.command);
   else if (name === "search") text = [str(a.pattern), str(a.glob)].filter(Boolean).join(" · ");
   else if (name === "list_dir") text = str(a.path) || ".";
