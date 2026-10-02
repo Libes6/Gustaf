@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { WindowHeader } from "./components/WindowHeader";
 import { ChatView } from "./components/ChatView";
 import { BudgetBanner } from "./components/Budgets";
+import { Compare } from "./components/Compare";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Onboarding } from "./components/Onboarding";
 import { SearchPalette } from "./components/SearchPalette";
@@ -16,6 +17,7 @@ import { AppProvider, type AppState } from "./state";
 function Shell({ app }: { app: AppState }) {
   const [creating, setCreating] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -40,7 +42,7 @@ function Shell({ app }: { app: AppState }) {
     <div className={`app${app.sideHidden && app.view === "chat" ? " side-hidden" : ""}`}>
       <WindowHeader />
       <BudgetBanner />
-      <Rail onCreateProject={() => setCreating(true)} />
+      <Rail onCreateProject={() => setCreating(true)} onCompare={() => setComparing(true)} />
       {app.view === "settings" ? (
         <Settings />
       ) : (
@@ -52,6 +54,7 @@ function Shell({ app }: { app: AppState }) {
       {app.sessions.items.map(session => <div key={session.key} className="chat-session" style={{ display: app.view === "chat" && app.sessions.active === session.key ? "flex" : "none" }}>
         <ChatView session={session} visible={app.view === "chat" && app.sessions.active === session.key} />
       </div>)}
+      {comparing && <Compare onClose={() => setComparing(false)} />}
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {creating && (
         <CreateProjectDialog

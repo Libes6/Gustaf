@@ -1,7 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  LayoutList, LogOut, MoreHorizontal, Pencil, Pin, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
+  Columns2, LayoutList, LogOut, MoreHorizontal, Pencil, Pin, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../i18n";
@@ -28,7 +28,7 @@ function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | nul
   );
 }
 
-export function Rail({ onCreateProject }: { onCreateProject: () => void }) {
+export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => void; onCompare: () => void }) {
   const t = useT();
   const app = useApp();
   const menu = useMenu();
@@ -52,6 +52,7 @@ export function Rail({ onCreateProject }: { onCreateProject: () => void }) {
         title={t("more")}
         onClick={(e) =>
           more.open(e.currentTarget.getBoundingClientRect(), [
+            { label: t("compareTitle"), icon: <Columns2 size={15} />, onClick: onCompare },
             { label: t("import"), icon: <Import size={15} />, onClick: () => app.openSettings("import") },
             { label: t("archivedChats"), icon: <Archive size={15} />, onClick: () => app.openSettings("archive") },
           ])

@@ -35,7 +35,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [ ] **`@file` / `@folder` mentions** in the composer with autocomplete.
 - [x] **Chat branching**: "Branch from here" on any message copies the history up to it into a new chat (`branchChat` in `lib/data.ts`).
-- [ ] **Model comparison**: send one prompt to several models side by side.
+- [x] **Model comparison**: send one prompt to 2-4 models side by side (`lib/compare.ts`, `Compare.tsx`): parallel read-only runs, per-column stop/run again, live and reported tokens, classified errors, "Continue in chat". Nothing is persisted except a continued chat; not smoke-tested in `tauri dev`. Not done: budget gauge does not count un-continued comparison tokens (it reads stored messages); system prompt and reasoning level are fixed.
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
 - [x] **Command allow/deny rules** (allow/ask/deny prefix and glob rules, global or per project, parsed-command evaluation, built-in deny defaults, rules editor) and a **unified agent action log** with undo of file edits (`rules.ts`, `actionLog.ts`, `fileUndo.ts`). Command execution itself cannot be undone; the UI was not smoke-tested in `tauri dev`.
 - [x] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).

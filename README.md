@@ -97,6 +97,14 @@ Hover a message for its actions (all but copy are disabled while a reply is runn
 - **Delete**: removes the message together with its reply (click twice to confirm); project files are not touched.
 - **Branch from here**: creates a new chat, titled "<title> (branch)", with the history up to and including that message, and opens it. The original chat is unchanged.
 
+### Model comparison
+
+The rail menu (the "..." button), Compare models, opens a view that sends one prompt to 2 to 4 models at once. Pick models from the normal model list (any API provider or CLI provider such as Codex, Claude Code or Cursor Agent), write the prompt and press Run (Cmd+Enter). Every model answers in its own column, streamed as Markdown, with the elapsed time and a live token estimate that is replaced by the provider-reported counts when the answer finishes (the estimate stays if the provider reports none). Each column has its own Stop; a failed or stopped column can be run again, and errors use the same classification as the chat (rate limit, quota, authentication, network, server, with a note on whether running it again can help). Column order is the order you picked the models.
+
+- Comparison runs are read-only: no tools, no file changes, no computer use (CLI providers are started with read-only access). Requests and provider-reported tokens are added to the Usage statistics like any other request.
+- Nothing is saved. Answers exist only while the view is open; closing it cancels running requests and discards the text. "Continue in chat with this answer" on a finished column creates a normal chat (in the active project) containing your prompt and that answer, selects its model and opens it; this is the only thing stored.
+- Budgets read provider usage from stored chat messages, so tokens of comparison answers that are not continued in a chat show in Usage but not in the budget gauge.
+
 ### Search across chats
 
 Press Cmd+K (or use the search-lines button in the sidebar header) to search the text of every message in all chats, archived ones included. Results are ranked by relevance with the matches highlighted; filter by project and by model (the model filter keeps assistant replies written by that model, since your own messages carry no model). Up/Down move through results, Enter opens the chat and scrolls to the message (steps folded under "Done in ..." are expanded), Esc or Cmd+K closes.
