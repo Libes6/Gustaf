@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { openSession, promoteSession, isAuthError, type Sessions } from "./lib/chatSessions";
+import type { Jump } from "./lib/searchUtil";
 import type { Access } from "./agent/agent";
 import { detectLocale, type Locale } from "./i18n";
 import { getSetting, setSetting } from "./lib/api";
@@ -77,6 +78,10 @@ function useAppState() {
   const activeChat = activeSession.chatId;
   const draftProject = activeSession.projectId;
   const openChat = (id: number, projectId: number | null) => { setSessions(s => openSession(s, id, projectId, crypto.randomUUID())); setView("chat"); };
+  // Opening a search result: the chat view scrolls to `jump.messageId` once the chat is shown (lib/useMessageJump.ts).
+  const [jump, setJump] = useState<Jump | null>(null);
+  const openChatAt = (id: number, projectId: number | null, messageId: number) => { setJump({ chatId: id, messageId, seq: Date.now() }); openChat(id, projectId); };
+  const clearJump = useCallback(() => setJump(null), []);
   const newChat = (projectId: number | null = null) => { setSessions(s => openSession(s, null, projectId, crypto.randomUUID())); setView("chat"); };
   const setSessionBusy = (key: string, busy: boolean) => setSessions(s => ({ ...s, items: s.items.map(item => item.key === key ? { ...item, busy } : item) }));
   const promoteChat = (key: string, id: number) => setSessions(s => promoteSession(s, key, id));
@@ -137,7 +142,7 @@ function useAppState() {
     selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models, modelErrors, refreshModels,
-    activeChat, draftProject, sessions, setSessionBusy, openChat, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
+    activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
     view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
   };
 }

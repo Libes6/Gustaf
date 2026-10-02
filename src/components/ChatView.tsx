@@ -14,6 +14,8 @@ import { getAdapter } from "../providers";
 import { textOf, type Msg, type ProviderConfig, type Part, type TokenUsage } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { useComposerDraft } from "../lib/useComposerDraft";
+import { useMessageJump } from "../lib/useMessageJump";
+import { turnHasMessage } from "../lib/searchUtil";
 import { useApp } from "../state";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
@@ -43,7 +45,8 @@ function groupTurns(msgs: StoredMsg[]): Turn[] {
   return turns;
 }
 
-const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg) => void }) {
+// `focusId` is the message a search result points at: it is highlighted, and expanded if it sits in the collapsed steps.
+const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg) => void; focusId?: number | null }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const results = new Map([...turn.steps.flatMap((m) => m.parts).filter((p) => p.type === "tool_result"), ...(live ? liveResults : [])].map((p: any) => [p.id, p]));
@@ -53,7 +56,10 @@ const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind }: {
   const inner = finalIsText ? assistants.slice(0, -1) : assistants;
   const toolCount = inner.reduce((n, m) => n + m.parts.filter((p) => p.type === "tool_call").length, 0);
   const duration = last?.meta?.durationMs;
-  const expanded = open || (live && !finalIsText);
+  const focusInSteps = focusId != null && inner.some((m) => m.id === focusId);
+  useEffect(() => { if (focusInSteps) setOpen(true); }, [focusInSteps]);
+  const expanded = open || focusInSteps || (live && !finalIsText);
+  const hit = (m: StoredMsg) => (m.id === focusId ? " hit-flash" : "");
 
   const renderParts = (m: StoredMsg) =>
     m.parts.map((p, i) =>
@@ -71,7 +77,7 @@ const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind }: {
   return (
     <>
       {turn.user && userText(textOf(turn.user)) !== null && (
-        <div className="msg-block">
+        <div className={`msg-block${hit(turn.user)}`} data-msg-id={turn.user.id}>
           <div className="msg-user">
             <div className="bubble">
               {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
@@ -97,9 +103,9 @@ const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind }: {
           {duration != null ? t("doneIn", { s: Math.max(1, Math.round(duration / 1000)) }) : t("steps", { count: toolCount })}
         </button>
       )}
-      {expanded && <div className="msg-tools">{inner.map((m) => <div key={m.id}>{renderParts(m)}</div>)}</div>}
+      {expanded && <div className="msg-tools">{inner.map((m) => <div key={m.id} data-msg-id={m.id} className={m.id === focusId ? "hit-flash" : undefined}>{renderParts(m)}</div>)}</div>}
       {finalIsText && (
-        <div className="msg-block">
+        <div className={`msg-block${hit(last)}`} data-msg-id={last.id}>
           {renderParts(last)}
           <div className="msg-actions">
             <button className="icon-btn" title={t("copy")} onClick={() => navigator.clipboard.writeText(textOf(last))}>
@@ -185,6 +191,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
   }, [contextOpen]);
   const draft = useComposerDraft(session, text, images, (d) => { setText(d.text); setImages(d.images); });
+  const flashId = useMessageJump({ jump: app.jump, clearJump: app.clearJump, chatId: session.chatId, visible, loaded, messages, feedRef, onJump: () => setAtBottom(false) });
 
   const chat =app.chats.find((c) => c.id === session.chatId);
   const project = app.projects.find((p) => p.id === (chat?.project_id ?? session.projectId));
@@ -496,7 +503,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         <div className="feed" ref={feedRef} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
-              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? rewind : undefined} />
+              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} />
             ))}
             {activities.map(a => <ToolCard key={a.id} call={a} />)}
             {stream !== null &&

@@ -25,6 +25,29 @@ export const secrets = {
   delete: (id: string) => invoke<void>("secret_delete", { id }),
 };
 
+/** One match from the full-text index (src-tauri/src/db.rs). `snippet` marks matches with MARK_OPEN/MARK_CLOSE (see searchUtil.ts). */
+export type SearchHit = {
+  messageId: number;
+  chatId: number;
+  chatTitle: string;
+  projectId: number | null;
+  projectName: string | null;
+  archived: boolean;
+  role: string;
+  /** Model recorded with the message (assistant replies); null for user messages and imported history. */
+  model: string | null;
+  createdAt: number;
+  snippet: string;
+};
+
+export const chatSearch = {
+  /** Best matches first. The query is escaped on the Rust side, so any user input is safe. */
+  messages: (query: string, opts: { projectId?: number | null; model?: string | null; limit?: number } = {}) =>
+    invoke<SearchHit[]>("search_messages", { query, projectId: opts.projectId ?? null, model: opts.model ?? null, limit: opts.limit }),
+  /** Models that have indexed messages, for the filter. */
+  models: () => invoke<string[]>("search_models"),
+};
+
 export type CursorChat = {
   id: string;
   title: string;
