@@ -111,10 +111,19 @@ export const gitRepo = {
   commit: (root: string, message: string, paths: string[], newBranch?: string | null) => invoke<CommitResult>("git_commit", { root, message, paths, newBranch }),
 };
 
-export type Review = { id: string; root: string; workspace: string };
+export type Review = { id: string; root: string; workspace: string; /** Dependency directories symlinked into the shadow copy; never applied. */ linked?: string[] };
+export type HunkLine = { kind: " " | "-" | "+"; text: string };
+export type Hunk = { id: string; header: string; old_start: number; old_lines: number; new_start: number; new_lines: number; lines: HunkLine[] };
 export type ReviewChange = { path: string; binary: boolean };
 export const review = {
-  prepare: (root: string) => invoke<Review>("review_prepare", { root }),
+  prepare: (root: string, linkDirs?: string[]) => invoke<Review>("review_prepare", { root, linkDirs }),
+  /** Runs a command with the shadow copy as working directory (never the original project). Approval is the caller's job. */
+  run: (id: string, command: string, timeoutMs?: number) =>
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("review_run", { id, command, timeoutMs }),
+  /** Hunks of a text file present in both versions; empty for new, deleted and binary files. */
+  hunks: (id: string, path: string) => invoke<Hunk[]>("review_hunks", { id, path }),
+  /** Accepts (applies to the project, baseline-checked) or rejects (reverts in the copy) only the given hunks. */
+  decideHunks: (id: string, path: string, hunkIds: string[], accept: boolean) => invoke<void>("review_decide_hunks", { id, path, hunkIds, accept }),
   list: (root: string) => invoke<[Review, ReviewChange[]][]>("review_list", { root }),
   diff: (id: string, path: string) => invoke<string>("review_diff", { id, path }),
   decide: (id: string, path: string, accept: boolean) => invoke<void>("review_decide", { id, path, accept }),

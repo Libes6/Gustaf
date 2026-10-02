@@ -2,6 +2,7 @@ import { computer, fsx, type CuAction } from "../lib/api";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
+import { commandAllowed, commandNeedsApproval } from "../lib/commandRules";
 
 export type Access = "readonly" | "auto" | "full";
 export type ApprovalRequest =
@@ -11,6 +12,8 @@ export type ApprovalRequest =
 export type RunOptions = {
   root: string | null;
   reviewMode?: boolean;
+  /** Directories of the review workspace that are symlinks to the original project's dependencies. */
+  reviewLinked?: string[];
   supportsTools?: boolean;
   history: Msg[];
   adapter: Adapter;
@@ -39,8 +42,7 @@ const HALT = "Not executed: an earlier computer action in this turn failed.";
 export const isRisky = (a: CuAction) =>
   a.type === "type" || (a.type === "keypress" && a.keys.some((k) => /^(enter|return|cmd|command|meta|super)$/i.test(k)));
 
-export const commandAllowed = (cmd: string, allowlist: string[]) =>
-  allowlist.some((p) => cmd === p || cmd.startsWith(p + " "));
+export { commandAllowed };
 
 async function buildSystem(root: string | null, computerUse: boolean) {
   const lines = [
@@ -81,7 +83,7 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
     case "write_file":
       return fsx.write(root, a.path, a.content);
     case "run_command": {
-      const needs = o.access === "auto" && !commandAllowed(a.command, o.allowlist);
+      const needs = commandNeedsApproval(o.access, a.command, o.allowlist);
       if (needs && !(await o.approve({ kind: "command", command: a.command }))) throw new Error("User declined to run this command.");
       const r = await fsx.run(root, a.command, a.timeout_ms);
       if (r.timed_out || r.code !== 0) throw new Error(`${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${r.output}`);
@@ -96,6 +98,7 @@ export async function runAgent(o: RunOptions) {
   const history = [...o.history];
   let system = await buildSystem(o.root, o.computerUse);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
+  if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
   const tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();

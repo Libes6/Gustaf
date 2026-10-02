@@ -103,7 +103,18 @@ Native Codex/Claude/Cursor CLI actions are stored separately from executable API
 
 The composer shows an approximate text-token count. Known context windows and image/tool capabilities come from provider model metadata; unavailable values remain unknown. The last reported input usage is displayed separately and is not treated as the full context size. CLI attachments are marked unsupported because the current prompt bridge does not forward them. Compress chat summarizes long history in chunks using the selected model, retains original messages, and starts future requests from the summary without reusing an older provider session. Restore full context removes summaries and clears provider session pointers.
 
-Writable project requests run in an app-managed copy of source files; proposed files persist across restarts until accepted or rejected. Diff is available before copying each file into the original project. Applying checks that the original still matches its baseline; a conflict does not overwrite the user's edits. Existing shadow checkpoints provide rollback after acceptance. Empty completed reviews are cleaned up. Copies omit ignored files, symlinks, git history, build outputs and dependencies, so build/test commands may need separate setup. This is a file-review workflow, not an OS security sandbox: native tools, commands using absolute paths and Computer Use retain their own permission boundaries.
+Writable project requests run in an app-managed copy of source files; proposed files persist across restarts until accepted or rejected. Diff is available before copying each file into the original project. Applying checks that the original still matches its baseline; a conflict does not overwrite the user's edits. Existing shadow checkpoints provide rollback after acceptance. Empty completed reviews are cleaned up. Copies omit ignored files, symlinks, git history, build outputs and dependencies, so build/test commands may need separate setup (see below). This is a file-review workflow, not an OS security sandbox: native tools, commands using absolute paths and Computer Use retain their own permission boundaries.
+
+### Setup and tests in the shadow copy
+The changes panel has an opt-in, per-project "Shadow copy setup" section (stored in the app database, off by default):
+- **Linked directories** (for example `node_modules`) are symlinked into each new copy, so builds and tests find their dependencies. They are meant for reading: they are never listed as changes and never applied or restored by review, and the agent is told to treat them as read-only. A command that writes through the link (such as `npm install`) does write to your real directory, so use the setup command below instead if the copy needs its own install.
+- **Setup command** (for example `npm ci`) runs once in every new copy before the agent starts.
+- **Test command** (for example `npm test`) gets a "Run tests" button above each pending review; the exit code and the tail of the output are shown there before you accept. The result is marked as outdated once the copy changes again.
+
+Both commands run with the shadow copy as working directory (never the original project), with a 5-minute timeout, and follow the normal command approval rules: in "Ask for commands" mode a command outside the always-allowed list asks first. They are not an OS sandbox.
+
+### Partial accept
+In a pending file's diff each hunk can be accepted or rejected on its own, or tick several and use "Accept selected" / "Reject selected". Accepting writes only those hunks to the project, after the same baseline conflict check as a whole file; the remaining hunks stay pending. Rejecting reverts them in the copy only. New, deleted and binary files are decided as a whole.
 
 ### Committing accepted changes
 

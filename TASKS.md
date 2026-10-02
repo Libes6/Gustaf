@@ -18,11 +18,11 @@ Items were drafted from the README and code layout; verify against the code befo
 ## P1
 - [x] **Persist drafts and attachments** across restarts (SQLite `drafts` table, debounced writes, bounded payloads; see `lib/chatSessions.ts`, `lib/useComposerDraft.ts`).
 - [x] **Full-text search across chats** (SQLite FTS5 index `messages_fts` kept in sync by triggers and backfilled on start; `search_messages` in `db.rs`; Cmd+K `SearchPalette` with project/model filters, snippets, keyboard navigation and jump to the message).
-- [ ] **Run setup and tests in the shadow copy** (install deps or link `node_modules`; optional `npm test` before accepting changes).
+- [x] **Run setup and tests in the shadow copy** (opt-in per project: symlinked dependency dirs that review never applies, setup command, "Run tests" result shown in `ChangesPanel`; commands follow the approval rules). Not done: sandboxing writes through linked dirs, streaming command output.
 
 ## P2
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
-- [ ] **Partial accept**: apply changes per hunk in `ChangesPanel`.
+- [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [ ] **`@file` / `@folder` mentions** in the composer with autocomplete.
 - [ ] **Chat branching**: fork a conversation from any message.

@@ -18,6 +18,7 @@ import { useComposerDraft } from "../lib/useComposerDraft";
 import { useMessageJump } from "../lib/useMessageJump";
 import { turnHasMessage } from "../lib/searchUtil";
 import { useApp } from "../state";
+import { prepareShadowCopy } from "../lib/reviewSetupStore";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { Markdown } from "./Markdown";
@@ -311,7 +312,24 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       }
       history = effectiveHistory(history);
       retryRef.current = { chatId, history: [...history] };
-      if (root && app.access !== "readonly" && !reviewRef.current) reviewRef.current = await review.prepare(root);
+      const approve = (req: ApprovalRequest) => new Promise<boolean>(resolve => {
+        const finish = (ok: boolean, always?: boolean) => {
+          ctl.signal.removeEventListener("abort", deny);
+          setApproval(null);
+          if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
+          resolve(ok);
+        };
+        const deny = () => finish(false);
+        if (ctl.signal.aborted) return finish(false);
+        ctl.signal.addEventListener("abort", deny, { once: true });
+        setApproval({ req, resolve: finish });
+      });
+      if (root && app.access !== "readonly" && !reviewRef.current) {
+        const made = await prepareShadowCopy(root, { access: app.access, allowlist: app.allowlist, approve: command => approve({ kind: "command", command }), onSetup: running => setRetryNotice(running ? t("reviewSetupRunning") : "") });
+        reviewRef.current = made.review;
+        if (made.setup === "declined") setError(t("reviewSetupDeclined"));
+        else if (made.setup && !made.setup.ok) setError(t("reviewSetupFailed", { code: made.setup.timedOut ? t("reviewTimedOut") : String(made.setup.code ?? "?"), output: made.setup.output.slice(-600) }));
+      }
       const workspace = reviewRef.current?.workspace ?? root;
       if (reviewRef.current && !retry) history = history.map(m => ({ ...m, meta: m.meta ? { ...m.meta, responseId: undefined } : undefined }));
       setStream("");
@@ -323,6 +341,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       await runAgent({
         root: workspace,
         reviewMode: !!reviewRef.current,
+        reviewLinked: reviewRef.current?.linked,
         supportsTools: selectedModel?.tools,
         history,
         adapter,
@@ -353,18 +372,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           activityRef.current = [];
           setTick((x) => x + 1);
         },
-        approve: (req) => new Promise(resolve => {
-          const finish = (ok: boolean, always?: boolean) => {
-            ctl.signal.removeEventListener("abort", deny);
-            setApproval(null);
-            if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
-            resolve(ok);
-          };
-          const deny = () => finish(false);
-          if (ctl.signal.aborted) return finish(false);
-          ctl.signal.addEventListener("abort", deny, { once: true });
-          setApproval({ req, resolve: finish });
-        }),
+        approve,
       });
       if (!ctl.signal.aborted) app.recordProviderResult(activeProvider.id);
       retryRef.current = null;
