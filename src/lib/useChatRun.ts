@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { commandAllowed, runAgent, type ApprovalRequest } from "../agent/agent";
+import { createSubagentHost } from "../agent/subagents";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -193,6 +194,7 @@ export function useChatRun(o: Options) {
           bumpTick();
         },
         approve,
+        subagents: root ? createSubagentHost({ projectRoot: root, recordTokens: app.recordTokens }) : undefined,
       });
       if (!ctl.signal.aborted) app.recordProviderResult(activeProvider.id);
       retryRef.current = null;

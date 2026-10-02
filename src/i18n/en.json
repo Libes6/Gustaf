@@ -17,6 +17,7 @@
   "appearance": "Appearance",
   "approveCommand": "Run this command?",
   "approveComputer": "Perform these actions on your Mac?",
+  "approveAgent": "Subagent: {title}",
   "archive": "Archive",
   "archiveChats": "Archive chats",
   "archiveEmpty": "No archived chats.",

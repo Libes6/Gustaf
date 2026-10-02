@@ -15,6 +15,7 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
   }, [onAnswer]);
   return (
     <div className="approval">
+      {req.agent && <div style={{ fontSize: 12, marginBottom: 4, color: "var(--text-3)" }}>{t("approveAgent", { title: req.agent })}</div>}
       <div className="q">{req.kind === "command" ? t("approveCommand") : t("approveComputer")}</div>
       <pre>{req.kind === "command" ? req.command : summarize({ type: "tool_call", id: "", name: "computer", args: {}, computer: { actions: req.actions } })}</pre>
       {req.kind === "computer" && req.safety?.map((s, i) => <div key={i} className="warn" style={{ marginBottom: 8 }}>⚠ {s}</div>)}

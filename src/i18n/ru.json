@@ -17,6 +17,7 @@
   "appearance": "Оформление",
   "approveCommand": "Выполнить команду?",
   "approveComputer": "Выполнить эти действия на вашем Mac?",
+  "approveAgent": "Субагент: {title}",
   "archive": "Архивировать",
   "archiveChats": "Архивировать чаты",
   "archiveEmpty": "Архив пуст.",
