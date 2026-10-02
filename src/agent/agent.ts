@@ -2,6 +2,8 @@ import { computer, fsx, type CuAction } from "../lib/api";
 import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
+import { SPAWN_TOOL, SPAWN_TOOL_NAME, serializeCalls } from "./subagentCore";
+import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
 import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
@@ -12,8 +14,8 @@ import { loadProjectInstructions } from "./instructionsStore";
 export type { Access };
 /** `reason` names the "ask" rule that stopped the command, when one did. */
 export type ApprovalRequest =
-  | { kind: "command"; command: string; reason?: string }
-  | { kind: "computer"; actions: CuAction[]; safety?: string[] };
+  | { kind: "command"; command: string; reason?: string; /** Title of the subagent that asks (shown on the approval card). */ agent?: string }
+  | { kind: "computer"; actions: CuAction[]; safety?: string[]; agent?: string };
 
 export type RunOptions = {
   root: string | null;
@@ -40,6 +42,14 @@ export type RunOptions = {
   onToolResult?: (result: Extract<Part, { type: "tool_result" }>) => void;
   onMessage: (msg: Msg) => Promise<void>;
   approve: (req: ApprovalRequest) => Promise<boolean>;
+  /** Present in the main loop: offers `spawn_agent`. Subagent runs never get it. */
+  subagents?: SubagentHost;
+  /** Subagents: only these tools may be used (others are not offered and are blocked if called). */
+  toolNames?: string[] | null;
+  /** Subagents: model turns allowed (default 50). */
+  maxSteps?: number;
+  /** Subagents: appended to the system prompt. */
+  systemExtra?: string;
 };
 
 const MAX_STEPS = 50;
@@ -94,6 +104,7 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
   const a = call.args ?? {};
   // Read-only runs are not offered the write tools; a model that calls one anyway must not get through.
   if (o.access === "readonly" && WRITE_NAMES.has(call.name)) throw new ActionBlocked("Blocked: read-only mode does not allow this tool.");
+  if (o.toolNames && !o.toolNames.includes(call.name)) throw new ActionBlocked("Blocked: this agent type is not allowed to use this tool.");
   switch (call.name) {
     case "read_file":
       return fsx.read(root, a.path, a.offset, a.limit);
@@ -134,6 +145,8 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
 
 /** While a run is active in a folder the action log does not offer to undo edits made there. */
 export async function runAgent(o: RunOptions) {
+  // Subagents may ask for approval while the main loop (or another subagent) has a card open: ask one at a time.
+  if (o.subagents) o = { ...o, approve: serializeCalls(o.approve) };
   if (o.root) beginRun(o.root);
   try {
     await runLoop(o);
@@ -148,13 +161,17 @@ async function runLoop(o: RunOptions) {
   let system = await buildSystem(o.root, o.computerUse, instructions?.text);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
   if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
-  const tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
+  if (o.systemExtra) system += "\n" + o.systemExtra;
+  let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
+  if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
+  const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly";
+  if (canSpawn) tools = [...tools, SPAWN_TOOL];
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
   let computerSteps = 0;
   const project = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null) : null;
 
-  for (let step = 0; step < MAX_STEPS && !o.signal.aborted; step++) {
+  for (let step = 0; step < (o.maxSteps ?? MAX_STEPS) && !o.signal.aborted; step++) {
     const out = await o.adapter.turn({
       system,
       messages: history,
@@ -184,6 +201,11 @@ async function runLoop(o: RunOptions) {
 
     const results: Part[] = [];
     let halted = false;
+    // spawn_agent calls of one turn start together (the scheduler limits how many run at once); results are collected in order.
+    const spawned = new Map<string, Promise<{ v: string } | { e: unknown }>>();
+    if (canSpawn && !o.signal.aborted)
+      for (const c of calls)
+        if (c.name === SPAWN_TOOL_NAME && !c.computer) spawned.set(c.id, o.subagents!.spawn(c.args, o).then((v) => ({ v }), (e) => ({ e })));
     const lastComputer = calls.filter((c) => c.computer).pop();
     for (const call of calls) {
       const res = { type: "tool_result" as const, id: call.id, name: call.name, output: "", computer: !!call.computer };
@@ -208,6 +230,10 @@ async function runLoop(o: RunOptions) {
           const shot = await computer.execute(actions);
           const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer";
           results.push({ ...res, output: "OK", image: wantsImage ? shot.png : undefined });
+        } else if (spawned.has(call.id)) {
+          const r = await spawned.get(call.id)!;
+          if ("e" in r) throw r.e;
+          results.push({ ...res, output: r.v });
         } else {
           results.push({ ...res, output: await runTool(call, o, { act, project }) });
         }

@@ -58,15 +58,15 @@ Items were drafted from the README and code layout; verify against the code befo
 
 ## Multi-agent (epic)
 Reference: the "Background tasks" panel in Claude Code desktop (running agents with model, elapsed time, tokens, tool uses, current step, stop button, transcript link, finished list).
-- [ ] **Agent runtime**: spawn a subagent as a separate run (own provider/model, system prompt, tool set, budget) from the main chat; the parent receives only the final report. Reuse `agent/agent.ts` loop; no shared mutable chat state.
-- [ ] **Isolation**: each subagent works in its own shadow copy (`review.rs`); on completion its changes appear as a separate review in `ChangesPanel`. Detect overlapping files between agents and flag conflicts before accept.
-- [ ] **Background tasks panel**: list Running/Finished agents with title, model, elapsed time, token count, tool-use count, current step, Stop button, and "View transcript".
-- [ ] **Orchestration**: planner splits a request into tasks with file ownership; parallelism limit (default 3-4); task queue with dependencies; retry/cancel; results merged into one summary message.
-- [ ] **Agent types** (explore read-only, plan, general, review) with per-type tool allowlists and default models (ties into model routing).
-- [ ] **Per-agent budgets** (tokens, time, tool calls) integrated with Budgets and alerts; aggregate usage in telemetry.
-- [ ] **Persistence**: store agent runs and transcripts in SQLite; survive app restart (mark interrupted runs).
-- [ ] **Notifications** when an agent finishes or needs approval; approvals from background agents surface in the UI.
-- [ ] **Tests**: scheduler/queue unit tests, isolation tests (two agents, same file), cancellation tests.
+- [x] **Agent runtime**: spawn a subagent as a separate run (own provider/model, system prompt, tool set, budget) from the main chat; the parent receives only the final report. Reuse `agent/agent.ts` loop; no shared mutable chat state. Done: `spawn_agent`, queue (3), cancellation, report cap; see README "Subagents".
+- [x] **Isolation**: each subagent works in its own shadow copy (`review.rs`); on completion its changes appear as a separate review in `ChangesPanel`. Detect overlapping files between agents and flag conflicts before accept. Done: per-agent shadow copy, overlap warning in the report and panel; no pre-accept conflict gate in ChangesPanel yet.
+- [x] **Background tasks panel**: list Running/Finished agents with title, model, elapsed time, token count, tool-use count, current step, Stop button, and "View transcript".
+- [ ] **Orchestration**: planner splits a request into tasks with file ownership; parallelism limit (default 3-4); task queue with dependencies; retry/cancel; results merged into one summary message. Not started: only the concurrency limit and queue exist; the main agent decides what to spawn.
+- [ ] **Agent types** (explore read-only, plan, general, review) with per-type tool allowlists and default models (ties into model routing). Allowlists per type done (explore/plan/review read-only, general writes); default model per type (model routing) still open.
+- [ ] **Per-agent budgets** (tokens, time, tool calls) integrated with Budgets and alerts; aggregate usage in telemetry. Per-run limits (steps, tool calls, wall time, tokens) enforced with defaults per type and tokens recorded via `recordTokens`; not yet user-configurable, no alerts or telemetry aggregation.
+- [x] **Persistence**: store agent runs and transcripts in SQLite; survive app restart (mark interrupted runs). Transcripts are clipped step summaries in `settings` (`agentRuns`), not full messages in SQLite.
+- [ ] **Notifications** when an agent finishes or needs approval; approvals from background agents surface in the UI. Approvals from subagents already surface as the chat's approval card (with the agent title); no notification when an agent finishes or waits while the app is in the background.
+- [ ] **Tests**: scheduler/queue unit tests, isolation tests (two agents, same file), cancellation tests. Partly: scheduler, cancellation, budgets, isolation with two agents on one file and approvals are covered in `tests/scheduler|subagentCore|subagents|agentRuns.test.mjs`; the Rust side and the UI are untested.
 
 ## Done
 - [x] Multi-provider chat (API + Codex/Claude/Cursor CLI)

@@ -15,6 +15,7 @@ import { useComposerDraft } from "../lib/useComposerDraft";
 import { useMessageJump } from "../lib/useMessageJump";
 import { turnHasMessage } from "../lib/searchUtil";
 import { useApp } from "../state";
+import { AgentsPanel } from "./AgentsPanel";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { Composer } from "./chat/Composer";
@@ -106,6 +107,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
 
+      {root && <AgentsPanel root={root} />}
       {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
 
       {messages.length === 0 && stream === null && !error ? (
