@@ -141,6 +141,7 @@ export function useChatRun(o: Options) {
       retryRef.current = { chatId, history: [...history] };
       await runAgent({
         root: workspace,
+        chatId: cid,
         reviewMode: !!reviewRef.current,
         supportsTools: selectedModel?.tools,
         history,

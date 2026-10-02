@@ -21,13 +21,13 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Run setup and tests in the shadow copy** (install deps or link `node_modules`; optional `npm test` before accepting changes).
 
 ## P1.5 — CLI image attachments
-- [ ] **Forward image attachments to CLI providers** (today `images: false` in `providers/cli.ts` and the composer refuses them). Plan:
+- [x] **Forward image attachments to CLI providers** (today `images: false` in `providers/cli.ts` and the composer refuses them). Plan:
   1. On send, write attached images to `<app data>/attachments/<chat>/<n>.png` (bounded size, unique names).
   2. Codex: pass files with `exec -i <file>` (verify on a working Codex install). Claude Code and Cursor Agent: add "Attached image: <path> (read it)" to the prompt; later consider Claude `--input-format stream-json` with native image blocks.
   3. Set `images: true` for these CLIs (keep false when the underlying model has no vision).
   4. Delete temp files after the reply and when the chat is deleted; never store them in the project folder.
   5. Tests for arg building and prompt text (`cliArgs.test.mjs`); update the README sentence about unsupported CLI attachments.
-  Touches `cli.ts`, `cliArgs.ts`, `ChatView.tsx` (start after the ChatView split is merged).
+  Done in `attachments.rs`, `cli.ts`, `cliArgs.ts`, `claudeCli.ts`. Codex uses `--image=<file>` (the `-i` option is variadic); Claude gets `--add-dir=<dir>` plus the prompt line, Cursor Agent `--add-dir <dir>` plus the prompt line. Not verified against real CLIs end to end: `codex exec --help` (bundled ChatGPT app binary) and `claude --help` / `cursor-agent --help` confirm the flags exist; actual image reading is untested. `images: true` is set for every CLI model (model vision is not detectable). Native Claude `stream-json` image blocks are still a later option.
 
 ## P2
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).

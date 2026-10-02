@@ -1,5 +1,6 @@
-export function claudeArgs({model,session,access}:{model?:string;session?:string;access?:'readonly'|'auto'|'full'}) {
- return ['-p','--output-format','stream-json','--verbose','--include-partial-messages','--permission-mode',access === 'readonly' ? 'plan' : access === 'full' ? 'bypassPermissions' : 'acceptEdits',...(model ? ['--model',model] : []),...(session ? ['--resume',session] : [])];
+/** `addDir` is passed as `--add-dir=<dir>`: the flag is variadic, so a separate value would also swallow the positional prompt. */
+export function claudeArgs({model,session,access,addDir}:{model?:string;session?:string;access?:'readonly'|'auto'|'full';addDir?:string}) {
+ return ['-p',...(addDir ? [`--add-dir=${addDir}`] : []),'--output-format','stream-json','--verbose','--include-partial-messages','--permission-mode',access === 'readonly' ? 'plan' : access === 'full' ? 'bypassPermissions' : 'acceptEdits',...(model ? ['--model',model] : []),...(session ? ['--resume',session] : [])];
 }
 export function parseClaudeEvent(e: any) {
  if (e.type === 'stream_event' && e.event?.delta?.type === 'text_delta') return {text:e.event.delta.text};

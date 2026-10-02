@@ -1,4 +1,4 @@
-import { cursor, db, fsx, getSetting, setSetting } from "./api";
+import { attachments, cursor, db, fsx, getSetting, setSetting } from "./api";
 import type { Msg } from "../providers/types";
 import { createDraftSaver, parseDraft, parseScope, type Draft, type DraftWrite } from "./chatSessions";
 
@@ -97,7 +97,12 @@ export const archiveChat = (id: number, archived = true) =>
   db.exec("update chats set archived = ? where id = ?", [archived ? 1 : 0, id]);
 export const archiveProjectChats = (projectId: number) =>
   db.exec("update chats set archived = 1 where project_id = ?", [projectId]);
-export const removeProject = (id: number) => db.exec("delete from projects where id = ?", [id]);
+export async function removeProject(id: number) {
+  // Chats are deleted with the project (cascade); drop any attachment files they left behind.
+  const chats = await db.select<{ id: number }>("select id from chats where project_id = ?", [id]).catch(() => []);
+  await db.exec("delete from projects where id = ?", [id]);
+  await Promise.all(chats.map((c) => attachments.clear(c.id).catch(() => {})));
+}
 export const renameProject = (id: number, name: string) => db.exec("update projects set name = ? where id = ?", [name, id]);
 export const togglePin = (id: number) => db.exec("update projects set pinned = 1 - pinned where id = ?", [id]);
 

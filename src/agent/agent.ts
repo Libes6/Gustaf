@@ -17,6 +17,7 @@ export type ApprovalRequest =
 export type RunOptions = {
   root: string | null;
   reviewMode?: boolean;
+  chatId?: number;
   supportsTools?: boolean;
   history: Msg[];
   adapter: Adapter;
@@ -156,6 +157,7 @@ async function runLoop(o: RunOptions) {
       reasoning: o.reasoning,
       computer: screen ? { width: screen.width, height: screen.height } : undefined,
       cwd: o.root ?? undefined,
+      chatId: o.chatId,
       access: o.access,
       signal: o.signal,
       onText: o.onText,

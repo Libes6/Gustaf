@@ -46,6 +46,8 @@ export type TurnInput = {
   reasoning?: Reasoning;
   computer?: { width: number; height: number };
   cwd?: string;
+  /** Chat the turn belongs to; CLI adapters use it to place image attachments on disk. */
+  chatId?: number;
   access?: "readonly" | "auto" | "full";
   signal: AbortSignal;
   onText: (delta: string) => void;
