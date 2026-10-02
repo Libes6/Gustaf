@@ -7,6 +7,7 @@ import { summarizeCall } from "./actionLog";
 import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
 import { getRulesConfig, projectRootFor } from "./rulesStore";
+import { loadProjectInstructions } from "./instructionsStore";
 
 export type { Access };
 /** `reason` names the "ask" rule that stopped the command, when one did. */
@@ -28,6 +29,8 @@ export type RunOptions = {
   reasoning?: Reasoning;
   access: Access;
   computerUse: boolean;
+  /** Instruction files the provider's CLI reads by itself (see `nativeInstructionFiles`); not repeated in the prompt. */
+  nativeInstructions?: string[];
   allowlist: string[];
   signal: AbortSignal;
   onLimits?: (windows: import("../providers/types").LimitWindow[]) => void;
@@ -63,7 +66,7 @@ class ActionDeclined extends Error {}
 const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
 type ToolContext = { act: string; project: string | null };
 
-async function buildSystem(root: string | null, computerUse: boolean) {
+async function buildSystem(root: string | null, computerUse: boolean, instructions = "") {
   const lines = [
     "You are M Code, a coding agent in a macOS desktop app.",
     `Today is ${new Date().toDateString()}.`,
@@ -76,8 +79,7 @@ async function buildSystem(root: string | null, computerUse: boolean) {
       `Project root: ${root}. File tool paths are relative to it.`,
       "Explore with list_dir/search/read_file before editing. Prefer edit_file with a unique old_string over rewriting files.",
     );
-    const rules = await fsx.rules(root).catch(() => "");
-    if (rules.trim()) lines.push("\nProject rules:\n" + rules);
+    if (instructions) lines.push("\n" + instructions);
   }
   if (computerUse)
     lines.push(
@@ -142,7 +144,8 @@ export async function runAgent(o: RunOptions) {
 
 async function runLoop(o: RunOptions) {
   const history = [...o.history];
-  let system = await buildSystem(o.root, o.computerUse);
+  const instructions = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null).then((project) => loadProjectInstructions({ root: o.root!, project, native: o.nativeInstructions })) : null;
+  let system = await buildSystem(o.root, o.computerUse, instructions?.text);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
   if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
   const tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];

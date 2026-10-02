@@ -172,31 +172,66 @@ pub fn fs_write(root: String, path: String, content: String) -> Result<String, S
     Ok("ok".into())
 }
 
-/// Project instructions: AGENTS.md, CLAUDE.md and `.cursor/rules/*.mdc` marked `alwaysApply: true`.
+/// Most bytes read from one instruction file; the prompt builder applies its own, smaller caps.
+const INSTRUCTION_READ_CAP: u64 = 64 * 1024;
+const MAX_CURSOR_RULES: usize = 50;
+
+#[derive(Serialize, Debug)]
+pub struct InstructionFile {
+    /// Path relative to the project root, as written in the prompt.
+    name: String,
+    /// Size of the file on disk; `text` holds at most `INSTRUCTION_READ_CAP` of it.
+    bytes: u64,
+    text: String,
+}
+
+/// True when the YAML front matter of a Cursor rule file says `alwaysApply: true`.
+fn always_apply(text: &str) -> bool {
+    let Some(rest) = text.strip_prefix("---") else { return false };
+    let Some(end) = rest.find("\n---") else { return false };
+    rest[..end].lines().any(|l| l.trim() == "alwaysApply: true")
+}
+
+/// Reads one candidate instruction file. Anything that resolves outside the project root (a symlink pointing out),
+/// is not a regular file, or is already seen under another name is skipped.
+fn read_instruction(root: &Path, rel: &str, seen: &mut Vec<PathBuf>, filter: impl Fn(&str) -> bool) -> Option<InstructionFile> {
+    let path = resolve_in_root(root, rel).ok()?;
+    let meta = fs::metadata(&path).ok()?;
+    if !meta.is_file() || seen.contains(&path) {
+        return None;
+    }
+    let mut buf = Vec::new();
+    fs::File::open(&path).ok()?.take(INSTRUCTION_READ_CAP).read_to_end(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf).into_owned();
+    if !filter(&text) {
+        return None;
+    }
+    seen.push(path);
+    Some(InstructionFile { name: rel.to_string(), bytes: meta.len(), text })
+}
+
+/// Project instruction files, in priority order: AGENTS.md, CLAUDE.md, .cursorrules and the `.cursor/rules/*.mdc|md`
+/// files marked `alwaysApply: true`. Only files inside the project root are read.
 #[tauri::command]
-pub fn read_rules(root: String) -> String {
+pub fn read_instructions(root: String) -> Vec<InstructionFile> {
     let base = Path::new(&root);
-    let mut out = String::new();
-    for name in ["AGENTS.md", "CLAUDE.md"] {
-        if let Ok(t) = fs::read_to_string(base.join(name)) {
-            out.push_str(&format!("# {name}\n{t}\n\n"));
+    let mut seen = Vec::new();
+    let mut out = Vec::new();
+    for name in ["AGENTS.md", "CLAUDE.md", ".cursorrules"] {
+        out.extend(read_instruction(base, name, &mut seen, |_| true));
+    }
+    if let Ok(dir) = resolve_in_root(base, ".cursor/rules").and_then(|d| fs::read_dir(d).map_err(|e| e.to_string())) {
+        let mut names: Vec<String> = dir
+            .filter_map(Result::ok)
+            .filter(|e| matches!(e.path().extension().and_then(|x| x.to_str()), Some("mdc" | "md")))
+            .filter_map(|e| e.file_name().into_string().ok())
+            .collect();
+        names.sort();
+        for name in names.into_iter().take(MAX_CURSOR_RULES) {
+            out.extend(read_instruction(base, &format!(".cursor/rules/{name}"), &mut seen, always_apply));
         }
     }
-    if let Ok(dir) = fs::read_dir(base.join(".cursor/rules")) {
-        for e in dir.filter_map(Result::ok) {
-            let p = e.path();
-            if !p.extension().is_some_and(|x| x == "mdc") {
-                continue;
-            }
-            let Some(name) = p.file_name() else { continue };
-            if let Ok(t) = fs::read_to_string(&p) {
-                if t.contains("alwaysApply: true") {
-                    out.push_str(&format!("# {}\n{t}\n\n", name.to_string_lossy()));
-                }
-            }
-        }
-    }
-    truncate(out)
+    out
 }
 
 #[tauri::command]
@@ -363,18 +398,45 @@ mod tests {
     }
 
     #[test]
-    fn read_rules_collects_only_always_apply_cursor_rules() {
+    fn read_instructions_collects_known_files_and_always_apply_rules() {
         let dir = tempfile::tempdir().unwrap();
         let rules = dir.path().join(".cursor/rules");
         fs::create_dir_all(&rules).unwrap();
         fs::write(dir.path().join("AGENTS.md"), "agents text").unwrap();
-        fs::write(rules.join("on.mdc"), "alwaysApply: true\nbody").unwrap();
-        fs::write(rules.join("off.mdc"), "alwaysApply: false").unwrap();
-        fs::write(rules.join("note.txt"), "alwaysApply: true").unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), "claude text").unwrap();
+        fs::write(dir.path().join(".cursorrules"), "legacy").unwrap();
+        fs::write(rules.join("on.mdc"), "---\nalwaysApply: true\n---\nbody").unwrap();
+        fs::write(rules.join("off.mdc"), "---\nalwaysApply: false\n---\n").unwrap();
+        fs::write(rules.join("body-only.mdc"), "no front matter\nalwaysApply: true").unwrap();
+        fs::write(rules.join("note.txt"), "---\nalwaysApply: true\n---\n").unwrap();
 
-        let out = read_rules(dir.path().to_str().unwrap().into());
-        assert!(out.contains("# AGENTS.md\nagents text"));
-        assert!(out.contains("# on.mdc\n"));
-        assert!(!out.contains("off.mdc") && !out.contains("note.txt"));
+        let out = read_instructions(dir.path().to_str().unwrap().into());
+        let names: Vec<&str> = out.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".cursor/rules/on.mdc"]);
+        assert_eq!(out[0].text, "agents text");
+        assert_eq!(out[0].bytes, 11);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_instructions_skips_symlinks_out_of_the_project_and_duplicates() {
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("secret.md"), "outside").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), "claude").unwrap();
+        std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("AGENTS.md")).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("CLAUDE.md"), dir.path().join(".cursorrules")).unwrap();
+        let out = read_instructions(dir.path().to_str().unwrap().into());
+        let names: Vec<&str> = out.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["CLAUDE.md"], "escaping symlink skipped, in-project symlink to the same file deduped");
+    }
+
+    #[test]
+    fn read_instructions_caps_the_read_but_reports_the_real_size() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("AGENTS.md"), "x".repeat(100_000)).unwrap();
+        let out = read_instructions(dir.path().to_str().unwrap().into());
+        assert_eq!(out[0].bytes, 100_000);
+        assert_eq!(out[0].text.len(), INSTRUCTION_READ_CAP as usize);
     }
 }

@@ -3,6 +3,7 @@ import {
   Archive, BarChart3, Download, FileText, GitBranch, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
 import { computer, fsx, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
@@ -436,7 +437,7 @@ function Rules() {
   const [rules, setRules] = useState("");
   const path = withPath.find((p) => p.id === pid)?.path;
   useEffect(() => {
-    if (path) fsx.rules(path).then(setRules);
+    if (path) loadProjectInstructions({ root: path, project: path }).then((r) => setRules(r.text));
   }, [path]);
   return (
     <>
