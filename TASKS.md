@@ -9,7 +9,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Strict CSP** in `tauri.conf.json` that still allows the canvas `srcDoc` iframe (verify with `npm run tauri dev`).
 - [ ] **Narrow Tauri capabilities**: drop the redundant `http://localhost:*` / `127.0.0.1` entries; decide on `http://*` vs per-provider hosts; restrict `shell` args if feasible.
 - [ ] **Tooling**: `rustup component add rustfmt`, `cargo fmt`, `clippy -D warnings`, ESLint + Prettier, and add them to `npm run check` and CI.
-- [ ] **Split `ChatView.tsx`** (630 lines) into composer, message list and header components.
+- [x] **Split `ChatView.tsx`** into composer (`components/chat/Composer`, `ContextChip`), turn list (`TurnView`), live status (`LiveStatus`, `ApprovalCard`) and the run hook `lib/useChatRun.ts`.
 - [ ] **UI tests** for Sidebar, Settings and ChatView (Vitest + Testing Library or Playwright against `npm run dev`).
 - [ ] **Build pipeline**: run `npm --prefix sidecar ci` in `beforeBuildCommand`; Developer ID signing and notarization instead of ad-hoc `-`.
 - [ ] **First commit and branch protection**; PR template.
@@ -25,13 +25,13 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Partial accept**: apply changes per hunk in `ChangesPanel`.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [ ] **`@file` / `@folder` mentions** in the composer with autocomplete.
-- [ ] **Chat branching**: fork a conversation from any message.
+- [x] **Chat branching**: "Branch from here" on any message copies the history up to it into a new chat (`branchChat` in `lib/data.ts`).
 - [ ] **Model comparison**: send one prompt to several models side by side.
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
 - [ ] **Command allow/deny rules** and a unified agent action log with undo.
 - [ ] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
 - [ ] **Per-project system prompt / instructions file** (`AGENTS.md` / `CLAUDE.md` auto-load).
-- [ ] **Message actions**: edit and resend, regenerate, copy, delete.
+- [x] **Message actions**: edit and resend, regenerate, copy, delete (disabled while a run is active; `lib/messageActions.ts`).
 - [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a "Retrying in Ns…" notice is shown in the chat).
 - [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.
 
