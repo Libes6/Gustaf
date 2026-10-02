@@ -4,6 +4,7 @@ import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget, subagentModelResolver } from "./modelRouting";
+import { beginApproval } from "./attention";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -136,7 +137,10 @@ export function useChatRun(o: Options) {
       history = effectiveHistory(history);
       retryRef.current = { chatId, history: [...history] };
       const approve = (req: ApprovalRequest) => new Promise<boolean>(resolve => {
+        // Sidebar badge on this chat (and a notification while the app is unfocused) until it is answered.
+        const answered = beginApproval(chatId, req.agent ?? "");
         const finish = (ok: boolean, always?: boolean) => {
+          answered();
           ctl.signal.removeEventListener("abort", deny);
           setApproval(null);
           if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
