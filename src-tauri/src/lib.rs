@@ -2,6 +2,7 @@ mod computer;
 mod cursor_import;
 mod db;
 mod git;
+mod hunks;
 mod review;
 mod secrets;
 mod tools;
@@ -47,9 +48,12 @@ pub fn run() {
             git::git_commit_context,
             git::git_commit,
             review::review_prepare,
+            review::review_run,
             review::review_list,
             review::review_diff,
             review::review_decide,
+            review::review_hunks,
+            review::review_decide_hunks,
             review::review_finish,
             computer::cu_execute,
             computer::cu_save_shot,

@@ -17,6 +17,8 @@ export type ApprovalRequest =
 export type RunOptions = {
   root: string | null;
   reviewMode?: boolean;
+  /** Directories of the review workspace that are symlinks to the original project's dependencies. */
+  reviewLinked?: string[];
   supportsTools?: boolean;
   history: Msg[];
   adapter: Adapter;
@@ -141,6 +143,7 @@ async function runLoop(o: RunOptions) {
   const history = [...o.history];
   let system = await buildSystem(o.root, o.computerUse);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
+  if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
   const tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
