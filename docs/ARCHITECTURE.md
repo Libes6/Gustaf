@@ -24,7 +24,7 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | `lib/useComposerDraft.ts` | Hook used by `ChatView`: restores the stored draft when a chat opens, saves edits debounced, moves a new-chat draft to the chat's scope on first send, and clears it once the message is stored |
 | `lib/context.ts` | Token estimate, context compression |
 | `lib/checkpoints.ts` | Shadow checkpoints / rollback |
-| `providers/` | One module per backend: `anthropic`, `openaiCompatible`, `openaiResponses`, CLI bridges (`cli`, `claudeCli`, `cursor`), plus `usage`, `limits`, `activities`, `computerBridge` |
+| `providers/` | One module per backend: `anthropic`, `openaiCompatible`, `openaiResponses`, CLI bridges (`cli`, `claudeCli`, `cursor`), plus `usage`, `limits`, `activities`, `computerBridge`. API providers share `retry.ts` (pure: error classification, `Retry-After`, abortable exponential backoff with jitter, retries only before any output reached `onText`), `sse.ts` (stream parser) and `http.ts` (Tauri fetch glue) |
 | `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools |
 | `canvas/` | Sandboxed TSX preview runtime (generated bundle in `canvas/generated`, git-ignored) |
 | `i18n/` | Translations, validated by `scripts/check-i18n.mjs` |

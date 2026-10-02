@@ -332,5 +332,6 @@
   "reviewWorking": "Preparing changes…",
   "restoreContext": "Restore full context",
   "restoreContextHint": "Remove only the summaries and send the entire conversation again.",
-  "imagesUnsupported": "This CLI connection does not send attached images. Select another connection."
+  "imagesUnsupported": "This CLI connection does not send attached images. Select another connection.",
+  "retryingIn": "Retrying in {seconds}s (attempt {attempt} of {max})…"
 }

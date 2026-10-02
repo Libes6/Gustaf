@@ -22,6 +22,7 @@ export type RunOptions = {
   allowlist: string[];
   signal: AbortSignal;
   onLimits?: (windows: import("../providers/types").LimitWindow[]) => void;
+  onRetry?: import("../providers/types").TurnInput["onRetry"];
   onText: (delta: string) => void;
   onActivity?: import("../providers/types").TurnInput["onActivity"];
   onToolResult?: (result: Extract<Part, { type: "tool_result" }>) => void;
@@ -114,6 +115,7 @@ export async function runAgent(o: RunOptions) {
       onText: o.onText,
       onActivity: o.onActivity,
       onLimits: o.onLimits,
+      onRetry: o.onRetry,
     });
     if (o.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const calls = out.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
