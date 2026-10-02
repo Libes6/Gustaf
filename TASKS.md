@@ -23,7 +23,7 @@ Items were drafted from the README and code layout; verify against the code befo
 ## P2
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
 - [ ] **Partial accept**: apply changes per hunk in `ChangesPanel`.
-- [ ] **Git integration**: commit accepted changes, generated commit message, branch/PR (`git.rs`).
+- [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [ ] **`@file` / `@folder` mentions** in the composer with autocomplete.
 - [ ] **Chat branching**: fork a conversation from any message.
 - [ ] **Model comparison**: send one prompt to several models side by side.

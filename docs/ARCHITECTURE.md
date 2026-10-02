@@ -16,13 +16,14 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | Path | Role |
 | --- | --- |
 | `App.tsx`, `state.tsx` | Root component and global app state |
-| `components/` | UI: `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding` |
+| `components/` | UI: `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `GitCommitDialog` (commit accepted files: file picker, generated/edited message, optional branch), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding` |
 | `lib/api.ts` | Typed wrappers over Tauri `invoke` |
 | `lib/exportChats.ts` | Pure chat export/import: whitelisted, secret-scrubbed JSON bundle (`mcode-chats` v1), Markdown renderer, JSON parser/sanitizer and `importBundle` over an injected `ChatStore`; UI glue (save dialog, file input, SQLite store) is in `components/ImportPanel.tsx` |
 | `lib/data.ts` | Persistence helpers over SQLite (projects, chats, messages, settings, composer drafts via `loadDraft` and the shared `draftSaver`) |
 | `lib/chatSessions.ts` | Open chat sessions (which chats are mounted, busy flags) plus the pure draft logic: scopes (`chat:<id>` / `new:<projectId>`), persistence bounds (`DRAFT_LIMITS`), (de)serialization of text and image attachments, and `createDraftSaver` (debounced, ordered, best-effort writes that skip no-ops and omit unchanged attachments). Session state itself is in memory; drafts are persisted in SQLite |
 | `lib/useComposerDraft.ts` | Hook used by `ChatView`: restores the stored draft when a chat opens, saves edits debounced, moves a new-chat draft to the chat's scope on first send, and clears it once the message is stored |
 | `lib/context.ts` | Token estimate, context compression |
+| `lib/gitCommit.ts`, `lib/commitMessage.ts` | Pure logic of the commit flow (unit-tested in `tests/gitCommit.test.mjs`, `tests/commitMessage.test.mjs`): in-memory store of files accepted in review per project, file candidates and pre-selection, branch-name validation and suggestion, commit-blocking rules; commit-message prompt building (diff passed as JSON data, hostile content cannot break out) and sanitizing of model output |
 | `lib/checkpoints.ts` | Shadow checkpoints / rollback |
 | `providers/` | One module per backend: `anthropic`, `openaiCompatible`, `openaiResponses`, CLI bridges (`cli`, `claudeCli`, `cursor`), plus `usage`, `limits`, `activities`, `computerBridge`. API providers share `retry.ts` (pure: error classification, `Retry-After`, abortable exponential backoff with jitter, retries only before any output reached `onText`), `sse.ts` (stream parser) and `http.ts` (Tauri fetch glue) |
 | `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools |
@@ -35,7 +36,7 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | `db.rs` | SQLite (rusqlite, WAL). Tables: `projects`, `chats`, `messages`, `settings`, `models_seen`, `drafts` (composer text and attachments per chat or unsent new chat; removed with their chat or project). The schema is all `create ... if not exists`, so opening an older database migrates it. A poisoned connection mutex is recovered instead of failing every later command. Commands: `db_select`, `db_execute` |
 | `tools.rs` | Filesystem and shell: `fs_read`, `fs_list`, `fs_files`, `fs_search`, `fs_edit`, `fs_write`, `run_command`, `read_rules`, `read_home_file` |
 | `review.rs` | Shadow-copy review: `review_prepare`, `review_list`, `review_diff`, `review_decide`, `review_finish` |
-| `git.rs` | `git` command wrapper |
+| `git.rs` | `git`: generic wrapper, also drives the app-managed shadow checkpoint repo. Project-repo commands for the commit flow (argument arrays only, no shell; paths validated with `resolve_in_root` and passed as literal pathspecs; repo-configured fsmonitor/textconv/external-diff commands disabled; hooks and signing never bypassed; no push/amend/force): `git_status` (branch, HEAD, changed files under the project root, unfinished merge/rebase), `git_commit_context` (bounded, fairly budgeted diff + stat + recent subjects of the selected files, for message generation), `git_commit` (commits exactly the given paths via `commit --only`, optional new branch from HEAD, rolls the branch and staging back if the commit fails). Multi-step operations are serialized per repository |
 | `secrets.rs` | `secret_set/get/delete` (API keys) |
 | `computer.rs` | Computer Use: `cu_execute`, `cu_screen_size`, `cu_permissions`, `cu_save_shot` |
 | `cursor_import.rs` | Import history from Cursor: `cursor_scan`, `cursor_messages` |
@@ -46,6 +47,7 @@ Node scripts launched by the app: `codex-limits.mjs` (Codex quota via app-server
 ## Key flows
 - **Chat request:** `ChatView` → `providers/index.ts` picks a backend → API providers go through `agent/agent.ts` (tool loop calling Tauri commands); CLI providers stream via the shell plugin.
 - **Writable project:** `review_prepare` copies sources to an app-managed directory; the agent edits the copy; `ChangesPanel` shows diffs; `review_decide` applies files after a baseline check; checkpoints allow rollback.
+- **Commit accepted changes:** `ChangesPanel` records each accepted file (`acceptedFiles`) and offers `GitCommitDialog` while any of them is still dirty in git. The dialog loads `git_status`, pre-selects the accepted files, optionally generates a message through `getAdapter(selected provider).turn` (read-only, no tools, usage recorded like other turns) from `git_commit_context`, and calls `git_commit` with only the ticked paths.
 - **Canvas:** assistant messages with a `tsx-canvas` fence become cards; revisions are derived from stored messages; code runs in an opaque-origin iframe.
 
 ## Conventions

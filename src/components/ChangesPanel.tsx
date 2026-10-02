@@ -2,10 +2,12 @@ import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Undo2, X } from "l
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n";
-import { changesSince, commitAll, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
+import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
 import type { StoredMsg } from "../lib/data";
 import type { Part } from "../providers/types";
-import { review, type Review, type ReviewChange } from "../lib/api";
+import { gitRepo, review, type GitStatus, type Review, type ReviewChange } from "../lib/api";
+import { acceptedFiles, offeredFiles } from "../lib/gitCommit";
+import { GitCommitDialog } from "./GitCommitDialog";
 
 function DiffView({ text }: { text: string }) {
   return (
@@ -31,13 +33,16 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
   const [diff, setDiff] = useState<{ path: string; text: string; reviewId?: string } | null>(null);
   const [reviews, setReviews] = useState<[Review, ReviewChange[]][]>([]);
   const [acting, setActing] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [repo, setRepo] = useState<GitStatus | null>(null);
+  const [commitOpen, setCommitOpen] = useState(false);
+  const [notice, setNotice] = useState("");
   const [err, setErr] = useState("");
   const base = messages.find((m) => m.meta?.checkpoint)?.meta?.checkpoint;
 
   const refresh = async () => {
     setInfo(await projectGit(root));
     setReviews(await review.list(root));
+    setRepo(await gitRepo.status(root).catch(() => null));
     if (base) setFiles(await changesSince(root, base));
     else setFiles([]);
   };
@@ -65,6 +70,9 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
     } finally { setActing(false); }
   };
 
+  // Accepting a file remembers it, so committing exactly those files can be offered afterwards.
+  const accept = (id: string, path: string) => async () => { await review.decide(id, path, true); acceptedFiles.add(root, path); setNotice(""); };
+  const offer = offeredFiles(repo, acceptedFiles.list(root));
   const added = files.reduce((s, f) => s + f.added, 0);
   const removed = files.reduce((s, f) => s + f.removed, 0);
   const pending = reviews.reduce((n, [, list]) => n + list.length, 0);
@@ -100,13 +108,26 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
         <span className="plus">+{t.num(info ? info.added : added)}</span>
         <span className="minus">−{t.num(info ? info.removed : removed)}</span>
       </div>
+      {offer.length > 0 && <div className="commit-offer">
+        <span className="grow">{t("gitOffer", { count: offer.length })}</span>
+        <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>{t("gitCommitAction")}</button>
+        <button className="icon-btn" title={t("gitOfferDismiss")} aria-label={t("gitOfferDismiss")} onClick={() => { acceptedFiles.forget(root, offer.map(f => f.path)); refresh().catch(e => setErr(String(e))); }}><X size={13} /></button>
+      </div>}
+      {notice && <div className="commit-notice" role="status"><Check size={13} /><span className="grow">{notice}</span></div>}
+      {commitOpen && <GitCommitDialog root={root} accepted={acceptedFiles.list(root)} onClose={() => setCommitOpen(false)} onCommitted={(r) => {
+        acceptedFiles.forget(root, r.files);
+        setCommitOpen(false);
+        setNotice(t("gitCommitted", { sha: r.short, branch: r.branch ?? "HEAD" }));
+        refresh().catch(e => setErr(String(e)));
+        onChanged();
+      }} />}
       {diff && createPortal(<div className="review-overlay" onMouseDown={e => { if (e.target === e.currentTarget && !acting) setDiff(null); }}>
         <section className="review-dialog" role="dialog" aria-modal="true" aria-label={diff.path}>
           <header><strong>{diff.path}</strong><button className="icon-btn" title={t("cancel")} onClick={() => setDiff(null)}><X size={17} /></button></header>
           <div className="review-diff-body"><DiffView text={diff.text} /></div>
           {err && <div className="error-box" role="alert">{err}</div>}
           {diff.reviewId && <div className="review-actions">
-            <button className="btn btn-primary" disabled={busy || acting} onClick={act(() => review.decide(diff.reviewId!, diff.path, true))}>{t("reviewAccept")}</button>
+            <button className="btn btn-primary" disabled={busy || acting} onClick={act(accept(diff.reviewId!, diff.path))}>{t("reviewAccept")}</button>
             <button className="btn btn-ghost" disabled={busy || acting} onClick={act(() => review.decide(diff.reviewId!, diff.path, false))}>{t("reviewReject")}</button>
           </div>}
         </section>
@@ -129,7 +150,7 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
                 {!pending && <div className="hint" style={{ padding: 12 }}>{t("reviewEmpty")}</div>}
                 {reviews.map(([r, list]) => <div key={r.id} className="review-group">{list.map(f => <div key={f.path} className="file-row review-row">
                   <button className="path review-path" onClick={() => showDiff(f.path, r.id)}>{f.path}<span className="hint">{t(f.binary ? "reviewBinary" : "reviewChanged")}</span></button>
-                  <button className="icon-btn" disabled={busy || acting} title={t("reviewAccept")} aria-label={`${t("reviewAccept")}: ${f.path}`} onClick={act(() => review.decide(r.id, f.path, true))}><Check size={15} /></button>
+                  <button className="icon-btn" disabled={busy || acting} title={t("reviewAccept")} aria-label={`${t("reviewAccept")}: ${f.path}`} onClick={act(accept(r.id, f.path))}><Check size={15} /></button>
                   <button className="icon-btn" disabled={busy || acting} title={t("reviewReject")} aria-label={`${t("reviewReject")}: ${f.path}`} onClick={act(() => review.decide(r.id, f.path, false))}><X size={15} /></button>
                 </div>)}</div>)}
                 {files.length > 0 && <div className="review-intro"><strong>{t("changes")}</strong></div>}
@@ -165,14 +186,7 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
                 <RotateCcw size={13} />
               </button>
             )}
-            {info && (
-              <>
-                <input className="input" style={{ height: 28 }} placeholder={t("commitMessage")} value={msg} onChange={(e) => setMsg(e.target.value)} />
-                <button className="btn-soft" disabled={busy || acting || !msg.trim()} onClick={act(async () => (await commitAll(root, msg.trim()), setMsg("")))}>
-                  {t("commit")}
-                </button>
-              </>
-            )}
+            {repo?.repo && <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>{t("gitCommitAction")}</button>}
           </div>
         </>
       )}

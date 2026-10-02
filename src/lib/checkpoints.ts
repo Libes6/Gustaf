@@ -52,8 +52,3 @@ export async function projectGit(root: string) {
     return null;
   }
 }
-
-export async function commitAll(root: string, message: string) {
-  await git(root, ["add", "-A"]);
-  await git(root, ["commit", "-q", "-m", message]);
-}

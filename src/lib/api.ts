@@ -56,6 +56,38 @@ export const fsx = {
 
 export const git = (root: string, args: string[], shadow = false) => invoke<string>("git", { root, args, shadow });
 
+// The project's own repository (src-tauri/src/git.rs): status, commit-message context and partial commits.
+export type GitFileKind = "modified" | "added" | "deleted" | "untracked" | "conflicted";
+/** `path` is relative to the project root. `staged`: part of the change is already in the index. */
+export type GitFile = { path: string; kind: GitFileKind; staged: boolean };
+export type GitStatus = {
+  /** False when the project is not inside a git work tree. */
+  repo: boolean;
+  toplevel: string;
+  /** Project root relative to the repository root (`""` or `sub/dir/`). */
+  prefix: string;
+  /** `null` while HEAD is detached. */
+  branch: string | null;
+  detached: boolean;
+  /** Short id of HEAD, `null` before the first commit. */
+  head: string | null;
+  files: GitFile[];
+  /** Changed files under the project root; `files` is capped, `total` is not. */
+  total: number;
+  /** An unfinished `merge`, `rebase`, `cherry-pick` or `revert`. */
+  inProgress: string | null;
+};
+export type CommitContext = { files: string[]; stat: string; diff: string; truncated: boolean; recent: string[] };
+export type CommitResult = { sha: string; short: string; branch: string | null; files: string[]; createdBranch: boolean };
+
+export const gitRepo = {
+  status: (root: string) => invoke<GitStatus>("git_status", { root }),
+  /** Bounded diff of the given changed files, used to generate a commit message. */
+  commitContext: (root: string, paths: string[], maxBytes?: number) => invoke<CommitContext>("git_commit_context", { root, paths, maxBytes }),
+  /** Commits only `paths` (hooks run, nothing is pushed); with `newBranch` it first creates and switches to it. */
+  commit: (root: string, message: string, paths: string[], newBranch?: string | null) => invoke<CommitResult>("git_commit", { root, message, paths, newBranch }),
+};
+
 export type Review = { id: string; root: string; workspace: string };
 export type ReviewChange = { path: string; binary: boolean };
 export const review = {
