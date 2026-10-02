@@ -153,8 +153,25 @@ export const review = {
   finish: (id: string) => invoke<void>("review_finish", { id }),
 };
 
-export type Shot = { png: string; width: number; height: number };
+/** Result of `cu_execute` (src-tauri/src/computer.rs): the screenshot after the batch plus facts about the desktop. */
+export type Shot = {
+  png: string;
+  width: number;
+  height: number;
+  frontApp?: string | null;
+  windowTitle?: string | null;
+  /** Mouse position in screenshot coordinates. */
+  cursor?: [number, number] | null;
+  /** Screen differs from before the batch; null for screenshot-only batches. */
+  changed?: boolean | null;
+  /** False when the screen was still changing when the bounded settle wait ended. */
+  settled?: boolean | null;
+  /** Zero-based index of the failed action; later actions did not run. */
+  failedStep?: number | null;
+  error?: string | null;
+};
 export type CuAction =
+  | { type: "open_app"; name: string }
   | { type: "click"; x: number; y: number; button?: string }
   | { type: "double_click"; x: number; y: number }
   | { type: "drag"; path: { x: number; y: number }[] }

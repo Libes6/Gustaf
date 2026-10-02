@@ -17,7 +17,7 @@ const ICONS: Record<string, typeof Wrench> = {
 
 export function summarize(call: Call) {
   const a = call.args ?? {};
-  if ("computer" in call && call.computer) return call.computer.actions.map((x) => ("x" in x ? `${x.type} ${x.x},${x.y}` : x.type === "type" ? `type "${x.text.slice(0, 30)}"` : x.type === "keypress" ? x.keys.join("+") : x.type)).join(" · ");
+  if ("computer" in call && call.computer) return call.computer.actions.map((x) => ("x" in x ? `${x.type} ${x.x},${x.y}` : x.type === "type" ? `type "${x.text.slice(0, 30)}"` : x.type === "keypress" ? x.keys.join("+") : x.type === "open_app" ? `open_app "${x.name.slice(0, 40)}"` : x.type)).join(" · ");
   return a.command ?? a.file_path ?? a.path ?? a.pattern ?? (a.tool ? `${a.server ?? ""} · ${a.tool}` : undefined) ?? JSON.stringify(a).slice(0, 80);
 }
 

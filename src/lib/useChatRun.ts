@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { commandAllowed, runAgent, type ApprovalRequest } from "../agent/agent";
+import { commandAllowed, runAgent, type ApprovalAnswer, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import type { LiveStats } from "../components/LiveMeter";
@@ -133,12 +133,12 @@ export function useChatRun(o: Options) {
       }
       history = effectiveHistory(history);
       retryRef.current = { chatId, history: [...history] };
-      const approve = (req: ApprovalRequest) => new Promise<boolean>(resolve => {
+      const approve = (req: ApprovalRequest) => new Promise<ApprovalAnswer>(resolve => {
         const finish = (ok: boolean, always?: boolean) => {
           ctl.signal.removeEventListener("abort", deny);
           setApproval(null);
           if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
-          resolve(ok);
+          resolve(ok && always && req.kind === "computer" ? "task" : ok);
         };
         const deny = () => finish(false);
         if (ctl.signal.aborted) return finish(false);
@@ -146,7 +146,7 @@ export function useChatRun(o: Options) {
         setApproval({ req, resolve: finish });
       });
       if (root && app.access !== "readonly" && !reviewRef.current) {
-        const made = await prepareShadowCopy(root, { access: app.access, allowlist: app.allowlist, approve: command => approve({ kind: "command", command }), onSetup: running => setRetryNotice(running ? t("reviewSetupRunning") : "") });
+        const made = await prepareShadowCopy(root, { access: app.access, allowlist: app.allowlist, approve: command => approve({ kind: "command", command }).then(Boolean), onSetup: running => setRetryNotice(running ? t("reviewSetupRunning") : "") });
         reviewRef.current = made.review;
         if (made.setup === "declined") setError(t("reviewSetupDeclined"));
         else if (made.setup && !made.setup.ok) setError(t("reviewSetupFailed", { code: made.setup.timedOut ? t("reviewTimedOut") : String(made.setup.code ?? "?"), output: made.setup.output.slice(-600) }));

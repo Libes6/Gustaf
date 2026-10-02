@@ -83,7 +83,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           const made = await prepare(cfg.projectRoot, {
             access: parent.access,
             allowlist: parent.allowlist,
-            approve: (command) => parent.approve({ kind: "command", command, agent: title }),
+            approve: (command) => parent.approve({ kind: "command", command, agent: title }).then(Boolean),
           });
           reviewId = made.review.id;
           reviewOwners.set(reviewId, id);
