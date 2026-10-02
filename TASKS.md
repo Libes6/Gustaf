@@ -39,7 +39,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
 - [x] **Command allow/deny rules** (allow/ask/deny prefix and glob rules, global or per project, parsed-command evaluation, built-in deny defaults, rules editor) and a **unified agent action log** with undo of file edits (`rules.ts`, `actionLog.ts`, `fileUndo.ts`). Command execution itself cannot be undone; the UI was not smoke-tested in `tauri dev`.
 - [x] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
-- [ ] **Per-project system prompt / instructions file** (`AGENTS.md` / `CLAUDE.md` auto-load).
+- [x] **Per-project system prompt / instructions file** (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, always-apply `.cursor/rules` auto-loaded with caps, dedupe, untrusted-content fencing and no repeat of files a CLI reads itself; per-project custom text in the sidebar project menu; loaded files listed in the context chip). Not done: nested/subfolder instruction files, `.cursor/rules` globs/agent-requested rules; the UI was not smoke-tested in `tauri dev`.
 - [x] **Message actions**: edit and resend, regenerate, copy, delete (disabled while a run is active; `lib/messageActions.ts`).
 - [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a "Retrying in Ns…" notice is shown in the chat).
 - [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.

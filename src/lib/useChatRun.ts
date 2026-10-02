@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { commandAllowed, runAgent, type ApprovalRequest } from "../agent/agent";
+import { nativeInstructionFiles } from "../agent/instructions";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -170,6 +171,7 @@ export function useChatRun(o: Options) {
         reasoning: app.reasoning,
         access: app.access,
         computerUse: app.computerUse && adapter.supportsComputer,
+        nativeInstructions: nativeInstructionFiles(activeProvider),
         allowlist: app.allowlist,
         signal: ctl.signal,
         onLimits: windows => app.recordLimits(activeProvider.id, windows),

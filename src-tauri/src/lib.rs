@@ -41,7 +41,7 @@ pub fn run() {
             tools::fs_search,
             tools::fs_edit,
             tools::fs_write,
-            tools::read_rules,
+            tools::read_instructions,
             tools::read_home_file,
             tools::run_command,
             git::git,

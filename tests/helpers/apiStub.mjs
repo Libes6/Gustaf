@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 
 export const state = {
   settings: new Map(),
+  instructionFiles: [],
   /** Commands the agent asked to run: { root, command }. */
   runs: [],
   runResult: { code: 0, output: 'ran', timed_out: false },
@@ -16,6 +17,7 @@ export const state = {
   shadows: mkdtempSync(join(tmpdir(), 'apistub-shadow-')),
   reset() {
     this.settings.clear();
+    this.instructionFiles = [];
     this.runs.length = 0;
     this.runResult = { code: 0, output: 'ran', timed_out: false };
     this.reviewDiff = () => '';
@@ -57,7 +59,8 @@ export const fsx = {
     writeFileSync(p, content);
     return 'ok';
   },
-  rules: async () => '',
+  /** Instruction files the test put in `state.instructionFiles` ({ name, text }). */
+  instructions: async () => state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
   homeFile: async () => null,
   run: async (root, command) => {
     state.runs.push({ root, command });

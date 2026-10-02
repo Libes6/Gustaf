@@ -1,7 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, LayoutList, LogOut, MoreHorizontal, Pencil, Pin, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
+  Columns2, LayoutList, LogOut, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../i18n";
@@ -9,6 +9,7 @@ import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProj
 import { useApp } from "../state";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
+import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
   const [v, setV] = useState(value);
@@ -99,6 +100,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [editing, setEditing] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [projectLimit, setProjectLimit] = useState(8);
+  const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
 
   const q = query?.toLowerCase() ?? "";
   const chatsByProject = useMemo(() => {
@@ -151,6 +153,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         onClick: () =>
           app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
       })),
+      ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
       ...(p.path ? [{ label: t("showInFinder"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
@@ -310,6 +313,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
 
       </div>
       {menu.node}
+      {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );
 }

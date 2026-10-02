@@ -71,7 +71,8 @@ export const fsx = {
   edit: (root: string, path: string, oldString: string, newString: string) =>
     invoke<string>("fs_edit", { root, path, oldString, newString }),
   write: (root: string, path: string, content: string) => invoke<string>("fs_write", { root, path, content }),
-  rules: (root: string) => invoke<string>("read_rules", { root }),
+  /** AGENTS.md, CLAUDE.md, .cursorrules and always-apply Cursor rules found inside the project root. */
+  instructions: (root: string) => invoke<{ name: string; bytes: number; text: string }[]>("read_instructions", { root }),
   homeFile: (rel: string) => invoke<string | null>("read_home_file", { rel }),
   run: (root: string, command: string, timeoutMs?: number) =>
     invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs }),

@@ -8,6 +8,7 @@ import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
+import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
 
 const ACCESS_ICON: Record<Access, typeof Lock> = { readonly: Lock, auto: ShieldCheck, full: Unlock };
@@ -44,6 +45,7 @@ export function Composer(p: Props) {
   const app = useApp();
   const menu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
+  const instructions = useInstructionReport(root, p.provider);
   const [picker, setPicker] = useState(false);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -178,6 +180,8 @@ export function Composer(p: Props) {
               canRestore={p.canRestore}
               onCompact={p.onCompact}
               onRestore={p.onRestore}
+              instructions={instructions.report}
+              onOpen={instructions.reload}
             />
             <div style={{ position: "relative" }}>
               <button className="chip" onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
