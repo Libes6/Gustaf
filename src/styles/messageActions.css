@@ -1,0 +1,11 @@
+/* Per-message actions (components/chat/TurnView.tsx). */
+.msg-actions.pinned { opacity: 1; }
+.msg-actions .icon-btn.confirm { color: var(--red); width: auto; padding: 0 8px; font-size: 12px; }
+.msg-edit { margin: 20px 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.msg-edit textarea {
+  width: 100%; min-height: 72px; max-height: 320px; resize: vertical; box-sizing: border-box;
+  background: var(--bg-input); color: var(--text); border: 1px solid var(--accent); border-radius: 12px;
+  padding: 10px 12px; font: inherit; line-height: 1.5;
+}
+.msg-edit .hint { align-self: stretch; color: var(--text-3); font-size: 12px; }
+.msg-edit .btns { display: flex; gap: 8px; }

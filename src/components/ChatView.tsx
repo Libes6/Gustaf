@@ -9,6 +9,7 @@ import { getAdapter } from "../providers";
 import { textOf } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { groupTurns } from "../lib/chatTurns";
+import { editableText, turnMessageIds } from "../lib/messageActions";
 import { useChatRun } from "../lib/useChatRun";
 import { useComposerDraft } from "../lib/useComposerDraft";
 import { useMessageJump } from "../lib/useMessageJump";
@@ -18,7 +19,7 @@ import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { Composer } from "./chat/Composer";
 import { LiveStatus } from "./chat/LiveStatus";
-import { TurnView } from "./chat/TurnView";
+import { TurnView, type TurnHandlers } from "./chat/TurnView";
 
 export function ChatView({ session, visible }: { session: ChatSession; visible: boolean }) {
   const t = useT();
@@ -49,6 +50,15 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom,
   });
   const { stream, error, running, approval, toolResults, activities } = run;
+  // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
+  const latest = useRef({ run, title: "", branchLabel: "" });
+  latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix") };
+  const turnHandlers = useMemo<TurnHandlers>(() => ({
+    onEdit: (m, txt) => void latest.current.run.resendFrom(m, txt),
+    onRegenerate: (user) => void latest.current.run.resendFrom(user, editableText(user)),
+    onDelete: (turn) => void latest.current.run.removeMessages((turn.user ?? turn.steps[0]).chat_id, turnMessageIds(turn)),
+    onBranch: (m) => void latest.current.run.branchFrom(m, latest.current.title, latest.current.branchLabel),
+  }), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +116,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         <div className="feed" ref={feedRef} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
-              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} />
+              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
             ))}
             <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} />
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button>{reserve && <button className="btn-soft" disabled={running} onClick={() => run.retryRequest(reserve)}>{t("retryReserve", { name: reserve.name })}</button>}</div></div>}
