@@ -1,0 +1,38 @@
+/* "Commit accepted changes": the offer line in the changes panel and the commit dialog. */
+.commit-offer, .commit-notice { display: flex; align-items: center; gap: 6px; padding: 0 10px 8px; color: var(--text-2); }
+.commit-offer .grow, .commit-notice .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-notice { color: var(--green); }
+
+.review-dialog.git-dialog { width: min(640px, 100%); }
+.git-body { padding: 14px 18px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+.git-state { display: flex; align-items: center; gap: 6px; color: var(--text-2); min-width: 0; }
+.git-state strong { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-note { font-size: 12.5px; color: var(--warn); margin-top: 4px; }
+.git-note.muted { color: var(--text-3); }
+.git-note.bad { color: var(--red); }
+.git-note.grow { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-body > .git-note { margin-top: -6px; }
+.error-box.git-error { margin: 0; max-height: 160px; overflow: auto; font: 12px/1.5 var(--mono); user-select: text; }
+.error-box.git-error-foot { margin: 0 18px 10px; }
+
+.git-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12.5px; color: var(--text-2); }
+.git-group-head strong { color: var(--text); font-weight: 600; }
+.git-group-head .grow { flex: 1; color: var(--text-3); }
+.git-files { max-height: 200px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.git-file { display: flex; align-items: center; gap: 8px; padding: 5px 10px; }
+.git-file:hover { background: var(--bg-hover); }
+.git-file input, .git-check input { accent-color: var(--accent); margin: 0; flex: none; }
+.git-file .git-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); }
+.git-kind { flex: none; width: 14px; text-align: center; font: 600 11px var(--mono); }
+.git-kind.modified { color: var(--warn); }
+.git-kind.added, .git-kind.untracked { color: var(--green); }
+.git-kind.deleted, .git-kind.conflicted { color: var(--red); }
+.git-tag { flex: none; font-size: 11px; color: var(--text-3); }
+
+.git-message-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.git-message-head label { flex: 1; color: var(--text-2); font-size: 12.5px; }
+textarea.git-message { height: auto; min-height: 110px; padding: 8px 10px; resize: vertical; font: 13px/1.5 var(--mono); }
+.git-check { display: flex; align-items: center; gap: 8px; }
+.git-branch-name { margin-top: 8px; font-family: var(--mono); }
+.git-branch-name[aria-invalid="true"] { border-color: var(--red); }
+.git-actions { align-items: center; justify-content: flex-end; }
