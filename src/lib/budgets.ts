@@ -93,6 +93,13 @@ export function summarizeUsage(records: UsageRecord[], range?: { from: number; t
   return totals;
 }
 
+/**
+ * Adds tokens that are not stored as chat messages (background subagents, see `agentUsage` in agent/agentRunsModel.ts).
+ * Unreadable totals stay unreadable.
+ */
+export const withExtraTokens = (t: UsageTotals | undefined, extra: number): UsageTotals | undefined =>
+  t && extra > 0 ? { ...t, tokens: t.tokens + extra, counted: t.counted + 1 } : t;
+
 /** Tokens in the local calendar day containing `now`. A new local date starts from zero again. */
 export const summarizeDay = (records: UsageRecord[], now: number): UsageTotals =>
   summarizeUsage(records, { from: localDayStart(now), to: nextLocalDayStart(now) });

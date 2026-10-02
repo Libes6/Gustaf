@@ -6,6 +6,8 @@ import { gitRepo, type CommitResult, type GitFileKind, type GitStatus } from "..
 import { buildCommitPrompt, diffBudget, messageFromParts } from "../lib/commitMessage";
 import { branchNameProblem, candidates, commitProblem, initialSelection, suggestBranchName, type Candidate } from "../lib/gitCommit";
 import { getAdapter } from "../providers";
+import { loadAgentSettings } from "../agent/agentSettingsStore";
+import { cheapTarget } from "../lib/modelRouting";
 import { useApp } from "../state";
 import "../styles/gitCommit.css";
 
@@ -90,22 +92,24 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
     setGenerating(true);
     setError("");
     try {
-      const budget = diffBudget(model?.contextWindow);
+      // The cheap model from the agent settings when configured and available, else the chat's model.
+      const target = cheapTarget(await loadAgentSettings(), app, { provider, model: selection.model });
+      const budget = diffBudget(target.info?.contextWindow);
       const context = await gitRepo.commitContext(root, paths, budget);
       const { system, user } = buildCommitPrompt(context, budget);
-      const adapter = await getAdapter(provider);
-      app.bumpUsage(provider.id);
+      const adapter = await getAdapter(target.provider);
+      app.bumpUsage(target.provider.id);
       const out = await adapter.turn({
         system,
         messages: [{ role: "user", parts: [{ type: "text", text: user }] }],
-        tools: [], model: selection.model, cwd: root, access: "readonly", signal: ctl.signal, onText: () => {},
+        tools: [], model: target.model, cwd: root, access: "readonly", signal: ctl.signal, onText: () => {},
       });
-      app.recordTokens(provider.id, selection.model, out.usage);
+      app.recordTokens(target.provider.id, target.model, out.usage);
       if (ctl.signal.aborted) return;
       const text = messageFromParts(out.parts);
       if (!text) throw new Error(t("gitMessageFailed"));
       setMessage(text);
-      setGeneratedBy(modelName);
+      setGeneratedBy(target.info?.name ?? target.model);
     } catch (e: any) {
       if (!ctl.signal.aborted) setError(String(e?.message ?? e));
     } finally {

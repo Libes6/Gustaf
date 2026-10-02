@@ -11,6 +11,9 @@
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
+    "core:window:allow-set-badge-count",
+    "core:window:allow-request-user-attention",
+    "notification:default",
     "opener:default",
     {
       "identifier": "opener:allow-open-url",

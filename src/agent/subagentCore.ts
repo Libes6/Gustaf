@@ -23,17 +23,22 @@ export const SPAWN_TOOL: ToolDef = {
       prompt: { type: "string", description: "Complete, self-contained instructions for the subagent" },
       type: { type: "string", enum: [...AGENT_TYPES], description: "explore | plan | general | review" },
       files: { type: "array", items: { type: "string" }, description: "Optional project-relative files the subagent should focus on" },
+      model: { type: "string", description: "Optional model (`provider/model`) from the allowed list; omit to use the default for the type" },
     },
     required: ["title", "prompt", "type"],
   },
 };
+
+/** The spawn tool as offered to the model: the allowed models are named in the description. */
+export const spawnToolFor = (allowedModels: readonly string[]): ToolDef =>
+  allowedModels.length > 1 ? { ...SPAWN_TOOL, description: `${SPAWN_TOOL.description} Models you may pass in \`model\`: ${allowedModels.join(", ")}.` } : SPAWN_TOOL;
 
 export const MAX_TITLE = 80;
 export const MAX_PROMPT = 20_000;
 export const MAX_FILES = 20;
 export const MAX_REPORT_CHARS = 8_000;
 
-export type SpawnArgs = { title: string; prompt: string; type: AgentType; files: string[] };
+export type SpawnArgs = { title: string; prompt: string; type: AgentType; files: string[]; /** Explicitly requested model (checked against the allow-list later). */ model?: string };
 
 /** A project-relative path that cannot leave the project (no absolute path, no `..`). */
 export const safeRelativePath = (p: string) => !!p && !p.startsWith("/") && !p.startsWith("~") && !/^[a-z]:[\\/]/i.test(p) && !p.split(/[\\/]/).includes("..") && !p.includes("\0");
@@ -48,7 +53,8 @@ export function parseSpawnArgs(raw: unknown): { ok: true; value: SpawnArgs } | {
   const type = a.type === undefined ? "explore" : a.type;
   if (!isAgentType(type)) return { ok: false, error: `spawn_agent \`type\` must be one of: ${AGENT_TYPES.join(", ")}.` };
   const files = Array.isArray(a.files) ? [...new Set(a.files.filter((f): f is string => typeof f === "string").map((f) => f.trim().replace(/^\.\//, "")).filter(safeRelativePath))].slice(0, MAX_FILES) : [];
-  return { ok: true, value: { title, prompt, type, files } };
+  const model = typeof a.model === "string" && a.model.trim() ? a.model.trim().slice(0, 300) : undefined;
+  return { ok: true, value: { title, prompt, type, files, ...(model ? { model } : {}) } };
 }
 
 // ---- per-type tool allowlists ----
@@ -79,7 +85,7 @@ export const DEFAULT_BUDGETS: Record<AgentType, Budget> = {
   review: { maxSteps: 20, maxToolCalls: 40, maxMs: 5 * 60_000, maxTokens: 600_000 },
   general: { maxSteps: 40, maxToolCalls: 80, maxMs: 15 * 60_000, maxTokens: 1_500_000 },
 };
-const HARD_CAPS: Budget = { maxSteps: 100, maxToolCalls: 300, maxMs: 60 * 60_000, maxTokens: 5_000_000 };
+export const HARD_CAPS: Budget = { maxSteps: 100, maxToolCalls: 300, maxMs: 60 * 60_000, maxTokens: 5_000_000 };
 
 /** The budget of one run: defaults for the type, overridden by (validated) overrides, never above the hard caps. */
 export function resolveBudget(type: AgentType, overrides?: BudgetOverrides): Budget {

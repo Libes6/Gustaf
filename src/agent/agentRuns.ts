@@ -1,6 +1,10 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "../lib/api";
-import { AGENT_RUNS_SETTING, appendStep, boundRuns, forPersist, isActiveStatus, mergeRuns, normalizeRuns, type AgentRun, type TranscriptStep } from "./agentRunsModel";
+import { localDayKey } from "../lib/budgets";
+import {
+  AGENT_RUNS_SETTING, AGENT_USAGE_SETTING, EMPTY_LEDGER, addToLedger, appendStep, boundRuns, forPersist, isActiveStatus, mergeRuns, normalizeLedger, normalizeRuns,
+  type AgentRun, type AgentUsageLedger, type TranscriptStep,
+} from "./agentRunsModel";
 
 // Background agent runs: one shared in-memory list (like rulesStore.ts), persisted shortly after each change in the app
 // `settings` table under "agentRuns". Runs that were still active when the app stopped load as "interrupted".
@@ -86,11 +90,39 @@ export function removeFinished(root?: string) {
   change(runs.filter((r) => isActiveStatus(r.status) || (root !== undefined && r.projectRoot !== root)), true);
 }
 
+// ---- subagent tokens for Budgets (persisted under "agentUsage") ----
+let ledger: AgentUsageLedger = EMPTY_LEDGER;
+let ledgerLoading: Promise<void> | undefined;
+const loadLedger = () => {
+  ledgerLoading ??= getSetting<unknown>(AGENT_USAGE_SETTING, null)
+    .then((raw) => {
+      const stored = normalizeLedger(raw);
+      // Tokens recorded before the stored copy arrived are added on top of it.
+      for (const [k, n] of Object.entries(ledger.days)) stored.days[k] = (stored.days[k] ?? 0) + n;
+      for (const [k, n] of Object.entries(ledger.chats)) stored.chats[k] = (stored.chats[k] ?? 0) + n;
+      ledger = stored;
+    })
+    .catch(() => {
+      ledgerLoading = undefined;
+    });
+  return ledgerLoading;
+};
+/** Loads the stored ledger (Budgets awaits this before reading it). */
+export const loadAgentUsage = () => loadLedger().then(() => ledger);
+export const getAgentUsage = () => ledger;
+export function recordAgentTokens(chatId: number | undefined, tokens: number, at = Date.now()) {
+  if (!(tokens > 0)) return;
+  ledger = addToLedger(ledger, localDayKey(at), chatId, tokens);
+  void loadLedger().then(() => setSetting(AGENT_USAGE_SETTING, ledger).catch(() => {}));
+}
+
 /** Test helper: forget everything in memory (the persisted copy is left alone). */
 export function resetAgentRuns() {
   clearTimeout(timer);
   runs = [];
   loading = undefined;
+  ledger = EMPTY_LEDGER;
+  ledgerLoading = undefined;
   stoppers.clear();
   emit();
 }

@@ -144,3 +144,40 @@ export function elapsed(run: Pick<AgentRun, "status" | "startedAt" | "endedAt">,
 }
 
 export const formatTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n));
+
+// ---- token ledger for Budgets ----
+// Subagent replies are not stored as chat messages, so the budget gauge (which reads stored messages) would miss them.
+// Their tokens are added here per local day and per parent chat, persisted under "agentUsage", bounded.
+export const AGENT_USAGE_SETTING = "agentUsage";
+export const MAX_LEDGER_DAYS = 31;
+export const MAX_LEDGER_CHATS = 300;
+export type AgentUsageLedger = { days: Record<string, number>; chats: Record<string, number> };
+export const EMPTY_LEDGER: AgentUsageLedger = { days: {}, chats: {} };
+
+const counts = (v: unknown, max: number, keyOk: (k: string) => boolean) => {
+  const out: Record<string, number> = {};
+  if (!v || typeof v !== "object") return out;
+  for (const [k, n] of Object.entries(v as Record<string, unknown>).slice(-max)) if (keyOk(k) && typeof n === "number" && Number.isFinite(n) && n > 0) out[k] = Math.floor(n);
+  return out;
+};
+export const normalizeLedger = (raw: unknown): AgentUsageLedger => {
+  const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return { days: counts(r.days, MAX_LEDGER_DAYS, (k) => /^\d{4}-\d{2}-\d{2}$/.test(k)), chats: counts(r.chats, MAX_LEDGER_CHATS, (k) => /^c\d+$/.test(k)) };
+};
+
+/** Adds `tokens` to the day and (when known) the chat; the oldest days and least recently used chats fall off. */
+export function addToLedger(l: AgentUsageLedger, dayKey: string, chatId: number | undefined, tokens: number): AgentUsageLedger {
+  if (!(tokens > 0)) return l;
+  const days: Record<string, number> = { ...l.days, [dayKey]: (l.days[dayKey] ?? 0) + Math.floor(tokens) };
+  const keepDays = Object.keys(days).sort().slice(-MAX_LEDGER_DAYS);
+  let chats = l.chats;
+  if (chatId !== undefined) {
+    const key = `c${chatId}`; // a prefix keeps insertion order (integer-like keys are sorted numerically)
+    const { [key]: old = 0, ...rest } = l.chats;
+    const moved: Record<string, number> = { ...rest, [key]: old + Math.floor(tokens) };
+    chats = Object.fromEntries(Object.entries(moved).slice(-MAX_LEDGER_CHATS));
+  }
+  return { days: Object.fromEntries(keepDays.map((k) => [k, days[k]])), chats };
+}
+export const ledgerDay = (l: AgentUsageLedger, dayKey: string) => l.days[dayKey] ?? 0;
+export const ledgerChat = (l: AgentUsageLedger, chatId: number | null | undefined) => (chatId == null ? 0 : l.chats[`c${chatId}`] ?? 0);
