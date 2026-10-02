@@ -1,0 +1,25 @@
+/* Budget alerts (non-blocking, dismissible) and the Budgets block on the Usage settings page. */
+.budget-alerts {
+  position: fixed; top: calc(var(--titlebar) + 4px); left: 50%; transform: translateX(-50%); z-index: 30;
+  display: grid; gap: 8px; width: min(560px, calc(100vw - 32px)); pointer-events: none;
+}
+.budget-alert {
+  pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: 0 8px 24px #0007; font-size: 12.5px;
+}
+.budget-alert.warning { border-color: #e9a23b66; }
+.budget-alert.exceeded { border-color: #ef6b6b66; }
+.budget-alert > svg { flex: none; margin-top: 1px; color: var(--text-2); }
+.budget-alert.warning > svg { color: var(--warn); }
+.budget-alert.exceeded > svg { color: var(--red); }
+.budget-alert .msg { flex: 1; min-width: 0; user-select: text; }
+.budget-alert .dismiss { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; color: var(--text-2); }
+.budget-alert .dismiss:hover { background: var(--bg-hover); color: var(--text); }
+
+.budget-state { margin-top: 3px; }
+.budget-state.warning { color: var(--warn); }
+.budget-state.exceeded { color: var(--red); }
+.budget-error { color: var(--red); font-size: 12.5px; margin-top: 3px; }
+.input.budget-input { width: 150px; height: 30px; flex: none; text-align: right; }
+.input.budget-input[aria-invalid="true"] { border-color: var(--red); }

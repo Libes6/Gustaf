@@ -1,0 +1,48 @@
+[package]
+name = "mcode"
+version = "0.1.0"
+description = "M Code"
+authors = ["maksimkulakov"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "mcode_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+tauri-plugin-http = { version = "~2.7", features = ["stream"] }
+security-framework = "3.7.0"
+tauri-plugin-dialog = "2.8.0"
+tauri-plugin-global-shortcut = "2.4.0"
+ignore = "0.4.33"
+regex = "1.13.1"
+dirs = "7.0.0"
+base64 = "0.23.1"
+enigo = "0.6.1"
+xcap = "0.9.8"
+tauri-plugin-shell = "2.4.0"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
