@@ -20,6 +20,15 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Full-text search across chats** (SQLite FTS5 index `messages_fts` kept in sync by triggers and backfilled on start; `search_messages` in `db.rs`; Cmd+K `SearchPalette` with project/model filters, snippets, keyboard navigation and jump to the message).
 - [ ] **Run setup and tests in the shadow copy** (install deps or link `node_modules`; optional `npm test` before accepting changes).
 
+## P1.5 — CLI image attachments
+- [ ] **Forward image attachments to CLI providers** (today `images: false` in `providers/cli.ts` and the composer refuses them). Plan:
+  1. On send, write attached images to `<app data>/attachments/<chat>/<n>.png` (bounded size, unique names).
+  2. Codex: pass files with `exec -i <file>` (verify on a working Codex install). Claude Code and Cursor Agent: add "Attached image: <path> (read it)" to the prompt; later consider Claude `--input-format stream-json` with native image blocks.
+  3. Set `images: true` for these CLIs (keep false when the underlying model has no vision).
+  4. Delete temp files after the reply and when the chat is deleted; never store them in the project folder.
+  5. Tests for arg building and prompt text (`cliArgs.test.mjs`); update the README sentence about unsupported CLI attachments.
+  Touches `cli.ts`, `cliArgs.ts`, `ChatView.tsx` (start after the ChatView split is merged).
+
 ## P2
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
 - [ ] **Partial accept**: apply changes per hunk in `ChangesPanel`.
