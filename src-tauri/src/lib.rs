@@ -1,3 +1,4 @@
+mod attachments;
 mod computer;
 mod cursor_import;
 mod db;
@@ -59,6 +60,8 @@ pub fn run() {
             computer::cu_save_shot,
             computer::cu_permissions,
             computer::cu_screen_size,
+            attachments::attachments_save,
+            attachments::attachments_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

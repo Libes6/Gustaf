@@ -19,6 +19,7 @@ export type RunOptions = {
   reviewMode?: boolean;
   /** Directories of the review workspace that are symlinks to the original project's dependencies. */
   reviewLinked?: string[];
+  chatId?: number;
   supportsTools?: boolean;
   history: Msg[];
   adapter: Adapter;
@@ -159,6 +160,7 @@ async function runLoop(o: RunOptions) {
       reasoning: o.reasoning,
       computer: screen ? { width: screen.width, height: screen.height } : undefined,
       cwd: o.root ?? undefined,
+      chatId: o.chatId,
       access: o.access,
       signal: o.signal,
       onText: o.onText,

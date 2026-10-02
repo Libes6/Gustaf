@@ -470,7 +470,7 @@
   "hunkRejectSelected": "Reject selected ({count})",
   "restoreContext": "Restore full context",
   "restoreContextHint": "Remove only the summaries and send the entire conversation again.",
-  "imagesUnsupported": "This CLI connection does not send attached images. Select another connection.",
+  "imagesUnsupported": "The selected model does not accept images. Select another model or remove the images.",
   "retryingIn": "Retrying in {seconds}s (attempt {attempt} of {max})…",
   "gitCommitAction": "Commit…",
   "gitCommitTitle": "Commit changes",

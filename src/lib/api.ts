@@ -149,3 +149,9 @@ export const computer = {
   screenSize: () => invoke<[number, number]>("cu_screen_size").then(([width, height]) => ({ width, height })),
   permissions: (request = false) => invoke<{ accessibility: boolean; screen: boolean }>("cu_permissions", { request }),
 };
+
+/** Image attachments for CLI providers, stored under the app data folder (src-tauri/src/attachments.rs). */
+export const attachments = {
+  save: (chatId: number, images: string[]) => invoke<{ dir: string; files: string[] }>("attachments_save", { chatId, images }),
+  clear: (chatId: number) => invoke<void>("attachments_clear", { chatId }),
+};

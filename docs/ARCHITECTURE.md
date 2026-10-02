@@ -47,6 +47,7 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | `git.rs` | `git`: generic wrapper, also drives the app-managed shadow checkpoint repo. Project-repo commands for the commit flow (argument arrays only, no shell; paths validated with `resolve_in_root` and passed as literal pathspecs; repo-configured fsmonitor/textconv/external-diff commands disabled; hooks and signing never bypassed; no push/amend/force): `git_status` (branch, HEAD, changed files under the project root, unfinished merge/rebase), `git_commit_context` (bounded, fairly budgeted diff + stat + recent subjects of the selected files, for message generation), `git_commit` (commits exactly the given paths via `commit --only`, optional new branch from HEAD, rolls the branch and staging back if the commit fails). Multi-step operations are serialized per repository |
 | `secrets.rs` | `secret_set/get/delete` (API keys) |
 | `computer.rs` | Computer Use: `cu_execute`, `cu_screen_size`, `cu_permissions`, `cu_save_shot` |
+| `attachments.rs` | `attachments_save` (base64 images to `<app data>/attachments/<chat id>/<n>.<ext>`, magic-byte type check, at most 8 images of 10 MB, all-or-nothing, `create_new` names), `attachments_clear` (removes a chat's folder). Used by `providers/cli.ts`: written at the start of a CLI turn, removed in its `finally` and when a project is removed |
 | `cursor_import.rs` | Import history from Cursor: `cursor_scan`, `cursor_messages` |
 
 #### Full-text search (`db.rs`)

@@ -3,7 +3,8 @@ import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
-import { codexArgs } from "./cliArgs";
+import { codexArgs, turnImages, withImagePaths } from "./cliArgs";
+import { attachments } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { Command } from "@tauri-apps/plugin-shell";
 import { flattenMsg, textOf, type Adapter, type CliId, type ProviderConfig, type TurnInput } from "./types";
@@ -90,7 +91,7 @@ export function resumePoint(t: TurnInput, providerId: string, withSystem: boolea
     : (withSystem ? `${t.system}\n\n` : "") +
       (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
   // Resumed CLI sessions may predate canvas support and don't receive the API system message.
-  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt };
+  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
 }
 
 async function listCodexModels() {
@@ -110,7 +111,10 @@ type Ev = { text?: string; session?: string; final?: string; error?: string };
 type Spec = {
   name: string;
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
-  args(o: { model?: string; session?: string; access: TurnInput["access"] }): string[];
+  /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
+  args(o: { model?: string; session?: string; access: TurnInput["access"]; images?: string[]; attachDir?: string }): string[];
+  /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
+  imageFlag?: boolean;
   parse(e: any): Ev;
   loginHint: string;
 };
@@ -120,7 +124,7 @@ const SPECS: Record<CliId, Spec> = {
   claude: {
     name: "Claude Code",
     models: ["default", "opus", "sonnet", "haiku"],
-    args: claudeArgs,
+    args: ({ attachDir, ...o }) => claudeArgs({ ...o, addDir: attachDir }),
     parse: parseClaudeEvent,
     loginHint: "claude auth login",
   },
@@ -136,11 +140,12 @@ const SPECS: Record<CliId, Spec> = {
       if (!out.length) throw new Error(cmd.stderr || cmd.stdout || "cursor-agent --list-models: empty");
       return out;
     },
-    args: ({ model, session, access }) => [
+    args: ({ model, session, access, attachDir }) => [
       "-p", "--output-format", "stream-json", "--stream-partial-output", "--trust",
       ...(access === "readonly" ? ["--mode", "plan"] : access === "full" ? ["--force"] : []),
       ...(model ? ["--model", model] : []),
       ...(session ? ["--resume", session] : []),
+      ...(attachDir ? ["--add-dir", attachDir] : []),
     ],
     parse: (e) => {
       // With --stream-partial-output the deltas carry timestamp_ms; the aggregate repeats without it.
@@ -154,6 +159,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Codex",
     models: listCodexModels,
     args: codexArgs,
+    imageFlag: true,
     parse: (e) => {
       if (e.type === "thread.started") return { session: e.thread_id };
       const it = e.item;
@@ -193,19 +199,23 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
         const cmd = await Command.create('zsh', ['-lc', `${shq(executable)} --list-models`], { ...(cfg.cliAuth === "key" ? { env: cursorAccountEnv(cfg, key) } : {}) }).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
-          return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: false }] : [];
+          return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
         });
         if (cmd.code || !models.length) throw new Error(cmd.stderr || 'Cursor did not return models.');
         return models;
       }
       const list = typeof spec.models === "function" ? await spec.models() : spec.models.map((id) => ({ id, name: id }));
-      return list.map((m) => ({ ...m, providerId: cfg.id, created: 0, tools: true, images: false }));
+      return list.map((m) => ({ ...m, providerId: cfg.id, created: 0, tools: true, images: true }));
     },
 
     async turn(t: TurnInput) {
       const point = resumePoint(t, cfg.id, false);
       let session = point.session;
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto" });
+      // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
+      const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
+      try {
+      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", images: saved?.files, attachDir: saved?.dir });
+      const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
       let text = "";
       const actions = new Map<string, Activity>();
       let final = "";
@@ -218,7 +228,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
       const executable = id === "codex" ? await codexExecutable() : id === "cursor-agent" ? await cursorExecutable() : await claudeExecutable();
       const res = await spawnLines(
         // Prompt goes last as one quoted argument; all three CLIs take it positionally.
-        `${id === "claude" && executable.startsWith("/") ? `export PATH=${shq(executable.slice(0, executable.lastIndexOf("/")))}:"$PATH"; ` : ""}exec ${shq(executable)} ${[...args, point.prompt].map(shq).join(" ")} < /dev/null`,
+        `${id === "claude" && executable.startsWith("/") ? `export PATH=${shq(executable.slice(0, executable.lastIndexOf("/")))}:"$PATH"; ` : ""}exec ${shq(executable)} ${[...args, prompt].map(shq).join(" ")} < /dev/null`,
         (e) => {
           if (e.type === "result" || e.type === "turn.completed") usage = tokenUsage(e.usage, id === "claude") ?? usage;
           const limit = claudeLimit(e);
@@ -244,6 +254,9 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
       }
       if (!text.trim() && final) emit(final);
       return { parts: [...[...actions.values()].map(a => a.status === "running" ? { ...a, status: "unknown" as const } : a), ...(text ? [{ type: "text" as const, text }] : [])], responseId: session, usage };
+      } finally {
+        if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
+      }
     },
   };
 }
