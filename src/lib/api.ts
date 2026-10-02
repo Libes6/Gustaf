@@ -62,6 +62,28 @@ export const cursor = {
   messages: (chatId: string) => invoke<{ role: "user" | "assistant"; text: string }[]>("cursor_messages", { chatId }),
 };
 
+/** Summary of a session (Claude Code, Codex) or conversation (ChatGPT) found by the history scanners in `import_sources.rs`. */
+export type SourceSession = {
+  id: string;
+  path: string;
+  title: string;
+  projectPath: string | null;
+  messageCount: number;
+  createdAt: number;
+  updatedAt: number;
+  sizeBytes: number;
+  truncated: boolean;
+};
+
+/** Read-only history readers. Session files are only readable inside the tool's own history folder. */
+export const importSources = {
+  scan: (source: "claude" | "codex") => invoke<SourceSession[]>("import_scan", { source }),
+  readSession: (source: "claude" | "codex", path: string) =>
+    invoke<{ text: string; truncated: boolean }>("import_read_session", { source, path }),
+  chatgptScan: (path: string) => invoke<SourceSession[]>("import_chatgpt_scan", { path }),
+  chatgptRead: (path: string, ids: string[]) => invoke<{ conversations: string[]; skipped: string[] }>("import_chatgpt_read", { path, ids }),
+};
+
 export const fsx = {
   read: (root: string, path: string, offset?: number, limit?: number) =>
     invoke<string>("fs_read", { root, path, offset, limit }),

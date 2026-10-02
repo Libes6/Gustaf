@@ -4,6 +4,7 @@ mod cursor_import;
 mod db;
 mod git;
 mod hunks;
+mod import_sources;
 mod review;
 mod secrets;
 mod tools;
@@ -35,6 +36,10 @@ pub fn run() {
             secrets::secret_delete,
             cursor_import::cursor_scan,
             cursor_import::cursor_messages,
+            import_sources::import_scan,
+            import_sources::import_read_session,
+            import_sources::import_chatgpt_scan,
+            import_sources::import_chatgpt_read,
             tools::fs_read,
             tools::fs_list,
             tools::fs_files,
