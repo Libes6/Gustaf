@@ -21,6 +21,7 @@ import { Markdown } from "./Markdown";
 import { useMenu } from "./Menu";
 import { ModelPicker } from "./ModelPicker";
 import { ModelIcon } from "./ModelIcon";
+import { LiveMeter, type LiveStats } from "./LiveMeter";
 import { summarize, ToolCard } from "./ToolCard";
 
 type Turn = { user?: StoredMsg; steps: StoredMsg[] };
@@ -173,6 +174,16 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const activityRef = useRef<Extract<Part, { type: "activity" }>[]>([]);
   const reviewRef = useRef<Review | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const contextRef = useRef<HTMLDivElement>(null);
+  const live = useRef<LiveStats>({ start: 0, chars: 0, input: 0 });
+  useEffect(() => {
+    if (!contextOpen) return;
+    const close = (e: MouseEvent) => { if (!contextRef.current?.contains(e.target as Node)) setContextOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setContextOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
+  }, [contextOpen]);
   const draft = useComposerDraft(session, text, images, (d) => { setText(d.text); setImages(d.images); });
 
   const chat =app.chats.find((c) => c.id === session.chatId);
@@ -260,6 +271,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     setActivities([]);
     setToolResults([]);
     activityRef.current = [];
+    live.current = { start: Date.now(), chars: 0, input: estimateContext(effectiveHistory(messages), body) };
     if (!retry) reviewRef.current = null;
     const ctl = new AbortController();
     abortRef.current = ctl;
@@ -313,7 +325,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         allowlist: app.allowlist,
         signal: ctl.signal,
         onLimits: windows => app.recordLimits(activeProvider.id, windows),
-        onText: (d) => setStream((s) => (s ?? "") + d),
+        onText: (d) => { live.current.chars += d.length; setStream((s) => (s ?? "") + d); },
         onToolResult: result => setToolResults(rs => [...rs.filter(r => r.id !== result.id), result]),
         onActivity: a => {
           activityRef.current = [...activityRef.current.filter(p => p.id !== a.id), a];
@@ -493,8 +505,9 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
                   <Markdown text={stream} />
                 </div>
               ) : (
-                !approval && <div className="thinking"><span>{t("thinking")}</span></div>
+                !approval && <div className="thinking"><span>{t("thinking")}</span> <LiveMeter stats={live.current} /></div>
               ))}
+            {stream && !approval && <div className="thinking"><LiveMeter stats={live.current} /></div>}
             {approval && visible && <ApprovalCard req={approval.req} onAnswer={approval.resolve} />}
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => send(!!retryRef.current)}>{t("retryRequest")}</button>{reserve && <button className="btn-soft" disabled={running} onClick={() => send(!!retryRef.current, reserve)}>{t("retryReserve", { name: reserve.name })}</button>}</div></div>}
           </div>
@@ -507,23 +520,6 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       )}
 
       <div className="composer-wrap">
-        <div className="context-strip">
-          <button className="chip" aria-expanded={contextOpen} onClick={() => setContextOpen(!contextOpen)}>
-            <Brain size={13} /> {t("contextLabel")} ≈{t.num(contextTokens)}{selectedModel?.contextWindow ? ` / ${t.num(selectedModel.contextWindow)}` : ""}
-            {selectedModel?.contextWindow && <progress value={contextTokens} max={selectedModel.contextWindow} />} <ChevronDown size={12} />
-          </button>
-          {root && <span className="hint">{app.access === "readonly" ? t("accessReadonly") : t("reviewMode")}</span>}
-        </div>
-        {contextOpen && <div className="context-details">
-          <div>{t("contextEstimateHint")}</div>
-          <div>{t("contextWindow")}: {selectedModel?.contextWindow ? t.num(selectedModel.contextWindow) : t("capabilityUnknown")}</div>
-          <div>{t("contextLastInput")}: {lastInput != null ? t.num(lastInput) : t("capabilityUnknown")}</div>
-          <div>{t("capImages")}: {selectedModel?.images == null ? t("capabilityUnknown") : t(selectedModel.images ? "capabilityYes" : "capabilityNo")}</div>
-          <div>{t("capTools")}: {selectedModel?.tools == null ? t("capabilityUnknown") : t(selectedModel.tools ? "capabilityYes" : "capabilityNo")}</div>
-          <button className="btn-soft" disabled={running || !loaded || messages.length < 4 || !provider} onClick={compact}>{t("compactChat")}</button>
-          {messages.some(m => m.meta?.compacted) && <button className="btn-soft" disabled={running} title={t("restoreContextHint")} onClick={restoreContext}>{t("restoreContext")}</button>}
-          <span className="hint">{t("compactHint")}</span>
-        </div>}
         <div
           className="composer"
           onDragOver={(e) => e.preventDefault()}
@@ -587,7 +583,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
                   { label: t("accessFull"), icon: <Unlock size={15} />, kbd: app.access === "full" ? "✓" : "", onClick: () => app.setAccess("full") },
                 ])
               }
-              title={t("accessMode")}
+              title={root && app.access !== "readonly" ? `${t("accessMode")} · ${t("reviewMode")}` : t("accessMode")}
             >
               <AccessIcon size={14} /> {accessLabel}
             </button>
@@ -597,6 +593,24 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
               </button>
             )}
             <span className="grow" />
+            <div className="ctx-wrap" ref={contextRef}>
+              <button className="chip ctx" aria-expanded={contextOpen} title={t("contextEstimateHint")} onClick={() => setContextOpen(!contextOpen)}>
+                {selectedModel?.contextWindow
+                  ? <span className="ctx-ring" style={{ ["--p" as string]: `${Math.min(100, Math.round((contextTokens / selectedModel.contextWindow) * 100))}%` }} />
+                  : <Brain size={13} />}
+                ≈{t.num(contextTokens)}
+              </button>
+          {contextOpen && <div className="context-pop">
+          <div>{t("contextEstimateHint")}</div>
+          <div>{t("contextWindow")}: {selectedModel?.contextWindow ? t.num(selectedModel.contextWindow) : t("capabilityUnknown")}</div>
+          <div>{t("contextLastInput")}: {lastInput != null ? t.num(lastInput) : t("capabilityUnknown")}</div>
+          <div>{t("capImages")}: {selectedModel?.images == null ? t("capabilityUnknown") : t(selectedModel.images ? "capabilityYes" : "capabilityNo")}</div>
+          <div>{t("capTools")}: {selectedModel?.tools == null ? t("capabilityUnknown") : t(selectedModel.tools ? "capabilityYes" : "capabilityNo")}</div>
+          <button className="btn-soft" disabled={running || !loaded || messages.length < 4 || !provider} onClick={compact}>{t("compactChat")}</button>
+          {messages.some(m => m.meta?.compacted) && <button className="btn-soft" disabled={running} title={t("restoreContextHint")} onClick={restoreContext}>{t("restoreContext")}</button>}
+          <span className="hint">{t("compactHint")}</span>
+          </div>}
+            </div>
             <div style={{ position: "relative" }}>
               <button className="chip" onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
                 {provider && <ModelIcon model={app.selection?.model ?? ""} provider={provider} size={15} />}

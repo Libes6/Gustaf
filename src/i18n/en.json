@@ -217,6 +217,8 @@
   "terminal": "Terminal",
   "testConnection": "Test connection",
   "thinking": "Thinking…",
+  "liveMeter": "↑ ≈{input} · ↓ ≈{output} tokens · {seconds}s",
+  "liveMeterHint": "Estimate from text length while the reply is running. Exact provider usage appears when the step finishes.",
   "thisComputer": "this computer",
   "toggleSidebar": "Toggle sidebar",
   "unarchive": "Restore",
