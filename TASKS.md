@@ -53,7 +53,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Theming**: light/dark/system and accent color.
 - [ ] **Windows/Linux support audit** (`secrets.rs` is macOS Keychain only; `computer.rs`; paths).
 - [x] **Export/import chats** (Markdown/JSON export, JSON import).
-- [ ] **Importers** for Claude Code, Codex and ChatGPT histories (Cursor exists in `cursor_import.rs`).
+- [x] **Importers** for Claude Code, Codex and ChatGPT histories (`import_sources.rs`, `src/lib/importers/`; Cursor stays in `cursor_import.rs`).
 - [ ] **Smoke-test in `tauri dev`**: draft restore, budgets banner, chat export/import, save dialog.
 
 ## Multi-agent (epic)

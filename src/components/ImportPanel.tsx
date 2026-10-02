@@ -4,14 +4,16 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useT } from "../i18n";
 import { db, fsx } from "../lib/api";
 import {
-  addMessage, archiveChat, createChat, createProject, importFromCursor, listArchived, listChats, listProjects, loadMessages, scanCursor,
+  addMessage, archiveChat, createChat, importFromCursor, listArchived, listChats, listProjects, loadMessages, scanCursor,
   type Chat, type ImportProject,
 } from "../lib/data";
 import {
   buildBundle, exportFileName, ImportError, importBundle, parseBundle, toJson, toMarkdown,
   type ChatStore, type ExportFormat, type ExportSource, type MdLabels,
 } from "../lib/exportChats";
+import { matchOrCreateProject } from "../lib/importers/store";
 import { useApp } from "../state";
+import { HistoryImport } from "./HistoryImport";
 
 type T = ReturnType<typeof useT>;
 const errorText = (e: unknown) => String(e instanceof Error ? e.message : e);
@@ -74,11 +76,7 @@ const dataStore: ChatStore = {
   existing: allChats,
   // Projects are matched by path, then by name. A path from a file is never registered as a new project, so an
   // import cannot hand the agent access to a directory the user did not add themselves.
-  async project(name, path) {
-    const projects = await listProjects();
-    const hit = (path && projects.find((p) => p.path === path)) || projects.find((p) => p.name === name);
-    return hit ? hit.id : createProject(name, null, null);
-  },
+  project: matchOrCreateProject,
   createChat,
   addMessage,
   async stamp(chatId, chat, messages) {
@@ -202,6 +200,7 @@ export function ImportPanel({ onDone }: { onDone: (imported: number) => void }) 
   return (
     <>
       <CursorImport onDone={onDone} />
+      <HistoryImport onDone={onDone} />
       <ChatTransfer />
     </>
   );

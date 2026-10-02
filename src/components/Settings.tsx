@@ -1,12 +1,13 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Download, FileText, GitBranch, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
+  Archive, BarChart3, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
 import { computer, fsx, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
+import { SOURCE_LABELS } from "../lib/importers/common";
 import { deleteProvider, PRESETS, saveProvider } from "../providers";
 import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
@@ -86,7 +87,7 @@ function ImportPage() {
       <div className="card">
         <div className="card-row">
           <span className="prov-icon"><MousePointer2 size={15} /></span>
-          <div className="grow t">Cursor</div>
+          <div className="grow t">{t("importSources")}</div>
           <button className="btn-soft" onClick={() => setOpen(!open)}>{t("import")}</button>
         </div>
       </div>
@@ -103,9 +104,9 @@ function ImportPage() {
         {!history.length && <div className="card-row d">{t("importHistoryEmpty")}</div>}
         {history.map((h, i) => (
           <div key={i} className="card-row">
-            <MousePointer2 size={15} />
+            {h.source === "cursor" ? <MousePointer2 size={15} /> : <History size={15} />}
             <div className="grow">
-              <div className="t">{t("importedFrom", { source: "Cursor" })}</div>
+              <div className="t">{t("importedFrom", { source: SOURCE_LABELS[h.source as keyof typeof SOURCE_LABELS] ?? h.source })}</div>
               <div className="d">{t.date(h.at)}</div>
             </div>
             <span className="d"><span className="status-dot" style={{ background: "var(--green)" }} />{t("chatsCount", { count: h.chats })}</span>
