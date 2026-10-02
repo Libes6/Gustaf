@@ -38,6 +38,23 @@ Items were drafted from the README and code layout; verify against the code befo
   5. Approvals: in Full access ask only for likely-irreversible steps (Enter/Return right after typing in a messaging app, delete/quit shortcuts), with "allow for this task"; keep the existing confirmation flow otherwise.
 
 ## P2
+- [ ] **Automatic Cursor account rotation.** Several Cursor accounts, each logged in through the `cursor-agent` CLI (browser login, not API key: reportedly faster). When the active account is out of quota, the next message goes to the next account, round-robin. No mid-response switching; the current message just fails with a clear error.
+  - [ ] **Research first:** how to keep several CLI logins side by side (separate config/home dir per account via env, e.g. `HOME` or a config-dir variable; where `cursor-agent` stores its token, Keychain or files). Verify `cursor-agent login`/`status` per isolated profile. Confirm the speed difference vs API key with a measurement.
+  - [ ] Account model: per-account isolated profile directory under app data, "Add account" flow that runs `cursor-agent login` in that profile and shows the logged-in email; remove/re-login.
+  - [ ] Replace the single `backupProviderId` with an ordered pool (`providers/cursorAccounts.ts`, `reserveFor`, `Settings.tsx`); keep API-key accounts as an optional fallback type.
+  - [ ] Detect quota exhaustion from `cursor-agent` output/exit; mark the account exhausted until its reset time, pick the next non-exhausted account for the following message, wrap around; error when all are exhausted.
+  - [ ] Show the active account in the UI, notify on switch, keep per-account usage in telemetry.
+  - [ ] Session resume: provider sessions are tied to an account, so after a switch start a fresh session (with context carried by app-side history/summary) and check the model exists on the new account.
+
+- [ ] **Cross-platform build (Windows/Linux)**; today macOS only.
+  - [ ] Replace `security-framework` in `src-tauri/src/secrets.rs` with `keyring` (or gate with `cfg(target_os)`).
+  - [ ] Pick the shell per OS: `/bin/zsh` in `tools.rs` and `zsh -lc` in `providers/cli.ts` (bash/sh on Linux, PowerShell on Windows).
+  - [ ] `tauri.conf.json`: add `nsis`/`msi`/`deb`/`rpm`/`appimage` targets; make `titleBarStyle`/`trafficLightPosition` macOS-only.
+  - [ ] Per-OS Cursor history path in `cursor_import.rs` (`%APPDATA%`, `~/.config`).
+  - [ ] CLI discovery in `providers/cli.ts` (hardcoded `/Applications/ChatGPT.app`, `~/.nvm`) and Windows paths.
+  - [ ] Review Computer Use (Wayland), macOS-specific wording in prompts/i18n, system font stack in `theme.css`.
+  - [ ] CI matrix: `windows-latest`, `ubuntu-latest` (install `libwebkit2gtk-4.1-dev` etc.).
+
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
