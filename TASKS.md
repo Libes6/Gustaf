@@ -38,7 +38,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Model comparison**: send one prompt to several models side by side.
 - [x] **Budgets and alerts**: token limits per day or chat (no cost: providers do not report prices); warn near Codex/Claude quota.
 - [x] **Command allow/deny rules** (allow/ask/deny prefix and glob rules, global or per project, parsed-command evaluation, built-in deny defaults, rules editor) and a **unified agent action log** with undo of file edits (`rules.ts`, `actionLog.ts`, `fileUndo.ts`). Command execution itself cannot be undone; the UI was not smoke-tested in `tauri dev`.
-- [ ] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
+- [x] **Keyboard shortcuts** map and settings screen (global shortcut plugin is already wired).
 - [ ] **Per-project system prompt / instructions file** (`AGENTS.md` / `CLAUDE.md` auto-load).
 - [ ] **Message actions**: edit and resend, regenerate, copy, delete.
 - [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a "Retrying in Ns…" notice is shown in the chat).
@@ -50,7 +50,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Scheduled prompts.**
 - [ ] **Voice input** and screenshot paste.
 - [ ] **Auto-update** channel (Tauri updater) and crash reporting opt-in.
-- [ ] **Theming**: light/dark/system and accent color.
+- [x] **Theming**: light/dark/system and accent color.
 - [ ] **Windows/Linux support audit** (`secrets.rs` is macOS Keychain only; `computer.rs`; paths).
 - [x] **Export/import chats** (Markdown/JSON export, JSON import).
 - [ ] **Importers** for Claude Code, Codex and ChatGPT histories (Cursor exists in `cursor_import.rs`).

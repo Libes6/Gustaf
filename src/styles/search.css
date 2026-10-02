@@ -3,7 +3,7 @@
 .overlay.search-overlay { place-items: start center; padding-top: 12vh; }
 .search-palette {
   width: 640px; max-width: calc(100vw - 32px); max-height: 70vh; display: flex; flex-direction: column; outline: none;
-  background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: 0 24px 80px #000c; overflow: hidden;
+  background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden;
 }
 .search-input { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 50px; flex: none; color: var(--text-2); border-bottom: 1px solid var(--border); }
 .search-input:focus-within { color: var(--accent-soft); }
@@ -27,7 +27,7 @@
   margin: 3px 0 4px 21px; color: var(--text-2); line-height: 1.45; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.search-snippet mark { background: #a884ee40; color: var(--text); border-radius: 3px; padding: 0 1px; }
+.search-snippet mark { background: color-mix(in srgb, var(--accent) 25%, transparent); color: var(--text); border-radius: 3px; padding: 0 1px; }
 .search-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-left: 21px; color: var(--text-3); font-size: 12px; }
 .search-meta > span + span::before { content: "·"; margin-right: 10px; }
 .search-meta .search-badge { color: var(--warn); }
@@ -36,5 +36,5 @@
 
 /* A message reached from a search result is highlighted briefly (FLASH_MS in lib/useMessageJump.ts). */
 .hit-flash { animation: hit-flash 2.4s ease-out; border-radius: 10px; }
-@keyframes hit-flash { 0%, 55% { background: #a884ee33; box-shadow: 0 0 0 6px #a884ee33; } 100% { background: transparent; box-shadow: 0 0 0 6px transparent; } }
-@media (prefers-reduced-motion: reduce) { .hit-flash { animation: none; background: #a884ee33; } }
+@keyframes hit-flash { 0%, 55% { background: color-mix(in srgb, var(--accent) 20%, transparent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent); } 100% { background: transparent; box-shadow: 0 0 0 6px transparent; } }
+@media (prefers-reduced-motion: reduce) { .hit-flash { animation: none; background: color-mix(in srgb, var(--accent) 20%, transparent); } }
