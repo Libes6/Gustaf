@@ -1,6 +1,7 @@
 import { modelMetadata } from "../lib/context";
 import { tokenUsage } from "./usage";
-import { ensureOk, fetch, sse } from "./http";
+import { request, sse } from "./http";
+import { streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
 
 function toChat(system: string, messages: Msg[], providerId: string) {
@@ -46,7 +47,7 @@ export function openaiCompatible(cfg: ProviderConfig, key: string): Adapter {
     supportsReasoning: () => false,
 
     async listModels() {
-      const res = await ensureOk(await fetch(`${base}/models`, { headers }));
+      const res = await request(`${base}/models`, { headers });
       const j = await res.json();
       return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.name ?? m.id, providerId: cfg.id, created: (m.created ?? 0) * 1000, ...modelMetadata(m) }));
     },
@@ -55,27 +56,32 @@ export function openaiCompatible(cfg: ProviderConfig, key: string): Adapter {
       const body: any = { model: t.model, messages: toChat(t.system, t.messages, cfg.id), stream: true, stream_options: { include_usage: true } };
       if (t.tools.length)
         body.tools = t.tools.map((d) => ({ type: "function", function: { name: d.name, description: d.description, parameters: d.parameters } }));
-      const res = await ensureOk(await fetch(`${base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal }));
-
-      let usage;
-      let text = "";
-      const calls: { id: string; name: string; args: string }[] = [];
-      for await (const ev of sse(res)) {
-        if (ev.error) throw new Error(ev.error.message ?? "stream error");
-        if (ev.usage) usage = tokenUsage(ev.usage);
-        const d = ev.choices?.[0]?.delta;
-        if (!d) continue;
-        if (d.content) {
-          text += d.content;
-          t.onText(d.content);
-        }
-        for (const tc of d.tool_calls ?? []) {
-          const c = (calls[tc.index ?? 0] ??= { id: "", name: "", args: "" });
-          if (tc.id) c.id = tc.id;
-          if (tc.function?.name) c.name += tc.function.name;
-          if (tc.function?.arguments) c.args += tc.function.arguments;
-        }
-      }
+      const { text, calls, usage } = await withRetry(
+        async (onText) => {
+          const res = await request(`${base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          let usage;
+          let text = "";
+          const calls: { id: string; name: string; args: string }[] = [];
+          for await (const ev of sse(res, t.signal)) {
+            if (ev.error) throw streamError(ev.error);
+            if (ev.usage) usage = tokenUsage(ev.usage);
+            const d = ev.choices?.[0]?.delta;
+            if (!d) continue;
+            if (d.content) {
+              text += d.content;
+              onText(d.content);
+            }
+            for (const tc of d.tool_calls ?? []) {
+              const c = (calls[tc.index ?? 0] ??= { id: "", name: "", args: "" });
+              if (tc.id) c.id = tc.id;
+              if (tc.function?.name) c.name += tc.function.name;
+              if (tc.function?.arguments) c.args += tc.function.arguments;
+            }
+          }
+          return { text, calls, usage };
+        },
+        { signal: t.signal, onText: t.onText, onRetry: t.onRetry },
+      );
       const parts: Part[] = text ? [{ type: "text", text }] : [];
       for (const c of calls) {
         if (!c) continue;

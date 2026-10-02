@@ -59,6 +59,10 @@ Canvas supports dragging the divider (or focusing it and pressing arrow keys) an
 
 Validation: `npm run check`, `npm run test:chat`, `npm run test:canvas`, `npm run tauri build -- --debug --bundles app`.
 
+### Streaming robustness
+
+The API providers (Anthropic, OpenAI Responses, OpenAI-compatible: OpenRouter, Gemini, Ollama, LM Studio, custom) retry transient failures with exponential backoff and jitter: HTTP 408/429/5xx, dropped connections, and error events inside a stream (for example Anthropic `overloaded_error`). Up to 4 attempts and 30 seconds of total waiting per request; `Retry-After` is honoured, and a longer one is shown to you instead of waited out. Stop cancels a pending wait immediately. A request is **never** retried once any text has been streamed to the chat: the error is shown and Retry continues the interrupted request from the completed steps, so nothing is duplicated. Errors are classified in the message: rate limit, quota or credits exhausted, authentication (401/403, not retried), network, provider server error. A refused connection (e.g. Ollama not running) is reported at once. The logic is in `src/providers/retry.ts` (pure, injectable fetch/sleep/clock) and `src/providers/sse.ts`; `TurnInput.onRetry` (also `RunOptions.onRetry`) reports each wait; the `retryingIn` string and `retryNoticeVars` are ready for a "Retrying in 5s…" notice, which the chat view does not show yet. `tests/retry.test.mjs` covers the logic and `tests/providerRetry.test.mjs` runs the three adapters against a scripted fetch.
+
 ### Usage telemetry
 
 Usage tracks provider-reported input, output, cache read/write and reasoning tokens by provider/model from the time tracking is enabled. Cached and reasoning counts are subsets, not extra total tokens. Unknown telemetry is displayed as unavailable; older messages and external app usage are not retroactively estimated. Each provider request with counts is counted once.

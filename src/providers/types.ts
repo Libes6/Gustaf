@@ -1,6 +1,7 @@
 export type TokenUsage = { input: number; output: number; cached: number; cacheWrite: number; reasoning: number };
 export type LimitWindow = { id: string; label: string; usedPercent: number; resetsAt?: number; plan?: string };
 import type { CuAction } from "../lib/api";
+import type { RetryInfo } from "./retry";
 
 export type Part =
   | { type: "activity"; id: string; name: string; args: Record<string, any>; status: "running" | "success" | "error" | "unknown"; output?: string }
@@ -50,6 +51,8 @@ export type TurnInput = {
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;
   onLimits?: (windows: LimitWindow[]) => void;
+  /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
+  onRetry?: (info: RetryInfo) => void;
 };
 
 export type TurnOutput = { parts: Part[]; responseId?: string; usage?: TokenUsage };

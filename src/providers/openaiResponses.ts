@@ -1,6 +1,7 @@
 import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
-import { ensureOk, fetch, sse } from "./http";
+import { request, sse } from "./http";
+import { makeError, streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
 
 function toAction(a: any): CuAction {
@@ -71,7 +72,7 @@ export function openaiResponses(cfg: ProviderConfig, key: string): Adapter {
     supportsReasoning: (model) => /^(o\d|gpt-5|gpt-6)/.test(model),
 
     async listModels() {
-      const res = await ensureOk(await fetch(`${base}/models`, { headers }));
+      const res = await request(`${base}/models`, { headers });
       const j = await res.json();
       return (j.data ?? [])
         .filter((m: any) => !/embedding|whisper|tts|dall-e|moderation|audio|realtime|transcribe|image/.test(m.id))
@@ -89,14 +90,21 @@ export function openaiResponses(cfg: ProviderConfig, key: string): Adapter {
       const body: any = { model: t.model, instructions: t.system, input, tools, stream: true, previous_response_id: previous };
       if (t.reasoning && this.supportsReasoning(t.model)) body.reasoning = { effort: t.reasoning };
 
-      const res = await ensureOk(await fetch(`${base}/responses`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal }));
-      let final: any;
-      for await (const ev of sse(res)) {
-        if (ev.type === "response.output_text.delta") t.onText(ev.delta);
-        else if (ev.type === "response.completed" || ev.type === "response.incomplete") final = ev.response;
-        else if (ev.type === "response.failed" || ev.type === "error") throw new Error(ev.response?.error?.message ?? ev.message ?? "response failed");
-      }
-      if (!final) throw new Error("stream ended without a response");
+      const final = await withRetry(
+        async (onText) => {
+          const res = await request(`${base}/responses`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          let final: any;
+          for await (const ev of sse(res, t.signal)) {
+            if (ev.type === "response.output_text.delta") onText(ev.delta);
+            else if (ev.type === "response.completed" || ev.type === "response.incomplete") final = ev.response;
+            else if (ev.type === "response.failed") throw streamError({ ...ev.response?.error, message: ev.response?.error?.message ?? "response failed" });
+            else if (ev.type === "error") throw streamError({ code: ev.code, message: ev.message ?? "response failed" });
+          }
+          if (!final) throw makeError("network", { detail: "the stream ended without a response" });
+          return final;
+        },
+        { signal: t.signal, onText: t.onText, onRetry: t.onRetry },
+      );
 
       const parts: Part[] = [];
       for (const item of final.output ?? []) {

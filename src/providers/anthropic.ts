@@ -1,6 +1,7 @@
 import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
-import { ensureOk, fetch, sse } from "./http";
+import { request, sse } from "./http";
+import { streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
 
 type XY = [number, number] | undefined;
@@ -104,7 +105,7 @@ export function anthropic(cfg: ProviderConfig, key: string): Adapter {
     supportsReasoning: () => false,
 
     async listModels() {
-      const res = await ensureOk(await fetch(`${base}/v1/models?limit=100`, { headers }));
+      const res = await request(`${base}/v1/models?limit=100`, { headers });
       const j = await res.json();
       return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.display_name ?? m.id, providerId: cfg.id, created: Date.parse(m.created_at) || 0 }));
     },
@@ -113,22 +114,27 @@ export function anthropic(cfg: ProviderConfig, key: string): Adapter {
       const tools: any[] = t.tools.map((d) => ({ name: d.name, description: d.description, input_schema: d.parameters }));
       if (t.computer) tools.push({ type: "computer_toolset_20260801" });
       const body = { model: t.model, max_tokens: 16000, system: t.system, messages: toAnthropic(t.messages, cfg.id), tools, stream: true };
-      const res = await ensureOk(await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal }));
-
-      const blocks: any[] = [];
-      let usageRaw = {};
-      for await (const ev of sse(res)) {
-        if (ev.type === "message_start") usageRaw = { ...usageRaw, ...ev.message?.usage };
-        else if (ev.type === "message_delta") usageRaw = { ...usageRaw, ...ev.usage };
-        else if (ev.type === "content_block_start") blocks[ev.index] = { ...ev.content_block, json: "" };
-        else if (ev.type === "content_block_delta") {
-          const b = blocks[ev.index];
-          if (ev.delta.type === "text_delta") {
-            b.text = (b.text ?? "") + ev.delta.text;
-            t.onText(ev.delta.text);
-          } else if (ev.delta.type === "input_json_delta") b.json += ev.delta.partial_json;
-        } else if (ev.type === "error") throw new Error(ev.error?.message ?? "stream error");
-      }
+      const { blocks, usageRaw } = await withRetry(
+        async (onText) => {
+          const blocks: any[] = [];
+          let usageRaw = {};
+          const res = await request(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          for await (const ev of sse(res, t.signal)) {
+            if (ev.type === "message_start") usageRaw = { ...usageRaw, ...ev.message?.usage };
+            else if (ev.type === "message_delta") usageRaw = { ...usageRaw, ...ev.usage };
+            else if (ev.type === "content_block_start") blocks[ev.index] = { ...ev.content_block, json: "" };
+            else if (ev.type === "content_block_delta") {
+              const b = blocks[ev.index];
+              if (ev.delta.type === "text_delta") {
+                b.text = (b.text ?? "") + ev.delta.text;
+                onText(ev.delta.text);
+              } else if (ev.delta.type === "input_json_delta") b.json += ev.delta.partial_json;
+            } else if (ev.type === "error") throw streamError(ev.error);
+          }
+          return { blocks, usageRaw };
+        },
+        { signal: t.signal, onText: t.onText, onRetry: t.onRetry },
+      );
       const screen = t.computer ?? { width: 1440, height: 900 };
       const parts: Part[] = [];
       for (const b of blocks) {
