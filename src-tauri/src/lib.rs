@@ -62,7 +62,6 @@ pub fn run() {
             review::review_decide_hunks,
             review::review_finish,
             computer::cu_execute,
-            computer::cu_save_shot,
             computer::cu_permissions,
             computer::cu_screen_size,
             attachments::attachments_save,
