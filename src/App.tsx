@@ -5,23 +5,27 @@ import { ChatView } from "./components/ChatView";
 import { BudgetBanner } from "./components/Budgets";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Onboarding } from "./components/Onboarding";
+import { SearchPalette } from "./components/SearchPalette";
 import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
+import { isSearchShortcut } from "./lib/searchUtil";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
   const [creating, setCreating] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === ",") (e.preventDefault(), app.openSettings());
       if (e.metaKey && e.key.toLowerCase() === "n" && !e.shiftKey) (e.preventDefault(), app.newChat());
+      if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching(open => !open));
       if (e.key === "Escape" && app.view === "settings") app.setView("chat");
     };
     addEventListener("keydown", k);
     return () => removeEventListener("keydown", k);
-  }, [app.view]);
+  }, [app.view, app.ready, app.onboarded]);
 
   useEffect(() => {
     let disposed = false;
@@ -39,13 +43,14 @@ function Shell({ app }: { app: AppState }) {
         <Settings />
       ) : (
         <>
-          <Sidebar onCreateProject={() => setCreating(true)} />
+          <Sidebar onCreateProject={() => setCreating(true)} onSearch={() => setSearching(true)} />
 
         </>
       )}
       {app.sessions.items.map(session => <div key={session.key} className="chat-session" style={{ display: app.view === "chat" && app.sessions.active === session.key ? "flex" : "none" }}>
         <ChatView session={session} visible={app.view === "chat" && app.sessions.active === session.key} />
       </div>)}
+      {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {creating && (
         <CreateProjectDialog
           onClose={() => setCreating(false)}

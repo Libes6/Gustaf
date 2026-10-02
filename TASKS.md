@@ -17,7 +17,7 @@ Items were drafted from the README and code layout; verify against the code befo
 
 ## P1
 - [x] **Persist drafts and attachments** across restarts (SQLite `drafts` table, debounced writes, bounded payloads; see `lib/chatSessions.ts`, `lib/useComposerDraft.ts`).
-- [ ] **Full-text search across chats** (SQLite FTS5 over `messages`, Cmd+K, filter by project/model).
+- [x] **Full-text search across chats** (SQLite FTS5 index `messages_fts` kept in sync by triggers and backfilled on start; `search_messages` in `db.rs`; Cmd+K `SearchPalette` with project/model filters, snippets, keyboard navigation and jump to the message).
 - [ ] **Run setup and tests in the shadow copy** (install deps or link `node_modules`; optional `npm test` before accepting changes).
 
 ## P2

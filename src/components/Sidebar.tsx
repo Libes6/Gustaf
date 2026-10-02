@@ -1,7 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  LayoutList, LogOut, MoreHorizontal, Pencil, Pin, Plug, Search, Settings, SquarePen, Trash2, X, BarChart3, Languages,
+  LayoutList, LogOut, MoreHorizontal, Pencil, Pin, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../i18n";
@@ -85,7 +85,7 @@ export function Rail({ onCreateProject }: { onCreateProject: () => void }) {
   );
 }
 
-export function Sidebar({ onCreateProject }: { onCreateProject: () => void }) {
+export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => void; onSearch: () => void }) {
   const t = useT();
   const app = useApp();
   const menu = useMenu();
@@ -203,6 +203,9 @@ export function Sidebar({ onCreateProject }: { onCreateProject: () => void }) {
         <span className="grow" />
         <button className="icon-btn" title={t("notifications")}>
           <Bell size={15} />
+        </button>
+        <button className="icon-btn" title={`${t("searchAllChats")} ⌘K`} aria-label={t("searchAllChats")} onClick={onSearch}>
+          <TextSearch size={15} />
         </button>
         <button className="icon-btn" title={t("search")} onClick={() => setQuery(query === null ? "" : null)}>
           <Search size={15} />
