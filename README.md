@@ -89,6 +89,14 @@ Right-click a chat in the sidebar and choose Export as Markdown or JSON; Setting
 
 Logic lives in `src/lib/exportChats.ts` (pure, no Tauri); `npm test` covers it in `tests/exportChats.test.mjs`. Imports from Claude Code, Codex and ChatGPT exports are not implemented yet.
 
+### Message actions and branching
+
+Hover a message for its actions (all but copy are disabled while a reply is running):
+- **Edit and resend** (your messages): edit the text inline and send again. The message and everything after it are replaced, and the project goes back to the checkpoint taken before that message when one exists (the same rollback as "Return to this point").
+- **Regenerate** (last reply): re-runs the last request the same way.
+- **Delete**: removes the message together with its reply (click twice to confirm); project files are not touched.
+- **Branch from here**: creates a new chat, titled "<title> (branch)", with the history up to and including that message, and opens it. The original chat is unchanged.
+
 ### Search across chats
 
 Press Cmd+K (or use the search-lines button in the sidebar header) to search the text of every message in all chats, archived ones included. Results are ranked by relevance with the matches highlighted; filter by project and by model (the model filter keeps assistant replies written by that model, since your own messages carry no model). Up/Down move through results, Enter opens the chat and scrolls to the message (steps folded under "Done in ..." are expanded), Esc or Cmd+K closes.

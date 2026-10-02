@@ -66,7 +66,33 @@ export async function addMessage(chatId: number, msg: Msg) {
 export const deleteMessagesFrom = (chatId: number, fromId: number) =>
   db.exec("delete from messages where chat_id = ? and id >= ?", [chatId, fromId]);
 
-export const renameChat = (id: number, title: string) => db.exec("update chats set title = ? where id = ?", [title, id]);
+/** Removes exactly these messages of a chat (a whole turn, for the per-message delete action). */
+export async function deleteMessages(chatId: number, ids: number[]) {
+  if (!ids.length) return;
+  await db.exec(`delete from messages where chat_id = ? and id in (${ids.map(() => "?").join(",")})`, [chatId, ...ids]);
+}
+
+/**
+ * Creates a chat titled `title` holding a copy of the messages of `fromChatId` up to and including `throughId`
+ * (see `branchCutoff`). Content is copied verbatim except for the provider response id, which points at server
+ * state of the original chat. Returns the new chat id; a failed copy removes the half-made chat.
+ */
+export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number) {
+  const id = await createChat(projectId, title);
+  try {
+    await db.exec(
+      "insert into messages(chat_id, role, content, created_at) " +
+        "select ?, role, json_remove(content, '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",
+      [id, fromChatId, throughId],
+    );
+  } catch (e) {
+    await db.exec("delete from chats where id = ?", [id]).catch(() => {});
+    throw e;
+  }
+  return id;
+}
+
+export const renameChat =(id: number, title: string) => db.exec("update chats set title = ? where id = ?", [title, id]);
 export const archiveChat = (id: number, archived = true) =>
   db.exec("update chats set archived = ? where id = ?", [archived ? 1 : 0, id]);
 export const archiveProjectChats = (projectId: number) =>
