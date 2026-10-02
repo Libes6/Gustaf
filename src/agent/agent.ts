@@ -1,11 +1,17 @@
 import { computer, fsx, type CuAction } from "../lib/api";
+import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
+import { summarizeCall } from "./actionLog";
+import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
+import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
+import { getRulesConfig, projectRootFor } from "./rulesStore";
 
-export type Access = "readonly" | "auto" | "full";
+export type { Access };
+/** `reason` names the "ask" rule that stopped the command, when one did. */
 export type ApprovalRequest =
-  | { kind: "command"; command: string }
+  | { kind: "command"; command: string; reason?: string }
   | { kind: "computer"; actions: CuAction[]; safety?: string[] };
 
 export type RunOptions = {
@@ -39,8 +45,20 @@ const HALT = "Not executed: an earlier computer action in this turn failed.";
 export const isRisky = (a: CuAction) =>
   a.type === "type" || (a.type === "keypress" && a.keys.some((k) => /^(enter|return|cmd|command|meta|super)$/i.test(k)));
 
-export const commandAllowed = (cmd: string, allowlist: string[]) =>
-  allowlist.some((p) => cmd === p || cmd.startsWith(p + " "));
+/**
+ * True when `cmd` would run without asking under the old "always allowed" list alone. The list is read as prefix rules on
+ * every simple command, so an entry for `git status` allows `git status -s` but not `git status && rm -rf x`; an entry
+ * that is a whole compound line (what "Always allow" stores for `a && b`) allows exactly that line.
+ */
+export const commandAllowed = (cmd: string, allowlist: string[]) => evaluateCommand(cmd, legacyAllowRules(allowlist)).decision === "allow";
+
+/** A rule or the access mode stopped a tool call before it ran. */
+class ActionBlocked extends Error {}
+/** The user answered "no" to an approval request. */
+class ActionDeclined extends Error {}
+
+const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
+type ToolContext = { act: string; project: string | null };
 
 async function buildSystem(root: string | null, computerUse: boolean) {
   const lines = [
@@ -66,9 +84,11 @@ async function buildSystem(root: string | null, computerUse: boolean) {
   return lines.join("\n");
 }
 
-async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions): Promise<string> {
+async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions, ctx: ToolContext): Promise<string> {
   const root = o.root!;
   const a = call.args ?? {};
+  // Read-only runs are not offered the write tools; a model that calls one anyway must not get through.
+  if (o.access === "readonly" && WRITE_NAMES.has(call.name)) throw new ActionBlocked("Blocked: read-only mode does not allow this tool.");
   switch (call.name) {
     case "read_file":
       return fsx.read(root, a.path, a.offset, a.limit);
@@ -77,12 +97,27 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
     case "search":
       return fsx.search(root, a.pattern, a.glob);
     case "edit_file":
-      return fsx.edit(root, a.path, a.old_string, a.new_string);
-    case "write_file":
-      return fsx.write(root, a.path, a.content);
+    case "write_file": {
+      // Keep the file's exact bytes so the action log can offer a safe undo; that must never get in the way of the edit.
+      const snap = await snapshotFile(root, a.path);
+      const out = call.name === "edit_file" ? await fsx.edit(root, a.path, a.old_string, a.new_string) : await fsx.write(root, a.path, a.content);
+      const undo = snap && (await sealSnapshot(root, snap, !!o.reviewMode));
+      if (undo) logPatch(ctx.act, { undo });
+      return out;
+    }
     case "run_command": {
-      const needs = o.access === "auto" && !commandAllowed(a.command, o.allowlist);
-      if (needs && !(await o.approve({ kind: "command", command: a.command }))) throw new Error("User declined to run this command.");
+      if (typeof a.command !== "string" || !a.command.trim()) throw new Error("run_command needs a non-empty `command` string.");
+      const config = await getRulesConfig().catch(() => DEFAULT_RULES);
+      const { action, evaluation } = decideCommand(a.command, { config, allowlist: o.allowlist, project: ctx.project }, o.access);
+      const rule = evaluation.rule ? describeRule(evaluation.rule) : undefined;
+      if (action === "block") {
+        logPatch(ctx.act, { ...(rule ? { rule } : {}), ...(evaluation.rule?.builtin ? { builtin: true } : {}) });
+        throw new ActionBlocked(blockedMessage(evaluation, o.access));
+      }
+      if (action === "ask") {
+        if (!(await o.approve({ kind: "command", command: a.command, reason: askReason(evaluation) }))) throw new ActionDeclined("User declined to run this command.");
+        logPatch(ctx.act, { approval: "user", ...(rule ? { rule } : {}) });
+      } else logPatch(ctx.act, evaluation.decision === "allow" ? { approval: "rule", ...(rule ? { rule } : {}) } : { approval: "mode" });
       const r = await fsx.run(root, a.command, a.timeout_ms);
       if (r.timed_out || r.code !== 0) throw new Error(`${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${r.output}`);
       return `${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${r.output}`;
@@ -92,7 +127,17 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
   }
 }
 
+/** While a run is active in a folder the action log does not offer to undo edits made there. */
 export async function runAgent(o: RunOptions) {
+  if (o.root) beginRun(o.root);
+  try {
+    await runLoop(o);
+  } finally {
+    if (o.root) endRun(o.root);
+  }
+}
+
+async function runLoop(o: RunOptions) {
   const history = [...o.history];
   let system = await buildSystem(o.root, o.computerUse);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
@@ -100,6 +145,7 @@ export async function runAgent(o: RunOptions) {
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
   let computerSteps = 0;
+  const project = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null) : null;
 
   for (let step = 0; step < MAX_STEPS && !o.signal.aborted; step++) {
     const out = await o.adapter.turn({
@@ -133,9 +179,11 @@ export async function runAgent(o: RunOptions) {
     const lastComputer = calls.filter((c) => c.computer).pop();
     for (const call of calls) {
       const res = { type: "tool_result" as const, id: call.id, name: call.name, output: "", computer: !!call.computer };
+      const act = logStart({ tool: call.computer ? "computer" : call.name, summary: summarizeCall(call.name, call.args, call.computer), ...(o.root ? { root: o.root } : {}), ...(project ? { project } : {}) });
       if (o.signal.aborted || halted) {
         const cancelled = { ...res, output: halted ? HALT : "Cancelled by user.", isError: true };
         results.push(cancelled);
+        logFinish(act, "cancelled", halted ? HALT : undefined);
         o.onToolResult?.(cancelled);
         continue;
       }
@@ -147,15 +195,20 @@ export async function runAgent(o: RunOptions) {
           const { actions, safetyChecks } = call.computer;
           const ask = actions.some(a => a.type !== "screenshot") && (o.access !== "full" || actions.some(isRisky) || !!safetyChecks?.length);
           if (ask && !(await o.approve({ kind: "computer", actions, safety: safetyChecks?.map((s) => s.message ?? s.code ?? s.id) })))
-            throw new Error("User declined this action.");
+            throw new ActionDeclined("User declined this action.");
+          if (ask) logPatch(act, { approval: "user" });
           const shot = await computer.execute(actions);
           const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer";
           results.push({ ...res, output: "OK", image: wantsImage ? shot.png : undefined });
         } else {
-          results.push({ ...res, output: await runTool(call, o) });
+          results.push({ ...res, output: await runTool(call, o, { act, project }) });
         }
+        logFinish(act, "success");
       } catch (e: any) {
-        results.push({ ...res, output: String(e?.message ?? e), isError: true });
+        const message = String(e?.message ?? e);
+        results.push({ ...res, output: message, isError: true });
+        const status = e instanceof ActionBlocked ? "blocked" : e instanceof ActionDeclined ? (o.signal.aborted ? "cancelled" : "declined") : "error";
+        logFinish(act, status, status === "error" || status === "blocked" ? message : undefined);
         if (call.computer) halted = true;
       }
       o.onToolResult?.(results[results.length - 1] as Extract<Part, { type: "tool_result" }>);

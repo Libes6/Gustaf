@@ -1,4 +1,5 @@
-import { git } from "./api";
+import { fsx, git, review } from "./api";
+import { captureAfter, captureBefore, reviewLocation, undoEdit, type FileSnapshot, type UndoDeps, type UndoRecord, type UndoResult } from "./fileUndo";
 
 export async function checkpoint(root: string) {
   await git(root, ["add", "-A"], true);
@@ -52,3 +53,30 @@ export async function projectGit(root: string) {
     return null;
   }
 }
+
+// ---- per-edit undo (the agent action log) ----
+// Uses the same shadow repo as the checkpoints above, but only to store the exact bytes of one file before an edit; see fileUndo.ts.
+
+const undoDeps = (root: string): UndoDeps => ({
+  git: (args) => git(root, args, true),
+  list: async (dir) => (await fsx.list(root, dir)).split("\n").filter(Boolean),
+  write: async (path, content) => void (await fsx.write(root, path, content)),
+  reviewDiff: (id, path) => review.diff(id, path),
+});
+
+/** Stores a file's current bytes before the agent edits it. Resolves to undefined when undo could not be offered; never rejects. */
+export function snapshotFile(root: string, path: unknown) {
+  return captureBefore(undoDeps(root), path).catch(() => undefined);
+}
+
+/**
+ * Records the result of an edit as an undo entry. In a review copy the entry also names the review, so undo can check that
+ * the change is still pending; if that review cannot be identified there is no undo.
+ */
+export async function sealSnapshot(root: string, snap: FileSnapshot, reviewMode: boolean): Promise<UndoRecord | undefined> {
+  const where = reviewLocation(root);
+  if (reviewMode && !where) return undefined;
+  return captureAfter(undoDeps(root), snap, root, reviewMode ? where?.id : undefined).catch(() => undefined);
+}
+
+export const undoFileEdit = (record: UndoRecord): Promise<UndoResult> => undoEdit(undoDeps(record.root), record);

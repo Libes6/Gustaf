@@ -16,7 +16,7 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | Path | Role |
 | --- | --- |
 | `App.tsx`, `state.tsx` | Root component and global app state |
-| `components/` | UI: `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `GitCommitDialog` (commit accepted files: file picker, generated/edited message, optional branch), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding`, `SearchPalette` (Cmd+K full-text search over all chats, opened from `App.tsx` and the `Sidebar` button) |
+| `components/` | UI: `CommandRules`/`ActionLog` (settings), `ChatView`, `Sidebar`, `Settings`, `ModelPicker`, `ChangesPanel` (file review), `GitCommitDialog` (commit accepted files: file picker, generated/edited message, optional branch), `CanvasPanel`/`CanvasWorkspace`, `ToolCard`, `ImportPanel`, `Onboarding`, `SearchPalette` (Cmd+K full-text search over all chats, opened from `App.tsx` and the `Sidebar` button) |
 | `lib/api.ts` | Typed wrappers over Tauri `invoke` |
 | `lib/exportChats.ts` | Pure chat export/import: whitelisted, secret-scrubbed JSON bundle (`mcode-chats` v1), Markdown renderer, JSON parser/sanitizer and `importBundle` over an injected `ChatStore`; UI glue (save dialog, file input, SQLite store) is in `components/ImportPanel.tsx` |
 | `lib/data.ts` | Persistence helpers over SQLite (projects, chats, messages, settings, composer drafts via `loadDraft` and the shared `draftSaver`) |
@@ -28,7 +28,8 @@ React UI (src/components) ── state.tsx ── lib/ (api, data, chatSessions,
 | `lib/gitCommit.ts`, `lib/commitMessage.ts` | Pure logic of the commit flow (unit-tested in `tests/gitCommit.test.mjs`, `tests/commitMessage.test.mjs`): in-memory store of files accepted in review per project, file candidates and pre-selection, branch-name validation and suggestion, commit-blocking rules; commit-message prompt building (diff passed as JSON data, hostile content cannot break out) and sanitizing of model output |
 | `lib/checkpoints.ts` | Shadow checkpoints / rollback |
 | `providers/` | One module per backend: `anthropic`, `openaiCompatible`, `openaiResponses`, CLI bridges (`cli`, `claudeCli`, `cursor`), plus `usage`, `limits`, `activities`, `computerBridge`. API providers share `retry.ts` (pure: error classification, `Retry-After`, abortable exponential backoff with jitter, retries only before any output reached `onText`), `sse.ts` (stream parser) and `http.ts` (Tauri fetch glue) |
-| `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools |
+| `agent/` | `agent.ts` runs the tool-calling loop for API providers; `tools.ts` declares the tools; `rules.ts` is the pure command parser, allow/ask/deny rules and built-in protections (`rulesStore.ts` persists them under `commandRules`); `actionLog.ts` (pure) and `actionLogStore.ts` keep the action log under `actionLog` |
+| `lib/fileUndo.ts` | Pure per-edit undo over injected git/file primitives; `checkpoints.ts` binds it to the shadow repo |
 | `canvas/` | Sandboxed TSX preview runtime (generated bundle in `canvas/generated`, git-ignored) |
 | `i18n/` | Translations, validated by `scripts/check-i18n.mjs` |
 
