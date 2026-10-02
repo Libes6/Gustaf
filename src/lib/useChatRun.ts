@@ -4,13 +4,14 @@ import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
 import { retryNoticeVars } from "../providers/retry";
-import { textOf, type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
+import { type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
 import { db, fsx, review, type Review } from "./api";
 import type { ChatSession } from "./chatSessions";
 import { checkpoint, restoreAll } from "./checkpoints";
 import { effectiveHistory, estimateContext, summaryChunks } from "./context";
-import { addMessage, createChat, deleteMessagesFrom, loadMessages, type StoredMsg } from "./data";
+import { addMessage, branchChat, createChat, deleteMessages, deleteMessagesFrom, loadMessages, type StoredMsg } from "./data";
+import { branchCutoff, branchTitle, editableText, messageImages, messagesBefore } from "./messageActions";
 import type { useComposerDraft } from "./useComposerDraft";
 
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void };
@@ -33,6 +34,9 @@ type Options = {
   selectedModel: ModelInfo | undefined;
   setAtBottom: (b: boolean) => void;
 };
+
+/** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
+type Edit = { text: string; images: string[]; base: StoredMsg[] };
 
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
@@ -80,18 +84,20 @@ export function useChatRun(o: Options) {
     return () => { removeEventListener("keydown", stopKey); removeEventListener("mcode-stop", stopGlobal); };
   }, [o.visible, approval]);
 
-  async function send(retry = false, account?: ProviderConfig) {
+  async function send(retry = false, account?: ProviderConfig, edit?: Edit) {
     const activeProvider = account ?? provider;
-    const body = text.trim();
-    if ((!retry && !body && !images.length) || running || !loaded || abortRef.current) return;
+    const body = (edit?.text ?? text).trim();
+    const imgs = edit?.images ?? images;
+    const prior = edit?.base ?? messages;
+    if ((!retry && !body && !imgs.length) || running || !loaded || abortRef.current) return;
     if (!activeProvider || !app.selection) return app.openSettings("providers");
-    if (!retry && images.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
+    if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
     if (account) app.setSelection({ providerId: account.id, model: app.selection.model });
     setError("");
     setActivities([]);
     setToolResults([]);
     activityRef.current = [];
-    live.current = { start: Date.now(), chars: 0, input: estimateContext(effectiveHistory(messages), body) };
+    live.current = { start: Date.now(), chars: 0, input: estimateContext(effectiveHistory(prior), body) };
     if (!retry) reviewRef.current = null;
     const ctl = new AbortController();
     abortRef.current = ctl;
@@ -111,14 +117,16 @@ export function useChatRun(o: Options) {
       } else {
       const cp = root ? await checkpoint(root) : undefined;
       const expanded = await expandMentions(root, o.files, body);
-      const user: Msg = { role: "user", parts: [{ type: "text", text: expanded }, ...images.map((data) => ({ type: "image" as const, data }))], meta: { checkpoint: cp } };
+      const user: Msg = { role: "user", parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))], meta: { checkpoint: cp } };
       const shown: Msg = { ...user, parts: [{ type: "text", text: body }, ...user.parts.slice(1)] };
       const id = await addMessage(chatId, user);
-      history = [...messages, { ...user, id, chat_id: chatId, created_at: Date.now() }];
-      setMessages([...messages, { ...shown, id, chat_id: chatId, created_at: Date.now() } as StoredMsg]);
-      o.setText("");
-      o.setImages([]);
-      o.draft.clearSent(chatId);
+      history = [...prior, { ...user, id, chat_id: chatId, created_at: Date.now() }];
+      setMessages([...prior, { ...shown, id, chat_id: chatId, created_at: Date.now() } as StoredMsg]);
+      if (!edit) {
+        o.setText("");
+        o.setImages([]);
+        o.draft.clearSent(chatId);
+      }
       }
       history = effectiveHistory(history);
       retryRef.current = { chatId, history: [...history] };
@@ -259,9 +267,49 @@ export function useChatRun(o: Options) {
     await restoreAll(root, m.meta.checkpoint);
     await deleteMessagesFrom(m.chat_id, m.id);
     setMessages(await loadMessages(m.chat_id));
-    o.setText(textOf(m).split("\n\n<file ")[0]);
+    o.setText(editableText(m));
     bumpTick();
   }, [root, running]);
 
-  return { stream, error, setError, running, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  /**
+   * Edit and resend / regenerate: rolls the project back to the checkpoint taken before message `m` (when there is
+   * one), drops `m` and everything after it, and sends `newText` (with the original images) as a new message.
+   */
+  async function resendFrom(m: StoredMsg, newText: string) {
+    if (running || !loaded || abortRef.current || !newText.trim() && !messageImages(m).length) return;
+    try {
+      if (root && m.meta?.checkpoint) await restoreAll(root, m.meta.checkpoint);
+      await deleteMessagesFrom(m.chat_id, m.id);
+    } catch (e) { return setError(String(e instanceof Error ? e.message : e)); }
+    const base = messagesBefore(messages, m.id);
+    setMessages(base);
+    retryRef.current = null;
+    bumpTick();
+    await send(false, undefined, { text: newText, images: messageImages(m), base });
+  }
+
+  /** Deletes the given messages (one whole turn) from the chat. */
+  async function removeMessages(chatId: number, ids: number[]) {
+    if (running || abortRef.current) return;
+    try {
+      await deleteMessages(chatId, ids);
+      const gone = new Set(ids);
+      setMessages((ms) => ms.filter((m) => !gone.has(m.id)));
+      retryRef.current = null;
+    } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
+  }
+
+  /** Copies the history up to and including message `m` into a new chat and opens it. */
+  async function branchFrom(m: StoredMsg, chatTitle: string, label: string) {
+    if (running || abortRef.current) return;
+    const cutoff = branchCutoff(messages, m.id);
+    if (cutoff === null) return;
+    try {
+      const id = await branchChat(o.projectId, branchTitle(chatTitle, label), m.chat_id, cutoff);
+      await app.reload();
+      app.openChat(id, o.projectId);
+    } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
+  }
+
+  return { resendFrom, removeMessages, branchFrom, stream, error, setError, running, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
 }
