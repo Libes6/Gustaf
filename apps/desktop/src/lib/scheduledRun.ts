@@ -66,7 +66,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   let review: ReviewCopy | null = null;
   let live: LiveRunHandle | undefined;
   const fail = async (error: string): Promise<RunResult> => {
-    if (chatId !== null) await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
+    if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
     return { status: "failed", chatId, error };
   };
   try {
@@ -144,7 +144,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } catch (e) {
     // The loop ends with an abort error when it was stopped mid-step; the chat still says why the run ended.
     if (attention || ctl.signal.aborted) {
-      if (chatId !== null) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
+      if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
       return { status: attention ? "attention" : "stopped", chatId };
     }
     const message = (await reportRunFailure(e, { providerId: sc.providerId, signal: ctl.signal }, deps)) ?? "";
@@ -152,9 +152,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } finally {
     outer.removeEventListener("abort", stopOuter);
     // Like a chat: the copy is removed when nothing was changed in it, otherwise it stays for the review panel.
-    await finishReviewCopy(deps, review);
-    live?.end();
-    release?.();
+    try { await finishReviewCopy(deps, review); } finally { live?.end(); release?.(); }
     deps.chatChanged?.();
   }
 }

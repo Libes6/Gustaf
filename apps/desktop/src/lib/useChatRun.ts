@@ -114,13 +114,16 @@ export function useChatRun(o: Options) {
   const draining = useRef(false);
   const queue = useSyncExternalStore(subscribeQueue, () => getQueue(session.chatId));
   const sendLatest = useRef(send); sendLatest.current = send;
+  const scopeLatest = useRef(session.key); scopeLatest.current = session.key;
   useEffect(() => { if (session.chatId) void loadQueue(session.chatId).catch(e => setError(String(e))); }, [session.chatId]);
   useEffect(() => {
     if (!session.chatId || !queue || queue.paused || running || coordinatorBusy || draining.current || abortRef.current || !loaded || !queue.items.length) return;
+    const queueChatId = session.chatId; const queueScope = session.key;
     draining.current = true;
     const item = queue.items[0];
     void (async () => {
-      const base = await loadMessages(session.chatId!);
+      const base = await loadMessages(queueChatId);
+      if (scopeLatest.current !== queueScope) return;
       await sendLatest.current(false, { text: item.text, images: item.images, base, queuedId: item.id });
     })().catch(e => setError(String(e))).finally(() => { draining.current = false; });
   }, [queue, running, coordinatorBusy, loaded]);
@@ -212,6 +215,7 @@ export function useChatRun(o: Options) {
     let runRoot = root;
     let made: WorkspaceCreated | null = null;
     let release: (() => void) | null = null;
+    let steeringIds: string[] = [];
     let outcome: "ok" | "failed" | "stopped" = "ok";
     if (chatId) chatStatusStore.runStarted(chatId);
     try {
@@ -284,9 +288,9 @@ export function useChatRun(o: Options) {
           const q = getQueue(cid);
           if (!q || q.paused) return [];
           // Preserve FIFO: only a leading clarification may join this run.
-          const pending = []; for (const item of q.items) { if (!item.clarify) break; pending.push(item); }
-          if (pending.length) await updateQueue(cid, q => ({ ...q, items: q.items.filter(i => !pending.some(p => p.id === i.id)) }));
-          return pending.map(i => ({ role: "user" as const, parts: [{ type: "text" as const, text: i.text }] }));
+          const pending: NonNullable<ReturnType<typeof getQueue>>["items"] = []; for (const item of q.items) { if (!item.clarify) break; pending.push(item); }
+          steeringIds = pending.map(i => i.id);
+          return Promise.all(pending.map(async i => ({ role: "user" as const, parts: [{ type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) }, ...i.images.map(data => ({ type: "image" as const, data }))] })));
         } : undefined,
         root: runRoot,
         history,
@@ -338,6 +342,7 @@ export function useChatRun(o: Options) {
         onActivity: setActivities,
         onAccepted: m => { retryRef.current?.history.push(m); },
         onMessage: (m, mid) => {
+          if (m.role === "user" && steeringIds.length) { const id = steeringIds.shift()!; void updateQueue(cid, q => ({ ...q, items: q.items.filter(i => i.id !== id) })).catch(e => setError(String(e))); }
           setMessages((ms) => [...ms, { ...m, id: mid, chat_id: cid, created_at: Date.now() }]);
           setStream("");
           setActivities([]);
@@ -409,6 +414,7 @@ export function useChatRun(o: Options) {
 
   async function compact() {
     if (running || !loaded || !session.chatId || !provider || !app.selection || abortRef.current) return;
+    const release = claimChat(session.chatId); if (!release) return;
     const ctl = new AbortController(); abortRef.current = ctl;
     setRunning(true); app.setSessionBusy(session.key, true); setError(""); setStream("");
     const cid = session.chatId;
@@ -442,7 +448,7 @@ export function useChatRun(o: Options) {
       setMessages(ms => [...ms, { ...message, id, chat_id: cid, created_at: Date.now() }]);
       retryRef.current = null;
     } catch (e) { if (!ctl.signal.aborted) setError(String(e instanceof Error ? e.message : e)); }
-    finally { abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
+    finally { release(); abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
   }
 
   const rewind = useCallback(async (m: StoredMsg) => {
