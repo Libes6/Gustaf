@@ -1,7 +1,11 @@
 /** Builds the self-contained canvas HTML document. Pure (the runtime source is passed in) so Node tests can import it. */
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export function buildCanvasDocument(code: string, runtime: string, options: { title?: string; nonce?: string } = {}): string {
+/** Sources that import lucide-react get the larger runtime that bundles the icons (see scripts/build-canvas.mjs). */
+export const needsIcons = (code: string) => /["']lucide-react["']/.test(code);
+
+export function buildCanvasDocument(code: string, runtime: string, options: { title?: string; nonce?: string; iconsRuntime?: string } = {}): string {
+  if (options.iconsRuntime && needsIcons(code)) runtime = options.iconsRuntime;
   const nonce = options.nonce ?? crypto.randomUUID().replace(/-/g, "");
   const payload = JSON.stringify({ code }).replace(/</g, "\\u003c");
   const title = options.title ? `<title>${escapeHtml(options.title.slice(0, 160))}</title>\n` : "";

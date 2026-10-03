@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { transform } from 'sucrase';
 import { parseArtifacts, CANVAS_INSTRUCTIONS } from '../src/canvas/artifacts.ts';
 import { diffLines, diffFiles, collapseContext } from '../src/canvas/diff.ts';
-import { buildCanvasDocument } from '../src/canvas/documentBuilder.ts';
+import { buildCanvasDocument, needsIcons } from '../src/canvas/documentBuilder.ts';
 import { parseFiles, loadModules, resolveRelative } from '../src/canvas/modules.ts';
 
 test('extracts complete artifacts and surrounding prose', () => {
@@ -155,4 +155,20 @@ test('HTML export embeds every file of the artifact and the payload cannot close
 test('each export gets a fresh CSP nonce unless one is given', () => {
   const nonce = (html) => /'nonce-([0-9a-f]+)'/.exec(html)[1];
   assert.notEqual(nonce(buildCanvasDocument('x', RUNTIME)), nonce(buildCanvasDocument('x', RUNTIME)));
+});
+
+test('the icons runtime is only inlined for sources importing lucide-react', () => {
+  const opts = { nonce: 'n', iconsRuntime: 'ICONS_RUNTIME();' };
+  assert.ok(buildCanvasDocument('import { Heart } from "lucide-react";', RUNTIME, opts).includes('ICONS_RUNTIME();'));
+  assert.ok(buildCanvasDocument("// file: A.tsx\nimport * as I from 'lucide-react';", RUNTIME, opts).includes('ICONS_RUNTIME();'));
+  const plain = buildCanvasDocument('export default () => null;', RUNTIME, opts);
+  assert.ok(!plain.includes('ICONS_RUNTIME();') && plain.includes('console.log("runtime"'));
+  assert.equal(needsIcons('const lucide = 1'), false);
+  assert.match(CANVAS_INSTRUCTIONS, /lucide-react/);
+});
+test('externals other than react are only reachable when provided by the runtime', () => {
+  const icons = { Heart: 'heart-icon' };
+  const files = parseFiles('import { Heart } from "lucide-react"; export default () => Heart;').files;
+  assert.equal(loadModules(files, compile, { react: React, 'lucide-react': icons }).default(), 'heart-icon');
+  assert.throws(() => loadModules(files, compile, { react: React }), /Unsupported import "lucide-react"/);
 });
