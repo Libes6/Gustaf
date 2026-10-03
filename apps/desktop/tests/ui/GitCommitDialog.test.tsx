@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GitCommitDialog } from "../../src/components/GitCommitDialog";
-import type { CommitContext, CommitResult, GitStatus } from "../../src/lib/api";
+import type { CommitContext, CommitResult, GitStatus, PublishInfo } from "../../src/lib/api";
 import { makeApp, provider, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
@@ -76,15 +76,17 @@ describe("GitCommitDialog", () => {
     await userEvent.type(messageBox(), "msg");
     await userEvent.click(checkbox("notes.md"));
     expect(commitButton()).toHaveTextContent("Commit 2 files");
-    mockInvoke({ git_commit: result });
-    await userEvent.click(commitButton());
-    await waitFor(() => expect(callsOf("git_commit")).toHaveLength(1));
-    expect(callsOf("git_commit")[0].paths).toEqual(["src/a.ts", "notes.md"]);
-
     await userEvent.click(checkbox("src/a.ts"));
     await userEvent.click(checkbox("notes.md"));
     expect(commitButton()).toBeDisabled();
     expect(screen.getByText("Select at least one file.")).toBeInTheDocument();
+
+    await userEvent.click(checkbox("src/a.ts"));
+    await userEvent.click(checkbox("notes.md"));
+    mockInvoke({ git_commit: result });
+    await userEvent.click(commitButton());
+    await waitFor(() => expect(callsOf("git_commit")).toHaveLength(1));
+    expect(callsOf("git_commit")[0].paths).toEqual(["src/a.ts", "notes.md"]);
   });
 
   it("'Select all' never ticks a conflicted file", async () => {
@@ -194,5 +196,78 @@ describe("GitCommitDialog", () => {
     mockInvoke({ git_commit: result });
     fireEvent.keyDown(messageBox(), { key: "Enter", metaKey: true });
     await waitFor(() => expect(onCommitted).toHaveBeenCalledWith(result));
+  });
+
+  describe("after the commit: push and pull request", () => {
+    const pub = (over: Partial<PublishInfo> = {}): PublishInfo => ({
+      repo: true, branch: "mcode/x", hasCommits: true, remotes: [{ name: "origin", url: "https://github.com/o/r.git" }], upstream: null, ahead: null, behind: null,
+      remoteBranches: ["origin/main", "origin/mcode/x"], defaultBase: "main", protected: false, ...over,
+    });
+    const commitNow = async (info: PublishInfo, extra: Record<string, unknown> = {}) => {
+      mockInvoke({ git_commit: { ...result, branch: info.branch }, git_publish_info: info, gh_status: { installed: true, authenticated: true, detail: "" }, ...extra });
+      open();
+      await screen.findByText("main");
+      await userEvent.type(messageBox(), "Add parser\n\nbody");
+      await userEvent.click(commitButton());
+      await screen.findByRole("button", { name: /^Push / });
+    };
+
+    it("pushes only on click, shows the new ahead/behind and never sends a force option", async () => {
+      await commitNow(pub());
+      expect(callsOf("git_push")).toEqual([]);
+      mockInvoke({ git_push: { remote: "origin", branch: "mcode/x", output: "", info: pub({ upstream: "origin/mcode/x", ahead: 0, behind: 0 }) } });
+      await userEvent.click(screen.getByRole("button", { name: "Push mcode/x" }));
+      expect(await screen.findByText("Pushed mcode/x to origin.")).toBeInTheDocument();
+      expect(callsOf("git_push")).toEqual([{ root: "/work/alpha", remote: "origin", branch: "mcode/x", setUpstream: true, confirmProtected: false }]);
+      expect(screen.getByText(/origin\/mcode\/x: 0 ahead, 0 behind/)).toBeInTheDocument();
+    });
+
+    it("asks before pushing a protected branch and can switch to a new branch instead", async () => {
+      await commitNow(pub({ branch: "main", protected: true }));
+      await userEvent.click(screen.getByRole("button", { name: "Push main" }));
+      expect(callsOf("git_push")).toEqual([]);
+      expect(screen.getByRole("alertdialog")).toHaveTextContent("protected branch");
+      mockInvoke({ git_create_branch: "mcode/add-parser", git_publish_info: pub({ branch: "mcode/add-parser" }) });
+      await userEvent.click(screen.getByRole("button", { name: "Create branch and switch" }));
+      expect(await screen.findByText(/Switched to mcode\/add-parser/)).toBeInTheDocument();
+      expect(callsOf("git_create_branch")).toEqual([{ root: "/work/alpha", name: "mcode/add-parser" }]);
+      expect(callsOf("git_push")).toEqual([]);
+    });
+
+    it("confirmed protected push passes the confirmation", async () => {
+      await commitNow(pub({ branch: "main", protected: true }));
+      mockInvoke({ git_push: { remote: "origin", branch: "main", output: "", info: pub({ branch: "main", upstream: "origin/main", ahead: 0, behind: 0 }) } });
+      await userEvent.click(screen.getByRole("button", { name: "Push main" }));
+      await userEvent.click(screen.getByRole("button", { name: "Push to main anyway" }));
+      await waitFor(() => expect(callsOf("git_push")).toHaveLength(1));
+      expect(callsOf("git_push")[0]).toMatchObject({ branch: "main", confirmProtected: true });
+    });
+
+    it("shows a push failure with the manual command", async () => {
+      await commitNow(pub(), { git_push: () => Promise.reject(new Error("could not read Username")) });
+      await userEvent.click(screen.getByRole("button", { name: "Push mcode/x" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("could not read Username");
+      expect(screen.getByText("Manual command: git push -u origin mcode/x")).toBeInTheDocument();
+    });
+
+    it("creates a pull request from the commit subject once pushed and offers the https link", async () => {
+      await commitNow(pub({ upstream: "origin/mcode/x", ahead: 0, behind: 0 }));
+      await userEvent.click(screen.getByRole("button", { name: "Create pull request…" }));
+      expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Add parser");
+      expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveValue("main");
+      mockInvoke({ git_create_pr: { url: "https://github.com/o/r/pull/9" } });
+      await userEvent.click(screen.getByLabelText("Draft"));
+      await userEvent.click(screen.getByRole("button", { name: "Create pull request" }));
+      expect(await screen.findByText("https://github.com/o/r/pull/9")).toBeInTheDocument();
+      expect(callsOf("git_create_pr")).toEqual([{ root: "/work/alpha", title: "Add parser", body: "", base: "main", draft: true }]);
+    });
+
+    it("blocks the pull request when gh is missing or the branch is not pushed", async () => {
+      await commitNow(pub(), { gh_status: { installed: false, authenticated: false, detail: "" } });
+      await userEvent.click(screen.getByRole("button", { name: "Create pull request…" }));
+      expect(screen.getAllByText(/GitHub CLI \(gh\) is not installed/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/gh pr create --base main --head mcode\/x/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create pull request" })).toBeDisabled();
+    });
   });
 });

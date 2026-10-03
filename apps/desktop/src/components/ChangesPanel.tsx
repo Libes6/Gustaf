@@ -178,7 +178,6 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
       {notice && <div className="commit-notice" role="status"><Check size={13} /><span className="grow">{notice}</span></div>}
       {commitOpen && <GitCommitDialog root={root} accepted={acceptedFiles.list(root)} onClose={() => setCommitOpen(false)} onCommitted={(r) => {
         acceptedFiles.forget(root, r.files);
-        setCommitOpen(false);
         setNotice(t("gitCommitted", { sha: r.short, branch: r.branch ?? "HEAD" }));
         refresh().catch(e => setErr(String(e)));
         onChanged();
