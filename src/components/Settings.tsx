@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
-import { computer, fsx, getSetting } from "../lib/api";
+import { computer, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
 import { SOURCE_LABELS } from "../lib/importers/common";
 import { deleteProvider, PRESETS, saveProvider } from "../providers";
@@ -16,10 +16,13 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
+import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
+import { McpServers } from "./McpServers";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
+import { ScheduledPromptsSection } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
@@ -68,6 +71,7 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
+      <ScheduledPromptsSection />
     </>
   );
 }
@@ -282,7 +286,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
       </div>
       {p.cli === "cursor-agent" && <>
         {p.cliAuth === "key" && <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("apiKey")}</div><div className="d">{t("cursorCliAccountHint")}</div></div><input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={e => setKey(e.target.value)} /><button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button></div></div>}
-        <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("reserveAccount")}</div><div className="d">{t("reserveAccountHint")}</div></div><select aria-label={t("reserveAccount")} className="input narrow" value={p.backupProviderId ?? ""} onChange={e => update({ ...p, backupProviderId: e.target.value || undefined })}><option value="">{t("noReserve")}</option>{app.providers.filter(other => other.id !== p.id && other.cli === "cursor-agent" && other.cliAuth === "key" && !other.disabled).map(other => <option key={other.id} value={other.id}>{other.name}</option>)}</select></div></div>
+        <CursorAccounts />
       </>}
       <h4>{t("models")}</h4>
       <div className="card">
@@ -392,35 +396,6 @@ function ComputerPage() {
   );
 }
 
-function Mcp() {
-  const t = useT();
-  const [servers, setServers] = useState<[string, any][] | null>(null);
-  useEffect(() => {
-    fsx.homeFile(".cursor/mcp.json").then((s) => setServers(s ? Object.entries(JSON.parse(s).mcpServers ?? {}) : []));
-  }, []);
-  return (
-    <>
-      <h1>MCP</h1>
-      <p className="lead">{t("mcpLead")}</p>
-      <div className="card">
-        {servers?.length === 0 && <div className="card-row d">{t("mcpNone")}</div>}
-        {servers?.map(([name, cfg]) => (
-          <div key={name} className="card-row">
-            <span className="prov-icon"><Plug size={14} /></span>
-            <div className="grow">
-              <div className="t">{name}</div>
-              <div className="d" style={{ fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {cfg.url ?? [cfg.command, ...(cfg.args ?? [])].join(" ")}
-              </div>
-            </div>
-            <span className="d">{cfg.url ? "HTTP" : "stdio"}</span>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function GitPage() {
   const t = useT();
   return (
@@ -485,7 +460,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: Mcp, git: GitPage, rules: Rules, archive: ArchivePage,
+  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
 };
 
 export function Settings() {

@@ -1,20 +1,21 @@
-/** Where the bundled canvas runtime is served from (public/canvas/runtime.js, built by scripts/build-canvas.mjs). */
+import { buildCanvasDocument, needsIcons } from "./documentBuilder.ts";
+
+/** Static copies of the runtimes (public/canvas/, written by scripts/build-canvas.mjs) that the preview iframe loads. */
 export const CANVAS_RUNTIME_URL = "/canvas/runtime.js";
+export const CANVAS_ICONS_RUNTIME_URL = "/canvas/runtime-icons.js";
 
-/** The CSP of the canvas document itself. It is combined with (never replaces) the app's CSP, see below. */
-export const canvasCsp = (nonce: string) =>
-  `default-src 'none'; script-src 'nonce-${nonce}' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
-
+/**
+ * Preview document for the sandboxed iframe (srcdoc). A srcdoc document inherits the app's CSP, which has no nonce for an
+ * inline script, so the bootstrap is an external script (allowed by the app's 'self' and by this document's nonce). The app
+ * policy must also allow 'unsafe-eval' (generated code runs through `new Function`) and inline styles; see docs/features/security.md.
+ */
 export function canvasDocument(code: string): string {
-  const nonce = crypto.randomUUID().replace(/-/g, "");
-  const payload = JSON.stringify({ code }).replace(/</g, "\\u003c");
-  // A srcdoc iframe inherits the parent's CSP and both policies must allow everything it does. The app's CSP has no
-  // nonce for an inline script, so the bootstrap is an external script (allowed by the parent's 'self' and by the
-  // nonce here) instead of an inline one; the parent also has to allow 'unsafe-eval' and inline styles for this frame.
-  // Generated code executes inside the opaque-origin sandbox (sandbox="allow-scripts" without allow-same-origin).
-  return `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${canvasCsp(nonce)}">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>html,body,#root{min-height:100%;margin:0}body{font:15px/1.5 system-ui;background:#faf9fc;color:#24212b}*{box-sizing:border-box}button,input,select,textarea{font:inherit}button{cursor:pointer}</style>
-</head><body><div id="root"></div><script id="canvas-source" type="application/json">${payload}</script><script nonce="${nonce}" src="${CANVAS_RUNTIME_URL}"></script></body></html>`;
+  return buildCanvasDocument(code, "", { runtimeUrl: CANVAS_RUNTIME_URL, iconsRuntimeUrl: CANVAS_ICONS_RUNTIME_URL });
+}
+
+/** Self-contained HTML for the export (runtime inlined; it has no app CSP around it). The runtimes load lazily, only on export. */
+export async function canvasExportDocument(code: string, title: string): Promise<string> {
+  const { default: runtime } = await import("./generated/runtime.js?raw");
+  const iconsRuntime = needsIcons(code) ? (await import("./generated/runtime-icons.js?raw")).default : undefined;
+  return buildCanvasDocument(code, runtime, { title, iconsRuntime });
 }

@@ -5,7 +5,7 @@
 //  3. if a local Chrome exists, the production build is served with the production CSP as a response header (as Tauri does
 //     for index.html) and driven over the DevTools protocol: the app must boot without violations, and the canvas iframe
 //     must still run (nonce'd external script, eval, inline styles) while staying isolated.
-//  4. capabilities/default.json is checked for the narrowing decisions documented in docs/ARCHITECTURE.md.
+//  4. capabilities/default.json is checked for the narrowing decisions documented in docs/features/security.md.
 // Not covered (needs the real app): WKWebView/WebKit behaviour. Chrome (Blink) implements the same CSP3 inheritance rules,
 // but the manual checklist in README.md ("Security") still has to be run once in `tauri dev`.
 import test, { before, after } from 'node:test';
@@ -113,7 +113,7 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
   ];
   for (const f of files) {
     const text = readFileSync(f, 'utf8');
-    for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/ARCHITECTURE.md) before allowing it.`);
+    for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
   }
   const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length));
   assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx'], 'only the canvas panel may create an iframe');
@@ -136,6 +136,8 @@ test('canvas document: no inline code, nonce on the only script, hardened own CS
   assert.ok(!/script-src[^;]*'unsafe-inline'/.test(meta), 'canvas script-src must not allow inline scripts');
 });
 
+/** Text only the canvas runtime contains: files with it are canvas copies (lazy raw-string chunks), not app code. */
+const RUNTIME_MARK = 'Export a React component with export default';
 let dist;
 let built = false;
 const SKIP_BUILD = process.env.MCODE_CSP_SKIP_BUILD === '1';
@@ -170,20 +172,27 @@ test('build: index.html has no inline script, inline handler, style block or ext
 
 test('build: the main bundle needs no eval, so script-src unsafe-eval is only for the canvas frame', (t) => {
   if (!built) return t.skip('build skipped');
+  // The canvas runtime also ships as raw strings in lazy chunks (standalone HTML export); those copies are the canvas, not the app.
+  let appChunks = 0;
   for (const f of walk(join(dist, 'assets')).filter((p) => p.endsWith('.js'))) {
     const js = readFileSync(f, 'utf8');
+    if (js.includes(RUNTIME_MARK)) continue;
+    appChunks++;
     assert.ok(!/\beval\s*\(/.test(js), `${f.slice(dist.length)} uses eval(`);
-    assert.ok(!/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(js), `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/ARCHITECTURE.md (Security) and this test.`);
+    assert.ok(!/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(js), `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/features/security.md and this test.`);
     assert.ok(!/(setTimeout|setInterval)\(\s*["'`]/.test(js), `${f.slice(dist.length)} passes a string to a timer`);
   }
+  assert.ok(appChunks >= 2, 'expected the main chunk and the lazy CanvasPanel chunk to be scanned');
   const runtime = readFileSync(join(dist, 'canvas/runtime.js'), 'utf8');
   assert.match(runtime, /new Function\(/, 'the canvas runtime is the one place that evaluates code');
+  assert.ok(existsSync(join(dist, 'canvas/runtime-icons.js')), 'icons runtime missing (loaded for sources that import lucide-react)');
 });
 
 test('build: no external URL outside the known constants, no remote CSS references', (t) => {
   if (!built) return t.skip('build skipped');
   for (const f of walk(join(dist, 'assets'))) {
     const text = readFileSync(f, 'utf8');
+    if (text.includes(RUNTIME_MARK)) continue; // runs in the sandbox with connect-src 'none'
     if (f.endsWith('.css')) assert.ok(!/@import|url\(\s*["']?(https?:|\/\/)/.test(text), `${f.slice(dist.length)}: remote CSS reference`);
     for (const m of text.matchAll(/(?:https?|wss?):\/\/([A-Za-z0-9.-]+)/g)) {
       assert.ok(KNOWN_HOSTS.has(m[1]), `${f.slice(dist.length)}: new external host ${m[1]} (${m[0]}). If it is loaded by the webview, add it to the CSP; if it is only an API/doc link (plugin-http / opener), add it to KNOWN_HOSTS.`);
@@ -210,6 +219,12 @@ const CANVAS_PROBE = `export default function Probe() {
   return <div id="probe" style={{ color: 'rgb(1, 2, 3)' }}>hello canvas</div>;
 }`;
 
+const CANVAS_ICONS = `import { Heart } from "lucide-react";
+export default function Icons() {
+  React.useEffect(() => { parent.postMessage({ type: 'icons', svg: !!document.querySelector('#icon svg') }, '*'); }, []);
+  return <div id="icon"><Heart /></div>;
+}`;
+
 const attr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 /** What the canvas looked like before: an inline nonce'd bootstrap. Under the app's CSP (no nonce) it must be refused. */
 const legacyInlineDocument = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-abc' 'unsafe-eval'"><script nonce="abc">parent.postMessage({ type: 'inline-ran' }, '*')</script>`;
@@ -218,6 +233,7 @@ function serve(dir, cspHeader) {
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
   const fixture = `<!doctype html><title>csp fixture</title><script src="/__csp/page.js"></script>
 <iframe id="good" sandbox="allow-scripts" referrerpolicy="no-referrer" srcdoc="${attr(canvasDocument(CANVAS_PROBE))}"></iframe>
+<iframe id="icons" sandbox="allow-scripts" srcdoc="${attr(canvasDocument(CANVAS_ICONS))}"></iframe>
 <iframe id="legacy" sandbox="allow-scripts" srcdoc="${attr(legacyInlineDocument)}"></iframe>`;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x').pathname;
@@ -258,7 +274,7 @@ test('browser: canvas srcdoc iframe still runs under the parent CSP and stays is
   const { server, origin } = await serve(dist, cspString(security.csp));
   try {
     const page = await chrome.open(`${origin}/__csp/canvas.html`);
-    const got = await page.waitFor("window.__msgs && window.__msgs.some(m => m && m.type === 'probe')");
+    const got = await page.waitFor("window.__msgs && ['probe', 'icons'].every(t => window.__msgs.some(m => m && m.type === t))");
     assert.ok(got, 'the canvas never reported back (script, eval or style blocked?):\n' + page.messages.join('\n'));
     await new Promise((r) => setTimeout(r, 500));
     const msgs = await page.eval('window.__msgs');
@@ -268,6 +284,7 @@ test('browser: canvas srcdoc iframe still runs under the parent CSP and stays is
     assert.equal(probe.styled, 'rgb(1, 2, 3)', 'inline style did not apply (style-src)');
     assert.equal(probe.fetchBlocked, true, 'canvas can reach the network');
     assert.equal(probe.parentBlocked, true, 'canvas can read the parent document');
+    assert.equal(msgs.find((m) => m?.type === 'icons')?.svg, true, 'the lucide-react canvas (runtime-icons.js) did not render');
     assert.ok(!msgs.some((m) => m?.type === 'mcode-canvas-error'), 'canvas runtime reported an error: ' + JSON.stringify(msgs));
     assert.ok(!msgs.some((m) => m?.type === 'inline-ran'), 'an inline script ran under the app CSP (inheritance assumption is wrong)');
     assert.deepEqual([...new Set(probe.violated)], ['connect-src'], 'the only refusal inside the canvas may be its own fetch: ' + JSON.stringify(probe.violated));

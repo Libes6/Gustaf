@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { useT } from "../../i18n";
 import { computer } from "../../lib/api";
+import { pickAccount } from "../../providers/cursorAccounts";
+import { useCursorPool } from "../../providers/cursorPoolStore";
 import type { ModelInfo, ProviderConfig } from "../../providers/types";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
@@ -46,6 +48,10 @@ export function Composer(p: Props) {
   const menu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
   const instructions = useInstructionReport(root, p.provider);
+  // Cursor account rotation: which account the next message will use (only when the selected one is in the pool).
+  const pool = useCursorPool();
+  const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
+  const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -184,7 +190,7 @@ export function Composer(p: Props) {
               onOpen={instructions.reload}
             />
             <div style={{ position: "relative" }}>
-              <button className="chip" onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
+              <button className="chip" title={accountTitle} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
                 {p.modelName ?? t("chooseModel")} <ChevronDown size={13} />
               </button>
