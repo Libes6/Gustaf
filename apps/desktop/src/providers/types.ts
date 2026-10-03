@@ -12,6 +12,8 @@ export type SubagentInfo = {
   agentId: string;
   /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
   title: string;
+  /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
+  bgId?: string;
   /** Claude `subagent_type`. */
   role?: string;
   action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";
@@ -53,6 +55,8 @@ export type Msg = {
     provider?: string;
     model?: string;
     responseId?: string;
+    /** Copied history needs its inline images when replayed into a fresh native session. */
+    branchHistory?: boolean;
     checkpoint?: string;
     imported?: string;
     durationMs?: number;

@@ -1,3 +1,5 @@
+import { freezeChat, shortenChat, splitChatReferences, joinChatReferences, CHAT_REFERENCE_LIMIT, type ChatReference } from "../../lib/chatContext";
+import { loadMessages, type Chat } from "../../lib/data";
 import { VoiceInput } from "../VoiceInput";
 import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -15,6 +17,7 @@ import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
+import { ImageThumb } from "../ImageViewer";
 import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
 import { mergeSkills } from "../../agent/skillsCore";
@@ -39,6 +42,7 @@ type Props = {
   modelName: string | undefined;
   supports: { computer: boolean; reasoning: boolean };
   running: boolean;
+  onClarify?: () => void;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
   onSend: () => void;
@@ -65,6 +69,27 @@ export function Composer(p: Props) {
   const menu = useMenu();
   const addMenu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
+  const { body: composerBody, references } = splitChatReferences(text);
+  const [pendingChat, setPendingChat] = useState<ChatReference | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const ru = app.locale === "ru";
+  const attachChat = async (chat: Chat) => {
+    const scope = currentScope.current;
+    setChatLoading(true); setAttachmentError("");
+    try {
+      const ref = freezeChat(chat.id, chat.title, await loadMessages(chat.id));
+      if (scope !== currentScope.current) return;
+      setPendingChat(ref); setMention(null);
+    } catch { setAttachmentError(ru ? "Не удалось прочитать чат" : "Could not read chat"); }
+    finally { if (scope === currentScope.current) setChatLoading(false); }
+  };
+  const confirmChat = (ref: ChatReference) => {
+    const latest = splitChatReferences(text);
+    const next = joinChatReferences(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref]);
+    if (next.length > 200_000) { setAttachmentError(ru ? "Снимок превышает лимит черновика (200 000 символов). Выберите сокращённую версию или удалите другое вложение." : "Snapshot exceeds draft limit (200,000 characters). Choose shortened version or remove another attachment."); return; }
+    setText(next);
+    setPendingChat(null); taRef.current?.focus();
+  };
   const instructions = useInstructionReport(root, p.provider);
   // Cursor account rotation: which account the next message will use (only when the selected one is in the pool).
   const pool = useCursorPool();
@@ -83,6 +108,7 @@ export function Composer(p: Props) {
   const [attachmentError,setAttachmentError]=useState("");
   const [capturing,setCapturing]=useState(false);
   const currentScope=useRef(p.scopeKey); currentScope.current=p.scopeKey;
+  useEffect(() => { setPendingChat(null); setChatLoading(false); }, [p.scopeKey]);
   const fileInput = useRef<HTMLInputElement>(null);
   const [skills, setSkills] = useState<Skill[]>(() => mergeSkills([]));
   const [slash, setSlash] = useState<{ q: string; hl: number } | null>(null);
@@ -106,9 +132,12 @@ export function Composer(p: Props) {
   }, [text]);
   useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
 
-  const mentionList = mention ? p.files.filter((f) => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 12) : [];
+  const mentionList = mention ? [
+    ...p.files.filter(f => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(path => ({ path, chat: undefined as Chat | undefined, label: path })),
+    ...app.chats.filter(c => c.title.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(chat => ({ path: "", chat, label: `💬 ${chat.title}` }))
+  ].slice(0, 12) : [];
   const insertMention = (path: string) => {
-    setText(text.replace(/@([\w./-]*)$/, `@${path} `));
+    setText(joinChatReferences(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
     setMention(null);
     taRef.current?.focus();
   };
@@ -124,7 +153,7 @@ export function Composer(p: Props) {
     if (mention && mentionList.length) {
       if (e.key === "ArrowDown") return e.preventDefault(), setMention({ ...mention, hl: Math.min(mention.hl + 1, mentionList.length - 1) });
       if (e.key === "ArrowUp") return e.preventDefault(), setMention({ ...mention, hl: Math.max(mention.hl - 1, 0) });
-      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), insertMention(mentionList[mention.hl]);
+      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), (mentionList[Math.min(mention.hl, mentionList.length - 1)].chat ? void attachChat(mentionList[Math.min(mention.hl, mentionList.length - 1)].chat!) : insertMention(mentionList[Math.min(mention.hl, mentionList.length - 1)].path));
       if (e.key === "Escape") return setMention(null);
     }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -172,7 +201,7 @@ export function Composer(p: Props) {
         <div
           className="composer"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => (e.preventDefault(), addImageFiles(e.dataTransfer.files))}
+          onDrop={(e) => { e.preventDefault(); const id = Number(e.dataTransfer.getData("text/chat")); const chat = app.chats.find(c => c.id === id); if (chat) void attachChat(chat); else addImageFiles(e.dataTransfer.files); }}
         >
           {attachmentError && <div className="error-box" role="alert">{attachmentError}<button className="btn-ghost" onClick={()=>setAttachmentError("")}>{t("cancel")}</button></div>}
           {slash && slashList.length > 0 && (
@@ -188,17 +217,32 @@ export function Composer(p: Props) {
           {mention && mentionList.length > 0 && (
             <div className="menu mention-list" id="mention-list" role="listbox" aria-label={t("mentionFile")} style={{ position: "absolute" }}>
               {mentionList.map((f, i) => (
-                <button key={f} id={`mention-opt-${i}`} role="option" aria-selected={i === mention.hl} tabIndex={-1} className={`menu-item${i === mention.hl ? " hl" : ""}`} onMouseDown={(e) => (e.preventDefault(), insertMention(f))}>
-                  <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f}</span>
+                <button key={f.chat ? `chat:${f.chat.id}` : f.path} id={`mention-opt-${i}`} role="option" aria-selected={i === mention.hl} tabIndex={-1} className={`menu-item${i === mention.hl ? " hl" : ""}`} onMouseDown={(e) => (e.preventDefault(), (f.chat ? void attachChat(f.chat) : insertMention(f.path)))}>
+                  <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f.label}</span>
                 </button>
               ))}
             </div>
           )}
+          {chatLoading && <div role="status">{ru ? "Читаю чат…" : "Reading chat…"}</div>}
+          {references.map((ref, i) => <div key={`${ref.sourceId}:${i}`} className="chat-reference">
+            <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
+            <span>{ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}{ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}</span>
+            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(joinChatReferences(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
+            <details><summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary><pre>{ref.snapshot}</pre></details>
+          </div>)}
+          {pendingChat && <div className="chat-reference" role="region" aria-label={ru ? "Прикрепить чат" : "Attach chat"}>
+            <strong>{pendingChat.title}</strong> · {pendingChat.fullSize.toLocaleString()} {ru ? "символов" : "characters"}
+            <p>{ru ? "Разговор будет отправлен как текстовый справочный материал (изображения не копируются). Снимок сохраняется независимо от последующих изменений исходника." : "Conversation is sent as text reference material (images are not copied). The snapshot is retained independently of later source edits."}</p>
+            <details><summary>{ru ? "Полный снимок" : "Full snapshot"}</summary><pre>{pendingChat.snapshot}</pre></details>
+            <button className="btn" onClick={() => confirmChat(pendingChat)}>{ru ? "Прикрепить полностью" : "Attach full version"}</button>
+            {pendingChat.fullSize > CHAT_REFERENCE_LIMIT && <><p>{ru ? "Большой разговор увеличит расход контекста. Можно явно сократить середину." : "A large conversation consumes more context. You can explicitly omit the middle."}</p><button className="btn" onClick={() => confirmChat(shortenChat(pendingChat))}>{ru ? "Прикрепить сокращённо" : "Attach shortened version"}</button></>}
+            <button className="btn-ghost" onClick={() => setPendingChat(null)}>{t("cancel")}</button>
+          </div>}
           {images.length > 0 && (
             <div className="attach-list">
               {images.map((d, i) => (
                 <div key={i} className="attach">
-                  <img src={`data:image/png;base64,${d}`} alt="" />
+                  <ImageThumb src={`data:image/png;base64,${d}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />
                   <button title={t("removeAttachment")} aria-label={t("removeAttachment")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
                     <X size={11} />
                   </button>
@@ -213,14 +257,14 @@ export function Composer(p: Props) {
             aria-controls={slash && slashList.length ? "skill-list" : mention && mentionList.length ? "mention-list" : undefined}
             aria-activedescendant={slash && slashList.length ? `skill-opt-${Math.min(slash.hl, slashList.length - 1)}` : mention && mentionList.length ? `mention-opt-${mention.hl}` : undefined}
             rows={1}
-            value={text}
+            value={composerBody}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
             onChange={(e) => {
-              setText(e.target.value);
+              setText(joinChatReferences(e.target.value, references));
               const cmd = /^\/([a-zA-Z0-9_-]*)$/.exec(e.target.value);
               setSlash(cmd ? { q: cmd[1], hl: 0 } : null);
-              const m = /@([\w./-]*)$/.exec(e.target.value.slice(0, e.target.selectionStart));
-              setMention(m && root ? { q: m[1], hl: 0 } : null);
+              const m = /@([^\s@]*)$/.exec(e.target.value.slice(0, e.target.selectionStart));
+              setMention(m ? { q: m[1], hl: 0 } : null);
             }}
             onKeyDown={onKeyDown}
             onBlur={() => setSlash(null)}
@@ -243,7 +287,8 @@ export function Composer(p: Props) {
                   { heading: t("attach") },
                   ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
-                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(text + (text && !text.endsWith(" ") ? " @" : "@")), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
+                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
+                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
                   { sep: true },
                   { heading: t("modeSwitch") },
@@ -319,10 +364,10 @@ export function Composer(p: Props) {
               instructions={instructions.report}
               onOpen={instructions.reload}
             />
-            <div style={{ position: "relative" }}>
+            <div className="composer-model" style={{ position: "relative" }}>
               <button className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                {p.modelName ?? t("chooseModel")} <ChevronDown size={13} />
+                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span> <ChevronDown size={13} className="chev" />
               </button>
               {picker && <ModelPicker onClose={() => setPicker(false)} />}
             </div>
@@ -337,7 +382,9 @@ export function Composer(p: Props) {
                 <Brain size={14} /> {t(`reasoning_${app.reasoning}`)}
               </button>
             )}
+            <div className="composer-actions">
             <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
+            {p.running && <><button className="chip" disabled={!text.trim() && !images.length} onClick={p.onSend}>{t("sendNext")}</button>{p.onClarify && <button className="chip" disabled={!text.trim() || !!images.length} onClick={p.onClarify}>{t("clarifyTask")}</button>}</>}
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />
@@ -347,6 +394,7 @@ export function Composer(p: Props) {
                 <ArrowUp size={16} />
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>

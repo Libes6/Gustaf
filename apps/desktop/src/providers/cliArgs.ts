@@ -69,5 +69,5 @@ export function resumePoint(t: TurnInput, providerId: string, withSystem: boolea
     : (withSystem ? `${t.system}\n\n` : "") +
       (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
   // Resumed CLI sessions may predate canvas support and don't receive the API system message.
-  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
+  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session || rest.some(m => m.meta?.branchHistory)) };
 }

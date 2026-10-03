@@ -307,6 +307,15 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .composer textarea::placeholder { color: var(--text-3); }
 .composer-bar { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .composer-bar .grow { flex: 1; }
+.composer-bar { flex-wrap: wrap; row-gap: 4px; padding-right: 2px; }
+.composer-bar > * { flex-shrink: 0; }
+.composer-bar .grow { flex: 1 1 0; min-width: 0; }
+.composer-bar .composer-model { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.composer-model .chip { max-width: 100%; min-width: 0; }
+.composer-model .chip .chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.composer-model .chip svg { flex: none; }
+.composer-bar .send { flex-shrink: 0; margin-left: 2px; }
+.composer-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; padding-left: 2px; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border-radius: 8px;
   color: var(--text-2); white-space: nowrap;
@@ -320,6 +329,12 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .send:disabled { background: var(--send-off-bg); color: var(--send-off-fg); }
 .attach-list { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .attach { position: relative; }
+.image-thumb { cursor: zoom-in; }
+.image-thumb:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.image-viewer { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(0, 0, 0, 0.75); padding: 24px; }
+.image-viewer-backdrop { position: absolute; inset: 0; }
+.image-viewer img { position: relative; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; cursor: default; }
+.image-viewer-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-active); color: inherit; }
 .attach img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; display: block; }
 .attach button { position: absolute; top: -6px; right: -6px; background: var(--bg-active); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; }
 .mention-list { position: absolute; bottom: calc(100% + 6px); left: 0; width: 420px; max-height: 260px; overflow-y: auto; }
@@ -653,3 +668,13 @@ button:disabled { cursor:default; opacity:.45; }
 .skill-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
 .skill-option-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; color: var(--text-2); }
 .skill-option-source { font-size: 11px; line-height: 1.4; color: var(--text-3); }
+.chat-reference { padding: 10px; margin: 6px 0; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.chat-reference pre { white-space: pre-wrap; max-height: 240px; overflow: auto; font-size: 12px; }
+
+.branch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.branch-bar p, .branch-picker p { max-width: 70ch; font-size: 12px; }
+.branch-picker { padding: 16px; border-bottom: 1px solid var(--border); }
+
+.queue-panel { max-height: 30vh; overflow-y: auto; padding: 8px 16px; border-top: 1px solid var(--border); }
+.queue-panel > div { margin-top: 8px; }
+.queue-panel textarea { width: 100%; min-height: 44px; resize: vertical; }

@@ -1,4 +1,12 @@
 {
+  "sendNext": "Send next",
+  "clarifyTask": "Clarify current task",
+  "queueInterrupted": "Previous run was interrupted. Resume queued requests explicitly.",
+  "queueResume": "Resume queue",
+  "queuePause": "Pause queue",
+  "queueEdit": "Edit queued message",
+  "queueRemove": "Remove",
+
   "accentColor": "Accent color",
   "accentCustom": "Custom color, e.g. #a884ee",
   "accentInvalid": "Enter a color like #a884ee",
@@ -50,6 +58,9 @@
   "modelPicker": "Choose a model",
   "navMain": "Main navigation",
   "removeAttachment": "Remove attachment",
+  "closeImage": "Close image",
+  "openImage": "Open image",
+  "attachedImage": "Attached image {n} of {total}",
   "riskEnterAfterTyping": "Pressing Return after typing may send a message or submit a form.",
   "riskNewline": "The typed text contains a line break, which may send or submit it.",
   "riskDestructiveShortcut": "This shortcut may quit an app, close a window or delete something.",
@@ -1094,5 +1105,11 @@
   "reviewCopyOn": "on",
   "reviewCopyOff": "off",
   "reviewCopyDefault": "Default ({state})",
-  "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git."
+  "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git.",
+  "branchNavigation": "Chat branches",
+  "branchSource": "Branch from",
+  "branchUnavailable": "source unavailable",
+  "branchTransfer": "Context transfer",
+  "branchChooseModel": "Choose provider and model before branching",
+  "branchTransferDetails": "Only history through the selected turn is copied, including attachments and recorded tool results. Creating a branch never executes tools. The next run starts a fresh provider session from copied context; native session state and provider-private context do not transfer. Switching models may change capabilities. Branch histories are independent; workspace files remain shared."
 }
