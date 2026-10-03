@@ -116,7 +116,7 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
     const text = readFileSync(f, 'utf8');
     for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
   }
-  const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length));
+  const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length).split(sep).join("/"));
   assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, isolated local project preview and HTML sharing may create an iframe');
   const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
   assert.match(share, /sandbox=""/, 'the share preview frame must be fully sandboxed (no scripts)');

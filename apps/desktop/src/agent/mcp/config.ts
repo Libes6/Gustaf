@@ -83,18 +83,22 @@ const validOAuth = (o: unknown) => {
 };
 const badValue = (v: unknown) => v !== undefined && (typeof v !== "string" || v.length > LIMITS.value || v.includes("\0"));
 
+/** POSIX, absolute drive paths and UNC shares; never drive-relative or NUL-containing paths. */
+const absolutePath = (p: unknown): p is string => typeof p === "string" && p.length <= LIMITS.path && !p.includes("\0") &&
+  (p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p) || /^\\\\[^\\]+\\[^\\]+/.test(p));
+
 /** Problems with a server, as codes (the UI translates them). `others` are the other configured servers. */
 export function validateServer(s: McpServer, others: readonly McpServer[] = []): ErrorCode[] {
   const errors = new Set<ErrorCode>();
   if (!NAME_RE.test(s.name)) errors.add("name");
   else if (others.some((o) => o.id !== s.id && o.name.toLowerCase() === s.name.toLowerCase())) errors.add("nameTaken");
-  if (s.scope === "project" && !(typeof s.project === "string" && s.project.startsWith("/"))) errors.add("project");
+  if (s.scope === "project" && !absolutePath(s.project)) errors.add("project");
   if (s.transport === "stdio") {
     if (typeof s.command !== "string" || !s.command.trim() || s.command.length > LIMITS.command || s.command.includes("\0")) errors.add("command");
     if (!Array.isArray(s.args) || s.args.length > LIMITS.args || s.args.some((a) => typeof a !== "string" || a.length > LIMITS.arg || a.includes("\0"))) errors.add("args");
     if (!Array.isArray(s.env) || s.env.length > LIMITS.entries || s.env.some((e) => !ENV_RE.test(e.key))) errors.add("envKey");
     if (s.env?.some((e) => badValue(e.value))) errors.add("value");
-    if (s.cwd !== undefined && (typeof s.cwd !== "string" || !s.cwd.startsWith("/") || s.cwd.length > LIMITS.path)) errors.add("cwd");
+    if (s.cwd !== undefined && !absolutePath(s.cwd)) errors.add("cwd");
   } else {
     if (!validUrl(s.url)) errors.add("url");
     if (!Array.isArray(s.headers) || s.headers.length > LIMITS.entries || s.headers.some((h) => !HEADER_RE.test(h.key))) errors.add("headerName");

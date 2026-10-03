@@ -306,3 +306,13 @@ test('HTTP client: oversized JSON bodies are refused', async () => {
   const c = new McpHttpClient({ url: 'https://x.dev/mcp', headers: {}, fetch });
   await assert.rejects(c.request('tools/list', undefined), /exceeded 16 MB/);
 });
+test('MCP project and working-directory validation accepts absolute Windows paths and rejects relative paths', () => {
+  const base = { id: 'windows', name: 'windows', enabled: true, scope: 'project', transport: 'stdio', command: 'node', args: [], env: [] };
+  for (const path of ['/work/project', 'C:\\work\\project', 'C:/work/project', '\\\\server\\share\\project']) {
+    assert.deepEqual(cfg.validateServer({ ...base, project: path, cwd: path }), []);
+  }
+  for (const path of ['relative', 'C:relative', 'C:\\work\0bad']) {
+    const errors = cfg.validateServer({ ...base, project: path, cwd: path });
+    assert.ok(errors.includes('project')); assert.ok(errors.includes('cwd'));
+  }
+});

@@ -155,7 +155,7 @@ gitTest('a created file in an ignored folder (dist/) and a tracked file can be r
 }));
 
 gitTest('names with spaces, dashes and glob characters are handled literally', withHarness(async (h) => {
-  for (const name of ['-n', 'a b.txt', 'a*b', 'x?y', '[z].txt']) {
+  for (const name of ['-n', 'a b.txt', '[z].txt', ...(process.platform === 'win32' ? [] : ['a*b', 'x?y'])]) {
     h.put('axb', 'sibling');
     h.put('xxy', 'sibling');
     h.put('z.txt', 'sibling');
