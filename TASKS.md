@@ -143,8 +143,8 @@ Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, 
   - [ ] Config per project/global (event, matcher, command, timeout); exit code can block a tool call with a message to the agent.
   - [ ] Go through `run_command` rules; show hook output in the action log.
 - [ ] **Push and pull request creation**: push the branch from `GitCommitDialog`, create a PR via `gh` (or GitHub API with a token in Keychain) with a generated title/description; show the PR link in the chat.
-- [ ] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules.
-- [ ] **Reply to the agent from the diff** (Warp). Comment on a line/hunk in `ChangesPanel`; comments are sent to the agent as a follow-up (or into a running request) with file/line context.
+- [~] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules. *Done: manual "Review with AI" (read-only, JSON findings, inline + list, dismiss); not done: automatic review before accept, `.mcode/REVIEW.md`.*
+- [x] **Reply to the agent from the diff** (Warp). Comment on a line/hunk in `ChangesPanel`; comments are sent to the agent as a follow-up (or into a running request) with file/line context.
 
 ### R3 — convenience
 - [ ] **Quick ask window** on a global shortcut (Spotlight-like): small always-on-top window, default model, answer inline, "Open in M Code" to continue as a chat; optional clipboard/selection as context.
