@@ -128,7 +128,7 @@ describe("Composer", () => {
     const onSend = vi.fn();
     renderApp(<Harness root="/work/alpha" files={["src/app.ts", "src/main.ts", "README.md"]} onSend={onSend} />);
     await userEvent.type(box(), "look at @src/m");
-    expect(screen.getByRole("button", { name: "src/main.ts" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "src/main.ts" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "README.md" })).not.toBeInTheDocument();
     await userEvent.type(box(), "{Enter}");
     expect(onSend).not.toHaveBeenCalled();
@@ -138,7 +138,7 @@ describe("Composer", () => {
   describe("context chip", () => {
     it("shows the estimate and toggles its popover on click", async () => {
       renderApp(<Harness />);
-      const chip = screen.getByRole("button", { name: /≈1,234/ });
+      const chip = screen.getByRole("button", { name: /1,234/ });
       expect(chip).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByText(/Model window/)).not.toBeInTheDocument();
       await userEvent.click(chip);
@@ -152,7 +152,7 @@ describe("Composer", () => {
 
     it("closes on Escape and on a click outside, but not on a click inside", async () => {
       renderApp(<Harness />);
-      const chip = screen.getByRole("button", { name: /≈1,234/ });
+      const chip = screen.getByRole("button", { name: /1,234/ });
       await userEvent.click(chip);
       fireEvent.mouseDown(screen.getByText(/Model window/));
       expect(screen.getByText(/Model window/)).toBeInTheDocument();
@@ -166,12 +166,12 @@ describe("Composer", () => {
     it("compress calls onCompact, and is disabled when there is nothing to compact", async () => {
       const onCompact = vi.fn();
       const { unmount } = renderApp(<Harness onCompact={onCompact} />);
-      await userEvent.click(screen.getByRole("button", { name: /≈1,234/ }));
+      await userEvent.click(screen.getByRole("button", { name: /1,234/ }));
       await userEvent.click(screen.getByRole("button", { name: "Compress chat" }));
       expect(onCompact).toHaveBeenCalledTimes(1);
       unmount();
       renderApp(<Harness canCompact={false} />);
-      await userEvent.click(screen.getByRole("button", { name: /≈1,234/ }));
+      await userEvent.click(screen.getByRole("button", { name: /1,234/ }));
       expect(screen.getByRole("button", { name: "Compress chat" })).toBeDisabled();
     });
   });

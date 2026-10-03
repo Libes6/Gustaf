@@ -19,7 +19,7 @@ const PAGES: [SettingsPage, string][] = [
 ];
 
 const page = () => screen.getByRole("heading", { level: 1 });
-const nav = () => screen.getByRole("heading", { name: "Settings" }).closest("nav") as HTMLElement;
+const nav = () => screen.getByRole("navigation", { name: "Settings" }) as HTMLElement;
 
 describe("Settings", () => {
   it.each(PAGES)("renders the %s page with an empty backend", async (id, title) => {
