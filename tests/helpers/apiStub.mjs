@@ -15,8 +15,14 @@ export const state = {
   /** (id, path) => diff text for the review panel; empty string = nothing pending. */
   reviewDiff: () => '',
   shadows: mkdtempSync(join(tmpdir(), 'apistub-shadow-')),
+  /** Keychain entries written through `secrets`. */
+  secrets: new Map(),
+  /** Fake stdio MCP servers by config id: { tools, call(name, args), epoch?, startError? }; and what was sent. */
+  mcp: { servers: {}, starts: [], requests: [], stops: [] },
   reset() {
     this.settings.clear();
+    this.secrets.clear();
+    this.mcp = { servers: {}, starts: [], requests: [], stops: [] };
     this.instructionFiles = [];
     this.runs.length = 0;
     this.runResult = { code: 0, output: 'ran', timed_out: false };
@@ -33,7 +39,36 @@ const confine = (root, rel) => {
 export const getSetting = async (key, fallback) => (state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback);
 export const setSetting = async (key, value) => void state.settings.set(key, JSON.stringify(value));
 export const db = { select: async () => [], exec: async () => ({ changes: 0, lastId: 0 }) };
-export const secrets = { set: async () => {}, get: async () => null, delete: async () => {} };
+export const secrets = {
+  set: async (id, value) => void state.secrets.set(id, value),
+  get: async (id) => state.secrets.get(id) ?? null,
+  delete: async (id) => void state.secrets.delete(id),
+};
+
+const fakeMcp = (id) => {
+  const s = state.mcp.servers[id];
+  if (!s) throw new Error(`unknown MCP server ${id}`);
+  return s;
+};
+const mcpStatus = (id) => ({ id, state: 'running', error: null, pid: 1, restarts: 0, toolsEpoch: state.mcp.servers[id]?.epoch ?? 0, init: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: id } } });
+export const mcpStdio = {
+  start: async (id, spec) => {
+    state.mcp.starts.push({ id, spec });
+    const s = fakeMcp(id);
+    if (s.startError) throw new Error(s.startError);
+    return mcpStatus(id);
+  },
+  request: async (id, method, params) => {
+    state.mcp.requests.push({ id, method, params });
+    const s = fakeMcp(id);
+    if (method === 'tools/list') return { tools: s.tools };
+    if (method === 'tools/call') return s.call(params.name, params.arguments);
+    throw new Error(`MCP error -32601: Method not found: ${method}`);
+  },
+  stop: async (id) => void state.mcp.stops.push(id),
+  status: async () => Object.keys(state.mcp.servers).map(mcpStatus),
+  logs: async () => [],
+};
 export const cursor = { scan: async () => [], messages: async () => [] };
 
 export const fsx = {

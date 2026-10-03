@@ -2,6 +2,13 @@ import { useEffect } from "react";
 import type { ApprovalRequest } from "../../agent/agent";
 import { useT } from "../../i18n";
 import { summarize } from "../ToolCard";
+import { allowMcpTool } from "../../agent/mcp/runtime";
+
+/** Arguments of an MCP call as shown for approval (bounded). */
+const mcpArgs = (args: unknown) => {
+  const text = JSON.stringify(args ?? {}, null, 2) ?? "{}";
+  return text.length > 4000 ? text.slice(0, 4000) + "\n…" : text;
+};
 
 export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer: (ok: boolean, always?: boolean) => void }) {
   const t = useT();
@@ -16,8 +23,8 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
   return (
     <div className="approval">
       {req.agent && <div style={{ fontSize: 12, marginBottom: 4, color: "var(--text-3)" }}>{t("approveAgent", { title: req.agent })}</div>}
-      <div className="q">{req.kind === "command" ? t("approveCommand") : t("approveComputer")}</div>
-      <pre>{req.kind === "command" ? req.command : summarize({ type: "tool_call", id: "", name: "computer", args: {}, computer: { actions: req.actions } })}</pre>
+      <div className="q">{req.kind === "command" ? t("approveCommand") : req.kind === "mcp" ? t("approveMcp", { tool: req.tool, server: req.server }) : t("approveComputer")}</div>
+      <pre>{req.kind === "command" ? req.command : req.kind === "mcp" ? mcpArgs(req.args) : summarize({ type: "tool_call", id: "", name: "computer", args: {}, computer: { actions: req.actions } })}</pre>
       {req.kind === "computer" && req.safety?.map((s, i) => <div key={i} className="warn" style={{ marginBottom: 8 }}>⚠ {s}</div>)}
       <div className="btns">
         <button className="btn btn-ghost" onClick={() => onAnswer(false)}>
@@ -26,6 +33,11 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
         {req.kind === "command" && (
           <button className="btn-soft" onClick={() => onAnswer(true, true)}>
             {t("alwaysAllow")}
+          </button>
+        )}
+        {req.kind === "mcp" && (
+          <button className="btn-soft" onClick={() => allowMcpTool(req.serverId, req.tool).catch(() => {}).finally(() => onAnswer(true))}>
+            {t("mcpAlwaysAllowTool")}
           </button>
         )}
         <button className="btn btn-primary" onClick={() => onAnswer(true)}>
