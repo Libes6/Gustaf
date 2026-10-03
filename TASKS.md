@@ -83,7 +83,7 @@ Items were drafted from the README and code layout; verify against the code befo
   - [x] CI matrix (`macos-latest`, `windows-latest`, `ubuntu-latest`, Linux system packages installed) running `npm run check`; symlink/POSIX-only Rust tests gated with `cfg(unix)`, `fileUndo` mode test guarded on `win32`. The Windows/Linux jobs have not been observed to pass.
 - [x] **MCP servers**: API-provider agents use tools of stdio and streamable-HTTP MCP servers (`src/agent/mcp/`, `mcp.rs`, `McpServers.tsx`): Keychain secrets, import of `mcpServers` JSON, approvals per call/tool/server, read-only mode, action log. Follow-ups done: cancellation of in-flight calls (stdio `mcp_cancel`, HTTP abort, `notifications/cancelled`, late responses dropped), resources (built-in `mcp_list_resources` / `mcp_read_resource` tools with approvals, `list_changed` cache invalidation), prompts (composer picker, user-invoked only), OAuth for HTTP servers (discovery, PKCE S256, dynamic registration, Rust loopback listener, Keychain tokens, refresh on 401, Sign in/out). Not done: sampling/elicitation, resource subscriptions and templates, the legacy SSE transport, the 2025-03-26 OAuth endpoint fallback, token revocation, subagent access to MCP tools, CLI providers (own config). OAuth, resources and prompts are tested against fakes only (no real provider or server, nothing smoke-tested in `tauri dev`: the browser step, the opener plugin and the Keychain writes are unexercised).
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
-- [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
+- [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Push and pull requests: see below.
 - [x] **`@file` mentions** in the composer with autocomplete (already existed; `@folder` not supported).
 - [x] **Chat branching**: "Branch from here" on any message copies the history up to it into a new chat (`branchChat` in `lib/data.ts`).
 - [x] **Model comparison**: send one prompt to 2-4 models side by side (`lib/compare.ts`, `Compare.tsx`): parallel read-only runs, per-column stop/run again, live and reported tokens, classified errors, "Continue in chat". Nothing is persisted except a continued chat; not smoke-tested in `tauri dev`. Not done: budget gauge does not count un-continued comparison tokens (it reads stored messages); system prompt and reasoning level are fixed.
@@ -111,10 +111,10 @@ Items were drafted from the README and code layout; verify against the code befo
 Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, Warp, Cline/Roo/Kilo, OpenCode, Msty, LibreChat and user discussions. Checked against the code on 2026-10-03: the API agent tools are only `read_file`, `list_dir`, `search`, `edit_file`, `write_file`, `run_command` (+ MCP, computer, subagents); no plan mode, skills, memory, terminal pane or semantic index exist.
 
 ### R1 — expected by users (do first)
-- [ ] **Plan mode** in the main chat (Claude Code, Cursor `--plan`, Roo). The agent may only read/search and must end with a step-by-step plan; edits start after the user clicks Approve.
-  - [ ] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
-  - [ ] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
-  - [ ] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
+- [x] **Plan mode** in the main chat (Claude Code, Cursor `--plan`, Roo). The agent may only read/search and must end with a step-by-step plan; edits start after the user clicks Approve.
+  - [x] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
+  - [x] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
+  - [x] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
 - [ ] **Persistent memory** (most requested on Reddit; Kilo Memory Bank). Facts about the project and the user survive across chats.
   - [ ] Store: per-project and global memory entries in SQLite (text, source chat, created/updated), editable list in Settings and the project menu.
   - [ ] Agent tools `remember` / `forget` (with approval option) and automatic injection of relevant entries into the system prompt (capped, fenced like project instructions).
@@ -142,14 +142,16 @@ Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, 
 - [ ] **Hooks** (Claude Code). User commands on lifecycle events: before/after tool call, after file edit, on stop, on approval request.
   - [ ] Config per project/global (event, matcher, command, timeout); exit code can block a tool call with a message to the agent.
   - [ ] Go through `run_command` rules; show hook output in the action log.
-- [ ] **Push and pull request creation**: push the branch from `GitCommitDialog`, create a PR via `gh` (or GitHub API with a token in Keychain) with a generated title/description; show the PR link in the chat.
-- [ ] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules.
-- [ ] **Reply to the agent from the diff** (Warp). Comment on a line/hunk in `ChangesPanel`; comments are sent to the agent as a follow-up (or into a running request) with file/line context.
+- [x] **Push and pull request creation**: after a commit `GitCommitDialog` offers Push (never force, no credential prompts, protected-branch confirm with new-branch option) and Create pull request via `gh` (generated editable description, base selector, draft, https-only link; `git_publish.rs`, `GitPublishPanel`). Tested against local bare remotes and a fake `gh` only, not smoke-tested in `tauri dev`.
+  - [ ] GitHub API fallback without `gh` (token in Keychain).
+  - [ ] Show the PR link in the chat.
+- [~] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules. *Done: manual "Review with AI" (read-only, JSON findings, inline + list, dismiss); not done: automatic review before accept, `.mcode/REVIEW.md`.*
+- [x] **Reply to the agent from the diff** (Warp). Comment on a line/hunk in `ChangesPanel`; comments are sent to the agent as a follow-up (or into a running request) with file/line context.
 
 ### R3 — convenience
 - [ ] **Quick ask window** on a global shortcut (Spotlight-like): small always-on-top window, default model, answer inline, "Open in M Code" to continue as a chat; optional clipboard/selection as context.
-- [ ] **Chat status in the sidebar** (Warp, Conductor): running / waiting for approval / done (unread) / failed badges per chat and project; filter "needs attention".
-- [ ] **Share a chat as a page**: export a chat (messages, tool cards, diffs) to a self-contained HTML file; redact secrets/paths option. Hosted links are out of scope.
+- [x] **Chat status in the sidebar** (Warp, Conductor): running / waiting for approval / done (unread) / failed badges per chat; filter "needs attention". Done per chat (`lib/chatStatus.ts`); project-level badges and the filter are not done.
+- [x] **Share a chat as a page**: export a chat (messages, tool cards, diffs) to a self-contained HTML file; redact secrets/paths option. Hosted links are out of scope.
 - [ ] **Knowledge base** (Msty Knowledge Stacks, LibreChat RAG): attach folders/PDFs/Markdown as a named collection; reuse the semantic index; pick collections per chat; cite sources in answers.
 
 ### R4 — large, later

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
+import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget, subagentModelResolver } from "./modelRouting";
-import { beginApproval } from "./attention";
+import { beginApproval, reportChatRun } from "./attention";
+import { chatStatusStore } from "./chatStatus";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -43,10 +45,12 @@ type Options = {
   provider: ProviderConfig | undefined;
   selectedModel: ModelInfo | undefined;
   setAtBottom: (b: boolean) => void;
+  /** Ask / Plan / Agent of this chat. */
+  mode: ChatMode;
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
-type Edit = { text: string; images: string[]; base: StoredMsg[] };
+type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode };
 
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
@@ -165,6 +169,8 @@ export function useChatRun(o: Options) {
       onLimits: app.recordLimits,
     };
     let chatId = retry ? retryRef.current?.chatId ?? session.chatId : session.chatId;
+    let outcome: "ok" | "failed" | "stopped" = "ok";
+    if (chatId) chatStatusStore.runStarted(chatId);
     try {
       if (!chatId) {
         chatId = await createChat(o.projectId, body.split("\n")[0].slice(0, 60) || t("newChat"));
@@ -210,6 +216,7 @@ export function useChatRun(o: Options) {
         history,
         retry,
         access: app.access,
+        mode: edit?.mode ?? o.mode,
         review: reviewRef.current ?? undefined,
         target: async () => {
           if (activeProvider.cli === "cursor-agent") {
@@ -270,6 +277,7 @@ export function useChatRun(o: Options) {
           return quota ? await parkExhausted(activeProvider, quota, m) : "";
         },
       }, deps);
+      outcome = message === null ? "stopped" : "failed";
       if (message !== null) setError(message);
     } finally {
       if (reviewRef.current && !retryRef.current) {
@@ -281,6 +289,7 @@ export function useChatRun(o: Options) {
       setRunning(false);
       setRetryNotice("");
       app.setSessionBusy(session.key, false);
+      reportChatRun(chatId, outcome, { title: app.chats.find(c => c.id === chatId)?.title ?? t("newChat"), t });
       setStream(null);
       setActivities([]);
       setToolResults([]);

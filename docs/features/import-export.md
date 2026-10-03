@@ -14,6 +14,16 @@ Right-click a chat in the sidebar and choose Export as Markdown or JSON; Setting
 
 Logic lives in `src/lib/exportChats.ts` (pure, no Tauri); `npm test` covers it in `tests/exportChats.test.mjs`.
 
+## Share a chat as HTML
+
+Right-click a chat and choose Share as HTML (Settings, Import has the same for any chat, next to the export buttons). The result is one self-contained `.html` file: no scripts, no network (a strict CSP meta tag with `default-src 'none'`, images only as `data:` URIs), light/dark through `prefers-color-scheme`, and a print stylesheet. Hosted links are out of scope.
+
+- The page has a header (title, project, dates, model) and the conversation: messages rendered with the app's own Markdown pipeline (react-markdown, GFM, highlight classes inlined as CSS; raw HTML in a message stays text, `javascript:` links are dropped and remote images become their alt text), tool cards that merge a call with its result (command, clipped output, status, failed marked), diffs for file edits, written files with their path, and canvas artifacts as source blocks (never run).
+- Secrets go through the same scrubbing as the Markdown/JSON export (`redactSecrets`/`redactValue`). Before saving, the dialog shows how many secrets were replaced (or that none were found, with a reminder that paths and project names stay in), a preview toggle (a sandboxed frame without scripts) and "Include images and screenshots" (off by default; images are embedded as `data:` URIs, so files can get large). Saving uses the native save dialog.
+- Limits: one message is clipped at 200,000 characters, one tool output at 6,000 and one tool argument block at 4,000, each with a "more characters not shown" note; a long diff is shown up to 400 lines.
+
+Logic lives in `src/lib/shareHtml.ts` (pure; tested in `tests/shareHtml.test.mjs`: escaping, redaction count, no external URLs, CSP, tool cards, unicode, clipping); the dialog is `components/ShareHtmlDialog.tsx` (`tests/ui/ShareHtmlDialog.test.tsx`).
+
 ## Import from Claude Code, Codex and ChatGPT
 
 Settings, Import (and onboarding) list the conversations of other assistants with checkboxes, a search box (title, folder, id) and "Select shown"; sessions that are already in M Code are marked and cannot be ticked again. Sources:

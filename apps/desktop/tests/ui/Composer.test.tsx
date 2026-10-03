@@ -21,6 +21,7 @@ type Over = {
   onCompact?: () => void;
   onRestore?: () => void;
   files?: string[];
+  onModeChange?: (m: string) => void;
 };
 
 /** Holds the text/attachment state the way ChatView does, so typing and removing really change what Composer gets. */
@@ -28,13 +29,14 @@ function Harness(o: Over) {
   const [text, setText] = useState(o.text ?? "");
   const [images, setImages] = useState(o.images ?? []);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const [mode, setMode] = useState<"ask" | "plan" | "agent">("agent");
   return (
     <Composer
       text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible
       root={o.root ?? null} projectName={undefined} files={o.files ?? []}
       provider={provider()} selectedModel={"selectedModel" in o ? o.selectedModel : model} modelName="Model One"
       supports={o.supports ?? { computer: false, reasoning: false }}
-      running={o.running ?? false} onSend={o.onSend ?? (() => {})} onStop={o.onStop ?? (() => {})}
+      running={o.running ?? false} mode={mode} onModeChange={(m) => { setMode(m); o.onModeChange?.(m); }} onSend={o.onSend ?? (() => {})} onStop={o.onStop ?? (() => {})}
       contextTokens={1234} lastInput={900} canCompact={o.canCompact ?? true} canRestore={false}
       onCompact={o.onCompact ?? (() => {})} onRestore={o.onRestore ?? (() => {})}
     />
@@ -43,6 +45,30 @@ function Harness(o: Over) {
 
 const sendButton = () => screen.getByRole("button", { name: "Send" });
 const box = () => screen.getByPlaceholderText("Ask anything") as HTMLTextAreaElement;
+
+describe("Composer mode switch", () => {
+  it("is a labelled radiogroup with Agent selected by default", () => {
+    renderApp(<Harness />);
+    const group = screen.getByRole("radiogroup", { name: "Chat mode" });
+    const radios = within(group).getAllByRole("radio");
+    expect(radios.map((r) => r.textContent)).toEqual(["Ask", "Plan", "Agent"]);
+    expect(within(group).getByRole("radio", { name: "Agent" })).toBeChecked();
+    expect(within(group).getByRole("radio", { name: "Plan" })).not.toBeChecked();
+  });
+
+  it("switches on click and with the arrow keys (roving tabindex)", async () => {
+    const seen: string[] = [];
+    renderApp(<Harness onModeChange={(m) => seen.push(m)} />);
+    await userEvent.click(screen.getByRole("radio", { name: "Plan" }));
+    expect(screen.getByRole("radio", { name: "Plan" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Plan" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: "Agent" })).toHaveAttribute("tabindex", "-1");
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Plan" }), { key: "ArrowLeft" });
+    expect(screen.getByRole("radio", { name: "Ask" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Ask" })).toHaveFocus();
+    expect(seen).toEqual(["plan", "ask"]);
+  });
+});
 
 describe("Composer", () => {
   it("disables Send while the message is empty or whitespace and enables it with text", async () => {

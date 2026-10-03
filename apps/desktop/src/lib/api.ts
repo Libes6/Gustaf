@@ -167,12 +167,29 @@ export type GitStatus = {
 export type CommitContext = { files: string[]; stat: string; diff: string; truncated: boolean; recent: string[] };
 export type CommitResult = { sha: string; short: string; branch: string | null; files: string[]; createdBranch: boolean };
 
+export type GitRemote = { name: string; url: string };
+export type PublishInfo = {
+  repo: boolean; branch: string | null; hasCommits: boolean; remotes: GitRemote[]; upstream: string | null;
+  ahead: number | null; behind: number | null; remoteBranches: string[]; defaultBase: string | null; protected: boolean;
+};
+export type PushResult = { remote: string; branch: string; output: string; info: PublishInfo };
+export type GhStatus = { installed: boolean; authenticated: boolean; detail: string };
+
 export const gitRepo = {
   status: (root: string) => invoke<GitStatus>("git_status", { root }),
   /** Bounded diff of the given changed files, used to generate a commit message. */
   commitContext: (root: string, paths: string[], maxBytes?: number) => invoke<CommitContext>("git_commit_context", { root, paths, maxBytes }),
   /** Commits only `paths` (hooks run, nothing is pushed); with `newBranch` it first creates and switches to it. */
   commit: (root: string, message: string, paths: string[], newBranch?: string | null) => invoke<CommitResult>("git_commit", { root, message, paths, newBranch }),
+  /** Remotes, upstream, ahead/behind and remote branches (read-only; the calls below are explicit user actions). */
+  publishInfo: (root: string) => invoke<PublishInfo>("git_publish_info", { root }),
+  /** Pushes the current branch (never forced) to an existing remote; protected branches need `confirmProtected`. */
+  push: (a: { root: string; remote: string; branch: string; setUpstream: boolean; confirmProtected: boolean }) => invoke<PushResult>("git_push", a),
+  createBranch: (root: string, name: string) => invoke<string>("git_create_branch", { root, name }),
+  ghStatus: (root: string) => invoke<GhStatus>("gh_status", { root }),
+  /** Diff, stat and commit subjects of the branch against a remote-tracking base such as `origin/main`. */
+  prContext: (root: string, baseRef: string, maxBytes?: number) => invoke<CommitContext>("git_pr_context", { root, baseRef, maxBytes }),
+  createPr: (root: string, title: string, body: string, base: string, draft: boolean) => invoke<{ url: string }>("git_create_pr", { root, title, body, base, draft }),
 };
 
 export type Review = { id: string; root: string; workspace: string; /** Dependency directories symlinked into the shadow copy; never applied. */ linked?: string[] };

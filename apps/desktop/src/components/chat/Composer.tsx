@@ -14,6 +14,8 @@ import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
+import { ModeSwitch } from "./ModeSwitch";
+import type { ChatMode } from "../../agent/planCore";
 
 const ACCESS_ICON: Record<Access, typeof Lock> = { readonly: Lock, auto: ShieldCheck, full: Unlock };
 
@@ -33,6 +35,8 @@ type Props = {
   modelName: string | undefined;
   supports: { computer: boolean; reasoning: boolean };
   running: boolean;
+  mode: ChatMode;
+  onModeChange: (m: ChatMode) => void;
   onSend: () => void;
   onStop: () => void;
   contextTokens: number;
@@ -175,6 +179,7 @@ export function Composer(p: Props) {
               <Plus size={16} />
             </button>
             <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => (e.target.files && addImageFiles(e.target.files), (e.target.value = ""))} />
+            <ModeSwitch mode={p.mode} onChange={p.onModeChange} />
             <button
               className="chip"
               aria-haspopup="menu"

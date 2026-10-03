@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -11,7 +11,11 @@ import { EMPTY_REVIEW_SETUP, type ReviewSetupConfig } from "../lib/reviewSetup";
 import { loadReviewSetup } from "../lib/reviewSetupStore";
 import { acceptedFiles, offeredFiles } from "../lib/gitCommit";
 import { GitCommitDialog } from "./GitCommitDialog";
+import { buildFeedbackMessage, hunkFor, type FeedbackComment, type Finding } from "../lib/diffReview";
+import { useDiffReview, type StoredFinding } from "../lib/useDiffReview";
+import { useApp } from "../state";
 import { HunkDiff } from "./HunkDiff";
+import { FeedbackQueue, FindingsBlock, FindingsList, type NewComment } from "./ReviewFindings";
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
 
 function DiffView({ text }: { text: string }) {
@@ -29,8 +33,12 @@ function DiffView({ text }: { text: string }) {
   );
 }
 
-export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { name: string; root: string; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void }) {
+export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onReplyToAgent }: { name: string; root: string; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
   const t = useT();
+  const app = useApp();
+  const aiReview = useDiffReview(root);
+  const [comments, setComments] = useState<FeedbackComment[]>([]);
+  const [focusHunk, setFocusHunk] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"changes" | "terminal">("changes");
   const [files, setFiles] = useState<FileChange[]>([]);
@@ -90,14 +98,33 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
     setErr("");
     try {
       setPicked(new Set());
-      setDiff({
-        path, reviewId,
-        text: reviewId ? await review.diff(reviewId, path) : await fileDiff(root, base!, path),
-        hunks: reviewId ? await review.hunks(reviewId, path).catch(() => []) : undefined,
-      });
+      const hunks = reviewId ? await review.hunks(reviewId, path).catch(() => []) : undefined;
+      setDiff({ path, reviewId, text: reviewId ? await review.diff(reviewId, path) : await fileDiff(root, base!, path), hunks });
+      return hunks;
     }
     catch (e) { setErr(String(e)); }
   };
+  const canReview = !!app.selection && !busy && !acting && !aiReview.running;
+  const reviewFiles = (only?: string) => aiReview.run(reviews.filter(([r]) => !only || r.id === only).flatMap(([r, list]) => list.filter(f => !f.binary).map(f => ({ reviewId: r.id, path: f.path }))));
+  const jumpTo = async (f: StoredFinding) => {
+    setFocusHunk(null);
+    const hunks = await showDiff(f.file, f.reviewId);
+    setFocusHunk((hunks && hunkFor(f, hunks)) ?? null);
+  };
+  const addComment = (c: NewComment) => setComments(old => [...old, { ...c, id: `c${Date.now()}-${old.length}` }]);
+  const sendFeedback = () => {
+    const text = buildFeedbackMessage(comments);
+    if (!text || !onReplyToAgent || busy) return;
+    onReplyToAgent(text);
+    setComments([]);
+    setNotice(t("feedbackSent"));
+  };
+  const st = aiReview.status;
+  const statusText = st.phase === "running" ? t("aiReviewRunning", { count: st.files })
+    : st.phase === "done" ? t("aiReviewDone", { count: st.count, files: st.files, model: st.model })
+    : "";
+  const statusError = st.phase === "error" ? (st.message === "unparsable" ? t("aiReviewUnparsable") : st.message) : "";
+  const fileFindings = (path: string) => aiReview.findings.filter((f: Finding) => f.file === path);
   // Hunk-level decision: applies or reverts only the given hunks, then reloads the file's remaining diff (or closes when nothing is left).
   const decideHunks = async (ids: string[], accepting: boolean) => {
     if (!diff?.reviewId || !ids.length) return;
@@ -151,7 +178,6 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
       {notice && <div className="commit-notice" role="status"><Check size={13} /><span className="grow">{notice}</span></div>}
       {commitOpen && <GitCommitDialog root={root} accepted={acceptedFiles.list(root)} onClose={() => setCommitOpen(false)} onCommitted={(r) => {
         acceptedFiles.forget(root, r.files);
-        setCommitOpen(false);
         setNotice(t("gitCommitted", { sha: r.short, branch: r.branch ?? "HEAD" }));
         refresh().catch(e => setErr(String(e)));
         onChanged();
@@ -161,14 +187,16 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
           <header><strong>{diff.path}</strong><button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={() => setDiff(null)}><X size={17} /></button></header>
           <div className="review-diff-body">
             {diff.hunks && diff.hunks.length > 0
-              ? <HunkDiff hunks={diff.hunks} picked={picked} disabled={busy || acting} onDecide={decideHunks}
+              ? <HunkDiff file={diff.path} hunks={diff.hunks} picked={picked} disabled={busy || acting} onDecide={decideHunks}
+                  findings={fileFindings(diff.path)} focusHunk={focusHunk} onDismissFinding={aiReview.dismiss} onComment={diff.reviewId ? addComment : undefined}
                   onToggle={id => setPicked(p => { const n = new Set(p); if (!n.delete(id)) n.add(id); return n; })} />
-              : <DiffView text={diff.text} />}
+              : <><FindingsBlock file={diff.path} findings={fileFindings(diff.path)} onDismiss={aiReview.dismiss} onComment={diff.reviewId ? addComment : undefined} /><DiffView text={diff.text} /></>}
           </div>
           {err && <div className="error-box" role="alert">{err}</div>}
           {diff.reviewId && <div className="review-actions">
             <button className="btn btn-primary" disabled={busy || acting} onClick={act(accept(diff.reviewId!, diff.path))}>{t("reviewAccept")}</button>
             <button className="btn btn-ghost" disabled={busy || acting} onClick={act(() => review.decide(diff.reviewId!, diff.path, false))}>{t("reviewReject")}</button>
+            <button className="btn-soft" disabled={!canReview} onClick={() => aiReview.run([{ reviewId: diff.reviewId!, path: diff.path }])}><Sparkles size={13} /> {t("aiReviewFile")}</button>
             {(diff.hunks?.length ?? 0) > 0 && <>
               <span style={{ flex: 1 }} />
               <button className="btn-soft" disabled={busy || acting || !picked.size} onClick={() => decideHunks([...picked], true)}>{t("hunkAcceptSelected", { count: picked.size })}</button>
@@ -190,11 +218,17 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
           <div className="panel-body">
             {tab === "changes" && (
               <>
-                <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p></div>
+                <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p>
+                  {pending > 0 && <button className="btn-soft" disabled={!canReview} onClick={() => reviewFiles()} title={t("aiReviewHint")}><Sparkles size={13} /> {t("aiReviewAll")}</button>}
+                </div>
+                <FindingsList findings={aiReview.findings} summary={aiReview.summary} statusText={statusText} running={aiReview.running} error={statusError}
+                  onJump={jumpTo} onDismiss={aiReview.dismiss} onCancel={aiReview.cancel} />
+                <FeedbackQueue comments={comments} busy={busy} canSend={!!onReplyToAgent} onRemove={id => setComments(old => old.filter(c => c.id !== id))} onSend={sendFeedback} />
                 {busy && <div className="hint" style={{ padding: 12 }}>{t("reviewWorking")}</div>}
                 {!pending && <div className="hint" style={{ padding: 12 }}>{t("reviewEmpty")}</div>}
                 <ReviewSetupForm root={root} config={setupCfg} onSaved={setSetupCfg} />
                 {reviews.map(([r, list]) => <div key={r.id} className="review-group">
+                  {reviews.length > 1 && <button className="btn-soft review-ai" disabled={!canReview} onClick={() => reviewFiles(r.id)}><Sparkles size={13} /> {t("aiReviewGroup", { count: list.length })}</button>}
                   {setupCfg.testCommand && <ReviewTestRun reviewId={r.id} command={setupCfg.testCommand} tick={tick} busy={busy || acting} />}
                   {list.map(f => <div key={f.path} className="file-row review-row">
                   <button className="path review-path" onClick={() => showDiff(f.path, r.id)}>{f.path}<span className="hint">{t(f.binary ? "reviewBinary" : "reviewChanged")}</span></button>

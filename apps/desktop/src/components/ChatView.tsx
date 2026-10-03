@@ -18,6 +18,8 @@ import { useApp } from "../state";
 import { AgentsColumn, AgentsToggle } from "./AgentsPanel";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
+import { useChatMode } from "../lib/useChatMode";
+import { planToInstruction, type Plan } from "../agent/planCore";
 import { Composer } from "./chat/Composer";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
@@ -49,19 +51,26 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
   const tasks = useBackgroundTasks(root);
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
+  const [mode, setMode] = useChatMode(session.chatId);
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
-    projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom,
+    projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
   });
   const { stream, error, running, approval, toolResults, activities } = run;
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
-  const latest = useRef({ run, title: "", branchLabel: "" });
-  latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix") };
+  const latest = useRef({ run, title: "", branchLabel: "", messages, setMode });
+  latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix"), messages, setMode };
   const turnHandlers = useMemo<TurnHandlers>(() => ({
     onEdit: (m, txt) => void latest.current.run.resendFrom(m, txt),
     onRegenerate: (user) => void latest.current.run.resendFrom(user, editableText(user)),
     onDelete: (turn) => void latest.current.run.removeMessages((turn.user ?? turn.steps[0]).chat_id, turnMessageIds(turn)),
     onBranch: (m) => void latest.current.run.branchFrom(m, latest.current.title, latest.current.branchLabel),
+    onApprovePlan: (plan: Plan) => {
+      // Approve: Agent mode from now on, and the plan is the next instruction.
+      latest.current.setMode("agent");
+      void latest.current.run.send(false, { text: planToInstruction(plan), images: [], base: latest.current.messages, mode: "agent" });
+    },
+    onRejectPlan: () => taRef.current?.focus(),
   }), []);
 
   useEffect(() => {
@@ -110,7 +119,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
-      {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
+      {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
 
       {messages.length === 0 && stream === null && !error ? (
         <div className="empty">
@@ -137,7 +146,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
         root={root} projectName={project?.name} files={files}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
-        running={running} onSend={() => run.send()} onStop={run.stop}
+        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
         contextTokens={contextTokens} lastInput={lastInput}
         canCompact={!(running || !loaded || messages.length < 4 || !provider)}
         canRestore={messages.some(m => m.meta?.compacted)}

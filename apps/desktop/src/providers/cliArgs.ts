@@ -1,16 +1,31 @@
 import { flattenMsg, textOf, type TurnInput } from "./types.ts";
 
+export type ChatMode = 'ask' | 'plan' | 'agent';
+/** Plan and Ask must not change anything. */
+export const isPlanning = (mode?: ChatMode) => mode === 'plan' || mode === 'ask';
+
+/**
+ * Cursor Agent: `--plan` (shorthand for `--mode=plan`) and `--mode ask` exist in `cursor-agent --help`. The older read-only
+ * access mode keeps `--mode plan`; "full" access adds `--force` unless the chat mode is read-only.
+ */
+export function cursorArgs({ model, session, access, mode, attachDir }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; attachDir?: string }): string[] {
+  const modeFlags = mode === 'plan' ? ['--plan'] : mode === 'ask' ? ['--mode', 'ask'] : access === 'readonly' ? ['--mode', 'plan'] : access === 'full' ? ['--force'] : [];
+  return ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--trust', ...modeFlags, ...(model ? ['--model', model] : []), ...(session ? ['--resume', session] : []), ...(attachDir ? ['--add-dir', attachDir] : [])];
+}
+
 /**
  * `images` are absolute paths of attachments written by `attachments_save`. `--image=<path>` (one flag per file) is used
  * instead of `-i <path>` because `codex exec -i` takes a variadic list and would swallow the positional prompt/session id.
  * Each flag is followed by another `--` option, never by a positional.
  */
-export function codexArgs({ model, session, access, images = [] }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; images?: string[] }): string[] {
-  const permissions = access === 'full'
+export function codexArgs({ model, session, access, mode, images = [] }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; images?: string[] }): string[] {
+  // Plan and Ask have no native Codex mode: the read-only sandbox is the equivalent, and it wins over "full" access.
+  const readonly = access === 'readonly' || isPlanning(mode);
+  const permissions = access === 'full' && !readonly
     ? ['--dangerously-bypass-approvals-and-sandbox']
     : session
-      ? ['-c', `sandbox_mode="${access === 'readonly' ? 'read-only' : 'workspace-write'}"`]
-      : ['--sandbox', access === 'readonly' ? 'read-only' : 'workspace-write'];
+      ? ['-c', `sandbox_mode="${readonly ? 'read-only' : 'workspace-write'}"`]
+      : ['--sandbox', readonly ? 'read-only' : 'workspace-write'];
   return ['exec', ...(session ? ['resume'] : []), '--json', '--skip-git-repo-check', ...images.map((p) => `--image=${p}`), ...permissions, ...(model ? ['-m', model] : []), ...(session ? [session] : [])];
 }
 

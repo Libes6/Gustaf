@@ -1,0 +1,32 @@
+/* AI review findings, inline comments and the feedback queue next to the diff. */
+.findings-list, .feedback-queue { margin: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.findings-status { font-size: 12px; color: var(--text-2); }
+.findings-summary { margin: 0; font-size: 12.5px; color: var(--text-2); }
+.finding-row { display: flex; align-items: center; gap: 4px; border-left: 3px solid var(--border); border-radius: 4px; background: var(--bg-elev); }
+.finding-jump { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 5px 8px; text-align: left; font-size: 12.5px; }
+.finding-jump .hint { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+.finding-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 8px; background: var(--bg); color: var(--text-2); flex: none; }
+.sev-bug { border-left-color: var(--red); }
+.sev-bug .chip { color: var(--red); }
+.sev-warn { border-left-color: var(--warn); }
+.sev-warn .chip { color: var(--warn); }
+.findings-block { display: flex; flex-direction: column; gap: 4px; padding: 6px 16px; }
+.finding { border-left: 3px solid var(--border); background: var(--bg-elev); border-radius: 4px; }
+.finding-head { display: flex; align-items: center; gap: 2px; }
+.finding-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 4px 8px; text-align: left; font-size: 12.5px; }
+.finding-body { padding: 0 10px 8px 28px; font-size: 12.5px; color: var(--text-2); }
+.finding-body p { margin: 4px 0; }
+.comment-box { display: flex; flex-direction: column; gap: 6px; padding: 6px 16px 10px; }
+.comment-box label, .comment-line { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.comment-line { padding: 6px 16px 0; }
+.comment-box .input, .comment-line .input { font: 12.5px var(--mono); padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); resize: vertical; }
+.comment-context { font: 11.5px var(--mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-actions { display: flex; gap: 8px; }
+.line-comment { opacity: 0; width: 14px; margin-right: 4px; color: var(--accent); font: inherit; cursor: pointer; }
+.commentable:hover .line-comment, .line-comment:focus { opacity: 1; }
+.feedback-queue ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.feedback-queue li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.feedback-queue li .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-queue code { font: 11.5px var(--mono); }
+.review-ai { margin: 6px 12px; }

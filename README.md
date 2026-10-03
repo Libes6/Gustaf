@@ -7,7 +7,7 @@ Desktop AI chat and coding assistant built with Tauri 2, React and TypeScript. I
 - **Chat with many providers**: switch models per chat, compare 2-4 models side by side, retry and resume interrupted requests ([chat](docs/features/chat.md)).
 - **Full-text search** across every message, Cmd+K ([search](docs/features/search.md)).
 - **Interactive canvas**: assistant-written React/TSX previews in a sandbox, with revisions ([canvas](docs/features/canvas.md)).
-- **Safe project edits**: the agent works in a shadow copy; you review per file or per hunk, run tests there, then commit only what you accepted ([files and git](docs/features/files-and-git.md)).
+- **Safe project edits**: the agent works in a shadow copy; you review per file or per hunk, run tests there, then commit only what you accepted, optionally push and open a pull request with `gh` ([files and git](docs/features/files-and-git.md)).
 - **Command rules and action log**: allow/ask/deny rules for shell commands, project instruction files (`AGENTS.md`, `CLAUDE.md`, ...) ([rules](docs/features/rules-and-instructions.md)).
 - **Subagents and MCP servers** for API providers, with budgets and background runs ([agents](docs/features/agents.md), [MCP](docs/features/mcp.md)), plus [scheduled prompts](docs/features/scheduled-prompts.md).
 - **Computer Use**: desktop control with per-action approval ([computer use](docs/features/computer-use.md)).
