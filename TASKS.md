@@ -39,6 +39,31 @@ Items were drafted from the README and code layout; verify against the code befo
   5. Approvals: in Full access ask only for likely-irreversible steps (Enter/Return right after typing in a messaging app, delete/quit shortcuts), with "allow for this task"; keep the existing confirmation flow otherwise.
 
 ## P2
+- [ ] **Monorepo layout** (prerequisite for the mobile app). npm workspaces; best done before the first commit so no history is lost.
+  ```
+  package.json          # root: "workspaces" + shared scripts only
+  apps/desktop/         # current app: src/, src-tauri/, sidecar/, scripts/, tests/, public/, index.html, vite/tsconfig
+  apps/mobile/          # Expo (dev build, not Expo Go): app/ (expo-router), app.json, eas.json
+  packages/protocol/    # API + WebSocket event types, protocol version (pure TS)
+  packages/i18n/        # shared en/ru strings (optional)
+  docs/  TASKS.md
+  ```
+  - [ ] Move the desktop app into `apps/desktop`; fix paths in `tauri.conf.json` (`frontendDist`, sidecar `resources`), `scripts/build-canvas.mjs`, tests, `.gitignore`.
+  - [ ] Root `package.json` with workspaces; root scripts delegate (`npm run check -w apps/desktop`, etc.).
+  - [ ] CI: working directory, `rust-cache` workspace path, `sidecar` install, `.nvmrc` location.
+  - [ ] Create `packages/protocol` and use it from desktop (server side) and mobile.
+  - [ ] Rule: shared packages are pure TypeScript, no React/Tauri/React Native imports (Expo pins its own React version, which may differ from desktop React 19.1).
+  - [ ] Update README and `docs/ARCHITECTURE.md`; verify `npm run check` and `npm run tauri build -- --debug --bundles app`.
+
+- [ ] **Mobile companion app (React Native)**: control M Code from a phone over the local network. The desktop shows a QR code, the phone scans it and connects to the whole workspace (projects, chats, running requests).
+  - [ ] **Desktop server**: a local HTTP + WebSocket server in the Tauri backend (`src-tauri`), off by default, toggled in Settings; listens on the LAN interface only; shows address and status.
+  - [ ] **Pairing via QR**: QR encodes host, port, a one-time pairing code and the server certificate fingerprint; the phone exchanges it for a long-lived per-device token. Device list in Settings with revoke.
+  - [ ] **Security**: TLS with a self-signed cert pinned by the fingerprint from the QR; every request authenticated by the device token; pairing code expires in minutes; rate-limit pairing; no access without explicit enable on desktop.
+  - [ ] **API surface**: list projects/chats, read messages, send a message and pick provider/model, stream responses and tool activity, approve/deny pending actions, stop a request, accept/reject file reviews. Reuse existing state instead of a second source of truth (requests keep running on the desktop).
+  - [ ] **Mobile app** (React Native + Expo with development builds via `expo-dev-client` / EAS, **not Expo Go**, so native modules like TLS pinning and local-network permissions are available): QR scanner, chat list, chat view with streaming Markdown, composer, approval prompts, review diffs (read-only first), reconnect handling, i18n (en/ru) like the desktop.
+  - [ ] **Discovery/robustness**: reconnect when the desktop IP changes (optionally mDNS/Bonjour), handle the desktop sleeping, local-network permission on iOS (`NSLocalNetworkUsageDescription`).
+  - [ ] **Later**: push notifications when a request finishes or needs approval; access outside the LAN (tunnel/relay) is out of scope for v1.
+
 - [x] **One run core for chats and scheduled runs; scheduled chats live in the UI.** `lib/chatRunCore.ts` (checkpoint and user message, shadow copy, agent loop, stored messages, usage, partial tool cards, failure report, approval flow) is used by `useChatRun` and `scheduledRun` (safety limits stay in `scheduledRun`); `lib/liveRuns.ts` makes an open chat show a scheduled run (stream, tool cards, approval, Stop), blocks sending into it and marks it running in the sidebar. Tests: `chatRunCore|liveRuns|scheduledRun.test.mjs`, `tests/ui/ChatViewLive.test.tsx`.
 - [ ] **Automatic Cursor account rotation.** Several Cursor accounts, each logged in through the `cursor-agent` CLI (browser login, not API key: reportedly faster). When the active account is out of quota, the next message goes to the next account, round-robin. No mid-response switching; the current message just fails with a clear error.
   - [~] **Research first** (partly done, 2026-10-02). Verified locally with `cursor-agent` 2026.09.28: `CURSOR_CONFIG_DIR=<dir>` is honoured (the CLI creates `cli-config.json` there instead of in `~/.cursor`); overriding `HOME` also isolates but also redirects caches. No Keychain reference found in the binary's strings, so the token is probably file-based in that dir. Not in the official docs, only in third-party material. Still to verify with a real login (needs the user's browser): `CURSOR_CONFIG_DIR=<dir> cursor-agent login`, then `status --format json` per profile, then confirm two profiles hold different accounts at once, that tokens refresh independently, and that nothing lands in the shared Keychain. Also measure CLI-login vs API-key speed. Note: the CLI is currently not logged in on this Mac. The unauthenticated `status --format json` shape was seen (`status: unauthenticated`, `isAuthenticated: false`, `message`); the authenticated shape, the exact exhausted-quota message and the login flow itself (does it open the browser with stdin closed, how long a login may take) are still unverified, and the implementation below rests on those assumptions.
