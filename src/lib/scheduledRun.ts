@@ -114,6 +114,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
         target: async () => ({ adapter: target.adapter, providerId: sc.providerId, model: sc.model, supportsTools: target.supportsTools, reasoning: deps.reasoning(), computerUse: false, nativeInstructions: target.nativeInstructions }),
         allowlist: deps.allowlist(),
         signal: ctl.signal,
+        stop: () => ctl.abort(),
         approve,
         source: "scheduled",
       },

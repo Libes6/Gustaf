@@ -3,8 +3,33 @@ export type LimitWindow = { id: string; label: string; usedPercent: number; rese
 import type { CuAction } from "../lib/api";
 import type { RetryInfo } from "./retry";
 
+/** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. */
+export type SubagentState = "running" | "waiting" | "completed" | "failed";
+/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events. */
+export type SubagentInfo = {
+  provider: "codex" | "claude";
+  /** Codex thread id or Claude `tool_use` id; empty while a Codex spawn is still in flight. */
+  agentId: string;
+  /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
+  title: string;
+  /** Claude `subagent_type`. */
+  role?: string;
+  action: "spawn" | "wait" | "send" | "close" | "task" | "progress";
+  state: SubagentState;
+  /** Short summary of the task given to the agent. */
+  prompt?: string;
+  /** Short summary of its latest message or report (the full text is the activity's `output`). */
+  result?: string;
+  /** Number of finished `wait` calls for this agent (merged into one entry). */
+  waits?: number;
+  /** Claude only: tool calls the subagent made. */
+  toolUses?: number;
+  /** Claude only: its latest tool call. */
+  step?: string;
+};
+
 export type Part =
-  | { type: "activity"; id: string; name: string; args: Record<string, any>; status: "running" | "success" | "error" | "unknown"; output?: string }
+  | { type: "activity"; id: string; name: string; args: Record<string, any>; status: "running" | "success" | "error" | "unknown"; output?: string; subagent?: SubagentInfo }
   | { type: "text"; text: string }
   | { type: "image"; data: string }
   | {

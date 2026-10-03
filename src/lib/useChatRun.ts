@@ -235,6 +235,7 @@ export function useChatRun(o: Options) {
         },
         allowlist: app.allowlist,
         signal: ctl.signal,
+        stop: () => ctl.abort(),
         approve,
         subagents: root ? createSubagentHost({ projectRoot: root, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app) }) : undefined,
       }, deps, {

@@ -1,4 +1,4 @@
-import { nativeActivities, mergeActivity, type Activity } from "./activities";
+import { nativeActivities, applyActivity, type Activity } from "./activities";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
@@ -230,9 +230,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           if (ev.session) session = ev.session;
           if (ev.text) emit(ev.text);
           for (const action of nativeActivities(id, e)) {
-            const merged = mergeActivity(actions.get(action.id), action);
-            actions.set(action.id, merged);
-            t.onActivity?.(merged);
+            t.onActivity?.(applyActivity(actions, action));
           }
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;

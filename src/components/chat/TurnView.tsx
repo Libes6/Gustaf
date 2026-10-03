@@ -6,6 +6,7 @@ import { editableText, turnActions } from "../../lib/messageActions";
 import type { StoredMsg } from "../../lib/data";
 import { textOf, type Part } from "../../providers/types";
 import { Markdown } from "../Markdown";
+import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
 import "../../styles/messageActions.css";
 
@@ -64,7 +65,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
   const hit = (m: StoredMsg) => (m.id === focusId ? " hit-flash" : "");
 
   const renderParts = (m: StoredMsg) =>
-    m.parts.map((p, i) =>
+    renderWithSubagents(m.parts, (p, i) =>
       p.type === "text" ? (
         <div key={i} className="msg-assistant">
           <Markdown text={p.text} />

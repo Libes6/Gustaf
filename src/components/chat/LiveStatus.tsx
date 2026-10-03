@@ -4,6 +4,7 @@ import type { ApprovalRequest } from "../../agent/agent";
 import type { Part } from "../../providers/types";
 import { Markdown } from "../Markdown";
 import { LiveMeter, type LiveStats } from "../LiveMeter";
+import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
 import { ApprovalCard } from "./ApprovalCard";
 
@@ -32,7 +33,7 @@ export function LiveStatus({ activities, stream, approval, retryNotice, stats, v
   return (
     <>
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{status}</div>
-      {activities.map((a) => <ToolCard key={a.id} call={a} />)}
+      {renderWithSubagents(activities, (a) => <ToolCard key={a.id} call={a} />)}
       {stream !== null &&
         (stream ? (
           <div className="msg-assistant caret">
