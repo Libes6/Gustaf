@@ -238,14 +238,49 @@ describe("Composer", () => {
     });
   });
 
-  it("shows the reasoning and computer-use chips only when the model supports them", () => {
+  it("shows the reasoning chip only when the model supports it, and never a Computer Use chip", () => {
     const { unmount } = renderApp(<Harness />);
     expect(screen.queryByRole("button", { name: /Medium/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
     unmount();
     renderApp(<Harness supports={{ computer: true, reasoning: true }} />);
     expect(screen.getByRole("button", { name: /Medium/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Computer use/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
+  });
+
+  it("the bar holds only mode, access, context ring, model, mic and send: no Computer Use or Review copy chip", () => {
+    // Everything that used to add a chip is on: a project, a computer-capable model, Computer Use and the review copy.
+    const { container } = renderApp(
+      <Harness root="/work/alpha" supports={{ computer: true, reasoning: false }} />,
+      makeApp({ computerUse: true, reviewCopy: true, providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }),
+    );
+    const bar = container.querySelector(".composer-bar")!;
+    expect(bar.querySelector(".composer-mode")).toHaveTextContent("Agent");
+    // Keyboard (DOM) order: attach menu, access, context ring, model, voice input, send.
+    expect(within(bar as HTMLElement).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
+      "Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Voice input", "Send",
+    ]);
+    expect(screen.queryByText(/Computer use/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Review copy/i)).not.toBeInTheDocument();
+  });
+
+  it("the context ring popover says Computer Use is on when it is on (and the model can use it), else nothing", async () => {
+    const supports = { computer: true, reasoning: false };
+    const on = renderApp(<Harness supports={supports} />, makeApp({ computerUse: true }));
+    await userEvent.click(on.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Computer Use on")).toBeInTheDocument();
+    on.unmount();
+
+    const off = renderApp(<Harness supports={supports} />, makeApp({ computerUse: false }));
+    await userEvent.click(off.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Compress chat")).toBeInTheDocument();
+    expect(screen.queryByText("Computer Use on")).not.toBeInTheDocument();
+    off.unmount();
+
+    // On, but this model has no computer support: the agent gets no computer tools, so nothing is claimed.
+    const unsupported = renderApp(<Harness supports={{ computer: false, reasoning: false }} />, makeApp({ computerUse: true }));
+    await userEvent.click(unsupported.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Compress chat")).toBeInTheDocument();
+    expect(screen.queryByText("Computer Use on")).not.toBeInTheDocument();
   });
 
   it("the access chip lists the three modes and switches the mode", async () => {

@@ -58,8 +58,6 @@ type Props = {
    * messages); `linkedBranch` marks a chat that already runs in a workspace. Absent or unavailable: nothing is shown.
    */
   workspace?: { available: boolean; on: boolean; onToggle: () => void; linkedBranch?: string };
-  /** Review copy of a project chat: the chat's own choice (`override`), what applies (`effective`) and how to change it. */
-  review?: { available: boolean; override?: "on" | "off"; effective: boolean; onChange: (v: "on" | "off" | undefined) => void };
 };
 
 /** Message composer: attachments, @file mention list, textarea and the bar with access / model / context controls. */
@@ -185,13 +183,6 @@ export function Composer(p: Props) {
   const screenshot=async()=>{const scope=p.scopeKey;setCapturing(true);setAttachmentError("");try{const shot=await computer.execute([]);if(scope===currentScope.current){if(!shot.png)throw Error(t("imageReadError"));setImages(xs=>[...xs,shot.png].slice(0,8));}}catch(e){if(scope===currentScope.current)setAttachmentError(String(e));}finally{setCapturing(false);}};
 
 
-  const toggleComputer = async () => {
-    if (app.computerUse) return app.setComputerUse(false);
-    const perms = await computer.permissions(false);
-    if (!perms.accessibility || !perms.screen) return app.openSettings("computer");
-    app.setComputerUse(true);
-  };
-
   const AccessIcon = ACCESS_ICON[app.access];
   const accessLabel = { readonly: t("accessReadonly"), auto: t("accessAuto"), full: t("accessFull") }[app.access];
 
@@ -315,33 +306,10 @@ export function Composer(p: Props) {
                   { label: t("accessFull"), icon: <Unlock size={15} />, kbd: app.access === "full" ? "✓" : "", onClick: () => app.setAccess("full") },
                 ])
               }
-              title={root && app.access !== "readonly" && p.review?.effective !== false ?`${t("accessMode")} · ${t("reviewMode")}` : t("accessMode")}
+              title={t("accessMode")}
             >
               <AccessIcon size={14} /> {accessLabel}
             </button>
-            {p.supports.computer && (
-              <button className={`chip${app.computerUse ? " on" : ""}`} aria-pressed={app.computerUse} onClick={toggleComputer} title={t("computerUseHint")}>
-                <Monitor size={14} /> {t("computerUse")}
-              </button>
-            )}
-            {p.review?.available && root && p.mode === "agent" && app.access !== "readonly" && (
-              <button
-                className={`chip${p.review.effective ? " on" : ""}`}
-                aria-haspopup="menu"
-                title={p.review.effective ? t("reviewMode") : t("reviewCopyDirectNote")}
-                onClick={(e) => {
-                  const r = p.review!;
-                  const state = (on: boolean) => t(on ? "reviewCopyOn" : "reviewCopyOff");
-                  menu.open(e.currentTarget.getBoundingClientRect(), [
-                    { label: t("reviewCopyDefault", { state: state(app.reviewCopy === true) }), kbd: !r.override ? "✓" : "", onClick: () => r.onChange(undefined) },
-                    { label: t("reviewCopyOn"), kbd: r.override === "on" ? "✓" : "", onClick: () => r.onChange("on") },
-                    { label: t("reviewCopyOff"), kbd: r.override === "off" ? "✓" : "", onClick: () => r.onChange("off") },
-                  ]);
-                }}
-              >
-                <GitBranch size={14} /> {t("reviewCopyChip", { state: t(p.review.effective ? "reviewCopyOn" : "reviewCopyOff") })}
-              </button>
-            )}
             {p.workspace?.linkedBranch ? (
               <span className="chip workspace-chip" title={p.workspace.linkedBranch}>
                 <GitBranch size={14} aria-hidden="true" /> <span className="name">{t("workspaceChip", { branch: p.workspace.linkedBranch })}</span>
@@ -362,6 +330,7 @@ export function Composer(p: Props) {
               onCompact={p.onCompact}
               onRestore={p.onRestore}
               instructions={instructions.report}
+              computerUse={app.computerUse && p.supports.computer}
               onOpen={instructions.reload}
             />
             <div className="composer-model" style={{ position: "relative" }}>

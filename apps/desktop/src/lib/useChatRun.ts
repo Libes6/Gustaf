@@ -24,7 +24,7 @@ import type { ChatSession } from "./chatSessions";
 import { getLiveRun, liveVersion, subscribeLiveRuns } from "./liveRuns";
 import { checkpoint, restoreAll } from "./checkpoints";
 import { prepareShadowCopy } from "./reviewSetupStore";
-import { resolveReviewCopy, saveReviewOverride, type ReviewOverride } from "./reviewCopy";
+import { resolveReviewCopy } from "./reviewCopy";
 import { createWorkspace, setupWorkspace, type WorkspaceCreated } from "./workspaceCreate";
 import type { ChatWorkspace } from "./workspaces";
 import { effectiveHistory, estimateContext, summaryChunks } from "./context";
@@ -63,8 +63,6 @@ type Options = {
   newWorkspace?: boolean;
   /** The option was used (or the send failed before using it): the composer switches it off again. */
   onWorkspaceUsed?: () => void;
-  /** This chat's own review-copy choice (null = follow the global setting); a draft chat's choice is stored when the chat is created. */
-  reviewOverride?: ReviewOverride | null;
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
@@ -236,7 +234,6 @@ export function useChatRun(o: Options) {
         }
         if (made) runRoot = made.root;
         chatId = made ? made.chatId : await createChat(o.projectId, title);
-        if (!made && o.reviewOverride) await saveReviewOverride(chatId, o.reviewOverride).catch(() => {});
         app.promoteChat(session.key, chatId);
         await app.reload();
       }
@@ -303,9 +300,9 @@ export function useChatRun(o: Options) {
         access: app.access,
         mode: edit?.mode ?? o.mode,
         // A workspace is its own isolation (the edits land in its checkout, never in the main one): no shadow copy.
-        // Review copy off (the chat's choice, else the global setting): the agent edits the project directly, like a workspace chat;
+        // Review copy off (the global setting): the agent edits the project directly, like a workspace chat;
         // the pre-run checkpoint and the action log still apply. An existing copy (retry) is kept.
-        review: o.workspace || made ? null : reviewRef.current ?? (resolveReviewCopy(o.reviewOverride, app.reviewCopy) ? undefined : null),
+        review: o.workspace || made ? null : reviewRef.current ?? (resolveReviewCopy(app.reviewCopy) ? undefined : null),
         target: async () => {
           if (activeProvider.cli === "cursor-agent") {
             // Account rotation: the pool decides which Cursor account (and so which isolated profile) serves this message.

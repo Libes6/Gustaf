@@ -179,7 +179,6 @@
   "computerSafety": "Safeguards",
   "computerSafetyDesc": "Each step is confirmed unless access is Full. Typing and Enter/{mod} shortcuts always need confirmation. Limit: 30 steps or 10 minutes. {stop} stops the agent.",
   "computerUse": "Computer use",
-  "computerUseHint": "Let the model control this computer",
   "connected": "Connected: {count} models",
   "connected_one": "Connected: {count} model",
   "connected_other": "Connected: {count} models",
@@ -856,7 +855,6 @@
   "compactChat": "Compress chat",
   "compactHint": "AI creates a summary; originals stay in the chat. Long histories are processed in chunks and may use multiple model requests.",
   "compactFailed": "The model did not return a text-only summary. The chat was not changed.",
-  "reviewMode": "Review before applying",
   "reviewPending": "Pending changes",
   "reviewHint": "The model edits a copy of your files. Accept individual files or single hunks to copy them into the project. Dependencies and ignored files are excluded.",
   "reviewAccept": "Accept file",
@@ -1101,10 +1099,6 @@
   "workspaceSyncTitle": "{ahead} ahead, {behind} behind {base}",
   "reviewCopySetting": "Review copy for chats",
   "reviewCopySettingDesc": "Off (default): the agent edits your project folder directly; use the checkpoint (Revert file / Revert all) or git to undo. On: each run works in a private copy and you accept files or hunks into the project. Subagents and scheduled runs always use their own copy.",
-  "reviewCopyChip": "Review copy: {state}",
-  "reviewCopyOn": "on",
-  "reviewCopyOff": "off",
-  "reviewCopyDefault": "Default ({state})",
   "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git.",
   "branchNavigation": "Chat branches",
   "branchSource": "Branch from",
@@ -1113,5 +1107,6 @@
   "branchChooseModel": "Choose provider and model before branching",
   "branchTransferDetails": "Only history through the selected turn is copied, including attachments and recorded tool results. Creating a branch never executes tools. The next run starts a fresh provider session from copied context; native session state and provider-private context do not transfer. Switching models may change capabilities. Branch histories are independent; workspace files remain shared.",
   "subagentStopped": "Stopped",
-  "subagentsStoppedCount": "{count} stopped"
+  "subagentsStoppedCount": "{count} stopped",
+  "computerUseOn": "Computer Use on"
 }
