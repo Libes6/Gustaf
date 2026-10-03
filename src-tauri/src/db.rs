@@ -2,6 +2,7 @@ use rusqlite::{params, params_from_iter, types::ValueRef, Connection, OptionalEx
 use serde::Serialize;
 use serde_json::{Map, Value};
 use std::{
+    collections::HashMap,
     path::Path,
     sync::{Mutex, MutexGuard},
 };
@@ -132,7 +133,7 @@ fn execute(conn: &Connection, sql: &str, params: Vec<Value>) -> Result<(usize, i
 // ---------------------------------------------------------------------------------------------------------------------
 
 /// Bump when the extraction rules or the table definition change: the index is then rebuilt on the next start.
-const SEARCH_VERSION: i64 = 1;
+const SEARCH_VERSION: i64 = 2;
 /// Row in `settings` that records which `SEARCH_VERSION` the index was built with.
 const SEARCH_VERSION_KEY: &str = "searchIndexVersion";
 /// Characters indexed per message; longer texts (pasted logs) are cut so one message cannot bloat the index.
@@ -141,10 +142,37 @@ const MAX_INDEXED_CHARS: usize = 100_000;
 /// frontend (`src/lib/searchUtil.ts`) splits on exactly these two.
 pub const MARK_OPEN: char = '\u{1}';
 pub const MARK_CLOSE: char = '\u{2}';
+/// Hits per page (default and maximum).
 const DEFAULT_RESULTS: usize = 40;
 const MAX_RESULTS: usize = 100;
+/// Only the best `SEARCH_CAP` hits of a query can be paged through, and `total` never counts past it (the UI says
+/// "1000+"). This keeps the count query and deep pages cheap on a huge history.
+pub const SEARCH_CAP: usize = 1000;
+/// Above this many matches a query is "very common" and its hits come newest first instead of bm25-ranked: FTS5
+/// computes bm25 for every match before it can cut a page, which costs ~3 µs per match (tens of ms on a big
+/// history, and it grows linearly), while recency order stops after one page. Ranking a query that matches this much
+/// of the history says little anyway; refining the query brings the ranking back.
+const RANK_UP_TO: usize = 5000;
 const MAX_QUERY_CHARS: usize = 256;
 const MAX_QUERY_TERMS: usize = 16;
+
+// `ё` / `е` folding. The tokenizer keeps them apart, so the index holds a folded copy of the text (`ё`→`е`, `Ё`→`Е`) and
+// query terms are folded the same way; stored messages are never touched. The fold replaces one character with one
+// character, so positions in the folded text are positions in the original (used to restore snippets).
+const YO_LOWER: char = '\u{451}';
+const YE_LOWER: char = '\u{435}';
+const YO_UPPER: char = '\u{401}';
+const YE_UPPER: char = '\u{415}';
+
+/// The query/index fold in Rust (the triggers use `fold_sql`, which must stay equivalent).
+pub fn fold_yo(s: &str) -> String {
+    s.chars().map(|c| match c { YO_LOWER => YE_LOWER, YO_UPPER => YE_UPPER, c => c }).collect()
+}
+
+/// The same fold as a SQL expression over `expr`, built from `replace()` so triggers need no custom function.
+fn fold_sql(expr: &str) -> String {
+    format!("replace(replace({expr}, '{YO_LOWER}', '{YE_LOWER}'), '{YO_UPPER}', '{YE_UPPER}')")
+}
 
 /// The message JSON, or NULL when `content` is not valid JSON (so malformed rows are skipped instead of failing writes).
 fn doc_sql(row: &str) -> String {
@@ -181,12 +209,13 @@ fn text_sql(row: &str) -> String {
 fn index_rows_sql(row: &str, from: &str) -> String {
     let doc = doc_sql(row);
     format!(
-        "select id, chat_id, role, model, text from (\
+        "select id, chat_id, role, model, {folded} as text from (\
             select {row}.id as id, {row}.chat_id as chat_id, {row}.role as role, \
                    nullif(case when json_type({doc}, '$.meta.model') = 'text' then json_extract({doc}, '$.meta.model') end, '') as model, \
                    {text} as text {from}) \
          where text is not null and text <> ''",
         text = text_sql(row),
+        folded = fold_sql("text"),
     )
 }
 
@@ -267,7 +296,7 @@ pub fn fts_match(query: &str) -> Option<String> {
         while i < chars.len() && if quoted { chars[i] != '"' } else { !chars[i].is_whitespace() && chars[i] != '"' } {
             i += 1;
         }
-        let text: String = chars[start..i].iter().collect();
+        let text: String = fold_yo(&chars[start..i].iter().collect::<String>());
         if quoted && i < chars.len() {
             i += 1; // closing quote
         }
@@ -306,54 +335,168 @@ pub struct SearchHit {
     pub snippet: String,
 }
 
+/// One page of results. `total` is the number of matches counted up to `SEARCH_CAP` (`total_capped` = there are more).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPage {
+    pub hits: Vec<SearchHit>,
+    pub total: usize,
+    pub total_capped: bool,
+    /// The query matched so much that hits are newest first instead of ranked (see `RANK_UP_TO`).
+    pub by_recency: bool,
+    /// More hits can be fetched with `offset + hits.len()`.
+    pub has_more: bool,
+}
+
+/// Placeholders: ?1 match, ?2 model, ?3 project, ?4 limit, ?5 offset. The inner select is the page (ranking and the
+/// page cut happen on the index only; no `snippet()` here, because a sorted select would compute it for every match);
+/// the outer joins fetch titles and the original text for the page's rows. `orig` is the unfolded text, used to
+/// restore `ё` in the snippet (see `restore_snippet`).
 const SEARCH_SQL: &str = "
-select h.rowid as message_id, h.chat_id, h.role, h.model, h.snip as snippet, m.created_at,
-       c.title as chat_title, c.project_id, c.archived, p.name as project_name
+select h.rowid as message_id, h.chat_id, h.role, h.model, m.created_at,
+       c.title as chat_title, c.project_id, c.archived, p.name as project_name, {orig} as orig
 from (
-  select rowid, chat_id, role, model, rank as score, snippet(messages_fts, 0, ?2, ?3, '…', 24) as snip
+  select rowid, chat_id, role, model, {score} as score
   from messages_fts
   where messages_fts match ?1
-    and (?4 is null or model = ?4)
-    and (?5 is null or chat_id in (select id from chats where project_id = ?5))
-  order by rank, rowid desc
-  limit ?6
+    and (?2 is null or model = ?2)
+    and (?3 is null or chat_id in (select id from chats where project_id = ?3))
+  order by {order}
+  limit ?4 offset ?5
 ) h
 join messages m on m.id = h.rowid
 join chats c on c.id = h.chat_id
 left join projects p on p.id = c.project_id
 order by h.score, h.rowid desc";
 
-/// Best matches first (bm25), newest first among equals. `project_id` / `model` narrow the results when given;
-/// the model filter keeps messages recorded with that model (assistant replies).
-pub fn search(conn: &Connection, query: &str, project_id: Option<i64>, model: Option<&str>, limit: usize) -> Result<Vec<SearchHit>, String> {
-    let Some(expr) = fts_match(query) else { return Ok(Vec::new()) };
+/// Snippets for the rows of one page (?1 match, ?2/?3 marks, ?4 lowest id, ?5 highest id, ?6 JSON array of ids). One
+/// pass over the matches inside the id range instead of one index seek per hit; `+rowid` keeps the `in` list from
+/// turning into repeated seeks, and `snippet()` is computed only for the rows that pass.
+const SNIPPET_SQL: &str = "
+select rowid, snippet(messages_fts, 0, ?2, ?3, '…', 24) from messages_fts
+where messages_fts match ?1 and rowid between ?4 and ?5 and +rowid in (select value from json_each(?6))";
+
+/// Matches of the query, counted up to `RANK_UP_TO + 1` (?1 match, ?2 model, ?3 project, ?4 cap).
+const COUNT_SQL: &str = "
+select count(*) from (
+  select 1 from messages_fts
+  where messages_fts match ?1
+    and (?2 is null or model = ?2)
+    and (?3 is null or chat_id in (select id from chats where project_id = ?3))
+  limit ?4)";
+
+/// The snippet of the folded index text, with the characters of the original text put back. The fold is
+/// one-to-one, so the (marker-free) snippet is a contiguous slice of the folded text and maps to the same slice of
+/// the original. `snip` is returned unchanged when the slice cannot be located.
+fn restore_snippet(snip: &str, orig: &str) -> String {
+    let chars: Vec<char> = snip.chars().collect();
+    let plain: String = chars.iter().filter(|&&c| c != MARK_OPEN && c != MARK_CLOSE).collect();
+    let folded = fold_yo(orig);
+    // snippet() may add a '…' at either end; the text itself may also contain one, so try the plain form first.
+    let lead = plain.starts_with('…');
+    let trail = plain.ends_with('…') && plain.chars().count() > 1;
+    for (cut_lead, cut_trail) in [(false, false), (true, false), (false, true), (true, true)] {
+        if (cut_lead && !lead) || (cut_trail && !trail) {
+            continue;
+        }
+        let mut core = plain.as_str();
+        if cut_lead {
+            core = &core['…'.len_utf8()..];
+        }
+        if cut_trail {
+            core = &core[..core.len() - '…'.len_utf8()];
+        }
+        let Some(pos) = folded.find(core) else { continue };
+        let mut src = orig.chars().skip(folded[..pos].chars().count());
+        let mut out = String::with_capacity(snip.len());
+        let last_plain = plain.chars().count() - 1;
+        let mut at = 0; // index among the non-marker characters
+        for &c in &chars {
+            if c == MARK_OPEN || c == MARK_CLOSE {
+                out.push(c);
+                continue;
+            }
+            if (cut_lead && at == 0) || (cut_trail && at == last_plain) {
+                out.push('…');
+            } else {
+                out.push(src.next().unwrap_or(c));
+            }
+            at += 1;
+        }
+        return out;
+    }
+    snip.to_string()
+}
+
+/// One page of the best matches (bm25), newest first among equals (or simply newest first for very common queries); `offset` / `limit` page through them, up to
+/// `SEARCH_CAP`. `project_id` / `model` narrow the results when given; the model filter keeps messages recorded
+/// with that model (assistant replies). The order is deterministic (rank, then message id), so consecutive pages
+/// do not repeat or skip hits unless messages are added in between.
+pub fn search(conn: &Connection, query: &str, project_id: Option<i64>, model: Option<&str>, limit: usize, offset: usize) -> Result<SearchPage, String> {
+    let empty = || SearchPage { hits: Vec::new(), total: 0, total_capped: false, by_recency: false, has_more: false };
+    let Some(expr) = fts_match(query) else { return Ok(empty()) };
     let model = model.filter(|m| !m.is_empty());
-    let limit = limit.clamp(1, MAX_RESULTS) as i64;
-    let run = || -> rusqlite::Result<Vec<SearchHit>> {
-        let mut stmt = conn.prepare_cached(SEARCH_SQL)?;
-        let rows = stmt.query_map(
-            params![expr, MARK_OPEN.to_string(), MARK_CLOSE.to_string(), model, project_id, limit],
-            |r| {
-                Ok(SearchHit {
-                    message_id: r.get("message_id")?,
-                    chat_id: r.get("chat_id")?,
-                    chat_title: r.get("chat_title")?,
-                    project_id: r.get("project_id")?,
-                    project_name: r.get("project_name")?,
-                    archived: r.get::<_, i64>("archived")? != 0,
-                    role: r.get("role")?,
-                    model: r.get("model")?,
-                    created_at: r.get("created_at")?,
-                    snippet: r.get("snippet")?,
-                })
-            },
-        )?;
-        rows.collect()
+    let limit = limit.clamp(1, MAX_RESULTS).min(SEARCH_CAP.saturating_sub(offset));
+    if limit == 0 {
+        return Ok(empty());
+    }
+    let run = || -> rusqlite::Result<SearchPage> {
+        let counted: i64 = conn
+            .prepare_cached(COUNT_SQL)?
+            .query_row(params![expr, model, project_id, RANK_UP_TO as i64 + 1], |r| r.get(0))?;
+        let total_capped = counted as usize > SEARCH_CAP;
+        let total = (counted as usize).min(SEARCH_CAP);
+        let by_recency = counted as usize > RANK_UP_TO;
+        let (score, order) = if by_recency { ("0", "rowid desc") } else { ("rank", "rank, rowid desc") };
+        let sql = SEARCH_SQL.replace("{orig}", &text_sql("m")).replace("{score}", score).replace("{order}", order);
+        let mut stmt = conn.prepare_cached(&sql)?;
+        let page: Vec<(SearchHit, Option<String>)> = stmt
+            .query_map(params![expr, model, project_id, limit as i64, offset as i64], |r| {
+                Ok((
+                    SearchHit {
+                        message_id: r.get("message_id")?,
+                        chat_id: r.get("chat_id")?,
+                        chat_title: r.get("chat_title")?,
+                        project_id: r.get("project_id")?,
+                        project_name: r.get("project_name")?,
+                        archived: r.get::<_, i64>("archived")? != 0,
+                        role: r.get("role")?,
+                        model: r.get("model")?,
+                        created_at: r.get("created_at")?,
+                        snippet: String::new(),
+                    },
+                    r.get::<_, Option<String>>("orig")?,
+                ))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut snippets: HashMap<i64, String> = HashMap::new();
+        if let (Some(lo), Some(hi)) = (page.iter().map(|(h, _)| h.message_id).min(), page.iter().map(|(h, _)| h.message_id).max()) {
+            let ids = serde_json::to_string(&page.iter().map(|(h, _)| h.message_id).collect::<Vec<_>>()).unwrap_or_default();
+            let mut stmt = conn.prepare_cached(SNIPPET_SQL)?;
+            let rows = stmt.query_map(params![expr, MARK_OPEN.to_string(), MARK_CLOSE.to_string(), lo, hi, ids], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+            for row in rows {
+                let (id, snip) = row?;
+                snippets.insert(id, snip);
+            }
+        }
+        let hits: Vec<SearchHit> = page
+            .into_iter()
+            .map(|(mut hit, orig)| {
+                let snip = snippets.remove(&hit.message_id).unwrap_or_default();
+                hit.snippet = match orig {
+                    Some(o) => restore_snippet(&snip, &o),
+                    None => snip,
+                };
+                hit
+            })
+            .collect();
+        let has_more = offset + hits.len() < total;
+        Ok(SearchPage { hits, total, total_capped, by_recency, has_more })
     };
     match run() {
-        Ok(hits) => Ok(hits),
+        Ok(page) => Ok(page),
         // `fts_match` quotes everything, so this should be unreachable; never let an FTS parser error reach the UI.
-        Err(e) if e.to_string().contains("fts5: syntax error") => Ok(Vec::new()),
+        Err(e) if e.to_string().contains("fts5: syntax error") => Ok(empty()),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -369,8 +512,15 @@ pub fn indexed_models(conn: &Connection) -> Result<Vec<String>, String> {
 
 // These run on a worker thread (`async`) so a large search cannot freeze the webview; they only read.
 #[tauri::command(async)]
-pub fn search_messages(db: State<Db>, query: String, project_id: Option<i64>, model: Option<String>, limit: Option<usize>) -> Result<Vec<SearchHit>, String> {
-    search(&lock(&db), &query, project_id, model.as_deref(), limit.unwrap_or(DEFAULT_RESULTS))
+pub fn search_messages(
+    db: State<Db>,
+    query: String,
+    project_id: Option<i64>,
+    model: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Result<SearchPage, String> {
+    search(&lock(&db), &query, project_id, model.as_deref(), limit.unwrap_or(DEFAULT_RESULTS), offset.unwrap_or(0))
 }
 
 #[tauri::command(async)]
@@ -536,7 +686,7 @@ mod tests {
 
     /// Ids of the matching messages in ranking order.
     fn ranked(conn: &Connection, query: &str) -> Vec<i64> {
-        search(conn, query, None, None, 100).unwrap().iter().map(|h| h.message_id).collect()
+        search_hits(conn, query, None, None, 100).unwrap().iter().map(|h| h.message_id).collect()
     }
 
     /// Ids of the matching messages, ascending (for assertions that do not care about the ranking).
@@ -549,6 +699,10 @@ mod tests {
     fn indexed_text(conn: &Connection, id: i64) -> Option<String> {
         let rows = select(conn, "select text from messages_fts where rowid = ?", vec![json!(id)]).unwrap();
         rows.first().map(|r| r["text"].as_str().unwrap().to_string())
+    }
+
+    fn search_hits(conn: &Connection, query: &str, project: Option<i64>, model: Option<&str>, limit: usize) -> Result<Vec<SearchHit>, String> {
+        search(conn, query, project, model, limit, 0).map(|p| p.hits)
     }
 
     fn drop_search_index(conn: &Connection) {
@@ -827,20 +981,20 @@ mod tests {
             "\u{1}", "\u{2}", "é", "ё", "日本語", "😀", "a\nb", "a\tb",
         ];
         for q in nasty {
-            let res = search(&conn, q, None, None, 10);
+            let res = search_hits(&conn, q, None, None, 10);
             assert!(res.is_ok(), "query {q:?} failed: {:?}", res.err());
         }
         // Long and many-term queries.
-        assert!(search(&conn, &"foo ".repeat(5_000), None, None, 10).is_ok());
-        assert!(search(&conn, &"\"a b\" ".repeat(500), Some(1), Some("m"), 10).is_ok());
+        assert!(search_hits(&conn, &"foo ".repeat(5_000), None, None, 10).is_ok());
+        assert!(search_hits(&conn, &"\"a b\" ".repeat(500), Some(1), Some("m"), 10).is_ok());
         // Operators are literal text: "foo NOT bar" needs the word `not` to be present, it does not exclude `bar`.
         assert_eq!(found(&conn, "foo NOT bar"), vec![id]);
         assert!(found(&conn, "foo NOT baz").is_empty());
         assert_eq!(found(&conn, "DROP TABLE"), vec![id]);
         assert_eq!(count(&conn, "messages"), 1, "the table is still there");
         // A model or project id that matches nothing is just an empty result.
-        assert!(search(&conn, "foo", Some(12345), Some("nope"), 10).unwrap().is_empty());
-        assert!(search(&conn, "", None, None, 10).unwrap().is_empty());
+        assert!(search_hits(&conn, "foo", Some(12345), Some("nope"), 10).unwrap().is_empty());
+        assert!(search_hits(&conn, "", None, None, 10).unwrap().is_empty());
     }
 
     #[test]
@@ -861,29 +1015,29 @@ mod tests {
             v
         };
 
-        assert_eq!(ids(search(&conn, "pelican", None, None, 50).unwrap()), vec![q1, a1, a2, a3]);
-        assert_eq!(ids(search(&conn, "pelican", Some(p1), None, 50).unwrap()), vec![q1, a1]);
-        assert_eq!(ids(search(&conn, "pelican", Some(p2), None, 50).unwrap()), vec![a2]);
-        assert_eq!(ids(search(&conn, "pelican", None, Some("m1"), 50).unwrap()), vec![a1, a3]);
-        assert_eq!(ids(search(&conn, "pelican", Some(p1), Some("m1"), 50).unwrap()), vec![a1]);
-        assert!(search(&conn, "pelican", Some(p2), Some("m1"), 50).unwrap().is_empty());
-        assert!(search(&conn, "pelican", None, Some("m3"), 50).unwrap().is_empty());
-        assert_eq!(ids(search(&conn, "pelican", None, Some(""), 50).unwrap()), vec![q1, a1, a2, a3], "an empty model means no filter");
+        assert_eq!(ids(search_hits(&conn, "pelican", None, None, 50).unwrap()), vec![q1, a1, a2, a3]);
+        assert_eq!(ids(search_hits(&conn, "pelican", Some(p1), None, 50).unwrap()), vec![q1, a1]);
+        assert_eq!(ids(search_hits(&conn, "pelican", Some(p2), None, 50).unwrap()), vec![a2]);
+        assert_eq!(ids(search_hits(&conn, "pelican", None, Some("m1"), 50).unwrap()), vec![a1, a3]);
+        assert_eq!(ids(search_hits(&conn, "pelican", Some(p1), Some("m1"), 50).unwrap()), vec![a1]);
+        assert!(search_hits(&conn, "pelican", Some(p2), Some("m1"), 50).unwrap().is_empty());
+        assert!(search_hits(&conn, "pelican", None, Some("m3"), 50).unwrap().is_empty());
+        assert_eq!(ids(search_hits(&conn, "pelican", None, Some(""), 50).unwrap()), vec![q1, a1, a2, a3], "an empty model means no filter");
 
         // Result fields come from the joined chat/project rows.
-        let hits = search(&conn, "pelican answer", Some(p1), None, 50).unwrap();
+        let hits = search_hits(&conn, "pelican answer", Some(p1), None, 50).unwrap();
         let hit = hits.iter().find(|h| h.message_id == a1).unwrap();
         assert_eq!((hit.chat_id, hit.chat_title.as_str(), hit.project_id), (c1, "Plan the launch", Some(p1)));
         assert_eq!((hit.project_name.as_deref(), hit.role.as_str(), hit.model.as_deref()), (Some("Alpha project"), "assistant", Some("m1")));
         assert!(!hit.archived);
-        let loose = search(&conn, "pelican note", None, None, 50).unwrap();
+        let loose = search_hits(&conn, "pelican note", None, None, 50).unwrap();
         assert_eq!((loose[0].project_id, loose[0].project_name.clone()), (None, None));
-        let user_hit = search(&conn, "pelican question", None, None, 50).unwrap();
+        let user_hit = search_hits(&conn, "pelican question", None, None, 50).unwrap();
         assert_eq!(user_hit[0].model, None);
 
         // Archived chats stay searchable and are flagged.
         execute(&conn, "update chats set archived = 1 where id = ?", vec![json!(c2)]).unwrap();
-        let archived = search(&conn, "reply", None, None, 50).unwrap();
+        let archived = search_hits(&conn, "reply", None, None, 50).unwrap();
         assert!(archived[0].archived);
 
         // Models offered by the filter: only models that have indexed messages.
@@ -900,22 +1054,22 @@ mod tests {
         let hits = ranked(&conn, "words");
         assert_eq!(hits[0], strong, "a shorter, denser match ranks first");
         assert_eq!(&hits[1..], &[second, first], "equal scores: newest first");
-        assert_eq!(search(&conn, "words", None, None, 2).unwrap().len(), 2);
-        assert_eq!(search(&conn, "words", None, None, 0).unwrap().len(), 1, "limit is clamped to at least one");
-        assert_eq!(search(&conn, "words", None, None, 1_000_000).unwrap().len(), 3);
+        assert_eq!(search_hits(&conn, "words", None, None, 2).unwrap().len(), 2);
+        assert_eq!(search_hits(&conn, "words", None, None, 0).unwrap().len(), 1, "limit is clamped to at least one");
+        assert_eq!(search_hits(&conn, "words", None, None, 1_000_000).unwrap().len(), 3);
 
         let long = format!("{} the needle is right here {}", "filler ".repeat(200), "more ".repeat(200));
         add_text(&conn, chat, "assistant", &long, Some("m"));
-        let hit = &search(&conn, "needle", None, None, 5).unwrap()[0];
+        let hit = &search_hits(&conn, "needle", None, None, 5).unwrap()[0];
         assert!(hit.snippet.contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")), "{:?}", hit.snippet);
         assert!(hit.snippet.contains('…'), "long messages are shortened around the match");
         assert!(hit.snippet.chars().count() < 400);
         // Prefix matching marks the whole word that matched.
-        let prefix = &search(&conn, "needl", None, None, 5).unwrap()[0];
+        let prefix = &search_hits(&conn, "needl", None, None, 5).unwrap()[0];
         assert!(prefix.snippet.contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")));
         // Phrases match exactly, in order.
-        assert_eq!(search(&conn, "\"needle is right\"", None, None, 5).unwrap().len(), 1);
-        assert!(search(&conn, "\"right needle\"", None, None, 5).unwrap().is_empty());
+        assert_eq!(search_hits(&conn, "\"needle is right\"", None, None, 5).unwrap().len(), 1);
+        assert!(search_hits(&conn, "\"right needle\"", None, None, 5).unwrap().is_empty());
     }
 
     #[test]
@@ -924,14 +1078,193 @@ mod tests {
         let chat = chat_in(&conn, None, "t");
         let ru = add_text(&conn, chat, "user", "Привет, как дела? Ёлка во дворе", None);
         let fr = add_text(&conn, chat, "assistant", "Un café très agréable", Some("m"));
-        // (Case folding covers Cyrillic; `ё` is not folded to `е` by the unicode61 tokenizer, so those stay distinct.)
-        for q in ["привет", "ПРИВЕТ", "Привет", "приве", "дела", "ёлка", "ЁЛКА"] {
+        for q in ["привет", "ПРИВЕТ", "Привет", "приве", "дела", "ёлка", "ЁЛКА", "елка"] {
             assert_eq!(found(&conn, q), vec![ru], "{q}");
         }
         for q in ["cafe", "CAFÉ", "agreable", "tres"] {
             assert_eq!(found(&conn, q), vec![fr], "{q}");
         }
         assert!(found(&conn, "привет cafe").is_empty(), "all terms must match");
+    }
+
+    fn texts_of(conn: &Connection, query: &str) -> Vec<String> {
+        search_hits(conn, query, None, None, 100).unwrap().into_iter().map(|h| h.snippet).collect()
+    }
+
+    #[test]
+    fn yo_and_ye_match_both_ways_without_changing_stored_text() {
+        let conn = memory();
+        let chat = chat_in(&conn, None, "t");
+        let with_yo = add_text(&conn, chat, "user", "Всё про ёлку и Ёжика", None);
+        let with_ye = add_text(&conn, chat, "assistant", "Все про елку и ежика", Some("m"));
+        let other = add_text(&conn, chat, "user", "совсем другое", None);
+        for q in ["все", "всё", "ВСЁ", "ВСЕ", "елку", "ёлку", "Ёлк", "елк", "ежика", "ЁЖИКА", "\"ёлку и\"", "\"елку и\""] {
+            assert_eq!(found(&conn, q), vec![with_yo, with_ye], "{q}");
+        }
+        assert_eq!(found(&conn, "все ёжик"), vec![with_yo, with_ye]);
+        assert!(!found(&conn, "ёлку").contains(&other));
+        assert!(found(&conn, "совсем ёлка").is_empty(), "other terms still all have to match");
+        // The index holds the folded copy, the stored message is untouched.
+        assert_eq!(indexed_text(&conn, with_yo).as_deref(), Some("Все про елку и Ежика"));
+        let stored = select(&conn, "select content from messages where id = ?", vec![json!(with_yo)]).unwrap();
+        assert!(stored[0]["content"].as_str().unwrap().contains("Всё про ёлку и Ёжика"));
+        // Updates fold too.
+        execute(&conn, "update messages set content = ? where id = ?", vec![json!(json!({ "role": "user", "parts": [{ "type": "text", "text": "Ещё ёрш" }] }).to_string()), json!(other)]).unwrap();
+        assert_eq!(found(&conn, "ерш"), vec![other]);
+        assert_eq!(found(&conn, "ёрш"), vec![other]);
+        assert_eq!(fold_yo("ёЁеЕ"), "еЕеЕ");
+        assert_eq!(fts_match("Ёлка \"всё\"").as_deref(), Some(r#""Елка"* "все""#));
+    }
+
+    #[test]
+    fn snippets_show_the_original_letters_with_marks_in_place() {
+        let conn = memory();
+        let chat = chat_in(&conn, None, "t");
+        add_text(&conn, chat, "user", "Всё про ёлку и Ёжика", None);
+        let long = format!("{} вот ёлка здесь и ещё ёлочка {}", "слово ".repeat(80), "ещё ".repeat(80));
+        add_text(&conn, chat, "assistant", &long, Some("m"));
+        for snip in texts_of(&conn, "елка") {
+            assert!(snip.contains(&format!("{MARK_OPEN}ёлка{MARK_CLOSE}")) || snip.contains(&format!("{MARK_OPEN}ёлку{MARK_CLOSE}")), "{snip:?}");
+            assert!(!snip.contains("елк"), "folded letters never leak into the snippet: {snip:?}");
+        }
+        let long_snip = &texts_of(&conn, "ёлка")[0];
+        assert!(long_snip.contains('…') && long_snip.contains("ещё"), "{long_snip:?}");
+        // Restoring is a no-op without ё and survives an ellipsis that belongs to the text.
+        assert_eq!(restore_snippet("a \u{1}b\u{2} c", "a b c"), "a \u{1}b\u{2} c");
+        assert_eq!(restore_snippet("…\u{1}ёлка\u{2}…", "xx… ёлка …yy").replace('…', "."), ".\u{1}ёлка\u{2}.");
+        assert_eq!(restore_snippet("\u{1}елка\u{2}", "other text"), "\u{1}елка\u{2}", "unlocatable: unchanged");
+    }
+
+    #[test]
+    fn bumping_the_search_version_rebuilds_the_index_once_with_folding() {
+        let conn = memory();
+        let chat = chat_in(&conn, None, "t");
+        let id = add_text(&conn, chat, "user", "Ёлка", None);
+        // An index from the previous version holds the unfolded text.
+        execute(&conn, "delete from messages_fts where rowid = ?", vec![json!(id)]).unwrap();
+        execute(&conn, "insert into messages_fts(rowid, chat_id, role, model, text) values(?, ?, 'user', null, 'Ёлка')", vec![json!(id), json!(chat)]).unwrap();
+        execute(&conn, "update settings set value = ? where key = 'searchIndexVersion'", vec![json!((SEARCH_VERSION - 1).to_string())]).unwrap();
+        assert!(found(&conn, "елка").is_empty(), "the old index does not fold");
+        init_search(&conn).unwrap();
+        assert_eq!(found(&conn, "елка"), vec![id]);
+        assert_eq!(indexed_text(&conn, id).as_deref(), Some("Елка"));
+        let v = select(&conn, "select value from settings where key = 'searchIndexVersion'", vec![]).unwrap();
+        assert_eq!(v[0]["value"].as_str(), Some(SEARCH_VERSION.to_string().as_str()));
+    }
+
+    fn many(conn: &Connection, n: usize) -> Vec<i64> {
+        let chat = chat_in(conn, None, "paged");
+        (0..n).map(|i| add_text(conn, chat, "assistant", &format!("common word number {i}"), Some("m"))).collect()
+    }
+
+    #[test]
+    fn pages_are_stable_complete_and_counted() {
+        let conn = memory();
+        let ids = many(&conn, 25);
+        let all = search(&conn, "common", None, None, 100, 0).unwrap();
+        assert_eq!((all.total, all.total_capped, all.has_more, all.hits.len()), (25, false, false, 25));
+        let order: Vec<i64> = all.hits.iter().map(|h| h.message_id).collect();
+        let mut paged = Vec::new();
+        let mut offset = 0;
+        loop {
+            let page = search(&conn, "common", None, None, 10, offset).unwrap();
+            assert_eq!(page.total, 25, "every page reports the same total");
+            paged.extend(page.hits.iter().map(|h| h.message_id));
+            offset += page.hits.len();
+            assert_eq!(page.has_more, offset < 25);
+            if !page.has_more {
+                break;
+            }
+        }
+        assert_eq!(paged, order, "pages concatenate to the single-shot order, no repeats or gaps");
+        let mut sorted = paged.clone();
+        sorted.sort();
+        sorted.dedup();
+        let mut expect = ids.clone();
+        expect.sort();
+        assert_eq!(sorted, expect);
+        let past = search(&conn, "common", None, None, 10, 25).unwrap();
+        assert!(past.hits.is_empty() && !past.has_more && past.total == 25);
+        let tail = search(&conn, "common", None, None, 10, 20).unwrap();
+        assert_eq!((tail.hits.len(), tail.has_more), (5, false));
+        // Filters apply to the count as well.
+        let p = project(&conn, "P");
+        let other = chat_in(&conn, Some(p), "in project");
+        add_text(&conn, other, "user", "common thing", None);
+        let scoped = search(&conn, "common", Some(p), None, 10, 0).unwrap();
+        assert_eq!((scoped.total, scoped.hits.len()), (1, 1));
+        assert_eq!(search(&conn, "common", None, Some("m"), 10, 0).unwrap().total, 25);
+    }
+
+    #[test]
+    fn very_common_queries_come_newest_first() {
+        let conn = memory();
+        let ids = many(&conn, RANK_UP_TO + 5);
+        let page = search(&conn, "common", None, None, 40, 0).unwrap();
+        assert!(page.by_recency && page.total_capped && page.has_more);
+        let got: Vec<i64> = page.hits.iter().map(|h| h.message_id).collect();
+        let expect: Vec<i64> = ids.iter().rev().take(40).copied().collect();
+        assert_eq!(got, expect, "newest first");
+        let next = search(&conn, "common", None, None, 40, 40).unwrap();
+        assert_eq!(next.hits[0].message_id, ids[ids.len() - 41], "pages continue without a gap");
+        let narrow = search(&conn, "\"number 7\"", None, None, 40, 0).unwrap();
+        assert!(!narrow.by_recency, "ranked again once the query is specific");
+    }
+
+    #[test]
+    fn the_total_is_capped_and_deep_pages_stop_at_the_cap() {
+        let conn = memory();
+        many(&conn, SEARCH_CAP + 20);
+        let first = search(&conn, "common", None, None, 40, 0).unwrap();
+        assert_eq!((first.total, first.total_capped, first.has_more), (SEARCH_CAP, true, true));
+        let last = search(&conn, "common", None, None, 100, SEARCH_CAP - 30).unwrap();
+        assert_eq!(last.hits.len(), 30, "the page is cut at the cap");
+        assert!(!last.has_more);
+        assert!(search(&conn, "common", None, None, 100, SEARCH_CAP).unwrap().hits.is_empty());
+        assert!(search(&conn, "common", None, None, 100, usize::MAX / 2).unwrap().hits.is_empty());
+    }
+
+    /// `cargo test --release -- --ignored search_perf --nocapture`: timings on a synthetic history.
+    #[test]
+    #[ignore]
+    fn search_perf() {
+        use std::time::Instant;
+        let conn = memory();
+        let chat = chat_in(&conn, None, "perf");
+        let words = ["alpha", "beta", "gamma", "delta", "parser", "модель", "ёжик", "ещё", "function", "render", "token", "stream", "файл", "ошибка"];
+        let tx = conn.unchecked_transaction().unwrap();
+        for i in 0..30_000usize {
+            let text: Vec<&str> = (0..60).map(|j| words[(i * 7 + j * 13 + j * j) % words.len()]).collect();
+            add_text(&conn, chat, if i % 2 == 0 { "user" } else { "assistant" }, &format!("the message {i} {}{}", text.join(" "), if i % 8 == 0 { " zebra" } else { "" }), Some("m"));
+        }
+        tx.commit().unwrap();
+        let time = |label: &str, q: &str, offset: usize, project: Option<i64>| {
+            let t = Instant::now();
+            let page = search(&conn, q, project, None, 40, offset).unwrap();
+            println!("{label:<34} {:>7.1} ms  hits={} total={}{}", t.elapsed().as_secs_f64() * 1000.0, page.hits.len(), page.total, if page.total_capped { "+" } else { "" });
+        };
+        let raw = |label: &str, sql: &str| {
+            let t = Instant::now();
+            let n: i64 = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+            println!("{label:<34} {:>7.1} ms  n={n}", t.elapsed().as_secs_f64() * 1000.0);
+        };
+        raw("raw count of all matches", "select count(*) from messages_fts where messages_fts match '\"the\"*'");
+        raw("raw count capped 1001", "select count(*) from (select 1 from messages_fts where messages_fts match '\"the\"*' limit 1001)");
+        raw("raw top40 by rank", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by rank, rowid desc limit 40)");
+        raw("raw top40 by rowid desc", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by rowid desc limit 40)");
+        raw("raw top40 rank only", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by rank limit 40)");
+        raw("raw top40 bm25(1.2,.75)", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by bm25(messages_fts) limit 40)");
+        time("matches every message: the", "the", 0, None);
+        time("matches every message, page 5", "the", 160, None);
+        time("1-char prefix: m", "m", 0, None);
+        time("common word: alpha", "alpha", 0, None);
+        time("ranked worst case: zebra (3750)", "zebra", 0, None);
+        time("ranked: zebra page 3", "zebra", 80, None);
+        time("two terms: parser stream", "parser stream", 0, None);
+        time("rare: message 12345", "\"message 12345\"", 0, None);
+        time("cyrillic yo: ёжик", "ёжик", 0, None);
+        time("cyrillic ye: ежик", "ежик", 0, None);
+        time("no match: zzzz", "zzzz", 0, None);
     }
 
     #[test]
