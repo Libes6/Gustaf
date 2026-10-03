@@ -5,6 +5,7 @@ mod db;
 mod git;
 mod hunks;
 mod import_sources;
+mod mcp;
 mod review;
 mod secrets;
 mod tools;
@@ -25,6 +26,7 @@ pub fn run() {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db(Mutex::new(db::open(&dir.join("app.db"))?)));
+            mcp::init(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -67,7 +69,19 @@ pub fn run() {
             computer::cu_screen_size,
             attachments::attachments_save,
             attachments::attachments_clear,
+            mcp::mcp_start,
+            mcp::mcp_request,
+            mcp::mcp_notify,
+            mcp::mcp_stop,
+            mcp::mcp_status,
+            mcp::mcp_logs,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // MCP servers are child processes: never leave them running after the app quits.
+            if let tauri::RunEvent::Exit = event {
+                mcp::shutdown(app);
+            }
+        });
 }

@@ -54,8 +54,7 @@ Items were drafted from the README and code layout; verify against the code befo
   - [ ] CLI discovery in `providers/cli.ts` (hardcoded `/Applications/ChatGPT.app`, `~/.nvm`) and Windows paths.
   - [ ] Review Computer Use (Wayland), macOS-specific wording in prompts/i18n, system font stack in `theme.css`.
   - [ ] CI matrix: `windows-latest`, `ubuntu-latest` (install `libwebkit2gtk-4.1-dev` etc.).
-
-- [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
+- [x] **MCP servers**: API-provider agents use tools of stdio and streamable-HTTP MCP servers (`src/agent/mcp/`, `mcp.rs`, `McpServers.tsx`): Keychain secrets, import of `mcpServers` JSON, approvals per call/tool/server, read-only mode, action log. Not done: resources/prompts/sampling/OAuth, the legacy SSE transport, subagent access to MCP tools, CLI providers (own config); not smoke-tested against real servers or in `tauri dev`.
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [x] **`@file` mentions** in the composer with autocomplete (already existed; `@folder` not supported).
