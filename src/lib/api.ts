@@ -62,6 +62,15 @@ export const cursor = {
   messages: (chatId: string) => invoke<{ role: "user" | "assistant"; text: string }[]>("cursor_messages", { chatId }),
 };
 
+/** Isolated cursor-agent profiles (src-tauri/src/cursor_accounts.rs); `status` never starts a login. */
+export type CursorIdentity = { loggedIn: boolean; email: string | null; message: string | null };
+export const cursorProfiles = {
+  create: (name: string) => invoke<string>("cursor_profile_create", { name }),
+  dir: (name: string) => invoke<string>("cursor_profile_dir", { name }),
+  remove: (name: string) => invoke<void>("cursor_profile_remove", { name }),
+  status: (name: string) => invoke<CursorIdentity>("cursor_profile_status", { name }),
+};
+
 /** Summary of a session (Claude Code, Codex) or conversation (ChatGPT) found by the history scanners in `import_sources.rs`. */
 export type SourceSession = {
   id: string;

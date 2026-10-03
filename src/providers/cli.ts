@@ -4,7 +4,7 @@ import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, turnImages, withImagePaths } from "./cliArgs";
-import { attachments } from "../lib/api";
+import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { Command } from "@tauri-apps/plugin-shell";
 import { flattenMsg, textOf, type Adapter, type CliId, type ProviderConfig, type TurnInput } from "./types";
@@ -21,7 +21,7 @@ export function codexExecutable() {
   })();
 }
 
-async function cursorExecutable() {
+export async function cursorExecutable() {
   const probe = await Command.create('zsh', ['-lc', 'command -v cursor-agent || { test -x "$HOME/.local/bin/cursor-agent" && echo "$HOME/.local/bin/cursor-agent"; }']).execute();
   if (probe.code || !probe.stdout.trim()) throw new Error('Cursor CLI is unavailable.');
   return probe.stdout.trim();
@@ -196,7 +196,8 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
-        const cmd = await Command.create('zsh', ['-lc', `${shq(executable)} --list-models`], { ...(cfg.cliAuth === "key" ? { env: cursorAccountEnv(cfg, key) } : {}) }).execute();
+        const env = cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
+        const cmd = await Command.create('zsh', ['-lc', `${shq(executable)} --list-models`], Object.keys(env).length ? { env } : {}).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
@@ -244,7 +245,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, env: cursorAccountEnv(cfg, key) },
+        { signal: t.signal, cwd: t.cwd, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;

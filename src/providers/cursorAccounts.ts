@@ -1,8 +1,17 @@
 import type { ProviderConfig } from './types';
 
-/** Keys travel in child environment, never shell arguments or saved provider config. */
-export function cursorAccountEnv(cfg: ProviderConfig, key: string): Record<string, string> {
+/** Profile names are folder names under the app data dir; must match the Rust `validate_name`. */
+export const PROFILE_NAME = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+export const profileName = (stamp: number) => `acc-${stamp.toString(36)}`;
+
+/** Credentials travel in the child environment, never shell arguments or saved provider config.
+ *  A browser-login profile account only needs its isolated config dir (`profileDir`, resolved by the backend). */
+export function cursorAccountEnv(cfg: ProviderConfig, key: string, profileDir?: string): Record<string, string> {
   if (cfg.cli !== 'cursor-agent') return {};
+  if (cfg.cliProfile) {
+    if (!PROFILE_NAME.test(cfg.cliProfile) || !profileDir) throw new Error('Cursor account profile is missing.');
+    return { CURSOR_CONFIG_DIR: profileDir };
+  }
   if (cfg.cliAuth === 'key' && !key.trim()) throw new Error('Cursor account API key is missing.');
   return cfg.cliAuth === 'key' ? { CURSOR_API_KEY: key.trim() } : {};
 }
