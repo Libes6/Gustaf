@@ -1,3 +1,4 @@
+import { loadQueue, updateQueue } from "./chatQueue";
 import { waitForChat } from "./chatCoordinator";
 import type { Adapter, Msg, Reasoning, TurnInput } from "../providers/types";
 import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ChatRunDeps, type ReviewCopy } from "./chatRunCore";
@@ -62,6 +63,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   else outer.addEventListener("abort", stopOuter, { once: true });
   let chatId: number | null = null;
   let release: (() => void) | undefined;
+  let succeeded = false;
   let attention = false;
   let review: ReviewCopy | null = null;
   let live: LiveRunHandle | undefined;
@@ -79,6 +81,8 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     deps.chatChanged?.();
     const cid = chatId;
     release = await waitForChat(cid, ctl.signal);
+    await loadQueue(cid);
+    await updateQueue(cid, q => ({ ...q, interrupted: true }));
     live = deps.live?.(cid, sc.title, () => ctl.abort());
     // The access mode is capped again here: whatever the stored value says, unattended runs never get "full".
     const access = target.ownTools ? "readonly" : capAccess(sc.access);
@@ -140,6 +144,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
       await deps.addMessage(cid, msgText(deps.note("stopped"), "assistant")).catch(() => {});
       return { status: "stopped", chatId: cid };
     }
+    succeeded = true;
     return { status: "success", chatId: cid };
   } catch (e) {
     // The loop ends with an abort error when it was stopped mid-step; the chat still says why the run ended.
@@ -152,7 +157,10 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } finally {
     outer.removeEventListener("abort", stopOuter);
     // Like a chat: the copy is removed when nothing was changed in it, otherwise it stays for the review panel.
-    try { await finishReviewCopy(deps, review); } finally { live?.end(); release?.(); }
+    try { await finishReviewCopy(deps, review); } finally {
+      if (release && chatId) await updateQueue(chatId, q => ({ ...q, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
+      live?.end(); release?.();
+    }
     deps.chatChanged?.();
   }
 }
