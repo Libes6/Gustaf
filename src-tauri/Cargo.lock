@@ -2650,6 +2650,7 @@ dependencies = [
  "dirs",
  "enigo",
  "ignore",
+ "libc",
  "regex",
  "rusqlite",
  "security-framework",
