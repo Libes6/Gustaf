@@ -1112,5 +1112,6 @@
   "durationMinutes": "{n} min",
   "durationHours": "{n} h",
   "agentsStopCliLabel": "Stop the whole {provider} run",
-  "computerUseOn": "Computer Use on"
+  "computerUseOn": "Computer Use on",
+  "sentImageAlt": "Attached image {n}"
 }

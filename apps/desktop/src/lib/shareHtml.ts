@@ -10,7 +10,7 @@ import remarkGfm from "remark-gfm";
 import { parseArtifacts } from "../canvas/artifacts";
 import type { Part } from "../providers/types";
 import {
-  buildBundle, formatDate, REDACTED, type ExportedChat, type ExportedMessage, type ExportSource, type MdLabels,
+  buildBundle, formatDate, partsInDisplayOrder, REDACTED, type ExportedChat, type ExportedMessage, type ExportSource, type MdLabels,
 } from "./exportChats";
 
 export type ShareLabels = MdLabels & {
@@ -182,7 +182,7 @@ pre{margin:0;padding:10px 14px;background:var(--code);border-radius:8px;overflow
 @media print{:root{--bg:#fff;--text:#000;--card:#fff;--code:#f4f4f4;--user:#f4f4f4;--text2:#444}main{max-width:none;padding:0}pre{white-space:pre-wrap;overflow:visible}.card,.msg{break-inside:avoid-page}a{color:inherit}}`;
 
 function messageHtml(m: ExportedMessage, results: Map<string, Result>, used: Set<string>, L: ShareLabels): string {
-  const body = m.parts.map((p) => partHtml(p, results, used, L)).join("");
+  const body = partsInDisplayOrder(m.role, m.parts).map((p) => partHtml(p, results, used, L)).join("");
   if (!body) return "";
   // Tool messages continue the assistant turn that requested them, so they get no heading of their own.
   if (m.role === "tool") return `<section class="msg tool"><div class="body">${body}</div></section>`;

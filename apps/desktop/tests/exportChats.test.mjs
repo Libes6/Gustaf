@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_MD_LABELS, EXPORT_FORMAT, EXPORT_VERSION, IMAGE_OMITTED, ImportError, MD_BLOCK_LIMIT, REDACTED,
-  buildBundle, exportFileName, formatDate, importBundle, parseBundle, redactSecrets, redactValue, toJson, toMarkdown,
+  buildBundle, exportFileName, formatDate, importBundle, parseBundle, partsInDisplayOrder, redactSecrets, redactValue, toJson, toMarkdown,
 } from '../src/lib/exportChats.ts';
 
 const NOW = Date.UTC(2026, 9, 2, 12, 30, 15);
@@ -406,4 +406,21 @@ test('import rejects foreign or newer files and sanitizes unknown fields', () =>
       { role: 'user', parts: [{ type: 'tool_result', id: 't', name: '', output: '' }] },
     ],
   }]);
+});
+
+const src = (messages) => ({ chat: chat(), project: null, messages });
+test('a sent message lists its pictures before the text in Markdown; the JSON keeps the stored order', () => {
+  const bundle = buildBundle([src([
+    msg('user', [text('look at these'), { type: 'image', data: 'AAAA' }, { type: 'image', data: 'CCCC' }]),
+    msg('assistant', [text('answer'), { type: 'image', data: 'DDDD' }]),
+  ])], { now: NOW, includeImages: true });
+  const md = toMarkdown(bundle);
+  const at = (s) => md.indexOf(s);
+  assert.ok(at('data:image/png;base64,AAAA') < at('data:image/png;base64,CCCC'), 'pictures keep their relative order');
+  assert.ok(at('data:image/png;base64,CCCC') < at('look at these'), 'user: pictures first');
+  assert.ok(at('answer') < at('data:image/png;base64,DDDD'), 'assistant: unchanged');
+  assert.deepEqual(bundle.chats[0].messages[0].parts.map((p) => p.type), ['text', 'image', 'image']);
+  const omitted = toMarkdown(buildBundle([src([msg('user', [text('look'), { type: 'image', data: 'AAAA' }])])]));
+  assert.ok(omitted.indexOf('[image omitted]') < omitted.indexOf('look'), 'omitted placeholder leads');
+  assert.deepEqual(partsInDisplayOrder('tool', [text('a'), { type: 'image', data: 'x' }]).map((p) => p.type), ['text', 'image']);
 });

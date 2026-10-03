@@ -1140,5 +1140,6 @@
   "durationMinutes": "{n} мин",
   "durationHours": "{n} ч",
   "agentsStopCliLabel": "Остановить весь запуск {provider}",
-  "computerUseOn": "Управление компьютером включено"
+  "computerUseOn": "Управление компьютером включено",
+  "sentImageAlt": "Прикреплённое изображение {n}"
 }

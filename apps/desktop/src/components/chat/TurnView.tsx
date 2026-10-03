@@ -89,9 +89,12 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       ) : null,
     );
 
+  const bodyText = turn.user ? userText(textOf(turn.user)) : null;
+  const contextText = turn.user ? userText(userContext.body) : null;
+  const images = (turn.user?.parts.filter((p) => p.type === "image") ?? []) as Extract<Part, { type: "image" }>[];
   return (
     <>
-      {turn.user && userText(textOf(turn.user)) !== null && (
+      {turn.user && bodyText !== null && (
         <div className={`msg-block${hit(turn.user)}`} data-msg-id={turn.user.id}>
           {editing !== null ? (
             <div className="msg-edit">
@@ -113,16 +116,22 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             </div>
           ) : (
           <div className="msg-user">
-            <div className="bubble">
-              {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
-              {userText(userContext.body)}
-              {userContext.references.map((ref, i) => <div className="chat-reference" key={`${ref.sourceId}:${i}`}>
-                <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
-                <span>{ref.snapshot.length.toLocaleString()} {app.locale === "ru" ? "символов · справочный материал" : "characters · reference material"}</span>
-                <details><summary>{app.locale === "ru" ? "Отправленный снимок" : "Sent snapshot"}</summary><pre>{ref.snapshot}</pre></details>
-              </div>)}
-              {turn.user.parts.filter((p) => p.type === "image").map((p: any, i, all) => <ImageThumb key={i} src={`data:image/png;base64,${p.data}`} alt={t("attachedImage", { n: i + 1, total: all.length })} />)}
-            </div>
+            {images.length > 0 && (
+              <div className="msg-images">
+                {images.map((p, i) => <ImageThumb key={i} src={`data:image/png;base64,${p.data}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />)}
+              </div>
+            )}
+            {(contextText || userContext.references.length > 0 || turn.user.meta?.compacted) && (
+              <div className="bubble">
+                {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
+                {contextText}
+                {userContext.references.map((ref, i) => <div className="chat-reference" key={`${ref.sourceId}:${i}`}>
+                  <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
+                  <span>{ref.snapshot.length.toLocaleString()} {app.locale === "ru" ? "символов · справочный материал" : "characters · reference material"}</span>
+                  <details><summary>{app.locale === "ru" ? "Отправленный снимок" : "Sent snapshot"}</summary><pre>{ref.snapshot}</pre></details>
+                </div>)}
+              </div>
+            )}
           </div>
           )}
           <div className={`msg-actions${confirming === "user" ? " pinned" : ""}`} style={{ justifyContent: "flex-end", marginTop: editing !== null ? 0 : -14 }}>
