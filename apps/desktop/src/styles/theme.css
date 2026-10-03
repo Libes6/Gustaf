@@ -674,3 +674,7 @@ button:disabled { cursor:default; opacity:.45; }
 .branch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
 .branch-bar p, .branch-picker p { max-width: 70ch; font-size: 12px; }
 .branch-picker { padding: 16px; border-bottom: 1px solid var(--border); }
+
+.queue-panel { max-height: 30vh; overflow-y: auto; padding: 8px 16px; border-top: 1px solid var(--border); }
+.queue-panel > div { margin-top: 8px; }
+.queue-panel textarea { width: 100%; min-height: 44px; resize: vertical; }

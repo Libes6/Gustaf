@@ -1,4 +1,5 @@
-import { updateQueue } from "../../src/lib/chatQueue";
+import { joinChatReferences, splitChatReferences } from "../../src/lib/chatContext";
+import { getQueue, updateQueue } from "../../src/lib/chatQueue";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +84,22 @@ describe("ChatView with a live scheduled run", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
     act(() => handle.end());
     await waitFor(() => expect(screen.queryByText("npm publish")).not.toBeInTheDocument());
+  });
+});
+
+describe("Queued chat context integration", () => {
+  it("edits the queued message body without changing its frozen chat attachment", async () => {
+    const reference = { sourceId: 9, title: "Reference chat", snapshot: "user: Original snapshot", fullSize: 23, shortened: false };
+    await updateQueue(5, () => ({ paused: true, items: [{ id: "with-context", text: joinChatReferences("Question", [reference]), images: [], clarify: false }] }));
+    setup();
+    const editor = await screen.findByRole("textbox", { name: "Edit queued message" });
+    expect(editor).toHaveValue("Question");
+    expect(screen.getByText("Reference chat")).toBeInTheDocument();
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Updated question");
+    const saved = splitChatReferences(getQueue(5)!.items[0].text);
+    expect(saved.body).toBe("Updated question");
+    expect(saved.references).toEqual([reference]);
   });
 });
 
