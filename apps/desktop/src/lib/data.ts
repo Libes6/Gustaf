@@ -92,8 +92,12 @@ export async function deleteMessages(chatId: number, ids: number[]) {
  * state of the original chat. Returns the new chat id; a failed copy removes the half-made chat.
  */
 export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number, ws?: { taskId: string; branch: string | null; base: string | null }) {
+  const [source] = await db.select<Chat>("select * from chats where id = ?", [fromChatId]);
+  const [point] = await db.select<{ id: number }>("select id from messages where chat_id = ? and id = ?", [fromChatId, throughId]);
+  if (!source || !point) throw new Error("The branch point no longer exists");
   const id = await createChat(projectId, title);
   try {
+    await db.exec("insert into chat_branches(chat_id, source_chat_id, source_message_id, source_title) values(?, ?, ?, ?)", [id, fromChatId, throughId, source.title]);
     // A branch of a workspace chat keeps working in the same workspace, never in the main checkout.
     if (ws) await db.exec("update chats set workspace_task_id = ?, workspace_branch = ?, workspace_base = ? where id = ?", [ws.taskId, ws.branch, ws.base, id]);
     await db.exec(
@@ -107,6 +111,10 @@ export async function branchChat(projectId: number | null, title: string, fromCh
   }
   return id;
 }
+
+export type ChatBranch = { chat_id: number; source_chat_id: number; source_message_id: number; source_title: string };
+export const loadChatBranch = async (id: number) => (await db.select<ChatBranch>("select * from chat_branches where chat_id = ?", [id]))[0] ?? null;
+export const listChatBranches = (sourceId: number) => db.select<Chat>("select chats.* from chats join chat_branches on chats.id = chat_branches.chat_id where source_chat_id = ? order by chats.created_at", [sourceId]);
 
 export const renameChat =(id: number, title: string) => db.exec("update chats set title = ? where id = ?", [title, id]);
 export const archiveChat = (id: number, archived = true) =>

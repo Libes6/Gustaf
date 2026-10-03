@@ -26,6 +26,13 @@ create table if not exists messages(
   id integer primary key, chat_id integer not null references chats(id) on delete cascade,
   role text not null, content text not null, created_at integer not null);
 create index if not exists messages_chat on messages(chat_id, id);
+-- Branch lineage survives deletion of the source; only the branch owns this record.
+create table if not exists chat_branches(
+  chat_id integer primary key references chats(id) on delete cascade,
+  source_chat_id integer not null, source_message_id integer not null,
+  source_title text not null);
+create index if not exists branches_source on chat_branches(source_chat_id);
+
 create table if not exists settings(key text primary key, value text not null);
 create table if not exists models_seen(
   provider text not null, model text not null, first_seen integer not null,
