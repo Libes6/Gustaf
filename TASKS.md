@@ -13,7 +13,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **UI tests**: Vitest + Testing Library + jsdom in `tests/ui/` (`npm run test:ui`, part of `npm run check`) for Sidebar, Settings, Composer/ContextChip, ApprovalCard, GitCommitDialog and SearchPalette with a mocked Tauri backend. Not done: `ChatView` end to end (run loop, streaming), `ChangesPanel`, `ModelPicker` details, real-browser (Playwright) tests.
 - [ ] **Build pipeline**: run `npm --prefix sidecar ci` in `beforeBuildCommand`; Developer ID signing and notarization instead of ad-hoc `-`.
 - [x] **First commit** (done); branch protection and PR template still open.
-- [ ] **README cleanup**: move the changelog-like sections into `docs/`, keep README to setup, structure and providers.
+- [x] **README cleanup**: README is now intro, features, install/development (with the `npm run check` commands), project structure and providers (about 80 lines); the per-feature sections moved unchanged into `docs/features/*.md`, indexed in `docs/README.md`.
 
 ## P1
 - [x] **Persist drafts and attachments** across restarts (SQLite `drafts` table, debounced writes, bounded payloads; see `lib/chatSessions.ts`, `lib/useComposerDraft.ts`).

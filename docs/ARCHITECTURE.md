@@ -1,6 +1,6 @@
 # Architecture
 
-M Code is a Tauri 2 desktop app: a React 19 + TypeScript frontend (Vite) and a Rust backend. User-facing behaviour is described in the [README](../README.md); this file describes how the code is organised.
+M Code is a Tauri 2 desktop app: a React 19 + TypeScript frontend (Vite) and a Rust backend. User-facing behaviour is described per feature in [docs/features](README.md) (overview and setup in the [README](../README.md)); this file describes how the code is organised.
 
 ## Layers
 
