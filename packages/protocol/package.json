@@ -1,0 +1,17 @@
+{
+  "name": "@mcode/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wire protocol between the M Code desktop server and its companion apps (pure TypeScript, no React/Tauri/React Native imports).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run typecheck && npm test"
+  }
+}

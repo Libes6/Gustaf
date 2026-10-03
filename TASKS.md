@@ -48,12 +48,12 @@ Items were drafted from the README and code layout; verify against the code befo
   packages/i18n/        # shared en/ru strings (optional)
   docs/  TASKS.md
   ```
-  - [ ] Move the desktop app into `apps/desktop`; fix paths in `tauri.conf.json` (`frontendDist`, sidecar `resources`), `scripts/build-canvas.mjs`, tests, `.gitignore`.
-  - [ ] Root `package.json` with workspaces; root scripts delegate (`npm run check -w apps/desktop`, etc.).
-  - [ ] CI: working directory, `rust-cache` workspace path, `sidecar` install, `.nvmrc` location.
-  - [ ] Create `packages/protocol` and use it from desktop (server side) and mobile.
-  - [ ] Rule: shared packages are pure TypeScript, no React/Tauri/React Native imports (Expo pins its own React version, which may differ from desktop React 19.1).
-  - [ ] Update README and `docs/ARCHITECTURE.md`; verify `npm run check` and `npm run tauri build -- --debug --bundles app`.
+  - [x] Move the desktop app into `apps/desktop` (pure renames, so history follows); paths fixed: `.gitignore`, `scripts/build-canvas.mjs` (resolves from its own location), tests that spawned `node_modules/vite/bin/vite.js` (now resolved through Node, since vite is hoisted to the root). `tauri.conf.json` needed no change: `frontendDist` and the sidecar `resources` are relative to `src-tauri`, which moved together with them. Not verified: a real `tauri dev` / `tauri build`.
+  - [x] Root `package.json` with workspaces (`apps/*`, `packages/*`); root `dev`, `build`, `tauri`, `test`, `test:ui`, `test:e2e`, `check` delegate to `apps/desktop` (`check` also runs `packages/protocol`). One root `package-lock.json`. The sidecar stays a standalone install (`npm --prefix apps/desktop/sidecar ci`) because it is bundled with its own `node_modules`.
+  - [x] CI: `rust-cache` workspace `apps/desktop/src-tauri`, sidecar install path, canvas build path, e2e artifact path; `.nvmrc` and the npm cache stay at the root. The three OS jobs have not run yet.
+  - [~] Create `packages/protocol` (`PROTOCOL_VERSION` plus type-only skeletons: pairing, projects, chats, messages, streaming events, approvals, stop; a node test and a `tsc` check). Declared as a dependency of `apps/desktop` but not imported yet: use it from the desktop server side when the HTTP/WebSocket server is written, and from mobile.
+  - [x] Rule: shared packages are pure TypeScript, no React/Tauri/React Native imports (Expo pins its own React version, which may differ from desktop React 19.1). Stated in `packages/protocol/src/index.ts` and `apps/mobile/README.md`.
+  - [~] README and `docs/ARCHITECTURE.md` updated (code paths in the docs are relative to `apps/desktop/`, noted at the top). `npm run check` passes from the root; still to do: `npm run tauri build -- --debug --bundles app` from the root.
 
 - [ ] **Mobile companion app (React Native)**: control M Code from a phone over the local network. The desktop shows a QR code, the phone scans it and connects to the whole workspace (projects, chats, running requests).
   - [ ] **Desktop server**: a local HTTP + WebSocket server in the Tauri backend (`src-tauri`), off by default, toggled in Settings; listens on the LAN interface only; shows address and status.
