@@ -1,5 +1,6 @@
 import { useEffect, useReducer } from "react";
 import { useT } from "../i18n";
+import { formatDuration } from "../lib/formatDuration";
 
 export type LiveStats = { start: number; chars: number; input: number };
 
@@ -14,7 +15,7 @@ export function LiveMeter({ stats }: { stats: LiveStats }) {
   const seconds = Math.max(0, Math.floor((Date.now() - stats.start) / 1000));
   return (
     <span className="live-meter" title={t("liveMeterHint")}>
-      {t("liveMeter", { input: t.num(stats.input), output: t.num(Math.ceil(stats.chars / 3)), seconds })}
+      {t("liveMeter", { input: t.num(stats.input), output: t.num(Math.ceil(stats.chars / 3)), time: formatDuration(seconds, t) })}
     </span>
   );
 }

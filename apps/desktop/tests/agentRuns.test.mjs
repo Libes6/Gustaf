@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 register('./helpers/hooks.mjs', import.meta.url);
@@ -8,6 +9,8 @@ const { state, db } = await import('./helpers/apiStub.mjs');
 const m = await import('../src/agent/agentRunsModel.ts');
 const t = await import('../src/agent/agentTranscript.ts');
 const store = await import('../src/agent/agentRuns.ts');
+
+const dict = Object.fromEntries(['en', 'ru'].map((l) => [l, JSON.parse(readFileSync(new URL(`../src/i18n/${l}.json`, import.meta.url), 'utf8'))]));
 
 const run = (over = {}) => ({
   id: 'r1', title: 'T', type: 'explore', providerId: 'p', model: 'mod', projectRoot: '/proj', status: 'completed',
@@ -75,9 +78,11 @@ test('rows of agent_runs map to runs and back', () => {
 });
 
 test('elapsed time and token formatting', () => {
-  assert.equal(m.elapsed({ status: 'running', startedAt: 1000 }, 66_000), '1:05');
-  assert.equal(m.elapsed({ status: 'completed', startedAt: 0 + 1, endedAt: 3_700_001 }, 9e9), '1:01:40');
-  assert.equal(m.elapsed({ status: 'queued', startedAt: 0 }, 5000), '');
+  const t = (key, vars) => dict.en[key].replace('{n}', vars.n);
+  assert.equal(m.elapsed({ status: 'running', startedAt: 1000 }, 66_000, t), '1 min 5 s');
+  assert.equal(m.elapsed({ status: 'running', startedAt: 1000 }, 16_000, t), '15 s');
+  assert.equal(m.elapsed({ status: 'completed', startedAt: 0 + 1, endedAt: 3_700_001 }, 9e9, t), '1 h 1 min');
+  assert.equal(m.elapsed({ status: 'queued', startedAt: 0 }, 5000, t), '');
   assert.equal(m.formatTokens(999), '999');
   assert.equal(m.formatTokens(1500), '1.5k');
   assert.equal(m.formatTokens(25_000), '25k');
