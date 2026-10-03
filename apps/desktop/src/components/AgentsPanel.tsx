@@ -97,7 +97,7 @@ function Transcript({ run, continuing, onContinue, onClose }: { run: AgentRun; c
 }
 
 const PROVIDER_KEY = { codex: "agentsProviderCodex", claude: "agentsProviderClaude" } as const;
-const CLI_STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", ended: "subagentEnded" } as const;
+const CLI_STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", stopped: "subagentStopped", ended: "subagentEnded" } as const;
 const cliTitle = (a: CliAgent, unnamed: (id: string) => string) => a.title || unnamed(a.agentId.slice(-6) || "…");
 
 /** Task and report of a CLI-native subagent (the CLI does not expose its transcript). */

@@ -67,7 +67,8 @@ pub struct Agent {
     pub role: Option<String>,
     /// The `message` of the `spawn_agent` call, clipped.
     pub message: Option<String>,
-    /// starting | running | completed | failed | shutdown
+    /// starting | running | completed | failed | stopped | shutdown. `stopped` is neutral: the turn was interrupted (by the user,
+    /// by the parent ending its turn) or the agent never wrote an end; it is not a failure.
     pub state: String,
     pub started_at_ms: Option<i64>,
     pub ended_at_ms: Option<i64>,
@@ -277,7 +278,15 @@ enum Life {
     Started,
     Complete,
     Error,
+    /// `turn_aborted` (interrupted): neutral, not an error.
+    Aborted,
     Shutdown,
+}
+
+impl Life {
+    fn open(self) -> bool {
+        matches!(self, Life::None | Life::Started)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -297,6 +306,8 @@ struct FileState {
     tool_uses: u32,
     step: Option<String>,
     tokens: Tokens,
+    /// Time of the latest relevant line (the file's own clock).
+    last_ms: Option<i64>,
     bad_lines: u32,
     last_used: u64,
 }
@@ -363,6 +374,7 @@ fn ingest(st: &mut FileState, line: &str) {
         return;
     }
     let ts = v["timestamp"].as_str().and_then(parse_iso_ms);
+    st.last_ms = st.last_ms.max(ts);
     let pty = p["type"].as_str().unwrap_or("");
     match (ty, pty) {
         ("event_msg", "task_started") => {
@@ -381,7 +393,13 @@ fn ingest(st: &mut FileState, line: &str) {
                 st.last_message = Some(clip_text(&redact(&m), REPORT_CHARS));
             }
         }
-        ("event_msg", "error") | ("event_msg", "turn_aborted") => {
+        ("event_msg", "turn_aborted") => {
+            st.life = Life::Aborted;
+            st.ended_ms = secs_to_ms(&p["completed_at"]).or(ts);
+            st.duration_ms = p["duration_ms"].as_i64();
+            st.error = None;
+        }
+        ("event_msg", "error") => {
             st.life = Life::Error;
             st.ended_ms = ts;
             st.error = Some(clip(&redact(&s(&p["message"]).or_else(|| s(&p["reason"])).unwrap_or_else(|| pty.to_string())), SUMMARY_CHARS));
@@ -642,6 +660,11 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
     }
 
     // Agents: one per child file, plus one per spawn call that has no child yet.
+    let stale_before = start_ms.map(|t| t - SLACK_MS);
+    let (parent_over, parent_end_ms) = match parent_path.as_ref().and_then(|p| cache.get(p)) {
+        Some(ps) if !ps.life.open() => (true, ps.ended_ms.or(ps.last_ms)),
+        _ => (false, None),
+    };
     let mut agents: Vec<(i64, Agent)> = Vec::new();
     let mut claimed: HashSet<(String, usize)> = HashSet::new();
     let mut order: Vec<&PathBuf> = kids.iter().collect();
@@ -657,11 +680,23 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                 spawn = Some(sp);
             }
         }
-        let state = match st.life {
+        // An agent that never wrote an end is over when the parent's turn is (Codex interrupts its children then, usually a
+        // second later and not always at all), and when nothing was written since before this run began (an earlier turn's).
+        let (life, ended_ms) = if !st.life.open() {
+            (st.life, st.ended_ms)
+        } else if let (true, Some(end)) = (parent_over && parent == thread_id, parent_end_ms) {
+            (Life::Aborted, Some(end))
+        } else if let (Some(before), Some(last)) = (stale_before, st.last_ms.or(m.created_ms)) {
+            if last < before { (Life::Aborted, Some(last)) } else { (st.life, st.ended_ms) }
+        } else {
+            (st.life, st.ended_ms)
+        };
+        let state = match life {
             Life::None => "starting",
             Life::Started => "running",
             Life::Complete => "completed",
             Life::Error => "failed",
+            Life::Aborted => "stopped",
             Life::Shutdown => "shutdown",
         };
         let started = st.first_started_ms.or(m.created_ms).or(spawn.and_then(|x| x.ts));
@@ -680,7 +715,7 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                 message: spawn.map(|x| x.message.clone()).filter(|x| !x.is_empty()),
                 state: state.into(),
                 started_at_ms: started,
-                ended_at_ms: st.ended_ms,
+                ended_at_ms: ended_ms,
                 duration_ms: st.duration_ms,
                 last_message: st.last_message.clone(),
                 error: st.error.clone(),
@@ -697,6 +732,11 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
             if claimed.contains(&(owner.clone(), i)) {
                 continue;
             }
+            // A spawn of an earlier turn whose child file is not part of this run's window is history, not a pending agent.
+            if stale_before.is_some_and(|b| sp.ts.is_some_and(|t| t < b)) {
+                continue;
+            }
+            let over = parent_over && owner == thread_id;
             agents.push((
                 sp.ts.unwrap_or(i64::MAX),
                 Agent {
@@ -710,9 +750,9 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                     task_name: Some(sp.task_name.clone()),
                     role: None,
                     message: Some(sp.message.clone()).filter(|x| !x.is_empty()),
-                    state: "starting".into(),
+                    state: if over { "stopped" } else { "starting" }.into(),
                     started_at_ms: sp.ts,
-                    ended_at_ms: None,
+                    ended_at_ms: if over { parent_end_ms } else { None },
                     duration_ms: None,
                     last_message: None,
                     error: None,
@@ -721,6 +761,31 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                     tokens: Tokens::default(),
                 },
             ));
+        }
+    }
+    // One card per agent: two threads that answer to the same path of one parent are one agent (the newest thread wins).
+    // The survivor keeps the card key of the spawn call, so the card the app already shows is the one that goes on.
+    let mut groups: HashMap<(String, String), (i64, Option<String>)> = HashMap::new();
+    for (t, a) in &agents {
+        if let Some(path) = &a.agent_path {
+            let e = groups.entry((a.parent_thread_id.clone(), path.clone())).or_insert((*t, None));
+            e.0 = e.0.max(*t);
+            if a.key != a.id && e.1.is_none() {
+                e.1 = Some(a.key.clone());
+            }
+        }
+    }
+    let mut kept: HashSet<(String, String)> = HashSet::new();
+    agents.retain(|(t, a)| match &a.agent_path {
+        Some(path) => {
+            let k = (a.parent_thread_id.clone(), path.clone());
+            groups[&k].0 == *t && kept.insert(k)
+        }
+        None => true,
+    });
+    for (_, a) in agents.iter_mut() {
+        if let Some(key) = a.agent_path.as_ref().and_then(|p| groups.get(&(a.parent_thread_id.clone(), p.clone()))).and_then(|g| g.1.clone()) {
+            a.key = key;
         }
     }
     agents.sort_by_key(|(t, _)| *t);
@@ -1040,5 +1105,123 @@ mod tests {
         assert_eq!(d.last(), Some(&(2026, 1, 4)));
         assert_eq!(exec_text(r#"text(await tools.exec_command({cmd:"ls \"a b\"\nwc","workdir":"/x"}))"#), "ls \"a b\" wc");
         assert_eq!(exec_text("plain text"), "plain text");
+    }
+
+    // ---- lifecycle fixes (docs/subagents-audit.md) ----
+
+    fn aborted(ord: i64) -> String {
+        format!(r#"{{"timestamp":"2026-01-05T10:01:30.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"turn_aborted","reason":"interrupted","completed_at":1767607290,"duration_ms":85000}}}}"#)
+    }
+    fn parent_started(ord: i64) -> String {
+        format!(r#"{{"timestamp":"2026-01-05T10:00:01.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_started","started_at":1767607201}}}}"#)
+    }
+    fn parent_complete(ord: i64) -> String {
+        format!(r#"{{"timestamp":"2026-01-05T10:02:00.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_complete","completed_at":1767607320,"duration_ms":119000}}}}"#)
+    }
+    fn by_nick<'a>(r: &'a ScanResult, n: &str) -> &'a Agent {
+        r.agents.iter().find(|a| a.nickname.as_deref() == Some(n)).unwrap()
+    }
+
+    #[test]
+    fn interrupted_turn_is_stopped_not_failed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta()];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 1));
+        put(dir.path(), PARENT, &lines);
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), aborted(2)]);
+        let r = scan(dir.path(), &mut Cache::new());
+        let a = &r.agents[0];
+        assert_eq!((a.state.as_str(), a.error.clone(), a.ended_at_ms), ("stopped", None, Some(1767607290000)));
+        assert_eq!(a.duration_ms, Some(85000));
+    }
+
+    #[test]
+    fn a_followup_turn_revives_a_stopped_agent() {
+        let dir = tempfile::tempdir().unwrap();
+        put(dir.path(), PARENT, &[parent_meta()]);
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/a", 1, 0), started(1, 1767607205), aborted(2), started(3, 1767607300)]);
+        let r = scan(dir.path(), &mut Cache::new());
+        assert_eq!((r.agents[0].state.as_str(), r.agents[0].ended_at_ms), ("running", None));
+    }
+
+    #[test]
+    fn running_children_stop_when_the_parent_turn_has_ended() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta(), parent_started(1)];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 2));
+        lines.extend(spawn("call-2", "beta_task", "Do beta", 4));
+        lines.push(parent_complete(7));
+        put(dir.path(), PARENT, &lines);
+        // Alpha never wrote a terminal event; beta has no file yet; gamma finished by itself.
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), exec(2, "ls")]);
+        put(dir.path(), C3, &[meta(C3, PARENT, "Cy", "/root/gamma_task", 3, 0), started(1, 1767607207), complete(2, "done")]);
+        let r = scan(dir.path(), &mut Cache::new());
+        let ada = by_nick(&r, "Ada");
+        assert_eq!((ada.state.as_str(), ada.ended_at_ms), ("stopped", Some(1767607320000)));
+        assert_eq!(by_nick(&r, "Cy").state, "completed");
+        let beta = r.agents.iter().find(|a| a.task_name.as_deref() == Some("beta_task")).unwrap();
+        assert_eq!((beta.state.as_str(), beta.thread_id.clone()), ("stopped", None));
+        assert!(r.agents.iter().all(|a| a.state != "running" && a.state != "starting"));
+    }
+
+    #[test]
+    fn a_running_parent_keeps_its_children_running() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta(), parent_started(1)];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 2));
+        put(dir.path(), PARENT, &lines);
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205)]);
+        assert_eq!(scan(dir.path(), &mut Cache::new()).agents[0].state, "running");
+    }
+
+    #[test]
+    fn spawns_of_earlier_turns_without_a_child_file_are_not_pending() {
+        let dir = tempfile::tempdir().unwrap();
+        // Turn 1 spawned alpha (its child file is old and out of this turn's window); turn 2 started three minutes later and spawned beta.
+        let mut lines = vec![parent_meta()];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 1));
+        lines.push(r#"{"timestamp":"2026-01-05T10:03:30.000Z","ordinal":5,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","arguments":"{\"task_name\":\"beta_task\",\"message\":\"Do beta\"}","call_id":"call-9"}}"#.into());
+        put(dir.path(), PARENT, &lines);
+        let late = parse_iso_ms("2026-01-05T10:03:00.000Z").unwrap();
+        let r = scan_in(dir.path(), PARENT, Some(late), now(), &mut Cache::new(), 1).unwrap();
+        let names: Vec<_> = r.agents.iter().map(|a| a.task_name.clone().unwrap()).collect();
+        assert_eq!(names, ["beta_task"], "{:?}", r.agents);
+        assert_eq!(r.agents[0].state, "starting");
+    }
+
+    #[test]
+    fn a_child_from_an_earlier_turn_that_never_ended_is_stopped() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta(), parent_started(1)];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 2));
+        put(dir.path(), PARENT, &lines);
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205)]);
+        // The file is in the window, but nothing was written to it since before this turn began.
+        let late = parse_iso_ms("2026-01-05T10:00:12.000Z").unwrap();
+        let r = scan_in(dir.path(), PARENT, Some(late), now(), &mut Cache::new(), 1).unwrap();
+        assert_eq!(r.agents[0].state, "stopped");
+    }
+
+    #[test]
+    fn an_error_event_still_fails_the_agent() {
+        let dir = tempfile::tempdir().unwrap();
+        fixture(dir.path());
+        let r = scan(dir.path(), &mut Cache::new());
+        assert_eq!(by_nick(&r, "Cy").state, "failed");
+    }
+
+    #[test]
+    fn two_threads_with_one_agent_path_make_one_card() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta()];
+        lines.extend(spawn("call-1", "alpha_task", "Do alpha", 1));
+        put(dir.path(), PARENT, &lines);
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), complete(2, "old")]);
+        put(dir.path(), C2, &[meta(C2, PARENT, "Bo", "/root/alpha_task", 2, 0), started(1, 1767607250)]);
+        let r = scan(dir.path(), &mut Cache::new());
+        assert_eq!(r.agents.len(), 1, "{:?}", r.agents);
+        assert_eq!((r.agents[0].nickname.as_deref(), r.agents[0].state.as_str()), (Some("Bo"), "running"));
+        // The card of the spawn call goes on with the newer thread.
+        assert_eq!(r.agents[0].key, format!("{PARENT}:alpha_task"));
     }
 }

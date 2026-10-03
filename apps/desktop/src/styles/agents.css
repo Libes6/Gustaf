@@ -86,7 +86,7 @@
 .subagent-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
 .subagent-chip.completed { color: var(--green); }
 .subagent-chip.failed { color: var(--red); }
-.subagent-chip.ended { color: var(--text-3); }
+.subagent-chip.ended, .subagent-chip.stopped { color: var(--text-3); }
 .subagent-result { margin: 0 0 0 19px; color: var(--text-3); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subagent-detail { margin: 4px 0 2px 19px; display: flex; flex-direction: column; gap: 6px; }
 .subagent-detail p { margin: 0; color: var(--text-2); overflow-wrap: anywhere; user-select: text; }

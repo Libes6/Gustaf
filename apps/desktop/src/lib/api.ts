@@ -271,7 +271,7 @@ export type RolloutAgent = {
   taskName?: string | null;
   role?: string | null;
   message?: string | null;
-  /** starting | running | completed | failed | shutdown */
+  /** starting | running | completed | failed | stopped (interrupted or cut off, neutral) | shutdown */
   state: string;
   startedAtMs?: number | null;
   endedAtMs?: number | null;

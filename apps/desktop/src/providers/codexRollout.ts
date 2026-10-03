@@ -24,7 +24,13 @@ const brief = (s: string, n: number) => clip(s.replace(/\s+/g, " ").trim(), n);
 const text = (v: unknown): string => (typeof v === "string" ? v : "");
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
 
-const STATE: Record<string, SubagentState> = { starting: "running", running: "running", completed: "completed", shutdown: "completed", failed: "failed" };
+const STATE: Record<string, SubagentState> = { starting: "running", running: "running", completed: "completed", shutdown: "completed", failed: "failed", stopped: "stopped" };
+
+/** "/root/queue_resume" to "queue resume": the last segment of an agent path or task name, readable. */
+export function humanTask(task: string): string {
+  const last = task.split("/").filter(Boolean).pop() ?? "";
+  return last.replace(/[_-]+/g, " ").trim();
+}
 
 /** Id of the activity of one scanned agent: stable from the spawn call to the end. */
 export const rolloutActivityId = (key: string) => `codex:${key}`;
@@ -42,12 +48,14 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
     const last = text(a.lastMessage);
     const error = text(a.error);
     const report = last || (state === "failed" ? error : "");
-    const role = text(a.role) || (nickname && task ? task : "");
+    // The task is what the agent was asked to do; its nickname ("Pasteur") says little, so it goes to the secondary line.
+    const readable = humanTask(task);
+    const role = text(a.role) || (nickname && readable ? nickname : "");
     const tokens = num(a.tokens?.total);
     const info: SubagentInfo = {
       provider: "codex",
       agentId: threadId || text(a.id) || key,
-      title: brief(nickname || task || (threadId ? threadId.slice(0, 8) : ""), 60),
+      title: brief(readable || nickname || (threadId ? threadId.slice(0, 8) : ""), 60),
       action: "scan",
       state,
       ...(role ? { role } : {}),
@@ -65,7 +73,7 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
       id: rolloutActivityId(key),
       name: "subagent",
       args: { tool: "rollout", ...(threadId ? { agent: threadId } : {}) },
-      status: state === "completed" ? "success" : state === "failed" ? "error" : "running",
+      status: state === "completed" ? "success" : state === "failed" ? "error" : state === "stopped" ? "unknown" : "running",
       ...(report ? { output: clip(report, MAX_OUTPUT) } : {}),
       subagent: info,
     });
@@ -81,7 +89,7 @@ export type RolloutTracker = {
    * dropped when the scan found agents and come back as one merged card when it found none (nothing is silently lost).
    */
   hold(acts: Activity[]): void;
-  /** Stops polling; with `final` one last scan runs first (the turn ended normally). Returns the fallback card(s) to show, if any. Safe to call twice. */
+  /** Stops polling; with `final` one last scan runs first (the turn ended normally). Returns the cards to publish: agents still running are returned as `stopped` (the process is gone), plus the fallback card for bare waits if the scan found nothing. Safe to call twice. */
   finish(final: boolean): Promise<Activity[]>;
 };
 
@@ -103,6 +111,8 @@ export function createRolloutTracker(o: TrackerOptions): RolloutTracker {
   const sent = new Map<string, string>();
   const notes = new Set<string>();
   const held = new Map<string, Activity>();
+  /** The latest entry of every agent seen, to settle the ones still running when the turn is over. */
+  const latest = new Map<string, Activity>();
   let thread = "";
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inflight: Promise<void> | null = null;
@@ -122,6 +132,7 @@ export function createRolloutTracker(o: TrackerOptions): RolloutTracker {
       const sig = JSON.stringify(a);
       if (sent.get(a.id) === sig) continue;
       sent.set(a.id, sig);
+      latest.set(a.id, a);
       try { o.onActivity(a); } catch { /* the caller's state is its own business */ }
     }
     agents = Math.max(agents, sent.size);
@@ -160,11 +171,18 @@ export function createRolloutTracker(o: TrackerOptions): RolloutTracker {
       timer = undefined;
       await inflight;
       if (final && thread) await once();
-      finished = [];
+      // The Codex process is gone, so nothing it started still runs (it does not always write an end to a child's file).
+      const now = Date.now();
+      finished = [...latest.values()]
+        .filter((a) => a.subagent && (a.subagent.state === "running" || a.subagent.state === "waiting"))
+        .map((a): Activity => {
+          const { step: _step, ...info } = a.subagent!;
+          return { ...a, status: "unknown", subagent: { ...info, action: "scan", state: "stopped", endedAt: now } };
+        });
       if (agents === 0 && held.size) {
         // The scan found nothing (no files, other Codex version): one merged generic card instead of one per wait.
         const all = [...held.values()];
-        finished = [{ ...all[all.length - 1], id: all[0].id, args: { ...all[all.length - 1].args, waits: all.length } }];
+        finished.push({ ...all[all.length - 1], id: all[0].id, args: { ...all[all.length - 1].args, waits: all.length } });
       }
       debug("rollout-total", { thread: thread ? thread.slice(0, 8) : null, scans, agents, held: held.size, errors });
       return finished;
