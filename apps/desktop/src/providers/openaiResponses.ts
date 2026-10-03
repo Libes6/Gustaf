@@ -1,3 +1,4 @@
+import { resolveKey, type KeySource } from "../lib/keys";
 import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
 import { request, sse } from "./http";
@@ -28,9 +29,10 @@ function userContent(m: Msg) {
 }
 
 /** OpenAI Responses API: function tools plus the native `computer` tool. */
-export function openaiResponses(cfg: ProviderConfig, key: string): Adapter {
+export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
   const base = cfg.baseUrl.replace(/\/$/, "");
-  const headers = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+  // The key is read on the first request that needs it (lib/keys.ts), not when the adapter is built.
+  const authHeaders = async () => ({ Authorization: `Bearer ${await resolveKey(key)}`, "Content-Type": "application/json" });
 
   function buildInput(messages: Msg[]) {
     let start = 0;
@@ -72,7 +74,7 @@ export function openaiResponses(cfg: ProviderConfig, key: string): Adapter {
     supportsReasoning: (model) => /^(o\d|gpt-5|gpt-6)/.test(model),
 
     async listModels() {
-      const res = await request(`${base}/models`, { headers });
+      const res = await request(`${base}/models`, { headers: await authHeaders() });
       const j = await res.json();
       return (j.data ?? [])
         .filter((m: any) => !/embedding|whisper|tts|dall-e|moderation|audio|realtime|transcribe|image/.test(m.id))
@@ -92,7 +94,7 @@ export function openaiResponses(cfg: ProviderConfig, key: string): Adapter {
 
       const final = await withRetry(
         async (onText) => {
-          const res = await request(`${base}/responses`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/responses`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
           let final: any;
           for await (const ev of sse(res, t.signal)) {
             if (ev.type === "response.output_text.delta") onText(ev.delta);

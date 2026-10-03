@@ -1,3 +1,4 @@
+import { resolveKey, type KeySource } from "../lib/keys";
 import { mergeActivity, type Activity } from "./activities";
 import { resolveResource } from "@tauri-apps/api/path";
 import { resumePoint, runScript, spawnLines } from "./cli";
@@ -18,7 +19,7 @@ async function call(req: object, onEvent: (e: any) => void, signal?: AbortSignal
 }
 
 /** Cursor SDK agent: it runs its own tools in the project; we only relay text and tool activity. */
-export function cursorAgent(cfg: ProviderConfig, key: string): Adapter {
+export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
   return {
     supportsComputer: false,
     supportsReasoning: () => false,
@@ -26,7 +27,7 @@ export function cursorAgent(cfg: ProviderConfig, key: string): Adapter {
     async listModels() {
       let list: { id: string; name: string }[] = [];
       let error = "";
-      await call({ type: "models", apiKey: key }, (e) => {
+      await call({ type: "models", apiKey: await resolveKey(key) }, (e) => {
         if (e.type === "models") list = e.list;
         if (e.type === "error") error = e.message;
       });
@@ -49,7 +50,7 @@ export function cursorAgent(cfg: ProviderConfig, key: string): Adapter {
         t.onText(s);
       };
       await call(
-        { type: "send", apiKey: key, model: t.model, cwd: t.cwd, agentId, prompt },
+        { type: "send", apiKey: await resolveKey(key), model: t.model, cwd: t.cwd, agentId, prompt },
         (e) => {
           if (e.type === "agent") agentId = e.agentId;
           else if (e.type === "text") emit(e.text);

@@ -46,7 +46,7 @@ pub async fn web_fetch(url:String,allow:Option<Vec<String>>,deny:Option<Vec<Stri
 pub async fn web_search(query:String)->Result<serde_json::Value,String>{
  if query.trim().is_empty()||query.len()>1000{return Err("Query must contain 1–1000 characters".into());}
  tauri::async_runtime::spawn_blocking(move||{
- let key=crate::secrets::secret_get("web:brave".into()).ok_or("Configure a Brave Search API key in Settings")?;
+ let key=crate::secrets::read("web:brave").ok_or("Configure a Brave Search API key in Settings")?;
  let mut url=Url::parse("https://api.search.brave.com/res/v1/web/search").unwrap();url.query_pairs_mut().append_pair("q",&query).append_pair("count","8");
  let response=client(&url)?.get(url).header("X-Subscription-Token",key).send().map_err(|e|e.to_string())?;
  if !response.status().is_success(){return Err(format!("Search HTTP {}",response.status()));}

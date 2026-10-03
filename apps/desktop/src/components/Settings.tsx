@@ -152,7 +152,14 @@ function Providers() {
   };
 
   const refresh = async () => (setBusy(true), await app.refreshModels().finally(() => setBusy(false)));
-  const update = async (p: ProviderConfig, key: string | null = null) => (await saveProvider(p, key), refresh());
+  // Only a new key, base URL or re-enabling refetches that provider's models; a rename keeps the cached list (no Keychain read).
+  const update = async (p: ProviderConfig, key: string | null = null) => {
+    const old = app.providers.find((x) => x.id === p.id);
+    await saveProvider(p, key);
+    const refetch = key !== null || !old || old.baseUrl !== p.baseUrl || (!!old.disabled && !p.disabled);
+    setBusy(true);
+    await app.refreshModels(refetch ? { only: [p.id] } : { refresh: "startup" }).finally(() => setBusy(false));
+  };
   const connect = async (id: CliId) => {
     const c: ProviderConfig = { id: `cli-${id}-${Date.now().toString(36)}`, kind: "cli", name: cliName(id), baseUrl: "", cli: id };
     await update(c);
@@ -214,7 +221,7 @@ function Providers() {
             <ProviderForm
               onCancel={app.providers[0] ? () => setSel(null) : undefined}
               onSaved={async (cfg, models) => {
-                await app.refreshModels();
+                await app.refreshModels({ only: [cfg.id] });
                 setSel(cfg.id);
                 if (!app.selection && models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });
               }}
@@ -260,7 +267,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
           </div>
           <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
+          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels({ refresh: "startup" }))}><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="card"><div className="card-row"><div className="grow"><div className="t">{t(app.providerHealth[p.id]?.status === "auth" ? "providerAuth" : app.providerHealth[p.id]?.status === "ok" ? "providerOn" : "providerAvailable")}</div><div className="d">{t("providerCheckHint")}</div>

@@ -1,6 +1,7 @@
 import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
 import { request, sse } from "./http";
+import { resolveKey, type KeySource } from "../lib/keys";
 import { streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
 
@@ -92,20 +93,21 @@ function toAnthropic(messages: Msg[], providerId: string) {
   return out;
 }
 
-export function anthropic(cfg: ProviderConfig, key: string): Adapter {
+export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
   const base = cfg.baseUrl.replace(/\/$/, "");
-  const headers = {
-    "x-api-key": key,
+  // The key is read on the first request that needs it (lib/keys.ts), not when the adapter is built.
+  const authHeaders = async () => ({
+    "x-api-key": await resolveKey(key),
     "anthropic-version": "2023-06-01",
     "anthropic-dangerous-direct-browser-access": "true",
     "Content-Type": "application/json",
-  };
+  });
   return {
     supportsComputer: true,
     supportsReasoning: () => false,
 
     async listModels() {
-      const res = await request(`${base}/v1/models?limit=100`, { headers });
+      const res = await request(`${base}/v1/models?limit=100`, { headers: await authHeaders() });
       const j = await res.json();
       return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.display_name ?? m.id, providerId: cfg.id, created: Date.parse(m.created_at) || 0 }));
     },
@@ -118,7 +120,7 @@ export function anthropic(cfg: ProviderConfig, key: string): Adapter {
         async (onText) => {
           const blocks: any[] = [];
           let usageRaw = {};
-          const res = await request(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/v1/messages`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
           for await (const ev of sse(res, t.signal)) {
             if (ev.type === "message_start") usageRaw = { ...usageRaw, ...ev.message?.usage };
             else if (ev.type === "message_delta") usageRaw = { ...usageRaw, ...ev.usage };

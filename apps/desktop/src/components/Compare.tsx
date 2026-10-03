@@ -41,6 +41,8 @@ export function Compare({ onClose }: { onClose: () => void }) {
 
   // Closing the view cancels every request that is still running; nothing is kept.
   useEffect(() => () => run.current?.stopAll(), []);
+  // Like the model picker: refresh lists older than 10 minutes when the comparison opens.
+  useEffect(() => void Promise.resolve(app.ensureModels?.()).catch(() => {}), []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", k);
