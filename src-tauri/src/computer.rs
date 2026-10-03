@@ -192,12 +192,33 @@ pub fn valid_app_name(name: &str) -> Result<&str, String> {
     Ok(n)
 }
 
-/// Runs `open -a <name>` (argument array, no shell), bounded to 10 s.
+/// The launcher process: `open -a <name>` on macOS, `gtk-launch <name>` (desktop entry id) on Linux; Windows has no
+/// equivalent that is safe to call with an arbitrary name (no shell is involved anywhere), so it reports unsupported.
+fn launcher(name: &str) -> Result<Command, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = Command::new("/usr/bin/open");
+        c.arg("-a").arg(name);
+        Ok(c)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let mut c = Command::new("gtk-launch");
+        c.arg(name);
+        Ok(c)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = name;
+        Err("open_app is not supported on this OS yet: switch to the app with clicks or keyboard shortcuts".into())
+    }
+}
+
+/// Runs the launcher (argument array, no shell), bounded to 10 s.
 fn open_app(name: &str) -> Result<(), String> {
     let name = valid_app_name(name)?;
-    let mut child = Command::new("/usr/bin/open")
-        .arg("-a")
-        .arg(name)
+    let mut command = launcher(name)?;
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -261,7 +282,9 @@ fn key_of(name: &str) -> Key {
         "end" => Key::End,
         "pageup" => Key::PageUp,
         "pagedown" => Key::PageDown,
-        "cmd" | "command" | "meta" | "super" | "win" => Key::Meta,
+        // "cmd" is the model's name for the main shortcut modifier: Command on macOS, Ctrl elsewhere.
+        "cmd" | "command" => if cfg!(target_os = "macos") { Key::Meta } else { Key::Control },
+        "meta" | "super" | "win" => Key::Meta,
         "ctrl" | "control" => Key::Control,
         "alt" | "option" => Key::Alt,
         "shift" => Key::Shift,
@@ -431,10 +454,12 @@ pub fn cu_screen_size() -> Result<(u32, u32), String> {
     Ok(fit(d.0, d.1))
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrusted() -> bool;
 }
+#[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
@@ -445,16 +470,33 @@ extern "C" {
 pub struct Permissions {
     accessibility: bool,
     screen: bool,
+    /// False where Computer Use cannot work at all (a pure Wayland session: no global input injection or capture without portals).
+    supported: bool,
 }
 
+/// Windows has no per-app screen/input permission to grant; on Linux X11 neither. A Wayland-only session is reported unsupported.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+fn other_os_permissions(os: &str, wayland_display: bool, x11_display: bool) -> Permissions {
+    let supported = os != "linux" || x11_display || !wayland_display;
+    Permissions { accessibility: supported, screen: supported, supported }
+}
+
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn cu_permissions(request: bool) -> Permissions {
     unsafe {
         if request && !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess();
         }
-        Permissions { accessibility: AXIsProcessTrusted(), screen: CGPreflightScreenCaptureAccess() }
+        Permissions { accessibility: AXIsProcessTrusted(), screen: CGPreflightScreenCaptureAccess(), supported: true }
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn cu_permissions(_request: bool) -> Permissions {
+    let set = |k: &str| std::env::var_os(k).is_some_and(|v| !v.is_empty());
+    other_os_permissions(std::env::consts::OS, set("WAYLAND_DISPLAY"), set("DISPLAY"))
 }
 
 #[cfg(test)]
@@ -562,6 +604,16 @@ mod tests {
         let cfg = Settle { poll_ms: 10, stable_ms: 50, max_ms: 100 };
         let r = settle(&cfg, || Err::<(Vec<u8>, ()), _>("no permission".to_string()), || 0, |_| {});
         assert_eq!(r.unwrap_err(), "no permission");
+    }
+
+    #[test]
+    fn permissions_off_macos() {
+        let p = other_os_permissions("windows", false, false);
+        assert!(p.accessibility && p.screen && p.supported);
+        assert!(other_os_permissions("linux", false, true).supported);
+        assert!(other_os_permissions("linux", true, true).supported, "XWayland session");
+        let w = other_os_permissions("linux", true, false);
+        assert!(!w.supported && !w.screen && !w.accessibility);
     }
 
     #[test]

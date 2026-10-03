@@ -1,4 +1,5 @@
 import { computer, fsx, type CuAction } from "../lib/api";
+import { platformLabel, shellLabel } from "../lib/platform";
 import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
@@ -86,7 +87,7 @@ type ToolContext = { act: string; project: string | null };
 
 async function buildSystem(root: string | null, computerUse: boolean, instructions = "") {
   const lines = [
-    "You are M Code, a coding agent in a macOS desktop app.",
+    `You are M Code, a coding agent in a desktop app on ${platformLabel()} (run_command uses ${shellLabel()}).`,
     `Today is ${new Date().toDateString()}.`,
     "Reply in the user's language. Be concise; use Markdown.",
     CANVAS_INSTRUCTIONS,

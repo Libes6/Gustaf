@@ -25,3 +25,18 @@ export function setPlatformForTests(p: Platform | undefined) {
 
 export const isMac = () => currentPlatform() === "macos";
 export const isWindows = () => currentPlatform() === "windows";
+
+export const platformLabel = (p: Platform = currentPlatform()) => ({ macos: "macOS", windows: "Windows", linux: "Linux" })[p];
+export const shellLabel = (p: Platform = currentPlatform()) => ({ macos: "zsh", windows: "PowerShell", linux: "bash" })[p];
+
+/** Display form of a combo written with the macOS symbols: `⌘` becomes `Ctrl+`, `⇧` `Shift+`, `⌥` `Alt+` elsewhere. */
+export function displayKeys(display: string, p: Platform = currentPlatform()): string {
+  if (p === "macos") return display;
+  return display
+    .replace(/⌘⇧/g, "Ctrl+Shift+")
+    .replace(/⌘/g, "Ctrl+")
+    .replace(/⇧/g, "Shift+")
+    .replace(/⌥/g, "Alt+")
+    .replace(/↵/g, "Enter")
+    .replace(/–/g, "-");
+}

@@ -7,6 +7,7 @@ mod hunks;
 mod import_sources;
 mod review;
 mod secrets;
+mod shell;
 mod tools;
 
 use std::sync::Mutex;
