@@ -189,9 +189,10 @@ export class FakeBackend {
   }
 
   // ---- full-text search stand-in ------------------------------------------------------------------------------------
-  searchMessages({ query, projectId, model, limit }) {
+  searchMessages({ query, projectId, model, limit, offset }) {
     const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return [];
+    const empty = { hits: [], total: 0, totalCapped: false, byRecency: false, hasMore: false };
+    if (!words.length) return empty;
     const hits = [];
     const rows = this.rows(`select m.id, m.chat_id, m.role, m.content, m.created_at, c.title, c.project_id, c.archived, p.name as project_name
       from messages m join chats c on c.id = m.chat_id left join projects p on p.id = c.project_id order by m.id desc`);
@@ -207,7 +208,9 @@ export class FakeBackend {
       const snippet = text.slice(start, at) + MARK_OPEN + text.slice(at, at + words[0].length) + MARK_CLOSE + text.slice(at + words[0].length, at + 80);
       hits.push({ messageId: r.id, chatId: r.chat_id, chatTitle: r.title, projectId: r.project_id, projectName: r.project_name, archived: !!r.archived, role: r.role, model: msg.meta?.model ?? null, createdAt: r.created_at, snippet });
     }
-    return hits.slice(0, limit ?? 50);
+    const start = offset ?? 0;
+    const page = hits.slice(start, start + (limit ?? 40));
+    return { hits: page, total: hits.length, totalCapped: false, byRecency: false, hasMore: start + page.length < hits.length };
   }
 
   // ---- plugin-http protocol (see node_modules/@tauri-apps/plugin-http/dist-js/index.js) -------------------------------
