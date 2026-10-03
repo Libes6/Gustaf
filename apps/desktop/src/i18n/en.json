@@ -103,6 +103,8 @@
   "agentCancelDependentsDesc": "For delegate_tasks plans. The main agent can change it for a single plan.",
   "agentNotifications": "Notify when agents need attention",
   "agentNotificationsDesc": "A system notification and a dock badge when a background agent finishes, fails or waits for approval while M Code is in the background.",
+  "codexSessions": "Read Codex session files to show subagents",
+  "codexSessionsDesc": "While a Codex chat runs, M Code reads only the session files of that run in your Codex folder to list its subagents live; nothing is sent anywhere.",
   "agentStopOnBudget": "Stop agents when over budget",
   "agentStopOnBudgetDesc": "When the daily or chat token budget (Usage, Budgets) is exceeded, running agents stop at their next step and new ones are not started. Budgets stay warnings everywhere else.",
   "notifyAgentDone": "{title} finished",

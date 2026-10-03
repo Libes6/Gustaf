@@ -5,6 +5,7 @@ import { refKey, sameRef, type AgentSettings, type ModelRef } from "../agent/age
 import { saveAgentSettings, useAgentSettings } from "../agent/agentSettingsStore";
 import { AGENT_TYPES, DEFAULT_BUDGETS, type AgentType, type Budget } from "../agent/subagentCore";
 import { parseTokenLimit } from "../lib/budgets";
+import { rolloutEnabled, setRolloutEnabled } from "../providers/codexRollout";
 import { runsOwnTools } from "../lib/modelRouting";
 import { useApp } from "../state";
 import "../styles/agents.css";
@@ -63,6 +64,30 @@ function BudgetCell({ type, field, label, settings, onBad }: { type: AgentType; 
 
 function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
   return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
+}
+
+/** Reading Codex's rollout files shows its subagents live (providers/codexRollout.ts); on unless switched off. */
+function CodexSessionsRow() {
+  const t = useT();
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    void rolloutEnabled().then((v) => { if (alive) setOn(v); });
+    return () => { alive = false; };
+  }, []);
+  const change = (v: boolean) => {
+    setOn(v);
+    setRolloutEnabled(v).catch(() => setOn(!v));
+  };
+  return (
+    <div className="card-row">
+      <div className="grow">
+        <div className="t">{t("codexSessions")}</div>
+        <div className="d">{t("codexSessionsDesc")}</div>
+      </div>
+      <Toggle on={on} label={t("codexSessions")} onChange={change} />
+    </div>
+  );
 }
 
 export function AgentSettingsSection() {
@@ -190,6 +215,7 @@ export function AgentSettingsSection() {
           </div>
           <Toggle on={s.notifications} label={t("agentNotifications")} onChange={(v) => saveAgentSettings({ ...s, notifications: v })} />
         </div>
+        <CodexSessionsRow />
       </div>
     </>
   );
