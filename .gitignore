@@ -24,8 +24,8 @@ dist-ssr
 *.sw?
 
 # Bundled isolated canvas runtime
-src/canvas/generated/
-public/canvas/
+apps/desktop/src/canvas/generated/
+apps/desktop/public/canvas/
 
 # Local tooling artifacts
 .playwright-mcp/
@@ -33,4 +33,4 @@ public/canvas/
 .claude/worktrees/
 
 # End-to-end failure artifacts (screenshots, traces)
-tests/e2e/artifacts/
+apps/desktop/tests/e2e/artifacts/

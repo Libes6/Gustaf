@@ -18,6 +18,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canvasDocument, CANVAS_RUNTIME_URL } from '../src/canvas/document.ts';
 import { findChrome, launchChrome } from './helpers/chrome.mjs';
+import { viteBin } from './helpers/viteBin.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const conf = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
@@ -146,7 +147,7 @@ before(() => {
   if (SKIP_BUILD) return;
   dist = mkdtempSync(join(tmpdir(), 'mcode-dist-'));
   execFileSync(process.execPath, ['scripts/build-canvas.mjs'], { cwd: root, stdio: 'pipe' });
-  execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', dist, '--emptyOutDir'], { cwd: root, stdio: 'pipe' });
+  execFileSync(process.execPath, [viteBin, 'build', '--outDir', dist, '--emptyOutDir'], { cwd: root, stdio: 'pipe' });
   built = true;
 });
 after(() => { if (dist) rmSync(dist, { recursive: true, force: true }); });

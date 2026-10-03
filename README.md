@@ -26,21 +26,25 @@ The UI aims at WCAG 2.1 AA: full keyboard operation, visible focus rings in both
 
 Requirements: Node (version in `.nvmrc`), the Rust toolchain and the Tauri 2 prerequisites for your OS. The app is developed on macOS; see [Platforms](#platforms) for Windows and Linux.
 
+The repository is an npm-workspaces monorepo; the app lives in `apps/desktop`. Run everything from the repository root:
+
 ```sh
-npm install
-npm --prefix sidecar ci      # Node helpers launched by the app
-npm run tauri dev            # native app with hot reload
+npm install                              # one install for all workspaces (single root package-lock.json)
+npm --prefix apps/desktop/sidecar ci     # Node helpers launched by the app (standalone install, see below)
+npm run tauri dev                        # native app with hot reload (same as: npm run tauri dev -w apps/desktop)
 ```
 
-`npm run dev` serves only the frontend; normal chats need the native Tauri backend. `npm run build` type-checks and builds the frontend. The canvas runtime (`src/canvas/generated` and `public/canvas`, git-ignored) is built by `scripts/build-canvas.mjs` from the `predev` and `prebuild` hooks; run it by hand if you only run tests.
+The root scripts `dev`, `build`, `tauri`, `test`, `test:ui`, `test:e2e` and `check` delegate to `apps/desktop`; other scripts (`test:chat`, ...) run with `npm run <name> -w apps/desktop`. `npm run dev` serves only the frontend; normal chats need the native Tauri backend. `npm run build` type-checks and builds the frontend. The canvas runtime (`apps/desktop/src/canvas/generated` and `apps/desktop/public/canvas`, git-ignored) is built by `apps/desktop/scripts/build-canvas.mjs` from the `predev` and `prebuild` hooks; run it by hand if you only run tests.
+
+The sidecar is not a workspace member: it is bundled into the app as a resource together with its own `node_modules` (`tauri.conf.json`, `bundle.resources`), so it keeps its own `package.json`/`package-lock.json` and is installed on its own; hoisting its dependencies to the root would leave the bundle empty.
 
 ### Verification
 
 ```sh
-npm run check        # i18n keys, tsc, node tests, UI tests, end-to-end tests, cargo test (what CI runs)
+npm run check        # i18n keys, tsc, node tests, UI tests, end-to-end tests, cargo test, protocol package (what CI runs)
 ```
 
-The steps of `npm run check` can be run separately:
+The steps of `npm run check` can be run separately (from `apps/desktop`, or with `-w apps/desktop` from the root):
 
 ```sh
 node scripts/check-i18n.mjs                               # translations
@@ -51,7 +55,7 @@ npm run test:e2e                                          # built frontend in lo
 cargo test --manifest-path src-tauri/Cargo.toml           # Rust
 ```
 
-Focused node suites: `npm run test:chat`, `test:canvas`, `test:usage`, `test:cli`. Before a release, also `npm run tauri build -- --debug --bundles app`.
+Focused node suites: `npm run test:chat`, `test:canvas`, `test:usage`, `test:cli` (with `-w apps/desktop` from the root). Before a release, also `npm run tauri build -- --debug --bundles app`.
 
 ## Platforms
 
@@ -79,15 +83,19 @@ What is **not** verified outside macOS:
 ## Project structure
 
 ```text
-src/            React UI: components/, lib/ (data, api, chat logic), providers/ (model backends),
-                agent/ (tool loop, rules, subagents, MCP), canvas/, i18n/
-src-tauri/src/  Rust backend: SQLite, files and shell, review copy, git, secrets, computer use, MCP
-sidecar/        Node helpers (Codex limits, Cursor agent)
-tests/          node:test suites (*.test.mjs) and tests/ui (Vitest component tests)
-docs/           Architecture and per-feature documentation
+apps/desktop/             the desktop app (package `mcode`)
+  src/                    React UI: components/, lib/ (data, api, chat logic), providers/ (model backends),
+                          agent/ (tool loop, rules, subagents, MCP), canvas/, i18n/
+  src-tauri/src/          Rust backend: SQLite, files and shell, review copy, git, secrets, computer use, MCP
+  sidecar/                Node helpers (Codex limits, Cursor agent); standalone npm install
+  scripts/, public/, design/, index.html, vite.config.ts, vitest.config.ts, tsconfig*.json
+  tests/                  node:test suites (*.test.mjs), tests/ui (Vitest component tests), tests/e2e
+apps/mobile/              placeholder for the planned React Native (Expo) companion app
+packages/protocol/        @mcode/protocol: protocol version and API/WebSocket event types (pure TypeScript)
+docs/                     Architecture and per-feature documentation
 ```
 
-Layers, data flow and the role of every module are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The backlog is in [TASKS.md](TASKS.md).
+Paths elsewhere in the documentation (`src/...`, `src-tauri/...`, `tests/...`, `sidecar/...`) are relative to `apps/desktop/`. Layers, data flow and the role of every module are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The backlog is in [TASKS.md](TASKS.md).
 
 ## Security
 

@@ -2,6 +2,8 @@
 
 M Code is a Tauri 2 desktop app: a React 19 + TypeScript frontend (Vite) and a Rust backend. User-facing behaviour is described per feature in [docs/features](README.md) (overview and setup in the [README](../README.md)); this file describes how the code is organised.
 
+> **Paths:** the repository is an npm-workspaces monorepo. Every path in this document and in `docs/features/*.md` (`src/...`, `src-tauri/...`, `sidecar/...`, `scripts/...`, `tests/...`, `public/...`) is relative to `apps/desktop/`, and npm scripts such as `npm run test:csp` run there (`npm run <name> -w apps/desktop` from the root; `dev`, `build`, `tauri`, `test`, `test:ui`, `test:e2e` and `check` also work from the root). Other workspaces: `packages/protocol` (`@mcode/protocol`: `PROTOCOL_VERSION` and type-only skeletons of the planned phone API and WebSocket events; pure TypeScript, no React/Tauri/React Native imports; declared as a dependency of `apps/desktop` but not imported yet, since nothing serves the API) and `apps/mobile` (placeholder for the Expo app, see [TASKS.md](../TASKS.md)). The sidecar is not a workspace member: it is bundled with its own `node_modules`, so it has its own lockfile and `npm --prefix apps/desktop/sidecar ci`.
+
 ## Layers
 
 ```

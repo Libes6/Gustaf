@@ -3,6 +3,8 @@
 - [Architecture](ARCHITECTURE.md): code layout (frontend, Rust backend, sidecar), key flows and conventions.
 - [Tasks](../TASKS.md): roadmap and backlog.
 
+Code paths in these documents are relative to `apps/desktop/` (see the note at the top of the architecture page).
+
 ## Features
 
 Behaviour, design decisions and test pointers per feature. The [project README](../README.md) has setup and an overview.
