@@ -10,7 +10,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Narrow Tauri capabilities**: drop the redundant `http://localhost:*` / `127.0.0.1` entries; decide on `http://*` vs per-provider hosts; restrict `shell` args if feasible.
 - [ ] **Tooling**: `rustup component add rustfmt`, `cargo fmt`, `clippy -D warnings`, ESLint + Prettier, and add them to `npm run check` and CI.
 - [x] **Split `ChatView.tsx`** into composer (`components/chat/Composer`, `ContextChip`), turn list (`TurnView`), live status (`LiveStatus`, `ApprovalCard`) and the run hook `lib/useChatRun.ts`.
-- [ ] **UI tests** for Sidebar, Settings and ChatView (Vitest + Testing Library or Playwright against `npm run dev`).
+- [x] **UI tests**: Vitest + Testing Library + jsdom in `tests/ui/` (`npm run test:ui`, part of `npm run check`) for Sidebar, Settings, Composer/ContextChip, ApprovalCard, GitCommitDialog and SearchPalette with a mocked Tauri backend. Not done: `ChatView` end to end (run loop, streaming), `ChangesPanel`, `ModelPicker` details, real-browser (Playwright) tests.
 - [ ] **Build pipeline**: run `npm --prefix sidecar ci` in `beforeBuildCommand`; Developer ID signing and notarization instead of ad-hoc `-`.
 - [x] **First commit** (done); branch protection and PR template still open.
 - [ ] **README cleanup**: move the changelog-like sections into `docs/`, keep README to setup, structure and providers.

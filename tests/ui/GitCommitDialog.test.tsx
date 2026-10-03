@@ -187,7 +187,7 @@ describe("GitCommitDialog", () => {
     await screen.findByText("main");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getAllByRole("button", { name: "Cancel" }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: "Cancel" })[1]);
     expect(onClose).toHaveBeenCalledTimes(2);
 
     await userEvent.type(messageBox(), "msg");
