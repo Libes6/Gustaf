@@ -1,5 +1,5 @@
 import { withComputer } from "./computerBridge";
-import { db, getSetting, secrets, setSetting } from "../lib/api";
+import { cursorProfiles, db, getSetting, secrets, setSetting } from "../lib/api";
 import { anthropic } from "./anthropic";
 import { cliAdapter } from "./cli";
 import { cursorAgent } from "./cursor";
@@ -32,7 +32,11 @@ export async function saveProvider(cfg: ProviderConfig, key: string | null) {
 }
 
 export async function deleteProvider(id: string) {
-  await setSetting("providers", (await loadProviders()).filter((p) => p.id !== id));
+  const list = await loadProviders();
+  // A browser-login Cursor account owns its isolated profile folder; it goes with the account.
+  const profile = list.find((p) => p.id === id)?.cliProfile;
+  if (profile) await cursorProfiles.remove(profile).catch(() => {});
+  await setSetting("providers", list.filter((p) => p.id !== id));
   await secrets.delete(`provider:${id}`);
   adapters.delete(id);
 }

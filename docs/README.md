@@ -18,5 +18,6 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [files-and-git.md](features/files-and-git.md) | Actions and context, file review in a shadow copy, setup and tests, partial accept, committing accepted changes |
 | Agent | [agents.md](features/agents.md) | Subagents, background agents, multi-agent orchestration |
 | Agent | [mcp.md](features/mcp.md) | MCP servers |
+| Providers | [cursor-accounts.md](features/cursor-accounts.md) | Cursor account pool, browser-login profiles, quota rotation |
 | Agent | [scheduled-prompts.md](features/scheduled-prompts.md) | Prompts that run on a schedule while the app is open |
 | Agent | [computer-use.md](features/computer-use.md) | Computer Use (desktop control) |

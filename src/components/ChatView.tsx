@@ -1,4 +1,3 @@
-import { reserveFor } from "../providers/cursorAccounts";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -100,8 +99,6 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const turns = useMemo(() => groupTurns(messages), [messages]);
   const canvasSources = useMemo(() => messages.filter((m) => m.role === "assistant").map(textOf), [messages]);
 
-  const reserve = reserveFor(provider, app.providers, app.selection?.model ?? "", app.models);
-
   return (
     <CanvasWorkspace sources={canvasSources} scope={session.key} onRepair={(prompt) => { setText(prompt); taRef.current?.focus(); }}>
     <main className="main">
@@ -121,7 +118,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
             ))}
             <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} />
-            {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button>{reserve && <button className="btn-soft" disabled={running} onClick={() => run.retryRequest(reserve)}>{t("retryReserve", { name: reserve.name })}</button>}</div></div>}
+            {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
         </div>
       )}

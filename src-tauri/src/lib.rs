@@ -1,5 +1,6 @@
 mod attachments;
 mod computer;
+mod cursor_accounts;
 mod cursor_import;
 mod db;
 mod git;
@@ -37,6 +38,10 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,
+            cursor_accounts::cursor_profile_create,
+            cursor_accounts::cursor_profile_dir,
+            cursor_accounts::cursor_profile_remove,
+            cursor_accounts::cursor_profile_status,
             cursor_import::cursor_scan,
             cursor_import::cursor_messages,
             import_sources::import_scan,
