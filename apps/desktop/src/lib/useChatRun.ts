@@ -241,7 +241,7 @@ export function useChatRun(o: Options) {
       release = claimChat(cid);
       if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
       await loadQueue(cid);
-      await updateQueue(cid, q => ({ ...q, interrupted: true }));
+      await updateQueue(cid, q => ({ ...q, active: true }));
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
@@ -249,7 +249,7 @@ export function useChatRun(o: Options) {
       } else {
         const expanded = await expandMentions(runRoot, o.files, body);
         const added = await appendUserMessage(deps, { chatId: cid, root: runRoot, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
-        if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, interrupted: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
+        if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, active: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
         const shown: Msg = { ...added.msg, parts: [{ type: "text", text: body }, ...added.msg.parts.slice(1)] };
         history = added.history;
         setMessages([...prior, { ...shown, id: added.stored.id, chat_id: cid, created_at: added.stored.created_at } as StoredMsg]);
@@ -371,7 +371,7 @@ export function useChatRun(o: Options) {
         if (failed) setError(failed);
         reviewRef.current = null;
       }
-      if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
+      if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
       release?.();
       abortRef.current = null;
       setRunning(false);
