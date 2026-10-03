@@ -1,4 +1,5 @@
-import { nativeActivities, applyActivity, type Activity } from "./activities";
+import { nativeActivities, applyActivity, isBareCollabWait, type Activity } from "./activities";
+import { createRolloutTracker, rolloutEnabled } from "./codexRollout";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
@@ -222,7 +223,13 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
         t.onText(s);
       };
       const executable = id === "codex" ? await codexExecutable() : id === "cursor-agent" ? await cursorExecutable() : await claudeExecutable();
-      const res = await spawnLines(
+      // Codex does not report its subagents on stdout: read them from its rollout files while the turn runs (codexRollout.ts).
+      const rollout = id === "codex" && (await rolloutEnabled())
+        ? createRolloutTracker({ startedAt: Date.now(), onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onDebug: log.debug })
+        : undefined;
+      let res: Awaited<ReturnType<typeof spawnLines>>;
+      try {
+      res = await spawnLines(
         // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
         runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
         (e) => {
@@ -232,14 +239,20 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           const ev = spec.parse(e);
           if (ev.session) session = ev.session;
           if (ev.text) emit(ev.text);
-          for (const action of nativeActivities(id, e, log.unmapped)) {
-            t.onActivity?.(applyActivity(actions, action));
-          }
+          if (e.type === "thread.started" && typeof e.thread_id === "string") rollout?.begin(e.thread_id);
+          const acts = nativeActivities(id, e, log.unmapped);
+          // Waits that name no agent are held back: the rollout scan shows the agents, and a merged card replaces them if it finds none.
+          if (rollout && isBareCollabWait(e)) rollout.hold(acts);
+          else for (const action of acts) t.onActivity?.(applyActivity(actions, action));
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
         { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
+      } finally {
+        // The turn is over: one last scan unless it was stopped, then the polling ends.
+        for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) t.onActivity?.(applyActivity(actions, action));
+      }
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
       if (error) {

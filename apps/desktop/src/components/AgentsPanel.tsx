@@ -214,7 +214,7 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
       kind={t("agentsKind", { type: provider })}
       status={active ? undefined : { label: t(CLI_STATE_KEY[agent.state]), tone: agent.state === "completed" ? "completed" : agent.state === "failed" ? "failed" : "cancelled" }}
       time={time || undefined}
-      meta={[...(agent.role ? [agent.role] : []), ...(agent.toolUses > 0 ? [t("agentsToolUses", { count: agent.toolUses })] : [])]}
+      meta={[...(agent.role ? [agent.role] : []), ...(agent.tokens ? [t("agentsTokens", { tokens: formatTokens(agent.tokens) })] : []), ...(agent.toolUses > 0 ? [t("agentsToolUses", { count: agent.toolUses })] : [])]}
       step={step}
       active={active}
       onOpen={onOpen}

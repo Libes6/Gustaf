@@ -1,5 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Loader2, Users, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
+import { formatTokens } from "../agent/agentRunsModel";
 import { useT } from "../i18n";
 import type { Part, SubagentInfo } from "../providers/types";
 import "../styles/agents.css";
@@ -37,10 +38,11 @@ function Row({ agent }: { agent: SubagentActivity }) {
       {open && (
         <div id={id} className="subagent-detail" role="group" aria-label={title}>
           {s.prompt && <div><div className="subagent-label">{t("subagentTask")}</div><p>{s.prompt}</p></div>}
-          {(s.waits || s.toolUses) ? (
+          {(s.waits || s.toolUses || s.tokens) ? (
             <div className="subagent-meta">
               {s.waits ? <span>{t("subagentWaits", { count: s.waits })}</span> : null}
               {s.toolUses ? <span>{t("agentsToolUses", { count: s.toolUses })}</span> : null}
+              {s.tokens ? <span>{t("agentsTokens", { tokens: formatTokens(s.tokens) })}</span> : null}
             </div>
           ) : null}
           {s.step && state !== "completed" && <div className="subagent-step">{s.step}</div>}

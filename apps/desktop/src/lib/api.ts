@@ -239,6 +239,36 @@ export const rawLog = {
   info: () => invoke<RawLogInfo>("raw_log_info"),
 };
 
+/** One Codex subagent as src-tauri/src/codex_agents.rs reads it from the rollout files (field names as the Rust side serializes them). */
+export type RolloutAgent = {
+  id: string;
+  /** Stable across polls (a pending spawn and the thread that follows it are one agent). */
+  key: string;
+  threadId?: string | null;
+  parentThreadId?: string;
+  depth?: number;
+  nickname?: string | null;
+  agentPath?: string | null;
+  taskName?: string | null;
+  role?: string | null;
+  message?: string | null;
+  /** starting | running | completed | failed | shutdown */
+  state: string;
+  startedAtMs?: number | null;
+  endedAtMs?: number | null;
+  durationMs?: number | null;
+  lastMessage?: string | null;
+  error?: string | null;
+  toolUses?: number;
+  step?: string | null;
+  tokens?: { input: number; output: number; cached: number; reasoning: number; total: number };
+};
+export type RolloutScan = { parentFound: boolean; agents: RolloutAgent[]; truncated: boolean; notes: string[] };
+/** Read-only view of the rollout files Codex writes for a run (providers/codexRollout.ts polls it). */
+export const codexAgents = {
+  scan: (threadId: string, startedAt?: number) => invoke<RolloutScan>("codex_agents_scan", { threadId, startedAt: startedAt ?? null }),
+};
+
 /** Image attachments for CLI providers, stored under the app data folder (src-tauri/src/attachments.rs). */
 export const attachments = {
   save: (chatId: number, images: string[]) => invoke<{ dir: string; files: string[] }>("attachments_save", { chatId, images }),

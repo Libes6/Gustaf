@@ -82,6 +82,16 @@ const TASK_TOOLS = new Set(['task', 'agent']);
 /** What a subagent just did, from one of its own `tool_use` blocks. */
 const stepOf = (name: string, input: Json) => brief(`${name} ${str(input.command ?? input.file_path ?? input.path ?? input.pattern ?? input.description ?? input.query ?? input.url ?? '')}`, 90);
 
+/** An entry read from a rollout file (providers/codexRollout.ts) is authoritative: its state and counters replace the old ones. */
+function applyScan(actions: Map<string, Activity>, next: Activity, patch: SubagentInfo): Activity {
+  const key = actions.has(next.id) ? next.id : [...actions].find(([, a]) => patch.agentId && a.subagent?.agentId === patch.agentId)?.[0] ?? next.id;
+  const old = actions.get(key);
+  const info: SubagentInfo = { ...old?.subagent, ...patch, title: patch.title || old?.subagent?.title || '', prompt: patch.prompt ?? old?.subagent?.prompt, result: patch.result ?? old?.subagent?.result };
+  const merged: Activity = { ...old, ...next, id: key, name: old?.name || next.name || 'subagent', status: statusOf(info.state), output: next.output ?? old?.output, subagent: info };
+  actions.set(key, merged);
+  return merged;
+}
+
 /**
  * Folds an activity into the per-run map and returns the entry to publish. Subagent activities are merged per agent:
  * repeated `wait` calls bump one counter, a spawn's call id and its later thread id are the same entry, and a Claude
@@ -102,7 +112,12 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     actions.set(next.id, merged);
     return merged;
   }
+  if (patch.action === 'scan') return applyScan(actions, next, patch);
   let key = next.id;
+  if (patch.action === 'spawn' && patch.agentId && !actions.has(next.id)) {
+    // A spawn event for an agent the rollout scan already lists is the same entry.
+    key = [...actions].find(([, a]) => a.subagent?.action === 'scan' && a.subagent.agentId === patch.agentId)?.[0] ?? next.id;
+  }
   if (patch.action !== 'spawn' && patch.action !== 'task' && patch.action !== 'progress' && patch.agentId) {
     key = [...actions].find(([, a]) => a.subagent?.agentId === patch.agentId)?.[0] ?? next.id;
   }
@@ -126,6 +141,15 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
   const merged: Activity = { ...old, ...next, id: key, name: old?.name || next.name || 'subagent', args: Object.keys(next.args).length ? next.args : old?.args ?? {}, status: statusOf(state), output: next.output ?? old?.output, subagent: info };
   actions.set(key, merged);
   return merged;
+}
+
+/** A Codex `wait` item that names no agent at all (`codex exec --json` emits only these for multi-agent runs). */
+export function isBareCollabWait(e: unknown): boolean {
+  const ev = rec(e);
+  const it = rec(ev.item);
+  if (!['item.started', 'item.updated', 'item.completed'].includes(str(ev.type)) || !norm(it.type).includes('collab')) return false;
+  if (COLLAB_ACTIONS[norm(it.tool ?? it.tool_name ?? it.toolName ?? it.action ?? it.name)] !== 'wait') return false;
+  return !list(it.receiver_thread_ids ?? it.receiverThreadIds).length && !Object.keys(rec(it.agents_states ?? it.agentsStates)).length;
 }
 
 /** Why an item that looks like a subagent event got the generic card; written to the raw CLI log (lib/rawCliLog.ts). */

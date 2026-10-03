@@ -78,6 +78,10 @@ export const rawLog = {
   clear: async () => void (state.rawLog.length = 0),
   info: async () => ({ dir: '/stub/raw-cli', bytes: state.rawLog.reduce((n, [, l]) => n + l.length, 0), files: state.rawLog.length ? 1 : 0, latest: state.rawLog.length ? '/stub/raw-cli/day.jsonl' : null }),
 };
+/** Codex rollout scan (src-tauri/src/codex_agents.rs): nothing found unless a test sets `state.codexScan`. */
+export const codexAgents = {
+  scan: async (threadId, startedAt) => (state.codexScan ?? (() => ({ parentFound: false, agents: [], truncated: false, notes: [] })))(threadId, startedAt),
+};
 export const secrets = {
   set: async (id, value) => void state.secrets.set(id, value),
   get: async (id) => state.secrets.get(id) ?? null,

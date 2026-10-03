@@ -5,7 +5,7 @@ import type { RetryInfo } from "./retry";
 
 /** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. */
 export type SubagentState = "running" | "waiting" | "completed" | "failed";
-/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events. */
+/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose values replace the old ones. */
 export type SubagentInfo = {
   provider: "codex" | "claude";
   /** Codex thread id or Claude `tool_use` id; empty while a Codex spawn is still in flight. */
@@ -14,7 +14,7 @@ export type SubagentInfo = {
   title: string;
   /** Claude `subagent_type`. */
   role?: string;
-  action: "spawn" | "wait" | "send" | "close" | "task" | "progress";
+  action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";
   state: SubagentState;
   /** Short summary of the task given to the agent. */
   prompt?: string;
@@ -22,10 +22,15 @@ export type SubagentInfo = {
   result?: string;
   /** Number of finished `wait` calls for this agent (merged into one entry). */
   waits?: number;
-  /** Claude only: tool calls the subagent made. */
+  /** Claude: tool calls the subagent made (counted from its events). Codex: shell calls in its rollout file. */
   toolUses?: number;
-  /** Claude only: its latest tool call. */
+  /** Its latest tool call. */
   step?: string;
+  /** Codex rollout scan only (providers/codexRollout.ts): total tokens, start and end (Unix ms) and run time. */
+  tokens?: number;
+  startedAt?: number;
+  endedAt?: number;
+  durationMs?: number;
 };
 
 export type Part =

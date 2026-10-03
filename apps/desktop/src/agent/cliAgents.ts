@@ -23,6 +23,8 @@ export type CliAgent = {
   /** Full report, when there is one. */
   output?: string;
   toolUses: number;
+  /** Total tokens (Codex rollout scan only). */
+  tokens?: number;
   step?: string;
   startedAt: number;
   endedAt?: number;
@@ -61,8 +63,10 @@ export function cliAgentFrom(a: Activity, ctx: { chatId: number; root: string; s
     ...(a.output ? { output: a.output } : {}),
     toolUses: s.toolUses ?? 0,
     ...(s.step ? { step: s.step } : {}),
-    startedAt: prev?.startedAt ?? now,
-    ...(!isCliAgentActive({ state }) ? { endedAt: prev?.endedAt ?? now } : {}),
+    ...(s.tokens ? { tokens: s.tokens } : {}),
+    // Times read from a rollout file are the real ones; otherwise the moment the event arrived.
+    startedAt: s.startedAt ?? prev?.startedAt ?? now,
+    ...(!isCliAgentActive({ state }) ? { endedAt: s.endedAt ?? prev?.endedAt ?? now } : {}),
     ...(ctx.stop ? { stop: ctx.stop } : {}),
   };
 }
