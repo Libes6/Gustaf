@@ -36,6 +36,8 @@
   "agentsCount": "{running} running · {done} finished",
   "agentsRunning": "Running",
   "agentsFinished": "Finished",
+  "agentsFinishedCount": "Finished {count}",
+  "agentsKind": "Agent · {type}",
   "agentsClear": "Clear finished",
   "agentsTranscript": "View transcript",
   "agentsTokens": "{tokens} tokens",

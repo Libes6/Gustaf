@@ -36,6 +36,8 @@
   "agentsCount": "Работают: {running} · завершены: {done}",
   "agentsRunning": "Работают",
   "agentsFinished": "Завершены",
+  "agentsFinishedCount": "Завершённые: {count}",
+  "agentsKind": "Агент · {type}",
   "agentsClear": "Очистить завершённые",
   "agentsTranscript": "Показать ход работы",
   "agentsTokens": "Токенов: {tokens}",

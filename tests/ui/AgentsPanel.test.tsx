@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { resetAgentRuns } from "../../src/agent/agentRuns";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { createRun, recordStep, resetAgentRuns, updateRun } from "../../src/agent/agentRuns";
 import { finishCliAgents, resetCliAgents, trackCliAgents } from "../../src/agent/cliAgents";
 import { AgentsPanel } from "../../src/components/AgentsPanel";
 import { renderApp } from "./render";
@@ -52,17 +52,17 @@ describe("AgentsPanel: CLI-native subagents", () => {
     act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "running", { step: "reading files" })]));
     // The panel opens by itself when the first agent starts.
     expect(await screen.findByText("Worker a")).toBeInTheDocument();
-    expect(screen.getByText("Codex")).toBeInTheDocument();
+    expect(screen.getByText("Agent · Codex")).toBeInTheDocument();
     expect(screen.getByText("reading files")).toBeInTheDocument();
-    const stopBtn = screen.getByRole("button", { name: /Stop/ });
+    const stopBtn = screen.getByRole("button", { name: "Stop" });
     expect(stopBtn).toHaveAttribute("title", "Stops the whole Codex run, not just this agent.");
     expect(screen.queryByRole("button", { name: "Continue this agent" })).toBeNull();
     fireEvent.click(stopBtn);
     expect(stop).toHaveBeenCalledTimes(1);
 
     act(() => { trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "completed")]); finishCliAgents(1); });
-    expect(screen.getByText("Finished")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Stop/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "View transcript" }));
     const dialog = await screen.findByRole("dialog", { name: "Worker a" });
     expect(within(dialog).getByText("Count the files")).toBeInTheDocument();
@@ -120,4 +120,46 @@ describe("AgentsPanel", () => {
     expect(message.endsWith("also check the lexer")).toBe(true);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
+
+  it("shows a card per run (title, muted type line, model · tokens · tool uses, current step) with a square stop button; finished runs fold into a collapsible row", async () => {
+    resetAgentRuns(); // the store loads its rows once per module
+    mockInvoke({
+      db_select: ({ sql }: { sql: string }) => {
+        if (/from settings where key/.test(sql)) return [{ value: "true" }];
+        if (/from agent_runs/.test(sql)) return [runRow("r1", "Done one", "completed")];
+        return [];
+      },
+    });
+    const stop = vi.fn();
+    renderApp(<AgentsPanel root="/work/alpha" />);
+    await screen.findByRole("button", { name: /Background agents/i });
+    act(() => {
+      const id = createRun({ title: "Live scout", type: "explore", providerId: "p1", model: "m1", projectRoot: "/work/alpha" }, stop);
+      updateRun(id, { status: "running", startedAt: Date.now() });
+      recordStep(id, null, { tokens: 15000, toolUses: 4 }, "reading parser.ts");
+    });
+    const live = await screen.findByRole("article", { name: "Live scout" });
+    expect(within(live).getByText("Agent · Explore")).toBeInTheDocument();
+    expect(within(live).getByText("m1")).toBeInTheDocument();
+    expect(within(live).getByText("15k tokens")).toBeInTheDocument();
+    expect(within(live).getByText("4 tool uses")).toBeInTheDocument();
+    expect(within(live).getByText("reading parser.ts")).toBeInTheDocument();
+    fireEvent.click(within(live).getByRole("button", { name: "Stop" }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(within(live).getByRole("button", { name: "View transcript" })).toBeInTheDocument();
+    // Something is running, so the finished list starts folded.
+    const toggle = await screen.findByRole("button", { name: "Finished 1" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("article", { name: "Done one" })).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const done = screen.getByRole("article", { name: "Done one" });
+    expect(within(done).getByText("Done")).toBeInTheDocument();
+    expect(within(done).getByText("short report")).toBeInTheDocument();
+    expect(within(done).queryByRole("button", { name: "Stop" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Done one" })).toBeNull());
+    expect(screen.getByRole("article", { name: "Live scout" })).toBeInTheDocument();
+  });
+  afterAll(() => resetAgentRuns());
 });
