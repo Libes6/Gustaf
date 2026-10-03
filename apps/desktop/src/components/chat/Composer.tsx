@@ -40,6 +40,7 @@ type Props = {
   modelName: string | undefined;
   supports: { computer: boolean; reasoning: boolean };
   running: boolean;
+  onClarify?: () => void;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
   onSend: () => void;
@@ -340,6 +341,7 @@ export function Composer(p: Props) {
             )}
             <div className="composer-actions">
             <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
+            {p.running && <><button className="chip" disabled={!text.trim() && !images.length} onClick={p.onSend}>{t("sendNext")}</button>{p.onClarify && <button className="chip" disabled={!text.trim() || !!images.length} onClick={p.onClarify}>{t("clarifyTask")}</button>}</>}
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />

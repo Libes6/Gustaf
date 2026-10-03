@@ -1,4 +1,5 @@
-import { claimChat } from "./chatCoordinator";
+import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
+import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
@@ -66,7 +67,7 @@ type Options = {
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
-type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode };
+type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode; queuedId?: string };
 
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
@@ -109,6 +110,26 @@ export function useChatRun(o: Options) {
   const ownLive = useRef<LiveStats>({ start: 0, chars: 0, input: 0 });
   const live = external ? { current: external.stats } : ownLive;
   const busyError = useRef("");
+  const coordinatorBusy = useSyncExternalStore(subscribeChatCoordinator, () => session.chatId ? chatBusy(session.chatId) : false);
+  const draining = useRef(false);
+  const queue = useSyncExternalStore(subscribeQueue, () => getQueue(session.chatId));
+  const sendLatest = useRef(send); sendLatest.current = send;
+  useEffect(() => { if (session.chatId) void loadQueue(session.chatId).catch(e => setError(String(e))); }, [session.chatId]);
+  useEffect(() => {
+    if (!session.chatId || !queue || queue.paused || running || coordinatorBusy || draining.current || abortRef.current || !loaded || !queue.items.length) return;
+    draining.current = true;
+    const item = queue.items[0];
+    void (async () => {
+      const base = await loadMessages(session.chatId!);
+      await sendLatest.current(false, { text: item.text, images: item.images, base, queuedId: item.id });
+    })().catch(e => setError(String(e))).finally(() => { draining.current = false; });
+  }, [queue, running, coordinatorBusy, loaded]);
+  async function enqueue(clarify = false) {
+    if (!session.chatId || (!text.trim() && !images.length)) return;
+    await updateQueue(session.chatId, q => ({ ...q, items: [...q.items, { id: crypto.randomUUID(), text, images: [...images], clarify }], paused: q.interrupted ? true : false }));
+    o.setText(""); o.setImages([]); o.draft.clearSent(session.chatId);
+  }
+  const changeQueue = (fn: Parameters<typeof updateQueue>[1]) => { if (session.chatId) void updateQueue(session.chatId, fn).catch(e => setError(String(e))); };
 
   const stop = () => {
     abortRef.current?.abort();
@@ -152,6 +173,7 @@ export function useChatRun(o: Options) {
     const body = (edit?.text ?? text).trim();
     const imgs = edit?.images ?? images;
     const prior = edit?.base ?? messages;
+    if (!edit && (running || coordinatorBusy)) return enqueue();
     if ((!retry && !body && !imgs.length) || ownRunning || !loaded || abortRef.current) return;
     if (external) return setError(busyError.current = t("scheduledChatBusy", { title: external.title }));
     if (!provider || !app.selection) return app.openSettings("providers");
@@ -221,6 +243,7 @@ export function useChatRun(o: Options) {
       } else {
         const expanded = await expandMentions(runRoot, o.files, body);
         const added = await appendUserMessage(deps, { chatId: cid, root: runRoot, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
+        if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, interrupted: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
         const shown: Msg = { ...added.msg, parts: [{ type: "text", text: body }, ...added.msg.parts.slice(1)] };
         history = added.history;
         setMessages([...prior, { ...shown, id: added.stored.id, chat_id: cid, created_at: added.stored.created_at } as StoredMsg]);
@@ -257,6 +280,14 @@ export function useChatRun(o: Options) {
       }
       await runChatCore({
         chatId: cid,
+        takeClarifications: !activeProvider.cli && activeProvider.kind !== "cli" && activeProvider.kind !== "cursor" ? async () => {
+          const q = getQueue(cid);
+          if (!q || q.paused) return [];
+          // Preserve FIFO: only a leading clarification may join this run.
+          const pending = []; for (const item of q.items) { if (!item.clarify) break; pending.push(item); }
+          if (pending.length) await updateQueue(cid, q => ({ ...q, items: q.items.filter(i => !pending.some(p => p.id === i.id)) }));
+          return pending.map(i => ({ role: "user" as const, parts: [{ type: "text" as const, text: i.text }] }));
+        } : undefined,
         root: runRoot,
         history,
         retry,
@@ -333,6 +364,7 @@ export function useChatRun(o: Options) {
         if (failed) setError(failed);
         reviewRef.current = null;
       }
+      if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
       release?.();
       abortRef.current = null;
       setRunning(false);
@@ -462,5 +494,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
 }

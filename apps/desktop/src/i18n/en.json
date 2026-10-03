@@ -1,4 +1,12 @@
 {
+  "sendNext": "Send next",
+  "clarifyTask": "Clarify current task",
+  "queueInterrupted": "Previous run was interrupted. Resume queued requests explicitly.",
+  "queueResume": "Resume queue",
+  "queuePause": "Pause queue",
+  "queueEdit": "Edit queued message",
+  "queueRemove": "Remove",
+
   "accentColor": "Accent color",
   "accentCustom": "Custom color, e.g. #a884ee",
   "accentInvalid": "Enter a color like #a884ee",
