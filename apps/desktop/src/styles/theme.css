@@ -155,6 +155,12 @@ a { color: var(--accent-soft); }
 }
 .rail-btn:hover { background: var(--bg-hover); color: var(--text); }
 .rail-btn.active { background: var(--bg-active); color: var(--text); }
+.rail-update { position: relative; color: var(--accent-soft); transition: transform 150ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms, color 150ms; }
+.rail-update:not(:disabled):active { transform: scale(0.96); }
+.rail-update:disabled { cursor: default; opacity: 0.7; }
+.rail-update.failed { color: var(--danger, #e88282); }
+.rail-update-dot { position: absolute; right: 5px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--bg-side); }
+@media (prefers-reduced-motion: reduce) { .rail-update { transition: none; } .rail-update .spin { animation: none; } }
 .rail .spacer { flex: 1; }
 .avatar {
   width: 26px; height: 26px; border-radius: 50%;

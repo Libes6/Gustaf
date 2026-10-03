@@ -14,6 +14,7 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
@@ -86,6 +87,7 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
       <button className="rail-btn" title={t("help")} aria-label={t("help")} onClick={() => app.openSettings("general")}>
         <HelpCircle size={17} />
       </button>
+      <RailUpdateButton />
       <button
         className="rail-btn"
         aria-label={t("accountMenu")}

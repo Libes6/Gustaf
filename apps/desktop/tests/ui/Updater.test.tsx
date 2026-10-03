@@ -1,7 +1,8 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { UpdaterPanel } from "../../src/components/UpdaterPanel";
+import { UpdaterPanel, UpdatesProvider, RailUpdateButton } from "../../src/components/UpdaterPanel";
+import { Rail } from "../../src/components/Sidebar";
 import { makeApp, renderApp } from "./render";
 import { mockInvoke } from "./tauri";
 const native = vi.hoisted(() => ({ check: vi.fn(), relaunch: vi.fn() }));
@@ -65,4 +66,65 @@ describe("Signed updater UI", () => {
     expect(install).toHaveBeenCalledTimes(1);
   });
 
+});
+
+describe("Rail update action", () => {
+  it("places the icon directly above account and downloads then installs in one click", async () => {
+    const download = vi.fn(async () => {});
+    const install = vi.fn(async () => {});
+    const transport = { check: async () => ({ version: "0.1.1", download, install }) };
+    renderApp(<UpdatesProvider transport={transport}><Rail onCreateProject={() => {}} onCompare={() => {}} /></UpdatesProvider>);
+    const button = await screen.findByRole("button", { name: "Update to 0.1.1 and restart" });
+    expect(button.nextElementSibling).toBe(screen.getByRole("button", { name: "App menu" }));
+    expect(download).not.toHaveBeenCalled();
+    await userEvent.click(button);
+    await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  it("blocks installation on a bad signature and exposes the error through settings", async () => {
+    const install = vi.fn();
+    const transport = { check: async () => ({ version: "0.1.1", download: async () => { throw Error("Invalid signature"); }, install }) };
+    const app = makeApp();
+    renderApp(<UpdatesProvider transport={transport}><RailUpdateButton /></UpdatesProvider>, app);
+    await userEvent.click(await screen.findByRole("button", { name: "Update to 0.1.1 and restart" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Update failed — open settings" }));
+    expect(install).not.toHaveBeenCalled();
+    expect(app.openSettings).toHaveBeenCalledWith("general");
+  });
+  it("asks before interrupting an active generation and allows cancellation", async () => {
+    const download = vi.fn(async () => {});
+    const install = vi.fn(async () => {});
+    const app = makeApp(); app.sessions.items[0].busy = true;
+    const transport = { check: async () => ({ version: "0.1.1", download, install }) };
+    renderApp(<UpdatesProvider transport={transport}><RailUpdateButton /></UpdatesProvider>, app);
+    await userEvent.click(await screen.findByRole("button", { name: "Update to 0.1.1 and restart" }));
+    expect(screen.getByRole("button", { name: "Update and restart" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(download).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Update to 0.1.1 and restart" }));
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Update and restart" }));
+    await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+  });
+  it("rechecks generation activity after download and prevents duplicate clicks", async () => {
+    let finish!: () => void;
+    const download = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const install = vi.fn(async () => {});
+    const app = makeApp();
+    const transport = { check: async () => ({ version: "0.1.1", download, install }) };
+    renderApp(<UpdatesProvider transport={transport}><RailUpdateButton /></UpdatesProvider>, app);
+    await userEvent.click(await screen.findByRole("button", { name: "Update to 0.1.1 and restart" }));
+    const busy = await screen.findByRole("button", { name: "Downloading update…" });
+    expect(busy).toBeDisabled();
+    await userEvent.click(busy);
+    app.sessions.items[0].busy = true; finish();
+    await screen.findByRole("dialog");
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(install).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Update and restart" }));
+    await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+    expect(download).toHaveBeenCalledTimes(1);
+  });
 });

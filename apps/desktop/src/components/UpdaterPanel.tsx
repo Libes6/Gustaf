@@ -1,3 +1,6 @@
+import { ArrowDownToLine, CircleAlert, Loader2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { getVersion } from "@tauri-apps/api/app";
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useApp } from "../state";
@@ -27,11 +30,68 @@ export function UpdatesProvider({ children, transport }: { children: ReactNode; 
   const value = useUpdates(transport);
   return <UpdateContext.Provider value={value}>{children}</UpdateContext.Provider>;
 }
-export function UpdateNotice() {
+export function RailUpdateButton() {
   const updates = useContext(UpdateContext);
+  return updates ? <RailUpdateAction updates={updates} /> : null;
+}
+function RailUpdateAction({ updates }: { updates: ReturnType<typeof useUpdates> }) {
   const app = useApp();
-  if (updates?.status.kind !== "available" && updates?.status.kind !== "downloaded") return null;
-  return <div className="budget-banner" role="status"><button className="btn-soft" onClick={() => { app.openSettings("general"); }}>{app.locale === "ru" ? "Доступно обновление" : "Update available"} {updates.status.version}</button></div>;
+  const ru = app.locale === "ru";
+  const appRef = useRef(app); appRef.current = app;
+  const live = useSyncExternalStore(subscribeLiveRuns, getLiveChats);
+  useRunnerVersion();
+  const activeNow = () => appRef.current.sessions.items.some(session => session.busy) || getLiveChats().size > 0 || (getRunner()?.running().size ?? 0) > 0;
+  const active = app.sessions.items.some(session => session.busy) || live.size > 0 || (getRunner()?.running().size ?? 0) > 0;
+  const running = useRef(false);
+  const seen = useRef(false);
+  const [working, setWorking] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const { status, controller } = updates;
+  if (["available", "downloaded", "downloading", "installing"].includes(status.kind)) seen.current = true;
+  const run = async (allowInterrupt = false) => {
+    if (running.current || !["available", "downloaded"].includes(controller.status.kind)) return;
+    if (activeNow() && !allowInterrupt) { setConfirming(true); return; }
+    running.current = true; setWorking(true); setConfirming(false);
+    try {
+      if (controller.status.kind === "available") await controller.download();
+      if (controller.status.kind !== "downloaded") return;
+      // A generation can start while the payload is downloading.
+      if (activeNow() && !allowInterrupt) { setConfirming(true); return; }
+      await controller.install();
+    } finally { running.current = false; setWorking(false); }
+  };
+  if (!["available", "downloaded", "downloading", "installing"].includes(status.kind) && !(seen.current && status.kind === "error")) return null;
+  const pending = working || status.kind === "downloading" || status.kind === "installing";
+  const version = "version" in status ? status.version : "";
+  const percent = status.kind === "downloading" && status.total ? Math.min(100, Math.floor((status.received ?? 0) / status.total * 100)) : null;
+  const label = status.kind === "error" ? (ru ? "Ошибка обновления — открыть настройки" : "Update failed — open settings")
+    : status.kind === "installing" ? (ru ? "Установка и перезапуск…" : "Installing and restarting…")
+    : pending ? (ru ? `Скачивание обновления${percent === null ? "…" : `: ${percent}%`}` : `Downloading update${percent === null ? "…" : `: ${percent}%`}`)
+    : ru ? `Обновить до ${version} и перезапустить` : `Update to ${version} and restart`;
+  return <>
+    <button className={`rail-btn rail-update${status.kind === "error" ? " failed" : ""}`} title={label} aria-label={label} aria-busy={pending} disabled={pending || confirming}
+      onClick={() => status.kind === "error" ? app.openSettings("general") : void run()}>
+      {pending ? <Loader2 size={17} className="spin" aria-hidden="true" /> : status.kind === "error" ? <CircleAlert size={17} aria-hidden="true" /> : <ArrowDownToLine size={17} strokeWidth={2} aria-hidden="true" />}
+      {!pending && status.kind !== "error" && <span className="rail-update-dot" aria-hidden="true" />}
+    </button>
+    {confirming && <UpdateInterruptionDialog ru={ru} active={active} onCancel={() => setConfirming(false)} onConfirm={() => void run(true)} />}
+  </>;
+}
+function UpdateInterruptionDialog({ ru, active, onCancel, onConfirm }: { ru: boolean; active: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogFocus(ref, onCancel);
+  const [allow, setAllow] = useState(false);
+  return createPortal(<div className="overlay" onMouseDown={event => event.target === event.currentTarget && onCancel()}>
+    <div ref={ref} className="dialog" role="dialog" aria-modal="true" aria-label={ru ? "Обновить приложение" : "Update application"}>
+      <h2>{ru ? "Обновить и перезапустить?" : "Update and restart?"}</h2>
+      <p>{ru ? "Сейчас выполняется генерация. Перезапуск прервёт её." : "A generation is running. Restarting will interrupt it."}</p>
+      {active && <label><input type="checkbox" checked={allow} onChange={event => setAllow(event.target.checked)} /> {ru ? "Разрешаю прервать активную генерацию" : "Allow interrupting active generation"}</label>}
+      <div className="dialog-foot">
+        <button className="btn btn-ghost" onClick={onCancel}>{ru ? "Отмена" : "Cancel"}</button>
+        <button className="btn btn-primary" disabled={active && !allow} onClick={onConfirm}>{ru ? "Обновить и перезапустить" : "Update and restart"}</button>
+      </div>
+    </div>
+  </div>, document.body);
 }
 export function UpdaterPanel({ transport }: { transport?: UpdateTransport }) {
   const shared = useContext(UpdateContext);
