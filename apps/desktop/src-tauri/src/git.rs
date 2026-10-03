@@ -1071,6 +1071,8 @@ mod tests {
         let f = fixture();
         let r = &f.root;
         init_commit(r, &["a.txt", "small.txt"]);
+        // Force text diffs: newer Git treats files above core.bigFileThreshold as binary.
+        write(r, ".gitattributes", "*.txt diff\n");
         write(r, "a.txt", &"changed line\n".repeat(400_000)); // ~5 MB tracked diff
         write(r, "small.txt", "tiny change\n");
         write(r, "huge.txt", &"0123456789abcdef\n".repeat(400_000)); // ~6 MB untracked

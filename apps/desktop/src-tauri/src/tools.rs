@@ -381,6 +381,7 @@ mod tests {
         assert_eq!(search_in(root_str, "needle outside", Some("**/secret.txt")).unwrap(), "no matches");
     }
 
+    #[cfg(unix)]
     #[test]
     fn contained_rejects_paths_that_resolve_outside_root() {
         let (_dir, root, outside) = escape_fixture();

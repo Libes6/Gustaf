@@ -451,6 +451,7 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         fs::create_dir_all(&remote).unwrap();
         g(&remote, &["init", "-q", "--bare"]);
+        g(&remote, &["symbolic-ref", "HEAD", "refs/heads/main"]);
         g(&root, &["init", "-q"]);
         g(&root, &["symbolic-ref", "HEAD", "refs/heads/main"]);
         for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false"), ("core.hooksPath", base.join("nohooks").to_str().unwrap())] {
@@ -463,6 +464,7 @@ mod tests {
         Fx { _tmp: tmp, base, root, remote }
     }
 
+    #[cfg(unix)]
     fn fake_gh(f: &Fx, body: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
         let path = f.base.join("gh");
@@ -610,13 +612,13 @@ mod tests {
 
     #[test]
     fn run_bounded_times_out_and_bounds_output() {
-        let mut sleep = Command::new("sleep");
-        sleep.arg("5");
+        let mut sleep = Command::new("node");
+        sleep.args(["-e", "setTimeout(() => {}, 5000)"]);
         let started = Instant::now();
         let out = run_bounded(sleep, Duration::from_millis(200)).unwrap();
         assert!(out.timed_out && !out.success && started.elapsed() < Duration::from_secs(3));
-        let mut big = Command::new("sh");
-        big.args(["-c", "yes xxxxxxxxxx | head -c 2000000"]);
+        let mut big = Command::new("node");
+        big.args(["-e", "process.stdout.write('x'.repeat(2000000))"]);
         let out = run_bounded(big, Duration::from_secs(10)).unwrap();
         assert!(out.text.chars().count() <= MAX_OUTPUT_CHARS + 2);
     }
@@ -630,6 +632,7 @@ mod tests {
         assert!(e.contains("not installed") && e.contains("gh pr create --base main --head mcode/x"), "{e}");
     }
 
+    #[cfg(unix)]
     #[test]
     fn gh_unauthenticated_stops_before_creating_anything() {
         let f = fx();
@@ -642,6 +645,7 @@ mod tests {
         assert!(!fs::read_to_string(&log).unwrap().contains("pr create"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn creates_a_pr_with_an_argument_array_and_returns_the_url() {
         let f = fx();
@@ -656,6 +660,7 @@ mod tests {
         assert!(args.contains(&"--base=main".to_string()) && args.contains(&"--head=mcode/x".to_string()) && args.contains(&"--draft".to_string()));
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_failing_gh_reports_its_output_and_bad_inputs_are_refused() {
         let f = fx();

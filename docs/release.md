@@ -65,7 +65,7 @@ The plugin's Windows installer can exit the application itself; macOS/Linux inst
 | --- | --- | --- | --- |
 | macOS arm64, x64 | APP, DMG | Signed `.app.tar.gz` per architecture | macOS 13+; ad-hoc signing by default; first-launch permission may be needed; writable installation location |
 | Windows x64 | NSIS EXE, MSI | Signed EXE and installer-specific MSI manifest entry | Native installer may request elevation and exit app; no Authenticode setup |
-| Linux x64 | AppImage, DEB, RPM | Signed AppImage | DEB/RPM in-app checks deliberately disabled; update through package tools/manually; AppImage/FUSE dependencies and write permissions |
+| Linux x64 | AppImage, DEB, RPM | Signed AppImage | Built on Ubuntu 24.04; older glibc distributions are not claimed supported; DEB/RPM in-app checks deliberately disabled; update through package tools/manually; AppImage/FUSE dependencies and write permissions |
 
 Windows ARM, Linux ARM, mobile, Flatpak/Snap and package-manager updates are not provided by this pipeline. The installed Tauri updater version has DEB/RPM install paths, but this feed intentionally does not produce their installer-specific entries. macOS archives and Windows installers follow the [official Tauri updater formats](https://v2.tauri.app/plugin/updater/). Matrix runners use the published [GitHub runner labels](https://github.com/actions/runner-images).
 
@@ -86,3 +86,5 @@ Before publishing the draft:
 On the local macOS checkout: version consistency and five release tests passed; TypeScript/frontend production build and i18n check passed; 756 Node tests passed (two skipped), 174 UI tests passed, and 18 browser E2E tests passed. Native tests passed serially: 188 passed, one ignored. Parallel native testing reproduced an existing MCP restart timing failure; CI uses serial native testing. Initial sandbox restrictions blocked loopback sockets/Chrome; successful native/E2E runs used the required local access. Workflow YAML parses; the four-platform GitHub matrix and signed installer/update round trip have not been run. No conclusion about actual Windows/Linux device behavior, notarization, signatures on release artifacts, or publication is implied by these local results.
 
 Apple signing policy update: Apple credentials are now optional for tag builds as well as manual builds. Workflow conditions and YAML were checked locally; no new GitHub build, release publication, or real macOS update test was performed for this policy change.
+
+CI portability fixes: Windows MCP absolute paths are accepted; path/file-name test fixtures respect Windows rules. Git fixtures pin the bare repository HEAD to main and explicitly request text for large diff tests. Linux builds use Ubuntu 24.04 because the existing libspa dependency cannot compile against Ubuntu 22.04 PipeWire headers. Compatibility with older Linux distributions requires a separate build strategy and has not been verified.
