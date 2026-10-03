@@ -1,16 +1,20 @@
-// Pure model of the background-agent runs (tests/agentRuns.test.mjs): types, bounds, normalization of what was persisted,
-// marking of runs interrupted by a restart, and small formatting helpers. The store in agentRuns.ts holds the state.
+// Pure model of the background-agent runs (tests/agentRuns.test.mjs): types, bounds, mapping to and from `agent_runs` rows,
+// normalization of the legacy `agentRuns` setting (migrated once into SQLite), marking of runs interrupted by a restart,
+// and small formatting helpers. The store in agentRuns.ts holds the state, agentRunsDb.ts talks to SQLite.
 import { isAgentType, type AgentType } from "./subagentCore";
 
+/** The old home of the runs (bounded list with clipped steps); read once by the migration, then emptied. */
 export const AGENT_RUNS_SETTING = "agentRuns";
-export const MAX_RUNS = 50;
+/** Runs kept in the database and shown in the panel (the newest ones; active runs are always kept). */
+export const MAX_RUNS = 200;
 export const MAX_STEPS_IN_MEMORY = 200;
 export const MAX_STEPS_PERSISTED = 60;
 export const MAX_STEP_TEXT = 240;
 export const MAX_SUMMARY = 1_500;
 
-export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "limit" | "interrupted";
-const STATUSES: RunStatus[] = ["queued", "running", "completed", "failed", "cancelled", "limit", "interrupted"];
+/** `budget`: stopped (or refused to start) because the user's day or chat token budget was exceeded. */
+export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "limit" | "budget" | "interrupted";
+const STATUSES: RunStatus[] = ["queued", "running", "completed", "failed", "cancelled", "limit", "budget", "interrupted"];
 export const isActiveStatus = (s: RunStatus) => s === "queued" || s === "running";
 
 export type TranscriptStep = {
@@ -45,6 +49,8 @@ export type AgentRun = {
   error?: string;
   /** Start of the final report (clipped). */
   summary?: string;
+  /** The full final report (up to MAX_REPORT_STORED characters). Only held by the session that ran it; stored in `agent_runs.report`. */
+  report?: string;
   /** Files changed in the private copy (writing agents). */
   changed?: string[];
   warnings?: string[];
@@ -119,14 +125,39 @@ export function boundRuns(runs: readonly AgentRun[], max = MAX_RUNS): AgentRun[]
   return sorted.filter((r) => keep.has(r.id));
 }
 
-/** Persisted copy: transcripts cut to the newest steps. */
-export const forPersist = (runs: readonly AgentRun[]): AgentRun[] => boundRuns(runs).map((r) => ({ ...r, transcript: r.transcript.slice(-MAX_STEPS_PERSISTED) }));
-
 /** Loaded (already interruption-marked) runs merged under the in-memory ones of this session, which win by id. */
 export function mergeRuns(loaded: readonly AgentRun[], memory: readonly AgentRun[]): AgentRun[] {
   const ids = new Set(memory.map((r) => r.id));
   return boundRuns([...memory, ...loaded.filter((r) => !ids.has(r.id))]);
 }
+
+// ---- rows of the `agent_runs` table ----
+const jsonList = (v: unknown): string[] | undefined => {
+  if (typeof v !== "string") return undefined;
+  try {
+    const x = JSON.parse(v);
+    return Array.isArray(x) ? x.filter((i): i is string => typeof i === "string") : undefined;
+  } catch {
+    return undefined;
+  }
+};
+/** A stored row as a run (the transcript is read on demand). Unknown types or statuses are dropped. */
+export function runFromRow(row: Record<string, unknown>): AgentRun | null {
+  return normalizeRun({
+    id: row.id, title: row.title, type: row.type, providerId: row.provider_id, model: row.model, projectRoot: row.project_root,
+    chatId: typeof row.chat_id === "number" ? row.chat_id : undefined, status: row.status, createdAt: row.created_at, startedAt: row.started_at,
+    endedAt: typeof row.ended_at === "number" ? row.ended_at : undefined, tokens: row.tokens, toolUses: row.tool_uses,
+    error: typeof row.error === "string" ? row.error : undefined, summary: typeof row.summary === "string" ? row.summary : undefined,
+    changed: jsonList(row.changed_json), warnings: jsonList(row.warnings_json),
+  });
+}
+export const MAX_REPORT_STORED = 8_000;
+/** Bind values for the upsert of a run, in the column order of UPSERT_RUN (agentRunsDb.ts). A null `report` keeps the stored one. */
+export const runParams = (r: AgentRun): unknown[] => [
+  r.id, r.chatId ?? null, r.title, r.type, r.model, r.status, r.startedAt, r.endedAt ?? null, r.tokens, r.toolUses, r.error ?? null,
+  r.report !== undefined ? clip(r.report, MAX_REPORT_STORED) : null, r.providerId, r.projectRoot, r.createdAt,
+  r.changed?.length ? JSON.stringify(r.changed) : null, r.warnings?.length ? JSON.stringify(r.warnings) : null,
+];
 
 export const appendStep = (steps: readonly TranscriptStep[], step: TranscriptStep): TranscriptStep[] =>
   steps.length >= MAX_STEPS_IN_MEMORY ? [...steps.slice(steps.length - MAX_STEPS_IN_MEMORY + 1), step] : [...steps, step];

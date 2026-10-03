@@ -36,6 +36,8 @@ Shell scope: `args` is `["-lc", {"validator": "(?s).+"}]` for `spawn` and `execu
 
 `npm run test:csp` checks the policy against an allow-list per directive, builds the frontend into a temp dir and scans it (no inline scripts or handlers, no `eval`, no unknown external hosts, no remote CSS), checks the capability file, and, when Chrome is installed (`CHROME_BIN` to override), serves the build with the CSP header and drives it over the DevTools protocol. Not covered: real WKWebView behaviour inside Tauri (Chrome implements the same CSP3 inheritance rules, but is not the same engine).
 
+`npm run test:e2e` (see [ARCHITECTURE](../ARCHITECTURE.md#conventions)) also loads the production build under this CSP in Chrome and fails any scenario that logs a console error or a CSP violation, covering onboarding, chat, search, approvals, canvas and every settings page.
+
 After changing the CSP, run once in `npm run tauri dev` (dev policy) and in a debug build (`npm run tauri build -- --debug --bundles app`, release policy):
 
 - open a canvas card: Preview renders, Code tab, Restart, Export HTML;

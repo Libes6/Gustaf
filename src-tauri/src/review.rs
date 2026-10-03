@@ -284,6 +284,7 @@ mod tests {
         assert_eq!(fs::read_to_string(root.join("new.txt")).unwrap(), "user edit");
         assert!(decide(&dir, &root, "../outside.txt", true).is_err());
     }
+    #[cfg(unix)]
     #[test]
     fn review_never_follows_symlinks() {
         let temp = tempfile::tempdir().unwrap(); let root = temp.path().join("project"); fs::create_dir(&root).unwrap();
@@ -327,6 +328,7 @@ mod tests {
         assert_eq!(fs::read_to_string(root.join("node_modules/dep/index.js")).unwrap(), "dep");
         assert_eq!(fs::read_to_string(root.join("packages/a/node_modules/x.js")).unwrap(), "x");
     }
+    #[cfg(unix)]
     #[test]
     fn unsafe_link_requests_are_rejected() {
         let temp = tempfile::tempdir().unwrap(); let root = temp.path().join("project"); fs::create_dir(&root).unwrap();

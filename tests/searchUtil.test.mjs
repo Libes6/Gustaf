@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MARK_OPEN, MARK_CLOSE, MIN_QUERY_CHARS, RESULT_LIMIT,
+  MARK_OPEN, MARK_CLOSE, MIN_QUERY_CHARS, PAGE_SIZE, mergeHits, arrowDown,
   parseSnippet, searchableQuery, moveHighlight, nearestMessageId, turnHasMessage, isSearchShortcut,
 } from '../src/lib/searchUtil.ts';
 
@@ -14,7 +14,7 @@ test('snippet markers match the ones db.rs sends', async () => {
   assert.equal(MARK_CLOSE, '\u0002');
   assert.match(rust, /pub const MARK_OPEN: char = '\\u\{1\}';/);
   assert.match(rust, /pub const MARK_CLOSE: char = '\\u\{2\}';/);
-  assert.equal(RESULT_LIMIT <= 100, true, 'db.rs clamps the limit to 100');
+  assert.equal(PAGE_SIZE <= 100, true, 'db.rs clamps the limit to 100');
 });
 
 test('parseSnippet splits plain and highlighted runs', () => {
@@ -125,4 +125,22 @@ test('isSearchShortcut is Cmd+K on any keyboard layout', () => {
   assert.equal(isSearchShortcut(key({ altKey: true })), false);
   assert.equal(isSearchShortcut(key({ key: 'n', code: 'KeyN' })), false);
   assert.equal(isSearchShortcut(key({ key: 'л', code: undefined })), false);
+});
+
+test('mergeHits appends a page and skips messages that are already shown', () => {
+  const h = (id) => ({ messageId: id });
+  assert.deepEqual(mergeHits([h(1), h(2)], [h(3), h(4)]).map((x) => x.messageId), [1, 2, 3, 4]);
+  assert.deepEqual(mergeHits([h(1), h(2)], [h(2), h(3), h(3)]).map((x) => x.messageId), [1, 2, 3], 'overlap and repeats within a page');
+  assert.deepEqual(mergeHits([], [h(5)]).map((x) => x.messageId), [5]);
+  const shown = [h(1)];
+  mergeHits(shown, [h(2)]);
+  assert.equal(shown.length, 1, 'the input is not mutated');
+});
+
+test('arrowDown loads the next page past the end instead of wrapping, when more exist', () => {
+  assert.deepEqual(arrowDown(0, 3, true), { next: 1, loadMore: false });
+  assert.deepEqual(arrowDown(2, 3, true), { next: 2, loadMore: true });
+  assert.deepEqual(arrowDown(2, 3, false), { next: 0, loadMore: false }, 'everything loaded: wraps');
+  assert.deepEqual(arrowDown(0, 0, true), { next: 0, loadMore: false });
+  assert.deepEqual(arrowDown(7, 3, true), { next: 2, loadMore: true }, 'a stale index is clamped');
 });

@@ -19,10 +19,15 @@ pub struct CursorMessage {
     pub text: String,
 }
 
+/// Cursor keeps its state next to VS Code's: `~/Library/Application Support` (macOS), `%APPDATA%` (Windows),
+/// `$XDG_CONFIG_HOME` or `~/.config` (Linux). `dirs::config_dir` resolves all three.
+fn global_db_in(config_dir: &Path) -> PathBuf {
+    config_dir.join("Cursor/User/globalStorage/state.vscdb")
+}
+
 fn global_db() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join("Library/Application Support/Cursor/User/globalStorage/state.vscdb")
+    let config = dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".config"));
+    global_db_in(&config)
 }
 
 fn open_ro(path: &Path) -> Result<Connection, String> {
@@ -92,6 +97,12 @@ pub async fn cursor_messages(chat_id: String) -> Result<Vec<CursorMessage>, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn database_lives_under_the_config_dir() {
+        let base = Path::new("cfg");
+        assert_eq!(global_db_in(base), base.join("Cursor").join("User").join("globalStorage").join("state.vscdb"));
+    }
 
     #[test]
     fn parses_cursor_layout() {

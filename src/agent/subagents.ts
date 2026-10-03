@@ -2,16 +2,18 @@ import { review } from "../lib/api";
 import { prepareShadowCopy } from "../lib/reviewSetupStore";
 import { textOf, type Adapter, type Msg, type Part, type TokenUsage, type ToolDef } from "../providers/types";
 import { summarizeCall } from "./actionLog";
-import { createRun, recordAgentTokens, recordStep, updateRun, getRun } from "./agentRuns";
+import { createRun, getRun, loadPreviousRun, recordAgentTokens, recordMessage, recordStep, updateRun } from "./agentRuns";
 import { clip, runTokens, MAX_SUMMARY, type RunStatus } from "./agentRunsModel";
+import { canContinue, continuationPrompt, type PreviousRun } from "./agentTranscript";
+import { currentBudgetStop } from "../lib/budgetUsage";
 import { allowedRefs, refKey, sameRef, selectModel, type AgentSettings, type ModelRef } from "./agentSettings";
 import { loadAgentSettings } from "./agentSettingsStore";
 import { runAgent, type RunOptions } from "./agent";
-import { DELEGATE_TOOL_NAME, delegateToolFor, dependencyContext, mergeReports, parsePlanArgs, runPlan, type Outcome } from "./orchestrator";
+import { DELEGATE_TOOL_NAME, delegateToolFor, dependencyContext, mergeReports, parsePlanArgs, runPlan, runWithRetries, type Outcome } from "./orchestrator";
 import { Scheduler, isAbortError } from "./scheduler";
 import {
-  SPAWN_TOOL_NAME, allowedToolNames, breachMessage, budgetBreach, buildReport, findOverlaps, isReadOnlyType, overlapWarning, parseSpawnArgs, resolveBudget, spawnToolFor, subagentSystem,
-  type BudgetBreach, type BudgetOverrides, type FileSet, type SpawnArgs,
+  MAX_TITLE, SPAWN_TOOL_NAME, allowedToolNames, breachMessage, budgetBreach, budgetStopMessage, buildReport, findOverlaps, isReadOnlyType, overlapWarning, parseSpawnArgs, resolveBudget, spawnToolFor, subagentSystem,
+  type BudgetBreach, type BudgetOverrides, type BudgetScope, type FileSet, type SpawnArgs,
 } from "./subagentCore";
 
 // Subagent runtime: `spawn_agent` runs a separate runAgent loop (own history, own tool allowlist and budget, model from
@@ -47,6 +49,12 @@ export type HostConfig = {
   resolveModel?: (ref: ModelRef) => Promise<ResolvedModel>;
   prepare?: typeof prepareShadowCopy;
   now?: () => number;
+  /** Which user token budget (day or chat) is exceeded now; default: read from the Budgets settings and usage. Only consulted when `stopOnBudget` is on. */
+  checkBudget?: (chatId: number | undefined) => Promise<BudgetScope | null>;
+  /** What a "continue this agent" run is seeded with; default: the stored run and transcript. */
+  previousRun?: (id: string) => Promise<PreviousRun | null>;
+  /** Pause before a delegate_tasks retry (ms, by retry number); default 1 s, then 3 s. */
+  retryBackoffMs?: (retry: number) => number;
 };
 
 type Result = { status: RunStatus; report: string };
@@ -85,12 +93,30 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     return choice.ref;
   }
 
+  /** The exceeded budget while `stopOnBudget` is on, else null. A failing check never stops anything. */
+  async function overBudget(settings: AgentSettings, parent: Pick<RunOptions, "chatId">): Promise<BudgetScope | null> {
+    if (!settings.stopOnBudget) return null;
+    return (await (cfg.checkBudget ?? currentBudgetStop)(parent.chatId).catch(() => null)) ?? null;
+  }
+
+  /** `continue_from`: the prompt becomes the previous run's summary plus the follow-up. */
+  async function seeded(args: SpawnArgs): Promise<SpawnArgs> {
+    if (!args.continueFrom) return args;
+    const prev = await (cfg.previousRun ?? loadPreviousRun)(args.continueFrom).catch(() => null);
+    if (!prev) throw new Error(`continue_from: there is no subagent run "${args.continueFrom}".`);
+    if (!canContinue(prev.status)) throw new Error(`continue_from: run "${args.continueFrom}" is ${prev.status}; only finished, failed or limit-stopped runs can be continued.`);
+    return { ...args, prompt: continuationPrompt(prev, args.prompt) };
+  }
+
   async function spawn(rawArgs: unknown, parent: RunOptions): Promise<string> {
     const parsed = parseSpawnArgs(rawArgs);
     if (!parsed.ok) throw new Error(parsed.error);
     const settings = await settingsNow();
-    const ref = chooseModel(parsed.value, settings, parent);
-    return (await runTask(parsed.value, ref, settings, parent)).report;
+    const over = await overBudget(settings, parent);
+    if (over) throw new Error(`Subagent not started: ${budgetStopMessage(over)}.`);
+    const args = await seeded(parsed.value);
+    const ref = chooseModel(args, settings, parent);
+    return (await runTask(args, ref, settings, parent)).report;
   }
 
   async function delegate(rawArgs: unknown, parent: RunOptions): Promise<string> {
@@ -98,20 +124,28 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     const parsed = parsePlanArgs(rawArgs, { cancelDependents: settings.cancelDependents });
     if (!parsed.ok) throw new Error(parsed.error);
     const plan = parsed.value;
+    if (plan.tasks.some((t) => t.continueFrom)) throw new Error("delegate_tasks does not support `continue_from`; use spawn_agent to continue a run.");
+    const over = await overBudget(settings, parent);
+    if (over) throw new Error(`Plan not started: ${budgetStopMessage(over)}.`);
     // Every model is checked before anything starts: a plan either runs as a whole or not at all.
     const refs = new Map(plan.tasks.map((t) => [t.id, chooseModel(t, settings, parent)]));
     const outcomes = await runPlan(plan, {
       limit: scheduler.concurrency,
       signal: parent.signal,
-      run: async (task, deps) => {
-        const r = await runTask({ ...task, prompt: task.prompt + dependencyContext(deps) }, refs.get(task.id)!, settings, parent);
-        return { status: r.status === "interrupted" || r.status === "queued" || r.status === "running" ? "failed" : r.status, report: r.report } satisfies Outcome;
-      },
+      run: (task, deps) =>
+        // A retry is a fresh run (new private copy for a writing task); the failed attempt's own changes are discarded.
+        runWithRetries(
+          async (n, last) => {
+            const r = await runTask({ ...task, title: n > 1 ? clip(`${task.title} (retry ${n - 1})`, MAX_TITLE) : task.title, prompt: task.prompt + dependencyContext(deps) }, refs.get(task.id)!, settings, parent, { discardIfFailed: !last });
+            return { status: r.status === "interrupted" || r.status === "queued" || r.status === "running" ? "failed" : r.status, report: r.report } satisfies Outcome;
+          },
+          { retries: plan.retries ?? 0, signal: parent.signal, ...(cfg.retryBackoffMs ? { backoffMs: cfg.retryBackoffMs } : {}) },
+        ),
     });
     return mergeReports(plan, outcomes);
   }
 
-  async function runTask(args: SpawnArgs, ref: ModelRef, settings: AgentSettings, parent: RunOptions): Promise<Result> {
+  async function runTask(args: SpawnArgs, ref: ModelRef, settings: AgentSettings, parent: RunOptions, opts: { discardIfFailed?: boolean } = {}): Promise<Result> {
     const { title, prompt, type, files } = args;
     const writing = !isReadOnlyType(type);
     const budget = resolveBudget(type, cfg.budgets ?? settings.budgets);
@@ -122,6 +156,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     parent.signal.addEventListener("abort", onParentAbort, { once: true });
     if (parent.signal.aborted) ctl.abort();
     const id = createRun({ title, type, providerId: runner.providerId, model: runner.model, projectRoot: cfg.projectRoot, ...(parent.chatId !== undefined ? { chatId: parent.chatId } : {}) }, () => ctl.abort());
+    recordMessage(id, "user", [{ type: "text", text: prompt }], now());
     if (runner.note) recordStep(id, { at: now(), kind: "note", text: runner.note });
     const finish = (status: RunStatus, patch: Parameters<typeof updateRun>[1] = {}) => updateRun(id, { status, endedAt: now(), currentStep: "", ...patch });
 
@@ -142,6 +177,13 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
 
     async function execute(): Promise<Result> {
       const startedAt = now();
+      const stopped = await overBudget(settings, parent);
+      if (stopped) {
+        const reason = budgetStopMessage(stopped);
+        finish("budget", { error: clip(`Not started: ${reason}`, 1000) });
+        recordStep(id, { at: now(), kind: "note", text: `Not started: ${reason}.`, error: true });
+        return { status: "budget", report: buildReport({ title, type, status: "budget", text: "", reason: `not started, ${reason}` }) };
+      }
       updateRun(id, { status: "running", startedAt });
       let workspace = parent.root;
       let reviewId: string | undefined;
@@ -170,6 +212,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
 
       const use = { steps: 0, toolCalls: 0, tokens: 0, startedAt };
       let stopReason = null as BudgetBreach | null;
+      let overScope = null as BudgetScope | null;
       let lastText = "";
       let lastRole = "user" as Msg["role"];
       let failure = "";
@@ -213,6 +256,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           },
           onMessage: async (m) => {
             lastRole = m.role;
+            recordMessage(id, m.role, m.parts, now());
             if (m.role === "assistant") {
               const usage = m.meta?.usage;
               use.steps++;
@@ -227,6 +271,8 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
               recordStep(id, said ? { at: now(), kind: "text", text: said } : null, { tokens: runTokens(usage), toolUses: calls.length }, calls.length ? `${calls[0].name} ${summarizeCall(calls[0].name, calls[0].args)}`.trim() : "");
               const breach = budgetBreach(use, budget, now());
               if (breach) stopFor(breach);
+              // The user's own token budget is checked at every step boundary too.
+              else if (!stopReason && (overScope = await overBudget(settings, parent))) stopFor("budget");
             } else if (m.role === "tool") {
               for (const r of m.parts.filter((p): p is ToolResult => p.type === "tool_result")) {
                 const c = pending.get(r.id);
@@ -242,6 +288,9 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
         clearTimeout(timer);
       }
       if (!stopReason && !ctl.signal.aborted && !failure && lastRole === "tool" && use.steps >= budget.maxSteps) stopReason = "steps";
+      const status: RunStatus = stopReason === "budget" ? "budget" : stopReason ? "limit" : failure ? "failed" : ctl.signal.aborted ? "cancelled" : "completed";
+      const reason = stopReason === "budget" ? budgetStopMessage(overScope ?? "day") : stopReason ? breachMessage(stopReason, budget) : failure;
+      const discard = !!opts.discardIfFailed && status === "failed";
 
       // Changed files (writing agents): the private copy stays as a separate pending review when it has changes.
       let changed: string[] = [];
@@ -252,7 +301,11 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           const sets: FileSet[] = all.map(([r, list]) => ({ id: r.id, label: ownerLabel(r.id), files: list.map((c) => c.path) }));
           const own = sets.find((s) => s.id === reviewId);
           changed = own ? [...own.files] : [];
-          if (own) {
+          if (own && discard) {
+            // This attempt will be retried in a fresh copy: its partial changes are not kept as a pending review.
+            for (const path of changed) await review.decide(reviewId, path, false).catch(() => {});
+            changed = [];
+          } else if (own) {
             const overlaps = findOverlaps(own, sets);
             const warning = overlapWarning(overlaps);
             if (warning) warnings.push(warning);
@@ -269,12 +322,10 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
         await review.finish(reviewId).catch(() => {});
       }
 
-      const status: RunStatus = stopReason ? "limit" : failure ? "failed" : ctl.signal.aborted ? "cancelled" : "completed";
-      const reason = stopReason ? breachMessage(stopReason, budget) : failure;
       if (runner.note) warnings.push(runner.note);
-      if (stopReason) recordStep(id, { at: now(), kind: "note", text: `Stopped at its ${reason}.`, error: true });
+      if (stopReason) recordStep(id, { at: now(), kind: "note", text: stopReason === "budget" ? `Stopped: ${reason}.` : `Stopped at its ${reason}.`, error: true });
       const report = buildReport({ title, type, status, text: lastText, reason, changed, warnings });
-      finish(status, { summary: clip(lastText, MAX_SUMMARY), ...(failure ? { error: clip(failure, 1000) } : stopReason ? { error: `Stopped at its ${reason}` } : {}), ...(changed.length ? { changed } : {}), ...(warnings.length ? { warnings } : {}) });
+      finish(status, { summary: clip(lastText, MAX_SUMMARY), report: lastText, ...(failure ? { error: clip(failure, 1000) } : stopReason ? { error: stopReason === "budget" ? `Stopped: ${reason}` : `Stopped at its ${reason}` } : {}), ...(changed.length ? { changed } : {}), ...(warnings.length ? { warnings } : {}) });
       return { status, report };
     }
   }

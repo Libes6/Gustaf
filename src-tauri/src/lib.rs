@@ -10,6 +10,7 @@ mod mcp;
 mod oauth;
 mod review;
 mod secrets;
+mod shell;
 mod tools;
 
 use std::sync::Mutex;

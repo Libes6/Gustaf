@@ -7,9 +7,26 @@ on:
 
 jobs:
   check:
-    runs-on: macos-latest
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux system libraries
+        if: runner.os == 'Linux'
+        # Tauri (WebKitGTK), keyring (D-Bus Secret Service), enigo/xcap (X11, PipeWire capture).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libdbus-1-dev pkg-config libxdo-dev libxcb1-dev libxrandr-dev libgbm-dev libegl-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libclang-dev libwayland-dev
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -23,4 +40,13 @@ jobs:
       - run: npm ci
       - run: npm --prefix sidecar ci
       - run: node scripts/build-canvas.mjs
+      # i18n check, tsc, node tests and `cargo test` (the Rust tests include per-OS shell and path logic).
       - run: npm run check
+      # Failure artifacts of npm run test:e2e (screenshots, Playwright traces, backend call log); the suite itself runs inside
+      # `npm run check` and skips itself with a message when no Chrome is found (macOS and Linux runners have one; the Windows paths are not probed).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failures
+          path: tests/e2e/artifacts
+          if-no-files-found: ignore

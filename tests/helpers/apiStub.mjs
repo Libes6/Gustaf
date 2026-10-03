@@ -4,6 +4,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 export const state = {
@@ -22,8 +23,12 @@ export const state = {
   /** Keychain entries written through `secrets`. */
   secrets: new Map(),
   /** Fake stdio MCP servers by config id: { tools, call(name, args), epoch?, startError? }; and what was sent. */
-  mcp: { servers: {}, starts: [], requests: [], stops: [], cancels: [] },
+  mcp: { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() },
+  /** Unexpected errors of the SQLite stand-in (a missing table is not one: only the agent tables exist there). */
+  dbErrors: [],
   reset() {
+    agentDb = null;
+    this.dbErrors.length = 0;
     this.settings.clear();
     this.secrets.clear();
     this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
@@ -44,7 +49,26 @@ const confine = (root, rel) => {
 
 export const getSetting = async (key, fallback) => (state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback);
 export const setSetting = async (key, value) => void state.settings.set(key, JSON.stringify(value));
-export const db = { select: async () => [], exec: async () => ({ changes: 0, lastId: 0 }) };
+// SQL bridge: a real in-memory SQLite (node:sqlite) holding only the agent_runs / agent_messages tables, created from the
+// statements in src-tauri/src/db.rs (between its agent-runs markers). Anything else behaves like an empty database.
+let agentDb = null;
+function sqlite() {
+  if (!agentDb) {
+    const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
+    agentDb = new DatabaseSync(':memory:');
+    const rs = readFileSync(new URL('../../src-tauri/src/db.rs', import.meta.url), 'utf8');
+    agentDb.exec('pragma foreign_keys = on; create table chats(id integer primary key);');
+    agentDb.exec(/-- agent-runs:begin([\s\S]*?)-- agent-runs:end/.exec(rs)[1]);
+  }
+  return agentDb;
+}
+const dbFail = (e) => { if (!/no such table/.test(String(e?.message))) state.dbErrors.push(String(e?.message ?? e)); };
+export const db = {
+  select: async (sql, params = []) => { try { return sqlite().prepare(sql).all(...params).map((r) => ({ ...r })); } catch (e) { dbFail(e); return []; } },
+  exec: async (sql, params = []) => { try { const r = sqlite().prepare(sql).run(...params); return { changes: Number(r.changes), lastId: Number(r.lastInsertRowid) }; } catch (e) { dbFail(e); return { changes: 0, lastId: 0 }; } },
+  /** Test access to the stand-in database. */
+  raw: () => sqlite(),
+};
 export const secrets = {
   set: async (id, value) => void state.secrets.set(id, value),
   get: async (id) => state.secrets.get(id) ?? null,

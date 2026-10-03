@@ -1,6 +1,6 @@
 import { mergeActivity, type Activity } from "./activities";
 import { resolveResource } from "@tauri-apps/api/path";
-import { resumePoint, shq, spawnLines } from "./cli";
+import { resumePoint, runScript, spawnLines } from "./cli";
 import { withImagePaths } from "./cliArgs";
 import { attachments } from "../lib/api";
 import type { Adapter, ProviderConfig, TurnInput } from "./types";
@@ -13,8 +13,8 @@ async function sidecarPath() {
 
 // ponytail: runs the sidecar with the user's own `node` (>= 22.13) from a login shell; ship a bundled runtime if users lack Node.
 async function call(req: object, onEvent: (e: any) => void, signal?: AbortSignal) {
-  const { stderr } = await spawnLines(`exec node ${shq(await sidecarPath())}`, onEvent, { signal, stdin: JSON.stringify(req) + "\n" });
-  if (/command not found: node|Cannot find package/.test(stderr)) throw new Error(`Cursor sidecar: ${stderr.slice(0, 300)}`);
+  const { stderr } = await spawnLines(runScript({ executable: "node", args: [await sidecarPath()] }), onEvent, { signal, stdin: JSON.stringify(req) + "\n" });
+  if (/command not found: node|not recognized|Cannot find package/.test(stderr)) throw new Error(`Cursor sidecar: ${stderr.slice(0, 300)}`);
 }
 
 /** Cursor SDK agent: it runs its own tools in the project; we only relay text and tool activity. */

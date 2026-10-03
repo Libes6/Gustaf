@@ -126,6 +126,16 @@ export function evaluateBudget(limit: number | null, totals: UsageTotals | undef
   return status(totals.missing > 0 ? 'partial' : 'ok');
 }
 
+/**
+ * Which budget is exceeded right now: the day's, else the chat's. Only a crossed limit counts (reported tokens are a lower
+ * bound, so it stays crossed); unreadable usage or no limit never stops anything.
+ */
+export function exceededBudget(settings: BudgetSettings, day?: UsageTotals, chat?: UsageTotals): 'day' | 'chat' | null {
+  if (evaluateBudget(settings.dayTokens, day, settings.warnPercent).level === 'exceeded') return 'day';
+  if (evaluateBudget(settings.chatTokens, chat, settings.warnPercent).level === 'exceeded') return 'chat';
+  return null;
+}
+
 // ---- account quota windows (Codex / Claude) ----
 export type QuotaLevel = 'ok' | 'warning' | 'exhausted' | 'stale' | 'unavailable';
 export type QuotaStatus = { id: string; label: string; level: QuotaLevel; usedPercent: number | null; resetsAt?: number; plan?: string };

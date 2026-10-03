@@ -73,7 +73,8 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   }, [provider, app.selection?.model]);
 
   useEffect(() => {
-    if (running) return;
+    // Not while this view runs a send itself (a new chat is promoted to its id then); a scheduled run is only displayed.
+    if (run.ownRunning) return;
     run.setError("");
     let cancelled = false;
     setLoaded(false);
@@ -104,7 +105,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
 
-      {root && <AgentsPanel root={root} />}
+      {root && <AgentsPanel root={root} onContinue={(message) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); }} />}
       {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
 
       {messages.length === 0 && stream === null && !error ? (

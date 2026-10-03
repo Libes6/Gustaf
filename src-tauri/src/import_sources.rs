@@ -598,11 +598,24 @@ fn home() -> PathBuf {
     dirs::home_dir().unwrap_or_default()
 }
 
-fn claude_root() -> PathBuf {
-    match std::env::var_os("CLAUDE_CONFIG_DIR").filter(|v| !v.is_empty()) {
-        Some(d) => PathBuf::from(d).join("projects"),
-        None => home().join(".claude/projects"),
+/// `CLAUDE_CONFIG_DIR` wins; else `~/.claude/projects` (also `%USERPROFILE%\.claude` on Windows); on Linux the
+/// XDG location `$XDG_CONFIG_HOME/claude/projects` is used when only that one exists.
+fn claude_root_in(home: &Path, config_dir_env: Option<PathBuf>, xdg_config: Option<PathBuf>) -> PathBuf {
+    if let Some(d) = config_dir_env {
+        return d.join("projects");
     }
+    let default = home.join(".claude").join("projects");
+    if !default.is_dir() {
+        if let Some(x) = xdg_config.map(|c| c.join("claude").join("projects")).filter(|p| p.is_dir()) {
+            return x;
+        }
+    }
+    default
+}
+
+fn claude_root() -> PathBuf {
+    let env = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|v| !v.is_empty()).map(PathBuf::from);
+    claude_root_in(&home(), env, dirs::config_dir())
 }
 
 fn codex_root() -> PathBuf {
@@ -658,6 +671,25 @@ mod tests {
     fn write(p: &Path, lines: &[&str]) {
         fs::create_dir_all(p.parent().unwrap()).unwrap();
         fs::write(p, lines.join("\n") + "\n").unwrap();
+    }
+
+    #[test]
+    fn claude_root_resolution() {
+        let home = tempfile::tempdir().unwrap();
+        let xdg = tempfile::tempdir().unwrap();
+        let default = home.path().join(".claude").join("projects");
+        // Nothing exists: the default location.
+        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), default);
+        // Only the XDG location exists.
+        let x = xdg.path().join("claude").join("projects");
+        fs::create_dir_all(&x).unwrap();
+        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), x);
+        // The default wins when both exist.
+        fs::create_dir_all(&default).unwrap();
+        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), default);
+        // An explicit CLAUDE_CONFIG_DIR wins over everything.
+        let explicit = PathBuf::from("custom");
+        assert_eq!(claude_root_in(home.path(), Some(explicit.clone()), None), explicit.join("projects"));
     }
 
     #[test]

@@ -1,19 +1,32 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "../lib/api";
 import { localDayKey } from "../lib/budgets";
+import type { Part } from "../providers/types";
+import { deleteFinished, loadMessages, loadReport, loadStoredRuns, migrateLegacyRuns, pruneRuns, saveMessage, saveRun } from "./agentRunsDb";
 import {
-  AGENT_RUNS_SETTING, AGENT_USAGE_SETTING, EMPTY_LEDGER, addToLedger, appendStep, boundRuns, forPersist, isActiveStatus, mergeRuns, normalizeLedger, normalizeRuns,
+  AGENT_USAGE_SETTING, EMPTY_LEDGER, addToLedger, appendStep, boundRuns, isActiveStatus, mergeRuns, normalizeLedger,
   type AgentRun, type AgentUsageLedger, type TranscriptStep,
 } from "./agentRunsModel";
+import { MAX_MESSAGES_PER_RUN, messageJson, noteJson, rowsToSteps, type MessageRow, type PreviousRun, type StoredRole } from "./agentTranscript";
 
-// Background agent runs: one shared in-memory list (like rulesStore.ts), persisted shortly after each change in the app
-// `settings` table under "agentRuns". Runs that were still active when the app stopped load as "interrupted".
+// Background agent runs: one shared in-memory list (like rulesStore.ts) that mirrors the SQLite tables `agent_runs` and
+// `agent_messages` (agentRunsDb.ts). Run rows are written right away when a run is created or finishes and shortly after
+// other changes; every subagent message is written as it happens, so the full transcript survives a restart and is read
+// lazily (`loadRunSteps`). Runs that were still active when the app stopped load as "interrupted".
 let runs: AgentRun[] = [];
 let loading: Promise<void> | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let counter = 0;
 const listeners = new Set<() => void>();
 const stoppers = new Map<string, () => void>();
+const dirty = new Set<string>();
+const seqs = new Map<string, number>();
+/** All writes go through one chain, so a run row is always written before its messages. */
+let chain: Promise<unknown> = Promise.resolve();
+const enqueue = (fn: () => Promise<unknown>) => {
+  chain = chain.then(fn).catch(() => {});
+  return chain;
+};
 
 const emit = () => listeners.forEach((l) => l());
 const subscribe = (l: () => void) => {
@@ -23,33 +36,37 @@ const subscribe = (l: () => void) => {
   };
 };
 const load = () => {
-  loading ??= getSetting<unknown>(AGENT_RUNS_SETTING, [])
-    .then((raw) => {
-      runs = mergeRuns(normalizeRuns(raw), runs);
-      emit();
-      schedule(true); // persist the "interrupted" marks
-    })
-    .catch(() => {
-      loading = undefined;
-    });
+  loading ??= (async () => {
+    await migrateLegacyRuns().catch(() => []);
+    const stored = await loadStoredRuns((id) => runs.some((r) => r.id === id));
+    runs = mergeRuns(stored, runs);
+    emit();
+  })().catch(() => {
+    loading = undefined;
+  });
   return loading;
 };
-async function persist() {
-  await load();
-  setSetting(AGENT_RUNS_SETTING, forPersist(runs)).catch(() => {});
-}
-/** Writes are batched: a run changes on every step. Finished states are written right away. */
-function schedule(now = false) {
+const flush = () => {
   clearTimeout(timer);
-  timer = setTimeout(() => void persist(), now ? 0 : 1000);
+  for (const id of [...dirty]) {
+    dirty.delete(id);
+    const run = runs.find((r) => r.id === id);
+    if (run) void enqueue(() => saveRun(run));
+  }
+};
+/** Row writes are batched: a run changes on every step. Created and finished runs are written right away. */
+function schedule(id: string, now = false) {
+  dirty.add(id);
+  clearTimeout(timer);
+  if (now) flush();
+  else timer = setTimeout(flush, 1000);
 }
-const change = (next: AgentRun[], now = false) => {
+const change = (next: AgentRun[]) => {
   runs = next;
   emit();
-  schedule(now);
 };
 
-/** Resolves once the persisted runs are loaded (active ones marked interrupted). */
+/** Resolves once the stored runs are loaded (active ones marked interrupted). */
 export const loadAgentRuns = () => load();
 
 export type NewRun = Pick<AgentRun, "title" | "type" | "providerId" | "model" | "projectRoot"> & { chatId?: number };
@@ -61,22 +78,39 @@ export function createRun(init: NewRun, stop: () => void): string {
   const now = Date.now();
   stoppers.set(id, stop);
   change(boundRuns([{ ...init, id, status: "queued", createdAt: now, startedAt: 0, tokens: 0, toolUses: 0, currentStep: "", transcript: [] }, ...runs]));
+  schedule(id, true);
+  void enqueue(() => pruneRuns());
   return id;
 }
 
 export function updateRun(id: string, patch: Partial<AgentRun>) {
   const finishing = patch.status !== undefined && !isActiveStatus(patch.status);
   if (finishing) stoppers.delete(id);
-  change(runs.map((r) => (r.id === id ? { ...r, ...patch } : r)), finishing);
+  change(runs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  schedule(id, finishing || patch.status !== undefined);
 }
 
-/** Adds to the counters and appends a transcript step in one update. */
+/** Adds to the counters and appends a transcript step in one update. A note is also stored as a transcript message. */
 export function recordStep(id: string, step: TranscriptStep | null, add: { tokens?: number; toolUses?: number } = {}, currentStep?: string) {
   change(
     runs.map((r) =>
       r.id !== id ? r : { ...r, tokens: r.tokens + (add.tokens ?? 0), toolUses: r.toolUses + (add.toolUses ?? 0), ...(currentStep !== undefined ? { currentStep } : {}), transcript: step ? appendStep(r.transcript, step) : r.transcript },
     ),
   );
+  schedule(id);
+  if (step?.kind === "note") writeMessage(id, "note", noteJson(step.text, step.error), step.at);
+}
+
+function writeMessage(id: string, role: StoredRole, json: string, at: number) {
+  const seq = seqs.get(id) ?? 0;
+  if (seq >= MAX_MESSAGES_PER_RUN) return;
+  seqs.set(id, seq + 1);
+  void enqueue(() => saveMessage(id, seq, role, json, at));
+}
+
+/** Stores one message of the subagent's own history (the task prompt, an assistant reply or tool results), bounded per message. */
+export function recordMessage(id: string, role: "user" | "assistant" | "tool", parts: readonly Part[], at = Date.now()) {
+  writeMessage(id, role, messageJson(parts), at);
 }
 
 export const getRun = (id: string) => runs.find((r) => r.id === id);
@@ -87,7 +121,32 @@ export function stopRun(id: string) {
 }
 
 export function removeFinished(root?: string) {
-  change(runs.filter((r) => isActiveStatus(r.status) || (root !== undefined && r.projectRoot !== root)), true);
+  const gone = runs.filter((r) => !(isActiveStatus(r.status) || (root !== undefined && r.projectRoot !== root)));
+  for (const r of gone) {
+    dirty.delete(r.id);
+    seqs.delete(r.id);
+  }
+  change(runs.filter((r) => !gone.includes(r)));
+  void enqueue(() => deleteFinished(root));
+}
+
+/** The stored messages of a run as transcript steps (waits for earlier writes, so a live run shows what was just recorded). */
+export async function loadRunSteps(id: string): Promise<TranscriptStep[]> {
+  await chain;
+  return rowsToSteps(await loadMessages(id));
+}
+
+/** Everything a continuation needs from a finished run, or null when it is unknown. */
+export async function loadPreviousRun(id: string): Promise<(PreviousRun & { chatId?: number }) | null> {
+  await load();
+  const run = getRun(id);
+  if (!run) return null;
+  await chain;
+  const rows: MessageRow[] = await loadMessages(id).catch(() => []);
+  const first = rows.find((r) => r.role === "user");
+  const task = first ? rowsToSteps([first])[0]?.text : undefined;
+  const report = (await loadReport(id).catch(() => "")) || run.report || run.summary || "";
+  return { title: run.title, type: run.type, status: run.status, ...(run.error ? { error: run.error } : {}), ...(task ? { task } : {}), report, steps: rowsToSteps(rows), ...(run.chatId !== undefined ? { chatId: run.chatId } : {}) };
 }
 
 // ---- subagent tokens for Budgets (persisted under "agentUsage") ----
@@ -116,7 +175,7 @@ export function recordAgentTokens(chatId: number | undefined, tokens: number, at
   void loadLedger().then(() => setSetting(AGENT_USAGE_SETTING, ledger).catch(() => {}));
 }
 
-/** Test helper: forget everything in memory (the persisted copy is left alone). */
+/** Test helper: forget everything in memory (the database is left alone). */
 export function resetAgentRuns() {
   clearTimeout(timer);
   runs = [];
@@ -124,8 +183,15 @@ export function resetAgentRuns() {
   ledger = EMPTY_LEDGER;
   ledgerLoading = undefined;
   stoppers.clear();
+  dirty.clear();
+  seqs.clear();
   emit();
 }
+/** Test helper: resolves when every queued database write has run. */
+export const settleAgentRunWrites = async () => {
+  flush();
+  await chain;
+};
 
 /** All runs (newest first), or those of one project folder. */
 export function useAgentRuns(root?: string | null): AgentRun[] {

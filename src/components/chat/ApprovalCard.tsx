@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import type { ApprovalRequest } from "../../agent/agent";
 import type { RiskCode } from "../../agent/computerCore";
 import { useT, type Key } from "../../i18n";
+import { cmdKey } from "../../lib/shortcuts";
+import { displayKeys, isMac } from "../../lib/platform";
 
 const RISK: Record<RiskCode, Key> = { enterAfterTyping: "riskEnterAfterTyping", newline: "riskNewline", destructiveShortcut: "riskDestructiveShortcut" };
 import { summarize } from "../ToolCard";
@@ -17,7 +19,7 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
   const t = useT();
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) onAnswer(true);
+      if (e.key === "Enter" && cmdKey(e)) onAnswer(true);
       if (e.key === "Escape") onAnswer(false);
     };
     addEventListener("keydown", k);
@@ -49,8 +51,8 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
             {t("allowForTask")}
           </button>
         )}
-        <button className="btn btn-primary" aria-keyshortcuts="Meta+Enter" onClick={() => onAnswer(true)}>
-          {t("allow")} <span className="kbd">⌘↵</span>
+        <button className="btn btn-primary" aria-keyshortcuts={isMac() ? "Meta+Enter" : "Control+Enter"} onClick={() => onAnswer(true)}>
+          {t("allow")} <span className="kbd">{displayKeys("⌘↵")}</span>
         </button>
       </div>
     </div>

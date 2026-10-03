@@ -1,0 +1,63 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "shell-linux",
+  "description": "Shells the app runs commands in on Linux (see src/providers/shell.ts and src-tauri/src/shell.rs)",
+  "windows": [
+    "main"
+  ],
+  "platforms": [
+    "linux"
+  ],
+  "permissions": [
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "bash",
+          "cmd": "/bin/bash",
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
+        },
+        {
+          "name": "sh",
+          "cmd": "/bin/sh",
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "bash",
+          "cmd": "/bin/bash",
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
+        },
+        {
+          "name": "sh",
+          "cmd": "/bin/sh",
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { cmdKey } from "./shortcuts.ts";
 // Pure helpers for the Cmd+K search palette (no Tauri/DOM/React imports, so node tests can cover them).
 // The index and the query escaping live in src-tauri/src/db.rs; this file only deals with what comes back.
 
@@ -6,8 +7,8 @@ export const MARK_OPEN = "\u0001";
 export const MARK_CLOSE = "\u0002";
 /** Shorter queries are not searched: one letter matches (as a prefix) most of the history. */
 export const MIN_QUERY_CHARS = 2;
-/** Hits requested per search; the palette says so when a search returns this many. */
-export const RESULT_LIMIT = 40;
+/** Hits requested per page (db.rs clamps to 100). */
+export const PAGE_SIZE = 40;
 /** A pending jump older than this is dropped (the chat never became visible). */
 export const JUMP_TTL_MS = 10_000;
 
@@ -51,6 +52,25 @@ export function searchableQuery(input: string): string | null {
   return [...q].length >= MIN_QUERY_CHARS && /[\p{L}\p{N}]/u.test(q) ? q : null;
 }
 
+/** Appends a page to the hits already shown, skipping messages that are already there (a new message can shift pages). */
+export function mergeHits<T extends { messageId: number }>(shown: readonly T[], page: readonly T[]): T[] {
+  const seen = new Set(shown.map((h) => h.messageId));
+  const merged = [...shown];
+  for (const h of page) {
+    if (!seen.has(h.messageId)) (seen.add(h.messageId), merged.push(h));
+  }
+  return merged;
+}
+
+/**
+ * What Arrow Down does. On the last row with more results available it asks for the next page (and stays put until it
+ * arrives); otherwise it moves like `moveHighlight` (wrapping at the ends, also when everything is loaded).
+ */
+export function arrowDown(current: number, count: number, hasMore: boolean): { next: number; loadMore: boolean } {
+  if (hasMore && count > 0 && current >= count - 1) return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
+  return { next: moveHighlight(current, 1, count), loadMore: false };
+}
+
 /** Next highlighted row for an arrow key, wrapping around at both ends. */
 export function moveHighlight(current: number, delta: number, count: number): number {
   if (count <= 0) return 0;
@@ -78,12 +98,12 @@ export function turnHasMessage(turn: { user?: { id: number }; steps: readonly { 
   return turn.user?.id === id || turn.steps.some((s) => s.id === id);
 }
 
-type KeyLike = { key: string; code?: string; metaKey: boolean; shiftKey: boolean; altKey: boolean };
+type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean; shiftKey: boolean; altKey: boolean };
 
 /**
  * Cmd+K. `code` is checked as well as `key` so the shortcut also works on a Russian layout (where `key` is "л").
- * Ctrl is not accepted: on macOS Ctrl+K is "delete to end of line" in text fields.
+ * Ctrl is not accepted on macOS (Ctrl+K is "delete to end of line" in text fields); on Windows and Linux Ctrl is the main key.
  */
 export function isSearchShortcut(e: KeyLike): boolean {
-  return e.metaKey && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
+  return cmdKey(e) && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
 }
