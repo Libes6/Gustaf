@@ -153,7 +153,8 @@ after(() => { if (dist) rmSync(dist, { recursive: true, force: true }); });
 
 /** Hosts that appear in the bundle as constants (provider presets, doc links, XML namespaces), never as loaded resources. */
 const KNOWN_HOSTS = new Set([
-  'www.w3.org', 'react.dev', 'github.com', 'localhost', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
+  // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
+  'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
   'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com',
 ]);
 
@@ -307,6 +308,25 @@ test('capabilities: http scope has no catch-all and no duplicates', () => {
   assert.ok(urls.includes('https://*'));
   assert.equal(new Set(urls).size, urls.length, 'duplicate http scope entries');
   for (const u of urls) assert.ok(/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\\\[|\(|\[|\*\.[a-z.]+:\*$)/.test(u), `unexpected http scope entry ${u}`);
+});
+
+test('capabilities: the http scope covers the OAuth endpoints the MCP sign-in accepts (https anywhere, http on loopback) and nothing weaker', () => {
+  // The scope entries are URL patterns; `*` is a wildcard and `( )` groups are regular expressions. Close enough for a shape check.
+  const rx = scoped('http:default').allow.map((a) => new RegExp('^' + a.url.replace(/\*/g, '.*') + '$'));
+  const covered = (u) => rx.some((r) => r.test(u));
+  // Discovery documents, registration, token and refresh requests all go through plugin-http, so they must be allowed ...
+  for (const u of [
+    'https://mcp.example.com/.well-known/oauth-protected-resource/api/mcp',
+    'https://auth.example.com/.well-known/oauth-authorization-server',
+    'https://auth.example.com:8443/register',
+    'https://auth.example.com/oauth2/token',
+    'http://localhost:9000/token',
+    'http://127.0.0.1:9000/.well-known/oauth-authorization-server',
+  ]) assert.ok(covered(u), `${u} must be inside the http scope for OAuth to work`);
+  // ... and a public authorization server over plain http (mcp/oauth.ts refuses it too) stays outside it.
+  for (const u of ['http://auth.example.com/token', 'http://8.8.8.8/token', 'http://auth.example.com:80/token']) assert.ok(!covered(u), `${u} must not be reachable`);
+  // The browser step needs no capability beyond opening default URLs (https/http) with the opener plugin.
+  assert.ok(perms.includes('opener:allow-default-urls'));
 });
 
 test('capabilities: shell is limited to `zsh -lc <script>`', () => {
