@@ -38,6 +38,25 @@ create table if not exists drafts(
   text text not null default '',
   attachments_json text not null default '[]',
   updated_at integer not null);
+-- agent-runs:begin
+-- Subagent runs and their full transcripts (src/agent/agentRunsDb.ts). Replaces the bounded `agentRuns` setting, which is
+-- migrated once by the app. `agent_messages.parts_json` holds one message of the subagent's own history (bounded per
+-- message by the app); seq 0 is the task prompt. Deleting a chat removes the runs it started (trigger below).
+create table if not exists agent_runs(
+  id text primary key, chat_id integer, title text not null, type text not null, model text not null default '',
+  status text not null, started_at integer not null default 0, ended_at integer, tokens integer not null default 0,
+  tool_uses integer not null default 0, error text, report text,
+  provider_id text not null default '', project_root text not null default '', created_at integer not null default 0,
+  changed_json text, warnings_json text);
+create index if not exists agent_runs_created on agent_runs(created_at);
+create table if not exists agent_messages(
+  run_id text not null references agent_runs(id) on delete cascade, seq integer not null,
+  role text not null, parts_json text not null, created_at integer not null default 0,
+  primary key(run_id, seq));
+create trigger if not exists agent_runs_chat_deleted after delete on chats begin
+  delete from agent_runs where chat_id = old.id;
+end;
+-- agent-runs:end
 ";
 
 fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
@@ -472,6 +491,106 @@ mod tests {
         let rows = select(&conn, "select scope from drafts", vec![]).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["scope"], json!("new:"));
+    }
+
+    // Same statements as src/agent/agentRunsDb.ts.
+    const UPSERT_RUN: &str = "insert into agent_runs(id, chat_id, title, type, model, status, started_at, ended_at, tokens, tool_uses, error, report, provider_id, project_root, created_at, changed_json, warnings_json) \
+        values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+        on conflict(id) do update set title = excluded.title, model = excluded.model, status = excluded.status, started_at = excluded.started_at, ended_at = excluded.ended_at, \
+        tokens = excluded.tokens, tool_uses = excluded.tool_uses, error = excluded.error, report = coalesce(excluded.report, agent_runs.report), \
+        changed_json = excluded.changed_json, warnings_json = excluded.warnings_json";
+    const INSERT_MESSAGE: &str = "insert or replace into agent_messages(run_id, seq, role, parts_json, created_at) values(?, ?, ?, ?, ?)";
+    const PRUNE_RUNS: &str = "delete from agent_runs where status not in ('queued', 'running') and id not in \
+        (select id from agent_runs where status not in ('queued', 'running') order by created_at desc, id desc limit ?)";
+    const DELETE_FINISHED: &str = "delete from agent_runs where status not in ('queued', 'running') and (? is null or project_root = ?)";
+
+    fn run_row(conn: &Connection, id: &str, chat: Option<i64>, status: &str, created: i64, report: Option<&str>) {
+        let chat = chat.map(|c| json!(c)).unwrap_or(Value::Null);
+        let report = report.map(|r| json!(r)).unwrap_or(Value::Null);
+        execute(conn, UPSERT_RUN, vec![json!(id), chat, json!("t"), json!("explore"), json!("m"), json!(status), json!(1), Value::Null, json!(5), json!(2), Value::Null, report, json!("p"), json!("/proj"), json!(created), Value::Null, Value::Null]).unwrap();
+    }
+
+    #[test]
+    fn agent_tables_are_added_to_an_old_database_and_keep_their_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.db");
+        let conn = open(&path).unwrap();
+        run_row(&conn, "r1", None, "completed", 1, Some("report"));
+        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+        drop(conn);
+
+        // Re-opening is a no-op for existing tables.
+        let conn = open(&path).unwrap();
+        assert_eq!((count(&conn, "agent_runs"), count(&conn, "agent_messages")), (1, 1));
+        // An older database (created before these tables existed) just gets them.
+        conn.execute_batch("drop trigger agent_runs_chat_deleted; drop table agent_messages; drop table agent_runs;").unwrap();
+        drop(conn);
+        let conn = open(&path).unwrap();
+        assert_eq!((count(&conn, "agent_runs"), count(&conn, "agent_messages")), (0, 0));
+        init(&conn).unwrap();
+        init(&conn).unwrap();
+        run_row(&conn, "r2", None, "running", 2, None);
+        assert_eq!(count(&conn, "agent_runs"), 1);
+    }
+
+    #[test]
+    fn agent_run_upsert_keeps_the_stored_report_and_messages_follow_their_run() {
+        let conn = memory();
+        run_row(&conn, "r1", None, "running", 1, None);
+        run_row(&conn, "r1", None, "completed", 1, Some("final report"));
+        run_row(&conn, "r1", None, "completed", 1, None); // a later update without a report keeps it
+        let rows = select(&conn, "select status, report from agent_runs where id = 'r1'", vec![]).unwrap();
+        assert_eq!((rows[0]["status"].clone(), rows[0]["report"].clone()), (json!("completed"), json!("final report")));
+
+        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[{\"type\":\"text\",\"text\":\"a\"}]"), json!(1)]).unwrap();
+        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(2)]).unwrap(); // same seq replaces
+        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(1), json!("assistant"), json!("[]"), json!(3)]).unwrap();
+        assert_eq!(count(&conn, "agent_messages"), 2);
+        let order = select(&conn, "select seq from agent_messages where run_id = 'r1' order by seq", vec![]).unwrap();
+        assert_eq!(order.iter().map(|r| r["seq"].as_i64().unwrap()).collect::<Vec<_>>(), vec![0, 1]);
+        // A message of a run that does not exist is rejected (the app writes the run row first).
+        assert!(execute(&conn, INSERT_MESSAGE, vec![json!("ghost"), json!(0), json!("user"), json!("[]"), json!(1)]).is_err());
+
+        execute(&conn, "delete from agent_runs where id = 'r1'", vec![]).unwrap();
+        assert_eq!(count(&conn, "agent_messages"), 0, "messages are deleted with their run");
+    }
+
+    #[test]
+    fn deleting_a_chat_removes_the_agent_runs_it_started() {
+        let conn = memory();
+        let project = execute(&conn, "insert into projects(name, created_at) values('p', 1)", vec![]).unwrap().1;
+        let chat = execute(&conn, "insert into chats(project_id, title, created_at, updated_at) values(?, 't', 1, 1)", vec![json!(project)]).unwrap().1;
+        let other = new_chat(&conn);
+        run_row(&conn, "mine", Some(chat), "completed", 1, None);
+        run_row(&conn, "theirs", Some(other), "completed", 2, None);
+        run_row(&conn, "loose", None, "completed", 3, None);
+        execute(&conn, INSERT_MESSAGE, vec![json!("mine"), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+        // Through the project cascade too.
+        execute(&conn, "delete from projects where id = ?", vec![json!(project)]).unwrap();
+        let ids = select(&conn, "select id from agent_runs order by id", vec![]).unwrap();
+        assert_eq!(ids.iter().map(|r| r["id"].as_str().unwrap().to_string()).collect::<Vec<_>>(), vec!["loose", "theirs"]);
+        assert_eq!(count(&conn, "agent_messages"), 0);
+    }
+
+    #[test]
+    fn agent_run_retention_keeps_active_runs_and_the_newest_finished_ones() {
+        let conn = memory();
+        for i in 0..10 {
+            run_row(&conn, &format!("d{i}"), None, "completed", 100 + i, None);
+            execute(&conn, INSERT_MESSAGE, vec![json!(format!("d{i}")), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+        }
+        run_row(&conn, "live", None, "running", 1, None);
+        run_row(&conn, "queued", None, "queued", 2, None);
+        execute(&conn, PRUNE_RUNS, vec![json!(3)]).unwrap();
+        let ids = select(&conn, "select id from agent_runs order by created_at", vec![]).unwrap();
+        assert_eq!(ids.iter().map(|r| r["id"].as_str().unwrap().to_string()).collect::<Vec<_>>(), vec!["live", "queued", "d7", "d8", "d9"]);
+        assert_eq!(count(&conn, "agent_messages"), 3);
+
+        // "Clear" removes finished runs of one project (or of all), never active ones.
+        execute(&conn, DELETE_FINISHED, vec![json!("/other"), json!("/other")]).unwrap();
+        assert_eq!(count(&conn, "agent_runs"), 5);
+        execute(&conn, DELETE_FINISHED, vec![Value::Null, Value::Null]).unwrap();
+        assert_eq!(count(&conn, "agent_runs"), 2);
     }
 
     #[test]

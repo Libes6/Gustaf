@@ -104,7 +104,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
 
-      {root && <AgentsPanel root={root} />}
+      {root && <AgentsPanel root={root} onContinue={(message) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); }} />}
       {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
 
       {messages.length === 0 && stream === null && !error ? (

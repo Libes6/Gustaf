@@ -65,7 +65,7 @@ export async function notifyUnfocused(title: string, body: string) {
   }
 }
 
-const NOTIFY: Partial<Record<RunStatus, "notifyAgentDone" | "notifyAgentFailed" | "notifyAgentLimit">> = { completed: "notifyAgentDone", failed: "notifyAgentFailed", limit: "notifyAgentLimit" };
+const NOTIFY: Partial<Record<RunStatus, "notifyAgentDone" | "notifyAgentFailed" | "notifyAgentLimit" | "notifyAgentBudget">> = { completed: "notifyAgentDone", failed: "notifyAgentFailed", limit: "notifyAgentLimit", budget: "notifyAgentBudget" };
 
 /** Mounted once (App): notifies about finished agents and new approval requests while unfocused; clears the badge on focus. */
 export function useAttentionNotifications() {

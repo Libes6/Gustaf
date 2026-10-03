@@ -16,7 +16,7 @@
 .agent-type { flex: none; font-size: 11px; color: var(--text-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; line-height: 16px; }
 .agent-status { flex: none; font-size: 11px; font-weight: 600; }
 .agent-status.completed { color: var(--green); }
-.agent-status.failed, .agent-status.limit { color: var(--red); }
+.agent-status.failed, .agent-status.limit, .agent-status.budget { color: var(--red); }
 .agent-status.cancelled, .agent-status.interrupted { color: var(--text-3); }
 .agent-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-3); font-size: 11.5px; }
 .agent-meta span { white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
@@ -29,6 +29,9 @@
 .agent-step { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
 .agent-step.bad { border-color: #ef6b6b55; }
 .agent-step-head { font-size: 12.5px; color: var(--text); overflow-wrap: anywhere; user-select: text; }
+.agent-step-head span { white-space: pre-wrap; }
+.agent-continue { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.agent-continue textarea { resize: vertical; min-height: 60px; }
 .agent-step-head code { font: 12px var(--mono); color: var(--accent-soft); }
 /* Settings > Usage > Agents (components/AgentSettingsSection.tsx) */
 .agent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

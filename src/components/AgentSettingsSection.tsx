@@ -171,6 +171,13 @@ export function AgentSettingsSection() {
         </div>
         <div className="card-row">
           <div className="grow">
+            <div className="t">{t("agentStopOnBudget")}</div>
+            <div className="d">{t("agentStopOnBudgetDesc")}</div>
+          </div>
+          <Toggle on={s.stopOnBudget} label={t("agentStopOnBudget")} onChange={(v) => saveAgentSettings({ ...s, stopOnBudget: v })} />
+        </div>
+        <div className="card-row">
+          <div className="grow">
             <div className="t">{t("agentCancelDependents")}</div>
             <div className="d">{t("agentCancelDependentsDesc")}</div>
           </div>
