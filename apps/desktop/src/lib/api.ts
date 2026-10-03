@@ -141,6 +141,12 @@ export const fsx = {
     invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs }),
 };
 
+/** Runs a hook command (src-tauri/src/hook_exec.rs): JSON on stdin, scrubbed environment plus `env` (GUSTAF_* only), hard timeout, process tree killed on timeout. */
+export const hookRunner = {
+  run: (root: string, command: string, timeoutMs: number, stdin: string, env: Record<string, string>) =>
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_hook", { root, command, timeoutMs, stdin, env: Object.entries(env) }),
+};
+
 export const git = (root: string, args: string[], shadow = false) => invoke<string>("git", { root, args, shadow });
 
 // The project's own repository (src-tauri/src/git.rs): status, commit-message context and partial commits.

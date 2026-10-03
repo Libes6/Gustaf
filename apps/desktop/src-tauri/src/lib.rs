@@ -6,6 +6,7 @@ mod cursor_import;
 mod db;
 mod git;
 mod git_publish;
+mod hook_exec;
 mod hunks;
 mod import_sources;
 mod mcp;
@@ -92,6 +93,7 @@ pub fn run() {
             tools::read_instructions,
             tools::read_home_file,
             tools::run_command,
+            hook_exec::run_hook,
             git::git,
             git::git_status,
             git::git_commit_context,

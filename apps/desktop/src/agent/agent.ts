@@ -21,6 +21,8 @@ import { getRulesConfig, projectRootFor } from "./rulesStore";
 import { loadProjectInstructions } from "./instructionsStore";
 import { callMcpResourceTool, callMcpTool, loadMcpConfig, loadMcpToolset, type McpToolset } from "./mcp/runtime";
 import { decideMcp } from "./mcp/toolset";
+import { approvalTool, createHooks } from "./hooks";
+import { loadHooksView } from "./hooksStore";
 
 export type { Access };
 /** `reason` names the "ask" rule that stopped the command, when one did. */
@@ -319,6 +321,13 @@ async function runLoop(o: RunOptions) {
   let computerTask = false;
   let afterTyping = false;
   const project = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null) : null;
+  // Hooks (docs/features/hooks.md): global ones, plus the project's file when the user enabled it. Only for runs that use tools.
+  const hooks = o.root && o.supportsTools !== false ? createHooks({ hooks: (await loadHooksView(project).catch(() => null))?.effective ?? [], root: o.root, project, chatId: o.chatId, access: o.access, allowlist: o.allowlist, approve: o.approve, signal: o.signal }) : null;
+  if (hooks?.active) {
+    const ask = o.approve;
+    o = { ...o, approve: (req) => (hooks.approval(approvalTool(req as any), req), ask(req)) };
+  }
+  let stopReruns = 0;
   // MCP tools: main loop only (subagents have a fixed allowlist), and only for models that take tools.
   const mcp = o.supportsTools === false || o.toolNames || planning ? null : await loadMcpToolset({ project, access: o.access, reserved: tools.map((t) => t.name), signal: o.signal }).catch(() => null);
   if (mcp?.defs.length) {
@@ -353,7 +362,20 @@ async function runLoop(o: RunOptions) {
     };
     history.push(assistant);
     await o.onMessage(assistant);
-    if (!calls.length) return;
+    if (!calls.length) {
+      // A stop hook may send the agent back to work once per turn (exit 2); after that one re-run stop hooks stay quiet.
+      if (hooks?.active && !o.subagent && !o.toolNames && stopReruns < 1 && !o.signal.aborted) {
+        const follow = await hooks.stop(out.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+        if (follow && !o.signal.aborted) {
+          stopReruns++;
+          const msg: Msg = { role: "user", parts: [{ type: "text", text: follow }] };
+          history.push(msg);
+          await o.onMessage(msg);
+          continue;
+        }
+      }
+      return;
+    }
 
     const results: Part[] = [];
     let halted = false;
@@ -373,7 +395,12 @@ async function runLoop(o: RunOptions) {
         o.onToolResult?.(cancelled);
         continue;
       }
+      const hooked = !!hooks?.active && !call.computer && !spawned.has(call.id);
       try {
+        if (hooked) {
+          const pre = await hooks!.pre(call);
+          if (pre) throw new ActionBlocked(pre.blocked);
+        }
         if (call.computer) {
           if (planning) throw new ActionBlocked(modeBlockedMessage(o.mode));
           if (!o.computerUse) throw new Error("Computer use is disabled by the user.");
@@ -404,6 +431,11 @@ async function runLoop(o: RunOptions) {
           results.push({ ...res, output: r.v });
         } else {
           results.push({ ...res, output: await runTool(call, o, { act, project, skills }) });
+        }
+        if (hooked) {
+          const done = results[results.length - 1] as Extract<Part, { type: "tool_result" }>;
+          const extra = await hooks!.post(call, done.output);
+          if (extra) done.output += extra;
         }
         logFinish(act, "success");
       } catch (e: any) {

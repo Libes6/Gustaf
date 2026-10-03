@@ -1022,5 +1022,22 @@
   "imageReadError": "Could not read the image",
   "takeScreenshot": "Take screenshot",
   "capturingScreenshot": "Capturing screen…",
-  "approveTerminal": "Read terminal output"
+  "approveTerminal": "Read terminal output",
+  "hooksTitle": "Hooks",
+  "hooksLead": "Commands that run on agent events (before and after a tool call, after an edit, when the agent stops, when an approval is asked). They apply to API-provider agents only; CLI providers keep their own hooks. Hook commands follow the same command rules and approvals as the agent's own commands.",
+  "hooksProjectEnable": "Run hooks from this project's {file}",
+  "hooksWarning": "Hooks run shell commands on your computer without you looking at each call. Enable project hooks only for projects you trust; a project file can contain any command.",
+  "hooksNoFile": "This project has no {file}.",
+  "hooksProjectOff": "The project file exists but its hooks are off and will not run.",
+  "hooksEffective": "Effective hooks",
+  "hooksNone": "No hooks are in effect for this project.",
+  "hooksSourceGlobal": "global",
+  "hooksSourceProject": "project file",
+  "hooksTimeout": "timeout {ms} ms",
+  "hooksSkipped": "Skipped hook entries",
+  "hooksEditGlobal": "Global hooks (JSON)",
+  "hooksSaved": "Saved",
+  "actionHook": "Hook",
+  "logHookExit": "exit {code}",
+  "logHookTimedOut": "timed out"
 }

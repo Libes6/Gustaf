@@ -22,6 +22,7 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [agents.md](features/agents.md) | Subagents, background agents, multi-agent orchestration |
 | Agent | [plan-mode.md](features/plan-mode.md) | Ask / Plan / Agent mode switch, plan card with Approve / Edit / Reject, CLI plan flags |
 | Agent | [mcp.md](features/mcp.md) | MCP servers |
+| Agent | [hooks.md](features/hooks.md) | Hooks: user commands on agent events (pre/post tool, post edit, stop, approval request), schema, exit codes, safety |
 | Providers | [cursor-accounts.md](features/cursor-accounts.md) | Cursor account pool, browser-login profiles, quota rotation |
 | Agent | [scheduled-prompts.md](features/scheduled-prompts.md) | Prompts that run on a schedule while the app is open |
 | Agent | [computer-use.md](features/computer-use.md) | Computer Use (desktop control) |

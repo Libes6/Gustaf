@@ -13,6 +13,9 @@ export const state = {
   /** Commands the agent asked to run: { root, command }. */
   runs: [],
   runResult: { code: 0, output: 'ran', timed_out: false },
+  /** Hook commands that were run: { root, command, timeoutMs, stdin, env }. */
+  hookRuns: [],
+  hookResult: () => ({ code: 0, output: '', timed_out: false }),
   /** (id, path) => diff text for the review panel; empty string = nothing pending. */
   reviewDiff: () => '',
   /** Computer action batches the agent executed (nothing touches the real desktop). */
@@ -37,6 +40,8 @@ export const state = {
     this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
     this.instructionFiles = [];
     this.runs.length = 0;
+    this.hookRuns.length = 0;
+    this.hookResult = () => ({ code: 0, output: '', timed_out: false });
     this.runResult = { code: 0, output: 'ran', timed_out: false };
     this.reviewDiff = () => '';
     this.executed = [];
@@ -167,6 +172,15 @@ export const fsx = {
   run: async (root, command) => {
     state.runs.push({ root, command });
     return state.runResult;
+  },
+};
+
+/** Hook runner (src-tauri/src/hook_exec.rs): calls are recorded in `state.hookRuns`, the answer comes from `state.hookResult(call)`. */
+export const hookRunner = {
+  run: async (root, command, timeoutMs, stdin, env) => {
+    const call = { root, command, timeoutMs, stdin, env };
+    state.hookRuns.push(call);
+    return state.hookResult(call);
   },
 };
 
