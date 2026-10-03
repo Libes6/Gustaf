@@ -1,3 +1,4 @@
+import * as chatData from "../../src/lib/data";
 import { joinChatReferences, freezeChat } from "../../src/lib/chatContext";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -317,6 +318,20 @@ describe("Composer image viewer", () => {
 
 
 describe("chat reference attachments", () => {
+  it("accepts sidebar drag, offers full or short versions and previews the chosen snapshot", async () => {
+    const read = vi.spyOn(chatData, "loadMessages").mockResolvedValue([{ id: 1, chat_id: 5, created_at: 0, role: "user", parts: [{ type: "text", text: "a".repeat(30_000) }] }]);
+    const app = makeApp({ chats: [{ id: 5, title: "Large source", project_id: null }] });
+    const { container } = renderApp(<Harness />, app);
+    fireEvent.drop(container.querySelector(".composer")!, { dataTransfer: { getData: () => "5", files: [] } });
+    await screen.findByRole("button", { name: "Attach shortened version" });
+    expect(screen.getByRole("button", { name: "Attach full version" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Attach shortened version" }));
+    expect(box().value).toBe("");
+    await userEvent.click(screen.getByText("Exact text to send"));
+    expect(screen.getByText(/Middle omitted by user choice/)).toBeInTheDocument();
+    read.mockRestore();
+  });
+
   it("shows an exact snapshot separate from textarea, preserves it while typing and removes it", async () => {
     const ref = freezeChat(5, "Source chat", [{ role: "user", parts: [{ type: "text", text: "frozen content" }] }]);
     renderApp(<Harness text={joinChatReferences("Question", [ref])} />);

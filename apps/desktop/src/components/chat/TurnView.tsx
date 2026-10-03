@@ -117,7 +117,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
               {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
               {userText(userContext.body)}
               {userContext.references.map((ref, i) => <div className="chat-reference" key={`${ref.sourceId}:${i}`}>
-                <button className="btn-ghost" onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
+                <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
                 <span>{ref.snapshot.length.toLocaleString()} {app.locale === "ru" ? "символов · справочный материал" : "characters · reference material"}</span>
                 <details><summary>{app.locale === "ru" ? "Отправленный снимок" : "Sent snapshot"}</summary><pre>{ref.snapshot}</pre></details>
               </div>)}

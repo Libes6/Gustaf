@@ -152,7 +152,7 @@ export function Composer(p: Props) {
     if (mention && mentionList.length) {
       if (e.key === "ArrowDown") return e.preventDefault(), setMention({ ...mention, hl: Math.min(mention.hl + 1, mentionList.length - 1) });
       if (e.key === "ArrowUp") return e.preventDefault(), setMention({ ...mention, hl: Math.max(mention.hl - 1, 0) });
-      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), (mentionList[mention.hl].chat ? void attachChat(mentionList[mention.hl].chat!) : insertMention(mentionList[mention.hl].path));
+      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), (mentionList[Math.min(mention.hl, mentionList.length - 1)].chat ? void attachChat(mentionList[Math.min(mention.hl, mentionList.length - 1)].chat!) : insertMention(mentionList[Math.min(mention.hl, mentionList.length - 1)].path));
       if (e.key === "Escape") return setMention(null);
     }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -224,7 +224,7 @@ export function Composer(p: Props) {
           )}
           {chatLoading && <div role="status">{ru ? "Читаю чат…" : "Reading chat…"}</div>}
           {references.map((ref, i) => <div key={`${ref.sourceId}:${i}`} className="chat-reference">
-            <button className="btn-ghost" onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
+            <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
             <span>{ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}{ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}</span>
             <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(joinChatReferences(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
             <details><summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary><pre>{ref.snapshot}</pre></details>
@@ -287,7 +287,7 @@ export function Composer(p: Props) {
                   ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
                   { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
-                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(text + (text && !text.endsWith(" ") ? " @" : "@")), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
+                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
                   { sep: true },
                   { heading: t("modeSwitch") },
