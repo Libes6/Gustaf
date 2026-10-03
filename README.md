@@ -37,7 +37,7 @@ npm run tauri dev            # native app with hot reload
 ### Verification
 
 ```sh
-npm run check        # i18n keys, tsc, node tests, UI tests, cargo test (what CI runs)
+npm run check        # i18n keys, tsc, node tests, UI tests, end-to-end tests, cargo test (what CI runs)
 ```
 
 The steps of `npm run check` can be run separately:
@@ -47,6 +47,7 @@ node scripts/check-i18n.mjs                               # translations
 npx tsc --noEmit                                          # types (src and tests/ui)
 npm test                                                  # node --test tests/*.test.mjs (pure logic)
 npm run test:ui                                           # Vitest + Testing Library component tests in tests/ui
+npm run test:e2e                                          # built frontend in local Chrome (playwright-core) with a fake Tauri backend; ~20 s, skips without Chrome
 cargo test --manifest-path src-tauri/Cargo.toml           # Rust
 ```
 

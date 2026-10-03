@@ -31,3 +31,6 @@ public/canvas/
 .playwright-mcp/
 *.playwright-mcp.log
 .claude/worktrees/
+
+# End-to-end failure artifacts (screenshots, traces)
+tests/e2e/artifacts/
