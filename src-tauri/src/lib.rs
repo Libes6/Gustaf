@@ -7,6 +7,7 @@ mod git;
 mod hunks;
 mod import_sources;
 mod mcp;
+mod oauth;
 mod review;
 mod secrets;
 mod tools;
@@ -81,6 +82,9 @@ pub fn run() {
             mcp::mcp_stop,
             mcp::mcp_status,
             mcp::mcp_logs,
+            oauth::oauth_loopback_start,
+            oauth::oauth_loopback_wait,
+            oauth::oauth_loopback_cancel,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
