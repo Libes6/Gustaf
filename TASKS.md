@@ -70,7 +70,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.
 
 ## P3
-- [ ] **Canvas**: multi-file modules, bundled extra libraries, export to HTML/PNG, revision diff.
+- [ ] **Canvas**: done: multi-file modules (`// file:` sections, relative imports, file tabs), `lucide-react` bundled as an extra library (separate larger runtime, loaded only when imported), export to standalone HTML, revision diff (Changes tab). Not done: export to PNG (not reliably possible through the sandboxed iframe, WebKit taints SVG foreignObject canvases), other bundled libraries (charts etc. are too large or not in `node_modules`), precompiling the HTML export (it compiles at open time). Not verified in the real Tauri WebView.
 - [x] **Model routing** by task type (cheap vs strong model). Done for agents: default model per subagent type, an allow-list for explicit `model` requests, and a cheap model for chat compaction and commit messages (Settings, Usage, Agents; `agentSettings.ts`, `lib/modelRouting.ts`). Not done: automatic routing of the main chat's own requests.
 - [ ] **Scheduled prompts.**
 - [ ] **Voice input** and screenshot paste.
