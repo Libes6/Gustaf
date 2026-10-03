@@ -1,6 +1,7 @@
 import { Check, Play, RotateCw, Search, Square, X, MessageSquarePlus } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { displayKeys } from "../lib/platform";
 import {
   MAX_COLUMNS, MIN_COLUMNS, anyRunning, canContinue, canRun, compareChatTitle, compareReducer, continueMessages, elapsedMs, emptyCompare,
   estimateOutput, startCompare, toggleTarget, type Column, type CompareRun, type CompareTarget,
@@ -161,7 +162,7 @@ export function Compare({ onClose }: { onClose: () => void }) {
                 <Play size={13} /> {t("compareRun")}
               </button>
             )}
-            <span className="compare-hint">{t("compareShortcut")}</span>
+            <span className="compare-hint">{t("compareShortcut", { keys: displayKeys("⌘↵") })}</span>
           </div>
           {error && <div className="compare-error" role="alert">{error}</div>}
         </div>

@@ -1,4 +1,5 @@
 import { WindowHeader } from "./WindowHeader";
+import { isMac, isWindows } from "../lib/platform";
 import { useState } from "react";
 import { useT } from "../i18n";
 import { useApp } from "../state";
@@ -44,7 +45,7 @@ export function Onboarding() {
           ) : (
             <>
               <h1>{t("onbProviderTitle")}</h1>
-              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbProviderLead")}</p>
+              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbProviderLead", { store: t(isMac() ? "keyStoreMac" : isWindows() ? "keyStoreWindows" : "keyStoreLinux") })}</p>
               <ProviderForm
                 onSaved={async (cfg, models) => {
                   await app.refreshModels();

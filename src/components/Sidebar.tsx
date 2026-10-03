@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../i18n";
+import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
 import { useApp } from "../state";
 import { useApprovalChats } from "../lib/attention";
@@ -74,7 +75,7 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
             { heading: "M Code" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
             { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },
-            { label: t("settings"), icon: <Settings size={15} />, kbd: "⌘,", onClick: () => app.openSettings() },
+            { label: t("settings"), icon: <Settings size={15} />, kbd: displayKeys("⌘,"), onClick: () => app.openSettings() },
             { sep: true },
             { label: t("resetOnboarding"), icon: <LogOut size={15} />, onClick: () => app.setOnboarded(false) },
           ]);
@@ -156,7 +157,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
       })),
       ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
-      ...(p.path ? [{ label: t("showInFinder"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
+      ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
       { label: t("removeProject"), icon: <X size={15} />, onClick: () => removeProject(p.id).then(app.reload) },

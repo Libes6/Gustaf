@@ -5,6 +5,8 @@ import {
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
+import { displayKeys, isMac } from "../lib/platform";
+import { shortcut, shortcutDisplay } from "../lib/shortcuts";
 import { computer, fsx, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
 import { SOURCE_LABELS } from "../lib/importers/common";
@@ -345,7 +347,7 @@ function Usage() {
 function ComputerPage() {
   const t = useT();
   const app = useApp();
-  const [perm, setPerm] = useState<{ accessibility: boolean; screen: boolean } | null>(null);
+  const [perm, setPerm] = useState<{ accessibility: boolean; screen: boolean; supported?: boolean } | null>(null);
   const check = (request = false) => computer.permissions(request).then(setPerm);
   useEffect(() => {
     check();
@@ -359,7 +361,7 @@ function ComputerPage() {
         <div className="d">{t(desc)}</div>
       </div>
       {ok ? <span className="d ok">{t("granted")}</span> : (
-        <button className="btn-soft" onClick={() => (request && check(true), openUrl(`x-apple.systempreferences:com.apple.preference.security?${pane}`))}>{t("openSettings")}</button>
+        isMac() ? <button className="btn-soft" onClick={() => (request && check(true), openUrl(`x-apple.systempreferences:com.apple.preference.security?${pane}`))}>{t("openSettings")}</button> : <span className="d">{t("computerUnsupportedHere")}</span>
       )}
     </div>
   );
@@ -384,7 +386,7 @@ function ComputerPage() {
         <div className="card-row">
           <div className="grow">
             <div className="t">{t("computerSafety")}</div>
-            <div className="d">{t("computerSafetyDesc")}</div>
+            <div className="d">{t("computerSafetyDesc", { mod: displayKeys("⌘").replace(/\+$/, ""), stop: shortcutDisplay(shortcut("stopAgent")) })}</div>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useT } from "../i18n";
-import { SHORTCUTS } from "../lib/shortcuts";
+import { SHORTCUTS, shortcutDisplay } from "../lib/shortcuts";
 
 /** Read-only list of the shortcuts from lib/shortcuts.ts. */
 export function ShortcutsSettings() {
@@ -12,7 +12,7 @@ export function ShortcutsSettings() {
         {SHORTCUTS.map((s) => (
           <div key={s.id} className="card-row" style={{ minHeight: 40 }}>
             <div className="grow">{t(s.label)}</div>
-            <span className="kbd-chip">{s.display}</span>
+            <span className="kbd-chip">{shortcutDisplay(s)}</span>
           </div>
         ))}
       </div>

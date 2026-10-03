@@ -3,7 +3,7 @@
 //   Linux   bash (login shell)
 //   Windows Windows PowerShell 5.1 (`powershell.exe`, present on every supported Windows)
 // The scope names must match the `shell:allow-spawn` / `shell:allow-execute` entries in src-tauri/capabilities.
-import type { Platform } from "../lib/platform";
+import type { Platform } from "../lib/platform.ts";
 
 export type ShellKind = "posix" | "powershell";
 export type ShellName = "zsh" | "bash" | "sh" | "powershell";
