@@ -110,7 +110,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
-      {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
+      {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
 
       {messages.length === 0 && stream === null && !error ? (
         <div className="empty">
