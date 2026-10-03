@@ -117,7 +117,7 @@ export function Composer(p: Props) {
               {images.map((d, i) => (
                 <div key={i} className="attach">
                   <img src={`data:image/png;base64,${d}`} alt="" />
-                  <button onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
+                  <button title={t("removeAttachment")} aria-label={t("removeAttachment")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
                     <X size={11} />
                   </button>
                 </div>
@@ -126,6 +126,7 @@ export function Composer(p: Props) {
           )}
           <textarea
             ref={taRef}
+            aria-label={t("askAnything")}
             rows={1}
             value={text}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}

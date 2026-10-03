@@ -1,9 +1,10 @@
 import { Loader2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CUSTOM_INSTRUCTIONS_CAP, type InstructionPrompt } from "../agent/instructions";
 import { getProjectInstructionText, loadProjectInstructions, setProjectInstructionText } from "../agent/instructionsStore";
 import { useT } from "../i18n";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { announceInstructionsSaved } from "../lib/useInstructionReport";
 import "../styles/instructions.css";
 
@@ -17,6 +18,8 @@ export function ProjectInstructionsDialog({ name, path, onClose }: { name: strin
   const [files, setFiles] = useState<InstructionPrompt["entries"]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef, () => { if (!saving) onClose(); });
 
   useEffect(() => {
     getProjectInstructionText(path).then(setText, () => setText(""));
@@ -37,7 +40,7 @@ export function ProjectInstructionsDialog({ name, path, onClose }: { name: strin
 
   return createPortal(
     <div className="review-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
-      <section className="review-dialog git-dialog" role="dialog" aria-modal="true" aria-label={t("projectInstructions")}>
+      <section ref={dialogRef} className="review-dialog git-dialog" role="dialog" aria-modal="true" aria-label={t("projectInstructions")}>
         <header>
           <strong>{t("projectInstructions")} · {name}</strong>
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose} disabled={saving}><X size={17} /></button>
@@ -47,7 +50,7 @@ export function ProjectInstructionsDialog({ name, path, onClose }: { name: strin
             <label htmlFor="project-instructions">{t("instructionsCustom")}</label>
             {text === null ? <div className="git-state"><Loader2 size={14} className="spin" /></div> : (
               <textarea
-                id="project-instructions" className="input instructions-text" rows={9} value={text} disabled={saving} spellCheck
+                id="project-instructions" autoFocus className="input instructions-text" rows={9} value={text} disabled={saving} spellCheck
                 maxLength={CUSTOM_INSTRUCTIONS_CAP} placeholder={t("instructionsPlaceholder")}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); save(); } }}

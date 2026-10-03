@@ -115,7 +115,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           <h1>{project ? t("emptyProject", { name: project.name }) : t("emptyTitle")}</h1>
         </div>
       ) : (
-        <div className="feed" ref={feedRef} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
+        <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
@@ -126,7 +126,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         </div>
       )}
       {!atBottom && (
-        <button className="to-bottom" onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}>
+        <button className="to-bottom" title={t("scrollToBottom")} aria-label={t("scrollToBottom")} onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}>
           <ArrowDown size={15} />
         </button>
       )}

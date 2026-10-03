@@ -84,6 +84,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             <div className="msg-edit">
               <textarea
                 autoFocus
+                aria-label={t("edit")}
                 value={editing}
                 onChange={(e) => setEditing(e.target.value)}
                 onKeyDown={(e) => {

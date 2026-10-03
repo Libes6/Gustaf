@@ -1,9 +1,10 @@
 import { Bot, ChevronDown, ChevronUp, Loader2, Square, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import { removeFinished, stopRun, useAgentRuns } from "../agent/agentRuns";
 import { elapsed, formatTokens, isActiveStatus, type AgentRun } from "../agent/agentRunsModel";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import "../styles/agents.css";
 
 const TYPE_KEY = { explore: "agentTypeExplore", plan: "agentTypePlan", general: "agentTypeGeneral", review: "agentTypeReview" } as const;
@@ -28,6 +29,8 @@ function useNow(active: boolean) {
 
 function Transcript({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   const t = useT();
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     addEventListener("keydown", k);
@@ -35,7 +38,7 @@ function Transcript({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   }, [onClose]);
   return createPortal(
     <div className="review-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section className="review-dialog" role="dialog" aria-modal="true" aria-label={run.title}>
+      <section ref={dialogRef} className="review-dialog" role="dialog" aria-modal="true" aria-label={run.title}>
         <header>
           <strong>{run.title}</strong>
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose}><X size={17} /></button>

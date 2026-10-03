@@ -1,13 +1,16 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, Folder, FolderPlus, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useT } from "../i18n";
 import { createProject } from "../lib/data";
+import { useDialogFocus } from "../lib/useDialogFocus";
 
 export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (id: number) => void }) {
   const t = useT();
   const [name, setName] = useState("");
   const [path, setPath] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef);
 
   const pick = async () => {
     const dir = await open({ directory: true, multiple: false });
@@ -24,10 +27,10 @@ export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => voi
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog" onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-label={t("createProject")} onKeyDown={(e) => e.key === "Escape" && onClose()}>
         <h2>
           <span className="grow">{t("createProject")}</span>
-          <button className="icon-btn" onClick={onClose}>
+          <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose}>
             <X size={16} />
           </button>
         </h2>
@@ -35,7 +38,7 @@ export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => voi
           <span className="icon">
             <Folder size={16} />
           </span>
-          <input autoFocus placeholder={t("projectName")} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
+          <input autoFocus aria-label={t("projectName")} placeholder={t("projectName")} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
         </div>
         <div className="sub">{t("sourceFolders")}</div>
         <div className="folder-box">

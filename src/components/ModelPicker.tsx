@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { modelKey as favKey, useApp, type Model } from "../state";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
@@ -16,6 +17,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
   const [more, setMore] = useState(false);
   const [hl, setHl] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  useDialogFocus(ref, onClose);
   const kindOf = (id: string) => app.providers.find((p) => p.id === id)?.kind ?? "custom";
   const nameOf = (id: string) => app.providers.find((p) => p.id === id)?.name ?? id;
 
@@ -44,23 +46,30 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
     return () => removeEventListener("mousedown", down);
   }, []);
   useEffect(() => setHl(0), [tab, q]);
+  useEffect(() => { document.getElementById(`model-opt-${hl}`)?.scrollIntoView({ block: "nearest" }); }, [hl]);
+
+  const toggleFav = (m: Model) => {
+    const fav = app.favorites.includes(favKey(m));
+    app.setFavorites(fav ? app.favorites.filter((k) => k !== favKey(m)) : [...app.favorites, favKey(m)]);
+  };
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") onClose();
     else if (e.key === "ArrowDown") (e.preventDefault(), setHl(Math.min(hl + 1, visible.length - 1)));
     else if (e.key === "ArrowUp") (e.preventDefault(), setHl(Math.max(hl - 1, 0)));
     else if (e.key === "Enter" && visible[hl]) pick(visible[hl]);
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && visible[hl]) (e.preventDefault(), toggleFav(visible[hl]));
     else if (e.metaKey && /^[1-9]$/.test(e.key) && visible[Number(e.key) - 1]) (e.preventDefault(), pick(visible[Number(e.key) - 1]));
   };
 
   return (
-    <div className="popover picker" ref={ref} onKeyDown={onKey}>
+    <div className="popover picker" ref={ref} role="dialog" aria-label={t("modelPicker")} onKeyDown={onKey}>
       <div className="picker-rail">
-        <button className={tab === "fav" && !q ? "active" : ""} title={t("favorites")} onClick={() => setTab("fav")}>
+        <button className={tab === "fav" && !q ? "active" : ""} title={t("favorites")} aria-label={t("favorites")} aria-pressed={tab === "fav" && !q} onClick={() => setTab("fav")}>
           <Star size={17} fill={tab === "fav" ? "currentColor" : "none"} />
         </button>
         {providers.map((p) => (
-          <button key={p.id} className={tab === p.id && !q ? "active" : ""} title={p.name} onClick={() => setTab(p.id)}>
+          <button key={p.id} className={tab === p.id && !q ? "active" : ""} title={p.name} aria-label={p.name} aria-pressed={tab === p.id && !q} onClick={() => setTab(p.id)}>
             <ProviderIcon kind={p.kind} cli={p.cli} size={18} />
           </button>
         ))}
@@ -68,14 +77,17 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
       <div className="picker-main">
         <div className="picker-search">
           <Search size={15} />
-          <input autoFocus placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input
+            autoFocus role="combobox" aria-label={t("searchModels")} aria-expanded aria-controls="model-list" aria-autocomplete="list" aria-keyshortcuts="Control+D Meta+D"
+            aria-activedescendant={visible[hl] ? `model-opt-${hl}` : undefined} placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="picker-list">
+          <div id="model-list" role="listbox" aria-label={t("modelPicker")} style={{ display: "contents" }}>
           {visible.map((m, i) => {
             const fav = app.favorites.includes(favKey(m));
             const sel = app.selection?.providerId === m.providerId && app.selection.model === m.id;
             return (
-              <div key={favKey(m)} className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`} onMouseEnter={() => setHl(i)} onClick={() => pick(m)}>
+              <div key={favKey(m)} id={`model-opt-${i}`} role="option" aria-selected={sel} className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`} onMouseEnter={() => setHl(i)} onClick={() => pick(m)}>
                 <div className="info">
                   <div className="model-name">
                     <ModelIcon model={`${m.id} ${m.name}`} provider={app.providers.find(p => p.id === m.providerId)} size={18} /> {m.name}
@@ -89,9 +101,12 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
                 <button
                   className={`star${fav ? " on" : ""}`}
                   title={t("favorite")}
+                  aria-label={t("favorite")}
+                  aria-pressed={fav}
+                  tabIndex={-1}
                   onClick={(e) => {
                     e.stopPropagation();
-                    app.setFavorites(fav ? app.favorites.filter((k) => k !== favKey(m)) : [...app.favorites, favKey(m)]);
+                    toggleFav(m);
                   }}
                 >
                   <Star size={14} fill={fav ? "currentColor" : "none"} />
@@ -99,6 +114,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
               </div>
             );
           })}
+          </div>
           {!visible.length && (
             <div className="picker-empty">
               {tab === "fav" && !q ? t("noFavorites") : app.modelErrors[tab] ? app.modelErrors[tab] : t("noModels")}

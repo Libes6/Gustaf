@@ -13,10 +13,12 @@ import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
+  const t = useT();
   const [v, setV] = useState(value);
   return (
     <input
       className="input"
+      aria-label={t("rename")}
       style={{ height: 24, padding: "0 6px" }}
       autoFocus
       value={v}
@@ -36,22 +38,24 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
   const menu = useMenu();
   const more = useMenu();
   return (
-    <nav className="rail drag">
-      <button className={`rail-btn${app.view === "chat" ? " active" : ""}`} title={t("home")} onClick={() => app.setView("chat")}>
+    <nav className="rail drag" aria-label={t("navMain")}>
+      <button className={`rail-btn${app.view === "chat" ? " active" : ""}`} title={t("home")} aria-label={t("home")} aria-current={app.view === "chat" ? "page" : undefined} onClick={() => app.setView("chat")}>
         <Home size={17} />
       </button>
-      <button className="rail-btn" title={t("toggleSidebar")} onClick={() => app.setSideHidden(!app.sideHidden)}>
+      <button className="rail-btn" title={t("toggleSidebar")} aria-label={t("toggleSidebar")} aria-expanded={!app.sideHidden} onClick={() => app.setSideHidden(!app.sideHidden)}>
         <Clock size={17} />
       </button>
-      <button className="rail-btn" title={t("newProject")} onClick={onCreateProject}>
+      <button className="rail-btn" title={t("newProject")} aria-label={t("newProject")} onClick={onCreateProject}>
         <FolderPlus size={17} />
       </button>
-      <button className="rail-btn" title="MCP" onClick={() => app.openSettings("mcp")}>
+      <button className="rail-btn" title="MCP" aria-label="MCP" onClick={() => app.openSettings("mcp")}>
         <Plug size={17} />
       </button>
       <button
         className="rail-btn"
         title={t("more")}
+        aria-label={t("more")}
+        aria-haspopup="menu"
         onClick={(e) =>
           more.open(e.currentTarget.getBoundingClientRect(), [
             { label: t("compareTitle"), icon: <Columns2 size={15} />, onClick: onCompare },
@@ -63,11 +67,13 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
         <MoreHorizontal size={17} />
       </button>
       <div className="spacer" />
-      <button className="rail-btn" title={t("help")} onClick={() => app.openSettings("general")}>
+      <button className="rail-btn" title={t("help")} aria-label={t("help")} onClick={() => app.openSettings("general")}>
         <HelpCircle size={17} />
       </button>
       <button
         className="rail-btn"
+        aria-label={t("accountMenu")}
+        aria-haspopup="menu"
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           menu.open({ clientX: r.right + 6, clientY: r.top - 190 }, [
@@ -127,8 +133,8 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     app.setView("chat");
   };
 
-  const chatMenu = (e: React.MouseEvent, c: Chat) => {
-    e.preventDefault();
+  const chatMenu = (e: React.MouseEvent | DOMRect, c: Chat) => {
+    if ("preventDefault" in e) e.preventDefault();
     menu.open(e, [
       { label: t("rename"), icon: <Pencil size={15} />, onClick: () => setEditing(`c${c.id}`) },
       ...app.sections.map((s) => ({
@@ -173,14 +179,18 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         className={`row${child ? " child" : ""}${app.activeChat === c.id && app.view === "chat" ? " active" : ""}`}
         draggable
         onDragStart={(e) => e.dataTransfer.setData("text/chat", String(c.id))}
-        onClick={() => openChat(c)}
         onContextMenu={(e) => chatMenu(e, c)}
       >
-        <span className="label">{c.title}</span>
-        {waiting.has(c.id) && <span className="approval-badge" role="status" aria-label={t("approvalPendingBadge")} title={t("approvalPendingBadge")}>!</span>}
-        {app.sessions.items.some(s => s.chatId === c.id && s.busy) && <span className="status-dot spin" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
+        <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
+          <span className="label">{c.title}</span>
+          {waiting.has(c.id) && <span className="approval-badge" role="status" aria-label={t("approvalPendingBadge")} title={t("approvalPendingBadge")}>!</span>}
+          {app.sessions.items.some(s => s.chatId === c.id && s.busy) && <span className="status-dot spin" role="img" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
+        </button>
         <span className="actions">
-          <button className="icon-btn" title={t("archive")} onClick={(e) => (e.stopPropagation(), archiveChat(c.id).then(app.reload))}>
+          <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
+            <MoreHorizontal size={14} />
+          </button>
+          <button className="icon-btn" title={t("archive")} aria-label={t("archive")} onClick={(e) => (e.stopPropagation(), archiveChat(c.id).then(app.reload))}>
             <Archive size={14} />
           </button>
         </span>
@@ -202,32 +212,32 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const projects = app.projects.filter((p) => !q || p.name.toLowerCase().includes(q) || chatsOf(p.id).length);
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label={t("sidebar")}>
       <div className="side-head drag">
         <div className="title">
           M Code <ChevronDown size={14} color="var(--text-2)" />
         </div>
         <span className="grow" />
-        <button className="icon-btn" title={t("notifications")}>
+        <button className="icon-btn" title={t("notifications")} aria-label={t("notifications")}>
           <Bell size={15} />
         </button>
         <button className="icon-btn" title={`${t("searchAllChats")} ⌘K`} aria-label={t("searchAllChats")} onClick={onSearch}>
           <TextSearch size={15} />
         </button>
-        <button className="icon-btn" title={t("search")} onClick={() => setQuery(query === null ? "" : null)}>
+        <button className="icon-btn" title={t("search")} aria-label={t("search")} aria-expanded={query !== null} onClick={() => setQuery(query === null ? "" : null)}>
           <Search size={15} />
         </button>
       </div>
       {query !== null && (
         <div className="side-search">
-          <input className="input" autoFocus placeholder={t("searchChats")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery(null)} />
+          <input className="input" autoFocus aria-label={t("searchChats")} placeholder={t("searchChats")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery(null)} />
         </div>
       )}
       <div className="side-scroll">
-        <div className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`} onClick={() => newChat(null)}>
+        <button className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`} onClick={() => newChat(null)}>
           <SquarePen size={15} />
           <span className="label">{t("newChat")}</span>
-        </div>
+        </button>
 
         {app.sections.map((s) =>
           editing === `s${s.id}` ? (
@@ -238,7 +248,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
             <div key={s.id} className={`dropzone${dropOver === s.id ? " over" : ""}`} {...dropProps(s.id, (id) => app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, id])] } : x))))}>
               <div className="section-title" onDoubleClick={() => setEditing(`s${s.id}`)}>
                 <span style={{ flex: 1 }}>{s.name}</span>
-                <button className="icon-btn" title={t("delete")} onClick={() => app.setSections(app.sections.filter((x) => x.id !== s.id))}>
+                <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={() => app.setSections(app.sections.filter((x) => x.id !== s.id))}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -248,15 +258,15 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           ),
         )}
         <div className={`dropzone${dropOver === "new" ? " over" : ""}`} {...dropProps("new", (id) => app.setSections([...app.sections, { id: crypto.randomUUID(), name: t("newSection"), chatIds: [id] }]))}>
-          <div className="row muted" onClick={addSection}>
+          <button className="row muted" onClick={addSection}>
             <span className="label">{t("newSection")}</span>
-          </div>
+          </button>
           <div className="hint">{t("dragHere")}</div>
         </div>
 
-        <div className="section-title" onClick={() => setProjectsOpen(!projectsOpen)}>
+        <button className="section-title" aria-expanded={projectsOpen} onClick={() => setProjectsOpen(!projectsOpen)}>
           {t("projects")} {projectsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </div>
+        </button>
         {projectsOpen &&
           projects.slice(0, projectLimit).map((p) => {
             const open = expanded[p.id] ?? true;
@@ -271,17 +281,18 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                 ) : (
                   <div
                     className={`row${menu.isOpen ? "" : ""}${app.draftProject === p.id && app.activeChat === null && app.view === "chat" ? " active" : ""}`}
-                    onClick={() => setExpanded({ ...expanded, [p.id]: !open })}
                     onContextMenu={(e) => (e.preventDefault(), projectMenu(e, p))}
                   >
-                    {open ? <FolderOpen size={15} /> : <Folder size={15} />}
-                    <span className="label">{p.name}</span>
-                    {!!p.pinned && <Pin size={11} color="var(--text-3)" />}
+                    <button className="row-main" aria-expanded={open} onClick={() => setExpanded({ ...expanded, [p.id]: !open })}>
+                      {open ? <FolderOpen size={15} /> : <Folder size={15} />}
+                      <span className="label">{p.name}</span>
+                      {!!p.pinned && <Pin size={11} color="var(--text-3)" aria-label={t("pin")} role="img" />}
+                    </button>
                     <span className="actions">
-                      <button className="icon-btn" title={t("more")} onClick={(e) => (e.stopPropagation(), projectMenu(e.currentTarget.getBoundingClientRect(), p))}>
+                      <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), projectMenu(e.currentTarget.getBoundingClientRect(), p))}>
                         <MoreHorizontal size={14} />
                       </button>
-                      <button className="icon-btn" title={t("newChatInProject")} onClick={(e) => (e.stopPropagation(), newChat(p.id))}>
+                      <button className="icon-btn" title={t("newChatInProject")} aria-label={t("newChatInProject")} onClick={(e) => (e.stopPropagation(), newChat(p.id))}>
                         <SquarePen size={14} />
                       </button>
                     </span>
@@ -289,27 +300,27 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                 )}
                 {open && shown.map((c) => chatRow(c, true))}
                 {open && list.length > 5 && !showAll[p.id] && (
-                  <div className="row child muted" onClick={() => setShowAll({ ...showAll, [p.id]: true })}>
+                  <button className="row child muted" onClick={() => setShowAll({ ...showAll, [p.id]: true })}>
                     {t("showMore")}
-                  </div>
+                  </button>
                 )}
               </div>
             );
           })}
         {projectsOpen && projects.length > projectLimit && (
-          <div className="row muted" onClick={() => setProjectLimit(projectLimit + 20)}>
+          <button className="row muted" onClick={() => setProjectLimit(projectLimit + 20)}>
             {t("showMore")}
-          </div>
+          </button>
         )}
         {projectsOpen && !projects.length && (
-          <div className="row muted" onClick={onCreateProject}>
+          <button className="row muted" onClick={onCreateProject}>
             <FolderPlus size={15} />
             <span className="label">{t("newProject")}</span>
-          </div>
+          </button>
         )}
-        <div className="section-title" onClick={() => setRecentOpen(!recentOpen)}>
+        <button className="section-title" aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}>
           {t("recent")} {recentOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </div>
+        </button>
         {(recentOpen || q) && app.chats.filter(c => !q || c.title.toLowerCase().includes(q.toLowerCase())).slice(0, q ? undefined : recentLimit).map((c) => chatRow(c, false))}
         {recentOpen && !q && app.chats.length > recentLimit && <button className="hint" onClick={() => setRecentLimit(n => n + 8)}>{t("showMore")}</button>}
 

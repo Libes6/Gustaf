@@ -8,6 +8,7 @@ import { branchNameProblem, candidates, commitProblem, initialSelection, suggest
 import { getAdapter } from "../providers";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget } from "../lib/modelRouting";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { useApp } from "../state";
 import "../styles/gitCommit.css";
 
@@ -28,6 +29,8 @@ const KIND_LETTER: Record<GitFileKind, string> = { modified: "M", added: "A", de
 export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root: string; accepted: string[]; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
   const t = useT();
   const app = useApp();
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef);
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -157,7 +160,7 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
 
   return createPortal(
     <div className="review-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !committing) onClose(); }}>
-      <section className="review-dialog git-dialog" role="dialog" aria-modal="true" aria-label={t("gitCommitTitle")}>
+      <section ref={dialogRef} className="review-dialog git-dialog" role="dialog" aria-modal="true" aria-label={t("gitCommitTitle")}>
         <header>
           <strong>{t("gitCommitTitle")}</strong>
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose} disabled={committing}><X size={17} /></button>
@@ -189,7 +192,7 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
                   </button>
                 </div>
                 <textarea
-                  id="git-commit-message" className="input git-message" rows={6} value={message} disabled={committing}
+                  id="git-commit-message" autoFocus className="input git-message" rows={6} value={message} disabled={committing}
                   placeholder={t("gitMessagePlaceholder")} spellCheck
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); commit(); } }}

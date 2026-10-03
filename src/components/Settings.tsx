@@ -37,8 +37,8 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return <button role="switch" aria-checked={on} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
+function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
+  return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
 }
 
 function General() {
@@ -53,9 +53,9 @@ function General() {
           <div className="grow">
             <div className="t">{t("language")}</div>
           </div>
-          <div className="seg" style={{ margin: 0 }}>
-            <button className={app.locale === "ru" ? "active" : ""} onClick={() => app.setLocale("ru")}>Русский</button>
-            <button className={app.locale === "en" ? "active" : ""} onClick={() => app.setLocale("en")}>English</button>
+          <div className="seg" role="group" aria-label={t("language")} style={{ margin: 0 }}>
+            <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" onClick={() => app.setLocale("ru")}>Русский</button>
+            <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" onClick={() => app.setLocale("en")}>English</button>
           </div>
         </div>
         <div className="card-row">
@@ -167,32 +167,32 @@ function Providers() {
       <div className="split card">
         <div className="split-list">
           {app.providers.map((p) => (
-            <div key={p.id} className={`split-item${current === p.id ? " active" : ""}`} onClick={() => setSel(p.id)}>
-              <ProviderIcon kind={p.kind} cli={p.cli} />
-              <div className="grow">
-                <div className="t">{p.name} {version(p) && <span className="mono d">v{version(p)}</span>}</div>
-                <div className="sub">{status(p)}</div>
-              </div>
-              <span onClick={(e) => e.stopPropagation()}>
-                <Toggle on={!p.disabled} onChange={(on) => update({ ...p, disabled: !on })} />
-              </span>
+            <div key={p.id} className={`split-item${current === p.id ? " active" : ""}`}>
+              <button className="split-main" aria-current={current === p.id ? "true" : undefined} onClick={() => setSel(p.id)}>
+                <ProviderIcon kind={p.kind} cli={p.cli} />
+                <div className="grow">
+                  <div className="t">{p.name} {version(p) && <span className="mono d">v{version(p)}</span>}</div>
+                  <div className="sub">{status(p)}</div>
+                </div>
+              </button>
+              <Toggle on={!p.disabled} label={p.name} onChange={(on) => update({ ...p, disabled: !on })} />
             </div>
           ))}
           {pending.map((c) => (
-            <div key={c.id} className={`split-item${current === `cli:${c.id}` ? " active" : ""}`} onClick={() => setSel(`cli:${c.id}`)}>
-              <ProviderIcon kind="cli" cli={c.id} />
-              <div className="grow">
-                <div className="t">{cliName(c.id)} <span className="mono d">v{short(c.version)}</span></div>
-                <div className="sub d">{t("notConnected")}</div>
-              </div>
-              <span onClick={(e) => e.stopPropagation()}>
-                <Toggle on={false} onChange={() => connect(c.id)} />
-              </span>
+            <div key={c.id} className={`split-item${current === `cli:${c.id}` ? " active" : ""}`}>
+              <button className="split-main" aria-current={current === `cli:${c.id}` ? "true" : undefined} onClick={() => setSel(`cli:${c.id}`)}>
+                <ProviderIcon kind="cli" cli={c.id} />
+                <div className="grow">
+                  <div className="t">{cliName(c.id)} <span className="mono d">v{short(c.version)}</span></div>
+                  <div className="sub d">{t("notConnected")}</div>
+                </div>
+              </button>
+              <Toggle on={false} label={cliName(c.id)} onChange={() => connect(c.id)} />
             </div>
           ))}
-          <div className={`split-item add${current === "new" ? " active" : ""}`} onClick={() => setSel("new")}>
+          <button className={`split-item add${current === "new" ? " active" : ""}`} aria-current={current === "new" ? "true" : undefined} onClick={() => setSel("new")}>
             <Plus size={15} /> <span className="grow">{t("addProvider")}</span>
-          </div>
+          </button>
         </div>
         <div className="split-detail">
           {current === "new" && (
@@ -244,8 +244,8 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             <div className="t">{t("displayName")}</div>
             <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
           </div>
-          <input className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-          <button className="icon-btn" title={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
+          <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
+          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="card"><div className="card-row"><div className="grow"><div className="t">{t(app.providerHealth[p.id]?.status === "auth" ? "providerAuth" : app.providerHealth[p.id]?.status === "ok" ? "providerOn" : "providerAvailable")}</div><div className="d">{t("providerCheckHint")}</div>
@@ -267,7 +267,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             {p.kind !== "cursor" && (
               <div className="card-row">
                 <div className="grow t">Base URL</div>
-                <input className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
+                <input aria-label="Base URL" className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
               </div>
             )}
             <div className="card-row">
@@ -275,7 +275,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
                 <div className="t">{t("apiKey")}</div>
                 <div className="d">{t("keyUnchanged")}</div>
               </div>
-              <input className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
+              <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
             </div>
           </>
         )}
@@ -287,7 +287,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
       <h4>{t("models")}</h4>
       <div className="card">
         <div className="card-row" style={{ minHeight: 44 }}>
-          <input className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input aria-label={t("searchModels")} className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
           <button className="btn-ghost small" onClick={() => app.setHiddenModels(allHidden ? app.hiddenModels.filter((k) => !keys.includes(k)) : [...new Set([...app.hiddenModels, ...keys])])}>
             {t(allHidden ? "showAll" : "hideAll")}
           </button>
@@ -299,11 +299,11 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             const fav = app.favorites.includes(k);
             return (
               <div key={m.id} className="model-line">
-                <button className={`star${fav ? " on" : ""}`} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
+                <button className={`star${fav ? " on" : ""}`} title={t("favorite")} aria-label={`${t("favorite")}: ${m.name}`} aria-pressed={fav} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
                   <Star size={13} fill={fav ? "currentColor" : "none"} />
                 </button>
                 <span className="grow">{m.name} {m.name !== m.id && <span className="mono d">{m.id}</span>}</span>
-                <Toggle on={!app.hiddenModels.includes(k)} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
+                <Toggle on={!app.hiddenModels.includes(k)} label={m.name} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
               </div>
             );
           })}
@@ -379,7 +379,7 @@ function ComputerPage() {
             <div className="t">{t("computerEnable")}</div>
             <div className="d">{t("computerEnableDesc")}</div>
           </div>
-          <Toggle on={app.computerUse} onChange={(v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen)} />
+          <Toggle on={app.computerUse} label={t("computerUse")} onChange={(v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen)} />
         </div>
         <div className="card-row">
           <div className="grow">
@@ -446,7 +446,7 @@ function Rules() {
     <>
       <h1>{t("rules")}</h1>
       <p className="lead">{t("rulesLead")}</p>
-      <select className="input" value={pid} onChange={(e) => setPid(Number(e.target.value))} style={{ marginBottom: 12 }}>
+      <select aria-label={t("searchProject")} className="input" value={pid} onChange={(e) => setPid(Number(e.target.value))} style={{ marginBottom: 12 }}>
         {withPath.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <div className="card" style={{ padding: 14 }}>
@@ -494,29 +494,29 @@ export function Settings() {
   const Page = PAGES[app.settingsPage];
   return (
     <div className="settings">
-      <nav className="settings-nav drag">
-        <h3>{t("settings")}</h3>
+      <nav className="settings-nav drag" aria-label={t("settings")}>
+        <div className="settings-nav-title">{t("settings")}</div>
         {NAV.map((g) => (
-          <div key={g.group}>
-            <div className="section-title" style={{ paddingTop: 10 }}>{t(g.group)}</div>
+          <div key={g.group} role="group" aria-label={t(g.group)}>
+            <div className="section-title" aria-hidden="true" style={{ paddingTop: 10 }}>{t(g.group)}</div>
             {g.items.map((it) => (
-              <div key={it.id} className={`row${app.settingsPage === it.id ? " active" : ""}`} onClick={() => app.openSettings(it.id)}>
+              <button key={it.id} className={`row${app.settingsPage === it.id ? " active" : ""}`} aria-current={app.settingsPage === it.id ? "page" : undefined} onClick={() => app.openSettings(it.id)}>
                 <it.icon size={15} />
                 <span className="label">{t(it.label)}</span>
-              </div>
+              </button>
             ))}
           </div>
         ))}
-        <div className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
+        <button className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
           <span className="label">{t("docs")}</span>
-        </div>
+        </button>
       </nav>
-      <div className="settings-main">
+      <main className="settings-main" aria-label={t(NAV.flatMap((g) => g.items).find((it) => it.id === app.settingsPage)?.label ?? "settings")}>
         <div className="drag" style={{ height: 0 }} />
         <div className={`settings-inner${app.settingsPage === "providers" ? " wide" : ""}`}>
           <Page />
         </div>
-      </div>
+      </main>
     </div>
   );
 }
