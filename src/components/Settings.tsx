@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
-import { computer, fsx, getSetting } from "../lib/api";
+import { computer, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
 import { SOURCE_LABELS } from "../lib/importers/common";
 import { deleteProvider, PRESETS, saveProvider } from "../providers";
@@ -17,6 +17,7 @@ import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
+import { McpServers } from "./McpServers";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
@@ -394,35 +395,6 @@ function ComputerPage() {
   );
 }
 
-function Mcp() {
-  const t = useT();
-  const [servers, setServers] = useState<[string, any][] | null>(null);
-  useEffect(() => {
-    fsx.homeFile(".cursor/mcp.json").then((s) => setServers(s ? Object.entries(JSON.parse(s).mcpServers ?? {}) : []));
-  }, []);
-  return (
-    <>
-      <h1>MCP</h1>
-      <p className="lead">{t("mcpLead")}</p>
-      <div className="card">
-        {servers?.length === 0 && <div className="card-row d">{t("mcpNone")}</div>}
-        {servers?.map(([name, cfg]) => (
-          <div key={name} className="card-row">
-            <span className="prov-icon"><Plug size={14} /></span>
-            <div className="grow">
-              <div className="t">{name}</div>
-              <div className="d" style={{ fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {cfg.url ?? [cfg.command, ...(cfg.args ?? [])].join(" ")}
-              </div>
-            </div>
-            <span className="d">{cfg.url ? "HTTP" : "stdio"}</span>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function GitPage() {
   const t = useT();
   return (
@@ -487,7 +459,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: Mcp, git: GitPage, rules: Rules, archive: ArchivePage,
+  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
 };
 
 export function Settings() {

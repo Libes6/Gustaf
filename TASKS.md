@@ -54,8 +54,7 @@ Items were drafted from the README and code layout; verify against the code befo
   - [ ] CLI discovery in `providers/cli.ts` (hardcoded `/Applications/ChatGPT.app`, `~/.nvm`) and Windows paths.
   - [ ] Review Computer Use (Wayland), macOS-specific wording in prompts/i18n, system font stack in `theme.css`.
   - [ ] CI matrix: `windows-latest`, `ubuntu-latest` (install `libwebkit2gtk-4.1-dev` etc.).
-
-- [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
+- [x] **MCP servers**: API-provider agents use tools of stdio and streamable-HTTP MCP servers (`src/agent/mcp/`, `mcp.rs`, `McpServers.tsx`): Keychain secrets, import of `mcpServers` JSON, approvals per call/tool/server, read-only mode, action log. Not done: resources/prompts/sampling/OAuth, the legacy SSE transport, subagent access to MCP tools, CLI providers (own config); not smoke-tested against real servers or in `tauri dev`.
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
 - [x] **Git integration**: commit accepted changes, generated commit message, optional branch before commit (`git.rs`, `GitCommitDialog`). Not done: push and pull-request creation.
 - [x] **`@file` mentions** in the composer with autocomplete (already existed; `@folder` not supported).
@@ -70,7 +69,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.
 
 ## P3
-- [ ] **Canvas**: multi-file modules, bundled extra libraries, export to HTML/PNG, revision diff.
+- [ ] **Canvas**: done: multi-file modules (`// file:` sections, relative imports, file tabs), `lucide-react` bundled as an extra library (separate larger runtime, loaded only when imported), export to standalone HTML, revision diff (Changes tab). Not done: export to PNG (not reliably possible through the sandboxed iframe, WebKit taints SVG foreignObject canvases), other bundled libraries (charts etc. are too large or not in `node_modules`), precompiling the HTML export (it compiles at open time). Not verified in the real Tauri WebView.
 - [x] **Model routing** by task type (cheap vs strong model). Done for agents: default model per subagent type, an allow-list for explicit `model` requests, and a cheap model for chat compaction and commit messages (Settings, Usage, Agents; `agentSettings.ts`, `lib/modelRouting.ts`). Not done: automatic routing of the main chat's own requests.
 - [x] **Scheduled prompts.** Run while the app is open (no OS daemon): once / every N minutes or hours (min 5) / daily / weekdays, DST-safe local-time math, missed-run policy (run once if due within 24 h, else "missed"), no overlap, max 20, switching on is the confirmation, access capped to auto, no Computer Use or subagents, approvals never auto-answered (timeout 10 min -> "needs attention"), action log source "scheduled" (`lib/scheduledPrompts.ts`, `scheduledRun.ts`, Settings, General). Not done: scheduled chat is not live while open, no OS-level launch, UI untested.
 - [ ] **Voice input** and screenshot paste.
