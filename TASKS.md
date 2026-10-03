@@ -1,6 +1,6 @@
 # Tasks
 
-Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Priority: P1 (next) · P2 · P3.
+Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Priority: P1 (next) · P2 · P3; market research items R1 (first) to R4.
 Items were drafted from the README and code layout; verify against the code before starting.
 
 ## P0 — hardening and hygiene
@@ -106,6 +106,56 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Export/import chats** (Markdown/JSON export, JSON import).
 - [x] **Importers** for Claude Code, Codex and ChatGPT histories (`import_sources.rs`, `src/lib/importers/`; Cursor stays in `cursor_import.rs`).
 - [ ] **Smoke-test in `tauri dev`**: draft restore, budgets banner, chat export/import, save dialog.
+
+## Market research backlog (2026-10-03)
+Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, Warp, Cline/Roo/Kilo, OpenCode, Msty, LibreChat and user discussions. Checked against the code on 2026-10-03: the API agent tools are only `read_file`, `list_dir`, `search`, `edit_file`, `write_file`, `run_command` (+ MCP, computer, subagents); no plan mode, skills, memory, terminal pane or semantic index exist.
+
+### R1 — expected by users (do first)
+- [ ] **Plan mode** in the main chat (Claude Code, Cursor `--plan`, Roo). The agent may only read/search and must end with a step-by-step plan; edits start after the user clicks Approve.
+  - [ ] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
+  - [ ] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
+  - [ ] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
+- [ ] **Persistent memory** (most requested on Reddit; Kilo Memory Bank). Facts about the project and the user survive across chats.
+  - [ ] Store: per-project and global memory entries in SQLite (text, source chat, created/updated), editable list in Settings and the project menu.
+  - [ ] Agent tools `remember` / `forget` (with approval option) and automatic injection of relevant entries into the system prompt (capped, fenced like project instructions).
+  - [ ] Optional "suggest memories" at the end of a chat; user confirms; export to `AGENTS.md`.
+- [ ] **Skills and slash commands** (Claude Code skills, Codex app). Reusable Markdown workflows.
+  - [ ] Format: `SKILL.md` with frontmatter (name, description, allowed tools, model) in `~/.mcode/skills` and `<project>/.mcode/skills`; also read `.claude/skills` and `.cursor/commands` if present.
+  - [ ] `/` picker in the composer with autocomplete; arguments; the skill body is inserted as instructions.
+  - [ ] Model-invoked skills: list names + descriptions in the system prompt, a `use_skill` tool loads the body on demand.
+  - [ ] Built-in starters: `/review`, `/commit`, `/explain`, `/test`.
+
+### R2 — coding workflow
+- [ ] **Integrated terminal pane** (Claude Code desktop, Warp). A real PTY per project in a bottom/side pane.
+  - [ ] Rust PTY (`portable-pty`) + `xterm.js`; multiple tabs, cwd = project (or shadow copy), shell from `shell.rs`.
+  - [ ] "Send selection to chat" and "Run in terminal" from tool cards; agent can read the last N lines with approval.
+- [ ] **Semantic code search** (Cursor indexing). Find code by meaning.
+  - [ ] Chunk files (respecting ignore rules), embeddings via a configured provider or a local model (Ollama), store vectors in SQLite (e.g. `sqlite-vec`), incremental re-index on file change.
+  - [ ] Agent tool `semantic_search` next to text `search`; index status and opt-in per project (embedding calls cost tokens and send code to the provider).
+- [ ] **Web tools for API agents**: `web_fetch` (URL → Markdown, size cap) and `web_search` (pluggable backend: provider-native search where available, or Brave/Tavily key). Approvals, domain allow/deny rules, untrusted-content fencing against prompt injection.
+- [ ] **Dev server preview** (Claude Code, Cline). Embedded browser pane for the project's app.
+  - [ ] Start/stop dev server from project settings (command + port), show logs; webview pane with URL bar.
+  - [ ] Agent tools: screenshot, console errors, click/type in the preview (reuse the computer-use verification loop, scoped to the preview).
+- [ ] **LSP diagnostics** (OpenCode, Claude Code plugins). After each edit the agent sees type/lint errors.
+  - [ ] Start language servers per detected language (tsserver, rust-analyzer, pyright…) or run the project's `tsc --noEmit` / linter as a fallback.
+  - [ ] Append new diagnostics for edited files to the tool result; `diagnostics` tool on demand.
+- [ ] **Hooks** (Claude Code). User commands on lifecycle events: before/after tool call, after file edit, on stop, on approval request.
+  - [ ] Config per project/global (event, matcher, command, timeout); exit code can block a tool call with a message to the agent.
+  - [ ] Go through `run_command` rules; show hook output in the action log.
+- [ ] **Push and pull request creation**: push the branch from `GitCommitDialog`, create a PR via `gh` (or GitHub API with a token in Keychain) with a generated title/description; show the PR link in the chat.
+- [ ] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules.
+- [ ] **Reply to the agent from the diff** (Warp). Comment on a line/hunk in `ChangesPanel`; comments are sent to the agent as a follow-up (or into a running request) with file/line context.
+
+### R3 — convenience
+- [ ] **Quick ask window** on a global shortcut (Spotlight-like): small always-on-top window, default model, answer inline, "Open in M Code" to continue as a chat; optional clipboard/selection as context.
+- [ ] **Chat status in the sidebar** (Warp, Conductor): running / waiting for approval / done (unread) / failed badges per chat and project; filter "needs attention".
+- [ ] **Share a chat as a page**: export a chat (messages, tool cards, diffs) to a self-contained HTML file; redact secrets/paths option. Hosted links are out of scope.
+- [ ] **Knowledge base** (Msty Knowledge Stacks, LibreChat RAG): attach folders/PDFs/Markdown as a named collection; reuse the semantic index; pick collections per chat; cite sources in answers.
+
+### R4 — large, later
+- [ ] **Integrations**: start a task from a GitHub issue / Linear / Slack message, report back with the result or PR link (via MCP servers where possible).
+- [ ] **Cloud/remote agents** that keep running while the laptop is closed (Cursor, Codex). Depends on the mobile app and a server-side runner; evaluate after the mobile companion.
+- [ ] **Warm agent environments** (Cursor): prepare shadow copies in the background (dependencies installed, setup run) so a new agent starts instantly; cache per project and lockfile hash.
 
 ## Multi-agent (epic)
 Reference: the "Background tasks" panel in Claude Code desktop (running agents with model, elapsed time, tokens, tool uses, current step, stop button, transcript link, finished list).
