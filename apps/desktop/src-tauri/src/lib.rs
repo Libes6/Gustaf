@@ -21,6 +21,7 @@ mod semantic;
 mod lsp;
 mod web_tools;
 mod updater;
+mod worktree;
 mod terminal;
 
 use std::sync::Mutex;
@@ -102,6 +103,11 @@ pub fn run() {
             git_publish::git_pr_context,
             git_publish::gh_status,
             git_publish::git_create_pr,
+            worktree::worktree_create,
+            worktree::worktree_list,
+            worktree::worktree_remove,
+            worktree::worktree_prune,
+            worktree::worktree_diff,
             review::review_prepare,
             review::review_run,
             review::review_list,
