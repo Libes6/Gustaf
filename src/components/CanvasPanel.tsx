@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Download, RotateCcw, X } from "lucide-react";
+import { Copy, Download, FileCode, RotateCcw, X } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { fsx } from "../lib/api";
@@ -32,27 +32,30 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
   }, [document]);
-  const download = async () => {
+  const saveAs = async (name: string, content: string, mime: string) => {
     if (saving) return;
     setCopyError("");
     setSavedPath("");
     setSaving(true);
-    const name = multi ? file.name.split("/").pop()! : (artifact.id.replace(/[^a-zA-Z0-9_-]/g, "-") || "canvas") + ".tsx";
+    const ext = name.split(".").pop()!;
     try {
       if (isTauri()) {
-        const path = await save({ defaultPath: name, filters: [{ name: "TypeScript", extensions: [name.split(".").pop()!] }] });
+        const path = await save({ defaultPath: name, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
         if (!path) return;
         const split = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-        await fsx.write(path.slice(0, split) || "/", path.slice(split + 1), file.code);
+        await fsx.write(path.slice(0, split) || "/", path.slice(split + 1), content);
         setSavedPath(path);
       } else {
-        const url = URL.createObjectURL(new Blob([file.code], { type: "text/plain;charset=utf-8" }));
+        const url = URL.createObjectURL(new Blob([content], { type: `${mime};charset=utf-8` }));
         const a = window.document.createElement("a"); a.href = url; a.download = name; a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
     } catch (e) { setCopyError(String(e instanceof Error ? e.message : e)); }
     finally { setSaving(false); }
   };
+  const baseName = artifact.id.replace(/[^a-zA-Z0-9_-]/g, "-") || "canvas";
+  const download = () => saveAs(multi ? file.name.split("/").pop()! : `${baseName}.tsx`, file.code, "text/plain");
+  const exportHtml = () => saveAs(`${baseName}.html`, canvasDocument(artifact.code, artifact.title), "text/html");
   const current = versions.findIndex((v) => v.code === artifact.code);
   return <aside className="canvas-panel" aria-label={artifact.title}>
     <header className="canvas-header"><strong>{artifact.title}</strong>
@@ -70,6 +73,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
       </select>}
       <button className="icon-btn" title={t("copy")} onClick={() => { navigator.clipboard.writeText(file.code).catch(() => setCopyError(t("canvasCopyError"))); }}><Copy size={15} /></button>
       <button className="icon-btn" title={t("canvasDownload")} disabled={saving} onClick={download}><Download size={15} /></button>
+      <button className="icon-btn" title={t("canvasExportHtml")} aria-label={t("canvasExportHtml")} disabled={saving} onClick={exportHtml}><FileCode size={15} /></button>
       <button className="icon-btn" title={t("canvasRestart")} onClick={() => { setError(""); setRevision((r) => r + 1); }}><RotateCcw size={15} /></button>
     </div>
     {savedPath && <div className="canvas-export-status" role="status">{t("canvasSaved", { path: savedPath })}</div>}

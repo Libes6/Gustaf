@@ -482,6 +482,7 @@
   "providerChecking": "Checking…",
   "providerCheckHint": "Sends a short test request using your selected model.",
   "canvasDownload": "Download source",
+  "canvasExportHtml": "Export as standalone HTML",
   "canvasResize": "Canvas width",
   "tokenUsageLead": "Provider-reported tokens in M Code since tracking was enabled. Cached tokens are included in input; account limits are shared with other apps.",
   "inputTokens": "Input tokens",

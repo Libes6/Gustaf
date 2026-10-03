@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { transform } from 'sucrase';
 import { parseArtifacts, CANVAS_INSTRUCTIONS } from '../src/canvas/artifacts.ts';
 import { diffLines, diffFiles, collapseContext } from '../src/canvas/diff.ts';
+import { buildCanvasDocument } from '../src/canvas/documentBuilder.ts';
 import { parseFiles, loadModules, resolveRelative } from '../src/canvas/modules.ts';
 
 test('extracts complete artifacts and surrounding prose', () => {
@@ -126,4 +127,32 @@ test('context collapsing keeps neighbours of changes and counts skipped lines', 
   assert.equal(rows.filter(r => r.kind !== 'skip').length, 6);
   assert.deepEqual(rows.at(-1), { kind: 'skip', count: 7 });
   assert.deepEqual(collapseContext(diffLines('a', 'a')), [{ kind: 'skip', count: 1 }]);
+});
+
+const RUNTIME = 'console.log("runtime", "</script><script>evil()</script><!-- x");';
+const exportHtml = (code, title) => buildCanvasDocument(code, RUNTIME, { title, nonce: 'n0nce' });
+test('HTML export is self-contained: CSP meta, inline runtime, no external references', () => {
+  const html = exportHtml('// file: App.tsx\nimport { x } from "./x";\nexport default () => x;\n// file: x.ts\nexport const x = "</script><img src=https://evil.example/x>";', 'Мой <график> & "co"');
+  assert.match(html, /^<!doctype html>/);
+  assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-n0nce' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">/);
+  assert.match(html, /<title>Мой &lt;график&gt; &amp; &quot;co&quot;<\/title>/);
+  assert.match(html, /<script nonce="n0nce">console\.log\("runtime"/);
+  // Outside the two inline scripts nothing can load anything: no link/img/iframe/src/href/@import/url().
+  const shell = html.replace(/<script\b[^>]*>[^]*?<\/script>/g, '');
+  assert.doesNotMatch(shell, /<link\b|<iframe\b|<img\b|\bsrc=|\bhref=|@import|url\(/i);
+  assert.equal(html.match(/<script\b/g).length, 2);
+  assert.equal(html.match(/<\/script>/g).length, 2);
+  assert.doesNotMatch(html, /<!--/);
+});
+test('HTML export embeds every file of the artifact and the payload cannot close its script tag', () => {
+  const code = '// file: App.tsx\nexport default () => <b/>;\n// file: lib/a.ts\nexport const a = 1;';
+  const html = exportHtml(code);
+  const payload = /<script id="canvas-source" type="application\/json">([^]*?)<\/script>/.exec(html)[1];
+  assert.equal(JSON.parse(payload).code, code);
+  assert.doesNotMatch(payload, /</);
+  assert.doesNotMatch(html, /<title>/);
+});
+test('each export gets a fresh CSP nonce unless one is given', () => {
+  const nonce = (html) => /'nonce-([0-9a-f]+)'/.exec(html)[1];
+  assert.notEqual(nonce(buildCanvasDocument('x', RUNTIME)), nonce(buildCanvasDocument('x', RUNTIME)));
 });
