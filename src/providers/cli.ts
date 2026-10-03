@@ -3,11 +3,11 @@ import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
-import { codexArgs, turnImages, withImagePaths } from "./cliArgs";
+import { codexArgs, resumePoint, withImagePaths } from "./cliArgs";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { Command } from "@tauri-apps/plugin-shell";
-import { flattenMsg, textOf, type Adapter, type CliId, type ProviderConfig, type TurnInput } from "./types";
+import type { Adapter, CliId, ProviderConfig, TurnInput } from "./types";
 
 export const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
@@ -73,26 +73,7 @@ export async function spawnLines(
   return { code, stderr };
 }
 
-/** Finds the last session this provider left in the history and the prompt to continue it with. */
-export function resumePoint(t: TurnInput, providerId: string, withSystem: boolean) {
-  let from = 0;
-  let session: string | undefined;
-  for (let i = t.messages.length - 1; i >= 0; i--) {
-    const m = t.messages[i];
-    if (m.role === "assistant" && m.meta?.provider === providerId && m.meta.responseId) {
-      session = m.meta.responseId;
-      from = i + 1;
-      break;
-    }
-  }
-  const rest = t.messages.slice(from);
-  const prompt = session
-    ? rest.filter((m) => m.role === "user").map(textOf).join("\n\n")
-    : (withSystem ? `${t.system}\n\n` : "") +
-      (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
-  // Resumed CLI sessions may predate canvas support and don't receive the API system message.
-  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
-}
+export { resumePoint } from "./cliArgs";
 
 async function listCodexModels() {
   const script = import.meta.env.DEV ? __SIDECAR__.replace(/cursor-agent\.mjs$/, 'codex-limits.mjs') : await resolveResource('sidecar/codex-limits.mjs');

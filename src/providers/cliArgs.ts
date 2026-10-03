@@ -1,3 +1,5 @@
+import { flattenMsg, textOf, type TurnInput } from "./types.ts";
+
 /**
  * `images` are absolute paths of attachments written by `attachments_save`. `--image=<path>` (one flag per file) is used
  * instead of `-i <path>` because `codex exec -i` takes a variadic list and would swallow the positional prompt/session id.
@@ -24,4 +26,33 @@ export function turnImages(rest: { role: string; parts: { type: string; data?: s
   const users = rest.filter((m) => m.role === 'user');
   const picked = resumed ? users : users.slice(-1);
   return picked.flatMap((m) => m.parts.flatMap((p) => (p.type === 'image' && p.data ? [p.data] : [])));
+}
+
+/**
+ * Finds the last session this provider left in the history and the prompt to continue it with.
+ * A provider session only knows its own turns: if another provider answered after it (for example another
+ * Cursor account took over and the pool wrapped back), resuming would silently drop those turns, so the
+ * session is not resumed and the whole history is replayed as text into a fresh session instead.
+ */
+export function resumePoint(t: TurnInput, providerId: string, withSystem: boolean) {
+  let from = 0;
+  let session: string | undefined;
+  for (let i = t.messages.length - 1; i >= 0; i--) {
+    const m = t.messages[i];
+    if (m.role === "assistant" && m.meta?.provider === providerId && m.meta.responseId) {
+      const interleaved = t.messages.slice(i + 1).some((x) => x.role === "assistant" && x.meta?.provider && x.meta.provider !== providerId);
+      if (!interleaved) {
+        session = m.meta.responseId;
+        from = i + 1;
+      }
+      break;
+    }
+  }
+  const rest = t.messages.slice(from);
+  const prompt = session
+    ? rest.filter((m) => m.role === "user").map(textOf).join("\n\n")
+    : (withSystem ? `${t.system}\n\n` : "") +
+      (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
+  // Resumed CLI sessions may predate canvas support and don't receive the API system message.
+  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
 }
