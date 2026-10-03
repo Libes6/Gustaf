@@ -13,7 +13,8 @@ import "../styles/scheduled.css";
 export function ScheduledPromptsRuntime() {
   const t = useT();
   const app = useApp();
-  const approvals = useScheduledApprovals();
+  // A request of the chat that is open is answered in the chat itself (it is live there), not in the corner card.
+  const approvals = useScheduledApprovals().filter((a) => !(a.chatId !== null && app.view === "chat" && app.activeChat === a.chatId));
   const appRef = useRef(app);
   appRef.current = app;
   const ready = app.ready && app.onboarded && app.checkedAt > 0;

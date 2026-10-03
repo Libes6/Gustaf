@@ -281,6 +281,8 @@
   "scheduledNoteFailed": "Scheduled run failed: {detail}",
   "scheduledNoteAttention": "Scheduled run stopped: a command waited too long for your approval.",
   "scheduledNoteStopped": "Scheduled run stopped.",
+  "scheduledChatRunning": "Scheduled run \"{title}\" is writing to this chat…",
+  "scheduledChatBusy": "The scheduled run \"{title}\" is writing to this chat. Wait for it to finish or press Stop.",
   "scheduledNotifyTitle": "{title}: scheduled prompt",
   "scheduledNotifyDone": "Finished.",
   "scheduledNotifyAttention": "Needs attention: a command is waiting for approval.",

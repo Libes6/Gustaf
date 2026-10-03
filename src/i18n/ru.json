@@ -285,6 +285,8 @@
   "scheduledNoteFailed": "Запланированный запуск завершился ошибкой: {detail}",
   "scheduledNoteAttention": "Запланированный запуск остановлен: команда слишком долго ждала вашего подтверждения.",
   "scheduledNoteStopped": "Запланированный запуск остановлен.",
+  "scheduledChatRunning": "Запланированный запуск «{title}» пишет в этот чат…",
+  "scheduledChatBusy": "Запланированный запуск «{title}» пишет в этот чат. Дождитесь окончания или нажмите «Стоп».",
   "scheduledNotifyTitle": "{title}: запланированный запрос",
   "scheduledNotifyDone": "Завершён.",
   "scheduledNotifyAttention": "Нужно внимание: команда ждёт подтверждения.",

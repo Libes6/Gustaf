@@ -2,10 +2,12 @@ import { useSyncExternalStore } from "react";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { translate, type Key } from "../i18n";
 import { getAdapter } from "../providers";
+import { retryNoticeVars } from "../providers/retry";
 import type { AppState } from "../state";
 import { db, review } from "./api";
 import { beginApproval, notifyUnfocused } from "./attention";
 import { checkpoint } from "./checkpoints";
+import { beginLiveRun } from "./liveRuns";
 import { addMessage, createChat } from "./data";
 import { runsOwnTools } from "./modelRouting";
 import { prepareShadowCopy } from "./reviewSetupStore";
@@ -73,6 +75,8 @@ function depsFor(getApp: () => AppState): ScheduledRunDeps {
     checkpoint,
     beginApproval,
     askUser: openScheduledApproval,
+    live: beginLiveRun,
+    retryNotice: (info) => t("retryingIn", retryNoticeVars(info)),
     recordUsage: (providerId, model, usage) => getApp().recordTokens(providerId, model, usage),
     bumpUsage: (providerId) => getApp().bumpUsage(providerId),
     recordResult: (providerId, error) => getApp().recordProviderResult(providerId, error),
