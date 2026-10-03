@@ -138,8 +138,11 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     }
     return { status: "success", chatId: cid };
   } catch (e) {
-    if (attention) return { status: "attention", chatId };
-    if (ctl.signal.aborted) return { status: "stopped", chatId };
+    // The loop ends with an abort error when it was stopped mid-step; the chat still says why the run ended.
+    if (attention || ctl.signal.aborted) {
+      if (chatId !== null) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
+      return { status: attention ? "attention" : "stopped", chatId };
+    }
     const message = (await reportRunFailure(e, { providerId: sc.providerId, signal: ctl.signal }, deps)) ?? "";
     return await fail(message);
   } finally {
