@@ -21,3 +21,11 @@
 .sched-approvals { position: fixed; right: 16px; bottom: 16px; z-index: 70; display: flex; flex-direction: column; gap: 10px; width: min(420px, calc(100vw - 32px)); }
 .sched-approval { background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .sched-cmd { display: block; font: 12px var(--mono); color: var(--text); background: var(--bg-input); border-radius: 6px; padding: 6px 8px; overflow-wrap: anywhere; user-select: text; max-height: 120px; overflow: auto; }
+.sched-how { margin: -4px 0 12px; }
+.sched-how summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); width: fit-content; }
+.sched-how p { margin-top: 8px; }
+.sched-toolbar { margin: 0 0 10px; }
+.sched-toolbar .sched-add { margin-top: 0; }
+.sched-formcard { margin-bottom: 12px; }
+.sched-list { list-style: none; margin: 0; padding: 0; }
+.sched-line .t { display: flex; align-items: center; gap: 6px; }

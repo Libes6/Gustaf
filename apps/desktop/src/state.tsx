@@ -13,7 +13,7 @@ export type Model = ModelInfo & { firstSeen: number };
 export const modelKey = (m: { providerId: string; id: string }) => `${m.providerId}\n${m.id}`;
 export type Selection = { providerId: string; model: string };
 export type Section = { id: string; name: string; chatIds: number[] };
-export type SettingsPage = "general" | "import" | "providers" | "usage" | "computer" | "mcp" | "git" | "rules" | "memory" | "archive";
+export type SettingsPage = "general" | "import" | "providers" | "usage" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive";
 
 function usePersisted<T>(key: string, initial: T, ready: boolean) {
   const [value, setValue] = useState<T>(initial);
