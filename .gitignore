@@ -43,3 +43,6 @@ apps/desktop/tests/e2e/artifacts/
 *.pem
 *.p12
 *.pfx
+
+# Local task backlog
+/TASKS.md
