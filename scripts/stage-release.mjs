@@ -11,7 +11,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(file);
-    else if (/\.(dmg|msi|exe|deb|rpm|AppImage|tar\.gz|sig)$/.test(entry.name)) {
+    else if (/(?:\.(?:dmg|msi|exe|deb|rpm|AppImage)|\.app\.tar\.gz)(?:\.sig)?$/.test(entry.name)) {
       // Prefix both payload and signature identically; macOS archives otherwise collide.
       fs.copyFileSync(file, path.join('release-assets', `${platform}-${entry.name}`));
     }

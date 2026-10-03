@@ -74,6 +74,14 @@ fn uri(path: &Path) -> String {
     if encoded.starts_with("//") { return format!("file:{encoded}"); }
     format!("file://{}{}", if encoded.starts_with('/') { "" } else { "/" }, encoded)
 }
+fn matches_file_uri(value: &str, file: &Path) -> bool {
+    // LSP servers may lowercase a Windows drive or percent-encode its colon.
+    // Compare resolved files instead of requiring identical URI spelling.
+    reqwest::Url::parse(value).ok()
+        .and_then(|url| url.to_file_path().ok())
+        .and_then(|path| path.canonicalize().ok())
+        .is_some_and(|path| path == file)
+}
 fn write_message(input: &mut impl Write, value: &Value) -> Result<(), String> {
     let body = serde_json::to_vec(value).map_err(|e| e.to_string())?;
     write!(input, "Content-Length: {}\r\n\r\n", body.len()).and_then(|_| input.write_all(&body)).and_then(|_| input.flush()).map_err(|e| e.to_string())
@@ -138,7 +146,7 @@ fn check_with_server(root: &str, path: &str, timeout_ms: u64, provided: Option<S
             initialized = true;
             write_message(&mut input, &json!({"jsonrpc":"2.0","method":"initialized","params":{}}))?;
             write_message(&mut input, &json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":file_uri,"languageId":language_id,"version":1,"text":text}}}))?;
-        } else if message.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics") && message.pointer("/params/uri").and_then(Value::as_str) == Some(&file_uri) {
+        } else if message.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics") && message.pointer("/params/uri").and_then(Value::as_str).is_some_and(|value| matches_file_uri(value, &file)) {
             let result = diagnostics(path, &message["params"]["diagnostics"]);
             let _ = write_message(&mut input, &json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}));
             let _ = write_message(&mut input, &json!({"jsonrpc":"2.0","method":"exit","params":null}));
@@ -171,6 +179,22 @@ pub async fn lsp_diagnostics(app: tauri::AppHandle, root: String, path: String, 
         assert_eq!(uri(Path::new(r"C:\work\a b.ts")), "file:///C:/work/a%20b.ts");
         assert_eq!(uri(Path::new(r"\\?\C:\work\a b.ts")), "file:///C:/work/a%20b.ts");
         assert_eq!(uri(Path::new(r"\\?\UNC\server\share\a.ts")), "file://server/share/a.ts");
+    }
+    #[test] fn diagnostic_uri_matches_the_resolved_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a b.ts");
+        fs::write(&path, "").unwrap();
+        let file = path.canonicalize().unwrap();
+        let value = uri(&file);
+        assert!(matches_file_uri(&value, &file));
+        assert!(matches_file_uri(&value.replace("a%20b", "%61%20b"), &file));
+        assert!(!matches_file_uri(&value.replace("a%20b", "other"), &file));
+        assert!(!matches_file_uri("https://example.com/a.ts", &file));
+        #[cfg(windows)] {
+            let value = value.replacen("file:///", "", 1);
+            let normalized = format!("file:///{}", value[..1].to_ascii_lowercase() + &value[1..]);
+            assert!(matches_file_uri(&normalized.replacen(":", "%3A", 2).replacen("file%3A", "file:", 1), &file));
+        }
     }
     #[cfg(unix)]
     #[test] fn stdio_session_opens_file_and_returns_structured_diagnostics() {

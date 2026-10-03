@@ -56,3 +56,17 @@ test('manifest CLI assembles staged platform directories and fails on missing si
     assert.throws(() => execFileSync(process.execPath, command, { stdio: 'pipe' }));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+test('asset staging excludes internal package archives while retaining installers and matching signatures', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gustaf-stage-'));
+  try {
+    const bundle = path.join(tmp, 'apps/desktop/src-tauri/target/release/bundle');
+    fs.mkdirSync(bundle, { recursive: true });
+    for (const name of ['Gustaf.app.tar.gz', 'Gustaf.app.tar.gz.sig', 'Gustaf.dmg', 'Gustaf.deb', 'Gustaf.deb.sig', 'control.tar.gz', 'data.tar.gz', 'unrelated.sig']) fs.writeFileSync(path.join(bundle, name), 'fixture');
+    const host = `${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch === 'arm64' ? 'aarch64' : process.arch === 'x64' ? 'x86_64' : process.arch}`;
+    execFileSync(process.execPath, [path.join(root, 'scripts/stage-release.mjs'), host], { cwd: tmp });
+    const names = fs.readdirSync(path.join(tmp, 'release-assets'));
+    assert.equal(names.length, 5);
+    assert.ok(names.includes(host + '-Gustaf.app.tar.gz.sig'));
+    assert.ok(!names.some(name => /control|data|unrelated/.test(name)));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
