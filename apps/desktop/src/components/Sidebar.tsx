@@ -1,7 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, LayoutList, Loader2, LogOut, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
+  Columns2, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
@@ -14,6 +14,7 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { ShareHtmlDialog } from "./ShareHtmlDialog";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
   const t = useT();
@@ -127,6 +128,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [projectLimit, setProjectLimit] = useState(8);
   const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
+  const [sharing, setSharing] = useState<Chat | null>(null);
 
   const q = query?.toLowerCase() ?? "";
   const chatsByProject = useMemo(() => {
@@ -163,6 +165,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { sep: true },
       { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
+      { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -351,6 +354,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
 
       </div>
       {menu.node}
+      {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
       {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );

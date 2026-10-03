@@ -179,13 +179,15 @@ function cleanMessage(raw: unknown, o: CleanOptions): ExportedMessage | null {
 // ---------------------------------------------------------------------------------------------------------------
 // JSON
 
-export function buildBundle(sources: ExportSource[], options: { includeImages?: boolean; now?: number } = {}): ChatBundle {
-  const o: CleanOptions = { redact: true, images: options.includeImages === true };
+/** `redact: false` is only for counting what redaction changes (the share dialog); never write such a bundle out. */
+export function buildBundle(sources: ExportSource[], options: { includeImages?: boolean; now?: number; redact?: boolean } = {}): ChatBundle {
+  const o: CleanOptions = { redact: options.redact !== false, images: options.includeImages === true };
+  const s = (x: string) => (o.redact ? redactSecrets(x) : x);
   const chats = sources.map(({ chat, project, messages }): ExportedChat => {
     const exported: ExportedChat = {
-      title: redactSecrets(chat.title),
+      title: s(chat.title),
       archived: !!chat.archived,
-      project: project ? { name: redactSecrets(project.name), path: project.path ?? null } : null,
+      project: project ? { name: s(project.name), path: project.path ?? null } : null,
       messages: messages.map((m) => cleanMessage(m, o)).filter((m): m is ExportedMessage => m !== null),
     };
     const createdAt = ts(chat.created_at);
