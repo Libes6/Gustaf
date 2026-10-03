@@ -8,6 +8,8 @@ import { beginApproval } from "./attention";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
+import { resolveAccount, setActive } from "../providers/cursorAccounts";
+import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
 import { type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
@@ -90,15 +92,15 @@ export function useChatRun(o: Options) {
     return () => { removeEventListener("keydown", stopKey); removeEventListener("mcode-stop", stopGlobal); };
   }, [o.visible, approval]);
 
-  async function send(retry = false, account?: ProviderConfig, edit?: Edit) {
-    const activeProvider = account ?? provider;
+  async function send(retry = false, edit?: Edit) {
     const body = (edit?.text ?? text).trim();
     const imgs = edit?.images ?? images;
     const prior = edit?.base ?? messages;
     if ((!retry && !body && !imgs.length) || running || !loaded || abortRef.current) return;
-    if (!activeProvider || !app.selection) return app.openSettings("providers");
+    if (!provider || !app.selection) return app.openSettings("providers");
+    let activeProvider: ProviderConfig = provider;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
-    if (account) app.setSelection({ providerId: account.id, model: app.selection.model });
+    let activeModel = app.selection.model;
     setError("");
     setActivities([]);
     setToolResults([]);
@@ -161,6 +163,20 @@ export function useChatRun(o: Options) {
       if (reviewRef.current && !retry) history = history.map(m => ({ ...m, meta: m.meta ? { ...m.meta, responseId: undefined } : undefined }));
       setStream("");
       o.setAtBottom(true);
+      if (activeProvider.cli === "cursor-agent") {
+        // Account rotation: the pool decides which Cursor account (and so which isolated profile) serves this message.
+        const { pool, providers } = await loadPool();
+        const r = resolveAccount({ pool, providers, models: app.models, selected: activeProvider, model: activeModel, now: Date.now() });
+        if (!r.ok) throw new Error(r.earliest ? t("cursorAllExhausted", { time: t.date(r.earliest) }) : t("cursorAllExhaustedUnknown"));
+        activeProvider = r.provider;
+        activeModel = r.model;
+        if (pool.ids.includes(r.provider.id) && pool.active !== r.provider.id) await updatePool(p => setActive(p, r.provider.id));
+        const notes = [
+          r.switchedFrom && t("cursorSwitched", { from: r.switchedFrom.name, to: r.provider.name }),
+          r.modelFallback && t("cursorModelFallback", r.modelFallback),
+        ].filter(Boolean);
+        if (notes.length) setRetryNotice(notes.join(" "));
+      }
       const adapter = await getAdapter(activeProvider);
       app.bumpUsage(activeProvider.id);
       const cid = chatId;
@@ -174,7 +190,7 @@ export function useChatRun(o: Options) {
         history,
         adapter,
         providerId: activeProvider.id,
-        model: app.selection.model,
+        model: activeModel,
         reasoning: app.reasoning,
         access: app.access,
         computerUse: app.computerUse && adapter.supportsComputer,
@@ -191,7 +207,7 @@ export function useChatRun(o: Options) {
         },
         onMessage: async (m) => {
           if (ctl.signal.aborted && !m.parts.some(p => p.type === "tool_result")) return;
-          app.recordTokens(activeProvider.id, app.selection!.model, m.meta?.usage);
+          app.recordTokens(activeProvider.id, activeModel, m.meta?.usage);
           retryRef.current?.history.push(m);
           const mid = await addMessage(cid, m);
           setMessages((ms) => [...ms, { ...m, id: mid, chat_id: cid, created_at: Date.now() }]);
@@ -208,7 +224,7 @@ export function useChatRun(o: Options) {
       retryRef.current = null;
     } catch (e: any) {
       if (chatId && activityRef.current.length) {
-        const partial: Msg = { role: "assistant", parts: activityRef.current.map(a => a.status === "running" ? { ...a, status: "unknown" } : a), meta: { provider: activeProvider.id, model: app.selection?.model } };
+        const partial: Msg = { role: "assistant", parts: activityRef.current.map(a => a.status === "running" ? { ...a, status: "unknown" } : a), meta: { provider: activeProvider.id, model: activeModel } };
         retryRef.current?.history.push(partial);
         const mid = await addMessage(chatId, partial);
         setMessages(ms => [...ms, { ...partial, id: mid, chat_id: chatId!, created_at: Date.now() }]);
@@ -230,7 +246,7 @@ export function useChatRun(o: Options) {
   }
 
   /** Re-runs the last request after a failure (resuming from the completed steps when there are any). */
-  const retryRequest = (account?: ProviderConfig) => send(!!retryRef.current, account);
+  const retryRequest = () => send(!!retryRef.current);
 
   async function restoreContext() {
     if (running || !session.chatId) return;
@@ -307,7 +323,7 @@ export function useChatRun(o: Options) {
     setMessages(base);
     retryRef.current = null;
     bumpTick();
-    await send(false, undefined, { text: newText, images: messageImages(m), base });
+    await send(false, { text: newText, images: messageImages(m), base });
   }
 
   /** Deletes the given messages (one whole turn) from the chat. */

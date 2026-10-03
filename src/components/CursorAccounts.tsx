@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { cursorProfiles, type CursorIdentity } from "../lib/api";
 import { deleteProvider, saveProvider } from "../providers";
-import { profileName } from "../providers/cursorAccounts";
+import { addToPool, profileName } from "../providers/cursorAccounts";
+import { updatePool } from "../providers/cursorPoolStore";
 import { loginUrl, startCursorLogin } from "../providers/cursorLogin";
 import type { ProviderConfig } from "../providers/types";
 import { useApp } from "../state";
+import { CursorPool } from "./CursorPool";
 
 const POLL_MS = 2500;
 const LOGIN_TIMEOUT_MS = 5 * 60_000;
@@ -66,7 +68,10 @@ export function CursorAccounts() {
         return;
       }
       const id = existing?.id ?? `cli-${name}`;
-      if (!existing) await saveProvider({ id, kind: "cli", cli: "cursor-agent", cliProfile: name, name: identity.email ?? `Cursor ${accounts.length + 1}`, baseUrl: "" }, null);
+      if (!existing) {
+        await saveProvider({ id, kind: "cli", cli: "cursor-agent", cliProfile: name, name: identity.email ?? `Cursor ${accounts.length + 1}`, baseUrl: "" }, null);
+        await updatePool((pool) => addToPool(pool, id));
+      }
       setWho((w) => ({ ...w, [id]: identity! }));
       await app.refreshModels();
       setFlow(null);
@@ -86,6 +91,7 @@ export function CursorAccounts() {
 
   const link = flow ? loginUrl(flow.output) : undefined;
   return (
+    <>
     <div className="card">
       <div className="card-row">
         <div className="grow">
@@ -118,5 +124,7 @@ export function CursorAccounts() {
         </div>
       )}
     </div>
+    <CursorPool />
+    </>
   );
 }

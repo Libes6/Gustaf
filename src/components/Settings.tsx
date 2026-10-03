@@ -284,7 +284,6 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
       {p.cli === "cursor-agent" && <>
         {p.cliAuth === "key" && <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("apiKey")}</div><div className="d">{t("cursorCliAccountHint")}</div></div><input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={e => setKey(e.target.value)} /><button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button></div></div>}
         <CursorAccounts />
-        <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("reserveAccount")}</div><div className="d">{t("reserveAccountHint")}</div></div><select aria-label={t("reserveAccount")} className="input narrow" value={p.backupProviderId ?? ""} onChange={e => update({ ...p, backupProviderId: e.target.value || undefined })}><option value="">{t("noReserve")}</option>{app.providers.filter(other => other.id !== p.id && other.cli === "cursor-agent" && other.cliAuth === "key" && !other.disabled).map(other => <option key={other.id} value={other.id}>{other.name}</option>)}</select></div></div>
       </>}
       <h4>{t("models")}</h4>
       <div className="card">
