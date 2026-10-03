@@ -108,6 +108,7 @@ pub fn run() {
             worktree::worktree_remove,
             worktree::worktree_prune,
             worktree::worktree_diff,
+            worktree::worktree_link_dirs,
             review::review_prepare,
             review::review_run,
             review::review_list,

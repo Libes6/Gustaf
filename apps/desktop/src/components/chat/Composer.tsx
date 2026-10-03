@@ -1,5 +1,5 @@
 import { VoiceInput } from "../VoiceInput";
-import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
@@ -15,6 +15,7 @@ import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
+import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
 import { mergeSkills } from "../../agent/skillsCore";
 import type { ChatMode } from "../../agent/planCore";
@@ -48,6 +49,11 @@ type Props = {
   canRestore: boolean;
   onCompact: () => void;
   onRestore: () => void;
+  /**
+   * Git workspaces: `available` offers the "new workspace" toggle for the next message (a git project and a chat without
+   * messages); `linkedBranch` marks a chat that already runs in a workspace. Absent or unavailable: nothing is shown.
+   */
+  workspace?: { available: boolean; on: boolean; onToggle: () => void; linkedBranch?: string };
 };
 
 /** Message composer: attachments, @file mention list, textarea and the bar with access / model / context controls. */
@@ -271,6 +277,15 @@ export function Composer(p: Props) {
                 <Monitor size={14} /> {t("computerUse")}
               </button>
             )}
+            {p.workspace?.linkedBranch ? (
+              <span className="chip workspace-chip" title={p.workspace.linkedBranch}>
+                <GitBranch size={14} aria-hidden="true" /> <span className="name">{t("workspaceChip", { branch: p.workspace.linkedBranch })}</span>
+              </span>
+            ) : p.workspace?.available ? (
+              <button className={`chip${p.workspace.on ? " on" : ""}`} aria-pressed={p.workspace.on} onClick={p.workspace.onToggle} title={t("workspaceRunInHint")}>
+                <GitBranch size={14} /> {t("workspaceRunIn")}
+              </button>
+            ) : null}
             <span className="grow" />
             <ContextChip
               model={selectedModel}

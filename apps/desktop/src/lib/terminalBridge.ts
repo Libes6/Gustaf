@@ -16,3 +16,12 @@ export function takeTerminalCommands(root: string): TerminalCommand[] {
 export function onTerminalCommand(fn: () => void) { subscribers.add(fn); return () => { subscribers.delete(fn); }; }
 
 export const hasTerminalCommands = (root: string) => pending.some(c => c.root === root);
+
+/** "Open in terminal" from the sidebar: the changes panel of the chat with this root shows its terminal tab (a new shell starts in `root`). */
+const openRequests = new Set<string>();
+export function requestTerminalOpen(root: string) {
+  if (!root) return;
+  openRequests.add(root);
+  subscribers.forEach(fn => fn());
+}
+export function takeTerminalOpen(root: string): boolean { return openRequests.delete(root); }

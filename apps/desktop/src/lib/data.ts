@@ -10,6 +10,10 @@ export type Chat = {
   archived: number;
   created_at: number;
   updated_at: number;
+  /** Set when the chat runs in its own git worktree (see lib/workspaces.ts); null/undefined for ordinary chats. */
+  workspace_task_id?: string | null;
+  workspace_branch?: string | null;
+  workspace_base?: string | null;
 };
 export type StoredMsg = Msg & { id: number; chat_id: number; created_at: number };
 
@@ -41,6 +45,16 @@ export async function createChat(projectId: number | null, title: string) {
     now,
     now,
   ]);
+  return r.lastId;
+}
+
+/** A chat linked to a workspace (`worktrees.create` made it). The checkout path itself is looked up with `worktrees.list`. */
+export async function createWorkspaceChat(projectId: number, title: string, ws: { taskId: string; branch: string; base: string }) {
+  const now = Date.now();
+  const r = await db.exec(
+    "insert into chats(project_id, title, created_at, updated_at, workspace_task_id, workspace_branch, workspace_base) values(?, ?, ?, ?, ?, ?, ?)",
+    [projectId, title, now, now, ws.taskId, ws.branch, ws.base],
+  );
   return r.lastId;
 }
 
@@ -77,9 +91,11 @@ export async function deleteMessages(chatId: number, ids: number[]) {
  * (see `branchCutoff`). Content is copied verbatim except for the provider response id, which points at server
  * state of the original chat. Returns the new chat id; a failed copy removes the half-made chat.
  */
-export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number) {
+export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number, ws?: { taskId: string; branch: string | null; base: string | null }) {
   const id = await createChat(projectId, title);
   try {
+    // A branch of a workspace chat keeps working in the same workspace, never in the main checkout.
+    if (ws) await db.exec("update chats set workspace_task_id = ?, workspace_branch = ?, workspace_base = ? where id = ?", [ws.taskId, ws.branch, ws.base, id]);
     await db.exec(
       "insert into messages(chat_id, role, content, created_at) " +
         "select ?, role, json_remove(content, '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",

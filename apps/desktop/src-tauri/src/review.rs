@@ -70,13 +70,13 @@ fn read_linked(dir: &Path) -> Vec<String> {
     fs::read(dir.join("review.json")).ok().and_then(|b| serde_json::from_slice::<Review>(&b).ok()).map(|r| r.linked).unwrap_or_default()
 }
 #[cfg(unix)]
-fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> { std::os::unix::fs::symlink(target, link) }
+pub(crate) fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> { std::os::unix::fs::symlink(target, link) }
 #[cfg(windows)]
-fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> { std::os::windows::fs::symlink_dir(target, link) }
+pub(crate) fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> { std::os::windows::fs::symlink_dir(target, link) }
 
 /// Validates the requested directories: each must be a real directory (not a symlink) inside the project. Missing ones are skipped,
 /// nested duplicates collapse into their parent, anything unsafe is an error.
-fn resolve_links(root: &Path, requested: &[String]) -> Result<Vec<String>, String> {
+pub(crate) fn resolve_links(root: &Path, requested: &[String]) -> Result<Vec<String>, String> {
     let mut cleaned = Vec::new();
     for raw in requested {
         let rel = clean_link(raw)?;

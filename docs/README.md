@@ -21,6 +21,7 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Data | [import-export.md](features/import-export.md) | Export and import of chats, import from Claude Code, Codex and ChatGPT |
 | Agent | [rules-and-instructions.md](features/rules-and-instructions.md) | Command rules and action log, project instruction files |
 | Agent | [files-and-git.md](features/files-and-git.md) | Actions and context, file review in a shadow copy, setup and tests, partial accept, committing accepted changes |
+| Agent | [workspaces.md](features/workspaces.md) | One git worktree per task: New workspace, composer option, sidebar rows, archive, changes and commit in the worktree |
 | Agent | [agents.md](features/agents.md) | Subagents, background agents, multi-agent orchestration |
 | Agent | [plan-mode.md](features/plan-mode.md) | Ask / Plan / Agent mode switch, plan card with Approve / Edit / Reject, CLI plan flags |
 | Agent | [mcp.md](features/mcp.md) | MCP servers |

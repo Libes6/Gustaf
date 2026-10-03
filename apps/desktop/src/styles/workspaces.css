@@ -1,0 +1,22 @@
+/* Workspaces (git worktrees): sidebar rows, dialogs, the composer chip and the changes list. */
+.review-dialog.ws-dialog { width: min(520px, 100%); }
+.ws-dialog .git-body code { display: block; padding: 6px 8px; border-radius: var(--radius); background: var(--bg-hover); font: 12px var(--mono); overflow-wrap: anywhere; user-select: text; }
+.ws-dialog .review-actions .grow { flex: 1; }
+
+.row.workspace { height: auto; min-height: 42px; padding: 4px 8px 4px 32px; color: var(--text); }
+.row.workspace.gone .label, .row.workspace.gone .ws-meta { color: var(--text-3); }
+.row.workspace .row-main { flex-direction: column; align-items: stretch; justify-content: center; gap: 1px; height: auto; }
+.row.workspace .ws-branch { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.row.workspace .ws-meta { display: flex; align-items: center; gap: 6px; padding-left: 20px; font-size: 11px; color: var(--text-3); min-width: 0; }
+.row.workspace .ws-meta .branch { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.row.workspace .ws-meta .sync { flex: none; }
+.row.workspace .ws-meta .changed { flex: none; color: var(--warn); }
+.row.workspace .ws-meta .dirty { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+
+.chip.workspace-chip { max-width: 220px; }
+.chip.workspace-chip span.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ws-diff { border-bottom: 1px solid var(--border); }
+.ws-diff .file-row .status { flex: none; font-size: 11px; color: var(--text-3); }
+.ws-diff .file-row .status.untracked, .ws-diff .file-row .status.added { color: var(--green); }
+.ws-diff .file-row .status.deleted { color: var(--red); }
