@@ -11,7 +11,7 @@ import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStor
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
 import { getRulesConfig, projectRootFor } from "./rulesStore";
 import { loadProjectInstructions } from "./instructionsStore";
-import { callMcpTool, loadMcpConfig, loadMcpToolset, type McpToolset } from "./mcp/runtime";
+import { callMcpResourceTool, callMcpTool, loadMcpConfig, loadMcpToolset, type McpToolset } from "./mcp/runtime";
 import { decideMcp } from "./mcp/toolset";
 
 export type { Access };
@@ -180,7 +180,7 @@ async function runMcpTool(call: Extract<Part, { type: "tool_call" }>, o: RunOpti
     if (!(await o.approve({ kind: "mcp", server: server.name, serverId: server.id, tool: route.tool, args: call.args ?? {} }))) throw new ActionDeclined("User declined this MCP tool call.");
     logPatch(act, { approval: "user" });
   } else logPatch(act, { approval: "rule", rule: d.reason === "server" ? `always allow MCP server ${server.name}` : `always allow MCP tool ${server.name}/${route.tool}` });
-  const r = await callMcpTool(server, route.tool, call.args, o.signal);
+  const r = route.kind === "list_resources" || route.kind === "read_resource" ? await callMcpResourceTool(server, route.kind, call.args, o.signal) : await callMcpTool(server, route.tool, call.args, o.signal);
   if (r.isError) throw new Error(r.output);
   return r;
 }

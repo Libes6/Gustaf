@@ -177,7 +177,8 @@ export async function signIn(d: OAuthDeps, o: SignInOptions): Promise<void> {
     const code = await waiting;
     phase("exchanging");
     const doc = await tokenCall(d, server.tokenEndpoint, tokenRequestBody({ grant: "authorization_code", code, redirectUri: redirect, clientId, ...(clientSecret ? { clientSecret } : {}), verifier, resource }), o.signal);
-    const t = parseTokenResponse(doc, now(d));
+    // The scope that was requested stands when the server does not echo one back.
+    const t = parseTokenResponse(doc, now(d), { scope });
     const stored: StoredOAuth = { ...t, tokenEndpoint: server.tokenEndpoint, clientId, ...(clientSecret ? { clientSecret } : {}), resource, issuer: server.issuer };
     await d.store.set(o.secretId, JSON.stringify(stored));
   } catch (e) {

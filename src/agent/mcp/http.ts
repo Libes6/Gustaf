@@ -116,6 +116,7 @@ export class McpHttpClient {
    * working on, tells it with `notifications/cancelled`; whatever the server answers later is never read.
    */
   private async post(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    if (signal?.aborted) throw abortError();
     const expect = "method" in msg && msg.id !== undefined ? msg.id : undefined;
     let stop: (() => void) | undefined;
     const aborted = new Promise<never>((_, reject) => {
