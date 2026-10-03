@@ -184,8 +184,9 @@ describe("Composer workspace option and the working folder of a chat", () => {
   const rows = [] as unknown[];
   const selection = { providerId: "p1", model: "m1" };
   const draft = { key: "k", chatId: null, projectId: 1 };
-  const view = (session: { key: string; chatId: number | null; projectId: number | null }, chats = [] as ReturnType<typeof chat>[]) =>
-    renderApp(<ChatView session={session} visible />, makeApp({ projects: [project()], chats, providers: [provider()], selection, sessions: { active: "k", items: [session] } }));
+  // The review copy is off by default; the tests that exercise the copy turn the global setting on explicitly.
+  const view = (session: { key: string; chatId: number | null; projectId: number | null }, chats = [] as ReturnType<typeof chat>[], reviewCopy = false) =>
+    renderApp(<ChatView session={session} visible />, makeApp({ projects: [project()], chats, providers: [provider()], selection, reviewCopy, sessions: { active: "k", items: [session] } }));
 
   it("offers Run in new workspace in a git project", async () => {
     mockInvoke({ git_status: gitStatus(), db_select: () => rows });
@@ -216,7 +217,7 @@ describe("Composer workspace option and the working folder of a chat", () => {
       git_status: gitStatus(), db_select: () => rows,
       review_prepare: { id: "1-2", root: "/work/alpha", workspace: "/shadow/work", linked: [] }, git: "abc123\n",
     });
-    view({ key: "k", chatId: 6, projectId: 1 }, [chat({ id: 6, project_id: 1 })]);
+    view({ key: "k", chatId: 6, projectId: 1 }, [chat({ id: 6, project_id: 1 })], true);
     await flush();
     await userEvent.type(screen.getByRole("textbox"), "hello{Enter}");
     await screen.findByText("done");
@@ -282,7 +283,7 @@ describe("Composer workspace option and the working folder of a chat", () => {
       review_prepare: { id: "1-2", root: "/work/alpha", workspace: "/shadow/work", linked: [] },
       db_execute: [1, 78], git: "abc123\n",
     });
-    view(draft);
+    view(draft, [], true);
     await userEvent.click(await screen.findByRole("button", { name: "New workspace" }));
     await userEvent.type(screen.getByRole("textbox"), "hello{Enter}");
     await screen.findByText("done");

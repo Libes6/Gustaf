@@ -38,7 +38,7 @@ function DiffView({ text }: { text: string }) {
   );
 }
 
-export function ChangesPanel({ name, root, workspace, busy, messages, tick, onChanged, onReplyToAgent }: { name: string; root: string; /** The chat runs in a git workspace: its net diff against the base is listed. */ workspace?: { taskId: string; branch: string; projectRoot: string }; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
+export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, tick, onChanged, onReplyToAgent }: { /** False: this chat edits the project directly (no review copy), so the copy hint is not shown while nothing is pending. */ reviewOn?: boolean; name: string; root: string; /** The chat runs in a git workspace: its net diff against the base is listed. */ workspace?: { taskId: string; branch: string; projectRoot: string }; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
   const t = useT();
   const app = useApp();
   const aiReview = useDiffReview(root);
@@ -234,14 +234,15 @@ export function ChangesPanel({ name, root, workspace, busy, messages, tick, onCh
               <>
                 {workspace && workspacePrefix !== null && <WorkspaceChanges projectRoot={workspace.projectRoot} taskId={workspace.taskId} branch={workspace.branch} root={root} prefix={workspacePrefix} tick={tick}
                   onShowDiff={(path, text) => { setErr(""); setPicked(new Set()); setDiff({ path, text }); }} onError={setErr} />}
-                <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p>
+                {(reviewOn !== false || pending > 0) && <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p>
                   {pending > 0 && <button className="btn-soft" disabled={!canReview} onClick={() => reviewFiles()} title={t("aiReviewHint")}><Sparkles size={13} /> {t("aiReviewAll")}</button>}
-                </div>
+                </div>}
                 <FindingsList findings={aiReview.findings} summary={aiReview.summary} statusText={statusText} running={aiReview.running} error={statusError}
                   onJump={jumpTo} onDismiss={aiReview.dismiss} onCancel={aiReview.cancel} />
                 <FeedbackQueue comments={comments} busy={busy} canSend={!!onReplyToAgent} onRemove={id => setComments(old => old.filter(c => c.id !== id))} onSend={sendFeedback} />
                 {busy && <div className="hint" style={{ padding: 12 }}>{t("reviewWorking")}</div>}
-                {!pending && <div className="hint" style={{ padding: 12 }}>{t("reviewEmpty")}</div>}
+                {!pending && reviewOn !== false && <div className="hint" style={{ padding: 12 }}>{t("reviewEmpty")}</div>}
+                {reviewOn === false && !pending && <div className="hint" style={{ padding: 12 }}>{t("reviewCopyDirectNote")}</div>}
                 <ReviewSetupForm root={root} config={setupCfg} onSaved={setSetupCfg} />
                 {reviews.map(([r, list]) => <div key={r.id} className="review-group">
                   {reviews.length > 1 && <button className="btn-soft review-ai" disabled={!canReview} onClick={() => reviewFiles(r.id)}><Sparkles size={13} /> {t("aiReviewGroup", { count: list.length })}</button>}

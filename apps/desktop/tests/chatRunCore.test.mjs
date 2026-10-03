@@ -3,7 +3,7 @@
 // interrupted run, failure reporting, finishing the copy and the approval flow.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +13,7 @@ register('./helpers/hooks.mjs', import.meta.url);
 const { state } = await import('./helpers/apiStub.mjs');
 const { scriptedAdapter, say, use, call } = await import('./helpers/scripted.mjs');
 const { appendUserMessage, runChatCore, reportRunFailure, finishReviewCopy, createApprover } = await import('../src/lib/chatRunCore.ts');
+const { createSubagentHost } = await import('../src/agent/subagents.ts');
 const { saveRulesConfig } = await import('../src/agent/rulesStore.ts');
 const { DEFAULT_RULES } = await import('../src/agent/rules.ts');
 
@@ -216,4 +217,52 @@ test('approver: requests outside `ask` are denied unseen; the timeout is the cal
   c.answer(true);
   await q;
   await sleep(50);
+});
+
+test('review: null runs in the project folder, takes the pre-run checkpoint and never asks for a copy', async () => {
+  const h = harness({
+    script: [use(call('write_file', { path: 'a.txt', content: 'edited\n' })), say('ok')],
+    prepare: () => assert.fail('no copy for a direct run'),
+  });
+  const stored = await appendUserMessage(h.deps, { chatId: 7, root: h.root, parts: [{ type: 'text', text: 'go' }] });
+  assert.equal(stored.msg.meta.checkpoint, 'cp1', 'the checkpoint is taken before the run, so Revert all works');
+  const r = await runChatCore(h.input({ access: 'auto', review: null, history: stored.history }), h.deps, h.ui);
+  assert.equal(r.review, null);
+  assert.deepEqual(h.log.reviews, []);
+  assert.equal(readFileSync(join(h.root, 'a.txt'), 'utf8'), 'edited\n', 'the edit went straight into the project');
+  assert.equal(await finishReviewCopy(h.deps, r.review), undefined);
+  assert.deepEqual(h.log.finished, []);
+});
+
+test('a subagent still works in its own private copy when the chat runs without a review copy', async () => {
+  const h = harness({
+    script: [
+      use(call('spawn_agent', { title: 'Writer', prompt: 'edit a', type: 'general' })),
+      say('parent done'),
+    ],
+    prepare: () => assert.fail('the chat itself makes no copy'),
+  });
+  const made = [];
+  const copy = mkdtempSync(join(tmpdir(), 'sub-copy-'));
+  writeFileSync(join(copy, 'a.txt'), 'hello\n');
+  const subagents = createSubagentHost({
+    projectRoot: h.root,
+    recordTokens: () => {},
+    prepare: async (projectRoot) => (made.push(projectRoot), { review: { id: 'sub1', root: projectRoot, workspace: copy }, setup: null }),
+  });
+  // The same scripted model answers the parent and (via the subagent system prompt) the child.
+  const base = h.input({ access: 'auto', review: null });
+  const parentTarget = base.target;
+  const inner = (await parentTarget()).adapter;
+  const adapter = {
+    ...inner,
+    turn: async (input) => (input.system.includes('You are a subagent')
+      ? (input.messages.length === 1 ? { parts: [call('write_file', { path: 'a.txt', content: 'by child\n' })], usage: { input: 1, output: 1, cached: 0, cacheWrite: 0, reasoning: 0 } } : { parts: [{ type: 'text', text: 'child done' }], usage: { input: 1, output: 1, cached: 0, cacheWrite: 0, reasoning: 0 } })
+      : inner.turn(input)),
+  };
+  const r = await runChatCore({ ...base, subagents, target: async () => ({ ...(await parentTarget()), adapter }) }, h.deps, h.ui);
+  assert.equal(r.review, null);
+  assert.deepEqual(made, [h.root], 'the writing subagent prepared its private copy');
+  assert.equal(readFileSync(join(h.root, 'a.txt'), 'utf8'), 'hello\n', 'the project folder is untouched by the subagent');
+  assert.equal(readFileSync(join(copy, 'a.txt'), 'utf8'), 'by child\n', 'the subagent wrote in its copy');
 });

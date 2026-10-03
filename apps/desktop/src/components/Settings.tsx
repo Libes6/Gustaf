@@ -416,10 +416,20 @@ function ComputerPage() {
 
 function GitPage() {
   const t = useT();
+  const app = useApp();
   return (
     <>
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
+      <div className="card">
+        <div className="card-row">
+          <div className="grow">
+            <div className="t">{t("reviewCopySetting")}</div>
+            <div className="d">{t("reviewCopySettingDesc")}</div>
+          </div>
+          <Toggle on={app.reviewCopy === true} label={t("reviewCopySetting")} onChange={app.setReviewCopy} />
+        </div>
+      </div>
       <CommandRules />
       <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
     </>

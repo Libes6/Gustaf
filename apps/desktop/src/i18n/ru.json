@@ -1115,5 +1115,12 @@
   "workspaceStatus_modified": "изменён",
   "workspaceStatus_deleted": "удалён",
   "workspaceStatus_untracked": "новый",
-  "workspaceSyncTitle": "Впереди {ahead}, позади {behind} относительно {base}"
+  "workspaceSyncTitle": "Впереди {ahead}, позади {behind} относительно {base}",
+  "reviewCopySetting": "Ревью-копия для чатов",
+  "reviewCopySettingDesc": "Выключено (по умолчанию): агент правит папку проекта напрямую; отменить можно через точку отката (Откатить файл / Откатить всё) или git. Включено: каждый запуск работает в отдельной копии, а вы принимаете файлы или фрагменты в проект. Субагенты и запуски по расписанию всегда используют свою копию.",
+  "reviewCopyChip": "Ревью-копия: {state}",
+  "reviewCopyOn": "вкл",
+  "reviewCopyOff": "выкл",
+  "reviewCopyDefault": "По умолчанию ({state})",
+  "reviewCopyDirectNote": "Ревью-копия выключена: изменения применяются сразу в папку проекта. Отмена: Откатить файл / Откатить всё или git."
 }

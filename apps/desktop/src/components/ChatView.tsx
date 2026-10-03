@@ -23,6 +23,7 @@ import { useChatMode } from "../lib/useChatMode";
 import { planToInstruction, type Plan } from "../agent/planCore";
 import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
 import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
+import { loadReviewOverride, resolveReviewCopy, saveReviewOverride, type ReviewOverride } from "../lib/reviewCopy";
 import { Composer } from "./chat/Composer";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
@@ -54,6 +55,18 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const root = resolved.root;
   const blocked = resolved.state === "pending" ? t("workspacePending") : resolved.state === "missing" ? t("workspaceMissing") : undefined;
   const [newWorkspace, setNewWorkspace] = useState(false);
+  const [reviewOverride, setReviewOverrideState] = useState<ReviewOverride | undefined>();
+  const reviewOn = resolveReviewCopy(reviewOverride, app.reviewCopy);
+  useEffect(() => {
+    if (!session.chatId) return;
+    let live = true;
+    loadReviewOverride(session.chatId).then(v => { if (live) setReviewOverrideState(v); });
+    return () => { live = false; };
+  }, [session.chatId]);
+  const setReviewOverride = (v: ReviewOverride | undefined) => {
+    setReviewOverrideState(v);
+    if (session.chatId) saveReviewOverride(session.chatId, v).catch(() => {});
+  };
   const isGit = useIsGitProject(projectRoot);
   const provider = app.providers.find((p) => p.id === app.selection?.providerId);
   const selectedModel = app.models.find(m => m.providerId === provider?.id && m.id === app.selection?.model);
@@ -68,7 +81,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
-    workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
+    workspace, projectRoot, blocked, newWorkspace, reviewOverride, onWorkspaceUsed: () => setNewWorkspace(false),
   });
   const { stream, error, running, approval, toolResults, activities } = run;
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
@@ -135,7 +148,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
-      {root && project && <ChangesPanel name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
+      {root && project && <ChangesPanel reviewOn={workspace ? undefined : reviewOn} name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
 
       {messages.length === 0 && stream === null && !error ? (
         <div className="empty">
@@ -168,6 +181,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           on: newWorkspace, onToggle: () => setNewWorkspace(v => !v),
           linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
         }}
+        review={{ available: !workspace && !!project, override: reviewOverride, effective: reviewOn, onChange: setReviewOverride }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
         running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
         contextTokens={contextTokens} lastInput={lastInput}

@@ -45,6 +45,7 @@ function useAppState() {
   const [reasoning, setReasoning] = usePersisted<Reasoning>("reasoning", "medium", true);
   const [access, setAccess] = usePersisted<Access>("access", "auto", true);
   const [computerUse, setComputerUse] = usePersisted("computerUse", false, true);
+  const [reviewCopy, setReviewCopy] = usePersisted<boolean>("reviewCopy", false, true);
   const [favorites, setFavorites] = usePersisted<string[]>("favorites", [], true);
   const [hiddenModels, setHiddenModels] = usePersisted<string[]>("hiddenModels", [], true);
   const [checkedAt, setCheckedAt] = useState(0);
@@ -151,7 +152,7 @@ function useAppState() {
   return {
     ready: localeLoaded && onboardedLoaded,
     locale, setLocale, onboarded, setOnboarded,
-    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse,
+    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,

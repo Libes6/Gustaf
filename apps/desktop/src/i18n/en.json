@@ -1087,5 +1087,12 @@
   "workspaceStatus_modified": "modified",
   "workspaceStatus_deleted": "deleted",
   "workspaceStatus_untracked": "new",
-  "workspaceSyncTitle": "{ahead} ahead, {behind} behind {base}"
+  "workspaceSyncTitle": "{ahead} ahead, {behind} behind {base}",
+  "reviewCopySetting": "Review copy for chats",
+  "reviewCopySettingDesc": "Off (default): the agent edits your project folder directly; use the checkpoint (Revert file / Revert all) or git to undo. On: each run works in a private copy and you accept files or hunks into the project. Subagents and scheduled runs always use their own copy.",
+  "reviewCopyChip": "Review copy: {state}",
+  "reviewCopyOn": "on",
+  "reviewCopyOff": "off",
+  "reviewCopyDefault": "Default ({state})",
+  "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git."
 }
