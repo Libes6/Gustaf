@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronRight, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { cmdKey } from "../lib/shortcuts";
+import { displayKeys } from "../lib/platform";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { modelKey as favKey, useApp, type Model } from "../state";
 import { ModelIcon } from "./ModelIcon";
@@ -59,7 +61,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
     else if (e.key === "ArrowUp") (e.preventDefault(), setHl(Math.max(hl - 1, 0)));
     else if (e.key === "Enter" && visible[hl]) pick(visible[hl]);
     else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && visible[hl]) (e.preventDefault(), toggleFav(visible[hl]));
-    else if (e.metaKey && /^[1-9]$/.test(e.key) && visible[Number(e.key) - 1]) (e.preventDefault(), pick(visible[Number(e.key) - 1]));
+    else if (cmdKey(e) && /^[1-9]$/.test(e.key) && visible[Number(e.key) - 1]) (e.preventDefault(), pick(visible[Number(e.key) - 1]));
   };
 
   return (
@@ -97,7 +99,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
                     <ProviderIcon kind={kindOf(m.providerId)} size={12} /> {nameOf(m.providerId)}
                   </div>
                 </div>
-                {i < 9 && <span className="kbd-chip">⌘{i + 1}</span>}
+                {i < 9 && <span className="kbd-chip">{displayKeys(`⌘${i + 1}`)}</span>}
                 <button
                   className={`star${fav ? " on" : ""}`}
                   title={t("favorite")}

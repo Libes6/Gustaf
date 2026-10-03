@@ -13,7 +13,7 @@ import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
 import { useAttentionNotifications } from "./lib/attention";
-import { matches, shortcut } from "./lib/shortcuts";
+import { acceleratorOf, matches } from "./lib/shortcuts";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -34,7 +34,7 @@ function Shell({ app }: { app: AppState }) {
   }, [app.view, app.ready, app.onboarded]);
 
   useEffect(() => {
-    const accelerator = shortcut("stopAgent").accelerator!;
+    const accelerator = acceleratorOf("stopAgent");
     let disposed = false;
     register(accelerator, () => dispatchEvent(new Event("mcode-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
     return () => { disposed = true; unregister(accelerator).catch(() => {}); };

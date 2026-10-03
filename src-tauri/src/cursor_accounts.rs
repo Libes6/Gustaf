@@ -109,8 +109,14 @@ pub fn parse_status(stdout: &str) -> Identity {
 
 /// Locates the CLI through a login shell (a GUI app's PATH is minimal). The script is a constant.
 fn find_cursor_agent() -> Result<PathBuf, String> {
-    let out = Command::new("/bin/zsh")
-        .args(["-lc", "command -v cursor-agent || { test -x \"$HOME/.local/bin/cursor-agent\" && echo \"$HOME/.local/bin/cursor-agent\"; }"])
+    let shell = crate::shell::Shell::current();
+    let script = match shell {
+        crate::shell::Shell::PowerShell => "(Get-Command cursor-agent -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source",
+        _ => "command -v cursor-agent || { test -x \"$HOME/.local/bin/cursor-agent\" && echo \"$HOME/.local/bin/cursor-agent\"; }",
+    };
+    let out = Command::new(shell.program())
+        .args(shell.flags())
+        .arg(script)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()

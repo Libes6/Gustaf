@@ -24,6 +24,7 @@ export const SPAWN_TOOL: ToolDef = {
       type: { type: "string", enum: [...AGENT_TYPES], description: "explore | plan | general | review" },
       files: { type: "array", items: { type: "string" }, description: "Optional project-relative files the subagent should focus on" },
       model: { type: "string", description: "Optional model (`provider/model`) from the allowed list; omit to use the default for the type" },
+      continue_from: { type: "string", description: "Optional id of a finished, failed or limit-stopped subagent run to continue (the run id is given in the user's message). The new run starts with a summary of that run and `prompt` as the follow-up; use the same `type` unless told otherwise" },
     },
     required: ["title", "prompt", "type"],
   },
@@ -38,7 +39,16 @@ export const MAX_PROMPT = 20_000;
 export const MAX_FILES = 20;
 export const MAX_REPORT_CHARS = 8_000;
 
-export type SpawnArgs = { title: string; prompt: string; type: AgentType; files: string[]; /** Explicitly requested model (checked against the allow-list later). */ model?: string };
+export type SpawnArgs = {
+  title: string;
+  prompt: string;
+  type: AgentType;
+  files: string[];
+  /** Explicitly requested model (checked against the allow-list later). */
+  model?: string;
+  /** Run id to continue (the host seeds the prompt with that run's summary). */
+  continueFrom?: string;
+};
 
 /** A project-relative path that cannot leave the project (no absolute path, no `..`). */
 export const safeRelativePath = (p: string) => !!p && !p.startsWith("/") && !p.startsWith("~") && !/^[a-z]:[\\/]/i.test(p) && !p.split(/[\\/]/).includes("..") && !p.includes("\0");
@@ -54,7 +64,8 @@ export function parseSpawnArgs(raw: unknown): { ok: true; value: SpawnArgs } | {
   if (!isAgentType(type)) return { ok: false, error: `spawn_agent \`type\` must be one of: ${AGENT_TYPES.join(", ")}.` };
   const files = Array.isArray(a.files) ? [...new Set(a.files.filter((f): f is string => typeof f === "string").map((f) => f.trim().replace(/^\.\//, "")).filter(safeRelativePath))].slice(0, MAX_FILES) : [];
   const model = typeof a.model === "string" && a.model.trim() ? a.model.trim().slice(0, 300) : undefined;
-  return { ok: true, value: { title, prompt, type, files, ...(model ? { model } : {}) } };
+  const continueFrom = typeof a.continue_from === "string" && a.continue_from.trim() ? a.continue_from.trim().slice(0, 100) : undefined;
+  return { ok: true, value: { title, prompt, type, files, ...(model ? { model } : {}), ...(continueFrom ? { continueFrom } : {}) } };
 }
 
 // ---- per-type tool allowlists ----
@@ -99,7 +110,8 @@ export function resolveBudget(type: AgentType, overrides?: BudgetOverrides): Bud
 }
 
 export type BudgetUse = { steps: number; toolCalls: number; tokens: number; startedAt: number };
-export type BudgetBreach = "steps" | "toolCalls" | "tokens" | "time";
+/** `budget`: the user's day or chat token budget (not one of the run's own limits; see `budgetStopMessage`). */
+export type BudgetBreach = "steps" | "toolCalls" | "tokens" | "time" | "budget";
 
 /** Which limit has been exceeded, if any. Steps count model turns; a run may use exactly its limit. */
 export function budgetBreach(use: BudgetUse, b: Budget, now: number): BudgetBreach | null {
@@ -109,8 +121,13 @@ export function budgetBreach(use: BudgetUse, b: Budget, now: number): BudgetBrea
   if (use.steps > b.maxSteps) return "steps";
   return null;
 }
-export const breachMessage = (x: BudgetBreach, b: Budget) =>
+export const breachMessage = (x: Exclude<BudgetBreach, "budget">, b: Budget) =>
   ({ steps: `step limit (${b.maxSteps})`, toolCalls: `tool call limit (${b.maxToolCalls})`, tokens: `token limit (${b.maxTokens})`, time: `time limit (${Math.round(b.maxMs / 1000)} s)` })[x];
+
+/** Which of the user's token budgets (Settings > Usage > Budgets) stopped agents. */
+export type BudgetScope = "day" | "chat";
+/** Text for a stopped run and for the tool error of a refused spawn. */
+export const budgetStopMessage = (scope: BudgetScope) => `the ${scope === "day" ? "daily" : "chat"} token budget is exceeded (Settings > Usage > Budgets; turn off "stop agents when over budget" in the agent settings to continue)`;
 
 // ---- overlap detection ----
 
@@ -147,7 +164,7 @@ export function truncateReport(text: string, max = MAX_REPORT_CHARS): string {
 export type ReportInput = {
   title: string;
   type: AgentType;
-  status: "completed" | "failed" | "cancelled" | "limit";
+  status: "completed" | "failed" | "cancelled" | "limit" | "budget";
   text: string;
   /** Why it stopped early (budget breach or error message). */
   reason?: string;
@@ -158,7 +175,7 @@ export type ReportInput = {
 
 /** The only thing the parent sees of a subagent run. Bounded in length. */
 export function buildReport(r: ReportInput): string {
-  const head = `Subagent "${r.title}" (${r.type}) ${r.status === "completed" ? "finished" : r.status === "limit" ? `stopped at its ${r.reason}` : r.status === "cancelled" ? "was cancelled" : "failed"}${r.status === "failed" && r.reason ? `: ${r.reason}` : ""}.`;
+  const head = `Subagent "${r.title}" (${r.type}) ${r.status === "completed" ? "finished" : r.status === "limit" ? `stopped at its ${r.reason}` : r.status === "budget" ? `was stopped: ${r.reason}` : r.status === "cancelled" ? "was cancelled" : "failed"}${r.status === "failed" && r.reason ? `: ${r.reason}` : ""}.`;
   const body = r.text.trim() ? truncateReport(r.text, r.max ?? MAX_REPORT_CHARS) : "(no report text)";
   const lines = [head, "", body];
   if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}, pending in a separate review in the Changes panel, nothing applied yet): ${r.changed.slice(0, 30).join(", ")}${r.changed.length > 30 ? ", ..." : ""}`);

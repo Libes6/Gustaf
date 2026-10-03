@@ -9,11 +9,11 @@ import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 register('./helpers/hooks.mjs', import.meta.url);
-const { state, review } = await import('./helpers/apiStub.mjs');
+const { state, review, db } = await import('./helpers/apiStub.mjs');
 const { runAgent } = await import('../src/agent/agent.ts');
 const { createSubagentHost } = await import('../src/agent/subagents.ts');
 const { Scheduler } = await import('../src/agent/scheduler.ts');
-const { getRuns, resetAgentRuns, stopRun, getAgentUsage } = await import('../src/agent/agentRuns.ts');
+const { getRuns, resetAgentRuns, stopRun, getAgentUsage, settleAgentRunWrites, loadRunSteps } = await import('../src/agent/agentRuns.ts');
 const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings } = await import('../src/agent/agentSettings.ts');
 const { localDayKey } = await import('../src/lib/budgets.ts');
 const { saveRulesConfig } = await import('../src/agent/rulesStore.ts');
@@ -58,8 +58,9 @@ function fakeReviews(root) {
  * Runs the main agent over `parentScript`; children are answered by `child(title-prompt text, input)`, a function that
  * returns the next scripted turn for that child (per-prompt queues keep parallel children independent).
  */
-async function run({ root, parentScript, children = {}, hostCfg = {}, access = 'auto', approve, signal, parentTools = true, resolve, chatId } = {}) {
+async function run({ root, parentScript, children = {}, hostCfg = {}, access = 'auto', approve, signal, parentTools = true, resolve, chatId, stored = {} } = {}) {
   state.reset();
+  for (const [k, v] of Object.entries(stored)) state.settings.set(k, JSON.stringify(v));
   saveRulesConfig(hostCfg.rules ?? DEFAULT_RULES);
   resetAgentRuns();
   const ctl = new AbortController();
@@ -554,4 +555,215 @@ test('delegate_tasks with an invalid plan or a disallowed model is a tool error 
   assert.equal(r.outputs[1].isError, true);
   assert.match(r.outputs[1].output, /not allowed/);
   assert.equal(r.runs.length, 0);
+});
+
+// ---- full transcripts in SQLite ----
+
+test('every message of a subagent is written to the database as it happens and read back as steps', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Reader', 'read a.txt')), say('ok')],
+    children: { 'read a.txt': [use(call('read_file', { path: 'a.txt' })), say('a.txt says one')] },
+  });
+  await settleAgentRunWrites();
+  const id = r.runs[0].id;
+  const rows = db.raw().prepare('select seq, role, parts_json from agent_messages where run_id = ? order by seq').all(id);
+  assert.deepEqual(rows.map((x) => x.role), ['user', 'assistant', 'tool', 'assistant']);
+  assert.match(rows[0].parts_json, /read a\.txt/);
+  assert.match(rows[2].parts_json, /one/, 'the full tool result is stored, not a 240-character summary');
+  const saved = db.raw().prepare('select status, report, tokens, tool_uses from agent_runs where id = ?').get(id);
+  assert.deepEqual({ ...saved }, { status: 'completed', report: 'a.txt says one', tokens: 30, tool_uses: 1 });
+  const steps = await loadRunSteps(id);
+  assert.deepEqual(steps.map((s) => s.kind), ['note', 'tool', 'text']);
+  assert.equal(steps[1].tool, 'read_file');
+  assert.match(steps[1].result, /one/);
+  assert.deepEqual(state.dbErrors, []);
+});
+
+// ---- continue this agent ----
+
+test('continue_from starts a new run seeded with the earlier task, calls, report and the follow-up', async () => {
+  const root = project();
+  const next = (build) => ({ get parts() { return [build()]; }, usage });
+  const r = await run({
+    root,
+    parentScript: [
+      use(spawn('First', 'First task: look at a.txt')),
+      next(() => call('spawn_agent', { title: 'Second', prompt: 'now check b.txt too', type: 'explore', continue_from: getRuns().at(-1).id })),
+      say('ok'),
+    ],
+    children: { 'First task: look at a.txt': [use(call('read_file', { path: 'a.txt' })), say('first report: a.txt has one line')] },
+  });
+  assert.equal(r.runs.length, 2);
+  const key = Object.keys(r.seen.childMessages).find((k) => k.startsWith('You are continuing an earlier subagent run "First"'));
+  assert.ok(key, 'the second run got the summary prompt');
+  const seed = r.seen.childMessages[key][0].parts[0].text;
+  assert.match(seed, /First task: look at a\.txt/);
+  assert.match(seed, /read_file a\.txt/);
+  assert.match(seed, /first report: a\.txt has one line/);
+  assert.match(seed, /--- Follow-up \(your task now\) ---\nnow check b\.txt too$/);
+  assert.equal(r.outputs.at(-1).isError, false);
+  await settleAgentRunWrites();
+  const first = db.raw().prepare("select count(*) as n from agent_messages where run_id = ?").get(r.runs.at(-1).id).n;
+  assert.ok(first >= 3);
+});
+
+test('continue_from refuses unknown, running and cancelled runs with a clear tool error', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'nope' })), say('ok')],
+  });
+  assert.equal(r.outputs[0].isError, true);
+  assert.match(r.outputs[0].output, /no subagent run "nope"/);
+  assert.equal(r.runs.length, 0);
+  const prev = { title: 'Old', type: 'plan', status: 'cancelled', steps: [] };
+  const c = await run({
+    root,
+    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })), say('ok')],
+    hostCfg: { previousRun: async () => prev },
+  });
+  assert.match(c.outputs[0].output, /is cancelled; only finished, failed or limit-stopped runs can be continued/);
+  const ok = await run({
+    root,
+    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })), say('ok')],
+    hostCfg: { previousRun: async () => ({ ...prev, status: 'limit', report: 'partial' }) },
+  });
+  assert.equal(ok.outputs[0].isError, false);
+});
+
+// ---- retries in delegate_tasks ----
+
+test('delegate_tasks retries: a failed task is re-run (fresh run each time), dependants wait, the summary states attempts', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    hostCfg: { retryBackoffMs: () => 0 },
+    parentScript: [
+      delegate([
+        { id: 'flaky', title: 'Flaky', prompt: 'flaky', type: 'explore' },
+        { id: 'steady', title: 'Steady', prompt: 'steady', type: 'explore' },
+        { id: 'after', title: 'After', prompt: 'after', type: 'explore', dependsOn: ['flaky'] },
+      ], { retries: 2 }),
+      say('ok'),
+    ],
+    children: { flaky: [() => Promise.reject(new Error('rate limited')), () => Promise.reject(new Error('rate limited')), say('third time lucky')], steady: [say('fine')] },
+  });
+  const out = r.outputs[0].output;
+  assert.match(out, /Plan finished: 3 task\(s\); 3 completed\. Failed tasks were retried up to 2 time\(s\)\./);
+  assert.match(out, /- flaky "Flaky" \(explore\): completed, 3 attempts/);
+  assert.match(out, /- steady "Steady" \(explore\): completed, 1 attempt$/m);
+  assert.match(out, /third time lucky/);
+  assert.deepEqual(r.runs.filter((x) => x.title.startsWith('Flaky')).map((x) => [x.title, x.status]).reverse(), [['Flaky', 'failed'], ['Flaky (retry 1)', 'failed'], ['Flaky (retry 2)', 'completed']]);
+  assert.match(r.seen.childMessages.after[0].parts[0].text, /third time lucky/, 'the dependant started after the retries and got the final report');
+});
+
+test('delegate_tasks without retries runs a failed task once; retries stop after the allowed number; limit stops are not retried', async () => {
+  const root = project();
+  const failing = Array.from({ length: 5 }, () => () => Promise.reject(new Error('boom')));
+  const r = await run({
+    root,
+    hostCfg: { retryBackoffMs: () => 0 },
+    parentScript: [delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }]), delegate([{ id: 'b', title: 'B', prompt: 'b', type: 'explore' }], { retries: 1 }), say('ok')],
+    children: { a: failing, b: failing },
+  });
+  assert.match(r.outputs[0].output, /- a "A" \(explore\): failed$/m);
+  assert.doesNotMatch(r.outputs[0].output, /attempt/);
+  assert.match(r.outputs[1].output, /- b "B" \(explore\): failed, 2 attempts/);
+  assert.equal(r.runs.filter((x) => x.title.startsWith('B')).length, 2);
+  const lim = await run({
+    root,
+    hostCfg: { retryBackoffMs: () => 0, budgets: { explore: { maxToolCalls: 1 } } },
+    parentScript: [delegate([{ id: 'l', title: 'L', prompt: 'l', type: 'explore' }], { retries: 2 }), say('ok')],
+    children: { l: [{ parts: [call('list_dir', {}), call('list_dir', {})], usage }] },
+  });
+  assert.match(lim.outputs[0].output, /- l "L" \(explore\): limit, 1 attempt/);
+  assert.equal(lim.runs.length, 1);
+});
+
+test('a retried writing task starts in a fresh copy and the failed attempt\'s changes are rejected, not left pending', async () => {
+  const root = project();
+  const fake = fakeReviews(root);
+  const decided = [];
+  review.decide = async (id, path, accept) => void decided.push([id, path, accept]);
+  const r = await run({
+    root,
+    hostCfg: { prepare: fake.prepare, retryBackoffMs: () => 0 },
+    parentScript: [delegate([{ id: 'w', title: 'W', prompt: 'w', type: 'general', files: ['a.txt'] }], { retries: 1 }), say('ok')],
+    children: { w: [use(call('write_file', { path: 'a.txt', content: 'partial\n' })), () => Promise.reject(new Error('crashed')), say('redone')] },
+  });
+  review.decide = async () => {};
+  assert.equal(fake.made.length, 2, 'one private copy per attempt');
+  assert.deepEqual(decided, [['r1', 'a.txt', false]]);
+  assert.match(r.outputs[0].output, /- w "W" \(general\): completed, 2 attempts/);
+  assert.equal(r.runs.find((x) => x.title === 'W').changed, undefined);
+});
+
+test('delegate_tasks rejects a bad retries value as a tool error', async () => {
+  const root = project();
+  const r = await run({ root, parentScript: [delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }], { retries: 3 }), say('ok')] });
+  assert.equal(r.outputs[0].isError, true);
+  assert.match(r.outputs[0].output, /`retries` must be a whole number from 0 to 2/);
+  assert.equal(r.runs.length, 0);
+});
+
+// ---- stop when the user's token budget is exceeded ----
+
+test('budget stop: a running subagent stops at the next step with status budget (real budgets + ledger)', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    stored: { budgets: { dayTokens: 20, chatTokens: null, warnPercent: 80 } },
+    parentScript: [use(spawn('Spender', 'spend tokens')), say('ok')],
+    children: { 'spend tokens': Array.from({ length: 8 }, () => ({ parts: [{ type: 'text', text: 'working' }, call('list_dir', {})], usage })) },
+  });
+  const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
+  assert.equal(r.runs[0].status, 'budget');
+  assert.match(out, /was stopped: the daily token budget is exceeded/);
+  assert.equal(r.runs[0].toolUses, 2, 'stopped after the second step (30 tokens > 20), not after all eight');
+  assert.match(r.runs[0].error, /^Stopped: the daily token budget is exceeded/);
+  assert.equal(r.runs[0].transcript.at(-1).error, true);
+});
+
+test('budget stop: new spawns and plans are refused with a clear tool error and create no run', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    hostCfg: { checkBudget: async () => 'chat' },
+    parentScript: [use(spawn('A', 'a'), delegate([{ id: 'x', title: 'X', prompt: 'x', type: 'explore' }]).parts[0]), say('ok')],
+  });
+  assert.equal(r.outputs.length, 2);
+  for (const o of r.outputs) {
+    assert.equal(o.isError, true);
+    assert.match(o.output, /not started: the chat token budget is exceeded/);
+  }
+  assert.equal(r.runs.length, 0);
+});
+
+test('budget stop: a queued task whose turn comes after the budget ran out ends as budget without running', async () => {
+  const root = project();
+  // Checks in order: spawn One, spawn Two, One starts, One's step boundary, then Two starts: the budget runs out before that one.
+  let checks = 0;
+  const scheduler = new Scheduler(1);
+  const r = await run({
+    root,
+    hostCfg: { scheduler, checkBudget: async () => (++checks >= 5 ? 'day' : null) },
+    parentScript: [use(spawn('One', 'one'), spawn('Two', 'two')), say('ok')],
+  });
+  const byTitle = Object.fromEntries(r.runs.map((x) => [x.title, x.status]));
+  assert.deepEqual(byTitle, { One: 'completed', Two: 'budget' });
+  assert.ok(!('two' in r.seen.childMessages));
+});
+
+test('with stopOnBudget off budgets stay warnings: nothing is stopped or refused', async () => {
+  const root = project();
+  const r = await run({
+    root,
+    hostCfg: { settings: { ...DEFAULT_AGENT_SETTINGS, stopOnBudget: false }, checkBudget: async () => 'day' },
+    parentScript: [use(spawn('Free', 'free')), say('ok')],
+    children: { free: [use(call('list_dir', {})), say('done')] },
+  });
+  assert.equal(r.runs[0].status, 'completed');
+  assert.equal(r.outputs[0].isError, false);
 });

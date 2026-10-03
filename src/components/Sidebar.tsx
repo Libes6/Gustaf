@@ -3,11 +3,13 @@ import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
   Columns2, LayoutList, LogOut, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
+import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
 import { useApp } from "../state";
 import { useApprovalChats } from "../lib/attention";
+import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
@@ -80,7 +82,7 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
             { heading: "M Code" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
             { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },
-            { label: t("settings"), icon: <Settings size={15} />, kbd: "⌘,", onClick: () => app.openSettings() },
+            { label: t("settings"), icon: <Settings size={15} />, kbd: displayKeys("⌘,"), onClick: () => app.openSettings() },
             { sep: true },
             { label: t("resetOnboarding"), icon: <LogOut size={15} />, onClick: () => app.setOnboarded(false) },
           ]);
@@ -99,6 +101,8 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const app = useApp();
   const menu = useMenu();
   const waiting = useApprovalChats();
+  // Chats a scheduled run is writing to (also when they are not open as a session).
+  const scheduledLive = useSyncExternalStore(subscribeLiveRuns, getLiveChats);
   const [query, setQuery] = useState<string | null>(null);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [recentLimit, setRecentLimit] = useState(8);
@@ -162,7 +166,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
       })),
       ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
-      ...(p.path ? [{ label: t("showInFinder"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
+      ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
       { label: t("removeProject"), icon: <X size={15} />, onClick: () => removeProject(p.id).then(app.reload) },
@@ -184,7 +188,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
           {waiting.has(c.id) && <span className="approval-badge" role="status" aria-label={t("approvalPendingBadge")} title={t("approvalPendingBadge")}>!</span>}
-          {app.sessions.items.some(s => s.chatId === c.id && s.busy) && <span className="status-dot spin" role="img" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
+          {(scheduledLive.has(c.id) || app.sessions.items.some(s => s.chatId === c.id && s.busy)) &&<span className="status-dot spin" role="img" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>

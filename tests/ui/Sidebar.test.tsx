@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../../src/components/Sidebar";
 import { beginApproval } from "../../src/lib/attention";
+import { beginLiveRun } from "../../src/lib/liveRuns";
 import { chat, makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
@@ -119,6 +120,18 @@ describe("Sidebar", () => {
     expect(within(other).queryByRole("status")).not.toBeInTheDocument();
     act(() => done());
     expect(screen.queryByRole("status", { name: "Waiting for your approval" })).not.toBeInTheDocument();
+  });
+
+  it("shows the running state of a chat a scheduled run writes to, even when it is not open", () => {
+    setup();
+    const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
+    expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
+    let handle: ReturnType<typeof beginLiveRun> | undefined;
+    act(() => { handle = beginLiveRun(3, "Nightly", noop); });
+    expect(within(row()).getByRole("img", { name: "Thinking…" })).toBeInTheDocument();
+    expect(within(screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
+    act(() => handle?.end());
+    expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
   });
 
   it("archives a chat with the row button", async () => {

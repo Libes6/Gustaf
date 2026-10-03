@@ -1,3 +1,4 @@
+import { cmdKey } from "./shortcuts.ts";
 // Pure helpers for the Cmd+K search palette (no Tauri/DOM/React imports, so node tests can cover them).
 // The index and the query escaping live in src-tauri/src/db.rs; this file only deals with what comes back.
 
@@ -97,12 +98,12 @@ export function turnHasMessage(turn: { user?: { id: number }; steps: readonly { 
   return turn.user?.id === id || turn.steps.some((s) => s.id === id);
 }
 
-type KeyLike = { key: string; code?: string; metaKey: boolean; shiftKey: boolean; altKey: boolean };
+type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean; shiftKey: boolean; altKey: boolean };
 
 /**
  * Cmd+K. `code` is checked as well as `key` so the shortcut also works on a Russian layout (where `key` is "л").
- * Ctrl is not accepted: on macOS Ctrl+K is "delete to end of line" in text fields.
+ * Ctrl is not accepted on macOS (Ctrl+K is "delete to end of line" in text fields); on Windows and Linux Ctrl is the main key.
  */
 export function isSearchShortcut(e: KeyLike): boolean {
-  return e.metaKey && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
+  return cmdKey(e) && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
 }

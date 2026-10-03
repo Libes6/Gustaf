@@ -9,6 +9,7 @@ mod import_sources;
 mod mcp;
 mod review;
 mod secrets;
+mod shell;
 mod tools;
 
 use std::sync::Mutex;

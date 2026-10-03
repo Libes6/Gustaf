@@ -18,11 +18,13 @@ export type AgentSettings = {
   cheapModel: ModelRef | null;
   /** delegate_tasks: a failed task cancels the tasks that depend on it (unless the call says otherwise). */
   cancelDependents: boolean;
+  /** Stop running subagents at their next step, and refuse new ones, while the day or chat token budget (Settings > Usage) is exceeded. Elsewhere budgets stay warnings. */
+  stopOnBudget: boolean;
   /** Native notification / dock badge when a background agent finishes, fails or waits for approval while the app is unfocused. */
   notifications: boolean;
 };
 
-export const DEFAULT_AGENT_SETTINGS: AgentSettings = { models: {}, allowedModels: [], budgets: {}, cheapModel: null, cancelDependents: true, notifications: true };
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = { models: {}, allowedModels: [], budgets: {}, cheapModel: null, cancelDependents: true, stopOnBudget: true, notifications: true };
 
 export const refKey = (r: ModelRef) => `${r.providerId}/${r.model}`;
 export const sameRef = (a: ModelRef | null | undefined, b: ModelRef | null | undefined) => !!a && !!b && a.providerId === b.providerId && a.model === b.model;
@@ -69,6 +71,7 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
     budgets,
     cheapModel: normalizeRef(r.cheapModel),
     cancelDependents: r.cancelDependents !== false,
+    stopOnBudget: r.stopOnBudget !== false,
     notifications: r.notifications !== false,
   };
 }

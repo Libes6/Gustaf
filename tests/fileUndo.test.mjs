@@ -114,12 +114,12 @@ gitTest('an edit can be undone, byte for byte', withHarness(async (h) => {
 
 gitTest('undo keeps the file permissions and touches nothing else', withHarness(async (h) => {
   h.put('run.sh', '#!/bin/sh\necho 1\n');
-  chmodSync(join(h.root, 'run.sh'), 0o755);
+  if (process.platform !== 'win32') chmodSync(join(h.root, 'run.sh'), 0o755); // POSIX permission bits do not exist on Windows
   h.put('other.txt', 'keep me');
   const rec = await h.edit('run.sh', '#!/bin/sh\necho 2\n');
   assert.deepEqual(await undoEdit(h.deps, rec), { ok: true });
   assert.equal(h.read('run.sh'), '#!/bin/sh\necho 1\n');
-  assert.equal(statSync(join(h.root, 'run.sh')).mode & 0o777, 0o755);
+  if (process.platform !== 'win32') assert.equal(statSync(join(h.root, 'run.sh')).mode & 0o777, 0o755);
   assert.equal(h.read('other.txt'), 'keep me');
   assert.equal(execFileSync('git', [`--git-dir=${h.shadow}`, 'rev-list', '--all', '--count'], { encoding: 'utf8' }).trim(), '0', 'no commits are made');
   assert.equal(execFileSync('git', [`--git-dir=${h.shadow}`, 'ls-files'], { encoding: 'utf8' }).trim(), '', 'the index is not used');
