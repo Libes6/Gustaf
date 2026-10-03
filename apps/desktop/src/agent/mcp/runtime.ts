@@ -6,7 +6,8 @@ import { readSecret, removeSecret, storeSecret } from "../../lib/keys";
 import type { ToolDef } from "../../providers/types";
 import { MCP_SETTING, normalizeConfig, oauthSecretId, secretId, serversFor, splitSecrets, staleSecretIds, type KV, type McpConfig, type McpServer } from "./config";
 import { McpHttpClient, type FetchLike } from "./http";
-import { authorizationHeader, isSignedIn, refreshTokens, signIn, type OAuthDeps, type Phase } from "./oauthFlow";
+import { parseStored } from "./oauth";
+import { authorizationHeader, isSignedIn, refreshTokens, revokeTokens, signIn, signOut, type OAuthDeps, type Phase } from "./oauthFlow";
 import { buildPromptArguments, normalizePrompts, renderPromptMessages, type McpPrompt } from "./prompts";
 import { checkInitialize } from "./protocol";
 import { formatResourceList, mapReadResult, normalizeResources, readResourceUri, RESOURCE_TOOLS, type McpResource } from "./resources";
@@ -49,8 +50,23 @@ export async function saveMcpServer(draft: McpServer): Promise<void> {
     stale = staleSecretIds(prev, server);
     return { servers: prev ? c.servers.map((s) => (s.id === server.id ? server : s)) : [...c.servers, server] };
   });
-  for (const id of stale) await removeSecret(id, true).catch(() => {});
+  await dropSecrets(stale);
   await disconnectMcpServer(server.id);
+}
+
+/**
+ * Deletes Keychain entries. OAuth tokens that are dropped because the server was edited or removed are also revoked
+ * (RFC 7009, best effort, in the background with the copy read before the delete); a failure never blocks anything.
+ */
+async function dropSecrets(ids: string[]) {
+  for (const id of ids) {
+    if (/^mcp:.+:oauth$/.test(id)) {
+      const d = await oauthDeps();
+      const stored = parseStored(await d.store.get(id).catch(() => null));
+      await removeSecret(id, true).catch(() => {});
+      if (stored?.revocationEndpoint) void revokeTokens(d, stored).catch(() => {});
+    } else await removeSecret(id, true).catch(() => {});
+  }
 }
 
 export async function removeMcpServer(id: string): Promise<void> {
@@ -59,7 +75,7 @@ export async function removeMcpServer(id: string): Promise<void> {
     prev = c.servers.find((s) => s.id === id);
     return { servers: c.servers.filter((s) => s.id !== id) };
   });
-  for (const sid of staleSecretIds(prev, null)) await removeSecret(sid, true).catch(() => {});
+  await dropSecrets(staleSecretIds(prev, null));
   await disconnectMcpServer(id, true);
 }
 
@@ -302,10 +318,19 @@ export async function signInMcpServer(server: McpServer, o: { signal?: AbortSign
   await disconnectMcpServer(server.id);
 }
 
-/** Deletes the stored tokens and ends the session. (No token revocation request is sent.) */
-export async function signOutMcpServer(server: McpServer): Promise<void> {
-  await secrets.delete(oauthSecretId(server.id)).catch(() => {});
+/**
+ * Asks the authorization server to revoke the tokens when its metadata had a `revocation_endpoint` (RFC 7009, best
+ * effort, a few seconds at most), then deletes the stored tokens whatever happened and ends the session.
+ */
+export async function signOutMcpServer(server: McpServer): Promise<{ attempted: number; revoked: number }> {
+  let result = { attempted: 0, revoked: 0 };
+  try {
+    result = await signOut(await oauthDeps(), oauthSecretId(server.id));
+  } catch {
+    await secrets.delete(oauthSecretId(server.id)).catch(() => {});
+  }
   await disconnectMcpServer(server.id);
+  return result;
 }
 
 // ---- the agent's view ----------------------------------------------------------------------------------------------
