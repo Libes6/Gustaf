@@ -82,7 +82,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     const cid = chatId;
     release = await waitForChat(cid, ctl.signal);
     await loadQueue(cid);
-    await updateQueue(cid, q => ({ ...q, interrupted: true }));
+    await updateQueue(cid, q => ({ ...q, active: true }));
     live = deps.live?.(cid, sc.title, () => ctl.abort());
     // The access mode is capped again here: whatever the stored value says, unattended runs never get "full".
     const access = target.ownTools ? "readonly" : capAccess(sc.access);
@@ -158,7 +158,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     outer.removeEventListener("abort", stopOuter);
     // Like a chat: the copy is removed when nothing was changed in it, otherwise it stays for the review panel.
     try { await finishReviewCopy(deps, review); } finally {
-      if (release && chatId) await updateQueue(chatId, q => ({ ...q, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
+      if (release && chatId) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
       live?.end(); release?.();
     }
     deps.chatChanged?.();

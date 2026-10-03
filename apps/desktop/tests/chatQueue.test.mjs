@@ -22,6 +22,8 @@ test('hydration cannot overwrite a newly enqueued item', async () => {
 });
 test('malformed saved queue is safe and bounded', () => {
  assert.deepEqual(validateQueue(null).items, []);
+ assert.equal(validateQueue({ active: true, items: [] }).interrupted, true);
+ assert.equal(validateQueue({ active: true, items: [] }).active, false);
  assert.deepEqual(validateQueue({ items: [null, {}, item('ok')] }).items, [item('ok')]);
  assert.equal(validateQueue({ items: Array.from({ length: 150 }, (_, i) => item(String(i))) }).items.length, 100);
 });
