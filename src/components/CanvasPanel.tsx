@@ -4,6 +4,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { fsx } from "../lib/api";
 import { canvasDocument } from "../canvas/document";
+import CanvasDiff from "./CanvasDiff";
 import type { Artifact } from "../canvas/artifacts";
 import { useT } from "../i18n";
 
@@ -11,7 +12,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
   artifact: Artifact; versions: Artifact[]; onSelect: (artifact: Artifact) => void; onClose: () => void; onRepair: (prompt: string) => void;
 }) {
   const t = useT();
-  const [tab, setTab] = useState<"preview" | "code">("preview");
+  const [tab, setTab] = useState<"preview" | "code" | "changes">("preview");
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
   const [copyError, setCopyError] = useState("");
@@ -61,6 +62,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
       <div className="canvas-tabs">
         <button aria-pressed={tab === "preview"} onClick={() => setTab("preview")}>{t("canvasPreview")}</button>
         <button aria-pressed={tab === "code"} onClick={() => setTab("code")}>{t("canvasCode")}</button>
+        {versions.length > 1 && <button aria-pressed={tab === "changes"} onClick={() => setTab("changes")}>{t("canvasChanges")}</button>}
       </div>
       {versions.length > 1 && <select aria-label={t("canvasVersion")} value={current} onChange={(e) => onSelect(versions[Number(e.target.value)])}>
         {current < 0 && <option value={-1}>{t("canvasCurrent")}</option>}
@@ -74,6 +76,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
     {copyError && <div role="alert" className="error-box">{copyError}</div>}
     {error && <div className="canvas-error" role="alert"><pre>{error}</pre><button className="btn-soft" onClick={() => onRepair(t("canvasRepairPrompt", { id: artifact.id, error }) + `\n\n\`\`\`tsx-canvas id="${artifact.id}"\n${artifact.code}\n\`\`\``)}>{t("canvasRepair")}</button></div>}
     <iframe ref={frame} key={revision} hidden={tab !== "preview"} title={artifact.title} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={document} />
+    {tab === "changes" && versions.length > 1 && <CanvasDiff versions={versions} current={current} />}
     {tab === "code" && multi && <div className="canvas-files" role="tablist" aria-label={t("canvasFiles")}>
       {artifact.files.map((f) => <button key={f.name} role="tab" aria-selected={f === file} onClick={() => setFileName(f.name)}>{f.name}</button>)}
     </div>}

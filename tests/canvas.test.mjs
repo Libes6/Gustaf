@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { transform } from 'sucrase';
 import { parseArtifacts, CANVAS_INSTRUCTIONS } from '../src/canvas/artifacts.ts';
+import { diffLines, diffFiles, collapseContext } from '../src/canvas/diff.ts';
 import { parseFiles, loadModules, resolveRelative } from '../src/canvas/modules.ts';
 
 test('extracts complete artifacts and surrounding prose', () => {
@@ -74,4 +75,55 @@ test('missing files and foreign packages produce clear errors', () => {
   assert.throws(() => load('// file: App.tsx\nimport "./nope";'), /Cannot find module "\.\/nope" imported from App\.tsx\. Files: App\.tsx/);
   assert.throws(() => load('// file: App.tsx\nimport x from "lodash"; x();'), /Unsupported import "lodash" in App\.tsx/);
   assert.throws(() => load('// file: App.tsx\nimport x from "../x"; x();'), /Cannot find module/);
+});
+
+const rebuild = (lines, side) => lines.filter(l => l.kind === 'same' || l.kind === side).map(l => l.text).join('\n');
+test('line diff marks additions, deletions and numbers both sides', () => {
+  const lines = diffLines('a\nb\nc\n', 'a\nB\nc\nd\n');
+  assert.deepEqual(lines.map(l => `${l.kind[0]}:${l.text}`), ['s:a', 'd:b', 'a:B', 's:c', 'a:d']);
+  assert.deepEqual(lines.filter(l => l.kind === 'same').map(l => [l.oldNo, l.newNo]), [[1, 1], [3, 3]]);
+  assert.equal(lines.find(l => l.kind === 'add').oldNo, undefined);
+  assert.equal(lines.find(l => l.kind === 'del').newNo, undefined);
+});
+test('line diff handles empty sides, identical text and CRLF', () => {
+  assert.deepEqual(diffLines('', ''), []);
+  assert.deepEqual(diffLines('', 'x').map(l => l.kind), ['add']);
+  assert.deepEqual(diffLines('x', '').map(l => l.kind), ['del']);
+  assert.ok(diffLines('a\r\nb', 'a\nb').every(l => l.kind === 'same'));
+});
+test('line diff reconstructs both sides for random edits and stays minimal', () => {
+  let seed = 7;
+  const rnd = (n) => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n;
+  for (let round = 0; round < 200; round++) {
+    const a = Array.from({ length: rnd(25) }, () => 'l' + rnd(6));
+    const b = Array.from({ length: rnd(25) }, () => 'l' + rnd(6));
+    const lines = diffLines(a.join('\n'), b.join('\n'));
+    assert.equal(rebuild(lines, 'del'), a.join('\n'));
+    assert.equal(rebuild(lines, 'add'), b.join('\n'));
+  }
+  const edits = diffLines('1\n2\n3\n4\n5\n6\n7', '1\n2\n4\n5\n6\n6.5\n7').filter(l => l.kind !== 'same').length;
+  assert.equal(edits, 2);
+});
+test('very different large files fall back to a replacement without hanging', () => {
+  const a = Array.from({ length: 3000 }, (_, i) => 'a' + i).join('\n');
+  const b = Array.from({ length: 3000 }, (_, i) => 'b' + i).join('\n');
+  const lines = diffLines(a, b);
+  assert.equal(lines.filter(l => l.kind === 'del').length, 3000);
+  assert.equal(lines.filter(l => l.kind === 'add').length, 3000);
+});
+test('file diff reports added, removed, modified and unchanged files', () => {
+  const diffs = diffFiles(
+    [{ name: 'App.tsx', code: 'a\n' }, { name: 'old.ts', code: 'x\n' }, { name: 'same.ts', code: 's\n' }],
+    [{ name: 'App.tsx', code: 'b\n' }, { name: 'same.ts', code: 's\n' }, { name: 'new.ts', code: 'n\n' }]);
+  assert.deepEqual(diffs.map(d => `${d.name}:${d.status}`), ['App.tsx:modified', 'same.ts:unchanged', 'new.ts:added', 'old.ts:removed']);
+  assert.deepEqual([diffs[0].added, diffs[0].removed], [1, 1]);
+});
+test('context collapsing keeps neighbours of changes and counts skipped lines', () => {
+  const body = Array.from({ length: 20 }, (_, i) => 'l' + i);
+  const changed = body.slice(); changed[10] = 'X';
+  const rows = collapseContext(diffLines(body.join('\n'), changed.join('\n')), 2);
+  assert.deepEqual(rows[0], { kind: 'skip', count: 8 });
+  assert.equal(rows.filter(r => r.kind !== 'skip').length, 6);
+  assert.deepEqual(rows.at(-1), { kind: 'skip', count: 7 });
+  assert.deepEqual(collapseContext(diffLines('a', 'a')), [{ kind: 'skip', count: 1 }]);
 });
