@@ -1,4 +1,5 @@
 import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions } from "../agent/agent";
+import { finishCliAgents, trackCliAgents } from "../agent/cliAgents";
 import type { Adapter, LimitWindow, Msg, Part, Reasoning, TokenUsage } from "../providers/types";
 
 // The part of "run the agent in a chat" that interactive sends (lib/useChatRun.ts) and scheduled runs
@@ -70,6 +71,8 @@ export type ChatRunInput = {
   target(): Promise<RunTarget>;
   allowlist: string[];
   signal: AbortSignal;
+  /** Stops this run; the agents panel offers it for the CLI-native subagents (they cannot be stopped one by one). */
+  stop?: () => void;
   approve: RunOptions["approve"];
   subagents?: RunOptions["subagents"];
   source?: RunOptions["source"];
@@ -131,7 +134,10 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       onText: (d) => ui.onText?.(d),
       onToolResult: (r) => ui.onToolResult?.(r),
       onActivity: (a) => {
-        activities = [...activities.filter((p) => p.id !== a.id), a];
+        // An update keeps the position of its card (a subagent's rows must not jump around while it works).
+        const at = activities.findIndex((p) => p.id === a.id);
+        activities = at < 0 ? [...activities, a] : activities.map((p, k) => (k === at ? a : p));
+        if (a.subagent) trackCliAgents({ chatId: i.chatId, root: i.root, stop: i.stop }, activities);
         ui.onActivity?.(activities);
       },
       onMessage: async (m) => {
@@ -156,6 +162,8 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       if (id !== null) ui.onMessage?.(partial, id);
     }
     throw e;
+  } finally {
+    finishCliAgents(i.chatId);
   }
 }
 
