@@ -52,7 +52,7 @@ describe("Share as HTML", () => {
     expect(call).toMatchObject({ root: "/tmp/out", path: "Deploy-notes.html" });
     expect(call.content).toContain("Content-Security-Policy");
     expect(call.content).not.toContain(KEY);
-    expect(vi.mocked(save).mock.calls.at(-1)?.[0]).toMatchObject({ defaultPath: "Deploy-notes.html" });
+    expect(vi.mocked(save).mock.lastCall?.[0]).toMatchObject({ defaultPath: "Deploy-notes.html" });
   });
 
   it("writes nothing when the save dialog is cancelled", async () => {
