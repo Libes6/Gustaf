@@ -114,6 +114,11 @@ export async function branchChat(projectId: number | null, title: string, fromCh
 
 export type ChatBranch = { chat_id: number; source_chat_id: number; source_message_id: number; source_title: string };
 export const loadChatBranch = async (id: number) => (await db.select<ChatBranch>("select * from chat_branches where chat_id = ?", [id]))[0] ?? null;
+export const loadBranchSource = async (link: ChatBranch) => {
+  const [chat] = await db.select<Chat>("select * from chats where id = ?", [link.source_chat_id]);
+  const [point] = await db.select<{ id: number }>("select id from messages where chat_id = ? and id = ?", [link.source_chat_id, link.source_message_id]);
+  return chat && point ? chat : null;
+};
 export const listChatBranches = (sourceId: number) => db.select<Chat>("select chats.* from chats join chat_branches on chats.id = chat_branches.chat_id where source_chat_id = ? order by chats.created_at", [sourceId]);
 
 export const renameChat =(id: number, title: string) => db.exec("update chats set title = ? where id = ?", [title, id]);

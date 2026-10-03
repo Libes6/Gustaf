@@ -610,6 +610,24 @@ mod tests {
     }
 
     #[test]
+    fn branch_lineage_survives_source_deletion_and_history_is_independent() {
+        let conn = Connection::open_in_memory().unwrap();
+        init(&conn).unwrap();
+        conn.execute_batch("insert into chats(id,title,created_at,updated_at) values(1,'source',1,1),(2,'branch',2,2);
+        insert into messages(chat_id,role,content,created_at) values(1,'user','{\"parts\":[{\"type\":\"image\",\"data\":\"AA\"}],\"meta\":{\"responseId\":\"session\"}}',1);
+        insert into chat_branches values(2,1,1,'source');
+        insert into messages(chat_id,role,content,created_at) select 2,role,json_remove(content,'$.meta.responseId'),created_at from messages where chat_id=1 and id<=1;").unwrap();
+        conn.execute("delete from chats where id=1", []).unwrap();
+        let title: String = conn.query_row("select source_title from chat_branches where chat_id=2", [], |r| r.get(0)).unwrap();
+        assert_eq!(title, "source");
+        let (image, session): (String, Option<String>) = conn.query_row("select json_extract(content,'$.parts[0].data'),json_extract(content,'$.meta.responseId') from messages where chat_id=2", [], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+        assert_eq!(image, "AA");
+        assert_eq!(session, None);
+        conn.execute("delete from chats where id=2", []).unwrap();
+        assert_eq!(conn.query_row("select count(*) from chat_branches", [], |r| r.get::<_,i64>(0)).unwrap(), 0);
+    }
+
+    #[test]
     fn schema_is_idempotent_and_migrates_an_old_database() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("app.db");

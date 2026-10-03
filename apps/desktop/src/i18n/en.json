@@ -1097,5 +1097,11 @@
   "reviewCopyOn": "on",
   "reviewCopyOff": "off",
   "reviewCopyDefault": "Default ({state})",
-  "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git."
+  "reviewCopyDirectNote": "Review copy is off: edits are applied directly to the project folder. Undo with Revert file / Revert all or git.",
+  "branchNavigation": "Chat branches",
+  "branchSource": "Branch from",
+  "branchUnavailable": "source unavailable",
+  "branchTransfer": "Context transfer",
+  "branchChooseModel": "Choose provider and model before branching",
+  "branchTransferDetails": "Only history through the selected turn is copied, including attachments and recorded tool results. Creating a branch never executes tools. The next run starts a fresh provider session from copied context; native session state and provider-private context do not transfer. Switching models may change capabilities. Branch histories are independent; workspace files remain shared."
 }

@@ -668,3 +668,7 @@ button:disabled { cursor:default; opacity:.45; }
 .skill-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
 .skill-option-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; color: var(--text-2); }
 .skill-option-source { font-size: 11px; line-height: 1.4; color: var(--text-3); }
+
+.branch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.branch-bar p, .branch-picker p { max-width: 70ch; font-size: 12px; }
+.branch-picker { padding: 16px; border-bottom: 1px solid var(--border); }
