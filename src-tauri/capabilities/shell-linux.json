@@ -15,12 +15,22 @@
         {
           "name": "bash",
           "cmd": "/bin/bash",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         },
         {
           "name": "sh",
           "cmd": "/bin/sh",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     },
@@ -30,12 +40,22 @@
         {
           "name": "bash",
           "cmd": "/bin/bash",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         },
         {
           "name": "sh",
           "cmd": "/bin/sh",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     }

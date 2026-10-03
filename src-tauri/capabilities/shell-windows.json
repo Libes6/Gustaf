@@ -15,7 +15,15 @@
         {
           "name": "powershell",
           "cmd": "powershell.exe",
-          "args": true
+          "args": [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     },
@@ -25,7 +33,15 @@
         {
           "name": "powershell",
           "cmd": "powershell.exe",
-          "args": true
+          "args": [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     }
