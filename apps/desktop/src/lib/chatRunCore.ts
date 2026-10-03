@@ -58,6 +58,7 @@ export type ChatRunUi = {
 };
 
 export type ChatRunInput = {
+  takeClarifications?: RunOptions["takeClarifications"];
   chatId: number;
   root: string | null;
   /** Final history for the model (already includes the new user message). */
@@ -132,6 +133,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       allowlist: i.allowlist,
       signal: i.signal,
       source: i.source,
+      takeClarifications: i.takeClarifications,
       subagents: i.subagents,
       onLimits: (windows) => deps.onLimits?.(tg.providerId, windows),
       onRetry: ui.onRetry,

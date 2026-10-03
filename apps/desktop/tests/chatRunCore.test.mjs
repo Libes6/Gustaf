@@ -266,3 +266,23 @@ test('a subagent still works in its own private copy when the chat runs without 
   assert.equal(readFileSync(join(h.root, 'a.txt'), 'utf8'), 'hello\n', 'the project folder is untouched by the subagent');
   assert.equal(readFileSync(join(copy, 'a.txt'), 'utf8'), 'by child\n', 'the subagent wrote in its copy');
 });
+
+test('clarifications arrive after a completed tool turn, are persisted, and reach the next model call', async () => {
+ let pending = [];
+ const clarification = { role: 'user', parts: [{ type: 'text', text: 'Use the other file instead' }, { type: 'image', data: 'abc' }] };
+ const h = harness({ script: [() => { pending.push(clarification); return use(call('read_file', { path: 'a.txt' })); }, say('adjusted')] });
+ await runChatCore(h.input({ takeClarifications: async () => pending.splice(0) }), h.deps, h.ui);
+ assert.equal(h.seen.turns[0].messages.length, 1);
+ const messages = h.seen.turns[1].messages;
+ assert.equal(messages.at(-2).role, 'tool');
+ assert.deepEqual(messages.at(-1), clarification);
+ assert.ok(h.log.stored.some(s => s.msg === clarification));
+});
+
+test('clarification queued during final response continues the run at the next boundary', async () => {
+ let pending = [];
+ const h = harness({ script: [() => { pending.push({ role: 'user', parts: [{ type: 'text', text: 'One more detail' }] }); return say('first'); }, say('second')] });
+ await runChatCore(h.input({ takeClarifications: async () => pending.splice(0) }), h.deps, h.ui);
+ assert.equal(h.seen.turns.length, 2);
+ assert.equal(h.seen.turns[1].messages.at(-1).parts[0].text, 'One more detail');
+});

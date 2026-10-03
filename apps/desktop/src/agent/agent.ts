@@ -37,6 +37,7 @@ export type ApprovalRequest =
 export type ApprovalAnswer = boolean | "task";
 
 export type RunOptions = {
+  takeClarifications?: () => Promise<Msg[]>;
   root: string | null;
   reviewMode?: boolean;
   /** Directories of the review workspace that are symlinks to the original project's dependencies. */
@@ -336,6 +337,7 @@ async function runLoop(o: RunOptions) {
   }
 
   for (let step = 0; step < (o.maxSteps ?? MAX_STEPS) && !o.signal.aborted; step++) {
+    for (const msg of await o.takeClarifications?.() ?? []) { history.push(msg); await o.onMessage(msg); }
     const out = await o.adapter.turn({
       system,
       messages: history,
@@ -363,6 +365,8 @@ async function runLoop(o: RunOptions) {
     history.push(assistant);
     await o.onMessage(assistant);
     if (!calls.length) {
+      const clarifications = await o.takeClarifications?.() ?? [];
+      if (clarifications.length) { for (const msg of clarifications) { history.push(msg); await o.onMessage(msg); } continue; }
       // A stop hook may send the agent back to work once per turn (exit 2); after that one re-run stop hooks stay quiet.
       if (hooks?.active && !o.subagent && !o.toolNames && stopReruns < 1 && !o.signal.aborted) {
         const follow = await hooks.stop(out.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));

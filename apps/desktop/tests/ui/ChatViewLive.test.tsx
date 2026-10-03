@@ -1,6 +1,7 @@
+import { updateQueue } from "../../src/lib/chatQueue";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatView } from "../../src/components/ChatView";
 import { beginLiveRun } from "../../src/lib/liveRuns";
 import { chat, makeApp, provider, renderApp } from "./render";
@@ -22,6 +23,8 @@ vi.mock("../../src/providers", async (orig) => ({
 const row = (id: number, role: "user" | "assistant", text: string) => ({ id, chat_id: 5, created_at: id, content: JSON.stringify({ role, parts: [{ type: "text", text }] }) });
 let rows = [row(1, "user", "Check the build")];
 
+beforeEach(async () => { await updateQueue(5, () => ({ items: [], paused: true })); });
+
 const setup = () => {
   rows = [row(1, "user", "Check the build")];
   mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from messages where chat_id/.test(sql) ? rows : []) });
@@ -33,7 +36,7 @@ const setup = () => {
 };
 
 describe("ChatView with a live scheduled run", () => {
-  it("shows streamed text, Stop and the stored messages, blocks sending, and Stop reaches the run", async () => {
+  it("shows streamed text, Stop and the stored messages, queues sending, and Stop reaches the run", async () => {
     const { app } = setup();
     await screen.findByText("Check the build");
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
@@ -56,7 +59,9 @@ describe("ChatView with a live scheduled run", () => {
     // Sending is refused with a clear message (Enter in the composer), nothing is stored or run.
     const box = screen.getByRole("textbox");
     await userEvent.type(box, "hello{Enter}");
-    expect(await screen.findByRole("alert")).toHaveTextContent(/scheduled run "Nightly" is writing to this chat/i);
+    expect(await screen.findByRole("textbox", { name: "Edit queued message" })).toHaveValue("hello");
+    await userEvent.click(screen.getByRole("button", { name: "Pause queue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(callsOf("db_execute").filter((a) => /insert into messages/i.test(a.sql))).toEqual([]);
 
     await userEvent.click(screen.getByRole("button", { name: "Stop" }));

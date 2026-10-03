@@ -1,3 +1,5 @@
+import { loadQueue, updateQueue } from "./chatQueue";
+import { waitForChat } from "./chatCoordinator";
 import type { Adapter, Msg, Reasoning, TurnInput } from "../providers/types";
 import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ChatRunDeps, type ReviewCopy } from "./chatRunCore";
 import type { LiveRunHandle } from "./liveRuns";
@@ -60,11 +62,13 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   if (outer.aborted) ctl.abort();
   else outer.addEventListener("abort", stopOuter, { once: true });
   let chatId: number | null = null;
+  let release: (() => void) | undefined;
+  let succeeded = false;
   let attention = false;
   let review: ReviewCopy | null = null;
   let live: LiveRunHandle | undefined;
   const fail = async (error: string): Promise<RunResult> => {
-    if (chatId !== null) await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
+    if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
     return { status: "failed", chatId, error };
   };
   try {
@@ -76,6 +80,9 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     chatId = (await deps.findChat(sc.projectId, title, sc.lastChatId)) ?? (await deps.createChat(sc.projectId, title));
     deps.chatChanged?.();
     const cid = chatId;
+    release = await waitForChat(cid, ctl.signal);
+    await loadQueue(cid);
+    await updateQueue(cid, q => ({ ...q, interrupted: true }));
     live = deps.live?.(cid, sc.title, () => ctl.abort());
     // The access mode is capped again here: whatever the stored value says, unattended runs never get "full".
     const access = target.ownTools ? "readonly" : capAccess(sc.access);
@@ -137,11 +144,12 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
       await deps.addMessage(cid, msgText(deps.note("stopped"), "assistant")).catch(() => {});
       return { status: "stopped", chatId: cid };
     }
+    succeeded = true;
     return { status: "success", chatId: cid };
   } catch (e) {
     // The loop ends with an abort error when it was stopped mid-step; the chat still says why the run ended.
     if (attention || ctl.signal.aborted) {
-      if (chatId !== null) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
+      if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
       return { status: attention ? "attention" : "stopped", chatId };
     }
     const message = (await reportRunFailure(e, { providerId: sc.providerId, signal: ctl.signal }, deps)) ?? "";
@@ -149,8 +157,10 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } finally {
     outer.removeEventListener("abort", stopOuter);
     // Like a chat: the copy is removed when nothing was changed in it, otherwise it stays for the review panel.
-    await finishReviewCopy(deps, review);
-    live?.end();
+    try { await finishReviewCopy(deps, review); } finally {
+      if (release && chatId) await updateQueue(chatId, q => ({ ...q, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
+      live?.end(); release?.();
+    }
     deps.chatChanged?.();
   }
 }
