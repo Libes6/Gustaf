@@ -21,6 +21,7 @@
     "test:e2e": "node --disable-warning=ExperimentalWarning tests/e2e/run.mjs"
   },
   "dependencies": {
+    "@mcode/protocol": "*",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.8.0",
     "@tauri-apps/plugin-global-shortcut": "^2.4.0",
