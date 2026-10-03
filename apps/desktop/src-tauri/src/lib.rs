@@ -23,6 +23,7 @@ mod lsp;
 mod web_tools;
 mod updater;
 mod worktree;
+mod merge_queue;
 mod terminal;
 
 use std::sync::Mutex;
@@ -111,6 +112,13 @@ pub fn run() {
             worktree::worktree_prune,
             worktree::worktree_diff,
             worktree::worktree_link_dirs,
+            merge_queue::conflicts_check,
+            merge_queue::queue_enqueue,
+            merge_queue::queue_status,
+            merge_queue::queue_cancel,
+            merge_queue::queue_resume,
+            merge_queue::queue_run_next,
+            merge_queue::queue_report_test,
             review::review_prepare,
             review::review_run,
             review::review_list,
