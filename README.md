@@ -90,12 +90,26 @@ apps/desktop/             the desktop app (package `mcode`)
   sidecar/                Node helpers (Codex limits, Cursor agent); standalone npm install
   scripts/, public/, design/, index.html, vite.config.ts, vitest.config.ts, tsconfig*.json
   tests/                  node:test suites (*.test.mjs), tests/ui (Vitest component tests), tests/e2e
-apps/mobile/              placeholder for the planned React Native (Expo) companion app
+apps/mobile/              companion app skeleton (Expo SDK 57 dev build, expo-router); NOT an npm workspace, own lockfile
 packages/protocol/        @mcode/protocol: protocol version and API/WebSocket event types (pure TypeScript)
 docs/                     Architecture and per-feature documentation
 ```
 
 Paths elsewhere in the documentation (`src/...`, `src-tauri/...`, `tests/...`, `sidecar/...`) are relative to `apps/desktop/`. Layers, data flow and the role of every module are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The backlog is in [TASKS.md](TASKS.md).
+
+## Mobile companion app (skeleton)
+
+`apps/mobile` is an Expo (React Native) app that will control the desktop app from a phone on the local network. Status: **skeleton only**. The screens (connection, QR pairing, projects, chat with streaming and approval cards, settings) run against an in-memory mock desktop (`src/api/mock.ts`, "Try demo mode"); the desktop server, the real pairing exchange and TLS certificate pinning do not exist yet (see [TASKS.md](TASKS.md)). It has not been run on a simulator or device; only the typecheck, the unit tests, `expo-doctor` and a Metro bundle (`expo export`) were run.
+
+It is a development build (`expo-dev-client`), not Expo Go, and is **not part of the root npm workspaces**: it has its own `package-lock.json` and `node_modules`, so Expo's pinned React / React Native cannot clash with the desktop's React. Root `npm ci` and `npm run check` do not touch it. Details in [apps/mobile/README.md](apps/mobile/README.md).
+
+```bash
+cd apps/mobile
+npm ci                          # or: npm install
+npm run check                   # tsc --noEmit + node --test (what the CI "mobile" job runs)
+npx expo run:ios                # builds and installs the dev client (needs Xcode); or: npx expo run:android
+npx expo start --dev-client     # Metro for an installed dev client
+```
 
 ## Security
 
