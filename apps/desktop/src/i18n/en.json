@@ -279,7 +279,7 @@
   "scheduledTitle": "Scheduled prompts",
   "scheduledLead": "Run a prompt on a schedule in its own chat, unattended. Prompts only run while Gustaf is open and the computer is awake. A run that was missed while the app was closed happens once on the next start if it was due within the last 24 hours, otherwise it is skipped. Whether to keep the computer awake is up to you; Gustaf does not change system settings.",
   "scheduledSafety": "Unattended runs never get full access or Computer Use and cannot start subagents; CLI agents are read-only. A command that needs approval is never allowed automatically: it waits for you (sidebar badge, notification and a card in the corner) and the run stops as \"needs attention\" after 10 minutes. A new or edited schedule starts only after you switch it on.",
-  "scheduledNone": "No scheduled prompts yet.",
+  "scheduledNone": "No schedules yet. Create one to run a prompt on a timetable.",
   "scheduledAdd": "New scheduled prompt",
   "scheduledEnabled": "Enabled: {title}",
   "scheduledNext": "Next run: {when}",
@@ -1022,5 +1022,9 @@
   "imageReadError": "Could not read the image",
   "takeScreenshot": "Take screenshot",
   "capturingScreenshot": "Capturing screen…",
-  "approveTerminal": "Read terminal output"
+  "approveTerminal": "Read terminal output",
+  "scheduledNav": "Scheduled",
+  "scheduledSummary": "Runs while Gustaf is open and the computer is awake; commands that need approval wait for you.",
+  "scheduledHow": "How it works",
+  "scheduledMenu": "Actions: {title}"
 }

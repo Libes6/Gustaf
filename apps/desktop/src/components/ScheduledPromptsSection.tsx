@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Clock, MoreHorizontal } from "lucide-react";
+import { useMenu, type MenuEntry } from "./Menu";
 import { useT, type Key } from "../i18n";
 import { getRunner, useRunnerVersion } from "../lib/scheduledRuntime";
 import {
@@ -68,7 +70,7 @@ function Toggle({ on, label, onChange, disabled }: { on: boolean; label: string;
   return <button role="switch" aria-checked={on} aria-label={label} disabled={disabled} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
 }
 
-export function ScheduledPromptsSection() {
+export function ScheduledPage() {
   const t = useT();
   const app = useApp();
   const list = useScheduled();
@@ -79,6 +81,16 @@ export function ScheduledPromptsSection() {
   const [note, setNote] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const runner = getRunner();
+  const menu = useMenu();
+  const addRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const wasOpen = useRef(false);
+  // The form opens focused; closing it (save or cancel) returns focus to the "New schedule" button.
+  useEffect(() => {
+    if (form && !wasOpen.current) titleRef.current?.focus();
+    if (!form && wasOpen.current) addRef.current?.focus();
+    wasOpen.current = !!form;
+  }, [form]);
 
   const models = app.models.filter((m) => !app.hiddenModels.includes(modelKey(m)) || (app.selection?.providerId === m.providerId && app.selection.model === m.id));
   const encode = (providerId: string, model: string) => `${providerId}\n${model}`;
@@ -152,57 +164,33 @@ export function ScheduledPromptsSection() {
   const projectName = (id: number | null) => (id === null ? t("scheduledNoProject") : app.projects.find((p) => p.id === id)?.name ?? "?");
   const modelName = (s: ScheduledPrompt) => app.models.find((m) => m.providerId === s.providerId && m.id === s.model)?.name ?? s.model;
 
+  const rowMenu = (e: React.MouseEvent<HTMLButtonElement>, s: ScheduledPrompt, running: boolean) => {
+    const items: MenuEntry[] = [];
+    if (!running) items.push({ label: t("scheduledEdit"), onClick: () => open(s) });
+    if (running) items.push({ label: t("scheduledStop"), onClick: () => runner?.stop(s.id) });
+    else if (runner) items.push({ label: t("scheduledRunNow"), onClick: () => runner.runNow(s.id) });
+    if (s.lastChatId !== undefined) items.push({ label: t("scheduledOpenChat"), onClick: () => { app.openChat(s.lastChatId!, s.projectId); app.setView("chat"); } });
+    if (!running) items.push({ sep: true }, { label: t("scheduledDelete"), danger: true, onClick: () => setConfirmDelete(s.id) });
+    menu.open(e.currentTarget.getBoundingClientRect(), items);
+  };
+
   return (
     <>
-      <h4>{t("scheduledTitle")}</h4>
-      <p className="h4-sub">{t("scheduledLead")}</p>
-      <p className="h4-sub sched-safety">{t("scheduledSafety")}</p>
-      <div className="card">
-        {!list.length && !form && <div className="card-row d">{t("scheduledNone")}</div>}
-        {list.map((s) => {
-          const running = runner?.isRunning(s.id) ?? false;
-          return (
-            <div className="sched-row" key={s.id}>
-              <div className="sched-line">
-                <div className="grow">
-                  <div className="t">⏰ {s.title}</div>
-                  <div className="d">{describe(s.schedule)} · {projectName(s.projectId)} · {modelName(s)} · {t(s.access === "auto" ? "scheduledAccessAuto" : "scheduledAccessReadonly").split(" (")[0]}</div>
-                </div>
-                <Toggle on={s.enabled} label={t("scheduledEnabled", { title: s.title })} onChange={(v) => toggle(s, v)} />
-              </div>
-              <div className="d sched-meta">
-                {s.enabled ? (s.nextRunAt ? t("scheduledNext", { when: when(s.nextRunAt) }) : t("scheduledNextNone")) : t("scheduledNotConfirmed")}
-              </div>
-              {s.lastStatus && (
-                <div className={`d sched-meta sched-${s.lastStatus}`}>
-                  {t("scheduledLast", { status: t(STATUS[s.lastStatus]), when: s.lastRunAt ? when(s.lastRunAt) : "—" })}
-                  {s.lastError ? ` · ${s.lastError}` : ""}
-                </div>
-              )}
-              <div className="sched-actions">
-                {running ? (
-                  <button className="btn-soft" onClick={() => runner?.stop(s.id)}>{t("scheduledStop")}</button>
-                ) : (
-                  <button className="btn-soft" disabled={!runner} onClick={() => runner?.runNow(s.id)}>{t("scheduledRunNow")}</button>
-                )}
-                {s.lastChatId !== undefined && <button className="btn-soft" onClick={() => { app.openChat(s.lastChatId!, s.projectId); app.setView("chat"); }}>{t("scheduledOpenChat")}</button>}
-                <button className="btn-soft" disabled={running} onClick={() => open(s)}>{t("scheduledEdit")}</button>
-                <button
-                  className="btn-soft btn-danger"
-                  disabled={running}
-                  onBlur={() => setConfirmDelete(null)}
-                  onClick={() => (confirmDelete === s.id ? (updateScheduled((l) => l.filter((x) => x.id !== s.id)), setConfirmDelete(null)) : setConfirmDelete(s.id))}
-                >
-                  {t(confirmDelete === s.id ? "scheduledDeleteConfirm" : "scheduledDelete")}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-        {form && (
+      <h1>{t("scheduledNav")}</h1>
+      <p className="lead">{t("scheduledSummary")}</p>
+      <details className="sched-how">
+        <summary>{t("scheduledHow")}</summary>
+        <p className="h4-sub">{t("scheduledLead")}</p>
+        <p className="h4-sub sched-safety">{t("scheduledSafety")}</p>
+      </details>
+      <div className="sched-toolbar">
+        <button ref={addRef} className="btn-soft sched-add" disabled={!!form || list.length >= MAX_SCHEDULES} onClick={() => open()}>{t("scheduledAdd")}</button>
+      </div>
+      {form && (
+        <div className="card sched-formcard" role="group" aria-label={t(editing === "new" ? "scheduledAdd" : "scheduledEdit")}>
           <div className="sched-form">
             <label className="field"><span>{t("scheduledFieldTitle")}</span>
-              <input className="input" maxLength={MAX_TITLE} value={form.title} onChange={(e) => set("title", e.target.value)} />
+              <input ref={titleRef} className="input" maxLength={MAX_TITLE} value={form.title} onChange={(e) => set("title", e.target.value)} />
             </label>
             <label className="field"><span>{t("scheduledFieldPrompt")}</span>
               <textarea className="input sched-prompt" value={form.prompt} onChange={(e) => set("prompt", e.target.value)} />
@@ -262,12 +250,47 @@ export function ScheduledPromptsSection() {
               <button className="btn btn-ghost" onClick={close}>{t("scheduledCancel")}</button>
             </div>
           </div>
-        )}
-      </div>
-      {note && <p className="d sched-note" role="status">{note}</p>}
-      {!form && (
-        <button className="btn-soft sched-add" disabled={list.length >= MAX_SCHEDULES} onClick={() => open()}>{t("scheduledAdd")}</button>
+        </div>
       )}
+      {note && <p className="d sched-note" role="status">{note}</p>}
+      {!list.length && !form && <div className="card"><div className="card-row d sched-empty">{t("scheduledNone")}</div></div>}
+      {list.length > 0 && (
+        <div className="card">
+          <ul className="sched-list" aria-label={t("scheduledTitle")}>
+            {list.map((s) => {
+              const running = runner?.isRunning(s.id) ?? false;
+              return (
+                <li className="sched-row" key={s.id}>
+                  <div className="sched-line">
+                    <div className="grow">
+                      <div className="t"><Clock size={13} aria-hidden="true" /> {s.title}</div>
+                      <div className="d">{describe(s.schedule)} · {projectName(s.projectId)} · {modelName(s)} · {t(s.access === "auto" ? "scheduledAccessAuto" : "scheduledAccessReadonly").split(" (")[0]}</div>
+                    </div>
+                    <Toggle on={s.enabled} label={t("scheduledEnabled", { title: s.title })} onChange={(v) => toggle(s, v)} />
+                    <button className="icon-btn" aria-label={t("scheduledMenu", { title: s.title })} aria-haspopup="menu" onKeyDown={menu.onTriggerKeyDown} onClick={(e) => rowMenu(e, s, running)}><MoreHorizontal size={16} /></button>
+                  </div>
+                  <div className="d sched-meta">
+                    {s.enabled ? (s.nextRunAt ? t("scheduledNext", { when: when(s.nextRunAt) }) : t("scheduledNextNone")) : t("scheduledNotConfirmed")}
+                  </div>
+                  {s.lastStatus && (
+                    <div className={`d sched-meta sched-${s.lastStatus}`}>
+                      {t("scheduledLast", { status: t(STATUS[s.lastStatus]), when: s.lastRunAt ? when(s.lastRunAt) : "—" })}
+                      {s.lastError ? ` · ${s.lastError}` : ""}
+                    </div>
+                  )}
+                  {confirmDelete === s.id && (
+                    <div className="sched-actions">
+                      <button className="btn-soft btn-danger" autoFocus onClick={() => { updateScheduled((l) => l.filter((x) => x.id !== s.id)); setConfirmDelete(null); addRef.current?.focus(); }}>{t("scheduledDeleteConfirm")}</button>
+                      <button className="btn-soft" onClick={() => setConfirmDelete(null)}>{t("scheduledCancel")}</button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {menu.node}
     </>
   );
 }
