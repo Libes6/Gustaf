@@ -25,6 +25,7 @@ dist-ssr
 
 # Bundled isolated canvas runtime
 src/canvas/generated/
+public/canvas/
 
 # Local tooling artifacts
 .playwright-mcp/

@@ -12,6 +12,7 @@ Desktop AI chat and coding assistant built with Tauri 2, React and TypeScript. I
 - **Subagents and MCP servers** for API providers, with budgets and background runs ([agents](docs/features/agents.md), [MCP](docs/features/mcp.md)), plus [scheduled prompts](docs/features/scheduled-prompts.md).
 - **Computer Use**: desktop control with per-action approval ([computer use](docs/features/computer-use.md)).
 - **Usage telemetry and budgets**: token counts, subscription windows, daily and per-chat limits ([usage](docs/features/usage-and-budgets.md)).
+- **Hardened webview**: strict CSP and narrowed Tauri capabilities ([security](docs/features/security.md)).
 - **Import and export**: chats as JSON or Markdown, history from Claude Code, Codex, ChatGPT and Cursor ([import and export](docs/features/import-export.md)).
 - **Accessibility**: keyboard operation, focus handling, landmarks, contrast tests and reduced motion ([accessibility](docs/features/accessibility.md)).
 
@@ -31,7 +32,7 @@ npm --prefix sidecar ci      # Node helpers launched by the app
 npm run tauri dev            # native app with hot reload
 ```
 
-`npm run dev` serves only the frontend; normal chats need the native Tauri backend. `npm run build` type-checks and builds the frontend. The canvas runtime (`src/canvas/generated`, git-ignored) is built by `scripts/build-canvas.mjs` from the `predev` and `prebuild` hooks; run it by hand if you only run tests.
+`npm run dev` serves only the frontend; normal chats need the native Tauri backend. `npm run build` type-checks and builds the frontend. The canvas runtime (`src/canvas/generated` and `public/canvas`, git-ignored) is built by `scripts/build-canvas.mjs` from the `predev` and `prebuild` hooks; run it by hand if you only run tests.
 
 ### Verification
 
@@ -63,6 +64,10 @@ docs/           Architecture and per-feature documentation
 ```
 
 Layers, data flow and the role of every module are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The backlog is in [TASKS.md](TASKS.md).
+
+## Security
+
+Release builds run under a strict Content Security Policy and a narrowed capability set (`src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`). The webview itself cannot reach the network (requests go through the Tauri http plugin), plain `http://` endpoints are limited to localhost, private networks, Tailscale and `.local`-style names (public hosts need https), and the shell scope is `zsh -lc <script>` only. `npm run test:csp` checks all of it without Tauri; the manual checklist, the reason for `'unsafe-eval'` (the canvas iframe inherits the CSP) and the one-line way to turn the CSP off are in [docs/features/security.md](docs/features/security.md).
 
 ## Providers and models
 

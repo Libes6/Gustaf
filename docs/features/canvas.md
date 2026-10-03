@@ -47,9 +47,9 @@ The Changes tab (shown when an artifact has more than one revision) compares two
 
 `import { Heart } from "lucide-react"` works in canvas sources. `scripts/build-canvas.mjs` builds two runtimes: `runtime.js` (about 430 KB) and `runtime-icons.js` (about 1.29 MB, all icons); the document builder (`src/canvas/documentBuilder.ts`) inlines the larger one only when the source mentions `"lucide-react"`, so other artifacts and their exports keep the small size. Nothing is fetched at runtime.
 
-React and Sucrase are bundled locally by `scripts/build-canvas.mjs` during `predev` and `prebuild`. The canvas panel is lazy-loaded. Generated files in `src/canvas/generated` are ignored by Git; no CDN is required.
+React and Sucrase are bundled locally by `scripts/build-canvas.mjs` during `predev` and `prebuild`. The canvas panel is lazy-loaded. Generated files in `src/canvas/generated` (inlined into the standalone HTML export) and `public/canvas` (loaded by the preview iframe with `<script src>`) are ignored by Git; no CDN is required. The preview cannot inline the runtime because the iframe inherits the app's CSP, see [security](security.md).
 
-Preview code is compiled and executed inside an opaque-origin iframe with only `allow-scripts`. CSP blocks fetch, external subresources, nested frames, forms, and objects. There is no application API exposed through messages; the parent only accepts bounded error text from the active iframe. The sandbox is a browser boundary, not a CPU/memory quota: a pathological infinite loop can still make the renderer unresponsive. Native WebView isolation should also be verified on release builds.
+Preview code is compiled and executed inside an opaque-origin iframe with only `allow-scripts`. Its own CSP (combined with the app's) blocks fetch, external subresources, nested frames, forms, and objects. There is no application API exposed through messages; the parent only accepts bounded error text from the active iframe. The sandbox is a browser boundary, not a CPU/memory quota: a pathological infinite loop can still make the renderer unresponsive. Native WebView isolation should also be verified on release builds.
 
 ## Verification
 
