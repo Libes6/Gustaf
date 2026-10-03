@@ -1,6 +1,6 @@
 # Actions, context and file review
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
 Native Codex/Claude/Cursor CLI actions are stored separately from executable API tool calls. Cards show readable names, output and error status; a missing native result is shown as unknown instead of successful. Nonzero API shell exits are tool errors. Existing imported text-only history cannot reconstruct missing tool outputs.
 

@@ -1,8 +1,8 @@
 # Computer Use
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
-With Computer Use enabled (Settings, Integrations; needs Accessibility and Screen Recording permission), every provider drives the Mac through the same text protocol: the model writes one `mcode-computer` block with 1–10 actions (`open_app`, `click`, `double_click`, `move`, `scroll`, `keypress`, `type`, `wait`, `drag`, `screenshot`) and M Code runs them while its own window is hidden.
+With Computer Use enabled (Settings, Integrations; needs Accessibility and Screen Recording permission), every provider drives the Mac through the same text protocol: the model writes one `mcode-computer` block with 1–10 actions (`open_app`, `click`, `double_click`, `move`, `scroll`, `keypress`, `type`, `wait`, `drag`, `screenshot`) and Gustaf runs them while its own window is hidden.
 
 - **Verification built in.** After a batch with any non-screenshot action, the final screenshot is taken once the screen stops changing (a 64×40 brightness grid compared every 60 ms until it is unchanged for 250 ms, at most 2 s, 4 s after `open_app`; a fixed 400 ms wait if a capture fails mid-way). The model gets that screenshot with every result, so it can check the outcome without another turn.
 - **Facts, not "OK".** Results read like `Executed 3 actions. Front app: Telegram — "Екатерина". Cursor: 512,300. Screen changed: yes.`; a failed step reports its number and error (`Step 2 of 3 (click) failed: …`) and still carries the screenshot. The front app and window title come from the on-screen window list (the active application's frontmost titled window), the cursor from the input library, mapped to screenshot pixels.

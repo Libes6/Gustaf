@@ -1,6 +1,6 @@
 # Search across chats
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
 Press Cmd+K (or use the search-lines button in the sidebar header) to search the text of every message in all chats, archived ones included. Results are ranked by relevance with the matches highlighted; filter by project and by model (the model filter keeps assistant replies written by that model, since your own messages carry no model). Up/Down move through results, Enter opens the chat and scrolls to the message (steps folded under "Done in ..." are expanded), Esc or Cmd+K closes.
 

@@ -1,8 +1,8 @@
 # MCP servers
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
-Settings, MCP servers: connect [Model Context Protocol](https://modelcontextprotocol.io) servers and the agents of **API providers** (OpenAI, Anthropic, Gemini, OpenRouter, local models) can use their tools. **Claude Code, Codex and Cursor Agent use their own MCP configuration; M Code does not inject servers into them** (the list is not shared with them either).
+Settings, MCP servers: connect [Model Context Protocol](https://modelcontextprotocol.io) servers and the agents of **API providers** (OpenAI, Anthropic, Gemini, OpenRouter, local models) can use their tools. **Claude Code, Codex and Cursor Agent use their own MCP configuration; Gustaf does not inject servers into them** (the list is not shared with them either).
 
 - **Servers:** local servers over stdio (`command`, `args`, `env`, optional working directory; started from an argument array, never through a shell, with the login-shell `PATH`, so `npx`/`uvx` work) and remote servers over streamable HTTP (`url`, `headers`; JSON and SSE responses; `https://`, or `http://` to localhost). The legacy SSE transport is not supported. Each server is global or bound to one project, and can be disabled. Paste an `mcpServers` JSON block (Claude Desktop, Cursor, VS Code shape) with "Import JSON", or load `~/.cursor/mcp.json`.
 - **Secrets:** env values and headers marked "Secret" (ticked automatically for names like `*_TOKEN`, `Authorization`) are stored in the macOS Keychain (`mcp:<server id>:env|header:<name>`), never in the settings database, and are removed with the server.

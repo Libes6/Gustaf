@@ -1,6 +1,6 @@
 # Chat
 
-Part of the [M Code documentation](../README.md). Chat sessions, streaming, message actions, model comparison and appearance.
+Part of the [Gustaf documentation](../README.md). Chat sessions, streaming, message actions, model comparison and appearance.
 
 ## Chat state and window controls
 

@@ -1,6 +1,6 @@
 # Interactive canvas
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
 Assistant messages can contain a complete React/TSX module:
 
