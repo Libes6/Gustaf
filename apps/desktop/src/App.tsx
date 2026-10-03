@@ -1,5 +1,6 @@
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { useEffect, useState } from "react";
+import { UpdatesProvider, UpdateNotice } from "./components/UpdaterPanel";
 import { WindowHeader } from "./components/WindowHeader";
 import { ChatView } from "./components/ChatView";
 import { BudgetBanner } from "./components/Budgets";
@@ -47,6 +48,7 @@ function Shell({ app }: { app: AppState }) {
       <WindowHeader />
       <ScheduledPromptsRuntime />
       <BudgetBanner />
+      <UpdateNotice />
       <Rail onCreateProject={() => setCreating(true)} onCompare={() => setComparing(true)} />
       {app.view === "settings" ? (
         <Settings />
@@ -80,7 +82,7 @@ export default function App() {
     <AppProvider>
       {(app) => (
         <I18nProvider locale={app.locale}>
-          <Shell app={app} />
+          <UpdatesProvider><Shell app={app} /></UpdatesProvider>
         </I18nProvider>
       )}
     </AppProvider>

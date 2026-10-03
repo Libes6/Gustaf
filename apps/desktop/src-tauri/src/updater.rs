@@ -6,7 +6,14 @@ fn configured(plugins: &std::collections::HashMap<String, serde_json::Value>) ->
     !key.trim().is_empty() && endpoints.is_some_and(|xs| !xs.is_empty() && xs.iter().all(|v| v.as_str().is_some_and(|url| url.starts_with("https://") && url.len() > 8)))
 }
 #[tauri::command]
-pub fn updater_configured(app: tauri::AppHandle) -> bool { configured(&app.config().plugins.0) }
+pub fn updater_configured(app: tauri::AppHandle) -> bool {
+    // This release feed supplies an AppImage for Linux, not a package-manager update.
+    #[cfg(target_os = "linux")]
+    if tauri::utils::platform::bundle_type() != Some(tauri::utils::config::BundleType::AppImage) {
+        return false;
+    }
+    configured(&app.config().plugins.0)
+}
 pub fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     if configured(&app.config().plugins.0) {

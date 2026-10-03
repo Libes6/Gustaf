@@ -13,6 +13,10 @@
     "check": "npm run check -w apps/desktop && npm run check -w packages/protocol",
     "test": "npm test -w apps/desktop",
     "test:ui": "npm run test:ui -w apps/desktop",
-    "test:e2e": "npm run test:e2e -w apps/desktop"
-  }
+    "test:e2e": "npm run test:e2e -w apps/desktop",
+    "version:bump": "node scripts/version.mjs",
+    "version:check": "node scripts/version.mjs --check",
+    "test:release": "node --test scripts/tests/*.test.mjs"
+  },
+  "version": "0.1.0"
 }
