@@ -129,7 +129,7 @@ export function useChatRun(o: Options) {
   }, [queue, running, coordinatorBusy, loaded]);
   async function enqueue(clarify = false) {
     if (!session.chatId || (!text.trim() && !images.length)) return;
-    await updateQueue(session.chatId, q => ({ ...q, items: [...q.items, { id: crypto.randomUUID(), text, images: [...images], clarify }], paused: q.interrupted ? true : false }));
+    try { await updateQueue(session.chatId, q => ({ ...q, items: [...q.items, { id: crypto.randomUUID(), text, images: [...images], clarify }], paused: q.interrupted && !running ? true : q.items.length ? q.paused : false })); } catch (e) { setError(String(e)); return; }
     o.setText(""); o.setImages([]); o.draft.clearSent(session.chatId);
   }
   const changeQueue = (fn: Parameters<typeof updateQueue>[1]) => { if (session.chatId) void updateQueue(session.chatId, fn).catch(e => setError(String(e))); };
@@ -240,6 +240,8 @@ export function useChatRun(o: Options) {
       const cid = chatId;
       release = claimChat(cid);
       if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
+      await loadQueue(cid);
+      await updateQueue(cid, q => ({ ...q, interrupted: true }));
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
@@ -500,5 +502,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
 }
