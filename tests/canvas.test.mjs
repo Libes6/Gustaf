@@ -140,7 +140,7 @@ test('HTML export is self-contained: CSP meta, inline runtime, no external refer
   // Outside the two inline scripts nothing can load anything: no link/img/iframe/src/href/@import/url().
   const shell = html.replace(/<script\b[^>]*>[^]*?<\/script>/g, '');
   assert.doesNotMatch(shell, /<link\b|<iframe\b|<img\b|\bsrc=|\bhref=|@import|url\(/i);
-  assert.equal(html.match(/<script\b/g).length, 2);
+  assert.equal(html.match(/<script nonce=/g).length, 1);
   assert.equal(html.match(/<\/script>/g).length, 2);
   assert.doesNotMatch(html, /<!--/);
 });
