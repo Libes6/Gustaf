@@ -701,7 +701,7 @@
   "themeLight": "Светлая",
   "themeSystem": "Системная",
   "thinking": "Думает…",
-  "liveMeter": "↑ ≈{input} · ↓ ≈{output} токенов · {seconds} с",
+  "liveMeter": "↑ ≈{input} · ↓ ≈{output} токенов · {time}",
   "liveMeterHint": "Оценка по длине текста, пока идёт ответ. Точные данные провайдера появятся, когда шаг завершится.",
   "compareTitle": "Сравнение моделей",
   "compareReadOnly": "Только чтение: без инструментов и изменений файлов. Ответы не сохраняются, пока вы не продолжите один из них в чате.",
@@ -727,7 +727,7 @@
   "compareNotRetryable": "Повтор не поможет, пока не устранена причина.",
   "compareRerun": "Запустить снова",
   "compareContinue": "Продолжить в чате с этим ответом",
-  "compareUsage": "↑ {input} · ↓ {output} токенов · {seconds} с",
+  "compareUsage": "↑ {input} · ↓ {output} токенов · {time}",
   "compareUsageHint": "Количество токенов, сообщённое провайдером.",
   "thisComputer": "этом компьютере",
   "toggleSidebar": "Показать или скрыть сайдбар",
@@ -1050,5 +1050,9 @@
   "imageReadError": "Не удалось прочитать изображение",
   "takeScreenshot": "Сделать скриншот",
   "capturingScreenshot": "Снимок экрана…",
-  "approveTerminal": "Прочитать вывод терминала"
+  "approveTerminal": "Прочитать вывод терминала",
+  "durationSeconds": "{n} с",
+  "durationMinutes": "{n} мин",
+  "durationHours": "{n} ч",
+  "agentsStopCliLabel": "Остановить весь запуск {provider}"
 }

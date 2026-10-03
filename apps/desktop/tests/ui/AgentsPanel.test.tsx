@@ -66,7 +66,9 @@ describe("AgentsPanel: CLI-native subagents", () => {
     expect(await screen.findByText("Worker a")).toBeInTheDocument();
     expect(screen.getByText("Agent · Codex")).toBeInTheDocument();
     expect(screen.getByText("reading files")).toBeInTheDocument();
-    const stopBtn = screen.getByRole("button", { name: "Stop" });
+    // The CLI cannot stop one subagent: the button aborts the whole run, and its accessible name says so.
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    const stopBtn = screen.getByRole("button", { name: "Stop the whole Codex run" });
     expect(stopBtn).toHaveAttribute("title", "Stops the whole Codex run, not just this agent.");
     expect(screen.queryByRole("button", { name: "Continue this agent" })).toBeNull();
     fireEvent.click(stopBtn);
@@ -74,7 +76,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
 
     act(() => { trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "completed")]); finishCliAgents(1); });
     expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Stop/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "View transcript" }));
     const dialog = await screen.findByRole("dialog", { name: "Worker a" });
     expect(within(dialog).getByText("Count the files")).toBeInTheDocument();
@@ -175,6 +177,18 @@ describe("AgentsPanel", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("in Russian the CLI stop button says it stops the whole run", async () => {
+    resetCliAgents();
+    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
+    renderApp(<Panel />, undefined, "ru");
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop: vi.fn() }, [{
+      type: "activity" as const, id: "a", name: "subagent", args: {}, status: "running" as const,
+      subagent: { provider: "codex" as const, agentId: "thread-a", title: "Worker a", action: "wait" as const, state: "running" as const },
+    }]));
+    expect(await screen.findByText("Worker a")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Остановить весь запуск Codex" })).toHaveAttribute("title", "Останавливает весь запуск Codex, а не только этого агента.");
+  });
+
   it("shows a card per run (title, muted type line, model · tokens · tool uses, current step) with a square stop button; finished runs fold into a collapsible row", async () => {
     resetAgentRuns(); // the store loads its rows once per module
     mockInvoke({
@@ -198,6 +212,9 @@ describe("AgentsPanel", () => {
     expect(within(live).getByText("15k tokens")).toBeInTheDocument();
     expect(within(live).getByText("4 tool uses")).toBeInTheDocument();
     expect(within(live).getByText("reading parser.ts")).toBeInTheDocument();
+    expect(within(live).getByText("0 s")).toBeInTheDocument(); // unit format, not a clock-style 0:00
+    // Our own agents stop individually: plain "Stop", no "whole run" wording.
+    expect(within(live).queryByRole("button", { name: /whole/ })).toBeNull();
     fireEvent.click(within(live).getByRole("button", { name: "Stop" }));
     expect(stop).toHaveBeenCalledTimes(1);
     expect(within(live).getByRole("button", { name: "View transcript" })).toBeInTheDocument();
@@ -210,6 +227,7 @@ describe("AgentsPanel", () => {
     const done = screen.getByRole("article", { name: "Done one" });
     expect(within(done).getByText("Done")).toBeInTheDocument();
     expect(within(done).getByText("short report")).toBeInTheDocument();
+    expect(within(done).getByText("4 s")).toBeInTheDocument(); // started_at 1000, ended_at 5000
     expect(within(done).queryByRole("button", { name: "Stop" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
     await waitFor(() => expect(screen.queryByRole("article", { name: "Done one" })).toBeNull());

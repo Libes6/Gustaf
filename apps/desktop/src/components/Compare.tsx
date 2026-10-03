@@ -1,6 +1,7 @@
 import { Check, Play, RotateCw, Search, Square, X, MessageSquarePlus } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { formatDuration } from "../lib/formatDuration";
 import { displayKeys } from "../lib/platform";
 import {
   MAX_COLUMNS, MIN_COLUMNS, anyRunning, canContinue, canRun, compareChatTitle, compareReducer, continueMessages, elapsedMs, emptyCompare,
@@ -261,7 +262,7 @@ function ColumnView({ c, provider, providerName, continuing, onStop, onRerun, on
 function Meter({ c }: { c: Column }) {
   const t = useT();
   if (c.status === "running") return <LiveMeter stats={{ start: c.start, chars: c.chars, input: c.input }} />;
-  const seconds = (elapsedMs(c, 0) / 1000).toFixed(1);
-  if (c.usage) return <span className="live-meter" title={t("compareUsageHint")}>{t("compareUsage", { input: t.num(c.usage.input), output: t.num(c.usage.output), seconds })}</span>;
-  return <span className="live-meter" title={t("liveMeterHint")}>{t("liveMeter", { input: t.num(c.input), output: t.num(estimateOutput(c)), seconds })}</span>;
+  const time = formatDuration(elapsedMs(c, 0) / 1000, t, { tenths: true });
+  if (c.usage) return <span className="live-meter" title={t("compareUsageHint")}>{t("compareUsage", { input: t.num(c.usage.input), output: t.num(c.usage.output), time })}</span>;
+  return <span className="live-meter" title={t("liveMeterHint")}>{t("liveMeter", { input: t.num(c.input), output: t.num(estimateOutput(c)), time })}</span>;
 }

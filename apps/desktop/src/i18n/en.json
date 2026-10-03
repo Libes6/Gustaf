@@ -679,7 +679,7 @@
   "themeLight": "Light",
   "themeSystem": "System",
   "thinking": "Thinking…",
-  "liveMeter": "↑ ≈{input} · ↓ ≈{output} tokens · {seconds}s",
+  "liveMeter": "↑ ≈{input} · ↓ ≈{output} tokens · {time}",
   "liveMeterHint": "Estimate from text length while the reply is running. Exact provider usage appears when the step finishes.",
   "compareTitle": "Compare models",
   "compareReadOnly": "Read-only: no tools, no file changes. Answers are not saved unless you continue one in a chat.",
@@ -705,7 +705,7 @@
   "compareNotRetryable": "Running it again will not help until the cause is fixed.",
   "compareRerun": "Run again",
   "compareContinue": "Continue in chat with this answer",
-  "compareUsage": "↑ {input} · ↓ {output} tokens · {seconds}s",
+  "compareUsage": "↑ {input} · ↓ {output} tokens · {time}",
   "compareUsageHint": "Token counts reported by the provider.",
   "thisComputer": "this computer",
   "toggleSidebar": "Toggle sidebar",
@@ -1022,5 +1022,9 @@
   "imageReadError": "Could not read the image",
   "takeScreenshot": "Take screenshot",
   "capturingScreenshot": "Capturing screen…",
-  "approveTerminal": "Read terminal output"
+  "approveTerminal": "Read terminal output",
+  "durationSeconds": "{n} s",
+  "durationMinutes": "{n} min",
+  "durationHours": "{n} h",
+  "agentsStopCliLabel": "Stop the whole {provider} run"
 }
