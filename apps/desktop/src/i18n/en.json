@@ -1022,5 +1022,6 @@
   "imageReadError": "Could not read the image",
   "takeScreenshot": "Take screenshot",
   "capturingScreenshot": "Capturing screen…",
-  "approveTerminal": "Read terminal output"
+  "approveTerminal": "Read terminal output",
+  "sentImageAlt": "Attached image {n}"
 }

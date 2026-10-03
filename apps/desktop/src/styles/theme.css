@@ -215,12 +215,14 @@ button.row, button.section-title { width: 100%; text-align: left; }
 
 .feed { flex: 1; min-height: 0; overflow-y: auto; user-select: text; }
 .feed-inner { max-width: 720px; margin: 0 auto; padding: 16px 24px 32px; }
-.msg-user { display: flex; justify-content: flex-end; margin: 20px 0; }
+.msg-user { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: 20px 0; }
 .msg-user .bubble {
   background: var(--bubble); color: var(--bubble-fg); padding: 8px 14px; border-radius: 18px;
   max-width: 80%; white-space: pre-wrap; word-wrap: break-word;
 }
-.msg-user .bubble img { max-width: 240px; border-radius: 8px; display: block; margin-top: 6px; }
+/* Pictures sit above the text bubble with no bubble background or padding: rounded corners only. */
+.msg-user .msg-images { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 80%; }
+.msg-user .msg-images img { display: block; min-width: 0; max-width: min(240px, 100%); max-height: 320px; border-radius: 12px; }
 .msg-assistant { margin: 12px 0; font-size: 14px; line-height: 1.6; }
 .msg-tools { margin: 6px 0; }
 .msg-actions { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .12s; }

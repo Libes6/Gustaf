@@ -84,9 +84,11 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       ) : null,
     );
 
+  const bodyText = turn.user ? userText(textOf(turn.user)) : null;
+  const images = (turn.user?.parts.filter((p) => p.type === "image") ?? []) as Extract<Part, { type: "image" }>[];
   return (
     <>
-      {turn.user && userText(textOf(turn.user)) !== null && (
+      {turn.user && bodyText !== null && (
         <div className={`msg-block${hit(turn.user)}`} data-msg-id={turn.user.id}>
           {editing !== null ? (
             <div className="msg-edit">
@@ -108,11 +110,17 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             </div>
           ) : (
           <div className="msg-user">
-            <div className="bubble">
-              {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
-              {userText(textOf(turn.user))}
-              {turn.user.parts.filter((p) => p.type === "image").map((p: any, i) => <img key={i} src={`data:image/png;base64,${p.data}`} alt="" />)}
-            </div>
+            {images.length > 0 && (
+              <div className="msg-images">
+                {images.map((p, i) => <img key={i} src={`data:image/png;base64,${p.data}`} alt={t("sentImageAlt", { n: i + 1 })} />)}
+              </div>
+            )}
+            {(bodyText || turn.user.meta?.compacted) && (
+              <div className="bubble">
+                {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
+                {bodyText}
+              </div>
+            )}
           </div>
           )}
           <div className={`msg-actions${confirming === "user" ? " pinned" : ""}`} style={{ justifyContent: "flex-end", marginTop: editing !== null ? 0 : -14 }}>

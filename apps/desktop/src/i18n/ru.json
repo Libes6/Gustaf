@@ -1050,5 +1050,6 @@
   "imageReadError": "Не удалось прочитать изображение",
   "takeScreenshot": "Сделать скриншот",
   "capturingScreenshot": "Снимок экрана…",
-  "approveTerminal": "Прочитать вывод терминала"
+  "approveTerminal": "Прочитать вывод терминала",
+  "sentImageAlt": "Прикреплённое изображение {n}"
 }

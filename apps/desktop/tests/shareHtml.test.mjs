@@ -139,6 +139,18 @@ test('images are omitted by default and embedded as data: URIs on request', () =
   assert.doesNotMatch(bad, /onerror="x/);
 });
 
+test('a sent message shows its pictures before the text; other roles keep their order', () => {
+  const png = 'iVBORw0KGgo=';
+  const on = build([msg('user', [text('see this'), { type: 'image', data: png }, { type: 'image', data: png }]), msg('assistant', [text('seen'), { type: 'image', data: png }])], { includeImages: true }).html;
+  const user = /<section class="msg user">[\s\S]*?<\/section>/.exec(on)[0];
+  assert.ok(user.indexOf('<img') !== -1 && user.indexOf('<img') < user.indexOf('see this'), 'user: image first');
+  assert.equal(user.split('<img').length - 1, 2);
+  const assistant = /<section class="msg assistant">[\s\S]*?<\/section>/.exec(on)[0];
+  assert.ok(assistant.indexOf('seen') < assistant.indexOf('<img'), 'assistant: order unchanged');
+  const off = build([msg('user', [text('see this'), { type: 'image', data: png }])]).html;
+  assert.ok(off.indexOf('[image omitted]') < off.indexOf('see this'), 'omitted placeholder also leads');
+});
+
 test('unicode survives; huge messages are clipped with a note', () => {
   const { html } = build([msg('user', [text('Привет, мир 👋 日本語 \u{1F600}')]), msg('assistant', [text('x'.repeat(SHARE_TEXT_LIMIT + 5000))])]);
   assert.match(html, /Привет, мир 👋 日本語 \u{1F600}/u);

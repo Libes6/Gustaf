@@ -429,6 +429,16 @@ function outputBlock(output: string | undefined, L: MdLabels): string {
   return output?.trim() ? fence("text", clip(output, L)) : `*${L.noOutput}*`;
 }
 
+/**
+ * A sent message shows its pictures above the text, so the exports do the same. An omitted picture (the placeholder
+ * text left by an export without images) counts as a picture. Other roles keep the order the model produced.
+ */
+export function partsInDisplayOrder(role: string, parts: Part[]): Part[] {
+  if (role !== "user") return parts;
+  const lead = (p: Part) => p.type === "image" || (p.type === "text" && p.text === IMAGE_OMITTED);
+  return [...parts.filter(lead), ...parts.filter((p) => !lead(p))];
+}
+
 function renderPart(p: Part, L: MdLabels): string[] {
   switch (p.type) {
     case "text":
@@ -466,7 +476,7 @@ function renderChat(chat: ExportedChat, level: number, L: MdLabels): { head: str
     // Tool messages continue the assistant turn that requested them, so they get no heading of their own.
     if (m.role === "user") body.push(`${h(level + 1)} ${L.user}`);
     else if (m.role === "assistant") body.push(`${h(level + 1)} ${L.assistant}${m.meta?.model ? ` (${m.meta.model})` : ""}`);
-    for (const p of m.parts) body.push(...renderPart(p, L));
+    for (const p of partsInDisplayOrder(m.role, m.parts)) body.push(...renderPart(p, L));
   }
   return { head, body };
 }
