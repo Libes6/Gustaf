@@ -53,6 +53,8 @@ export type RunOptions = {
   maxSteps?: number;
   /** Subagents: appended to the system prompt. */
   systemExtra?: string;
+  /** Marks the calls of an unattended run in the action log (`"scheduled"`: a scheduled prompt). */
+  source?: "scheduled";
 };
 
 const MAX_STEPS = 50;
@@ -226,7 +228,7 @@ async function runLoop(o: RunOptions) {
     const lastComputer = calls.filter((c) => c.computer).pop();
     for (const call of calls) {
       const res = { type: "tool_result" as const, id: call.id, name: call.name, output: "", computer: !!call.computer };
-      const act = logStart({ tool: call.computer ? "computer" : call.name, summary: summarizeCall(call.name, call.args, call.computer), ...(o.root ? { root: o.root } : {}), ...(project ? { project } : {}) });
+      const act = logStart({ tool: call.computer ? "computer" : call.name, summary: summarizeCall(call.name, call.args, call.computer), ...(o.root ? { root: o.root } : {}), ...(project ? { project } : {}), ...(o.source ? { source: o.source } : {}) });
       if (o.signal.aborted || halted) {
         const cancelled = { ...res, output: halted ? HALT : "Cancelled by user.", isError: true };
         results.push(cancelled);

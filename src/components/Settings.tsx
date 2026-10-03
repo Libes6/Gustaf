@@ -20,6 +20,7 @@ import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
+import { ScheduledPromptsSection } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
@@ -68,6 +69,7 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
+      <ScheduledPromptsSection />
     </>
   );
 }

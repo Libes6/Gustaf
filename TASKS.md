@@ -72,7 +72,7 @@ Items were drafted from the README and code layout; verify against the code befo
 ## P3
 - [ ] **Canvas**: multi-file modules, bundled extra libraries, export to HTML/PNG, revision diff.
 - [x] **Model routing** by task type (cheap vs strong model). Done for agents: default model per subagent type, an allow-list for explicit `model` requests, and a cheap model for chat compaction and commit messages (Settings, Usage, Agents; `agentSettings.ts`, `lib/modelRouting.ts`). Not done: automatic routing of the main chat's own requests.
-- [ ] **Scheduled prompts.**
+- [x] **Scheduled prompts.** Run while the app is open (no OS daemon): once / every N minutes or hours (min 5) / daily / weekdays, DST-safe local-time math, missed-run policy (run once if due within 24 h, else "missed"), no overlap, max 20, switching on is the confirmation, access capped to auto, no Computer Use or subagents, approvals never auto-answered (timeout 10 min -> "needs attention"), action log source "scheduled" (`lib/scheduledPrompts.ts`, `scheduledRun.ts`, Settings, General). Not done: scheduled chat is not live while open, no OS-level launch, UI untested.
 - [ ] **Voice input** and screenshot paste.
 - [ ] **Auto-update** channel (Tauri updater) and crash reporting opt-in.
 - [x] **Theming**: light/dark/system and accent color.

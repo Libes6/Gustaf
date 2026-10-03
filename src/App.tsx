@@ -6,6 +6,7 @@ import { BudgetBanner } from "./components/Budgets";
 import { Compare } from "./components/Compare";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Onboarding } from "./components/Onboarding";
+import { ScheduledPromptsRuntime } from "./components/ScheduledPromptsRuntime";
 import { SearchPalette } from "./components/SearchPalette";
 import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
@@ -43,6 +44,7 @@ function Shell({ app }: { app: AppState }) {
   return (
     <div className={`app${app.sideHidden && app.view === "chat" ? " side-hidden" : ""}`}>
       <WindowHeader />
+      <ScheduledPromptsRuntime />
       <BudgetBanner />
       <Rail onCreateProject={() => setCreating(true)} onCompare={() => setComparing(true)} />
       {app.view === "settings" ? (
