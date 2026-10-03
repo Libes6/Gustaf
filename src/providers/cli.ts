@@ -7,28 +7,40 @@ import { codexArgs, turnImages, withImagePaths } from "./cliArgs";
 import { attachments } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { Command } from "@tauri-apps/plugin-shell";
+import { currentPlatform } from "../lib/platform";
+import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
 import { flattenMsg, textOf, type Adapter, type CliId, type ProviderConfig, type TurnInput } from "./types";
 
-export const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+export { shq } from "./shell";
 
-const BUNDLED_CODEX = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex";
+/** Runs a script in the OS shell (zsh on macOS, bash on Linux, PowerShell on Windows; see shell.ts). */
+export function shellCommand(script: string, options?: Parameters<typeof Command.create>[2]) {
+  const sh = shellFor(currentPlatform());
+  return Command.create(sh.name, sh.args(script), options);
+}
+
+/** Script running `executable` with the platform's quoting (see `invocationScript`). */
+export const runScript = (inv: Invocation) => invocationScript(shellFor(currentPlatform()).kind, inv);
+
+const findScript = (id: CliName, verify = false) => findCliScript(currentPlatform(), id, verify);
+
 let codexPath: Promise<string> | undefined;
 export function codexExecutable() {
   return codexPath ??= (async () => {
-    const probe = await Command.create("zsh", ["-lc", `if codex --version >/dev/null 2>&1; then echo codex; elif ${shq(BUNDLED_CODEX)} --version >/dev/null 2>&1; then echo ${shq(BUNDLED_CODEX)}; else exit 1; fi`]).execute();
+    const probe = await shellCommand(findScript("codex", true)).execute();
     if (probe.code !== 0 || !probe.stdout.trim()) throw new Error("Codex CLI is unavailable");
     return probe.stdout.trim();
   })();
 }
 
 async function cursorExecutable() {
-  const probe = await Command.create('zsh', ['-lc', 'command -v cursor-agent || { test -x "$HOME/.local/bin/cursor-agent" && echo "$HOME/.local/bin/cursor-agent"; }']).execute();
+  const probe = await shellCommand(findScript("cursor-agent")).execute();
   if (probe.code || !probe.stdout.trim()) throw new Error('Cursor CLI is unavailable.');
   return probe.stdout.trim();
 }
 
 async function claudeExecutable() {
-  const probe = await Command.create('zsh', ['-lc', 'command -v claude || { for candidate in "$HOME/.local/bin/claude" "$HOME"/.nvm/versions/node/*/bin/claude(N); do if test -x "$candidate"; then echo "$candidate"; break; fi; done; }']).execute();
+  const probe = await shellCommand(findScript("claude")).execute();
   if (!probe.stdout.trim()) throw new Error('Claude CLI is unavailable. Install Claude Code and run claude auth login.');
   return probe.stdout.trim();
 }
@@ -40,7 +52,7 @@ export async function spawnLines(
   o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string> } = {},
 ) {
   if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const cmd = Command.create("zsh", ["-lc", script], { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
+  const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
   let buf = "";
   let stderr = "";
   const line = (s: string) => {
@@ -99,7 +111,7 @@ async function listCodexModels() {
   const executable = await codexExecutable();
   let models: { id: string; name: string }[] = [];
   let error = '';
-  const result = await spawnLines(`exec env MCODE_CODEX_BINARY=${shq(executable)} node ${shq(script)} --models`, e => {
+  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { MCODE_CODEX_BINARY: executable } }), e => {
     if (e.type === 'models') models = e.result;
     if (e.type === 'error') error = e.message;
   });
@@ -132,7 +144,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Cursor Agent",
     models: async () => {
       const out: { id: string; name: string }[] = [];
-      const cmd = await Command.create("zsh", ["-lc", "cursor-agent --list-models"]).execute();
+      const cmd = await shellCommand("cursor-agent --list-models").execute();
       for (const l of cmd.stdout.split("\n")) {
         const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
         if (m) out.push({ id: m[1], name: m[2] });
@@ -176,13 +188,12 @@ export const cliName = (id: CliId) => SPECS[id].name;
 /** CLIs that are on the login-shell PATH and actually start (`--version` succeeds). */
 export async function detectClis(): Promise<{ id: CliId; version: string }[]> {
   const ids = Object.keys(SPECS) as CliId[];
-  const script = ids.map((c) => `v=$(${c === "codex" ? `codex --version 2>/dev/null || ${shq(BUNDLED_CODEX)} --version 2>/dev/null` : c === "cursor-agent" ? 'cursor-agent --version 2>/dev/null || "$HOME/.local/bin/cursor-agent" --version 2>/dev/null' : 'claude --version 2>/dev/null || { for candidate in "$HOME/.local/bin/claude" "$HOME"/.nvm/versions/node/*/bin/claude(N); do if test -x "$candidate"; then export PATH="${candidate:h}:$PATH"; "$candidate" --version 2>/dev/null && break; fi; done; }' }) && echo ${c}$'\\t'"\${v%%$'\\n'*}"`).join("; ");
-  const out = await Command.create("zsh", ["-lc", `${script}; true`]).execute();
+  const out = await shellCommand(detectScript(currentPlatform(), ids)).execute();
   return out.stdout
     .split("\n")
-    .map((l) => l.split("\t"))
+    .map((l) => l.replace(/\r$/, "").split("\t"))
     .filter(([id]) => ids.includes(id as CliId))
-    .map(([id, version]) => ({ id: id as CliId, version: version ?? "" }));
+    .map(([id, version]) => ({ id: id as CliId, version: (version ?? "").trim() }));
 }
 
 /** An installed agent CLI: it runs its own tools and auth in the project folder; we relay text and tool activity. */
@@ -196,7 +207,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
-        const cmd = await Command.create('zsh', ['-lc', `${shq(executable)} --list-models`], { ...(cfg.cliAuth === "key" ? { env: cursorAccountEnv(cfg, key) } : {}) }).execute();
+        const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), { ...(cfg.cliAuth === "key" ? { env: cursorAccountEnv(cfg, key) } : {}) }).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
@@ -227,8 +238,8 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
       };
       const executable = id === "codex" ? await codexExecutable() : id === "cursor-agent" ? await cursorExecutable() : await claudeExecutable();
       const res = await spawnLines(
-        // Prompt goes last as one quoted argument; all three CLIs take it positionally.
-        `${id === "claude" && executable.startsWith("/") ? `export PATH=${shq(executable.slice(0, executable.lastIndexOf("/")))}:"$PATH"; ` : ""}exec ${shq(executable)} ${[...args, prompt].map(shq).join(" ")} < /dev/null`,
+        // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
+        runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
         (e) => {
           if (e.type === "result" || e.type === "turn.completed") usage = tokenUsage(e.usage, id === "claude") ?? usage;
           const limit = claudeLimit(e);
