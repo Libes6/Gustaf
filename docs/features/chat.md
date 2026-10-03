@@ -8,7 +8,7 @@ Visited chats keep separate messages, drafts, attachments, pending approvals and
 
 Provider sign-in is verified by a small test request or a successful chat response, not by listing models. HTTP 401 marks the provider as requiring sign-in. Failed requests can be retried without duplicating the user message; a retry can use another provider. Completed steps are retained when continuing an interrupted request.
 
-Canvas supports dragging the divider (or focusing it and pressing arrow keys) and exporting the selected revision as TSX through the native save dialog. The dedicated window header reserves space for macOS controls and supports dragging and double-clicking to toggle maximization.
+Canvas supports dragging the divider (or focusing it and pressing arrow keys) and exporting the selected revision as TSX (or the whole canvas as standalone HTML) through the native save dialog. The dedicated window header reserves space for macOS controls and supports dragging and double-clicking to toggle maximization.
 
 Validation: `npm run check`, `npm run test:chat`, `npm run test:canvas`, `npm run tauri build -- --debug --bundles app`.
 
