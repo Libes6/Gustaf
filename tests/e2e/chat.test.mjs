@@ -15,7 +15,7 @@ const messagesOf = (backend, chatId) => backend.rows('select role, content from 
 async function ask(page, text) {
   const composer = page.getByRole('textbox', { name: 'Ask anything' });
   await composer.fill(text);
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
 }
 
 test('streamed answer: the live token meter shows while streaming and goes away at the end', { skip: skipReason }, async () => {
@@ -111,5 +111,67 @@ test('Cmd+K search finds a message in another chat and jumps to it', { skip: ski
     // The chat opens and the matched message is highlighted.
     await shown(page.locator('.hit-flash').filter({ hasText: 'nine minutes' }));
     assert.ok(await page.getByText('Boil spaghetti for nine minutes').isVisible());
+  });
+});
+
+const openChat = async (page, title) => page.getByRole('complementary', { name: 'Chats and projects' }).getByText(title, { exact: true }).first().click();
+const PROJECT = '/fake/projects/shop';
+const withProject = (b) => {
+  b.seedReady();
+  const project = b.seedProject('Shop', PROJECT);
+  b.seedChat('Deploy chat', [['user', 'earlier message'], ['assistant', 'earlier reply']], project);
+};
+
+test('approval card: a shell command waits for Allow and then runs', { skip: skipReason }, async () => {
+  await scenario(suite, 'approval-allow', { setup: withProject }, async ({ page, backend, origin }) => {
+    backend.provider.reply({ toolCalls: [{ name: 'run_command', args: { command: 'npm install left-pad' } }] });
+    backend.provider.reply({ text: 'Installed it.' });
+    await openApp(page, origin);
+    await openChat(page, 'Deploy chat');
+    await ask(page, 'install left-pad');
+    const card = page.getByRole('alertdialog', { name: 'Run this command?' });
+    await shown(card);
+    assert.match(await card.innerText(), /npm install left-pad/);
+    assert.deepEqual(backend.shellCommands, [], 'nothing runs before the answer');
+    await card.getByRole('button', { name: /^Allow/ }).click();
+    await shown(page.getByText('Installed it.'));
+    await gone(card);
+    assert.deepEqual(backend.shellCommands, ['npm install left-pad']);
+  });
+});
+
+test('approval card: Deny keeps the command from running and tells the model', { skip: skipReason }, async () => {
+  await scenario(suite, 'approval-deny', { setup: withProject }, async ({ page, backend, origin }) => {
+    backend.provider.reply({ toolCalls: [{ name: 'run_command', args: { command: 'npm install left-pad' } }] });
+    backend.provider.reply({ text: 'Understood, not installing.' });
+    await openApp(page, origin);
+    await openChat(page, 'Deploy chat');
+    await ask(page, 'install left-pad');
+    const card = page.getByRole('alertdialog', { name: 'Run this command?' });
+    await shown(card);
+    await card.getByRole('button', { name: /^Deny/ }).click();
+    await shown(page.getByText('Understood, not installing.'));
+    assert.deepEqual(backend.shellCommands, []);
+    const toolMessage = backend.provider.chatBodies.at(-1).messages.findLast((m) => m.role === 'tool');
+    assert.match(toolMessage.content, /declined/i);
+  });
+});
+
+const CANVAS_FENCE = '```tsx-canvas id="hello" title="Hello card"\nexport default function Hello() { return <h1>Canvas says hi</h1>; }\n```';
+
+test('canvas: a tsx-canvas fence becomes a card that renders in its sandboxed iframe', { skip: skipReason }, async () => {
+  await scenario(suite, 'canvas-card', { setup: ready }, async ({ page, backend, origin }) => {
+    backend.provider.reply({ text: `Here you go.\n\n${CANVAS_FENCE}\n` });
+    await openApp(page, origin);
+    await ask(page, 'make a hello card');
+    const card = page.getByRole('button', { name: /Hello card/ });
+    await shown(card);
+    await card.click();
+    const frameEl = page.locator('iframe[title="Hello card"]');
+    await shown(frameEl);
+    assert.equal(await frameEl.getAttribute('sandbox'), 'allow-scripts');
+    await shown(page.frameLocator('iframe[title="Hello card"]').getByRole('heading', { name: 'Canvas says hi' }));
+    await page.getByRole('button', { name: 'Code' }).click();
+    await shown(page.locator('.canvas-source').getByText('Canvas says hi'));
   });
 });

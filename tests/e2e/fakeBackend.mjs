@@ -175,6 +175,8 @@ export class FakeBackend {
       }
       case 'review_prepare': return { id: 'review-1', root: args.root, workspace: `${args.root}/.ws` };
       case 'review_list': case 'fs_files': case 'import_scan': case 'cursor_scan': case 'read_instructions': case 'import_chatgpt_scan': return [];
+      case 'git': // checkpoints and the project badge: a repository on `main` with one commit and a clean tree
+        return args.args?.includes('--abbrev-ref') ? 'main\n' : args.args?.includes('rev-parse') ? 'c0ffee0123456789\n' : '';
       case 'git_status': return { branch: 'main', files: [] };
       case 'cu_permissions': return { accessibility: true, screen: true };
       case 'cu_screen_size': return { width: 1440, height: 900 };

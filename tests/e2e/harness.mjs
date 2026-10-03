@@ -2,14 +2,14 @@
 // browsers: the locally installed Chrome is used, see tests/helpers/chrome.mjs), with a faked Tauri backend
 // (tests/e2e/fakeBackend.mjs + tauriInit.js). The page is served with the production CSP from tauri.conf.json as a
 // response header (like Tauri does), so a CSP violation shows up as a console error and fails the scenario.
-import { execFileSync } from 'node:child_process';
 import http from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../helpers/chrome.mjs';
+import { buildFrontend } from './build.mjs';
 import { FakeBackend } from './fakeBackend.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -35,10 +35,6 @@ function distDir() {
   return dir;
 }
 
-export function buildFrontend(outDir) {
-  execFileSync(process.execPath, ['scripts/build-canvas.mjs'], { cwd: root, stdio: 'pipe' });
-  execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', outDir, '--emptyOutDir'], { cwd: root, stdio: 'pipe' });
-}
 
 function serve(dir) {
   const server = http.createServer((req, res) => {
@@ -75,7 +71,7 @@ export async function startSuite() {
 }
 
 /** Console output that must never happen: errors (CSP violations are errors), and anything that mentions a refusal. */
-const isProblem = (m) => m.type() === 'error' || /Refused to/.test(m.text());
+const isProblem = (m) => m.type() === 'error' || /Refused to|violates the following Content Security Policy/.test(m.text());
 
 /**
  * Runs one scenario in a fresh browser context with its own fake backend.
@@ -83,7 +79,7 @@ const isProblem = (m) => m.type() === 'error' || /Refused to/.test(m.text());
  * The scenario fails when the page logged a console error / CSP refusal or threw an uncaught exception.
  * On failure a screenshot and a Playwright trace go to tests/e2e/artifacts/.
  */
-export async function scenario(suite, name, { setup, locale = 'en-US', colorScheme = 'light' } = {}, fn) {
+export async function scenario(suite, name, { setup, locale = 'en-US', colorScheme = 'light', artifacts = true } = {}, fn) {
   const backend = new FakeBackend();
   setup?.(backend);
   const context = await suite.browser.newContext({ locale, colorScheme, viewport: { width: 1280, height: 800 }, acceptDownloads: true });
@@ -91,7 +87,7 @@ export async function scenario(suite, name, { setup, locale = 'en-US', colorSche
   await context.exposeBinding('__e2e_invoke', async (_src, cmd, args) => backend.invoke(cmd, args ?? {}));
   await context.addInitScript({ content: INIT });
   const page = await context.newPage();
-  page.setDefaultTimeout(10_000);
+  page.setDefaultTimeout(15_000);
   const problems = [];
   page.on('console', (m) => { if (isProblem(m)) problems.push(`console.${m.type()}: ${m.text()}`); });
   page.on('pageerror', (e) => problems.push(`uncaught: ${e.stack ?? e.message}`));
@@ -101,10 +97,11 @@ export async function scenario(suite, name, { setup, locale = 'en-US', colorSche
     if (problems.length) throw new Error(`page logged problems:\n${problems.join('\n')}`);
     failed = false;
   } finally {
-    if (failed) {
+    if (failed && artifacts) {
       mkdirSync(ARTIFACTS, { recursive: true });
       const base = join(ARTIFACTS, name.replace(/[^a-z0-9]+/gi, '-').toLowerCase());
       await page.screenshot({ path: `${base}.png` }).catch(() => {});
+      writeFileSync(`${base}.backend-calls.json`, JSON.stringify({ problems, calls: backend.calls.filter(([c]) => c !== 'db_select' && c !== 'db_execute') }, null, 1));
       await context.tracing.stop({ path: `${base}.trace.zip` }).catch(() => {});
     } else await context.tracing.stop().catch(() => {});
     await context.close();

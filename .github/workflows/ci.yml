@@ -24,3 +24,11 @@ jobs:
       - run: npm --prefix sidecar ci
       - run: node scripts/build-canvas.mjs
       - run: npm run check
+      # Failure artifacts of npm run test:e2e (screenshots, Playwright traces, backend call log); the suite itself runs inside
+      # `npm run check` and skips itself with a message when no Chrome is installed (the macOS runners have one).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failures
+          path: tests/e2e/artifacts
+          if-no-files-found: ignore
