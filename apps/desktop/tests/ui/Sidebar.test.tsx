@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../../src/components/Sidebar";
 import { beginApproval } from "../../src/lib/attention";
+import { chatStatusStore } from "../../src/lib/chatStatus";
 import { beginLiveRun } from "../../src/lib/liveRuns";
 import { chat, makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -132,6 +133,31 @@ describe("Sidebar", () => {
     expect(within(screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
     act(() => handle?.end());
     expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
+  });
+
+  it("shows done-unread and failed badges with text alternatives, cleared when the chat is opened or run again", () => {
+    setup();
+    const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
+    act(() => chatStatusStore.runEnded(3, "ok"));
+    const unread = within(row()).getByRole("img", { name: "Finished, not viewed yet" });
+    expect(unread).toHaveAttribute("title", "Finished, not viewed yet");
+    act(() => chatStatusStore.setViewing(3));
+    expect(within(row()).queryByRole("img", { name: "Finished, not viewed yet" })).not.toBeInTheDocument();
+    act(() => chatStatusStore.setViewing(null));
+    act(() => chatStatusStore.runEnded(3, "failed"));
+    expect(within(row()).getByRole("status", { name: "The last run failed" })).toBeInTheDocument();
+    act(() => chatStatusStore.runStarted(3));
+    expect(within(row()).queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("shows one badge per chat: an open approval wins over a failure", () => {
+    setup();
+    const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
+    let done = noop;
+    act(() => { chatStatusStore.runEnded(3, "failed"); done = beginApproval(3, "main"); });
+    expect(within(row()).getByRole("status", { name: "Waiting for your approval" })).toBeInTheDocument();
+    expect(within(row()).queryByRole("status", { name: "The last run failed" })).not.toBeInTheDocument();
+    act(() => { done(); chatStatusStore.runStarted(3); });
   });
 
   it("archives a chat with the row button", async () => {

@@ -12,7 +12,7 @@ import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
-import { useAttentionNotifications } from "./lib/attention";
+import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { AppProvider, type AppState } from "./state";
 
@@ -21,6 +21,7 @@ function Shell({ app }: { app: AppState }) {
   const [searching, setSearching] = useState(false);
   const [comparing, setComparing] = useState(false);
   useAttentionNotifications();
+  useChatStatusSync(app.activeChat, app.view);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

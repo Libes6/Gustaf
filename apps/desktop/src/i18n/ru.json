@@ -115,6 +115,8 @@
   "notifyApprovalBody": "{who} ждёт вашего подтверждения в M Code.",
   "notifyMainAgent": "Агент",
   "approvalPendingBadge": "Ждёт вашего подтверждения",
+  "chatStatusUnread": "Завершён, ещё не просмотрен",
+  "chatStatusFailed": "Последний запуск завершился ошибкой",
   "archive": "Архивировать",
   "archiveChats": "Архивировать чаты",
   "archiveEmpty": "Архив пуст.",

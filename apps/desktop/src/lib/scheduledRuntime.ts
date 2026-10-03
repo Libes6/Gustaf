@@ -5,7 +5,7 @@ import { getAdapter } from "../providers";
 import { retryNoticeVars } from "../providers/retry";
 import type { AppState } from "../state";
 import { db, review } from "./api";
-import { beginApproval, notifyUnfocused } from "./attention";
+import { beginApproval, notifyUnfocused, reportChatRun } from "./attention";
 import { checkpoint } from "./checkpoints";
 import { beginLiveRun } from "./liveRuns";
 import { addMessage, createChat } from "./data";
@@ -94,6 +94,8 @@ export function startScheduledRuntime(getApp: () => AppState): () => void {
     { get: getScheduled, update: updateScheduled },
     async (sc, signal) => {
       const result = await executeScheduledRun(sc, deps, signal);
+      // Sidebar flags: done-unread / failed (the notification below stays the scheduled one); attention is shown by the approval badge.
+      reportChatRun(result.chatId, result.status === "success" ? "ok" : result.status === "failed" ? "failed" : "stopped");
       const body = result.status === "success" ? t("scheduledNotifyDone") : result.status === "attention" ? t("scheduledNotifyAttention") : result.status === "failed" ? result.error?.slice(0, 180) ?? "" : "";
       if (body) void notifyUnfocused(t("scheduledNotifyTitle", { title: sc.title }), body);
       return result;

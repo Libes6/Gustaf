@@ -115,6 +115,8 @@
   "notifyApprovalBody": "{who} is waiting for your approval in M Code.",
   "notifyMainAgent": "The agent",
   "approvalPendingBadge": "Waiting for your approval",
+  "chatStatusUnread": "Finished, not viewed yet",
+  "chatStatusFailed": "The last run failed",
   "archive": "Archive",
   "archiveChats": "Archive chats",
   "archiveEmpty": "No archived chats.",
