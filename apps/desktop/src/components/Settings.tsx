@@ -25,6 +25,7 @@ import { DeveloperSettings } from "./DeveloperSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
+import { HooksSettings } from "./HooksSettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
@@ -420,7 +421,7 @@ function GitPage() {
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
       <CommandRules />
-      <DiagnosticsSettings /><SemanticSettings />
+      <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
     </>
   );
 }

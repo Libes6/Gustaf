@@ -30,18 +30,35 @@ export type ActionEntry = {
   builtin?: boolean;
   detail?: string;
   undo?: UndoRecord;
-  /** Set for calls made by an unattended run (`"scheduled"`: a scheduled prompt). */
-  source?: "scheduled";
+  /** `"scheduled"`: a call made by an unattended run (a scheduled prompt). `"hook"`: the entry is a hook run, see `hook`. */
+  source?: "scheduled" | "hook";
+  hook?: HookMeta;
 };
+/** What is recorded of a hook run (its output is the entry's `detail`). */
+export type HookMeta = { event: string; command: string; exitCode?: number | null; timedOut?: boolean; scope?: "global" | "project" };
 
 const STATUSES: readonly string[] = ["running", "success", "error", "blocked", "declined", "cancelled", "interrupted"];
 const APPROVALS: readonly string[] = ["rule", "mode", "user"];
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const oneLine = (s: string) => s.replace(/\s*\n\s*/g, " ⏎ ");
 
+function normalizeHook(raw: unknown): HookMeta | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const h = raw as Record<string, unknown>;
+  if (typeof h.event !== "string" || typeof h.command !== "string") return undefined;
+  return {
+    event: clip(h.event, 40),
+    command: clip(h.command, MAX_SUMMARY),
+    ...(typeof h.exitCode === "number" || h.exitCode === null ? { exitCode: h.exitCode as number | null } : {}),
+    ...(h.timedOut === true ? { timedOut: true } : {}),
+    ...(h.scope === "global" || h.scope === "project" ? { scope: h.scope } : {}),
+  };
+}
+
 export const isEditTool = (name: string) => name === "edit_file" || name === "write_file";
-export type ActionKind = "command" | "edit" | "read" | "computer" | "other";
+export type ActionKind = "command" | "edit" | "read" | "computer" | "hook" | "other";
 export function actionKind(tool: string): ActionKind {
+  if (tool === "hook") return "hook";
   if (tool === "run_command") return "command";
   if (isEditTool(tool)) return "edit";
   if (tool === "read_file" || tool === "list_dir" || tool === "search") return "read";
@@ -98,7 +115,8 @@ export function normalizeActionLog(raw: unknown): ActionEntry[] {
       ...(typeof e.approval === "string" && APPROVALS.includes(e.approval) ? { approval: e.approval as Approval } : {}),
       ...(optText(e.rule, 400) ? { rule: optText(e.rule, 400) } : {}),
       ...(e.builtin === true ? { builtin: true } : {}),
-      ...(e.source === "scheduled" ? { source: "scheduled" as const } : {}),
+      ...(e.source === "scheduled" || e.source === "hook" ? { source: e.source } : {}),
+      ...(e.source === "hook" && normalizeHook(e.hook) ? { hook: normalizeHook(e.hook) } : {}),
       ...(optText(e.detail, MAX_DETAIL) ? { detail: optText(e.detail, MAX_DETAIL) } : {}),
       ...(undo ? { undo } : {}),
     });
