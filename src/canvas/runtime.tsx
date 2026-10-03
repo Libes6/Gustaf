@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { transform } from "sucrase";
+import { parseFiles, loadModules } from "./modules.ts";
 
 const payload = JSON.parse(document.getElementById("canvas-source")!.textContent!);
 const report = (error: unknown) => {
@@ -17,13 +18,14 @@ window.addEventListener("error", (event) => report(event.error ?? event.message)
 window.addEventListener("unhandledrejection", (event) => report(event.reason));
 
 try {
-  const output = transform(payload.code, { transforms: ["typescript", "jsx", "imports"], production: true, jsxRuntime: "classic" }).code;
-  const module = { exports: {} as { default?: React.ComponentType } };
-  const require = (name: string) => {
-    if (name === "react") return React;
-    throw new Error(`Unsupported import: ${name}. Only react is available.`);
+  const parsed = parseFiles(payload.code);
+  if (parsed.error) throw new Error(parsed.error);
+  const multi = parsed.files.length > 1;
+  const compile = (code: string, name: string) => {
+    try { return transform(code, { transforms: ["typescript", "jsx", "imports"], production: true, jsxRuntime: "classic" }).code; }
+    catch (error) { throw multi ? new Error(`${name}: ${error instanceof Error ? `${error.name}: ${error.message}` : error}`) : error; }
   };
-  new Function("require", "module", "exports", "React", output)(require, module, module.exports, React);
-  if (!module.exports.default) throw new Error("Export a React component with export default.");
-  createRoot(document.getElementById("root")!, { onUncaughtError: report }).render(React.createElement(module.exports.default));
+  const exported = loadModules(parsed.files, compile, { react: React }) as { default?: React.ComponentType };
+  if (!exported.default) throw new Error(`Export a React component with export default${multi ? ` from ${parsed.files[0].name}` : ""}.`);
+  createRoot(document.getElementById("root")!, { onUncaughtError: report }).render(React.createElement(exported.default));
 } catch (error) { report(error); }

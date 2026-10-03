@@ -17,7 +17,10 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
   const [copyError, setCopyError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedPath, setSavedPath] = useState("");
+  const [fileName, setFileName] = useState("");
   const frame = useRef<HTMLIFrameElement>(null);
+  const file = artifact.files.find((f) => f.name === fileName) ?? artifact.files[0];
+  const multi = artifact.files.length > 1;
   const document = useMemo(() => canvasDocument(artifact.code), [artifact.code, revision]);
   useEffect(() => {
     setError("");
@@ -33,16 +36,16 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
     setCopyError("");
     setSavedPath("");
     setSaving(true);
-    const name = (artifact.id.replace(/[^a-zA-Z0-9_-]/g, "-") || "canvas") + ".tsx";
+    const name = multi ? file.name.split("/").pop()! : (artifact.id.replace(/[^a-zA-Z0-9_-]/g, "-") || "canvas") + ".tsx";
     try {
       if (isTauri()) {
-        const path = await save({ defaultPath: name, filters: [{ name: "React TSX", extensions: ["tsx"] }] });
+        const path = await save({ defaultPath: name, filters: [{ name: "TypeScript", extensions: [name.split(".").pop()!] }] });
         if (!path) return;
         const split = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-        await fsx.write(path.slice(0, split) || "/", path.slice(split + 1), artifact.code);
+        await fsx.write(path.slice(0, split) || "/", path.slice(split + 1), file.code);
         setSavedPath(path);
       } else {
-        const url = URL.createObjectURL(new Blob([artifact.code], { type: "text/plain;charset=utf-8" }));
+        const url = URL.createObjectURL(new Blob([file.code], { type: "text/plain;charset=utf-8" }));
         const a = window.document.createElement("a"); a.href = url; a.download = name; a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
@@ -63,7 +66,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
         {current < 0 && <option value={-1}>{t("canvasCurrent")}</option>}
         {versions.map((_, i) => <option key={i} value={i}>{t("canvasVersion")} {i + 1}</option>)}
       </select>}
-      <button className="icon-btn" title={t("copy")} onClick={() => { navigator.clipboard.writeText(artifact.code).catch(() => setCopyError(t("canvasCopyError"))); }}><Copy size={15} /></button>
+      <button className="icon-btn" title={t("copy")} onClick={() => { navigator.clipboard.writeText(file.code).catch(() => setCopyError(t("canvasCopyError"))); }}><Copy size={15} /></button>
       <button className="icon-btn" title={t("canvasDownload")} disabled={saving} onClick={download}><Download size={15} /></button>
       <button className="icon-btn" title={t("canvasRestart")} onClick={() => { setError(""); setRevision((r) => r + 1); }}><RotateCcw size={15} /></button>
     </div>
@@ -71,6 +74,9 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
     {copyError && <div role="alert" className="error-box">{copyError}</div>}
     {error && <div className="canvas-error" role="alert"><pre>{error}</pre><button className="btn-soft" onClick={() => onRepair(t("canvasRepairPrompt", { id: artifact.id, error }) + `\n\n\`\`\`tsx-canvas id="${artifact.id}"\n${artifact.code}\n\`\`\``)}>{t("canvasRepair")}</button></div>}
     <iframe ref={frame} key={revision} hidden={tab !== "preview"} title={artifact.title} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={document} />
-    {tab === "code" && <pre className="canvas-source"><code>{artifact.code}</code></pre>}
+    {tab === "code" && multi && <div className="canvas-files" role="tablist" aria-label={t("canvasFiles")}>
+      {artifact.files.map((f) => <button key={f.name} role="tab" aria-selected={f === file} onClick={() => setFileName(f.name)}>{f.name}</button>)}
+    </div>}
+    {tab === "code" && <pre className="canvas-source"><code>{file.code}</code></pre>}
   </aside>;
 }

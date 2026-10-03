@@ -461,6 +461,7 @@
   "canvasClose": "Close canvas",
   "canvasPreview": "Result",
   "canvasCode": "Code",
+  "canvasFiles": "Files",
   "canvasVersion": "Version",
   "canvasCurrent": "Current",
   "canvasRestart": "Restart preview",
