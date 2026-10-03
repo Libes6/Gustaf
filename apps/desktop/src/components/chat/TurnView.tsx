@@ -14,6 +14,8 @@ import "../../styles/messageActions.css";
 
 // `focusId` is the message a search result points at: it is highlighted, and expanded if it sits in the collapsed steps.
 export type TurnHandlers = {
+  onRunCommand?: (command: string) => void;
+  diagnosticsProjectRoot?: string;
   /** Edit the user message and send the new text from there (history from that message on is replaced). */
   onEdit: (m: StoredMsg, text: string) => void;
   /** Re-run the turn of this user message. */
@@ -76,9 +78,9 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       p.type === "text" ? (
         <PlanOrMarkdown key={i} text={p.text} actionable={planActionable && m === last} handlers={handlers} />
       ) : p.type === "activity" ? (
-        <ToolCard key={p.id} call={p} />
+        <ToolCard key={p.id} call={p} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : p.type === "tool_call" ? (
-        <ToolCard key={p.id} call={p} result={results.get(p.id)} />
+        <ToolCard key={p.id} call={p} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : null,
     );
 

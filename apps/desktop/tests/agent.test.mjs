@@ -35,6 +35,7 @@ async function run(script, o = {}) {
   saveRulesConfig(o.config ?? DEFAULT_RULES);
   clearActionLog();
   const root = o.root ?? mkdtempSync(join(tmpdir(), 'agent-test-'));
+  if (o.setup) await o.setup(root);
   const ctl = new AbortController();
   const approvals = [];
   const outputs = [];
@@ -329,3 +330,32 @@ edits('review mode in a folder that is not a review copy offers no undo and cann
   assert.equal(r.log[0].project, undefined);
   rmSync(root, { recursive: true, force: true });
 });
+
+
+test('memory changes ask even in full access and readonly refuses forged calls', async () => {
+  const r = await run([step(call('remember',{scope:'global',text:'Prefer Russian'}))], {access:'full'});
+  assert.equal(r.approvals[0].kind,'memory'); assert.match(r.outputs[0].output,/Saved fact/);
+  const denied = await run([step(call('remember',{scope:'global',text:'Never stored'}))], {approve:()=>false});
+  assert.equal(denied.outputs[0].isError,true);
+  const readonly = await run([step(call('remember',{scope:'global',text:'Never stored'}))], {access:'readonly'});
+  assert.equal(readonly.approvals.length,0); assert.equal(readonly.outputs[0].isError,true);
+});
+test('post-edit diagnostics respects command approval and reports failure without undoing the edit',async()=>{
+  const {saveDiagnostics}=await import('../src/agent/diagnostics.ts');
+  const r=await run([step(call('write_file',{path:'new.txt',content:'value'}))],{
+    setup: root=>saveDiagnostics(root,{enabled:true,command:'npm run typecheck',timeoutMs:30000}),
+    runResult:{code:1,output:'type mismatch',timed_out:false}
+  });
+  assert.equal(r.approvals[0].command,'npm run typecheck');
+  assert.match(r.outputs[0].output,/Diagnostics did not pass/);assert.match(r.outputs[0].output,/type mismatch/);
+  assert.equal(readFileSync(join(r.root,'new.txt'),'utf8'),'value');
+});
+
+
+test('web disabled or declined never executes a native request',async()=>{
+ const {setSetting}=await import('./helpers/apiStub.mjs');
+ const r=await run([step(call('web_fetch',{url:'https://example.com'}))]);assert.equal(r.outputs[0].isError,true);assert.match(r.outputs[0].output,/disabled/);
+ const denied=await run([step(call('web_fetch',{url:'https://example.com'}))],{setup:()=>setSetting('webTools',{enabled:true,allow:[],deny:[]}),approve:()=>false});assert.equal(denied.approvals[0].kind,'web');assert.equal(denied.outputs[0].isError,true);
+ const domain=await run([step(call('web_fetch',{url:'https://blocked.example.com'}))],{access:'full',setup:()=>setSetting('webTools',{enabled:true,allow:[],deny:['example.com']})});assert.equal(domain.approvals.length,0);assert.equal(domain.outputs[0].isError,true);
+});
+test('terminal reading always asks, including full access',async()=>{const r=await run([step(call('read_terminal',{id:1,lines:30}))],{access:'full',approve:()=>false});assert.equal(r.approvals[0].kind,'terminal');assert.equal(r.outputs[0].isError,true);});

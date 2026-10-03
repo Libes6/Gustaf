@@ -1,3 +1,7 @@
+import { SemanticSettings } from "./SemanticSettings";
+import { VoiceSettings } from "./VoiceSettings";
+import { WebSettings } from "./WebSettings";
+import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Archive, BarChart3, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
@@ -14,6 +18,8 @@ import { deleteProvider, PRESETS, saveProvider } from "../providers";
 import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
+import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
 import { BudgetsSection } from "./Budgets";
@@ -36,6 +42,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "import", label: "import", icon: Download },
       { id: "providers", label: "providers", icon: Boxes },
       { id: "usage", label: "usage", icon: BarChart3 },
+      { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
   { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }] },
@@ -76,7 +83,7 @@ function General() {
       <ShortcutsSettings />
       <ScheduledPromptsSection />
       <DeveloperSettings />
-    </>
+    <VoiceSettings /><WebSettings /><UpdaterPanel /></>
   );
 }
 
@@ -407,6 +414,7 @@ function GitPage() {
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
       <CommandRules />
+      <DiagnosticsSettings /><SemanticSettings />
     </>
   );
 }
@@ -464,7 +472,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
+  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
 };
 
 export function Settings() {

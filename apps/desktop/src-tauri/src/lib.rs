@@ -13,8 +13,15 @@ mod oauth;
 mod rawlog;
 mod review;
 mod secrets;
+mod skills;
 mod shell;
 mod tools;
+mod preview;
+mod semantic;
+mod lsp;
+mod web_tools;
+mod updater;
+mod terminal;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -22,6 +29,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(terminal::Terminals::default())
+        .manage(preview::Previews::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
@@ -29,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            updater::initialize(app)?;
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db(Mutex::new(db::open(&dir.join("app.db"))?)));
@@ -36,6 +46,23 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            terminal::terminal_create,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_close,
+            web_tools::web_fetch,
+            web_tools::web_search,
+            semantic::semantic_build,
+            semantic::semantic_query,
+            semantic::semantic_clear,
+            lsp::lsp_detect,
+            lsp::lsp_diagnostics,
+            terminal::terminal_list,
+            terminal::terminal_tail,
+            preview::preview_start,
+            preview::preview_status,
+            preview::preview_stop,
+            preview::preview_list,
             db::db_select,
             db::db_execute,
             db::search_messages,
@@ -53,6 +80,9 @@ pub fn run() {
             import_sources::import_read_session,
             import_sources::import_chatgpt_scan,
             import_sources::import_chatgpt_read,
+            updater::updater_configured,
+            skills::skills_scan,
+            skills::skills_read,
             tools::fs_read,
             tools::fs_list,
             tools::fs_files,
@@ -106,6 +136,8 @@ pub fn run() {
             // MCP servers are child processes: never leave them running after the app quits.
             if let tauri::RunEvent::Exit = event {
                 mcp::shutdown(app);
+                terminal::shutdown(app);
+                preview::shutdown(app);
             }
         });
 }

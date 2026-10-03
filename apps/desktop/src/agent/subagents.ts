@@ -243,6 +243,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
           maxSteps: budget.maxSteps,
           toolNames: allowedToolNames(type),
           systemExtra: subagentSystem(type, files),
+          subagent: true,
           onLimits: sameProvider ? parent.onLimits : undefined,
           onText: () => {},
           approve: async (req) => {

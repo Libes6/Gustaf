@@ -28,7 +28,7 @@ test('read-only types get only the read tools; general gets everything but spawn
     assert.deepEqual(core.allowedToolNames(t), ['read_file', 'list_dir', 'search']);
   }
   assert.equal(core.isReadOnlyType('general'), false);
-  assert.deepEqual(core.filterTools('general', ALL).map((d) => d.name), ['read_file', 'list_dir', 'search', 'edit_file', 'write_file', 'run_command']);
+  assert.deepEqual(core.filterTools('general', ALL).map((d) => d.name), ['read_file', 'list_dir', 'search', 'diagnostics', 'edit_file', 'write_file', 'run_command']);
   assert.equal(core.allowedToolNames('general'), null);
 });
 

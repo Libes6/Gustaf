@@ -213,6 +213,8 @@ export const review = {
 
 /** Result of `cu_execute` (src-tauri/src/computer.rs): the screenshot after the batch plus facts about the desktop. */
 export type Shot = {
+  timings?: { actionsMs: number; settleMs: number; captureMs: number; encodeMs: number; accessibilityMs: number; totalMs: number };
+  elements?: { role: string; label: string }[];
   png: string;
   width: number;
   height: number;

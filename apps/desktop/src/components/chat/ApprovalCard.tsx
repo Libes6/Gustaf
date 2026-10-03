@@ -26,10 +26,10 @@ export function ApprovalCard({ req, onAnswer }: { req: ApprovalRequest; onAnswer
     return () => removeEventListener("keydown", k);
   }, [onAnswer]);
   return (
-    <div className="approval" role="alertdialog" aria-label={req.kind === "command" ? t("approveCommand") : t("approveComputer")}>
+    <div className="approval" role="alertdialog" aria-label={req.kind === "command" ? t("approveCommand") : req.kind === "terminal" ? t("approveTerminal") : req.kind === "web" ? t("approveWeb") : req.kind === "memory" ? t("approveMemory") : t("approveComputer")}>
       {req.agent && <div style={{ fontSize: 12, marginBottom: 4, color: "var(--text-3)" }}>{t("approveAgent", { title: req.agent })}</div>}
-      <div className="q">{req.kind === "command" ? t("approveCommand") : req.kind === "mcp" ? t("approveMcp", { tool: req.tool, server: req.server }) : t("approveComputer")}</div>
-      <pre>{req.kind === "command" ? req.command : req.kind === "mcp" ? mcpArgs(req.args) : summarize({ type: "tool_call", id: "", name: "computer", args: {}, computer: { actions: req.actions } })}</pre>
+      <div className="q">{req.kind === "command" ? t("approveCommand") : req.kind === "terminal" ? t("approveTerminal") : req.kind === "web" ? t("approveWeb") : req.kind === "memory" ? t("approveMemory") : req.kind === "mcp" ? t("approveMcp", { tool: req.tool, server: req.server }) : t("approveComputer")}</div>
+      <pre>{req.kind === "command" ? req.command : req.kind === "terminal" ? req.text : req.kind === "web" ? req.text : req.kind === "memory" ? req.text : req.kind === "mcp" ? mcpArgs(req.args) : summarize({ type: "tool_call", id: "", name: "computer", args: {}, computer: { actions: req.actions } })}</pre>
       {req.kind === "computer" && req.reason && <div className="warn" style={{ marginBottom: 8 }}>⚠ {t(RISK[req.reason])}</div>}
       {req.kind === "computer" && req.safety?.map((s, i) => <div key={i} className="warn" style={{ marginBottom: 8 }}>⚠ {s}</div>)}
       <div className="btns">

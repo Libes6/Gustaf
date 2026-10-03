@@ -39,6 +39,13 @@ create table if not exists drafts(
   text text not null default '',
   attachments_json text not null default '[]',
   updated_at integer not null);
+-- memories:begin
+create table if not exists memories(
+ id integer primary key, project_root text, text text not null,
+ source_chat integer references chats(id) on delete set null,
+ created_at integer not null, updated_at integer not null);
+create index if not exists memories_scope on memories(project_root, updated_at);
+-- memories:end
 -- agent-runs:begin
 -- Subagent runs and their full transcripts (src/agent/agentRunsDb.ts). Replaces the bounded `agentRuns` setting, which is
 -- migrated once by the app. `agent_messages.parts_json` holds one message of the subagent's own history (bounded per

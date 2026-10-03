@@ -16,6 +16,9 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **README cleanup**: README is now intro, features, install/development (with the `npm run check` commands), project structure and providers (about 80 lines); the per-feature sections moved unchanged into `docs/features/*.md`, indexed in `docs/README.md`.
 
 ## P1
+- [ ] **Chat queue and steering (2026-10-03, first)**: allow sending while an agent is running, with explicit "Clarify current task" and "Send next" actions. Deliver clarifications at the next supported execution boundary; providers without steering offer queueing instead. Show pending messages with edit/remove controls. Use one per-chat run coordinator for interactive and scheduled requests so only one request writes to a chat at a time. Persist queued messages across restarts; show interrupted runs separately and do not silently restart them. Acceptance: FIFO order, clarification delivery, edit/remove, cancellation/failure behavior and restart recovery are covered; interactive and scheduled runs cannot overlap in the same chat.
+- [ ] **Extend existing chat branching (2026-10-03, second)**: basic "Branch from here" already exists (`branchChat` in `lib/data.ts`; see completed Chat branching below). Add a persistent link to the source chat and branch-point message, navigation between branches, and provider/model selection before the first branch run. Verify that copied attachments and tool results remain usable, subsequent branch histories are independent, and creating a branch never replays tools. Define native provider-session handling and disclose context/session transfer limitations. Acceptance: branch context ends at the selected message, original history is unchanged, lineage navigation works, and API/CLI session behavior is verified.
+- [ ] **Attach chats as context (2026-10-03, third)**: extend the composer picker with chat search through `@` and support dragging a sidebar chat into the composer. Show a removable attachment with source title and a preview of the content to be sent. Freeze a snapshot when sending, retain a source-chat link, and identify the attached conversation as reference material. For long histories, show size and offer an explicit shortened version instead of silently truncating. Acceptance: preview matches the sent snapshot, later source edits do not alter sent context, picker/drag/remove work, and oversized histories have visible handling.
 - [x] **Persist drafts and attachments** across restarts (SQLite `drafts` table, debounced writes, bounded payloads; see `lib/chatSessions.ts`, `lib/useComposerDraft.ts`).
 - [x] **Full-text search across chats** (SQLite FTS5 index `messages_fts` kept in sync by triggers and backfilled on start; `search_messages` in `db.rs`; Cmd+K `SearchPalette` with project/model filters, snippets, keyboard navigation and jump to the message).
   - [x] Follow-up: `ё`/`е` folded at index and query time (index version 2), paged results (`limit`/`offset`, bounded total "1000+", Load more and Arrow Down past the end), "Only this project" toggle, newest-first order for queries matching more than 5000 messages, page-only snippets (first page of a match-everything query on 30k messages: ~4 ms in a debug build). The 2-character minimum stays on purpose. Not done: highlighting of a decomposed `е` + diaeresis, keyset paging (offset can shift if messages arrive between pages).
@@ -99,7 +102,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [ ] **Canvas**: done: multi-file modules (`// file:` sections, relative imports, file tabs), `lucide-react` bundled as an extra library (separate larger runtime, loaded only when imported), export to standalone HTML, revision diff (Changes tab). Not done: export to PNG (not reliably possible through the sandboxed iframe, WebKit taints SVG foreignObject canvases), other bundled libraries (charts etc. are too large or not in `node_modules`), precompiling the HTML export (it compiles at open time). Not verified in the real Tauri WebView.
 - [x] **Model routing** by task type (cheap vs strong model). Done for agents: default model per subagent type, an allow-list for explicit `model` requests, and a cheap model for chat compaction and commit messages (Settings, Usage, Agents; `agentSettings.ts`, `lib/modelRouting.ts`). Not done: automatic routing of the main chat's own requests.
 - [x] **Scheduled prompts.** Run while the app is open (no OS daemon): once / every N minutes or hours (min 5) / daily / weekdays, DST-safe local-time math, missed-run policy (run once if due within 24 h, else "missed"), no overlap, max 20, switching on is the confirmation, access capped to auto, no Computer Use or subagents, approvals never auto-answered (timeout 10 min -> "needs attention"), action log source "scheduled" (`lib/scheduledPrompts.ts`, `scheduledRun.ts`, Settings, General). Not done: no OS-level launch, UI untested.
-- [ ] **Voice input** and screenshot paste.
+- [x] **Voice input** and screenshot paste/capture. Explicit recording and transcription into the draft; configurable OpenAI-compatible transcription endpoint, no automatic upload or message send.
 - [ ] **Auto-update** channel (Tauri updater) and crash reporting opt-in.
 - [x] **Theming**: light/dark/system and accent color.
 - [ ] **Windows/Linux support audit** (`secrets.rs` is macOS Keychain only; `computer.rs`; paths).
@@ -115,30 +118,30 @@ Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, 
   - [x] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
   - [x] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
   - [x] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
-- [ ] **Persistent memory** (most requested on Reddit; Kilo Memory Bank). Facts about the project and the user survive across chats.
+- [x] **Persistent memory** (most requested on Reddit; Kilo Memory Bank). Facts about the project and the user survive across chats.
   - [ ] Store: per-project and global memory entries in SQLite (text, source chat, created/updated), editable list in Settings and the project menu.
-  - [ ] Agent tools `remember` / `forget` (with approval option) and automatic injection of relevant entries into the system prompt (capped, fenced like project instructions).
+  - [x] Agent tools `remember` / `forget` (with approval option) and automatic injection of relevant entries into the system prompt (capped, fenced like project instructions).
   - [ ] Optional "suggest memories" at the end of a chat; user confirms; export to `AGENTS.md`.
-- [ ] **Skills and slash commands** (Claude Code skills, Codex app). Reusable Markdown workflows.
-  - [ ] Format: `SKILL.md` with frontmatter (name, description, allowed tools, model) in `~/.mcode/skills` and `<project>/.mcode/skills`; also read `.claude/skills` and `.cursor/commands` if present.
-  - [ ] `/` picker in the composer with autocomplete; arguments; the skill body is inserted as instructions.
-  - [ ] Model-invoked skills: list names + descriptions in the system prompt, a `use_skill` tool loads the body on demand.
-  - [ ] Built-in starters: `/review`, `/commit`, `/explain`, `/test`.
+- [x] **Skills and slash commands** (Claude Code skills, Codex app). Reusable Markdown workflows.
+  - [x] Format: `SKILL.md` with frontmatter (name, description, allowed tools, model) in `~/.mcode/skills` and `<project>/.mcode/skills`; also read `.claude/skills` and `.cursor/commands` if present.
+  - [x] `/` picker in the composer with autocomplete; arguments; the skill body is inserted as instructions.
+  - [x] Model-invoked skills: list names + descriptions in the system prompt, a `use_skill` tool loads the body on demand.
+  - [x] Built-in starters: `/review`, `/commit`, `/explain`, `/test`.
 
 ### R2 — coding workflow
-- [ ] **Integrated terminal pane** (Claude Code desktop, Warp). A real PTY per project in a bottom/side pane.
-  - [ ] Rust PTY (`portable-pty`) + `xterm.js`; multiple tabs, cwd = project (or shadow copy), shell from `shell.rs`.
-  - [ ] "Send selection to chat" and "Run in terminal" from tool cards; agent can read the last N lines with approval.
-- [ ] **Semantic code search** (Cursor indexing). Find code by meaning.
-  - [ ] Chunk files (respecting ignore rules), embeddings via a configured provider or a local model (Ollama), store vectors in SQLite (e.g. `sqlite-vec`), incremental re-index on file change.
-  - [ ] Agent tool `semantic_search` next to text `search`; index status and opt-in per project (embedding calls cost tokens and send code to the provider).
-- [ ] **Web tools for API agents**: `web_fetch` (URL → Markdown, size cap) and `web_search` (pluggable backend: provider-native search where available, or Brave/Tavily key). Approvals, domain allow/deny rules, untrusted-content fencing against prompt injection.
-- [ ] **Dev server preview** (Claude Code, Cline). Embedded browser pane for the project's app.
-  - [ ] Start/stop dev server from project settings (command + port), show logs; webview pane with URL bar.
+- [x] **Integrated terminal pane** (Claude Code desktop, Warp). A real PTY per project in a bottom/side pane.
+  - [x] Rust PTY (`portable-pty`) + `xterm.js`; multiple tabs, cwd = project (or shadow copy), shell from `shell.rs`.
+  - [x] "Send selection to chat" and "Run in terminal" from tool cards; agent can read the last N lines with approval.
+- [x] **Semantic code search** (Cursor indexing). Find code by meaning.
+  - [x] Ignored-file-aware chunks, Ollama or compatible embeddings API, incremental private JSON vector cache (SQLite remains optional).
+  - [x] Agent tool `semantic_search` next to text `search`; index status and opt-in per project (embedding calls cost tokens and send code to the provider).
+- [x] **Web tools for API agents**: `web_fetch` (URL → Markdown, size cap) and `web_search` (Brave key; other search backends remain future work). Approvals, domain allow/deny rules, untrusted-content fencing against prompt injection.
+- [x] **Dev server preview** (Claude Code, Cline). Embedded browser pane for the project's app.
+  - [x] Start/stop dev server from the preview panel (command + port), show logs, page and console errors. Local proxy with manual reload; WebSocket HMR remains future work.
   - [ ] Agent tools: screenshot, console errors, click/type in the preview (reuse the computer-use verification loop, scoped to the preview).
-- [ ] **LSP diagnostics** (OpenCode, Claude Code plugins). After each edit the agent sees type/lint errors.
-  - [ ] Start language servers per detected language (tsserver, rust-analyzer, pyright…) or run the project's `tsc --noEmit` / linter as a fallback.
-  - [ ] Append new diagnostics for edited files to the tool result; `diagnostics` tool on demand.
+- [x] **LSP diagnostics** (OpenCode, Claude Code plugins). After each edit the agent sees type/lint errors.
+  - [x] Bounded LSP checks: bundled TypeScript server (installed Node required), installed rust-analyzer/pyright, configured command fallback.
+  - [x] Append new diagnostics for edited files to the tool result; `diagnostics` tool on demand.
 - [ ] **Hooks** (Claude Code). User commands on lifecycle events: before/after tool call, after file edit, on stop, on approval request.
   - [ ] Config per project/global (event, matcher, command, timeout); exit code can block a tool call with a message to the agent.
   - [ ] Go through `run_command` rules; show hook output in the action log.
@@ -181,3 +184,12 @@ Reference: the "Background tasks" panel in Claude Code desktop (running agents w
 - [x] File review with diff, conflict check and checkpoints
 - [x] Context compression, token usage and quota telemetry
 - [x] Cursor history import, Computer Use
+
+
+## Implementation update — 2026-10-03 (six priorities)
+- Computer Use: preserve target app keyboard focus when revealing M Code; bounded read-only macOS Accessibility labels and capture-stage timing. Native Mac task latency / GUI end-to-end still requires a live benchmark. No DOM executor or UI-TARS model was added.
+- Skills: project/global SKILL.md and compatible Claude/Cursor workflows; slash picker and arguments; on-demand `use_skill`; built-in review/test/explain/commit. Skill metadata never widens permissions or changes the selected model.
+- Memory: SQLite facts scoped globally or to the original project, capped relevant prompt injection, settings add/edit/delete, `remember`/`forget` requiring approval by default. Suggested memories/export remain follow-up work.
+- Terminal: portable-pty + xterm, shell cwd project/review workspace, multiple tabs, input/resize/close and selection to chat; shutdown terminates sessions. An agent PTY tool and run-from-tool-card shortcut remain follow-ups.
+- Diagnostics: opt-in command per project, detect installed JS typecheck/lint, automatically run after API file edits through existing command approvals, bounded results and on-demand `diagnostics`. Native CLI models receive the configured instruction; language-server daemons were not added.
+- Releases: manual three-OS bundle workflow, macOS signing/notarization gates and verification; updater enabled only with an HTTPS endpoint and public signing key. Credentials, real signed artifacts and Windows/Linux runtime verification remain external prerequisites; nothing was published.

@@ -131,7 +131,7 @@ test('Plan mode offers only read tools and blocks writes, commands, MCP and spaw
   const r = await run('plan', [
     { parts: [call('read_file', { path: 'a.txt' }), call('run_command', { command: 'echo hi' }), call('write_file', { path: 'new.txt', content: 'x' }), call('edit_file', { path: 'a.txt', old_string: 'hello', new_string: 'bye' }), call('spawn_agent', { title: 't', prompt: 'p', type: 'general' }), call('mcp__srv__tool', {})] },
   ]);
-  assert.deepEqual(r.offered[0].sort(), ['list_dir', 'read_file', 'search']);
+  assert.deepEqual(r.offered[0].sort(), ['list_dir', 'read_file', 'search', 'use_skill']);
   assert.match(r.systems[0], /Plan mode/);
   assert.match(r.systems[0], /mcode-plan/);
   const byName = Object.fromEntries(r.outputs.map((o) => [o.name, o]));

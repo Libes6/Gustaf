@@ -1,7 +1,13 @@
-import { computer, fsx, type CuAction } from "../lib/api";
+import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
+import { SEMANTIC_TOOL, semanticSearch, formatSemanticHits, loadSemantic } from "./semanticSearch";
+import { WEB_TOOLS, webConfig, webDomain, webResult } from "./web";
+import { computer, fsx, getSetting, type CuAction } from "../lib/api";
 import { platformLabel, shellLabel } from "../lib/platform";
 import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
+import { loadDiagnostics, diagnosticResult, detectLanguageServers, runLspDiagnostics, languageForPath, formatLspReport } from "./diagnostics";
+import { loadSkills, skillCatalogPrompt, requestedSkillPrompt, SKILL_TOOL, executeSkill } from "./skills";
+import { MEMORY_TOOLS, remember, forget, loadMemoryPrompt, memoryText } from "./memory";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
 import { serializeCalls } from "./subagentCore";
 import { modeAllowsTool, modeBlockedMessage, modePrompt, type ChatMode } from "./planCore";
@@ -21,6 +27,9 @@ export type { Access };
 export type ApprovalRequest =
   | { kind: "command"; command: string; reason?: string; /** Title of the subagent that asks (shown on the approval card). */ agent?: string }
   | { kind: "computer"; actions: CuAction[]; safety?: string[]; /** Why this batch needs a human (Full access). */ reason?: import("./computerCore").RiskCode; /** Offer "Allow for this task". */ allowTask?: boolean; agent?: string }
+  | { kind: "terminal"; text: string; agent?: string }
+  | { kind: "web"; text: string; agent?: string }
+  | { kind: "memory"; text: string; agent?: string }
   | { kind: "mcp"; server: string; serverId: string; tool: string; args: unknown; agent?: string };
 /** `"task"`: allowed, and further computer batches of this run need no confirmation (not persisted). */
 export type ApprovalAnswer = boolean | "task";
@@ -60,6 +69,7 @@ export type RunOptions = {
   systemExtra?: string;
   /** Marks the calls of an unattended run in the action log (`"scheduled"`: a scheduled prompt). */
   source?: "scheduled";
+  subagent?: boolean;
   /** Main chat only (Ask: no tools, Plan: read-only tools and a plan at the end, Agent/undefined: everything). Subagent and scheduled runs ignore it. */
   mode?: ChatMode;
 };
@@ -90,8 +100,8 @@ class ComputerFailed extends Error {
   }
 }
 
-const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
-type ToolContext = { act: string; project: string | null };
+const WRITE_NAMES = new Set([...WRITE_TOOLS, ...MEMORY_TOOLS].map((t) => t.name));
+type ToolContext = { act: string; project: string | null; skills?: Awaited<ReturnType<typeof loadSkills>> };
 
 async function buildSystem(root: string | null, computerUse: boolean, instructions = "", mode?: ChatMode) {
   const lines = [
@@ -128,11 +138,70 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
   const root = o.root!;
   const a = call.args ?? {};
   // Ask and Plan mode: a tool outside the mode's set never runs, whatever the model calls.
-  if (!modeAllowsTool(o.mode, call.name)) throw new ActionBlocked(modeBlockedMessage(o.mode));
+  if (call.name !== "use_skill" && !modeAllowsTool(o.mode, call.name)) throw new ActionBlocked(modeBlockedMessage(o.mode));
   // Read-only runs are not offered the write tools; a model that calls one anyway must not get through.
   if (o.access === "readonly" && WRITE_NAMES.has(call.name)) throw new ActionBlocked("Blocked: read-only mode does not allow this tool.");
   if (o.toolNames && !o.toolNames.includes(call.name)) throw new ActionBlocked("Blocked: this agent type is not allowed to use this tool.");
   switch (call.name) {
+    case "semantic_search": {
+      if(!root)throw Error("Select a project first.");
+      if(typeof a.query!=="string"||!a.query.trim()||a.query.length>2000)throw Error("Invalid semantic query");
+      return formatSemanticHits(await semanticSearch(root,a.query,typeof a.limit==="number"?a.limit:8,ctx.project??root));
+    }
+    case "read_terminal": {
+      if(!root || o.source || o.subagent || o.toolNames)throw new ActionBlocked("Terminal output is available only in an interactive project chat.");
+      if(!await o.approve({kind:"terminal",text:a.id == null ? "List terminals in this project." : `Read terminal #${a.id} output (may include credentials).`}))throw new ActionDeclined("User declined reading terminal output.");
+      return readTerminal(root,a);
+    }
+    case "web_search":
+    case "web_fetch": {
+      if (o.source || o.subagent || o.toolNames) throw new ActionBlocked("Web tools are available only in the main interactive chat.");
+      const config = await webConfig(); if (!config.enabled) throw new ActionBlocked("Web tools are disabled.");
+      const value=call.name === "web_search" ? a.query : a.url;
+      if(typeof value!=="string" || !value.trim() || value.length>2000)throw Error("Invalid web tool input");
+      const target=call.name==="web_fetch"?webDomain(value,config):"api.search.brave.com";
+      if(call.name==="web_search")webDomain("https://api.search.brave.com",config);
+      if(o.access!=="full" && !await o.approve({kind:"web",text:`${call.name}: ${value}\nDestination: ${target}`}))throw new ActionDeclined("User declined the web request.");
+      return webResult(call.name,a,config);
+    }
+    case "use_skill": return executeSkill(ctx.project,ctx.skills??[],a.name,a.arguments??"");
+    case "diagnostics": {
+      if (!root) throw new Error("Select a project for diagnostics.");
+      const config = await loadDiagnostics(ctx.project??root);
+      if(config.engine==="lsp") {
+        if(typeof a.path!=="string"||!a.path.trim())throw Error("LSP diagnostics needs a relative file path.");
+        const servers=await detectLanguageServers(root);const server=servers.find(s=>s.language===languageForPath(a.path));
+        const fallback=async(report:import("./diagnostics").LspReport)=>{
+          if(!config.command)return formatLspReport(report);
+          try {const output=await runTool({...call,name:"run_command",args:{command:config.command,timeout_ms:config.timeoutMs}},o,ctx);return formatLspReport({...report,detail:report.detail+"\nConfigured command fallback:\n"+diagnosticResult(output)});}
+          catch(e){return formatLspReport({...report,detail:report.detail+"\nFallback failed or was declined:\n"+String(e)});}
+        };
+        if(!server)return fallback({status:"unavailable",diagnostics:[],detail:"No installed language server for this file.",root});
+        const command=[server.command,...server.args].map(value => "'" + value.replace(/'/g, "'\"'\"'") + "'").join(" ");
+        const rules=await getRulesConfig();
+        if(decideCommand(command,{config:rules,allowlist:o.allowlist,project:ctx.project},o.access).action === "block")throw new ActionBlocked("Language-server launch blocked by command rules.");
+        if(!await o.approve({kind:"command",command,reason:"Launch the installed language server to inspect this project"}))throw new ActionDeclined("User declined language-server diagnostics.");
+        let report:import("./diagnostics").LspReport;
+        try {report=await runLspDiagnostics(root,a.path,config.timeoutMs);}catch(e){return fallback({status:"unavailable",diagnostics:[],detail:String(e),root});}
+        return report.status==="complete" ? formatLspReport(report) : fallback(report);
+      }
+      if (!config.command) throw new Error("Configure a diagnostics command in Settings > Git and commands.");
+      return diagnosticResult(await runTool({ ...call,name:"run_command",args:{command:config.command,timeout_ms:config.timeoutMs} },o,ctx));
+    }
+    case "remember":
+    case "forget": {
+      if (o.source || o.subagent || o.toolNames) throw new ActionBlocked("Memory changes are available only in an interactive main chat.");
+      if (!await getSetting("memoryEnabled", true)) throw new ActionBlocked("Memory is disabled.");
+      if (a.scope !== "project" && a.scope !== "global") throw new Error("Memory scope must be project or global.");
+      if (a.scope === "project" && !ctx.project) throw new Error("Select a project before saving a project fact.");
+      const scope = a.scope === "global" ? null : ctx.project;
+      const text = call.name === "remember" ? memoryText(a.text) : `Remove fact #${a.id}`;
+      if (await getSetting("memoryApproval", true)) {
+        if (!await o.approve({ kind: "memory", text: `${a.scope}: ${text}` })) throw new ActionDeclined("User declined the memory change.");
+        logPatch(ctx.act,{ approval: "user" });
+      }
+      return call.name === "remember" ? `Saved fact #${await remember(scope,text,o.chatId)}.` : `Removed ${await forget(a.id,scope)} fact(s).`;
+    }
     case "read_file":
       return fsx.read(root, a.path, a.offset, a.limit);
     case "list_dir":
@@ -146,6 +215,11 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
       const out = call.name === "edit_file" ? await fsx.edit(root, a.path, a.old_string, a.new_string) : await fsx.write(root, a.path, a.content);
       const undo = snap && (await sealSnapshot(root, snap, !!o.reviewMode));
       if (undo) logPatch(ctx.act, { undo });
+      const config = await loadDiagnostics(ctx.project??root).catch(()=>null);
+      if (config?.enabled && (config.command || config.engine === "lsp") && !o.signal.aborted) {
+        try { return out + "\n\nDiagnostics:\n" + diagnosticResult(await runTool({...call,name:"diagnostics",args:{path:a.path}},o,ctx)); }
+        catch(e) { return out + "\n\nDiagnostics did not pass or could not run:\n" + diagnosticResult(String(e)); }
+      }
       return out;
     }
     case "run_command": {
@@ -210,14 +284,32 @@ export async function runAgent(o: RunOptions) {
 async function runLoop(o: RunOptions) {
   const history = [...o.history];
   const instructions = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null).then((project) => loadProjectInstructions({ root: o.root!, project, native: o.nativeInstructions })) : null;
+  const skillRoot = o.root ? await projectRootFor(o.root,!!o.reviewMode).catch(()=>o.root) : null;
+  const skills = await loadSkills(skillRoot).catch(()=>[]);
+  const selectedSkill = !o.source && !o.subagent && !o.toolNames ? await requestedSkillPrompt(skillRoot,o.history,skills) : "";
+  const diag = skillRoot ? await loadDiagnostics(skillRoot).catch(()=>null) : null;
   const planning = o.mode === "plan" || o.mode === "ask";
+  const memoryRoot = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => o.root) : null;
+  const query = [...o.history].reverse().find(m => m.role === "user")?.parts.filter(p => p.type === "text").map(p=>p.text).join(" ") ?? "";
+  const facts = await loadMemoryPrompt(memoryRoot,query).catch(()=>"");
   let system = await buildSystem(o.root, o.computerUse && !planning, instructions?.text, o.mode);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
   if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
+  if (facts) system += "\n" + facts;
+  if (skills.length) system += "\n" + skillCatalogPrompt(skills);
+  if (selectedSkill) system += "\n" + selectedSkill;
+  if (diag?.enabled && diag.command) system += `\nProject diagnostics command: ${JSON.stringify(diag.command)}. After editing, run this check through the available approved command tool. Never claim checks passed without actual output.`;
   if (o.systemExtra) system += "\n" + o.systemExtra;
   let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
+  if (o.supportsTools !== false && o.access !== "readonly" && !planning && !o.source && !o.subagent && !o.toolNames && await getSetting("memoryEnabled",true)) tools = [...tools,...MEMORY_TOOLS];
+  if (o.supportsTools !== false && !o.source && !o.subagent && !o.toolNames && skills.length && o.mode !== "ask") tools = [...tools,SKILL_TOOL];
+  if (o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames && (await webConfig()).enabled) tools = [...tools,...WEB_TOOLS];
+  if (o.root && o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames) {
+    if((await loadSemantic(skillRoot??o.root)).enabled)tools=[...tools,SEMANTIC_TOOL];
+    tools=[...tools,TERMINAL_READ_TOOL];
+  }
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
-  if (planning) tools = tools.filter((t) => modeAllowsTool(o.mode, t.name));
+  if (planning) tools = tools.filter((t) => t.name === "use_skill" || modeAllowsTool(o.mode, t.name));
   const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning;
   if (canSpawn) tools = [...tools, ...(await o.subagents!.tools({ providerId: o.providerId, model: o.model }))];
   const screen = o.computerUse && !planning && o.adapter.supportsComputer ? await computer.screenSize() : null;
@@ -311,7 +403,7 @@ async function runLoop(o: RunOptions) {
           if ("e" in r) throw r.e;
           results.push({ ...res, output: r.v });
         } else {
-          results.push({ ...res, output: await runTool(call, o, { act, project }) });
+          results.push({ ...res, output: await runTool(call, o, { act, project, skills }) });
         }
         logFinish(act, "success");
       } catch (e: any) {

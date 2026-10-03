@@ -1,4 +1,5 @@
-import { ArrowUp, AtSign, Brain, ChevronDown, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import { VoiceInput } from "../VoiceInput";
+import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
@@ -14,12 +15,14 @@ import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
-import { ModeSwitch } from "./ModeSwitch";
+import { loadSkills, type Skill } from "../../agent/skills";
+import { mergeSkills } from "../../agent/skillsCore";
 import type { ChatMode } from "../../agent/planCore";
 
 const ACCESS_ICON: Record<Access, typeof Lock> = { readonly: Lock, auto: ShieldCheck, full: Unlock };
 
 type Props = {
+  scopeKey?: string;
   text: string;
   setText: (s: string) => void;
   images: string[];
@@ -52,6 +55,7 @@ export function Composer(p: Props) {
   const t = useT();
   const app = useApp();
   const menu = useMenu();
+  const addMenu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
   const instructions = useInstructionReport(root, p.provider);
   // Cursor account rotation: which account the next message will use (only when the selected one is in the pool).
@@ -68,14 +72,31 @@ export function Composer(p: Props) {
     return onMcpConfigChange(load);
   }, []);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
+  const [attachmentError,setAttachmentError]=useState("");
+  const [capturing,setCapturing]=useState(false);
+  const currentScope=useRef(p.scopeKey); currentScope.current=p.scopeKey;
   const fileInput = useRef<HTMLInputElement>(null);
+  const [skills, setSkills] = useState<Skill[]>(() => mergeSkills([]));
+  const [slash, setSlash] = useState<{ q: string; hl: number } | null>(null);
+  const [skillError, setSkillError] = useState(false);
+  useEffect(() => {
+    let stale = false;
+    loadSkills(root, true).then(xs => { if (!stale) { setSkills(xs); setSkillError(false); } }, () => { if (!stale) { setSkills(mergeSkills([])); setSkillError(true); } });
+    return () => { stale = true; };
+  }, [root, !!slash]);
+  const slashList = slash ? skills.filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
+  const insertSkill = (skill: Skill) => {
+    setText(`/${skill.name} `);
+    setSlash(null);
+    taRef.current?.focus();
+  };
 
   useEffect(() => {
     const ta = taRef.current!;
     ta.style.height = "auto";
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
-  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); } }, [p.visible]);
+  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
 
   const mentionList = mention ? p.files.filter((f) => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 12) : [];
   const insertMention = (path: string) => {
@@ -85,6 +106,13 @@ export function Composer(p: Props) {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.nativeEvent.isComposing) return;
+    if (slash && slashList.length) {
+      if (e.key === "ArrowDown") return e.preventDefault(), setSlash({ ...slash, hl: Math.min(slash.hl + 1, slashList.length - 1) });
+      if (e.key === "ArrowUp") return e.preventDefault(), setSlash({ ...slash, hl: Math.max(slash.hl - 1, 0) });
+      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), insertSkill(slashList[Math.min(slash.hl, slashList.length - 1)]);
+      if (e.key === "Escape") return e.preventDefault(), setSlash(null);
+    }
     if (mention && mentionList.length) {
       if (e.key === "ArrowDown") return e.preventDefault(), setMention({ ...mention, hl: Math.min(mention.hl + 1, mentionList.length - 1) });
       if (e.key === "ArrowUp") return e.preventDefault(), setMention({ ...mention, hl: Math.max(mention.hl - 1, 0) });
@@ -98,12 +126,27 @@ export function Composer(p: Props) {
   };
 
   const addImageFiles = (list: FileList | File[]) => {
-    for (const f of Array.from(list).filter((f) => f.type.startsWith("image/"))) {
-      const r = new FileReader();
-      r.onload = () => setImages((xs) => [...xs, String(r.result).split(",")[1]]);
-      r.readAsDataURL(f);
+    const scope=p.scopeKey;
+    if(selectedModel?.images===false){setAttachmentError(t("imageUnsupported"));return;}
+    for(const file of Array.from(list).filter(f=>f.type.startsWith("image/")).slice(0,8)){
+      if(file.size>10*1024*1024){setAttachmentError(t("imageTooLarge"));continue;}
+      const reader=new FileReader();
+      reader.onerror=()=>setAttachmentError(t("imageReadError"));
+      reader.onload=()=>{
+        if(scope!==currentScope.current)return;
+        if(file.type==="image/png")setImages(xs=>[...xs,String(reader.result).split(",")[1]].slice(0,8));
+        else {
+          const image=new Image();image.onerror=()=>setAttachmentError(t("imageReadError"));image.onload=()=>{
+            if(scope!==currentScope.current)return;
+            const canvas=document.createElement("canvas");const scale=Math.min(1,4096/Math.max(image.naturalWidth,image.naturalHeight));canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+            const ctx=canvas.getContext("2d");if(!ctx){setAttachmentError(t("imageReadError"));return;}ctx.drawImage(image,0,0,canvas.width,canvas.height);setImages(xs=>[...xs,canvas.toDataURL("image/png").split(",")[1]].slice(0,8));
+          };image.src=String(reader.result);
+        }
+      };reader.readAsDataURL(file);
     }
   };
+  const screenshot=async()=>{const scope=p.scopeKey;setCapturing(true);setAttachmentError("");try{const shot=await computer.execute([]);if(scope===currentScope.current){if(!shot.png)throw Error(t("imageReadError"));setImages(xs=>[...xs,shot.png].slice(0,8));}}catch(e){if(scope===currentScope.current)setAttachmentError(String(e));}finally{setCapturing(false);}};
+
 
   const toggleComputer = async () => {
     if (app.computerUse) return app.setComputerUse(false);
@@ -123,6 +166,17 @@ export function Composer(p: Props) {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => (e.preventDefault(), addImageFiles(e.dataTransfer.files))}
         >
+          {attachmentError && <div className="error-box" role="alert">{attachmentError}<button className="btn-ghost" onClick={()=>setAttachmentError("")}>{t("cancel")}</button></div>}
+          {slash && slashList.length > 0 && (
+            <div className="menu mention-list skill-list" id="skill-list" role="listbox" aria-label={app.locale === "ru" ? "Команды и навыки" : "Commands and skills"} style={{ position: "absolute" }}>
+              {skillError && <div className="menu-heading">{app.locale === "ru" ? "Не удалось прочитать навыки; доступны встроенные команды" : "Skills could not be read; built-in commands are available"}</div>}
+              {slashList.map((s, i) => (
+                <button key={s.id} id={`skill-opt-${i}`} role="option" aria-selected={i === slash.hl} tabIndex={-1} className={`menu-item${i === slash.hl ? " hl" : ""}`} onMouseDown={e => { e.preventDefault(); insertSkill(s); }}>
+                  <span className="skill-option-content"><span className="skill-option-name">/{s.name}</span><span className="skill-option-description" title={s.description}>{s.description}</span><span className="skill-option-source">{s.source}</span></span>
+                </button>
+              ))}
+            </div>
+          )}
           {mention && mentionList.length > 0 && (
             <div className="menu mention-list" id="mention-list" role="listbox" aria-label={t("mentionFile")} style={{ position: "absolute" }}>
               {mentionList.map((f, i) => (
@@ -148,38 +202,56 @@ export function Composer(p: Props) {
             ref={taRef}
             aria-label={t("askAnything")}
             aria-haspopup="listbox"
-            aria-controls={mention && mentionList.length ? "mention-list" : undefined}
-            aria-activedescendant={mention && mentionList.length ? `mention-opt-${mention.hl}` : undefined}
+            aria-controls={slash && slashList.length ? "skill-list" : mention && mentionList.length ? "mention-list" : undefined}
+            aria-activedescendant={slash && slashList.length ? `skill-opt-${Math.min(slash.hl, slashList.length - 1)}` : mention && mentionList.length ? `mention-opt-${mention.hl}` : undefined}
             rows={1}
             value={text}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
             onChange={(e) => {
               setText(e.target.value);
+              const cmd = /^\/([a-zA-Z0-9_-]*)$/.exec(e.target.value);
+              setSlash(cmd ? { q: cmd[1], hl: 0 } : null);
               const m = /@([\w./-]*)$/.exec(e.target.value.slice(0, e.target.selectionStart));
               setMention(m && root ? { q: m[1], hl: 0 } : null);
             }}
             onKeyDown={onKeyDown}
-            onPaste={(e) => e.clipboardData.files.length && (e.preventDefault(), addImageFiles(e.clipboardData.files))}
+            onBlur={() => setSlash(null)}
+            onPaste={e => {
+              const files = Array.from(e.clipboardData.items ?? []).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => !!file);
+              const images = files.length ? files : Array.from(e.clipboardData.files).filter(file => file.type.startsWith("image/"));
+              if (images.length) { e.preventDefault(); addImageFiles(images); }
+            }}
           />
           <div className="composer-bar">
             <button
-              className="icon-btn"
-              disabled={selectedModel?.images === false && !root && !hasMcp}
+              className={`icon-btn composer-add${addMenu.isOpen ? " on" : ""}`}
+              aria-expanded={addMenu.isOpen}
+              onKeyDown={addMenu.onTriggerKeyDown}
               title={t("attach")}
               aria-label={t("attach")}
               aria-haspopup="menu"
               onClick={(e) =>
-                menu.open(e.currentTarget.getBoundingClientRect(), [
+                addMenu.open(e.currentTarget.getBoundingClientRect(), [
+                  { heading: t("attach") },
+                  ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
                   ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(text + (text && !text.endsWith(" ") ? " @" : "@")), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
-                  ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={15} />, onClick: () => setPromptDialog(true) }] : []),
-                ])
+                  ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
+                  { sep: true },
+                  { heading: t("modeSwitch") },
+                  ...(["ask", "plan", "agent"] as const).map(m => ({
+                    label: t(m === "ask" ? "modeAsk" : m === "plan" ? "modePlan" : "modeAgent"),
+                    description: t(m === "ask" ? "modeAskHint" : m === "plan" ? "modePlanHint" : "modeAgentHint"),
+                    icon: m === "ask" ? <MessageCircle size={18} /> : m === "plan" ? <ListTodo size={18} /> : <Bot size={18} />,
+                    checked: p.mode === m, onClick: () => p.onModeChange(m),
+                  })),
+                ], { wide: true })
               }
             >
               <Plus size={16} />
             </button>
             <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => (e.target.files && addImageFiles(e.target.files), (e.target.value = ""))} />
-            <ModeSwitch mode={p.mode} onChange={p.onModeChange} />
+            <span className="composer-mode" title={t("modeSwitch")}>{t(p.mode === "ask" ? "modeAsk" : p.mode === "plan" ? "modePlan" : "modeAgent")}</span>
             <button
               className="chip"
               aria-haspopup="menu"
@@ -230,6 +302,7 @@ export function Composer(p: Props) {
                 <Brain size={14} /> {t(`reasoning_${app.reasoning}`)}
               </button>
             )}
+            <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />
@@ -243,6 +316,7 @@ export function Composer(p: Props) {
         </div>
       </div>
       {menu.node}
+      {addMenu.node}
       {promptDialog && (
         <McpPromptDialog
           project={root ?? null}

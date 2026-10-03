@@ -1,7 +1,8 @@
 import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { hasTerminalCommands, onTerminalCommand } from "../lib/terminalBridge";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
 import type { StoredMsg } from "../lib/data";
 import type { Part } from "../providers/types";
@@ -16,6 +17,8 @@ import { useDiffReview, type StoredFinding } from "../lib/useDiffReview";
 import { useApp } from "../state";
 import { HunkDiff } from "./HunkDiff";
 import { FeedbackQueue, FindingsBlock, FindingsList, type NewComment } from "./ReviewFindings";
+const ProjectPreview = lazy(() => import("./ProjectPreview").then(module => ({ default: module.ProjectPreview })));
+const TerminalPanel = lazy(() => import("./TerminalPanel").then(module => ({ default: module.TerminalPanel })));
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
 
 function DiffView({ text }: { text: string }) {
@@ -40,7 +43,13 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
   const [comments, setComments] = useState<FeedbackComment[]>([]);
   const [focusHunk, setFocusHunk] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"changes" | "terminal">("changes");
+  const [terminalOpened, setTerminalOpened] = useState(false);
+  const [previewOpened, setPreviewOpened] = useState(false);
+  const [tab, setTab] = useState<"changes" | "terminal" | "preview">("changes");
+  useEffect(() => {
+    const show = () => { if (hasTerminalCommands(root)) { setOpen(true); setTab("terminal"); setTerminalOpened(true); } };
+    show(); return onTerminalCommand(show);
+  }, [root]);
   const [files, setFiles] = useState<FileChange[]>([]);
   const [info, setInfo] = useState<Awaited<ReturnType<typeof projectGit>>>(null);
   const [diff, setDiff] = useState<{ path: string; text: string; reviewId?: string; hunks?: Hunk[] } | null>(null);
@@ -211,11 +220,13 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
             <button className={tab === "changes" ? "active" : ""} aria-pressed={tab === "changes"} onClick={() => setTab("changes")}>
               {t("changes")} {files.length ? `(${files.length})` : ""}
             </button>
-            <button className={tab === "terminal" ? "active" : ""} aria-pressed={tab === "terminal"} onClick={() => setTab("terminal")}>
+            <button className={tab === "terminal" ? "active" : ""} aria-pressed={tab === "terminal"} onClick={() => { setTab("terminal"); setTerminalOpened(true); }}>
               {t("terminal")}
             </button>
+            <button className={tab === "preview" ? "active" : ""} aria-pressed={tab === "preview"} onClick={() => { setTab("preview"); setPreviewOpened(true); }}>{t.locale === "ru" ? "Предпросмотр" : "Preview"}</button>
           </div>
           <div className="panel-body">
+            {previewOpened && <div hidden={tab !== "preview"}><Suspense fallback={<div className="term">Preview…</div>}><ProjectPreview root={reviews[0]?.[0].workspace ?? root} onSendConsole={onReplyToAgent} /></Suspense></div>}
             {tab === "changes" && (
               <>
                 <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p>
@@ -249,8 +260,10 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
                 ))}
               </>
             )}
-            {tab === "terminal" && (
-              <div className="term">
+            {terminalOpened && (
+              <div hidden={tab !== "terminal"} style={{ minHeight: 260 }}>
+                <Suspense fallback={<div className="term">{t("terminal")}…</div>}><TerminalPanel commandScope={root} root={reviews[0]?.[0].workspace ?? root} onSendSelection={onReplyToAgent} /></Suspense>
+                <details className="term"><summary>{t("terminal")} · {t.locale === "ru" ? "История команд агента" : "Agent command history"}</summary>
                 {!commands.length && t("noCommands")}
                 {commands.map((c) => (
                   <div key={c.id} style={{ marginBottom: 10 }}>
@@ -258,6 +271,7 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
                     {outputs.get(c.id)}
                   </div>
                 ))}
+                </details>
               </div>
             )}
           </div>

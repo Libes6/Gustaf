@@ -46,27 +46,34 @@ function Harness(o: Over) {
 const sendButton = () => screen.getByRole("button", { name: "Send" });
 const box = () => screen.getByPlaceholderText("Ask anything") as HTMLTextAreaElement;
 
-describe("Composer mode switch", () => {
-  it("is a labelled radiogroup with Agent selected by default", () => {
-    renderApp(<Harness />);
-    const group = screen.getByRole("radiogroup", { name: "Chat mode" });
-    const radios = within(group).getAllByRole("radio");
-    expect(radios.map((r) => r.textContent)).toEqual(["Ask", "Plan", "Agent"]);
-    expect(within(group).getByRole("radio", { name: "Agent" })).toBeChecked();
-    expect(within(group).getByRole("radio", { name: "Plan" })).not.toBeChecked();
-  });
-
-  it("switches on click and with the arrow keys (roving tabindex)", async () => {
+describe("Composer mode menu", () => {
+  it("offers modes in the plus menu and retains the selection", async () => {
     const seen: string[] = [];
-    renderApp(<Harness onModeChange={(m) => seen.push(m)} />);
-    await userEvent.click(screen.getByRole("radio", { name: "Plan" }));
-    expect(screen.getByRole("radio", { name: "Plan" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Plan" })).toHaveAttribute("tabindex", "0");
-    expect(screen.getByRole("radio", { name: "Agent" })).toHaveAttribute("tabindex", "-1");
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Plan" }), { key: "ArrowLeft" });
-    expect(screen.getByRole("radio", { name: "Ask" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Ask" })).toHaveFocus();
+    renderApp(<Harness onModeChange={m => seen.push(m)} />);
+    const plus = screen.getByRole("button", { name: "Attach" });
+    await userEvent.click(plus);
+    expect(screen.getByRole("menuitemradio", { name: /^Agent/ })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: /^Plan/ }));
+    expect(seen).toEqual(["plan"]);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await userEvent.click(plus);
+    expect(screen.getByRole("menuitemradio", { name: /^Plan/ })).toHaveAttribute("aria-checked", "true");
+    screen.getByRole("menuitemradio", { name: /^Plan/ }).focus();
+    fireEvent.keyDown(screen.getByRole("menuitemradio", { name: /^Plan/ }), { key: "ArrowUp" });
+    expect(screen.getByRole("menuitemradio", { name: /^Ask/ })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
     expect(seen).toEqual(["plan", "ask"]);
+  });
+  it("toggles closed on a repeated trigger click and restores focus on Escape", async () => {
+    renderApp(<Harness />);
+    const plus = screen.getByRole("button", { name: "Attach" });
+    await userEvent.click(plus);
+    await userEvent.click(plus);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await userEvent.click(plus);
+    await userEvent.keyboard("{Escape}");
+    expect(plus).toHaveFocus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
 
@@ -247,4 +254,39 @@ describe("Composer", () => {
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Full access/ }));
     expect(app.setAccess).toHaveBeenCalledWith("full");
   });
+});
+
+describe("Composer slash commands", () => {
+  it("selects a command with keyboard without sending and accepts arguments afterwards", async () => {
+    const send = vi.fn();
+    renderApp(<Harness onSend={send} />);
+    await userEvent.type(box(), "/rev");
+    expect(await screen.findByRole("option", { name: /\/review/ })).toBeInTheDocument();
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(box()).toHaveValue("/review ");
+    expect(send).not.toHaveBeenCalled();
+    await userEvent.type(box(), "src/main.ts");
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+  it("Escape dismisses suggestions without changing the draft", async () => {
+    renderApp(<Harness />);
+    await userEvent.type(box(), "/ex");
+    expect(await screen.findByRole("option", { name: /\/explain/ })).toBeInTheDocument();
+    fireEvent.keyDown(box(), { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(box()).toHaveValue("/ex");
+  });
+});
+
+
+describe("Screenshot paste",()=>{
+ it("accepts clipboard image items even when files collection is empty",async()=>{
+ const {container}=renderApp(<Harness/>);
+ const file=new File(["screenshot"],"Screenshot.png",{type:"image/png"});
+ fireEvent.paste(box(),{clipboardData:{files:[],items:[{kind:"file",type:"image/png",getAsFile:()=>file}]}});
+ await vi.waitFor(()=>expect(container.querySelector(".attach img")).not.toBeNull());
+ expect(box().value).toBe("");
+ });
+ it("leaves ordinary text paste to the textarea",()=>{renderApp(<Harness/>);const event=new Event("paste",{bubbles:true,cancelable:true});Object.defineProperty(event,"clipboardData",{value:{files:[],items:[]}});box().dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
 });

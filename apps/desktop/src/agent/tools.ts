@@ -23,6 +23,7 @@ export const READ_TOOLS: ToolDef[] = [
 ];
 
 export const WRITE_TOOLS: ToolDef[] = [
+  { name: "diagnostics", description: "Run the configured project type/lint check and return actual output. Obeys the same command approvals as run_command. Requires a configured diagnostics command.", parameters: obj({path:str("Relative file path for LSP diagnostics")}, []) },
   {
     name: "edit_file",
     description: "Replace exactly one occurrence of old_string with new_string. Fails if old_string is missing or not unique; include enough context.",

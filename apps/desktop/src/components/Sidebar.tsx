@@ -89,10 +89,11 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
       <button
         className="rail-btn"
         aria-label={t("accountMenu")}
+        onKeyDown={menu.onTriggerKeyDown}
         aria-haspopup="menu"
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
-          menu.open({ clientX: r.right + 6, clientY: r.top - 190 }, [
+          menu.open(r, [
             { heading: "M Code" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
             { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },

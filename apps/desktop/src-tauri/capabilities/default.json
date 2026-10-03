@@ -128,6 +128,8 @@
           "url": "http://*.ts.net:*"
         }
       ]
-    }
+    },
+    "updater:default",
+    "process:allow-restart"
   ]
 }

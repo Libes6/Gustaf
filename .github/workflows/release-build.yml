@@ -1,0 +1,117 @@
+name: Desktop distribution artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed_macos:
+        description: 'Sign and notarize macOS (requires Apple secrets)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: bundle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: Linux prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libdbus-1-dev pkg-config libxdo-dev libxcb1-dev libxrandr-dev libgbm-dev libegl-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libclang-dev libwayland-dev
+      - run: npm ci
+      - run: npm --prefix apps/desktop/sidecar ci
+      - name: Check source and native tests
+        run: |
+          node apps/desktop/scripts/check-i18n.mjs
+          npm exec -w apps/desktop -- tsc --noEmit
+          npm test
+          npm run test:ui
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Import Developer ID certificate
+        if: runner.os == 'macOS' && inputs.signed_macos
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          test -n "$APPLE_CERTIFICATE" && test -n "$APPLE_CERTIFICATE_PASSWORD" && test -n "$KEYCHAIN_PASSWORD"
+          test -n "$APPLE_SIGNING_IDENTITY" && test -n "$APPLE_ID" && test -n "$APPLE_PASSWORD" && test -n "$APPLE_TEAM_ID"
+          case "$APPLE_SIGNING_IDENTITY" in "Developer ID Application:"*) ;; *) echo "Expected a Developer ID Application identity" >&2; exit 1;; esac
+          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/mcode-cert.p12", Buffer.from(process.env.APPLE_CERTIFICATE, "base64"))'
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
+          security set-keychain-settings -t 3600 -u "$RUNNER_TEMP/mcode-build.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/mcode-build.keychain-db" login.keychain-db
+          security import "$RUNNER_TEMP/mcode-cert.p12" -k "$RUNNER_TEMP/mcode-build.keychain-db" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
+          rm -f "$RUNNER_TEMP/mcode-cert.p12"
+      - name: Build distribution bundles
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && inputs.signed_macos && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && inputs.signed_macos && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ runner.os == 'macOS' && inputs.signed_macos && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && inputs.signed_macos && secrets.APPLE_TEAM_ID || '' }}
+          M_CODE_UPDATER_PUBLIC_KEY: ${{ vars.M_CODE_UPDATER_PUBLIC_KEY }}
+          M_CODE_UPDATER_ENDPOINT: ${{ vars.M_CODE_UPDATER_ENDPOINT }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$M_CODE_UPDATER_PUBLIC_KEY" ] || [ -n "$M_CODE_UPDATER_ENDPOINT" ]; then
+            test -n "$M_CODE_UPDATER_PUBLIC_KEY" && test -n "$M_CODE_UPDATER_ENDPOINT" && test -n "$TAURI_SIGNING_PRIVATE_KEY"
+            node -e 'const fs=require("fs");const u=process.env.M_CODE_UPDATER_ENDPOINT;if(!u.startsWith("https://"))throw Error("Updater endpoint must use HTTPS");fs.writeFileSync(process.env.RUNNER_TEMP+"/mcode-updater.json",JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:process.env.M_CODE_UPDATER_PUBLIC_KEY,endpoints:[u]}}}))'
+            npm run tauri -- build --config "$RUNNER_TEMP/mcode-updater.json"
+          else
+            npm run tauri -- build
+          fi
+      - name: Verify macOS signature and notarization
+        if: runner.os == 'macOS' && inputs.signed_macos
+        run: |
+          codesign --verify --deep --strict --verbose=2 "apps/desktop/src-tauri/target/release/bundle/macos/M Code.app"
+          spctl --assess --type execute --verbose=2 "apps/desktop/src-tauri/target/release/bundle/macos/M Code.app"
+          xcrun stapler validate "apps/desktop/src-tauri/target/release/bundle/macos/M Code.app"
+      - name: Remove temporary signing keychain
+        if: always() && runner.os == 'macOS' && inputs.signed_macos
+        run: |
+          security delete-keychain "$RUNNER_TEMP/mcode-build.keychain-db" || true
+          rm -f "$RUNNER_TEMP/mcode-cert.p12"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcode-${{ runner.os }}-${{ runner.arch }}-${{ inputs.signed_macos && runner.os == 'macOS' && 'signed' || 'test-build' }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/**/*.msi
+            apps/desktop/src-tauri/target/release/bundle/**/*.exe
+            apps/desktop/src-tauri/target/release/bundle/**/*.deb
+            apps/desktop/src-tauri/target/release/bundle/**/*.rpm
+            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/**/*.sig
+            apps/desktop/src-tauri/target/release/bundle/**/*.tar.gz
+            apps/desktop/src-tauri/target/release/bundle/**/*.zip
+          if-no-files-found: error
+          retention-days: 14

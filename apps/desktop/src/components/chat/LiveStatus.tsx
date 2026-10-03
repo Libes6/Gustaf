@@ -11,7 +11,9 @@ import { ApprovalCard } from "./ApprovalCard";
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void } | null;
 
 /** Tail of the feed while a run is active: running activities, streamed text or the "thinking" line (with the retry notice and LiveMeter), approval prompt. */
-export function LiveStatus({ activities, stream, approval, retryNotice, stats, visible }: {
+export function LiveStatus({ activities, stream, approval, retryNotice, stats, visible, onRunCommand, projectRoot }: {
+  onRunCommand?: (command: string) => void;
+  projectRoot?: string;
   activities: Extract<Part, { type: "activity" }>[];
   stream: string | null;
   approval: Approval;
@@ -33,7 +35,7 @@ export function LiveStatus({ activities, stream, approval, retryNotice, stats, v
   return (
     <>
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{status}</div>
-      {renderWithSubagents(activities, (a) => <ToolCard key={a.id} call={a} />)}
+      {renderWithSubagents(activities, (a) => <ToolCard key={a.id} call={a} onRunCommand={onRunCommand} projectRoot={projectRoot} />)}
       {stream !== null &&
         (stream ? (
           <div className="msg-assistant caret">

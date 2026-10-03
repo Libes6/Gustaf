@@ -61,6 +61,7 @@ function sqlite() {
     agentDb = new DatabaseSync(':memory:');
     const rs = readFileSync(new URL('../../src-tauri/src/db.rs', import.meta.url), 'utf8');
     agentDb.exec('pragma foreign_keys = on; create table chats(id integer primary key);');
+    agentDb.exec(/-- memories:begin([\s\S]*?)-- memories:end/.exec(rs)[1]);
     agentDb.exec(/-- agent-runs:begin([\s\S]*?)-- agent-runs:end/.exec(rs)[1]);
   }
   return agentDb;

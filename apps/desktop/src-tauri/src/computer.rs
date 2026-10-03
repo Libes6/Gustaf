@@ -58,6 +58,26 @@ pub struct Shot {
     /// Zero-based index of the action that failed; later actions were not executed.
     failed_step: Option<usize>,
     error: Option<String>,
+    timings: Timings,
+    /// Bounded Accessibility labels from the active app; page content is untrusted.
+    elements: Vec<AccessibleElement>,
+}
+
+#[derive(Serialize, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+struct Timings {
+    actions_ms: u64,
+    settle_ms: u64,
+    capture_ms: u64,
+    encode_ms: u64,
+    accessibility_ms: u64,
+    total_ms: u64,
+}
+
+#[derive(Serialize, Debug)]
+struct AccessibleElement {
+    role: String,
+    label: String,
 }
 
 /// Maps a point from the (possibly downscaled) screenshot space to display points.
@@ -312,7 +332,9 @@ fn input(en: &mut Option<Enigo>) -> Result<&mut Enigo, String> {
 fn perform(actions: &[Action], shot: (u32, u32), display: (u32, u32), en: &mut Option<Enigo>) -> Result<(), (usize, String)> {
     for (i, a) in actions.iter().enumerate() {
         perform_one(a, shot, display, en).map_err(|e| (i, e))?;
-        sleep(Duration::from_millis(80));
+        if i + 1 < actions.len() && !matches!(a, Action::Screenshot | Action::Wait { .. }) {
+            sleep(Duration::from_millis(80));
+        }
     }
     Ok(())
 }
@@ -392,30 +414,70 @@ fn perform_one(a: &Action, shot: (u32, u32), display: (u32, u32), en: &mut Optio
 /// can verify the outcome without another turn. A failed step still returns a screenshot, with `failed_step` and `error`.
 #[tauri::command]
 pub async fn cu_execute(app: AppHandle, actions: Vec<Action>) -> Result<Shot, String> {
+    let command_started = Instant::now();
     let win = app.get_webview_window("main");
     if let Some(w) = &win {
         let _ = w.hide();
     }
-    sleep(Duration::from_millis(300));
-    let result = execute_batch(&actions);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        sleep(Duration::from_millis(300));
+        execute_batch(&actions)
+    }).await.map_err(|e| format!("desktop worker failed: {e}")).and_then(|v| v);
     if let Some(w) = &win {
-        let _ = w.show();
-        let _ = w.set_focus();
+        restore_without_focus(w);
+
     }
-    result
+    result.map(|mut shot| {
+        shot.timings.total_ms = command_started.elapsed().as_millis() as u64;
+        shot
+    })
+}
+
+
+/// Tao's macOS `show()` calls makeKeyAndOrderFront, which steals focus even without set_focus.
+/// Restore visibility with NSWindow orderFront: on the main thread instead.
+fn restore_without_focus(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || unsafe {
+            use std::ffi::{c_char, c_void};
+            #[link(name = "objc")]
+            extern "C" {
+                fn sel_registerName(name: *const c_char) -> *const c_void;
+                fn objc_msgSend();
+            }
+            if let Ok(native) = w.ns_window() {
+                let send: unsafe extern "C" fn(*mut c_void, *const c_void, *const c_void) = std::mem::transmute(objc_msgSend as *const ());
+                send(native, sel_registerName(b"orderFront:\0".as_ptr().cast()), std::ptr::null());
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    { let _ = window.show(); }
 }
 
 fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
+    let started = Instant::now();
+    let mut timings = Timings::default();
     let m = primary()?;
     let display = display_size(&m)?;
     let size = fit(display.0, display.1);
     let mut en: Option<Enigo> = None;
     let acting = actions.iter().any(|a| *a != Action::Screenshot);
     let (raw, changed, settled, outcome) = if !acting {
-        (grab(&m)?, None, None, Ok(()))
+        let t = Instant::now();
+        let raw = grab(&m)?;
+        timings.capture_ms = t.elapsed().as_millis() as u64;
+        (raw, None, None, Ok(()))
     } else {
+        let capture_started = Instant::now();
         let before = grab(&m).ok().map(|r| thumb_of(&r));
+        timings.capture_ms = capture_started.elapsed().as_millis() as u64;
+        let actions_started = Instant::now();
         let outcome = perform(actions, size, display, &mut en);
+        timings.actions_ms = actions_started.elapsed().as_millis() as u64;
+        let settle_started = Instant::now();
         let opened = actions.iter().any(|a| matches!(a, Action::OpenApp { .. }));
         sleep(Duration::from_millis(if opened { 400 } else { 120 }));
         let cfg = Settle { poll_ms: 60, stable_ms: 250, max_ms: if opened { 4000 } else { 2000 } };
@@ -431,9 +493,12 @@ fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
                 (r, th, false)
             }
         };
+        timings.settle_ms = settle_started.elapsed().as_millis() as u64;
         (raw, before.map(|b| differs(&b, &after)), Some(ok), outcome)
     };
+    let encode_started = Instant::now();
     let mut shot = encode(&raw, size)?;
+    timings.encode_ms = encode_started.elapsed().as_millis() as u64;
     shot.changed = changed;
     shot.settled = settled;
     if let Err((i, e)) = outcome {
@@ -444,6 +509,11 @@ fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
     shot.front_app = front_app;
     shot.window_title = window_title;
     shot.cursor = input(&mut en).ok().and_then(|en| en.location().ok()).map(|(x, y)| unmap_coords(x, y, size, display));
+    let ax_started = Instant::now();
+    shot.elements = accessible_elements();
+    timings.accessibility_ms = ax_started.elapsed().as_millis() as u64;
+    timings.total_ms = started.elapsed().as_millis() as u64;
+    shot.timings = timings;
     Ok(shot)
 }
 
@@ -652,5 +722,85 @@ mod tests {
         assert_eq!(v["cursor"], serde_json::json!([3, 4]));
         assert_eq!(v["failedStep"], 1);
         assert!(v["windowTitle"].is_null());
+    }
+}
+
+
+#[cfg(not(target_os = "macos"))]
+fn accessible_elements() -> Vec<AccessibleElement> { Vec::new() }
+
+/// Read-only AX inspection. Never reads text-field values or performs actions. No permission prompt.
+#[cfg(target_os = "macos")]
+fn accessible_elements() -> Vec<AccessibleElement> {
+    use std::ffi::{c_char, c_void, CString};
+    type Ref = *const c_void;
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXUIElementCreateSystemWide() -> Ref;
+        fn AXUIElementCopyAttributeValue(element: Ref, attribute: Ref, value: *mut Ref) -> i32;
+        fn AXUIElementSetMessagingTimeout(element: Ref, timeout: f32) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFRelease(value: Ref);
+        fn CFStringCreateWithCString(allocator: Ref, text: *const c_char, encoding: u32) -> Ref;
+        fn CFStringGetCString(value: Ref, buffer: *mut c_char, size: isize, encoding: u32) -> bool;
+        fn CFGetTypeID(value: Ref) -> usize;
+        fn CFStringGetTypeID() -> usize;
+        fn CFArrayGetTypeID() -> usize;
+        fn CFArrayGetCount(value: Ref) -> isize;
+        fn CFArrayGetValueAtIndex(value: Ref, index: isize) -> Ref;
+    }
+    unsafe fn attr(element: Ref, name: &str) -> Ref {
+        let name = CString::new(name).unwrap();
+        let key = CFStringCreateWithCString(std::ptr::null(), name.as_ptr(), 0x08000100);
+        let mut value = std::ptr::null();
+        let status = AXUIElementCopyAttributeValue(element, key, &mut value);
+        CFRelease(key);
+        if status == 0 { value } else { std::ptr::null() }
+    }
+    unsafe fn string(element: Ref, name: &str) -> String {
+        let value = attr(element, name);
+        if value.is_null() { return String::new(); }
+        let mut buf = [0i8; 1024];
+        let out = if CFGetTypeID(value) == CFStringGetTypeID() && CFStringGetCString(value, buf.as_mut_ptr(), buf.len() as isize, 0x08000100) {
+            std::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned()
+        } else { String::new() };
+        CFRelease(value);
+        out
+    }
+    unsafe fn walk(element: Ref, depth: usize, visited: &mut usize, deadline: Instant, out: &mut Vec<AccessibleElement>) {
+        if depth > 8 || *visited >= 100 || Instant::now() >= deadline { return; }
+        *visited += 1;
+        AXUIElementSetMessagingTimeout(element, 0.05);
+        let role = string(element, "AXRole");
+        let mut label = string(element, "AXTitle");
+        if label.is_empty() { label = string(element, "AXDescription"); }
+        if !label.is_empty() && role != "AXSecureTextField" && out.len() < 40 {
+            out.push(AccessibleElement { role, label: label.chars().take(120).collect() });
+        }
+        let children = attr(element, "AXChildren");
+        if !children.is_null() {
+            if CFGetTypeID(children) == CFArrayGetTypeID() {
+                for i in 0..CFArrayGetCount(children).min(100) {
+                    walk(CFArrayGetValueAtIndex(children, i), depth + 1, visited, deadline, out);
+                    if *visited >= 100 || Instant::now() >= deadline { break; }
+                }
+            }
+            CFRelease(children);
+        }
+    }
+    unsafe {
+        if !AXIsProcessTrusted() { return Vec::new(); }
+        let system = AXUIElementCreateSystemWide();
+        AXUIElementSetMessagingTimeout(system, 0.05);
+        let app = attr(system, "AXFocusedApplication");
+        let mut out = Vec::new();
+        if !app.is_null() {
+            walk(app, 0, &mut 0, Instant::now() + Duration::from_millis(250), &mut out);
+            CFRelease(app);
+        }
+        CFRelease(system);
+        out
     }
 }

@@ -1,6 +1,7 @@
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { requestTerminalCommand } from "../lib/terminalBridge";
 import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
@@ -61,6 +62,8 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const latest = useRef({ run, title: "", branchLabel: "", messages, setMode });
   latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix"), messages, setMode };
   const turnHandlers = useMemo<TurnHandlers>(() => ({
+    diagnosticsProjectRoot: root ?? undefined,
+    onRunCommand: root ? command => requestTerminalCommand(root, command) : undefined,
     onEdit: (m, txt) => void latest.current.run.resendFrom(m, txt),
     onRegenerate: (user) => void latest.current.run.resendFrom(user, editableText(user)),
     onDelete: (turn) => void latest.current.run.removeMessages((turn.user ?? turn.steps[0]).chat_id, turnMessageIds(turn)),
@@ -71,7 +74,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       void latest.current.run.send(false, { text: planToInstruction(plan), images: [], base: latest.current.messages, mode: "agent" });
     },
     onRejectPlan: () => taRef.current?.focus(),
-  }), []);
+  }), [root]);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +134,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
             {turns.map((turn, i) => (
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
             ))}
-            <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} />
+            <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} onRunCommand={turnHandlers.onRunCommand} projectRoot={root ?? undefined} />
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
         </div>
@@ -143,7 +146,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       )}
 
       <Composer
-        text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
+        scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
         root={root} projectName={project?.name} files={files}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
         running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}

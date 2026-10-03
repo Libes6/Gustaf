@@ -41,7 +41,7 @@ const ALLOWED = {
   'img-src': ["'self'", 'data:', 'blob:'],
   'font-src': ["'self'", 'data:'],
   'connect-src': ["'self'", 'ipc:', 'http://ipc.localhost'],
-  'frame-src': ['about:'],
+  'frame-src': ['about:', 'http://127.0.0.1:*'],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
   'form-action': ["'self'"],
@@ -117,7 +117,7 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
     for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
   }
   const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length));
-  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only the canvas panel and the share-as-HTML preview may create an iframe');
+  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, isolated local project preview and HTML sharing may create an iframe');
   const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
   assert.match(share, /sandbox=""/, 'the share preview frame must be fully sandboxed (no scripts)');
   const panel = readFileSync(join(root, 'src/components/CanvasPanel.tsx'), 'utf8');
@@ -157,7 +157,7 @@ after(() => { if (dist) rmSync(dist, { recursive: true, force: true }); });
 /** Hosts that appear in the bundle as constants (provider presets, doc links, XML namespaces), never as loaded resources. */
 const KNOWN_HOSTS = new Set([
   // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
-  'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
+  'api.search.brave.com', 'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
   'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com',
 ]);
 

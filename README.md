@@ -1,4 +1,6 @@
-# M Code
+# Gustaf
+
+Previously developed as M Code; the desktop application currently keeps that name.
 
 Desktop AI chat and coding assistant built with Tauri 2, React and TypeScript. It talks to hosted model APIs, local models and the Codex, Claude Code and Cursor command-line agents from one window, and can edit your projects in a reviewable copy.
 
@@ -134,3 +136,7 @@ Add providers in Settings, Model providers. API keys are stored by the Rust back
 - Sign-in is verified by a small test request or a successful chat response, not by listing models. Transient API failures are retried with backoff before any text reaches the chat ([streaming robustness](docs/features/chat.md#streaming-robustness)).
 - Subscription windows (Codex, Claude Code) and token usage: [usage and budgets](docs/features/usage-and-budgets.md). Which model hosts subagents, compaction and commit messages: [agents](docs/features/agents.md).
 - Image attachments work with CLI providers too (written to a temporary folder per chat, see [files and git](docs/features/files-and-git.md)).
+
+## License
+
+[MIT](LICENSE). Third-party assets and dependencies retain their own licenses, including the [model icons](apps/desktop/public/icons/LICENSE).

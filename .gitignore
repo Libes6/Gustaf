@@ -34,3 +34,12 @@ apps/desktop/public/canvas/
 
 # End-to-end failure artifacts (screenshots, traces)
 apps/desktop/tests/e2e/artifacts/
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.p12
+*.pfx
