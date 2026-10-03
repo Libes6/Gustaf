@@ -46,3 +46,23 @@
 .input.agent-budget-input::placeholder { color: var(--text-3); }
 
 .agent-step pre { margin: 4px 0 0; max-height: 140px; overflow: auto; font: 11.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); user-select: text; }
+
+/* Grouped "Subagents" card of a CLI agent's own subagents (components/SubagentsCard.tsx) */
+.subagent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.subagent-row { padding: 4px 10px 6px; border-bottom: 1px solid var(--border); }
+.subagent-row:last-child { border-bottom: 0; }
+.subagent-head { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 2px 0; color: var(--text-2); text-align: left; }
+.subagent-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
+.subagent-role { flex: none; font-size: 11px; color: var(--text-3); }
+.subagent-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.subagent-chip.completed { color: var(--green); }
+.subagent-chip.failed { color: var(--red); }
+.subagent-chip.ended { color: var(--text-3); }
+.subagent-result { margin: 0 0 0 19px; color: var(--text-3); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subagent-detail { margin: 4px 0 2px 19px; display: flex; flex-direction: column; gap: 6px; }
+.subagent-detail p { margin: 0; color: var(--text-2); overflow-wrap: anywhere; user-select: text; }
+.subagent-detail pre { margin: 0; max-height: 200px; overflow: auto; font: 11.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); user-select: text; }
+.subagent-detail pre.err { color: var(--red); }
+.subagent-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.subagent-meta { display: flex; gap: 10px; color: var(--text-3); font-size: 11.5px; }
+.subagent-step { font: 11.5px var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
