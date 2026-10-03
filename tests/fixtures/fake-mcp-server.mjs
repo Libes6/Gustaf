@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Tiny MCP server over stdio (newline-delimited JSON-RPC) used by the Rust tests in src-tauri/src/mcp.rs.
 // Tools: echo {text} → text; sleep → never answers (timeouts); crash → exits; change → sends tools/list_changed;
-// env {name} → value of an environment variable; big → a response larger than the client's cap.
+// env {name} → value of an environment variable; big → a response larger than the client's cap; slow {ms} → answers
+// after a delay (cancellation tests: the late answer must be dropped); changeall → announces tool, resource and prompt
+// list changes. `notifications/cancelled` is noted on stderr as `cancelled <id>`.
 // Flags: --exit-after-init (exits right after the handshake), --no-init (never answers initialize).
 import { createInterface } from 'node:readline';
 
@@ -13,6 +15,8 @@ const tools = [
   { name: 'crash', description: 'Exits the process', inputSchema: { type: 'object' } },
   { name: 'change', description: 'Announces a tool list change', inputSchema: { type: 'object' } },
   { name: 'env', description: 'Reads an environment variable', inputSchema: { type: 'object', properties: { name: { type: 'string' } } } },
+  { name: 'slow', description: 'Answers after ms', inputSchema: { type: 'object', properties: { ms: { type: 'number' } } } },
+  { name: 'changeall', description: 'Announces tool, resource and prompt list changes', inputSchema: { type: 'object' } },
   { name: 'big', description: 'Returns a huge response', inputSchema: { type: 'object' } },
 ];
 
@@ -30,6 +34,10 @@ rl.on('line', (line) => {
   if (method === 'initialize') {
     if (flags.has('--no-init')) return;
     send({ id, result: { protocolVersion: params?.protocolVersion ?? '2025-06-18', capabilities: { tools: { listChanged: true } }, serverInfo: { name: 'fake', version: '1.0.0' } } });
+    return;
+  }
+  if (method === 'notifications/cancelled') {
+    process.stderr.write(`cancelled ${params?.requestId}\n`);
     return;
   }
   if (method === 'notifications/initialized') {
@@ -50,6 +58,14 @@ rl.on('line', (line) => {
         return;
       case 'change':
         send({ method: 'notifications/tools/list_changed' });
+        return send({ id, result: { content: [{ type: 'text', text: 'changed' }] } });
+      case 'slow':
+        setTimeout(() => send({ id, result: { content: [{ type: 'text', text: 'late answer' }] } }), Number(args.ms ?? 300));
+        return;
+      case 'changeall':
+        send({ method: 'notifications/tools/list_changed' });
+        send({ method: 'notifications/resources/list_changed' });
+        send({ method: 'notifications/prompts/list_changed' });
         return send({ id, result: { content: [{ type: 'text', text: 'changed' }] } });
       case 'env':
         return send({ id, result: { content: [{ type: 'text', text: String(process.env[args.name] ?? '') }] } });

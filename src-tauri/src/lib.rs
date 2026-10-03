@@ -77,6 +77,7 @@ pub fn run() {
             mcp::mcp_start,
             mcp::mcp_request,
             mcp::mcp_notify,
+            mcp::mcp_cancel,
             mcp::mcp_stop,
             mcp::mcp_status,
             mcp::mcp_logs,

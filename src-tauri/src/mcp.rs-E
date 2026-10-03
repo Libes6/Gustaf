@@ -999,14 +999,14 @@ mod tests {
         // A second ensure with the same spec reuses the process.
         assert_eq!(m.ensure("a", spec.clone()).unwrap().pid, st.pid);
 
-        let tools = m.request("a", "tools/list", None, None, None).unwrap();
+        let tools = m.request("a", "tools/list", None, None).unwrap();
         let names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
         assert!(names.contains(&"echo") && names.contains(&"sleep"));
         assert_eq!(call(&m, "a", "echo", json!({ "text": "hi" }), None).unwrap()["content"][0]["text"], "hi");
         // Environment from the spec reaches the server (secrets are passed this way).
         assert_eq!(call(&m, "a", "env", json!({ "name": "FAKE_SECRET" }), None).unwrap()["content"][0]["text"], "s3cret");
         // Unknown method: the JSON-RPC error comes back as an error.
-        assert!(m.request("a", "nope/nope", None, None, None).unwrap_err().contains("-32601"));
+        assert!(m.request("a", "nope/nope", None, None).unwrap_err().contains("-32601"));
 
         let before = status(&m, "a").tools_epoch;
         call(&m, "a", "change", json!({}), None).unwrap();
@@ -1016,7 +1016,7 @@ mod tests {
 
         m.stop("a", false);
         assert_eq!(status(&m, "a").state, "stopped");
-        assert!(m.request("a", "tools/list", None, None, None).is_err());
+        assert!(m.request("a", "tools/list", None, None).is_err());
         // A changed spec starts a new process.
         let mut changed = spec.clone();
         changed.env.insert("OTHER".into(), "1".into());
