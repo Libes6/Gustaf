@@ -1,0 +1,23 @@
+/* Settings > Scheduled prompts (components/ScheduledPromptsSection.tsx) and the approval cards of unattended runs (ScheduledPromptsRuntime.tsx) */
+.sched-safety { margin-top: -4px; }
+.sched-row { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.sched-row:last-child { border-bottom: 0; }
+.sched-line { display: flex; align-items: center; gap: 10px; }
+.sched-line .grow { min-width: 0; }
+.sched-line .d { overflow-wrap: anywhere; }
+.sched-meta { font-size: 12px; overflow-wrap: anywhere; }
+.sched-failed, .sched-attention { color: var(--red); }
+.sched-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.sched-form { padding: 12px 14px; border-top: 1px solid var(--border); }
+.sched-form:first-child { border-top: 0; }
+.sched-prompt { height: 96px; min-height: 60px; padding: 8px 10px; resize: vertical; font: inherit; }
+.sched-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.sched-inline { display: flex; gap: 8px; align-items: center; }
+.sched-num { width: 80px; }
+.sched-narrow { width: 200px; }
+.sched-issues { color: var(--red); font-size: 12.5px; margin-bottom: 8px; }
+.sched-note { margin: 8px 2px 0; }
+.sched-add { margin-top: 10px; }
+.sched-approvals { position: fixed; right: 16px; bottom: 16px; z-index: 70; display: flex; flex-direction: column; gap: 10px; width: min(420px, calc(100vw - 32px)); }
+.sched-approval { background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.sched-cmd { display: block; font: 12px var(--mono); color: var(--text); background: var(--bg-input); border-radius: 6px; padding: 6px 8px; overflow-wrap: anywhere; user-select: text; max-height: 120px; overflow: auto; }

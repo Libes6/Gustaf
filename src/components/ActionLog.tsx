@@ -88,7 +88,7 @@ export function ActionLog() {
           lastDay = d;
           const block = e.undo ? undoBlocker(entries, e, active) : "none";
           const blockText = block === "running" ? t("undoBusy") : block === "later" ? t("undoLater") : undefined;
-          const sub = [e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
+          const sub = [e.source === "scheduled" ? t("logSourceScheduled") : undefined, e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
           return (
             <Fragment key={e.id}>
               {header}

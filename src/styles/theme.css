@@ -517,6 +517,19 @@ button.split-item { width: 100%; text-align: left; }
 .canvas-toolbar select { max-width: 125px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px; }
 .canvas-panel iframe { flex: 1; min-height: 0; width: 100%; border: 0; background: #faf9fc; /* artifact documents are always light, see src/canvas/document.ts */ }
 .canvas-panel iframe[hidden] { display: none; }
+.canvas-files { display: flex; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border); overflow-x: auto; flex: none; }
+.canvas-files button { padding: 4px 10px; border-radius: 7px; color: var(--text-2); font: 12px var(--mono); white-space: nowrap; }
+.canvas-files button[aria-selected="true"] { background: var(--bg-active); color: var(--text); }
+.canvas-diff-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.canvas-diff-bar { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; color: var(--text-2); }
+.canvas-diff-pick { display: flex; gap: 6px; align-items: center; }
+.canvas-diff-pick select { background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px; color: var(--text); }
+.canvas-diff-body { flex: 1; overflow: auto; padding: 8px 0; }
+.canvas-diff-empty { padding: 16px; color: var(--text-2); margin: 0; }
+.canvas-diff-file h3 { margin: 8px 12px 4px; font-size: 12px; font-weight: 500; }
+.canvas-diff-file h3 small { color: var(--text-2); margin-left: 8px; }
+.canvas-diff-file .diff { min-width: max-content; }
+.canvas-diff-no { display: inline-block; width: 4ch; margin-right: 8px; text-align: right; color: var(--text-2); user-select: none; }
 .canvas-source { flex: 1; overflow: auto; margin: 0; padding: 16px; font: 12px/1.6 var(--mono); user-select: text; }
 .canvas-error { padding: 12px; border-bottom: 1px solid var(--border); }
 .canvas-error pre { max-height: 130px; overflow: auto; white-space: pre-wrap; color: var(--red); user-select: text; }

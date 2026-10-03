@@ -1,0 +1,1013 @@
+//! MCP stdio servers: spawned from an argument array (never a shell), spoken to with newline-delimited JSON-RPC 2.0.
+//!
+//! Lifecycle: `mcp_start` starts a server on demand (or returns the running one; a changed spec restarts it) and does
+//! the `initialize` / `notifications/initialized` handshake. A server that exits after a successful handshake is
+//! restarted with exponential backoff, at most `MAX_RESTARTS` times in a row (the counter resets once it has run for
+//! `STABLE_AFTER`); after that it stays in the `error` state until started again. `mcp_stop` and app exit close stdin,
+//! then SIGTERM and finally SIGKILL the server's process group. Incoming lines are capped at `MAX_MESSAGE`, outgoing
+//! messages at `MAX_OUTGOING`, and every request has a timeout. stderr (and lifecycle notes) go to a bounded log.
+//! `notifications/tools/list_changed` bumps `tools_epoch` and emits an `mcp-event`; the TS client re-lists tools then.
+//! HTTP servers do not come through here: the TS side talks to them with the HTTP plugin (src/agent/mcp/http.ts).
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::{HashMap, VecDeque};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::process::{Child, Command, Stdio};
+use std::sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
+
+pub const PROTOCOL_VERSION: &str = "2025-06-18";
+const MAX_MESSAGE: usize = 16 * 1024 * 1024;
+const MAX_OUTGOING: usize = 4 * 1024 * 1024;
+const LOG_LINES: usize = 400;
+const LOG_LINE_CHARS: usize = 2000;
+const INIT_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_TIMEOUT_MS: u64 = 60_000;
+const MAX_TIMEOUT_MS: u64 = 10 * 60_000;
+const MAX_RESTARTS: u32 = 5;
+const STABLE_AFTER: Duration = Duration::from_secs(60);
+#[cfg(not(test))]
+const BACKOFF_BASE_MS: u64 = 500;
+#[cfg(test)]
+const BACKOFF_BASE_MS: u64 = 20;
+const BACKOFF_MAX_MS: u64 = 30_000;
+const STOPPED_DURING_START: &str = "the server was stopped during startup";
+
+/// How to launch a stdio server. `env` is added to the app's environment (secrets are resolved by the caller).
+#[derive(Clone, Deserialize, PartialEq, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Spec {
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+    pub cwd: Option<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum State {
+    Stopped,
+    Starting,
+    Running,
+    Restarting,
+    Error,
+}
+
+impl State {
+    fn name(self) -> &'static str {
+        match self {
+            State::Stopped => "stopped",
+            State::Starting => "starting",
+            State::Running => "running",
+            State::Restarting => "restarting",
+            State::Error => "error",
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    pub id: String,
+    pub state: &'static str,
+    pub error: Option<String>,
+    pub pid: Option<u32>,
+    pub restarts: u32,
+    pub tools_epoch: u64,
+    /// The `initialize` result (protocolVersion, capabilities, serverInfo, instructions).
+    pub init: Option<Value>,
+}
+
+type Reply = Result<Value, String>;
+type Notifier = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
+struct Inner {
+    spec: Spec,
+    state: State,
+    error: Option<String>,
+    /// Lines for the writer thread; dropping it closes the server's stdin.
+    tx: Option<mpsc::Sender<Vec<u8>>>,
+    child: Option<Child>,
+    pid: Option<u32>,
+    /// Bumped on every spawn and stop, so threads of an older process never touch the current one.
+    gen: u64,
+    next_id: u64,
+    pending: HashMap<u64, mpsc::Sender<Reply>>,
+    log: VecDeque<String>,
+    /// Crashes in a row (reset after a stable run or a manual start).
+    crashes: u32,
+    restarts: u32,
+    tools_epoch: u64,
+    init: Option<Value>,
+    started_at: Option<Instant>,
+}
+
+pub struct Server {
+    id: String,
+    inner: Mutex<Inner>,
+    notify: Notifier,
+}
+
+fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn clip(s: &str, n: usize) -> String {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        s.chars().take(n).collect::<String>() + "…"
+    }
+}
+
+impl Inner {
+    fn push_log(&mut self, line: &str) {
+        if self.log.len() >= LOG_LINES {
+            self.log.pop_front();
+        }
+        self.log.push_back(clip(line.trim_end(), LOG_LINE_CHARS));
+    }
+    fn fail_pending(&mut self, why: &str) {
+        for (_, tx) in self.pending.drain() {
+            let _ = tx.send(Err(why.to_string()));
+        }
+    }
+}
+
+/// The user's login-shell PATH (GUI apps start with a minimal one), merged with the current PATH and common tool dirs.
+fn search_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        let mut dirs: Vec<String> = Vec::new();
+        let mut add = |p: &str| {
+            for d in p.split(':').filter(|d| !d.is_empty()) {
+                if !dirs.iter().any(|x| x == d) {
+                    dirs.push(d.to_string());
+                }
+            }
+        };
+        if let Some(p) = login_shell_path() {
+            add(&p);
+        }
+        add(&std::env::var("PATH").unwrap_or_default());
+        if let Some(home) = dirs::home_dir() {
+            add(&format!("{}/.local/bin", home.display()));
+        }
+        add("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+        dirs.join(":")
+    })
+}
+
+/// Runs a fixed script (no user input) in an interactive login zsh to read PATH; bounded to 5 s.
+fn login_shell_path() -> Option<String> {
+    const MARK: &str = "__MCODE_PATH__";
+    let mut child = Command::new("/bin/zsh")
+        .args(["-ilc", &format!("printf '\\n{MARK}%s\\n' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut out = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = out.by_ref().take(1 << 20).read_to_end(&mut buf);
+        buf
+    });
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Ok(Some(_)) = child.try_wait() {
+            break;
+        }
+        if Instant::now() > deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let text = String::from_utf8_lossy(&reader.join().ok()?).into_owned();
+    text.lines().rev().find_map(|l| l.strip_prefix(MARK)).map(str::to_string).filter(|p| !p.is_empty())
+}
+
+/// Finds a bare command name in `path` (like the shell would); paths with a slash are used as given.
+fn resolve_command(command: &str, path: &str) -> Result<String, String> {
+    if command.contains('/') {
+        return Ok(command.to_string());
+    }
+    use std::os::unix::fs::PermissionsExt;
+    for dir in path.split(':').filter(|d| !d.is_empty()) {
+        let candidate = std::path::Path::new(dir).join(command);
+        if let Ok(meta) = std::fs::metadata(&candidate) {
+            if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
+                return Ok(candidate.to_string_lossy().into_owned());
+            }
+        }
+    }
+    Err(format!("command not found: {command} (searched the login shell PATH)"))
+}
+
+fn validate_spec(spec: &Spec) -> Result<(), String> {
+    if spec.command.trim().is_empty() || spec.command.len() > 4096 {
+        return Err("invalid command".into());
+    }
+    if spec.args.len() > 256 || spec.args.iter().any(|a| a.len() > 16384) {
+        return Err("too many or too long arguments".into());
+    }
+    if spec.env.len() > 256 || spec.env.keys().any(|k| k.is_empty() || k.contains('=') || k.contains('\0')) {
+        return Err("invalid environment variables".into());
+    }
+    if spec.command.contains('\0') || spec.args.iter().any(|a| a.contains('\0')) || spec.env.values().any(|v| v.contains('\0')) {
+        return Err("NUL byte in command, arguments or environment".into());
+    }
+    Ok(())
+}
+
+/// Reads one line of at most `max` bytes. `Ok(None)` at EOF; an over-long line is consumed and returned as
+/// `Err(prefix)` with its first bytes, so the caller can still tell which request it answered.
+fn read_line_bounded(r: &mut impl BufRead, max: usize) -> std::io::Result<Option<Result<Vec<u8>, Vec<u8>>>> {
+    let mut line = Vec::new();
+    let mut over = false;
+    loop {
+        let buf = r.fill_buf()?;
+        if buf.is_empty() {
+            return Ok(if line.is_empty() && !over { None } else if over { Some(Err(line)) } else { Some(Ok(line)) });
+        }
+        let (take, found) = match buf.iter().position(|&b| b == b'\n') {
+            Some(i) => (i, true),
+            None => (buf.len(), false),
+        };
+        let chunk = &buf[..take];
+        if !over {
+            if line.len() + chunk.len() > max {
+                over = true;
+                let keep = 512usize.saturating_sub(line.len()).min(chunk.len());
+                line.extend_from_slice(&chunk[..keep]);
+                line.truncate(512);
+            } else {
+                line.extend_from_slice(chunk);
+            }
+        }
+        r.consume(if found { take + 1 } else { take });
+        if found {
+            return Ok(Some(if over { Err(line) } else { Ok(line) }));
+        }
+    }
+}
+
+fn error_text(e: &Value) -> String {
+    let code = e.get("code").and_then(Value::as_i64).unwrap_or(0);
+    let msg = e.get("message").and_then(Value::as_str).unwrap_or("unknown error");
+    clip(&format!("MCP error {code}: {msg}"), 2000)
+}
+
+#[cfg(unix)]
+fn signal_group(pid: u32, sig: i32) {
+    // The server runs in its own process group (process_group(0)), so helpers it started (npx → node) go too.
+    unsafe {
+        libc::killpg(pid as libc::pid_t, sig);
+    }
+}
+
+/// Closes stdin (already done by the caller), then escalates: wait, SIGTERM, wait, SIGKILL.
+fn terminate(mut child: Child) -> Option<std::process::ExitStatus> {
+    let pid = child.id();
+    let wait = |child: &mut Child, ms: u64| {
+        let end = Instant::now() + Duration::from_millis(ms);
+        loop {
+            if let Ok(Some(s)) = child.try_wait() {
+                return Some(s);
+            }
+            if Instant::now() > end {
+                return None;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    if let Some(s) = wait(&mut child, 300) {
+        return Some(s);
+    }
+    signal_group(pid, libc::SIGTERM);
+    if let Some(s) = wait(&mut child, 1500) {
+        return Some(s);
+    }
+    signal_group(pid, libc::SIGKILL);
+    let _ = child.kill();
+    child.wait().ok()
+}
+
+impl Server {
+    fn new(id: &str, spec: Spec, notify: Notifier) -> Arc<Self> {
+        Arc::new(Server {
+            id: id.to_string(),
+            notify,
+            inner: Mutex::new(Inner {
+                spec,
+                state: State::Stopped,
+                error: None,
+                tx: None,
+                child: None,
+                pid: None,
+                gen: 0,
+                next_id: 1,
+                pending: HashMap::new(),
+                log: VecDeque::new(),
+                crashes: 0,
+                restarts: 0,
+                tools_epoch: 0,
+                init: None,
+                started_at: None,
+            }),
+        })
+    }
+
+    pub fn status(&self) -> Status {
+        let i = lock(&self.inner);
+        Status {
+            id: self.id.clone(),
+            state: i.state.name(),
+            error: i.error.clone(),
+            pid: i.pid,
+            restarts: i.restarts,
+            tools_epoch: i.tools_epoch,
+            init: i.init.clone(),
+        }
+    }
+
+    pub fn logs(&self) -> Vec<String> {
+        lock(&self.inner).log.iter().cloned().collect()
+    }
+
+    fn set_state(&self, state: State, error: Option<String>) {
+        {
+            let mut i = lock(&self.inner);
+            i.state = state;
+            if let Some(e) = &error {
+                i.push_log(&format!("[error] {e}"));
+            }
+            i.error = error;
+        }
+        (self.notify)(&self.id, "status");
+    }
+
+    /// Spawns the process and runs the handshake. On failure the process is gone and the state is `error` (unless a
+    /// stop came in meanwhile).
+    fn start(self: &Arc<Self>) -> Result<(), String> {
+        let r = self.start_inner();
+        if let Err(e) = &r {
+            // Handshake failures already set `error`; a stop during startup keeps `stopped`.
+            if !e.starts_with("handshake failed") && e != STOPPED_DURING_START {
+                self.set_state(State::Error, Some(e.clone()));
+            }
+        }
+        r
+    }
+
+    fn start_inner(self: &Arc<Self>) -> Result<(), String> {
+        let spec = lock(&self.inner).spec.clone();
+        validate_spec(&spec)?;
+        let path = spec.env.get("PATH").cloned().unwrap_or_else(|| search_path().to_string());
+        let program = resolve_command(&spec.command, &path)?;
+        let mut cmd = Command::new(&program);
+        cmd.args(&spec.args).envs(&spec.env).env("PATH", &path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        if let Some(cwd) = spec.cwd.as_deref().filter(|c| !c.is_empty()) {
+            cmd.current_dir(cwd);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+        let mut child = cmd.spawn().map_err(|e| format!("failed to start {program}: {e}"))?;
+        let (stdin, stdout, stderr) = match (child.stdin.take(), child.stdout.take(), child.stderr.take()) {
+            (Some(a), Some(b), Some(c)) => (a, b, c),
+            _ => {
+                terminate(child);
+                return Err("failed to open the server's stdio".into());
+            }
+        };
+        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        let gen = {
+            let mut i = lock(&self.inner);
+            i.gen += 1;
+            i.pid = Some(child.id());
+            i.child = Some(child);
+            i.tx = Some(tx);
+            i.state = State::Starting;
+            i.error = None;
+            i.init = None;
+            i.started_at = Some(Instant::now());
+            let note = format!("[started] {} (pid {})", spec.command, i.pid.unwrap_or(0));
+            i.push_log(&note);
+            i.gen
+        };
+        std::thread::spawn(move || {
+            let mut stdin = stdin;
+            for line in rx {
+                if stdin.write_all(&line).and_then(|_| stdin.flush()).is_err() {
+                    break;
+                }
+            }
+        });
+        let me = self.clone();
+        std::thread::spawn(move || {
+            let mut r = BufReader::new(stderr);
+            while let Ok(Some(line)) = read_line_bounded(&mut r, 64 * 1024) {
+                let text = String::from_utf8_lossy(match &line {
+                    Ok(l) | Err(l) => l,
+                });
+                let mut i = lock(&me.inner);
+                if i.gen != gen {
+                    break;
+                }
+                i.push_log(&text);
+            }
+        });
+        let me = self.clone();
+        std::thread::spawn(move || me.read_loop(stdout, gen));
+
+        let params = json!({
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": { "name": "M Code", "version": env!("CARGO_PKG_VERSION") },
+        });
+        let result = self.send_request("initialize", Some(params), INIT_TIMEOUT, true).and_then(|r| {
+            if r.get("protocolVersion").and_then(Value::as_str).is_some() {
+                Ok(r)
+            } else {
+                Err("invalid initialize result (no protocolVersion)".to_string())
+            }
+        });
+        match result {
+            Ok(init) => {
+                let mut init = init;
+                if serde_json::to_string(&init).map(|s| s.len()).unwrap_or(0) > 64 * 1024 {
+                    init = json!({ "protocolVersion": init["protocolVersion"], "serverInfo": init.get("serverInfo").cloned().unwrap_or(Value::Null) });
+                }
+                {
+                    let mut i = lock(&self.inner);
+                    if i.gen != gen {
+                        return Err(STOPPED_DURING_START.into());
+                    }
+                    i.init = Some(init);
+                    i.state = State::Running;
+                }
+                self.send_notification("notifications/initialized", None)?;
+                (self.notify)(&self.id, "status");
+                Ok(())
+            }
+            Err(e) => {
+                if lock(&self.inner).gen != gen {
+                    return Err(STOPPED_DURING_START.into());
+                }
+                self.kill_current(State::Error, Some(format!("handshake failed: {e}")));
+                Err(format!("handshake failed: {e}"))
+            }
+        }
+    }
+
+    /// Stops the current process (if any) and sets the given state. Threads of that process become stale.
+    fn kill_current(&self, state: State, error: Option<String>) {
+        let child = {
+            let mut i = lock(&self.inner);
+            i.gen += 1;
+            i.tx = None;
+            i.pid = None;
+            i.fail_pending("MCP server stopped");
+            i.child.take()
+        };
+        if let Some(child) = child {
+            let status = terminate(child);
+            lock(&self.inner).push_log(&format!("[stopped] {}", status.map(|s| s.to_string()).unwrap_or_else(|| "killed".into())));
+        }
+        self.set_state(state, error);
+    }
+
+    fn read_loop(self: Arc<Self>, stdout: std::process::ChildStdout, gen: u64) {
+        let mut r = BufReader::new(stdout);
+        loop {
+            let line = match read_line_bounded(&mut r, MAX_MESSAGE) {
+                Ok(Some(l)) => l,
+                _ => break,
+            };
+            if lock(&self.inner).gen != gen {
+                return;
+            }
+            match line {
+                Ok(bytes) => self.handle_line(&bytes),
+                Err(prefix) => {
+                    let head = String::from_utf8_lossy(&prefix).into_owned();
+                    let id = regex::Regex::new(r#""id"\s*:\s*(\d+)"#).ok().and_then(|re| re.captures(&head)).and_then(|c| c[1].parse::<u64>().ok());
+                    let mut i = lock(&self.inner);
+                    i.push_log(&format!("[dropped a message over {} MB]", MAX_MESSAGE >> 20));
+                    if let Some(tx) = id.and_then(|id| i.pending.remove(&id)) {
+                        let _ = tx.send(Err(format!("MCP response exceeded {} MB", MAX_MESSAGE >> 20)));
+                    }
+                }
+            }
+        }
+        self.on_exit(gen);
+    }
+
+    fn handle_line(&self, bytes: &[u8]) {
+        let text = String::from_utf8_lossy(bytes);
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        let Ok(msg) = serde_json::from_str::<Value>(text) else {
+            lock(&self.inner).push_log(&format!("[stdout, not JSON-RPC] {}", clip(text, 300)));
+            return;
+        };
+        let method = msg.get("method").and_then(Value::as_str);
+        let id = msg.get("id").filter(|v| !v.is_null());
+        match (method, id) {
+            (None, Some(id)) => {
+                let reply = match (msg.get("result"), msg.get("error")) {
+                    (_, Some(e)) => Err(error_text(e)),
+                    (Some(r), None) => Ok(r.clone()),
+                    (None, None) => Err("invalid JSON-RPC response".into()),
+                };
+                if let Some(tx) = id.as_u64().and_then(|n| lock(&self.inner).pending.remove(&n)) {
+                    let _ = tx.send(reply);
+                }
+            }
+            (Some(method), Some(id)) => {
+                // Requests from the server: answer the harmless ones; sampling, elicitation etc. are not offered.
+                let reply = match method {
+                    "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
+                    "roots/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "roots": [] } }),
+                    _ => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("Method not found: {}", clip(method, 100)) } }),
+                };
+                let _ = self.write(&reply);
+            }
+            (Some(method), None) => match method {
+                "notifications/tools/list_changed" => {
+                    lock(&self.inner).tools_epoch += 1;
+                    (self.notify)(&self.id, "tools_changed");
+                }
+                "notifications/message" => {
+                    let p = msg.get("params").cloned().unwrap_or(Value::Null);
+                    let level = p.get("level").and_then(Value::as_str).unwrap_or("info").to_string();
+                    let data = p.get("data").map(|d| d.as_str().map(str::to_string).unwrap_or_else(|| d.to_string())).unwrap_or_default();
+                    lock(&self.inner).push_log(&format!("[{level}] {data}"));
+                }
+                _ => {}
+            },
+            (None, None) => lock(&self.inner).push_log("[stdout] message without id or method"),
+        }
+    }
+
+    fn on_exit(self: Arc<Self>, gen: u64) {
+        let (child, was) = {
+            let mut i = lock(&self.inner);
+            if i.gen != gen {
+                return;
+            }
+            i.tx = None;
+            i.pid = None;
+            i.fail_pending("MCP server exited");
+            (i.child.take(), i.state)
+        };
+        let status = child.and_then(terminate);
+        {
+            let mut i = lock(&self.inner);
+            if i.gen != gen {
+                return;
+            }
+            i.push_log(&format!("[exited] {}", status.map(|s| s.to_string()).unwrap_or_else(|| "unknown status".into())));
+        }
+        if was != State::Running {
+            // Exit during the handshake: `start` reports it.
+            return;
+        }
+        self.restart_loop(gen);
+    }
+
+    /// Restarts a crashed server with exponential backoff. Ends when a start succeeds, after too many crashes, or as
+    /// soon as anything else (a stop, a manual start, a spec change) bumped the generation.
+    fn restart_loop(self: Arc<Self>, mut gen: u64) {
+        loop {
+            let delay = {
+                let mut i = lock(&self.inner);
+                if i.gen != gen {
+                    return;
+                }
+                if i.started_at.map_or(false, |t| t.elapsed() > STABLE_AFTER) {
+                    i.crashes = 0;
+                }
+                i.crashes += 1;
+                if i.crashes > MAX_RESTARTS {
+                    drop(i);
+                    self.set_state(State::Error, Some(format!("the server crashed {MAX_RESTARTS} times in a row; start it again from Settings")));
+                    return;
+                }
+                i.state = State::Restarting;
+                i.started_at = None;
+                let delay = (BACKOFF_BASE_MS << (i.crashes - 1)).min(BACKOFF_MAX_MS);
+                i.push_log(&format!("[restarting in {delay} ms]"));
+                delay
+            };
+            (self.notify)(&self.id, "status");
+            std::thread::sleep(Duration::from_millis(delay));
+            if lock(&self.inner).gen != gen {
+                return;
+            }
+            match self.start() {
+                Ok(()) => {
+                    lock(&self.inner).restarts += 1;
+                    return;
+                }
+                Err(_) => {
+                    // A failed attempt leaves `error`; anything else means someone stopped or restarted it meanwhile.
+                    let i = lock(&self.inner);
+                    if i.state != State::Error {
+                        return;
+                    }
+                    gen = i.gen;
+                }
+            }
+        }
+    }
+
+    fn write(&self, msg: &Value) -> Result<(), String> {
+        let mut line = serde_json::to_vec(msg).map_err(|e| e.to_string())?;
+        if line.len() > MAX_OUTGOING {
+            return Err(format!("MCP request exceeds {} MB", MAX_OUTGOING >> 20));
+        }
+        line.push(b'\n');
+        let i = lock(&self.inner);
+        i.tx.as_ref().ok_or("MCP server is not running")?.send(line).map_err(|_| "MCP server is not running".to_string())
+    }
+
+    fn send_notification(&self, method: &str, params: Option<Value>) -> Result<(), String> {
+        let mut msg = json!({ "jsonrpc": "2.0", "method": method });
+        if let Some(p) = params {
+            msg["params"] = p;
+        }
+        self.write(&msg)
+    }
+
+    fn send_request(&self, method: &str, params: Option<Value>, timeout: Duration, starting: bool) -> Result<Value, String> {
+        let (id, rx) = {
+            let mut i = lock(&self.inner);
+            let ok = i.state == State::Running || (starting && i.state == State::Starting);
+            if !ok || i.tx.is_none() {
+                return Err(format!("MCP server is {}", i.state.name()));
+            }
+            let id = i.next_id;
+            i.next_id += 1;
+            let (tx, rx) = mpsc::channel();
+            i.pending.insert(id, tx);
+            (id, rx)
+        };
+        let mut msg = json!({ "jsonrpc": "2.0", "id": id, "method": method });
+        if let Some(p) = params {
+            msg["params"] = p;
+        }
+        if let Err(e) = self.write(&msg) {
+            lock(&self.inner).pending.remove(&id);
+            return Err(e);
+        }
+        match rx.recv_timeout(timeout) {
+            Ok(r) => r,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                lock(&self.inner).pending.remove(&id);
+                let _ = self.send_notification("notifications/cancelled", Some(json!({ "requestId": id, "reason": "timeout" })));
+                Err(format!("MCP request {method} timed out after {} s", timeout.as_secs_f32().round()))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err("MCP server exited".into()),
+        }
+    }
+
+    /// Waits up to `limit` while the server is starting or restarting.
+    fn wait_ready(&self, limit: Duration) -> Result<(), String> {
+        let end = Instant::now() + limit;
+        loop {
+            let (state, err) = {
+                let i = lock(&self.inner);
+                (i.state, i.error.clone())
+            };
+            match state {
+                State::Running => return Ok(()),
+                State::Starting | State::Restarting if Instant::now() < end => std::thread::sleep(Duration::from_millis(25)),
+                State::Error => return Err(err.unwrap_or_else(|| "MCP server failed".into())),
+                s => return Err(format!("MCP server is {}", s.name())),
+            }
+        }
+    }
+
+    pub fn request(&self, method: &str, params: Option<Value>, timeout_ms: Option<u64>) -> Result<Value, String> {
+        self.wait_ready(Duration::from_secs(45))?;
+        let ms = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).clamp(100, MAX_TIMEOUT_MS);
+        self.send_request(method, params, Duration::from_millis(ms), false)
+    }
+}
+
+/// All stdio servers of the app, by the config id the TS side gives them.
+pub struct Mcp {
+    servers: Mutex<HashMap<String, Arc<Server>>>,
+    notify: Notifier,
+}
+
+impl Mcp {
+    pub fn new(notify: Notifier) -> Self {
+        Mcp { servers: Mutex::new(HashMap::new()), notify }
+    }
+
+    fn get(&self, id: &str) -> Result<Arc<Server>, String> {
+        lock(&self.servers).get(id).cloned().ok_or_else(|| format!("unknown MCP server {id}"))
+    }
+
+    /// Starts the server if needed (restarting it when the spec changed) and returns its status once it runs.
+    pub fn ensure(&self, id: &str, spec: Spec) -> Result<Status, String> {
+        validate_spec(&spec)?;
+        let server = lock(&self.servers).entry(id.to_string()).or_insert_with(|| Server::new(id, spec.clone(), self.notify.clone())).clone();
+        let changed = lock(&server.inner).spec != spec;
+        if changed {
+            server.kill_current(State::Stopped, None);
+            lock(&server.inner).spec = spec;
+        }
+        let state = lock(&server.inner).state;
+        match state {
+            State::Running => {}
+            State::Starting | State::Restarting => server.wait_ready(Duration::from_secs(45))?,
+            State::Stopped | State::Error => {
+                lock(&server.inner).crashes = 0;
+                server.start()?;
+            }
+        }
+        Ok(server.status())
+    }
+
+    pub fn request(&self, id: &str, method: &str, params: Option<Value>, timeout_ms: Option<u64>) -> Result<Value, String> {
+        self.get(id)?.request(method, params, timeout_ms)
+    }
+
+    pub fn notify(&self, id: &str, method: &str, params: Option<Value>) -> Result<(), String> {
+        self.get(id)?.send_notification(method, params)
+    }
+
+    pub fn stop(&self, id: &str, forget: bool) {
+        let server = if forget { lock(&self.servers).remove(id) } else { lock(&self.servers).get(id).cloned() };
+        if let Some(s) = server {
+            s.kill_current(State::Stopped, None);
+        }
+    }
+
+    pub fn statuses(&self) -> Vec<Status> {
+        let list: Vec<Arc<Server>> = lock(&self.servers).values().cloned().collect();
+        list.iter().map(|s| s.status()).collect()
+    }
+
+    pub fn logs(&self, id: &str) -> Vec<String> {
+        self.get(id).map(|s| s.logs()).unwrap_or_default()
+    }
+
+    /// Stops every server in parallel (app exit).
+    pub fn shutdown(&self) {
+        let list: Vec<Arc<Server>> = lock(&self.servers).drain().map(|(_, s)| s).collect();
+        let handles: Vec<_> = list.into_iter().map(|s| std::thread::spawn(move || s.kill_current(State::Stopped, None))).collect();
+        for h in handles {
+            let _ = h.join();
+        }
+    }
+}
+
+pub fn init(app: &tauri::App) {
+    use tauri::{Emitter, Manager};
+    let handle = app.handle().clone();
+    let notify: Notifier = Arc::new(move |id: &str, kind: &str| {
+        let _ = handle.emit("mcp-event", json!({ "id": id, "kind": kind }));
+    });
+    app.manage(Mcp::new(notify));
+}
+
+pub fn shutdown(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(m) = app.try_state::<Mcp>() {
+        m.shutdown();
+    }
+}
+
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+}
+
+fn app_mcp(app: &tauri::AppHandle) -> tauri::State<'_, Mcp> {
+    use tauri::Manager;
+    app.state::<Mcp>()
+}
+
+#[tauri::command]
+pub async fn mcp_start(app: tauri::AppHandle, id: String, spec: Spec) -> Result<Status, String> {
+    blocking(move || app_mcp(&app).ensure(&id, spec)).await
+}
+
+#[tauri::command]
+pub async fn mcp_request(app: tauri::AppHandle, id: String, method: String, params: Option<Value>, timeout_ms: Option<u64>) -> Result<Value, String> {
+    blocking(move || app_mcp(&app).request(&id, &method, params, timeout_ms)).await
+}
+
+#[tauri::command]
+pub async fn mcp_notify(app: tauri::AppHandle, id: String, method: String, params: Option<Value>) -> Result<(), String> {
+    blocking(move || app_mcp(&app).notify(&id, &method, params)).await
+}
+
+#[tauri::command]
+pub async fn mcp_stop(app: tauri::AppHandle, id: String, forget: Option<bool>) -> Result<(), String> {
+    blocking(move || {
+        app_mcp(&app).stop(&id, forget.unwrap_or(false));
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn mcp_status(app: tauri::AppHandle) -> Vec<Status> {
+    app_mcp(&app).statuses()
+}
+
+#[tauri::command]
+pub fn mcp_logs(app: tauri::AppHandle, id: String) -> Vec<String> {
+    app_mcp(&app).logs(&id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> String {
+        format!("{}/../tests/fixtures/fake-mcp-server.mjs", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    fn node() -> Option<String> {
+        resolve_command("node", search_path()).ok()
+    }
+
+    fn spec(extra: &[&str]) -> Option<Spec> {
+        let node = node()?;
+        let mut args = vec![fixture()];
+        args.extend(extra.iter().map(|s| s.to_string()));
+        Some(Spec { command: node, args, env: HashMap::from([("FAKE_SECRET".to_string(), "s3cret".to_string())]), cwd: None })
+    }
+
+    fn mcp() -> (Mcp, Arc<Mutex<Vec<String>>>) {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let e = events.clone();
+        (Mcp::new(Arc::new(move |id: &str, kind: &str| lock(&e).push(format!("{id}:{kind}")))), events)
+    }
+
+    fn call(m: &Mcp, id: &str, tool: &str, args: Value, timeout: Option<u64>) -> Result<Value, String> {
+        m.request(id, "tools/call", Some(json!({ "name": tool, "arguments": args })), timeout)
+    }
+
+    fn status(m: &Mcp, id: &str) -> Status {
+        m.statuses().into_iter().find(|s| s.id == id).expect("server status")
+    }
+
+    fn wait_for(limit_ms: u64, mut f: impl FnMut() -> bool) -> bool {
+        let end = Instant::now() + Duration::from_millis(limit_ms);
+        while Instant::now() < end {
+            if f() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        f()
+    }
+
+    #[test]
+    fn bounded_line_reader() {
+        let data = b"{\"a\":1}\n\n{\"id\":7,\"result\":\"xxxxxxxxxxxxxxxxxxxx\"}\ntail";
+        let mut r = BufReader::with_capacity(4, &data[..]);
+        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(b"{\"a\":1}".to_vec())));
+        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(Vec::new())));
+        match read_line_bounded(&mut r, 30).unwrap() {
+            Some(Err(prefix)) => assert!(String::from_utf8_lossy(&prefix).starts_with("{\"id\":7")),
+            other => panic!("expected an oversized line, got {other:?}"),
+        }
+        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(b"tail".to_vec())));
+        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), None);
+    }
+
+    #[test]
+    fn spec_validation_and_command_lookup() {
+        assert!(validate_spec(&Spec { command: " ".into(), ..Default::default() }).is_err());
+        assert!(validate_spec(&Spec { command: "x".into(), env: HashMap::from([("A=B".into(), "1".into())]), ..Default::default() }).is_err());
+        assert!(validate_spec(&Spec { command: "x".into(), args: vec!["a\0b".into()], ..Default::default() }).is_err());
+        assert!(validate_spec(&Spec { command: "npx".into(), args: vec!["-y".into(), "pkg".into()], ..Default::default() }).is_ok());
+        assert_eq!(resolve_command("/bin/echo", "").unwrap(), "/bin/echo");
+        assert_eq!(resolve_command("sh", "/nonexistent:/bin").unwrap(), "/bin/sh");
+        assert!(resolve_command("definitely-not-a-command-xyz", "/bin").is_err());
+    }
+
+    #[test]
+    fn handshake_list_call_and_notifications() {
+        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let (m, events) = mcp();
+        let st = m.ensure("a", spec.clone()).unwrap();
+        assert_eq!(st.state, "running");
+        assert_eq!(st.init.as_ref().unwrap()["serverInfo"]["name"], "fake");
+        assert_eq!(st.init.as_ref().unwrap()["protocolVersion"], PROTOCOL_VERSION);
+        // A second ensure with the same spec reuses the process.
+        assert_eq!(m.ensure("a", spec.clone()).unwrap().pid, st.pid);
+
+        let tools = m.request("a", "tools/list", None, None).unwrap();
+        let names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"echo") && names.contains(&"sleep"));
+        assert_eq!(call(&m, "a", "echo", json!({ "text": "hi" }), None).unwrap()["content"][0]["text"], "hi");
+        // Environment from the spec reaches the server (secrets are passed this way).
+        assert_eq!(call(&m, "a", "env", json!({ "name": "FAKE_SECRET" }), None).unwrap()["content"][0]["text"], "s3cret");
+        // Unknown method: the JSON-RPC error comes back as an error.
+        assert!(m.request("a", "nope/nope", None, None).unwrap_err().contains("-32601"));
+
+        let before = status(&m, "a").tools_epoch;
+        call(&m, "a", "change", json!({}), None).unwrap();
+        assert!(wait_for(2000, || status(&m, "a").tools_epoch == before + 1));
+        assert!(lock(&events).iter().any(|e| e == "a:tools_changed"));
+        assert!(m.logs("a").iter().any(|l| l.contains("fake server started")), "stderr is captured");
+
+        m.stop("a", false);
+        assert_eq!(status(&m, "a").state, "stopped");
+        assert!(m.request("a", "tools/list", None, None).is_err());
+        // A changed spec starts a new process.
+        let mut changed = spec.clone();
+        changed.env.insert("OTHER".into(), "1".into());
+        let again = m.ensure("a", changed).unwrap();
+        assert_eq!(again.state, "running");
+        assert_ne!(again.pid, st.pid);
+        m.shutdown();
+        assert!(m.statuses().is_empty());
+    }
+
+    #[test]
+    fn timeouts_and_oversized_responses() {
+        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let (m, _) = mcp();
+        m.ensure("t", spec).unwrap();
+        let t = Instant::now();
+        let err = call(&m, "t", "sleep", json!({}), Some(300)).unwrap_err();
+        assert!(err.contains("timed out"), "{err}");
+        assert!(t.elapsed() < Duration::from_secs(3));
+        // The server is still usable after a timeout.
+        assert_eq!(call(&m, "t", "echo", json!({ "text": "ok" }), None).unwrap()["content"][0]["text"], "ok");
+        let err = call(&m, "t", "big", json!({}), Some(20_000)).unwrap_err();
+        assert!(err.contains("exceeded"), "{err}");
+        assert_eq!(call(&m, "t", "echo", json!({ "text": "after" }), None).unwrap()["content"][0]["text"], "after");
+        m.shutdown();
+    }
+
+    #[test]
+    fn crash_restarts_with_backoff() {
+        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let (m, _) = mcp();
+        let pid = m.ensure("c", spec).unwrap().pid;
+        let err = call(&m, "c", "crash", json!({}), None).unwrap_err();
+        assert!(err.contains("exited"), "{err}");
+        // A request waits for the restart instead of failing.
+        assert_eq!(call(&m, "c", "echo", json!({ "text": "back" }), None).unwrap()["content"][0]["text"], "back");
+        let st = status(&m, "c");
+        assert_eq!(st.state, "running");
+        assert_eq!(st.restarts, 1);
+        assert_ne!(st.pid, pid);
+        assert!(m.logs("c").iter().any(|l| l.starts_with("[restarting in")));
+        m.shutdown();
+    }
+
+    #[test]
+    fn repeated_crashes_end_in_error() {
+        let Some(spec) = spec(&["--exit-after-init"]) else { return eprintln!("node not found; skipping") };
+        let (m, _) = mcp();
+        let _ = m.ensure("x", spec);
+        assert!(wait_for(20_000, || status(&m, "x").state == "error"), "{:?}", m.statuses());
+        let st = status(&m, "x");
+        assert!(st.error.unwrap_or_default().contains("crashed"), "{:?}", m.logs("x"));
+        m.shutdown();
+    }
+
+    #[test]
+    fn handshake_failures_and_stop_during_start() {
+        let Some(spec) = spec(&["--no-init"]) else { return eprintln!("node not found; skipping") };
+        let m = Arc::new(mcp().0);
+        let quick = Spec { command: node().unwrap(), args: vec!["-e".into(), "process.exit(2)".into()], ..Default::default() };
+        let err = m.ensure("q", quick).unwrap_err();
+        assert!(err.contains("handshake failed"), "{err}");
+        assert_eq!(status(&m, "q").state, "error");
+        let missing = Spec { command: "no-such-mcp-binary-xyz".into(), ..Default::default() };
+        assert!(m.ensure("m", missing).unwrap_err().contains("not found"));
+        assert_eq!(status(&m, "m").state, "error");
+        // A server that never answers initialize can be stopped while the start waits.
+        let started = Instant::now();
+        let m2 = m.clone();
+        let h = std::thread::spawn(move || m2.ensure("n", spec));
+        assert!(wait_for(5000, || m.statuses().iter().any(|s| s.id == "n" && s.state == "starting")));
+        m.stop("n", false);
+        assert!(h.join().unwrap().is_err());
+        assert!(started.elapsed() < Duration::from_secs(10));
+        assert_eq!(status(&m, "n").state, "stopped");
+        m.shutdown();
+    }
+}
