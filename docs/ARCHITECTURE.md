@@ -1,6 +1,6 @@
 # Architecture
 
-M Code is a Tauri 2 desktop app: a React 19 + TypeScript frontend (Vite) and a Rust backend. User-facing behaviour is described in the [README](../README.md); this file describes how the code is organised.
+M Code is a Tauri 2 desktop app: a React 19 + TypeScript frontend (Vite) and a Rust backend. User-facing behaviour is described per feature in [docs/features](README.md) (overview and setup in the [README](../README.md)); this file describes how the code is organised.
 
 ## Layers
 
@@ -80,7 +80,8 @@ Node scripts launched by the app: `codex-limits.mjs` (Codex quota via app-server
 - **Canvas:** assistant messages with a `tsx-canvas` fence become cards; revisions are derived from stored messages; code runs in an opaque-origin iframe. An artifact may have several files (`// file:` sections), a Changes tab diffs two revisions, and the document can be exported as standalone HTML.
 
 ## Conventions
-- Validation: `npm run check` (i18n, `tsc`, node tests, `cargo test`). CI (`.github/workflows`) runs it on macOS.
-- Tests live in `tests/*.test.mjs` (Node test runner); `tests/canvas.html` is a dev-only fixture.
+- Validation: `npm run check` (i18n, `tsc`, node tests, UI tests, `cargo test`). CI (`.github/workflows`) runs it on macOS.
+- Tests live in `tests/*.test.mjs` (Node test runner, pure logic; `npm test`); `tests/canvas.html` is a dev-only fixture.
+- Component tests live in `tests/ui/*.test.tsx` (Vitest + Testing Library + jsdom, `npm run test:ui`, config in `vitest.config.ts`, type-checked by `tsc` through `tsconfig.json`). `tests/ui/setup.ts` replaces every `@tauri-apps/*` module the components import; `tests/ui/tauri.ts` is the fake backend (`mockInvoke({ command: value | fn })`, `mockSettings`, `callsOf`; unknown commands answer like an empty backend); `tests/ui/render.tsx` provides `renderApp(ui, makeApp({...}))` with a fake app state (`AppContext` is exported from `state.tsx` for this; functions not given are spies). Covered: `Sidebar`, `Settings` navigation and pages, `Composer` and `ContextChip`, `ApprovalCard`, `GitCommitDialog`, `SearchPalette` (fake timers for its debounce). Not covered: `ChatView` as a whole (run loop, streaming), `ChangesPanel`, `ModelPicker` details, canvas, importers UI.
 - All user-visible strings go through `src/i18n`.
 - Node version: see `.nvmrc`.
