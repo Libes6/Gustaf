@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { hasTerminalCommands, onTerminalCommand, takeTerminalOpen } from "../lib/terminalBridge";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
+import { reviewChangeStats, summarizeChanges, type ReviewStat } from "../lib/changesSummary";
 import type { StoredMsg } from "../lib/data";
 import type { Part } from "../providers/types";
 import { useDialogFocus } from "../lib/useDialogFocus";
@@ -59,6 +60,7 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [setupCfg, setSetupCfg] = useState<ReviewSetupConfig>(EMPTY_REVIEW_SETUP);
   const [reviews, setReviews] = useState<[Review, ReviewChange[]][]>([]);
+  const [reviewStat, setReviewStat] = useState<ReviewStat | null>(null);
   const [acting, setActing] = useState(false);
   const [repo, setRepo] = useState<GitStatus | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
@@ -68,7 +70,9 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
 
   const refresh = async () => {
     setInfo(await projectGit(root));
-    setReviews(await review.list(root));
+    const list = await review.list(root);
+    setReviews(list);
+    setReviewStat(await reviewChangeStats(list, review.diff));
     setRepo(await gitRepo.status(root).catch(() => null));
     if (base) setFiles(await changesSince(root, base));
     else setFiles([]);
@@ -103,9 +107,13 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
   // Accepting a file remembers it, so committing exactly those files can be offered afterwards.
   const accept = (id: string, path: string) => async () => { await review.decide(id, path, true); acceptedFiles.add(root, path); setNotice(""); };
   const offer = offeredFiles(repo, acceptedFiles.list(root));
-  const added = files.reduce((s, f) => s + f.added, 0);
-  const removed = files.reduce((s, f) => s + f.removed, 0);
   const pending = reviews.reduce((n, [, list]) => n + list.length, 0);
+  // Chip and branch row read one summary, so the count and the +/- always describe the same files (see lib/changesSummary.ts).
+  const summary = useMemo(() => summarizeChanges({
+    review: pending > 0 ? (reviewStat && reviewStat.files === pending ? reviewStat : { files: pending, added: null, removed: null }) : null,
+    checkpoint: base ? files : null,
+    tree: repo ? { repo: repo.repo, files: repo.files ?? [], total: repo.total ?? 0, added: info?.added ?? 0, removed: info?.removed ?? 0 } : null,
+  }), [pending, reviewStat, base, files, repo, info]);
   const showDiff = async (path: string, reviewId?: string) => {
     setErr("");
     try {
@@ -171,7 +179,9 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
     <aside className={`panel${open ? " open" : ""}`} aria-label={t("changes")}>
       <div className="panel-head">
         <span className="grow">{name}</span>
-        {pending > 0 && <button className="btn-soft" onClick={() => { setOpen(true); setTab("changes"); }}>{t("reviewPending")} · {pending}</button>}
+        {summary.source === "review" && <button className="btn-soft" onClick={() => { setOpen(true); setTab("changes"); }}>{t("reviewPending")} · {summary.files}</button>}
+        {summary.source === "checkpoint" && <button className="btn-soft" onClick={() => { setOpen(true); setTab("changes"); }}>{t("changesChipChat", { count: summary.files })}</button>}
+        {summary.source === "tree" && <span className="hint" title={summary.added === null ? t("changesLinesUnknown") : undefined}>{t("changesChipTree", { count: summary.files })}</span>}
         <button className="icon-btn" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? t("collapse") : t("changes")} title={open ? t("collapse") : t("changes")}>
           {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
@@ -179,8 +189,10 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
       <div className="panel-branch">
         <GitBranch size={13} />
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info?.branch ?? t("noGit")}</span>
-        <span className="plus">+{t.num(info ? info.added : added)}</span>
-        <span className="minus">−{t.num(info ? info.removed : removed)}</span>
+        {summary.added !== null && summary.removed !== null && summary.files > 0 && <>
+          <span className="plus">+{t.num(summary.added)}</span>
+          <span className="minus">−{t.num(summary.removed)}</span>
+        </>}
       </div>
       {offer.length > 0 && <div className="commit-offer">
         <span className="grow">{t("gitOffer", { count: offer.length })}</span>

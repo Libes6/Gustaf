@@ -1113,5 +1113,8 @@
   "durationHours": "{n} h",
   "agentsStopCliLabel": "Stop the whole {provider} run",
   "computerUseOn": "Computer Use on",
-  "sentImageAlt": "Attached image {n}"
+  "sentImageAlt": "Attached image {n}",
+  "changesChipChat": "Changed files · {count}",
+  "changesChipTree": "Uncommitted · {count}",
+  "changesLinesUnknown": "Line counts are not available for new, untracked files."
 }

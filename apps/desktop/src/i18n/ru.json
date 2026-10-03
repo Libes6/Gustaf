@@ -1141,5 +1141,8 @@
   "durationHours": "{n} ч",
   "agentsStopCliLabel": "Остановить весь запуск {provider}",
   "computerUseOn": "Управление компьютером включено",
-  "sentImageAlt": "Прикреплённое изображение {n}"
+  "sentImageAlt": "Прикреплённое изображение {n}",
+  "changesChipChat": "Изменено файлов · {count}",
+  "changesChipTree": "Не закоммичено · {count}",
+  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно."
 }
