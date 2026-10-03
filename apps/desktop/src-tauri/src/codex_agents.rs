@@ -137,7 +137,7 @@ fn secret_patterns() -> &'static Vec<(Regex, &'static str)> {
 }
 
 /// Obvious secrets (key=value pairs, bearer tokens, common key formats, URL credentials) replaced by `***`.
-pub fn redact(s: &str) -> String {
+fn redact(s: &str) -> String {
     let mut out = s.to_string();
     for (re, to) in secret_patterns() {
         out = re.replace_all(&out, *to).into_owned();
@@ -168,7 +168,7 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 /// `2026-10-03T15:49:41.123Z` to Unix milliseconds (UTC; an offset other than Z is not expected and reads as None).
-pub fn parse_iso_ms(s: &str) -> Option<i64> {
+fn parse_iso_ms(s: &str) -> Option<i64> {
     let b = s.as_bytes();
     if b.len() < 20 || b[4] != b'-' || b[7] != b'-' || (b[10] != b'T' && b[10] != b' ') || b[13] != b':' || b[16] != b':' {
         return None;
@@ -547,7 +547,7 @@ fn task_matches(path: &str, task: &str) -> bool {
 }
 
 /// Scans one run: `thread_id` is the thread id of the run's `thread.started`, `start_ms` when the run began.
-pub fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cache: &mut Cache, tick: u64) -> Result<ScanResult, String> {
+fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cache: &mut Cache, tick: u64) -> Result<ScanResult, String> {
     if !is_id(thread_id) {
         return Err("invalid thread id".into());
     }
@@ -563,7 +563,7 @@ pub fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64,
     let files = candidates(&root, &day_dirs(start, now_ms), start_ms.map(|t| t - SLACK_MS));
     let suffix = format!("-{thread_id}.jsonl");
     let parent_path = files.iter().find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().ends_with(&suffix))).cloned();
-    let mut note = |res: &mut ScanResult, t: String| {
+    let note = |res: &mut ScanResult, t: String| {
         if res.notes.len() < MAX_NOTES && !res.notes.contains(&t) {
             res.notes.push(t);
         }
