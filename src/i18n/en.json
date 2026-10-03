@@ -536,6 +536,7 @@
   "cursorModelFallback": "Model {from} is not available on this account, using {to}.",
   "cursorAllExhausted": "All Cursor accounts are out of quota. The earliest one resets {time}. You can mark an account as available in Settings, Providers.",
   "cursorAllExhaustedUnknown": "All Cursor accounts are out of quota. You can mark an account as available in Settings, Providers.",
+  "cursorActiveAccount": "Cursor account for the next message: {name}",
   "cursorQuotaExhausted": "{name} is out of quota (parked until {time}).",
   "cursorQuotaNext": "Retry to continue on {to}.",
   "cursorPool": "Rotation pool",
