@@ -5,7 +5,10 @@ import { db, getSetting, setSetting } from "../lib/api";
 import {
   BUDGETS_SETTING, DEFAULT_BUDGETS, buildAlerts, evaluateBudget, localDayStart, nextLocalDayStart, normalizeBudgets, parseTokenLimit,
   parseUsageRow, parseWarnPercent, summarizeUsage, type BudgetAlert, type BudgetSettings, type BudgetStatus, type UsageTotals,
+  localDayKey, withExtraTokens,
 } from "../lib/budgets";
+import { loadAgentUsage } from "../agent/agentRuns";
+import { ledgerChat, ledgerDay } from "../agent/agentRunsModel";
 import { useApp } from "../state";
 import "../styles/budgets.css";
 
@@ -50,10 +53,12 @@ function useBudgetUsage(enabled: boolean, chatId: number | null, dayStart: numbe
       try {
         const dayRows = await db.select<Row>(`${SELECT} created_at >= ? and ${FILTER}`, [dayStart]);
         const chatRows = chatId === null ? undefined : await db.select<Row>(`${SELECT} chat_id = ? and ${FILTER}`, [chatId]);
+        // Background subagents' replies are not stored as messages: their tokens come from the agent usage ledger.
+        const agents = await loadAgentUsage();
         if (live) setState({
           dayStart, chatId, failed: false,
-          day: summarizeUsage(dayRows.map(parseUsageRow), { from: dayStart, to: nextLocalDayStart(dayStart) }),
-          chat: chatRows && summarizeUsage(chatRows.map(parseUsageRow)),
+          day: withExtraTokens(summarizeUsage(dayRows.map(parseUsageRow), { from: dayStart, to: nextLocalDayStart(dayStart) }), ledgerDay(agents, localDayKey(dayStart))),
+          chat: chatRows && withExtraTokens(summarizeUsage(chatRows.map(parseUsageRow)), ledgerChat(agents, chatId)),
         });
       } catch { if (live) setState({ dayStart, chatId, failed: true }); }
     }, 250);

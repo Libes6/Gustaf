@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { useT } from "../i18n";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
 import { useApp } from "../state";
+import { useApprovalChats } from "../lib/attention";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
@@ -91,6 +92,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const t = useT();
   const app = useApp();
   const menu = useMenu();
+  const waiting = useApprovalChats();
   const [query, setQuery] = useState<string | null>(null);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [recentLimit, setRecentLimit] = useState(8);
@@ -175,6 +177,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         onContextMenu={(e) => chatMenu(e, c)}
       >
         <span className="label">{c.title}</span>
+        {waiting.has(c.id) && <span className="approval-badge" role="status" aria-label={t("approvalPendingBadge")} title={t("approvalPendingBadge")}>!</span>}
         {app.sessions.items.some(s => s.chatId === c.id && s.busy) && <span className="status-dot spin" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
         <span className="actions">
           <button className="icon-btn" title={t("archive")} onClick={(e) => (e.stopPropagation(), archiveChat(c.id).then(app.reload))}>

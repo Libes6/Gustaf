@@ -14,6 +14,10 @@ export const state = {
   runResult: { code: 0, output: 'ran', timed_out: false },
   /** (id, path) => diff text for the review panel; empty string = nothing pending. */
   reviewDiff: () => '',
+  /** Computer action batches the agent executed (nothing touches the real desktop). */
+  executed: [],
+  /** actions => the fake `cu_execute` result. */
+  shot: () => ({ png: '', width: 1, height: 1 }),
   shadows: mkdtempSync(join(tmpdir(), 'apistub-shadow-')),
   /** Keychain entries written through `secrets`. */
   secrets: new Map(),
@@ -27,6 +31,8 @@ export const state = {
     this.runs.length = 0;
     this.runResult = { code: 0, output: 'ran', timed_out: false };
     this.reviewDiff = () => '';
+    this.executed = [];
+    this.shot = () => ({ png: '', width: 1, height: 1 });
   },
 };
 
@@ -125,7 +131,10 @@ export const review = {
 };
 
 export const computer = {
-  execute: async () => ({ png: '', width: 1, height: 1 }),
+  execute: async (actions) => {
+    state.executed.push(actions);
+    return state.shot(actions);
+  },
   screenSize: async () => ({ width: 1, height: 1 }),
   permissions: async () => ({ accessibility: true, screen: true }),
 };

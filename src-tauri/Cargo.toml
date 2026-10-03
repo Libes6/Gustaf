@@ -27,6 +27,7 @@ tauri-plugin-http = { version = "~2.7", features = ["stream"] }
 security-framework = "3.7.0"
 tauri-plugin-dialog = "2.8.0"
 tauri-plugin-global-shortcut = "2.4.0"
+tauri-plugin-notification = "2"
 ignore = "0.4.33"
 regex = "1.13.1"
 dirs = "7.0.0"

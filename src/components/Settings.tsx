@@ -14,6 +14,7 @@ import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { BudgetsSection } from "./Budgets";
+import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
@@ -322,6 +323,7 @@ function Usage() {
   return <>
     <h1>{t("usage")}</h1><p className="lead">{t("tokenUsageLead")}</p>
     <BudgetsSection />
+    <AgentSettingsSection />
     <h4>{t("providers")}</h4>
     {app.providers.map(p => {
       const stats = Object.values(app.tokenStats).filter(s => s.providerId === p.id);

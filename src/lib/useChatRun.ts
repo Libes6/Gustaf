@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { commandAllowed, runAgent, type ApprovalRequest } from "../agent/agent";
+import { commandAllowed, runAgent, type ApprovalAnswer, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
+import { loadAgentSettings } from "../agent/agentSettingsStore";
+import { cheapTarget, subagentModelResolver } from "./modelRouting";
+import { beginApproval } from "./attention";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -133,12 +136,15 @@ export function useChatRun(o: Options) {
       }
       history = effectiveHistory(history);
       retryRef.current = { chatId, history: [...history] };
-      const approve = (req: ApprovalRequest) => new Promise<boolean>(resolve => {
+      const approve = (req: ApprovalRequest) => new Promise<ApprovalAnswer>(resolve => {
+        // Sidebar badge on this chat (and a notification while the app is unfocused) until it is answered.
+        const answered = beginApproval(chatId, req.agent ?? "");
         const finish = (ok: boolean, always?: boolean) => {
+          answered();
           ctl.signal.removeEventListener("abort", deny);
           setApproval(null);
           if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
-          resolve(ok);
+          resolve(ok && always && req.kind === "computer" ? "task" : ok);
         };
         const deny = () => finish(false);
         if (ctl.signal.aborted) return finish(false);
@@ -146,7 +152,7 @@ export function useChatRun(o: Options) {
         setApproval({ req, resolve: finish });
       });
       if (root && app.access !== "readonly" && !reviewRef.current) {
-        const made = await prepareShadowCopy(root, { access: app.access, allowlist: app.allowlist, approve: command => approve({ kind: "command", command }), onSetup: running => setRetryNotice(running ? t("reviewSetupRunning") : "") });
+        const made = await prepareShadowCopy(root, { access: app.access, allowlist: app.allowlist, approve: command => approve({ kind: "command", command }).then(Boolean), onSetup: running => setRetryNotice(running ? t("reviewSetupRunning") : "") });
         reviewRef.current = made.review;
         if (made.setup === "declined") setError(t("reviewSetupDeclined"));
         else if (made.setup && !made.setup.ok) setError(t("reviewSetupFailed", { code: made.setup.timedOut ? t("reviewTimedOut") : String(made.setup.code ?? "?"), output: made.setup.output.slice(-600) }));
@@ -196,7 +202,7 @@ export function useChatRun(o: Options) {
           bumpTick();
         },
         approve,
-        subagents: root ? createSubagentHost({ projectRoot: root, recordTokens: app.recordTokens }) : undefined,
+        subagents: root ? createSubagentHost({ projectRoot: root, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app) }) : undefined,
       });
       if (!ctl.signal.aborted) app.recordProviderResult(activeProvider.id);
       retryRef.current = null;
@@ -245,10 +251,13 @@ export function useChatRun(o: Options) {
     const ctl = new AbortController(); abortRef.current = ctl;
     setRunning(true); app.setSessionBusy(session.key, true); setError(""); setStream("");
     const cid = session.chatId;
-    const selected = app.selection;
     try {
-      const adapter = await getAdapter(provider);
-      const capacity = selectedModel?.contextWindow ?? 8192;
+      // The cheap model from the agent settings when one is configured and available, else the chat's model.
+      const target = cheapTarget(await loadAgentSettings(), app, { provider, model: app.selection.model });
+      const selected = { providerId: target.provider.id, model: target.model };
+      const summarizer = target.provider;
+      const adapter = await getAdapter(summarizer);
+      const capacity = (target.provider === provider && target.model === app.selection.model ? selectedModel?.contextWindow : target.info?.contextWindow) ?? 8192;
       const chunks = summaryChunks(effectiveHistory(messages), Math.min(2000, Math.max(256, Math.floor(capacity * .4))));
       let summary = "";
       let summaryUsage: TokenUsage | undefined;
@@ -261,13 +270,13 @@ export function useChatRun(o: Options) {
           tools: [], model: selected.model, cwd: root ?? undefined, access: "readonly", signal: ctl.signal,
           onText: d => setStream(s => (s ?? "") + d),
         });
-        app.bumpUsage(provider.id); app.recordTokens(provider.id, selected.model, out.usage);
+        app.bumpUsage(summarizer.id); app.recordTokens(summarizer.id, selected.model, out.usage);
         summaryUsage = out.usage;
         if (ctl.signal.aborted) return;
         summary = out.parts.filter(p => p.type === "text").map(p => p.text).join("\n").trim();
         if (!summary || summary.length / 3 > capacity * .4 || out.parts.some(p => p.type === "tool_call" || p.type === "activity")) throw new Error(t("compactFailed"));
       }
-      const message: Msg = { role: "user", parts: [{ type: "text", text: summary }], meta: { compacted: true, provider: provider.id, model: selected.model, usage: summaryUsage } };
+      const message: Msg = { role: "user", parts: [{ type: "text", text: summary }], meta: { compacted: true, provider: summarizer.id, model: selected.model, usage: summaryUsage } };
       const id = await addMessage(cid, message);
       setMessages(ms => [...ms, { ...message, id, chat_id: cid, created_at: Date.now() }]);
       retryRef.current = null;

@@ -1,6 +1,8 @@
 import { mergeActivity, type Activity } from "./activities";
 import { resolveResource } from "@tauri-apps/api/path";
 import { resumePoint, shq, spawnLines } from "./cli";
+import { withImagePaths } from "./cliArgs";
+import { attachments } from "../lib/api";
 import type { Adapter, ProviderConfig, TurnInput } from "./types";
 
 declare const __SIDECAR__: string;
@@ -33,8 +35,12 @@ export function cursorAgent(cfg: ProviderConfig, key: string): Adapter {
     },
 
     async turn(t: TurnInput) {
-      const { session, prompt } = resumePoint(t, cfg.id, true);
-      let agentId = session;
+      const point = resumePoint(t, cfg.id, true);
+      // Images (attachments, Computer Use screenshots) go to disk and the prompt points at them; removed when the turn ends.
+      const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
+      try {
+      const prompt = saved ? withImagePaths(point.prompt, saved.files) : point.prompt;
+      let agentId = point.session;
       let text = "";
       const activities = new Map<string, Activity>();
       let error = "";
@@ -59,6 +65,9 @@ export function cursorAgent(cfg: ProviderConfig, key: string): Adapter {
       );
       if (error) throw new Error(error);
       return { parts: [...activities.values(), { type: "text" as const, text }], responseId: agentId };
+      } finally {
+        if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
+      }
     },
   };
 }

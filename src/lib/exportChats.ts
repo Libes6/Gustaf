@@ -396,6 +396,7 @@ function callBody(args: unknown, computer: Extract<Part, { type: "tool_call" }>[
           x.type === "type" ? `- type ${JSON.stringify(String(x.text ?? "").slice(0, 200))}` :
           x.type === "keypress" ? `- keypress ${Array.isArray(x.keys) ? x.keys.join("+") : ""}` :
           x.type === "drag" ? `- drag (${Array.isArray(x.path) ? x.path.length : 0} points)` :
+          x.type === "open_app" ? `- open_app ${JSON.stringify(String(x.name ?? "").slice(0, 80))}` :
           `- ${x.type}${num(x.x) && num(x.y) ? ` ${x.x},${x.y}` : ""}`,
         )
         .join("\n"),

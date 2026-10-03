@@ -2,10 +2,11 @@ import { computer, fsx, type CuAction } from "../lib/api";
 import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
-import { SPAWN_TOOL, SPAWN_TOOL_NAME, serializeCalls } from "./subagentCore";
+import { serializeCalls } from "./subagentCore";
 import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
+import { computerApproval, endsWithTyping, formatComputerResult } from "./computerCore";
 import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
 import { getRulesConfig, projectRootFor } from "./rulesStore";
@@ -17,8 +18,10 @@ export type { Access };
 /** `reason` names the "ask" rule that stopped the command, when one did. */
 export type ApprovalRequest =
   | { kind: "command"; command: string; reason?: string; /** Title of the subagent that asks (shown on the approval card). */ agent?: string }
-  | { kind: "computer"; actions: CuAction[]; safety?: string[]; agent?: string }
+  | { kind: "computer"; actions: CuAction[]; safety?: string[]; /** Why this batch needs a human (Full access). */ reason?: import("./computerCore").RiskCode; /** Offer "Allow for this task". */ allowTask?: boolean; agent?: string }
   | { kind: "mcp"; server: string; serverId: string; tool: string; args: unknown; agent?: string };
+/** `"task"`: allowed, and further computer batches of this run need no confirmation (not persisted). */
+export type ApprovalAnswer = boolean | "task";
 
 export type RunOptions = {
   root: string | null;
@@ -44,7 +47,7 @@ export type RunOptions = {
   onActivity?: import("../providers/types").TurnInput["onActivity"];
   onToolResult?: (result: Extract<Part, { type: "tool_result" }>) => void;
   onMessage: (msg: Msg) => Promise<void>;
-  approve: (req: ApprovalRequest) => Promise<boolean>;
+  approve: (req: ApprovalRequest) => Promise<ApprovalAnswer>;
   /** Present in the main loop: offers `spawn_agent`. Subagent runs never get it. */
   subagents?: SubagentHost;
   /** Subagents: only these tools may be used (others are not offered and are blocked if called). */
@@ -60,9 +63,6 @@ const MAX_COMPUTER_STEPS = 30;
 const COMPUTER_DEADLINE_MS = 10 * 60_000;
 const HALT = "Not executed: an earlier computer action in this turn failed.";
 
-/** Typing and Enter/Cmd shortcuts can submit or send data, so they always need a human. */
-export const isRisky = (a: CuAction) =>
-  a.type === "type" || (a.type === "keypress" && a.keys.some((k) => /^(enter|return|cmd|command|meta|super)$/i.test(k)));
 
 /**
  * True when `cmd` would run without asking under the old "always allowed" list alone. The list is read as prefix rules on
@@ -75,6 +75,14 @@ export const commandAllowed = (cmd: string, allowlist: string[]) => evaluateComm
 class ActionBlocked extends Error {}
 /** The user answered "no" to an approval request. */
 class ActionDeclined extends Error {}
+/** A computer batch stopped at a failed step; the result still carries the screenshot taken afterwards. */
+class ComputerFailed extends Error {
+  image?: string;
+  constructor(message: string, image?: string) {
+    super(message);
+    this.image = image;
+  }
+}
 
 const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
 type ToolContext = { act: string; project: string | null };
@@ -96,7 +104,13 @@ async function buildSystem(root: string | null, computerUse: boolean, instructio
   }
   if (computerUse)
     lines.push(
-      "You can operate the user's real Mac through the computer tool. Take a screenshot first, act in small batches, and verify with a screenshot. Ask before purchases, sending messages or deleting data.",
+      [
+        "You can operate the user's real Mac through M Code's computer actions.",
+        "Work in batches of 3–8 actions you are confident about; use open_app to open or switch apps. Every result already includes a fresh screenshot taken after the screen settles, plus the front app, window title and whether the screen changed: verify from it instead of asking for another screenshot, and keep waits minimal.",
+        "Do not narrate (no \"let me look at the screenshot\"); act, or report the outcome.",
+        "Say a task is done only when the latest screenshot shows it; if it does not or you are unsure, say so plainly.",
+        "Ask the user before purchases, sending messages to new recipients, or deleting data.",
+      ].join(" "),
     );
   else lines.push("M Code desktop control is disabled. Do not claim you can control the computer or use desktop automation; ask the user to enable Computer Use in M Code first.");
   return lines.join("\n");
@@ -191,10 +205,13 @@ async function runLoop(o: RunOptions) {
   let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly";
-  if (canSpawn) tools = [...tools, SPAWN_TOOL];
+  if (canSpawn) tools = [...tools, ...(await o.subagents!.tools({ providerId: o.providerId, model: o.model }))];
   const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
   let computerSteps = 0;
+  // "Allow for this task" lasts for this run only; Return right after a batch that ended with typing counts as risky.
+  let computerTask = false;
+  let afterTyping = false;
   const project = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null) : null;
   // MCP tools: main loop only (subagents have a fixed allowlist), and only for models that take tools.
   const mcp = o.supportsTools === false || o.toolNames ? null : await loadMcpToolset({ project, access: o.access, reserved: tools.map((t) => t.name), signal: o.signal }).catch(() => null);
@@ -233,11 +250,11 @@ async function runLoop(o: RunOptions) {
 
     const results: Part[] = [];
     let halted = false;
-    // spawn_agent calls of one turn start together (the scheduler limits how many run at once); results are collected in order.
+    // spawn_agent / delegate_tasks calls of one turn start together (the scheduler limits how many run at once); results are collected in order.
     const spawned = new Map<string, Promise<{ v: string } | { e: unknown }>>();
     if (canSpawn && !o.signal.aborted)
       for (const c of calls)
-        if (c.name === SPAWN_TOOL_NAME && !c.computer) spawned.set(c.id, o.subagents!.spawn(c.args, o).then((v) => ({ v }), (e) => ({ e })));
+        if (o.subagents!.handles(c.name) && !c.computer) spawned.set(c.id, o.subagents!.call(c.name, c.args, o).then((v) => ({ v }), (e) => ({ e })));
     const lastComputer = calls.filter((c) => c.computer).pop();
     for (const call of calls) {
       const res = { type: "tool_result" as const, id: call.id, name: call.name, output: "", computer: !!call.computer };
@@ -255,13 +272,21 @@ async function runLoop(o: RunOptions) {
           if (++computerSteps > MAX_COMPUTER_STEPS || Date.now() - started > COMPUTER_DEADLINE_MS)
             throw new Error("Computer use step/time limit reached. Stop and summarize for the user.");
           const { actions, safetyChecks } = call.computer;
-          const ask = actions.some(a => a.type !== "screenshot") && (o.access !== "full" || actions.some(isRisky) || !!safetyChecks?.length);
-          if (ask && !(await o.approve({ kind: "computer", actions, safety: safetyChecks?.map((s) => s.message ?? s.code ?? s.id) })))
-            throw new ActionDeclined("User declined this action.");
-          if (ask) logPatch(act, { approval: "user" });
+          const safety = safetyChecks?.map((s) => s.message ?? s.code ?? s.id) ?? [];
+          const decision = computerApproval({ actions, access: o.access, safety, afterTyping, taskAllowed: computerTask });
+          if (decision.ask) {
+            const answer = await o.approve({ kind: "computer", actions, ...(safety.length ? { safety } : {}), ...(decision.reason ? { reason: decision.reason } : {}), ...(decision.allowTask ? { allowTask: true } : {}) });
+            if (!answer) throw new ActionDeclined("User declined this action.");
+            if (answer === "task" && decision.allowTask) computerTask = true;
+            logPatch(act, { approval: "user" });
+          } else if (actions.some((a) => a.type !== "screenshot")) logPatch(act, { approval: computerTask ? "user" : "mode" });
           const shot = await computer.execute(actions);
-          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer";
-          results.push({ ...res, output: "OK", image: wantsImage ? shot.png : undefined });
+          const failed = typeof shot.failedStep === "number" || !!shot.error;
+          afterTyping = endsWithTyping(failed ? actions.slice(0, shot.failedStep ?? 0) : actions, afterTyping);
+          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer" || call.name === "mcode_computer";
+          const output = formatComputerResult(actions, shot);
+          if (failed) throw new ComputerFailed(output, shot.png || undefined);
+          results.push({ ...res, output, image: wantsImage ? shot.png : undefined });
         } else if (mcp?.route.has(call.name)) {
           const r = await runMcpTool(call, o, mcp, act);
           results.push({ ...res, output: r.output, ...(r.image ? { image: r.image } : {}) });
@@ -275,7 +300,7 @@ async function runLoop(o: RunOptions) {
         logFinish(act, "success");
       } catch (e: any) {
         const message = String(e?.message ?? e);
-        results.push({ ...res, output: message, isError: true });
+        results.push({ ...res, output: message, isError: true, ...(e instanceof ComputerFailed && e.image ? { image: e.image } : {}) });
         const status = e instanceof ActionBlocked ? "blocked" : e instanceof ActionDeclined ? (o.signal.aborted ? "cancelled" : "declined") : "error";
         logFinish(act, status, status === "error" || status === "blocked" ? message : undefined);
         if (call.computer) halted = true;
