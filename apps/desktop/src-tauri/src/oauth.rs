@@ -134,17 +134,17 @@ fn handle(stream: &mut TcpStream, port: u16, expected_state: &str) -> Verdict {
     // Compare the state before anything else is trusted; a mismatch ends the attempt.
     let state = query_param(query, "state").unwrap_or_default();
     if state.len() != expected_state.len() || state.bytes().zip(expected_state.bytes()).fold(0u8, |a, (x, y)| a | (x ^ y)) != 0 {
-        respond(stream, "400 Bad Request", &page("Sign-in failed", "The response did not match this sign-in attempt. Close this tab and try again from M Code."));
+        respond(stream, "400 Bad Request", &page("Sign-in failed", "The response did not match this sign-in attempt. Close this tab and try again from Gustaf."));
         return Verdict::Done(Err("state mismatch: the redirect did not belong to this sign-in".into()));
     }
     if let Some(err) = query_param(query, "error") {
-        respond(stream, "400 Bad Request", &page("Sign-in was not completed", "You can close this tab and return to M Code."));
+        respond(stream, "400 Bad Request", &page("Sign-in was not completed", "You can close this tab and return to Gustaf."));
         let err: String = err.chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')).take(64).collect();
         return Verdict::Done(Err(format!("authorization denied: {err}")));
     }
     match query_param(query, "code").filter(|c| !c.is_empty() && c.len() <= 4096) {
         Some(code) => {
-            respond(stream, "200 OK", &page("Signed in", "You can close this tab and return to M Code."));
+            respond(stream, "200 OK", &page("Signed in", "You can close this tab and return to Gustaf."));
             Verdict::Done(Ok(code))
         }
         None => {

@@ -40,7 +40,7 @@ export function openaiCompatible(cfg: ProviderConfig, key: string): Adapter {
   const base = cfg.baseUrl.replace(/\/$/, "");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
-  if (cfg.kind === "openrouter") headers["X-Title"] = "M Code";
+  if (cfg.kind === "openrouter") headers["X-Title"] = "Gustaf";
 
   return {
     supportsComputer: false,

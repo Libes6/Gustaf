@@ -23,6 +23,7 @@ export type ExportedChat = {
   project: { name: string; path: string | null } | null;
   messages: ExportedMessage[];
 };
+// `app` stays "M Code": it is part of the file format, not a display name.
 export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: "M Code"; exportedAt: string; chats: ExportedChat[] };
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
@@ -342,7 +343,7 @@ export type MdLabels = {
 };
 
 export const DEFAULT_MD_LABELS: MdLabels = {
-  exported: "Exported from M Code on {date}",
+  exported: "Exported from Gustaf on {date}",
   project: "Project",
   created: "Created",
   updated: "Updated",
@@ -479,7 +480,7 @@ export function toMarkdown(bundle: ChatBundle, labels: MdLabels = DEFAULT_MD_LAB
     const { head, body } = renderChat(bundle.chats[0], 1, labels);
     blocks = [...head, note, ...body];
   } else {
-    blocks = ["# M Code", `${note}\n\n- ${labels.chats}: ${bundle.chats.length}`];
+    blocks = ["# Gustaf", `${note}\n\n- ${labels.chats}: ${bundle.chats.length}`];
     for (const chat of bundle.chats) {
       const { head, body } = renderChat(chat, 2, labels);
       blocks.push("---", ...head, ...body);

@@ -20,11 +20,11 @@ export type ShareLabels = MdLabels & {
   generated: string;
 };
 export const DEFAULT_SHARE_LABELS: ShareLabels = {
-  exported: "Exported from M Code on {date}",
+  exported: "Exported from Gustaf on {date}",
   project: "Project", created: "Created", updated: "Updated", messages: "Messages", chats: "Chats", user: "User", assistant: "Assistant",
   toolCall: "Tool", toolResult: "Result", noOutput: "(no output)", truncated: "… {chars} more characters not shown",
   status: { running: "Running", success: "Completed", error: "Failed", unknown: "Result not reported" },
-  canvas: "Canvas", model: "Model", generated: "Shared from M Code on {date}",
+  canvas: "Canvas", model: "Model", generated: "Shared from Gustaf on {date}",
 };
 
 /** Longest text of one message, one tool output and one tool argument block; the rest is replaced by a note. */

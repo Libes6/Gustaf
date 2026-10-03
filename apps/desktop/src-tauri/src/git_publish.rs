@@ -207,9 +207,9 @@ pub fn publish_info(root: &Path) -> Result<PublishInfo, String> {
 fn push_hint(text: &str) -> &'static str {
     let low = text.to_lowercase();
     if low.contains("terminal prompts disabled") || low.contains("could not read username") || low.contains("could not read password") || low.contains("authentication failed") || low.contains("permission denied (publickey") {
-        "\nM Code cannot ask for credentials. Set up a credential helper or an SSH key, or run the push once in a terminal."
+        "\nGustaf cannot ask for credentials. Set up a credential helper or an SSH key, or run the push once in a terminal."
     } else if low.contains("non-fast-forward") || low.contains("fetch first") || low.contains("[rejected]") {
-        "\nThe remote has commits you do not have. Pull or rebase in a terminal first; M Code never force-pushes."
+        "\nThe remote has commits you do not have. Pull or rebase in a terminal first; Gustaf never force-pushes."
     } else {
         ""
     }

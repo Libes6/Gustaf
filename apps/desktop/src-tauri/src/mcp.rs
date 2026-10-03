@@ -482,7 +482,7 @@ impl Server {
         let params = json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": { "name": "M Code", "version": env!("CARGO_PKG_VERSION") },
+            "clientInfo": { "name": "Gustaf", "version": env!("CARGO_PKG_VERSION") },
         });
         let result = self.send_request("initialize", Some(params), INIT_TIMEOUT, true, None).and_then(|r| {
             if r.get("protocolVersion").and_then(Value::as_str).is_some() {

@@ -198,7 +198,7 @@ export function serializeCalls<A extends unknown[], R>(fn: (...args: A) => Promi
 
 // ---- prompts ----
 
-const COMMON = "You are a subagent started by the main M Code agent for one task. You cannot ask the user questions and cannot see the main conversation. Your final message is your report: the main agent receives only that, so put the results in it, concisely (under 400 words), with project-relative file paths.";
+const COMMON = "You are a subagent started by the main Gustaf agent for one task. You cannot ask the user questions and cannot see the main conversation. Your final message is your report: the main agent receives only that, so put the results in it, concisely (under 400 words), with project-relative file paths.";
 const TYPE_PROMPT: Record<AgentType, string> = {
   explore: "You are read-only: investigate with list_dir/search/read_file and report what you found (paths and line numbers). Do not propose edits unless asked.",
   plan: "You are read-only: study the code and return a concrete, ordered implementation plan (files to change, what to change, risks). Do not make edits.",

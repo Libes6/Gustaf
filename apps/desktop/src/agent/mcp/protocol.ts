@@ -95,7 +95,7 @@ export class SseDecoder {
 export const initializeParams = (version: string) => ({
   protocolVersion: PROTOCOL_VERSION,
   capabilities: {},
-  clientInfo: { name: "M Code", version },
+  clientInfo: { name: "Gustaf", version },
 });
 
 /** Checks an `initialize` result and returns the parts the client keeps. */

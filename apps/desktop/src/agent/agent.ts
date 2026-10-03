@@ -105,7 +105,7 @@ type ToolContext = { act: string; project: string | null; skills?: Awaited<Retur
 
 async function buildSystem(root: string | null, computerUse: boolean, instructions = "", mode?: ChatMode) {
   const lines = [
-    `You are M Code, a coding agent in a desktop app on ${platformLabel()} (run_command uses ${shellLabel()}).`,
+    `You are Gustaf, a coding agent in a desktop app on ${platformLabel()} (run_command uses ${shellLabel()}).`,
     `Today is ${new Date().toDateString()}.`,
     "Reply in the user's language. Be concise; use Markdown.",
     CANVAS_INSTRUCTIONS,
@@ -121,14 +121,14 @@ async function buildSystem(root: string | null, computerUse: boolean, instructio
   if (computerUse)
     lines.push(
       [
-        "You can operate the user's real Mac through M Code's computer actions.",
+        "You can operate the user's real computer through Gustaf's computer actions.",
         "Work in batches of 3–8 actions you are confident about; use open_app to open or switch apps. Every result already includes a fresh screenshot taken after the screen settles, plus the front app, window title and whether the screen changed: verify from it instead of asking for another screenshot, and keep waits minimal.",
         "Do not narrate (no \"let me look at the screenshot\"); act, or report the outcome.",
         "Say a task is done only when the latest screenshot shows it; if it does not or you are unsure, say so plainly.",
         "Ask the user before purchases, sending messages to new recipients, or deleting data.",
       ].join(" "),
     );
-  else if (!mode || mode === "agent") lines.push("M Code desktop control is disabled. Do not claim you can control the computer or use desktop automation; ask the user to enable Computer Use in M Code first.");
+  else if (!mode || mode === "agent") lines.push("Gustaf desktop control is disabled. Do not claim you can control the computer or use desktop automation; ask the user to enable Computer Use in Gustaf first.");
   const extra = modePrompt(mode);
   if (extra) lines.push(extra);
   return lines.join("\n");

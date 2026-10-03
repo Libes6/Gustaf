@@ -120,7 +120,7 @@ test('Markdown snapshot for a chat with tool calls', () => {
   const md = toMarkdown(buildBundle([sampleSource()], { now: NOW }));
   const expected = `# Fix login
 
-*Exported from M Code on 2026-10-02 12:30 UTC*
+*Exported from Gustaf on 2026-10-02 12:30 UTC*
 
 - Project: web-app (/Users/me/web-app)
 - Created: 2026-01-05 09:00 UTC
@@ -188,15 +188,15 @@ Done.
 });
 
 test('Markdown for several chats has one section per chat and localizable labels', () => {
-  const ru = { ...DEFAULT_MD_LABELS, user: 'Пользователь', assistant: 'Ассистент', exported: 'Экспорт из M Code, {date}', chats: 'Чатов', messages: 'Сообщений' };
+  const ru = { ...DEFAULT_MD_LABELS, user: 'Пользователь', assistant: 'Ассистент', exported: 'Экспорт из Gustaf, {date}', chats: 'Чатов', messages: 'Сообщений' };
   const bundle = buildBundle([
     { chat: chat({ title: 'Первый чат' }), project: null, messages: [msg('user', [text('Привет')]), msg('assistant', [text('Здравствуйте')])] },
     { chat: chat({ title: 'Second', created_at: 0, updated_at: 0 }), project: null, messages: [msg('user', [text('Hello')])] },
   ], { now: NOW });
   const md = toMarkdown(bundle, ru);
-  assert.equal(md, `# M Code
+  assert.equal(md, `# Gustaf
 
-*Экспорт из M Code, 2026-10-02 12:30 UTC*
+*Экспорт из Gustaf, 2026-10-02 12:30 UTC*
 
 - Чатов: 2
 
