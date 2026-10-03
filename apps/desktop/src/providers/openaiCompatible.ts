@@ -1,3 +1,4 @@
+import { resolveKey, type KeySource } from "../lib/keys";
 import { modelMetadata } from "../lib/context";
 import { tokenUsage } from "./usage";
 import { request, sse } from "./http";
@@ -36,18 +37,22 @@ function toChat(system: string, messages: Msg[], providerId: string) {
 }
 
 /** Chat Completions: OpenRouter, Ollama, LM Studio and any OpenAI-compatible endpoint. */
-export function openaiCompatible(cfg: ProviderConfig, key: string): Adapter {
+export function openaiCompatible(cfg: ProviderConfig, key: KeySource): Adapter {
   const base = cfg.baseUrl.replace(/\/$/, "");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (key) headers.Authorization = `Bearer ${key}`;
   if (cfg.kind === "openrouter") headers["X-Title"] = "M Code";
+  // The key is read on the first request that needs it (lib/keys.ts), not when the adapter is built.
+  const authHeaders = async () => {
+    const k = await resolveKey(key);
+    return k ? { ...headers, Authorization: `Bearer ${k}` } : headers;
+  };
 
   return {
     supportsComputer: false,
     supportsReasoning: () => false,
 
     async listModels() {
-      const res = await request(`${base}/models`, { headers });
+      const res = await request(`${base}/models`, { headers: await authHeaders() });
       const j = await res.json();
       return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.name ?? m.id, providerId: cfg.id, created: (m.created ?? 0) * 1000, ...modelMetadata(m) }));
     },
@@ -58,7 +63,7 @@ export function openaiCompatible(cfg: ProviderConfig, key: string): Adapter {
         body.tools = t.tools.map((d) => ({ type: "function", function: { name: d.name, description: d.description, parameters: d.parameters } }));
       const { text, calls, usage } = await withRetry(
         async (onText) => {
-          const res = await request(`${base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/chat/completions`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
           let usage;
           let text = "";
           const calls: { id: string; name: string; args: string }[] = [];

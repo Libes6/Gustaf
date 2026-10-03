@@ -1,3 +1,4 @@
+import { resolveKey, type KeySource } from "../lib/keys";
 import { nativeActivities, applyActivity, isBareCollabWait, type Activity } from "./activities";
 import { createRolloutTracker, rolloutEnabled } from "./codexRollout";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
@@ -175,7 +176,9 @@ export async function detectClis(): Promise<{ id: CliId; version: string }[]> {
 }
 
 /** An installed agent CLI: it runs its own tools and auth in the project folder; we relay text and tool activity. */
-export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
+export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
+  // Only Cursor API-key accounts need the key; other CLIs keep their own auth and never touch the Keychain.
+  const accountKey = async () => (cfg.cliAuth === "key" ? resolveKey(key) : "");
   const id = cfg.cli!;
   const spec = SPECS[id];
   return {
@@ -185,7 +188,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
-        const env = cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
+        const env = cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
         const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), Object.keys(env).length ? { env } : {}).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
@@ -241,7 +244,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
+        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       } finally {
         // The turn is over: one last scan unless it was stopped, then the polling ends.

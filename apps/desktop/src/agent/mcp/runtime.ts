@@ -2,6 +2,7 @@
 // Keychain), keeps one connection per server (stdio via src-tauri/src/mcp.rs, HTTP via McpHttpClient over Tauri's
 // fetch), caches tool lists until the server announces a change, and builds the toolset a run is offered.
 import { getSetting, mcpStdio, oauthLoopback, secrets, setSetting } from "../../lib/api";
+import { readSecret, removeSecret, storeSecret } from "../../lib/keys";
 import type { ToolDef } from "../../providers/types";
 import { MCP_SETTING, normalizeConfig, oauthSecretId, secretId, serversFor, splitSecrets, staleSecretIds, type KV, type McpConfig, type McpServer } from "./config";
 import { McpHttpClient, type FetchLike } from "./http";
@@ -41,14 +42,14 @@ export function updateMcpConfig(fn: (c: McpConfig) => McpConfig): Promise<McpCon
 /** Saves a server (new or edited): secret values go to the Keychain, unused Keychain entries are removed. */
 export async function saveMcpServer(draft: McpServer): Promise<void> {
   const { server, secrets: toStore } = splitSecrets(draft);
-  for (const s of toStore) await secrets.set(s.id, s.value);
+  for (const s of toStore) await storeSecret(s.id, s.value);
   let stale: string[] = [];
   await updateMcpConfig((c) => {
     const prev = c.servers.find((s) => s.id === server.id);
     stale = staleSecretIds(prev, server);
     return { servers: prev ? c.servers.map((s) => (s.id === server.id ? server : s)) : [...c.servers, server] };
   });
-  for (const id of stale) await secrets.delete(id).catch(() => {});
+  for (const id of stale) await removeSecret(id, true).catch(() => {});
   await disconnectMcpServer(server.id);
 }
 
@@ -58,7 +59,7 @@ export async function removeMcpServer(id: string): Promise<void> {
     prev = c.servers.find((s) => s.id === id);
     return { servers: c.servers.filter((s) => s.id !== id) };
   });
-  for (const sid of staleSecretIds(prev, null)) await secrets.delete(sid).catch(() => {});
+  for (const sid of staleSecretIds(prev, null)) await removeSecret(sid, true).catch(() => {});
   await disconnectMcpServer(id, true);
 }
 
@@ -102,7 +103,8 @@ async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): 
   for (const e of list) {
     if (!e.secret) out[e.key] = e.value ?? "";
     else {
-      const v = await secrets.get(secretId(serverId, kind, e.key)).catch(() => null);
+      // Read only when this server is started (never at app launch), at most once per session (lib/keys.ts).
+      const v = await readSecret(secretId(serverId, kind, e.key)).catch(() => null);
       if (v == null) throw new Error(`the secret ${e.key} is missing from the Keychain; edit the server and enter it again`);
       out[e.key] = v;
     }

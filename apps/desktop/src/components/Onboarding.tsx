@@ -48,7 +48,7 @@ export function Onboarding() {
               <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbProviderLead", { store: t(isMac() ? "keyStoreMac" : isWindows() ? "keyStoreWindows" : "keyStoreLinux") })}</p>
               <ProviderForm
                 onSaved={async (cfg, models) => {
-                  await app.refreshModels();
+                  await app.refreshModels({ only: [cfg.id] });
                   if (models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });
                   await finish();
                 }}

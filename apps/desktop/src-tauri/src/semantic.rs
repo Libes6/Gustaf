@@ -40,7 +40,7 @@ fn embed(config: &Config, texts: &[String]) -> Result<Vec<Vec<f32>>,String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(60)).redirect(reqwest::redirect::Policy::none()).build().map_err(|e|e.to_string())?;
     let body=if config.kind=="ollama"{serde_json::json!({"model":config.model,"input":texts,"truncate":false})}else{serde_json::json!({"model":config.model,"input":texts})};
     let mut request = client.post(endpoint).json(&body);
-    if config.kind == "openai" { if let Some(id) = &config.key_id { if let Some(key) = crate::secrets::secret_get(id.clone()).filter(|v| !v.is_empty()) { request = request.bearer_auth(key); } } }
+    if config.kind == "openai" { if let Some(id) = &config.key_id { if let Some(key) = crate::secrets::read(id).filter(|v| !v.is_empty()) { request = request.bearer_auth(key); } } }
     let response = request.send().map_err(|e|e.to_string())?;
     if !response.status().is_success() { return Err(format!("Embeddings request failed: HTTP {}", response.status())); }
     let mut bytes = Vec::new(); response.take(8_000_001).read_to_end(&mut bytes).map_err(|e|e.to_string())?;

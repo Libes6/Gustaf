@@ -5,7 +5,7 @@ import type { Access } from "./agent/agent";
 import { detectLocale, type Locale } from "./i18n";
 import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
-import { getAdapter, listAllModels, loadProviders } from "./providers";
+import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
@@ -114,19 +114,25 @@ function useAppState() {
     setChats(c);
   }, []);
 
-  const refreshModels = useCallback(async (list?: ProviderConfig[]) => {
-    const ps = list ?? (await loadProviders());
+  /**
+   * Reloads providers and model lists. Default ("force"): fetch fresh lists (only the `only` providers when given; the
+   * rest from cache). "startup" shows cached lists and reads no API key; "stale" (the model picker) fetches lists older
+   * than 10 minutes. See listAllModels.
+   */
+  const refreshModels = useCallback(async (o: { refresh?: ModelRefresh; only?: string[] } = {}) => {
+    const ps = await loadProviders();
     setProviders(ps);
-    const { models, errors } = await listAllModels(ps);
+    const { models, errors } = await listAllModels(ps, o.refresh ?? "force", o.only);
     setModels(models);
     setModelErrors(errors);
     setCheckedAt(Date.now());
     return models;
   }, []);
+  const ensureModels = useCallback(() => refreshModels({ refresh: "stale" }), [refreshModels]);
 
   useEffect(() => {
     reload();
-    refreshModels();
+    refreshModels({ refresh: "startup" });
   }, []);
 
   const openSettings = (page: SettingsPage = "general") => {
@@ -141,7 +147,7 @@ function useAppState() {
     locale, setLocale, onboarded, setOnboarded,
     selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
-    projects, chats, reload, providers, models, modelErrors, refreshModels,
+    projects, chats, reload, providers, models, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
     view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
   };
