@@ -62,6 +62,8 @@ fn clean_link(raw: &str) -> Result<String, String> {
     Ok(parts.join("/"))
 }
 fn under_any(path: &str, dirs: &[String]) -> bool {
+    let normalized = if cfg!(windows) { path.replace('\\', "/") } else { path.to_owned() };
+    let path = normalized.as_str();
     dirs.iter().any(|d| path == d || path.strip_prefix(d.as_str()).is_some_and(|rest| rest.starts_with('/')))
 }
 fn read_linked(dir: &Path) -> Vec<String> {

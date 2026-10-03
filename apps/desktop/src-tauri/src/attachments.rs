@@ -128,12 +128,12 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let first = save_images(root.path(), 7, &[b64(PNG), b64(JPG)]).unwrap();
         assert_eq!(first.files.len(), 2);
-        assert!(first.files[0].ends_with("attachments/7/1.png"));
-        assert!(first.files[1].ends_with("attachments/7/2.jpg"));
+        assert!(Path::new(&first.files[0]).ends_with(Path::new("attachments").join("7").join("1.png")));
+        assert!(Path::new(&first.files[1]).ends_with(Path::new("attachments").join("7").join("2.jpg")));
         assert!(Path::new(&first.dir).starts_with(root.path()));
         // A second call never overwrites existing files.
         let second = save_images(root.path(), 7, &[b64(PNG)]).unwrap();
-        assert!(second.files[0].ends_with("attachments/7/3.png"));
+        assert!(Path::new(&second.files[0]).ends_with(Path::new("attachments").join("7").join("3.png")));
         assert_eq!(std::fs::read(&first.files[0]).unwrap(), PNG);
     }
 

@@ -66,8 +66,12 @@ fn bundled_typescript(root: &Path, resource: Option<&Path>) -> Option<Server> {
 }
 fn uri(path: &Path) -> String {
     let text = path.to_string_lossy().replace('\\', "/");
+    // Canonical Windows paths carry a filesystem-only verbatim prefix, not a URI authority.
+    let text = if let Some(unc) = text.strip_prefix("//?/UNC/") { format!("//{unc}") }
+        else { text.strip_prefix("//?/").unwrap_or(&text).to_owned() };
     let mut encoded = String::new();
     for b in text.bytes() { if b.is_ascii_alphanumeric() || b"/-_.~:".contains(&b) { encoded.push(b as char); } else { encoded.push_str(&format!("%{b:02X}")); } }
+    if encoded.starts_with("//") { return format!("file:{encoded}"); }
     format!("file://{}{}", if encoded.starts_with('/') { "" } else { "/" }, encoded)
 }
 fn write_message(input: &mut impl Write, value: &Value) -> Result<(), String> {
@@ -164,6 +168,9 @@ pub async fn lsp_diagnostics(app: tauri::AppHandle, root: String, path: String, 
     #[test] fn uri_encodes_unicode_spaces_and_fragment_characters() {
         assert_eq!(uri(Path::new("/tmp/a b#c.ts")),"file:///tmp/a%20b%23c.ts");
         assert!(uri(Path::new("/tmp/тест.py")).contains("%D1"));
+        assert_eq!(uri(Path::new(r"C:\work\a b.ts")), "file:///C:/work/a%20b.ts");
+        assert_eq!(uri(Path::new(r"\\?\C:\work\a b.ts")), "file:///C:/work/a%20b.ts");
+        assert_eq!(uri(Path::new(r"\\?\UNC\server\share\a.ts")), "file://server/share/a.ts");
     }
     #[cfg(unix)]
     #[test] fn stdio_session_opens_file_and_returns_structured_diagnostics() {

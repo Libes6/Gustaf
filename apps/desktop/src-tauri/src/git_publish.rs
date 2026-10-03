@@ -460,7 +460,8 @@ mod tests {
         fs::write(root.join("a.txt"), "1\n").unwrap();
         g(&root, &["add", "."]);
         g(&root, &["commit", "-q", "-m", "init"]);
-        g(&root, &["remote", "add", "origin", remote.to_str().unwrap()]);
+        let remote_url = reqwest::Url::from_file_path(&remote).unwrap().to_string();
+        g(&root, &["remote", "add", "origin", &remote_url]);
         Fx { _tmp: tmp, base, root, remote }
     }
 
@@ -559,7 +560,8 @@ mod tests {
         let f = fx();
         push(&f.root, "origin", "main", true, true).unwrap();
         let other = f.base.join("other");
-        g(&f.base, &["clone", "-q", f.remote.to_str().unwrap(), "other"]);
+        let remote_url = reqwest::Url::from_file_path(&f.remote).unwrap().to_string();
+        g(&f.base, &["clone", "-q", &remote_url, "other"]);
         for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false")] {
             g(&other, &["config", k, v]);
         }

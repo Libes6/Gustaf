@@ -625,10 +625,13 @@ impl Server {
             if i.gen != gen {
                 return;
             }
+            let was = i.state;
             i.tx = None;
             i.pid = None;
+            // Publish the restart before waking pending callers: their next request must wait.
+            if was == State::Running { i.state = State::Restarting; }
             i.fail_pending("MCP server exited");
-            (i.child.take(), i.state)
+            (i.child.take(), was)
         };
         let status = child.and_then(terminate);
         {
