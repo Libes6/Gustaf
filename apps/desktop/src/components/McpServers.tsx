@@ -7,6 +7,7 @@ import { RESOURCE_TOOLS } from "../agent/mcp/resources";
 import type { McpTool } from "../agent/mcp/toolset";
 import { useT, type Key } from "../i18n";
 import { fsx, mcpStdio, type McpStatus } from "../lib/api";
+import { keyStoreKey } from "../lib/platform";
 import { useApp } from "../state";
 import "../styles/mcp.css";
 
@@ -236,7 +237,7 @@ function KVRows({ rows, setRows, kind }: { rows: KV[]; setRows: (r: KV[]) => voi
             value={r.value ?? ""}
             onChange={(e) => set(i, { value: e.target.value })}
           />
-          <label className="mcp-check" title={t("mcpSecretHint")}>
+          <label className="mcp-check" title={t("mcpSecretHint", { store: t(keyStoreKey()) })}>
             <input type="checkbox" checked={r.secret} onChange={(e) => set(i, { secret: e.target.checked })} /> {t("mcpSecret")}
           </label>
           <button className="btn-soft" aria-label={t("delete")} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
@@ -314,7 +315,7 @@ function Editor({ initial, isNew, others, onCancel, onSaved }: { initial: McpSer
             </label>
             {s.oauth && (
               <>
-                <div className="d" style={{ margin: "4px 0 8px" }}>{t("mcpOauthHint")}</div>
+                <div className="d" style={{ margin: "4px 0 8px" }}>{t("mcpOauthHint", { store: t(keyStoreKey()) })}</div>
                 <label className="field">
                   <span>{t("mcpOauthClientId")}</span>
                   <input className="input mono" value={s.oauth.clientId ?? ""} onChange={(e) => set({ oauth: { ...s.oauth, clientId: e.target.value || undefined } } as Partial<McpServer>)} />
@@ -366,7 +367,7 @@ function ImportBox({ text, setText, existing }: { text: string; setText: (v: str
   return (
     <div className="card mcp-editor">
       <div className="card-row" style={{ display: "block" }}>
-        <div className="d" style={{ marginBottom: 8 }}>{t("mcpImportHint")}</div>
+        <div className="d" style={{ marginBottom: 8 }}>{t("mcpImportHint", { store: t(keyStoreKey()) })}</div>
         <textarea className="input mono" aria-label={t("mcpImport")} rows={8} value={text} placeholder={'{\n  "mcpServers": {\n    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] }\n  }\n}'} onChange={(e) => setText(e.target.value)} />
         {parsed?.servers.length ? <div className="d" style={{ marginTop: 6 }}>{t("mcpImportFound", { names: parsed.servers.map((s) => s.name).join(", ") })}</div> : null}
         {parsed?.errors.map((e, i) => <div key={i} className="d warn">{errText(e)}</div>)}

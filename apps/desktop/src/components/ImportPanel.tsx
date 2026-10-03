@@ -93,13 +93,13 @@ const dataStore: ChatStore = {
 
 export const MAX_IMPORT_MB = 200;
 
-/** Reads an M Code JSON export and adds its chats to the database; throws `ImportError` for unusable files. */
+/** Reads an Gustaf JSON export and adds its chats to the database; throws `ImportError` for unusable files. */
 export async function importChatsFromFile(file: File, onProgress?: (done: number, total: number) => void) {
   if (file.size > MAX_IMPORT_MB * 1024 * 1024) throw new ImportError("too_large");
   return importBundle(parseBundle(await file.text()), dataStore, onProgress);
 }
 
-/** Export of all chats and import of an M Code JSON export. */
+/** Export of all chats and import of an Gustaf JSON export. */
 export function ChatTransfer() {
   const t = useT();
   const app = useApp();

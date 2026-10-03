@@ -98,7 +98,7 @@ const getJson = async (d: OAuthDeps, url: string, signal?: AbortSignal) => {
 
 /** Asks the server without a token and reads the challenge (`WWW-Authenticate`) of its 401. */
 async function probe(d: OAuthDeps, o: SignInOptions) {
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "M Code", version: "0" } } });
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "Gustaf", version: "0" } } });
   const headers = { ...(o.headers ?? {}), "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
   const r = await send(d, o.serverUrl, { method: "POST", headers, body }, o.signal);
   if (r.status !== 401) {

@@ -96,7 +96,7 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           menu.open(r, [
-            { heading: "M Code" },
+            { heading: "Gustaf" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
             { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },
             { label: t("settings"), icon: <Settings size={15} />, kbd: displayKeys("⌘,"), onClick: () => app.openSettings() },
@@ -245,7 +245,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     <aside className="sidebar" aria-label={t("sidebar")}>
       <div className="side-head drag">
         <div className="title">
-          M Code <ChevronDown size={14} color="var(--text-2)" />
+          Gustaf <ChevronDown size={14} color="var(--text-2)" />
         </div>
         <span className="grow" />
         <button className="icon-btn" title={t("notifications")} aria-label={t("notifications")}>

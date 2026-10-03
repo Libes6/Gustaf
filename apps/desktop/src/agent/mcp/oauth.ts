@@ -172,7 +172,7 @@ export function buildAuthorizationUrl(o: { endpoint: string; clientId: string; r
 }
 
 /** RFC 7591 request body: a public native client using the authorization code flow. */
-export const registrationBody = (redirect: string, clientName = "M Code") => ({
+export const registrationBody = (redirect: string, clientName = "Gustaf") => ({
   client_name: clientName,
   redirect_uris: [redirect],
   grant_types: ["authorization_code", "refresh_token"],
