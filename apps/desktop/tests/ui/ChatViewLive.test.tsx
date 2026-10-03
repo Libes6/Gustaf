@@ -115,3 +115,50 @@ describe("ChatView interactive send (shared run core)", () => {
     await waitFor(() => expect(app.setSessionBusy).toHaveBeenLastCalledWith("k", false));
   });
 });
+
+describe('pending interactive messages', () => {
+ it('automatically sends the next queued request after the active model finishes', async () => {
+   let finish!: () => void;
+   let calls = 0;
+   const seen: string[] = [];
+   model.turn = async input => {
+     calls++;
+     seen.push(input.messages.filter((m: any) => m.role === 'user').at(-1).parts[0].text);
+     if (calls === 1) await new Promise<void>(resolve => { finish = resolve; });
+     return { parts: [{ type: 'text', text: calls === 1 ? 'First completed' : 'Second completed' }] };
+   };
+   setup(); await screen.findByText('Check the build');
+   await userEvent.type(screen.getByRole('textbox'), 'first{Enter}');
+   await waitFor(() => expect(calls).toBe(1));
+   await userEvent.type(screen.getByRole('textbox'), 'second');
+   await userEvent.click(screen.getByRole('button', { name: 'Send next' }));
+   expect(await screen.findByRole('textbox', { name: 'Edit queued message' })).toHaveValue('second');
+   expect(calls).toBe(1);
+   act(() => finish());
+   await screen.findByText('Second completed');
+   expect(seen).toEqual(['first', 'second']);
+   expect(screen.queryByRole('textbox', { name: 'Edit queued message' })).not.toBeInTheDocument();
+ });
+});
+
+it('delivers clarification during an active API run without pausing its queue', async () => {
+ let finish!: () => void;
+ let turns = 0;
+ let received = '';
+ model.turn = async input => {
+   turns++;
+   if (turns === 1) await new Promise<void>(resolve => { finish = resolve; });
+   else received = input.messages.at(-1).parts[0].text;
+   return { parts: [{ type: 'text', text: turns === 1 ? 'Original response' : 'Clarified response' }] };
+ };
+ setup(); await screen.findByText('Check the build');
+ await userEvent.type(screen.getByRole('textbox'), 'do this{Enter}');
+ await waitFor(() => expect(turns).toBe(1));
+ await userEvent.type(screen.getByRole('textbox'), 'use this detail');
+ await userEvent.click(screen.getByRole('button', { name: 'Clarify current task' }));
+ expect(await screen.findByRole('textbox', { name: 'Edit queued message' })).toHaveValue('use this detail');
+ act(() => finish());
+ await screen.findByText('Clarified response');
+ expect(received).toBe('use this detail');
+ expect(screen.queryByRole('textbox', { name: 'Edit queued message' })).not.toBeInTheDocument();
+});
