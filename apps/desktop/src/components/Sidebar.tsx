@@ -14,6 +14,8 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { Brain } from "lucide-react";
+import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
 import { ConfirmDialog, NewWorkspaceDialog, useConfirm } from "./WorkspaceDialogs";
@@ -138,6 +140,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [projectLimit, setProjectLimit] = useState(8);
   const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
   const [sharing, setSharing] = useState<Chat | null>(null);
+  const memoryUi = useMemoryDialogs();
   // Workspaces (git worktrees): the data lives in lib/workspaceStore.ts; this component re-renders when it changes.
   useWorkspaceVersion();
   const confirm = useConfirm();
@@ -198,6 +201,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
+      { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -216,6 +220,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       })),
       ...(p.path && gitProjects.has(p.id) ? [{ label: t("workspaceNew"), icon: <GitBranch size={15} />, onClick: () => (setWorkspaceError(""), setNewWorkspaceFor(p)) }] : []),
       ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
+      ...(p.path ? [{ label: t("memoryMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openProject(p) }] : []),
       ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
@@ -507,6 +512,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         </ConfirmDialog>
       )}
       {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
+      {memoryUi.node}
       {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );

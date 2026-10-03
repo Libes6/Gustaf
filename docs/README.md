@@ -27,6 +27,7 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [mcp.md](features/mcp.md) | MCP servers |
 | Agent | [skills.md](features/skills.md) | Skills and slash commands |
 | Agent | [diagnostics.md](features/diagnostics.md) | LSP diagnostics, terminal commands and `read_terminal` |
+| Agent | [memory.md](features/memory.md) | Saved facts: what is stored where, what is sent to the provider, project menu editor, suggest memories from a chat, export to AGENTS.md |
 | Agent | [agent-workflows.md](agent-workflows.md) | Skills, memory, terminal, diagnostics, voice, web tools, semantic search, preview |
 | Agent | [hooks.md](features/hooks.md) | Hooks: user commands on agent events (pre/post tool, post edit, stop, approval request), schema, exit codes, safety |
 | Providers | [cursor-accounts.md](features/cursor-accounts.md) | Cursor account pool, browser-login profiles, quota rotation |

@@ -66,7 +66,7 @@ const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 const THINKING = /<(think|thinking|reasoning)>[\s\S]*?<\/\1>/gi;
 
 /** The first balanced top-level JSON object or array in the text (string-aware), or null. */
-function firstJson(text: string): unknown {
+export function firstJson(text: string): unknown {
   for (let start = 0; start < text.length; start++) {
     const open = text[start];
     if (open !== "{" && open !== "[") continue;

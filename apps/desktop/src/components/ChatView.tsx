@@ -30,6 +30,8 @@ import { BranchPicker } from "./chat/BranchPicker";
 import { BranchBar } from "./chat/BranchBar";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
+import { useAutoMemorySuggest } from "../lib/useAutoMemorySuggest";
+import { MemorySuggestDialog } from "./MemoryDialogs";
 
 export function ChatView({ session, visible }: { session: ChatSession; visible: boolean }) {
   const t = useT();
@@ -77,6 +79,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
   });
   const { stream, error, running, approval, toolResults, activities } = run;
+  const autoMemory = useAutoMemorySuggest({ chatId: session.chatId, running: run.ownRunning, active: visible, projectRoot: projectRoot });
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
   const latest = useRef({ run, title: "", branchLabel: "", messages, setMode });
   latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix"), messages, setMode };
@@ -200,6 +203,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         canRestore={messages.some(m => m.meta?.compacted)}
         onCompact={run.compact} onRestore={run.restoreContext}
       />
+      {autoMemory.found && chat && autoMemory.found.chatId === chat.id && <MemorySuggestDialog chat={chat} project={project ?? null} initial={autoMemory.found.suggestions} onClose={autoMemory.dismiss} />}
     </main>
     </CanvasWorkspace>
   );
