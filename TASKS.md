@@ -46,14 +46,14 @@ Items were drafted from the README and code layout; verify against the code befo
   - [ ] Show the active account in the UI, notify on switch, keep per-account usage in telemetry.
   - [ ] Session resume: provider sessions are tied to an account, so after a switch start a fresh session (with context carried by app-side history/summary) and check the model exists on the new account.
 
-- [ ] **Cross-platform build (Windows/Linux)**; today macOS only.
-  - [ ] Replace `security-framework` in `src-tauri/src/secrets.rs` with `keyring` (or gate with `cfg(target_os)`).
-  - [ ] Pick the shell per OS: `/bin/zsh` in `tools.rs` and `zsh -lc` in `providers/cli.ts` (bash/sh on Linux, PowerShell on Windows).
-  - [ ] `tauri.conf.json`: add `nsis`/`msi`/`deb`/`rpm`/`appimage` targets; make `titleBarStyle`/`trafficLightPosition` macOS-only.
-  - [ ] Per-OS Cursor history path in `cursor_import.rs` (`%APPDATA%`, `~/.config`).
-  - [ ] CLI discovery in `providers/cli.ts` (hardcoded `/Applications/ChatGPT.app`, `~/.nvm`) and Windows paths.
-  - [ ] Review Computer Use (Wayland), macOS-specific wording in prompts/i18n, system font stack in `theme.css`.
-  - [ ] CI matrix: `windows-latest`, `ubuntu-latest` (install `libwebkit2gtk-4.1-dev` etc.).
+- [ ] **Cross-platform build (Windows/Linux)**; code paths exist for all items below, but nothing has been built, launched or smoke-tested on Windows or Linux (see README "Platforms"). Stays open until someone runs it there.
+  - [x] `secrets.rs`: Keychain (`security-framework`) under `cfg(target_os = "macos")`, `keyring` (Credential Manager / Secret Service) elsewhere, same commands. Not run on Windows/Linux.
+  - [x] Shell per OS: `src-tauri/src/shell.rs` (zsh / bash, sh fallback / PowerShell, quoting helpers, tests) used by `run_command`; `src/providers/shell.ts` (same choice, `shq`/`psq`/`winArg`, invocation and discovery scripts, tests) used by `providers/cli.ts`, `limits.ts`, `cursor.ts`; shell scopes in `capabilities/default.json` (zsh) and `shell-linux.json` / `shell-windows.json`. PowerShell quoting and the stdin path for `.cmd` shims are untested on Windows.
+  - [x] `tauri.conf.json`: `titleBarStyle`/`trafficLightPosition` moved to `tauri.macos.conf.json`; bundle targets `all` with explicit lists per OS (`app`+`dmg`, `nsis`+`msi`, `deb`+`rpm`+`appimage`); `WindowHeader` uses native decorations (no drag handler, no traffic-light padding) off macOS. No installer was built.
+  - [x] Per-OS Cursor history path (`dirs::config_dir`: `~/Library/Application Support`, `%APPDATA%`, `$XDG_CONFIG_HOME`/`~/.config`) and Claude Code root (`CLAUDE_CONFIG_DIR`, `~/.claude`, XDG fallback). Paths not checked against real installs outside macOS.
+  - [x] CLI discovery per OS (candidate lists in `shell.ts`: no `/Applications/ChatGPT.app` outside macOS, `$NVM_DIR`, npm/volta dirs, `%APPDATA%\npm` `.cmd` shims, `Get-Command` on Windows). Windows install locations of the CLIs are assumed.
+  - [x] Computer Use: CoreGraphics/AX code under `cfg(macos)`; elsewhere permissions are reported granted, or unsupported on pure Wayland; `open_app` via `gtk-launch` on Linux, unsupported on Windows; `cmd` key means Ctrl off macOS. Wording: agent prompt names the OS and shell, shortcuts/key-store/"Show in Finder" labels per OS (`lib/platform.ts`, `lib/shortcuts.ts`), system font stack with Segoe UI/Roboto fallbacks. Wayland input injection/capture was not investigated beyond reporting it unsupported.
+  - [x] CI matrix (`macos-latest`, `windows-latest`, `ubuntu-latest`, Linux system packages installed) running `npm run check`; symlink/POSIX-only Rust tests gated with `cfg(unix)`, `fileUndo` mode test guarded on `win32`. The Windows/Linux jobs have not been observed to pass.
 
 - [ ] **MCP servers**: connect external tools (GitHub, databases, browser).
 - [x] **Partial accept**: accept/reject per hunk in the diff view (`hunks.rs`, `HunkDiff`); whole-file decisions remain for new, deleted and binary files.
