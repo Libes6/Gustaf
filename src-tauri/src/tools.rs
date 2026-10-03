@@ -1,3 +1,4 @@
+use crate::shell::Shell;
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use regex::Regex;
 use serde::Serialize;
@@ -120,7 +121,7 @@ fn walk_files(base: &Path, glob: Option<&str>) -> Result<impl Iterator<Item = (P
         .filter(|e| e.file_type().is_some_and(|t| t.is_file()))
         .filter_map(move |e| {
             let real = contained(&base, e.path())?;
-            let rel = e.path().strip_prefix(&base).ok()?.to_string_lossy().into_owned();
+            let rel = e.path().strip_prefix(&base).ok()?.to_string_lossy().replace('\\', "/");
             Some((real, rel))
         }))
 }
@@ -249,11 +250,15 @@ pub struct CmdResult {
 // ponytail: output is returned when the command ends, not streamed; switch to Channel events if long builds need live logs.
 #[tauri::command]
 pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>) -> Result<CmdResult, String> {
-    let mut child = Command::new("/bin/zsh")
-        .args(["-lc", &format!("{command} 2>&1")])
+    let shell = Shell::current();
+    let merged = shell.merges_stderr_itself();
+    let mut child = Command::new(shell.program())
+        .args(shell.flags())
+        .arg(shell.script(&command))
         .current_dir(&root)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
+        .stderr(if merged { Stdio::inherit() } else { Stdio::piped() })
         .spawn()
         .map_err(|e| e.to_string())?;
     let Some(mut stdout) = child.stdout.take() else {
@@ -265,6 +270,14 @@ pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>)
         let mut buf = Vec::new();
         let _ = stdout.read_to_end(&mut buf);
         buf
+    });
+    // Shells that cannot merge stderr themselves (PowerShell): read it on its own thread and append it.
+    let err_reader = child.stderr.take().map(|mut stderr| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stderr.read_to_end(&mut buf);
+            buf
+        })
     });
     let deadline = Instant::now() + Duration::from_millis(timeout_ms.unwrap_or(120_000));
     let (code, timed_out) = loop {
@@ -278,7 +291,11 @@ pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>)
         }
         std::thread::sleep(Duration::from_millis(50));
     };
-    let output = truncate(String::from_utf8_lossy(&reader.join().unwrap_or_default()).into_owned());
+    let mut bytes = reader.join().unwrap_or_default();
+    if let Some(r) = err_reader {
+        bytes.extend(r.join().unwrap_or_default());
+    }
+    let output = truncate(String::from_utf8_lossy(&bytes).into_owned());
     Ok(CmdResult { code, output, timed_out })
 }
 
@@ -292,12 +309,14 @@ mod tests {
         let root = dir.path().join("proj");
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(dir.path().join("secret.txt"), "x").unwrap();
+        #[cfg(unix)]
         std::os::unix::fs::symlink(dir.path(), root.join("link")).unwrap();
 
         assert!(resolve_in_root(&root, "src/new.rs").is_ok());
         assert!(resolve_in_root(&root, "../secret.txt").is_err());
         assert!(resolve_in_root(&root, "src/../../secret.txt").is_err());
         assert!(resolve_in_root(&root, "/etc/passwd").is_err());
+        #[cfg(unix)]
         assert!(resolve_in_root(&root, "link/secret.txt").is_err());
         assert!(resolve_in_root(&root, "missing/../../x").is_err());
 
@@ -310,6 +329,7 @@ mod tests {
     }
 
     /// `outside/` holds a secret; `proj/` has a real file plus symlinks pointing at the secret.
+    #[cfg(unix)]
     fn escape_fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let dir = tempfile::tempdir().unwrap();
         let outside = dir.path().join("outside");
@@ -340,6 +360,7 @@ mod tests {
         assert_eq!(fs_files(dir.path().to_str().unwrap().into()).unwrap(), ["plain.txt"]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn files_and_search_do_not_escape_through_symlinks() {
         let (_dir, root, _outside) = escape_fixture();
@@ -374,6 +395,7 @@ mod tests {
         assert!(contained(&base, &root.join("nope.txt")).is_none());
     }
 
+    #[cfg(unix)]
     #[test]
     fn root_given_as_symlink_is_canonicalized() {
         let (dir, root, _outside) = escape_fixture();
