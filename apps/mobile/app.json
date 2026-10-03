@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "M Code",
+    "slug": "mcode-mobile",
+    "version": "0.1.0",
+    "scheme": "mcode",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.mcode.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
+        "NSLocalNetworkUsageDescription": "M Code connects to the M Code desktop app on your local network.",
+        "NSBonjourServices": ["_mcode._tcp"]
+      }
+    },
+    "android": {
+      "package": "app.mcode.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#181818",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["android.permission.CAMERA", "android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.CHANGE_WIFI_MULTICAST_STATE"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
