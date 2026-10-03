@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import en from "./en.json";
 import ru from "./ru.json";
 
@@ -24,9 +24,11 @@ export function translate(locale: Locale, key: Key, vars: Record<string, string 
 
 const Ctx = createContext<Locale>("en");
 
-export const I18nProvider = ({ locale, children }: { locale: Locale; children: ReactNode }) => (
-  <Ctx.Provider value={locale}>{children}</Ctx.Provider>
-);
+export const I18nProvider = ({ locale, children }: { locale: Locale; children: ReactNode }) => {
+  // Screen readers pick the voice and pronunciation from <html lang>.
+  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+  return <Ctx.Provider value={locale}>{children}</Ctx.Provider>;
+};
 
 export function useT() {
   const locale = useContext(Ctx);

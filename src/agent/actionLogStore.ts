@@ -50,7 +50,7 @@ const change = (next: ActionEntry[], now = false) => {
   schedule(now);
 };
 
-export type ActionStart = { tool: string; summary: string; root?: string; project?: string };
+export type ActionStart = { tool: string; summary: string; root?: string; project?: string; source?: "scheduled" };
 
 /** Records a tool call that is about to run; returns its id. */
 export function logStart(a: ActionStart): string {

@@ -6,7 +6,7 @@ export function ShortcutsSettings() {
   const t = useT();
   return (
     <>
-      <h4>{t("shortcuts")}</h4>
+      <h4 aria-level={2}>{t("shortcuts")}</h4>
       <p className="h4-sub">{t("shortcutsLead")}</p>
       <div className="card">
         {SHORTCUTS.map((s) => (

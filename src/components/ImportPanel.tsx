@@ -148,7 +148,7 @@ export function ChatTransfer() {
 
   return (
     <>
-      <h4>{t("chatFiles")}</h4>
+      <h4 aria-level={2}>{t("chatFiles")}</h4>
       <p className="h4-sub">{t("chatFilesSub")}</p>
       <div className="card">
         {count > 0 && (
@@ -268,7 +268,7 @@ function CursorImport({ onDone }: { onDone: (imported: number) => void }) {
       </div>
       {scan.mcpServers.length > 0 && (
         <>
-          <h4>{t("mcpFound")}</h4>
+          <h4 aria-level={2}>{t("mcpFound")}</h4>
           <div className="card">
             <div className="card-row">
               <Plug size={15} />

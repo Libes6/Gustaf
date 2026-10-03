@@ -15,5 +15,5 @@ export function WindowHeader() {
     e.preventDefault();
     const window = getCurrentWindow();
     (e.detail === 2 ? window.toggleMaximize() : window.startDragging()).catch(console.error);
-  }}>{app.onboarded && app.view === "chat" && <button className="icon-btn" title={t("toggleSidebar")} onClick={() => app.setSideHidden(!app.sideHidden)}><PanelLeft size={15} /></button>}<span>{title}</span></header>;
+  }}>{app.onboarded && app.view === "chat" && <button className="icon-btn" title={t("toggleSidebar")} aria-label={t("toggleSidebar")} aria-expanded={!app.sideHidden} onClick={() => app.setSideHidden(!app.sideHidden)}><PanelLeft size={15} /></button>}<span>{title}</span></header>;
 }

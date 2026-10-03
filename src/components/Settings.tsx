@@ -7,7 +7,7 @@ import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
 import { displayKeys, isMac } from "../lib/platform";
 import { shortcut, shortcutDisplay } from "../lib/shortcuts";
-import { computer, fsx, getSetting } from "../lib/api";
+import { computer, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
 import { SOURCE_LABELS } from "../lib/importers/common";
 import { deleteProvider, PRESETS, saveProvider } from "../providers";
@@ -18,10 +18,13 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
+import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
+import { McpServers } from "./McpServers";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
+import { ScheduledPromptsSection } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
@@ -39,8 +42,8 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return <button role="switch" aria-checked={on} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
+function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
+  return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
 }
 
 function General() {
@@ -55,9 +58,9 @@ function General() {
           <div className="grow">
             <div className="t">{t("language")}</div>
           </div>
-          <div className="seg" style={{ margin: 0 }}>
-            <button className={app.locale === "ru" ? "active" : ""} onClick={() => app.setLocale("ru")}>Русский</button>
-            <button className={app.locale === "en" ? "active" : ""} onClick={() => app.setLocale("en")}>English</button>
+          <div className="seg" role="group" aria-label={t("language")} style={{ margin: 0 }}>
+            <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" onClick={() => app.setLocale("ru")}>Русский</button>
+            <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" onClick={() => app.setLocale("en")}>English</button>
           </div>
         </div>
         <div className="card-row">
@@ -70,6 +73,7 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
+      <ScheduledPromptsSection />
     </>
   );
 }
@@ -85,7 +89,7 @@ function ImportPage() {
     <>
       <h1>{t("import")}</h1>
       <p className="lead">{t("importLead")}</p>
-      <h4>{t("importFromApp")}</h4>
+      <h4 aria-level={2}>{t("importFromApp")}</h4>
       <p className="h4-sub">{t("importFromAppSub")}</p>
       <div className="card">
         <div className="card-row">
@@ -102,7 +106,7 @@ function ImportPage() {
       <div style={{ marginTop: 12 }}>
         <ChatTransfer />
       </div>
-      <h4>{t("importHistory")}</h4>
+      <h4 aria-level={2}>{t("importHistory")}</h4>
       <div className="card">
         {!history.length && <div className="card-row d">{t("importHistoryEmpty")}</div>}
         {history.map((h, i) => (
@@ -169,32 +173,32 @@ function Providers() {
       <div className="split card">
         <div className="split-list">
           {app.providers.map((p) => (
-            <div key={p.id} className={`split-item${current === p.id ? " active" : ""}`} onClick={() => setSel(p.id)}>
-              <ProviderIcon kind={p.kind} cli={p.cli} />
-              <div className="grow">
-                <div className="t">{p.name} {version(p) && <span className="mono d">v{version(p)}</span>}</div>
-                <div className="sub">{status(p)}</div>
-              </div>
-              <span onClick={(e) => e.stopPropagation()}>
-                <Toggle on={!p.disabled} onChange={(on) => update({ ...p, disabled: !on })} />
-              </span>
+            <div key={p.id} className={`split-item${current === p.id ? " active" : ""}`}>
+              <button className="split-main" aria-current={current === p.id ? "true" : undefined} onClick={() => setSel(p.id)}>
+                <ProviderIcon kind={p.kind} cli={p.cli} />
+                <div className="grow">
+                  <div className="t">{p.name} {version(p) && <span className="mono d">v{version(p)}</span>}</div>
+                  <div className="sub">{status(p)}</div>
+                </div>
+              </button>
+              <Toggle on={!p.disabled} label={p.name} onChange={(on) => update({ ...p, disabled: !on })} />
             </div>
           ))}
           {pending.map((c) => (
-            <div key={c.id} className={`split-item${current === `cli:${c.id}` ? " active" : ""}`} onClick={() => setSel(`cli:${c.id}`)}>
-              <ProviderIcon kind="cli" cli={c.id} />
-              <div className="grow">
-                <div className="t">{cliName(c.id)} <span className="mono d">v{short(c.version)}</span></div>
-                <div className="sub d">{t("notConnected")}</div>
-              </div>
-              <span onClick={(e) => e.stopPropagation()}>
-                <Toggle on={false} onChange={() => connect(c.id)} />
-              </span>
+            <div key={c.id} className={`split-item${current === `cli:${c.id}` ? " active" : ""}`}>
+              <button className="split-main" aria-current={current === `cli:${c.id}` ? "true" : undefined} onClick={() => setSel(`cli:${c.id}`)}>
+                <ProviderIcon kind="cli" cli={c.id} />
+                <div className="grow">
+                  <div className="t">{cliName(c.id)} <span className="mono d">v{short(c.version)}</span></div>
+                  <div className="sub d">{t("notConnected")}</div>
+                </div>
+              </button>
+              <Toggle on={false} label={cliName(c.id)} onChange={() => connect(c.id)} />
             </div>
           ))}
-          <div className={`split-item add${current === "new" ? " active" : ""}`} onClick={() => setSel("new")}>
+          <button className={`split-item add${current === "new" ? " active" : ""}`} aria-current={current === "new" ? "true" : undefined} onClick={() => setSel("new")}>
             <Plus size={15} /> <span className="grow">{t("addProvider")}</span>
-          </div>
+          </button>
         </div>
         <div className="split-detail">
           {current === "new" && (
@@ -246,15 +250,15 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             <div className="t">{t("displayName")}</div>
             <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
           </div>
-          <input className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-          <button className="icon-btn" title={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
+          <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
+          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="card"><div className="card-row"><div className="grow"><div className="t">{t(app.providerHealth[p.id]?.status === "auth" ? "providerAuth" : app.providerHealth[p.id]?.status === "ok" ? "providerOn" : "providerAvailable")}</div><div className="d">{t("providerCheckHint")}</div>
       {app.providerHealth[p.id]?.message && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{app.providerHealth[p.id].message}</div>}
       {app.providerHealth[p.id]?.status === "auth" && p.kind === "cli" && <code>{p.cli === "claude" ? "claude auth login" : p.cli === "cursor-agent" ? "cursor-agent login" : "codex login"}</code>}
       </div><button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button></div></div>
-      <h4>{t("runtime")}</h4>
+      <h4 aria-level={2}>{t("runtime")}</h4>
       <div className="card">
         {p.kind === "cli" ? (
           <div className="card-row">
@@ -269,7 +273,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             {p.kind !== "cursor" && (
               <div className="card-row">
                 <div className="grow t">Base URL</div>
-                <input className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
+                <input aria-label="Base URL" className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
               </div>
             )}
             <div className="card-row">
@@ -277,19 +281,19 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
                 <div className="t">{t("apiKey")}</div>
                 <div className="d">{t("keyUnchanged")}</div>
               </div>
-              <input className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
+              <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
             </div>
           </>
         )}
       </div>
       {p.cli === "cursor-agent" && <>
         {p.cliAuth === "key" && <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("apiKey")}</div><div className="d">{t("cursorCliAccountHint")}</div></div><input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={e => setKey(e.target.value)} /><button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button></div></div>}
-        <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("reserveAccount")}</div><div className="d">{t("reserveAccountHint")}</div></div><select aria-label={t("reserveAccount")} className="input narrow" value={p.backupProviderId ?? ""} onChange={e => update({ ...p, backupProviderId: e.target.value || undefined })}><option value="">{t("noReserve")}</option>{app.providers.filter(other => other.id !== p.id && other.cli === "cursor-agent" && other.cliAuth === "key" && !other.disabled).map(other => <option key={other.id} value={other.id}>{other.name}</option>)}</select></div></div>
+        <CursorAccounts />
       </>}
-      <h4>{t("models")}</h4>
+      <h4 aria-level={2}>{t("models")}</h4>
       <div className="card">
         <div className="card-row" style={{ minHeight: 44 }}>
-          <input className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input aria-label={t("searchModels")} className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
           <button className="btn-ghost small" onClick={() => app.setHiddenModels(allHidden ? app.hiddenModels.filter((k) => !keys.includes(k)) : [...new Set([...app.hiddenModels, ...keys])])}>
             {t(allHidden ? "showAll" : "hideAll")}
           </button>
@@ -301,11 +305,11 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             const fav = app.favorites.includes(k);
             return (
               <div key={m.id} className="model-line">
-                <button className={`star${fav ? " on" : ""}`} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
+                <button className={`star${fav ? " on" : ""}`} title={t("favorite")} aria-label={`${t("favorite")}: ${m.name}`} aria-pressed={fav} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
                   <Star size={13} fill={fav ? "currentColor" : "none"} />
                 </button>
                 <span className="grow">{m.name} {m.name !== m.id && <span className="mono d">{m.id}</span>}</span>
-                <Toggle on={!app.hiddenModels.includes(k)} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
+                <Toggle on={!app.hiddenModels.includes(k)} label={m.name} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
               </div>
             );
           })}
@@ -325,7 +329,7 @@ function Usage() {
     <h1>{t("usage")}</h1><p className="lead">{t("tokenUsageLead")}</p>
     <BudgetsSection />
     <AgentSettingsSection />
-    <h4>{t("providers")}</h4>
+    <h4 aria-level={2}>{t("providers")}</h4>
     {app.providers.map(p => {
       const stats = Object.values(app.tokenStats).filter(s => s.providerId === p.id);
       const total = stats.reduce((a,s) => ({ input: a.input + s.input, output: a.output + s.output, cached: a.cached + s.cached }), { input: 0, output: 0, cached: 0 });
@@ -336,7 +340,7 @@ function Usage() {
         {!stats.length && <p className="d usage-note">{t("tokensUnavailable")}</p>}
         {stats.map(s => <div className="card-row" key={s.model}><ModelIcon model={s.model} provider={p} /><div className="grow"><div className="t">{app.models.find(m => m.providerId === p.id && m.id === s.model)?.name ?? s.model}</div><div className="d">{t("reportedTurns", { count: s.turns })}</div></div><span className="d">{format(s.input)} ↓ · {format(s.output)} ↑</span></div>)}
         <div className="card-row"><div className="grow t">{t("subscriptionLimits")}</div>{p.cli === "codex" && <button className="btn-soft" disabled={!!app.loadingLimits} onClick={() => app.refreshLimits(p)}>{t(app.loadingLimits === p.id ? "providerChecking" : "refreshLimits")}</button>}{link && <button className="btn-soft" onClick={() => openUrl(link)}>{t("usageDashboard")}</button>}</div>
-        {snapshot?.windows.length ? <div className="usage-limits">{snapshot.windows.map(w => <div key={w.id}><div className="usage-limit-label"><span>{w.label}{w.plan ? ` · ${w.plan}` : ""}</span><span>{Math.round(w.usedPercent)}% {t("used")}</span></div><progress max={100} value={w.usedPercent} />{w.resetsAt && <div className="d">{t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}</div>}</div>)}<p className="d">{t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}</p></div> : <p className="d usage-note">{t("limitsUnavailable")}</p>}
+        {snapshot?.windows.length ? <div className="usage-limits">{snapshot.windows.map(w => <div key={w.id}><div className="usage-limit-label"><span>{w.label}{w.plan ? ` · ${w.plan}` : ""}</span><span>{Math.round(w.usedPercent)}% {t("used")}</span></div><progress max={100} value={w.usedPercent} aria-label={`${w.label}: ${Math.round(w.usedPercent)}% ${t("used")}`} />{w.resetsAt && <div className="d">{t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}</div>}</div>)}<p className="d">{t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}</p></div> : <p className="d usage-note">{t("limitsUnavailable")}</p>}
         {app.limitErrors[p.id] && <div className="error-box">{app.limitErrors[p.id]}</div>}
       </div>;
     })}
@@ -369,19 +373,19 @@ function ComputerPage() {
     <>
       <h1>{t("computerUse")}</h1>
       <p className="lead">{t("computerLead")}</p>
-      <h4>{t("permissions")}</h4>
+      <h4 aria-level={2}>{t("permissions")}</h4>
       <div className="card">
         {row(perm?.accessibility, "permAccessibility", "permAccessibilityDesc", "Privacy_Accessibility")}
         {row(perm?.screen, "permScreen", "permScreenDesc", "Privacy_ScreenCapture", true)}
       </div>
-      <h4>{t("behavior")}</h4>
+      <h4 aria-level={2}>{t("behavior")}</h4>
       <div className="card">
         <div className="card-row">
           <div className="grow">
             <div className="t">{t("computerEnable")}</div>
             <div className="d">{t("computerEnableDesc")}</div>
           </div>
-          <Toggle on={app.computerUse} onChange={(v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen)} />
+          <Toggle on={app.computerUse} label={t("computerUse")} onChange={(v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen)} />
         </div>
         <div className="card-row">
           <div className="grow">
@@ -389,35 +393,6 @@ function ComputerPage() {
             <div className="d">{t("computerSafetyDesc", { mod: displayKeys("⌘").replace(/\+$/, ""), stop: shortcutDisplay(shortcut("stopAgent")) })}</div>
           </div>
         </div>
-      </div>
-    </>
-  );
-}
-
-function Mcp() {
-  const t = useT();
-  const [servers, setServers] = useState<[string, any][] | null>(null);
-  useEffect(() => {
-    fsx.homeFile(".cursor/mcp.json").then((s) => setServers(s ? Object.entries(JSON.parse(s).mcpServers ?? {}) : []));
-  }, []);
-  return (
-    <>
-      <h1>MCP</h1>
-      <p className="lead">{t("mcpLead")}</p>
-      <div className="card">
-        {servers?.length === 0 && <div className="card-row d">{t("mcpNone")}</div>}
-        {servers?.map(([name, cfg]) => (
-          <div key={name} className="card-row">
-            <span className="prov-icon"><Plug size={14} /></span>
-            <div className="grow">
-              <div className="t">{name}</div>
-              <div className="d" style={{ fontFamily: "var(--mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {cfg.url ?? [cfg.command, ...(cfg.args ?? [])].join(" ")}
-              </div>
-            </div>
-            <span className="d">{cfg.url ? "HTTP" : "stdio"}</span>
-          </div>
-        ))}
       </div>
     </>
   );
@@ -448,7 +423,7 @@ function Rules() {
     <>
       <h1>{t("rules")}</h1>
       <p className="lead">{t("rulesLead")}</p>
-      <select className="input" value={pid} onChange={(e) => setPid(Number(e.target.value))} style={{ marginBottom: 12 }}>
+      <select aria-label={t("searchProject")} className="input" value={pid} onChange={(e) => setPid(Number(e.target.value))} style={{ marginBottom: 12 }}>
         {withPath.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <div className="card" style={{ padding: 14 }}>
@@ -487,7 +462,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: Mcp, git: GitPage, rules: Rules, archive: ArchivePage,
+  general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
 };
 
 export function Settings() {
@@ -496,29 +471,29 @@ export function Settings() {
   const Page = PAGES[app.settingsPage];
   return (
     <div className="settings">
-      <nav className="settings-nav drag">
-        <h3>{t("settings")}</h3>
+      <nav className="settings-nav drag" aria-label={t("settings")}>
+        <div className="settings-nav-title">{t("settings")}</div>
         {NAV.map((g) => (
-          <div key={g.group}>
-            <div className="section-title" style={{ paddingTop: 10 }}>{t(g.group)}</div>
+          <div key={g.group} role="group" aria-label={t(g.group)}>
+            <div className="section-title" aria-hidden="true" style={{ paddingTop: 10 }}>{t(g.group)}</div>
             {g.items.map((it) => (
-              <div key={it.id} className={`row${app.settingsPage === it.id ? " active" : ""}`} onClick={() => app.openSettings(it.id)}>
+              <button key={it.id} className={`row${app.settingsPage === it.id ? " active" : ""}`} aria-current={app.settingsPage === it.id ? "page" : undefined} onClick={() => app.openSettings(it.id)}>
                 <it.icon size={15} />
                 <span className="label">{t(it.label)}</span>
-              </div>
+              </button>
             ))}
           </div>
         ))}
-        <div className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
+        <button className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
           <span className="label">{t("docs")}</span>
-        </div>
+        </button>
       </nav>
-      <div className="settings-main">
+      <main className="settings-main" aria-label={t(NAV.flatMap((g) => g.items).find((it) => it.id === app.settingsPage)?.label ?? "settings")}>
         <div className="drag" style={{ height: 0 }} />
         <div className={`settings-inner${app.settingsPage === "providers" ? " wide" : ""}`}>
           <Page />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -99,7 +99,7 @@ export function AgentSettingsSection() {
 
   return (
     <>
-      <h4>{t("agentSettings")}</h4>
+      <h4 aria-level={2}>{t("agentSettings")}</h4>
       <p className="h4-sub">{t("agentSettingsLead")}</p>
       <div className="card">
         {AGENT_TYPES.map((type) => (

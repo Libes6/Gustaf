@@ -22,13 +22,13 @@ export function Onboarding() {
   return (
     <div className="onboarding">
       <WindowHeader />
-      <div className="lang-switch seg">
-        <button className={app.locale === "ru" ? "active" : ""} onClick={() => app.setLocale("ru")}>RU</button>
-        <button className={app.locale === "en" ? "active" : ""} onClick={() => app.setLocale("en")}>EN</button>
+      <div className="lang-switch seg" role="group" aria-label={t("language")}>
+        <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" aria-label="Русский" onClick={() => app.setLocale("ru")}>RU</button>
+        <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" aria-label="English" onClick={() => app.setLocale("en")}>EN</button>
       </div>
-      <div className="onb-body">
+      <main className="onb-body">
         <div className="onb-inner">
-          <div className="onb-steps">
+          <div className="onb-steps" role="img" aria-label={t("stepOf", { n: step + 1, total: 2 })}>
             <i className="on" />
             <i className={step === 1 ? "on" : ""} />
           </div>
@@ -57,7 +57,7 @@ export function Onboarding() {
             </>
           )}
         </div>
-      </div>
+      </main>
       {creating && <CreateProjectDialog onClose={() => setCreating(false)} onCreated={async () => (setCreating(false), await app.reload(), setStep(1))} />}
     </div>
   );

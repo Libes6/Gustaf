@@ -1,10 +1,11 @@
 import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Undo2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
 import type { StoredMsg } from "../lib/data";
 import type { Part } from "../providers/types";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { gitRepo, review, type GitStatus, type Hunk, type Review, type ReviewChange } from "../lib/api";
 import { EMPTY_REVIEW_SETUP, type ReviewSetupConfig } from "../lib/reviewSetup";
 import { loadReviewSetup } from "../lib/reviewSetupStore";
@@ -57,6 +58,8 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
   }, [root, base, tick]);
   useEffect(() => { loadReviewSetup(root).then(setSetupCfg).catch(() => setSetupCfg(EMPTY_REVIEW_SETUP)); }, [root]);
 
+  const diffDialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(diffDialogRef, undefined, !!diff);
   useEffect(() => {
     if (!diff) return;
     const close = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setDiff(null); } };
@@ -126,11 +129,11 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
   }, [messages]);
 
   return (
-    <div className={`panel${open ? " open" : ""}`}>
+    <aside className={`panel${open ? " open" : ""}`} aria-label={t("changes")}>
       <div className="panel-head">
         <span className="grow">{name}</span>
         {pending > 0 && <button className="btn-soft" onClick={() => { setOpen(true); setTab("changes"); }}>{t("reviewPending")} · {pending}</button>}
-        <button className="icon-btn" onClick={() => setOpen(!open)} title={open ? t("collapse") : t("changes")}>
+        <button className="icon-btn" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? t("collapse") : t("changes")} title={open ? t("collapse") : t("changes")}>
           {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       </div>
@@ -154,8 +157,8 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
         onChanged();
       }} />}
       {diff && createPortal(<div className="review-overlay" onMouseDown={e => { if (e.target === e.currentTarget && !acting) setDiff(null); }}>
-        <section className="review-dialog" role="dialog" aria-modal="true" aria-label={diff.path}>
-          <header><strong>{diff.path}</strong><button className="icon-btn" title={t("cancel")} onClick={() => setDiff(null)}><X size={17} /></button></header>
+        <section ref={diffDialogRef} className="review-dialog" role="dialog" aria-modal="true" aria-label={diff.path}>
+          <header><strong>{diff.path}</strong><button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={() => setDiff(null)}><X size={17} /></button></header>
           <div className="review-diff-body">
             {diff.hunks && diff.hunks.length > 0
               ? <HunkDiff hunks={diff.hunks} picked={picked} disabled={busy || acting} onDecide={decideHunks}
@@ -177,10 +180,10 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
       {open && (
         <>
           <div className="panel-tabs">
-            <button className={tab === "changes" ? "active" : ""} onClick={() => setTab("changes")}>
+            <button className={tab === "changes" ? "active" : ""} aria-pressed={tab === "changes"} onClick={() => setTab("changes")}>
               {t("changes")} {files.length ? `(${files.length})` : ""}
             </button>
-            <button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}>
+            <button className={tab === "terminal" ? "active" : ""} aria-pressed={tab === "terminal"} onClick={() => setTab("terminal")}>
               {t("terminal")}
             </button>
           </div>
@@ -201,11 +204,11 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
                 {files.length > 0 && <div className="review-intro"><strong>{t("changes")}</strong></div>}
                 {!files.length && <div className="hint" style={{ padding: 12 }}>{t("noChanges")}</div>}
                 {files.map((f) => (
-                  <div key={f.path} className="file-row" onClick={() => showDiff(f.path)}>
-                    <span className="path">{f.path}</span>
+                  <div key={f.path} className="file-row">
+                    <button className="path" onClick={() => showDiff(f.path)}>{f.path}</button>
                     <span className="plus">+{f.added}</span>
                     <span className="minus">−{f.removed}</span>
-                    <button className="icon-btn" disabled={busy || acting} title={t("revertFile")} onClick={(e) => (e.stopPropagation(), act(() => restoreFile(root, base!, f.path))())}>
+                    <button className="icon-btn" disabled={busy || acting} title={t("revertFile")} aria-label={`${t("revertFile")}: ${f.path}`} onClick={(e) => (e.stopPropagation(), act(() => restoreFile(root, base!, f.path))())}>
                       <Undo2 size={13} />
                     </button>
                   </div>
@@ -235,6 +238,6 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
           </div>
         </>
       )}
-    </div>
+    </aside>
   );
 }

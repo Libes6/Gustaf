@@ -7,6 +7,7 @@ import {
   estimateOutput, startCompare, toggleTarget, type Column, type CompareRun, type CompareTarget,
 } from "../lib/compare";
 import { addMessage, createChat } from "../lib/data";
+import { useDialogFocus } from "../lib/useDialogFocus";
 import { getAdapter } from "../providers";
 import { retryNoticeVars } from "../providers/retry";
 import { modelKey, useApp, type Model } from "../state";
@@ -22,6 +23,8 @@ import "../styles/compare.css";
 export function Compare({ onClose }: { onClose: () => void }) {
   const t = useT();
   const app = useApp();
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef);
   const [state, dispatch] = useReducer(compareReducer, emptyCompare);
   const [prompt, setPrompt] = useState("");
   const [chosen, setChosen] = useState<CompareTarget[]>(() => {
@@ -92,7 +95,7 @@ export function Compare({ onClose }: { onClose: () => void }) {
   const cols = state.columns;
   return (
     <div className="overlay compare-overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <section className="compare" role="dialog" aria-modal="true" aria-label={t("compareTitle")}>
+      <section ref={dialogRef} className="compare" role="dialog" aria-modal="true" aria-label={t("compareTitle")}>
         <header className="compare-head">
           <h2>{t("compareTitle")}</h2>
           <span className="compare-sub">{t("compareReadOnly")}</span>
@@ -104,6 +107,7 @@ export function Compare({ onClose }: { onClose: () => void }) {
 
         <div className="compare-setup">
           <textarea
+            autoFocus
             className="compare-prompt"
             rows={3}
             value={prompt}

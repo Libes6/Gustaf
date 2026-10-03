@@ -1,4 +1,3 @@
-import { reserveFor } from "../providers/cursorAccounts";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -100,8 +99,6 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const turns = useMemo(() => groupTurns(messages), [messages]);
   const canvasSources = useMemo(() => messages.filter((m) => m.role === "assistant").map(textOf), [messages]);
 
-  const reserve = reserveFor(provider, app.providers, app.selection?.model ?? "", app.models);
-
   return (
     <CanvasWorkspace sources={canvasSources} scope={session.key} onRepair={(prompt) => { setText(prompt); taRef.current?.focus(); }}>
     <main className="main">
@@ -115,18 +112,18 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           <h1>{project ? t("emptyProject", { name: project.name }) : t("emptyTitle")}</h1>
         </div>
       ) : (
-        <div className="feed" ref={feedRef} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
+        <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
             ))}
             <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} />
-            {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button>{reserve && <button className="btn-soft" disabled={running} onClick={() => run.retryRequest(reserve)}>{t("retryReserve", { name: reserve.name })}</button>}</div></div>}
+            {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
         </div>
       )}
       {!atBottom && (
-        <button className="to-bottom" onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}>
+        <button className="to-bottom" title={t("scrollToBottom")} aria-label={t("scrollToBottom")} onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}>
           <ArrowDown size={15} />
         </button>
       )}

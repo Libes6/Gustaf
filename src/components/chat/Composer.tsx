@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { useT } from "../../i18n";
 import { computer } from "../../lib/api";
+import { pickAccount } from "../../providers/cursorAccounts";
+import { useCursorPool } from "../../providers/cursorPoolStore";
 import type { ModelInfo, ProviderConfig } from "../../providers/types";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
@@ -46,6 +48,10 @@ export function Composer(p: Props) {
   const menu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
   const instructions = useInstructionReport(root, p.provider);
+  // Cursor account rotation: which account the next message will use (only when the selected one is in the pool).
+  const pool = useCursorPool();
+  const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
+  const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -104,9 +110,9 @@ export function Composer(p: Props) {
           onDrop={(e) => (e.preventDefault(), addImageFiles(e.dataTransfer.files))}
         >
           {mention && mentionList.length > 0 && (
-            <div className="menu mention-list" style={{ position: "absolute" }}>
+            <div className="menu mention-list" id="mention-list" role="listbox" aria-label={t("mentionFile")} style={{ position: "absolute" }}>
               {mentionList.map((f, i) => (
-                <button key={f} className={`menu-item${i === mention.hl ? " hl" : ""}`} onMouseDown={(e) => (e.preventDefault(), insertMention(f))}>
+                <button key={f} id={`mention-opt-${i}`} role="option" aria-selected={i === mention.hl} tabIndex={-1} className={`menu-item${i === mention.hl ? " hl" : ""}`} onMouseDown={(e) => (e.preventDefault(), insertMention(f))}>
                   <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f}</span>
                 </button>
               ))}
@@ -117,7 +123,7 @@ export function Composer(p: Props) {
               {images.map((d, i) => (
                 <div key={i} className="attach">
                   <img src={`data:image/png;base64,${d}`} alt="" />
-                  <button onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
+                  <button title={t("removeAttachment")} aria-label={t("removeAttachment")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
                     <X size={11} />
                   </button>
                 </div>
@@ -126,6 +132,10 @@ export function Composer(p: Props) {
           )}
           <textarea
             ref={taRef}
+            aria-label={t("askAnything")}
+            aria-haspopup="listbox"
+            aria-controls={mention && mentionList.length ? "mention-list" : undefined}
+            aria-activedescendant={mention && mentionList.length ? `mention-opt-${mention.hl}` : undefined}
             rows={1}
             value={text}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
@@ -142,6 +152,8 @@ export function Composer(p: Props) {
               className="icon-btn"
               disabled={selectedModel?.images === false && !root}
               title={t("attach")}
+              aria-label={t("attach")}
+              aria-haspopup="menu"
               onClick={(e) =>
                 menu.open(e.currentTarget.getBoundingClientRect(), [
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
@@ -154,6 +166,7 @@ export function Composer(p: Props) {
             <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => (e.target.files && addImageFiles(e.target.files), (e.target.value = ""))} />
             <button
               className="chip"
+              aria-haspopup="menu"
               onClick={(e) =>
                 menu.open(e.currentTarget.getBoundingClientRect(), [
                   { label: t("accessReadonly"), icon: <Lock size={15} />, kbd: app.access === "readonly" ? "✓" : "", onClick: () => app.setAccess("readonly") },
@@ -166,7 +179,7 @@ export function Composer(p: Props) {
               <AccessIcon size={14} /> {accessLabel}
             </button>
             {p.supports.computer && (
-              <button className={`chip${app.computerUse ? " on" : ""}`} onClick={toggleComputer} title={t("computerUseHint")}>
+              <button className={`chip${app.computerUse ? " on" : ""}`} aria-pressed={app.computerUse} onClick={toggleComputer} title={t("computerUseHint")}>
                 <Monitor size={14} /> {t("computerUse")}
               </button>
             )}
@@ -184,7 +197,7 @@ export function Composer(p: Props) {
               onOpen={instructions.reload}
             />
             <div style={{ position: "relative" }}>
-              <button className="chip" onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
+              <button className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
                 {p.modelName ?? t("chooseModel")} <ChevronDown size={13} />
               </button>
@@ -193,6 +206,7 @@ export function Composer(p: Props) {
             {p.supports.reasoning && (
               <button
                 className="chip"
+                aria-haspopup="menu"
                 onClick={(e) =>
                   menu.open(e.currentTarget.getBoundingClientRect(), (["low", "medium", "high"] as const).map((r) => ({ label: t(`reasoning_${r}`), kbd: app.reasoning === r ? "✓" : "", onClick: () => app.setReasoning(r) })))
                 }
@@ -201,11 +215,11 @@ export function Composer(p: Props) {
               </button>
             )}
             {p.running ? (
-              <button className="send" onClick={p.onStop} title={t("stop")}>
+              <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />
               </button>
             ) : (
-              <button className="send" disabled={!text.trim() && !images.length} onClick={p.onSend} title={t("send")}>
+              <button className="send" disabled={!text.trim() && !images.length} onClick={p.onSend} title={t("send")} aria-label={t("send")}>
                 <ArrowUp size={16} />
               </button>
             )}

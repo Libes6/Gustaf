@@ -33,7 +33,7 @@ export function ToolCard({ call, result }: { call: Call; result?: Result }) {
   const edit = call.name === "edit_file" && call.args;
   return (
     <div className="tool-card">
-      <button className="tool-head" style={{ width: "100%" }} onClick={() => setOpen(!open)}>
+      <button className="tool-head" style={{ width: "100%" }} aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon size={14} />
         <span className="name">{label}</span>
         <span className="arg">{summarize(call)}</span>

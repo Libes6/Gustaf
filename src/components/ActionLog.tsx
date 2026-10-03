@@ -63,12 +63,12 @@ export function ActionLog() {
   let lastDay = "";
   return (
     <>
-      <h4>{t("actionLog")}</h4>
+      <h4 aria-level={2}>{t("actionLog")}</h4>
       <p className="h4-sub">{t("actionLogLead")}</p>
       <div className="log-bar">
-        <div className="seg">
+        <div className="seg" role="group" aria-label={t("actionLog")}>
           {FILTERS.map((f) => (
-            <button key={f.id} className={filter === f.id ? "active" : ""} onClick={() => setFilter(f.id)}>{t(f.label)}</button>
+            <button key={f.id} className={filter === f.id ? "active" : ""} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{t(f.label)}</button>
           ))}
         </div>
         <span className="grow" />
@@ -88,7 +88,7 @@ export function ActionLog() {
           lastDay = d;
           const block = e.undo ? undoBlocker(entries, e, active) : "none";
           const blockText = block === "running" ? t("undoBusy") : block === "later" ? t("undoLater") : undefined;
-          const sub = [e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
+          const sub = [e.source === "scheduled" ? t("logSourceScheduled") : undefined, e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
           return (
             <Fragment key={e.id}>
               {header}

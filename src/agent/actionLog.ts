@@ -30,6 +30,8 @@ export type ActionEntry = {
   builtin?: boolean;
   detail?: string;
   undo?: UndoRecord;
+  /** Set for calls made by an unattended run (`"scheduled"`: a scheduled prompt). */
+  source?: "scheduled";
 };
 
 const STATUSES: readonly string[] = ["running", "success", "error", "blocked", "declined", "cancelled", "interrupted"];
@@ -96,6 +98,7 @@ export function normalizeActionLog(raw: unknown): ActionEntry[] {
       ...(typeof e.approval === "string" && APPROVALS.includes(e.approval) ? { approval: e.approval as Approval } : {}),
       ...(optText(e.rule, 400) ? { rule: optText(e.rule, 400) } : {}),
       ...(e.builtin === true ? { builtin: true } : {}),
+      ...(e.source === "scheduled" ? { source: "scheduled" as const } : {}),
       ...(optText(e.detail, MAX_DETAIL) ? { detail: optText(e.detail, MAX_DETAIL) } : {}),
       ...(undo ? { undo } : {}),
     });

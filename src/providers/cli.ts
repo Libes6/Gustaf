@@ -3,13 +3,13 @@ import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
-import { codexArgs, turnImages, withImagePaths } from "./cliArgs";
-import { attachments } from "../lib/api";
+import { codexArgs, resumePoint, withImagePaths } from "./cliArgs";
+import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { Command } from "@tauri-apps/plugin-shell";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
-import { flattenMsg, textOf, type Adapter, type CliId, type ProviderConfig, type TurnInput } from "./types";
+import type { Adapter, CliId, ProviderConfig, TurnInput } from "./types";
 
 export { shq } from "./shell";
 
@@ -33,7 +33,7 @@ export function codexExecutable() {
   })();
 }
 
-async function cursorExecutable() {
+export async function cursorExecutable() {
   const probe = await shellCommand(findScript("cursor-agent")).execute();
   if (probe.code || !probe.stdout.trim()) throw new Error('Cursor CLI is unavailable.');
   return probe.stdout.trim();
@@ -85,26 +85,7 @@ export async function spawnLines(
   return { code, stderr };
 }
 
-/** Finds the last session this provider left in the history and the prompt to continue it with. */
-export function resumePoint(t: TurnInput, providerId: string, withSystem: boolean) {
-  let from = 0;
-  let session: string | undefined;
-  for (let i = t.messages.length - 1; i >= 0; i--) {
-    const m = t.messages[i];
-    if (m.role === "assistant" && m.meta?.provider === providerId && m.meta.responseId) {
-      session = m.meta.responseId;
-      from = i + 1;
-      break;
-    }
-  }
-  const rest = t.messages.slice(from);
-  const prompt = session
-    ? rest.filter((m) => m.role === "user").map(textOf).join("\n\n")
-    : (withSystem ? `${t.system}\n\n` : "") +
-      (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
-  // Resumed CLI sessions may predate canvas support and don't receive the API system message.
-  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
-}
+export { resumePoint } from "./cliArgs";
 
 async function listCodexModels() {
   const script = import.meta.env.DEV ? __SIDECAR__.replace(/cursor-agent\.mjs$/, 'codex-limits.mjs') : await resolveResource('sidecar/codex-limits.mjs');
@@ -207,7 +188,8 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
-        const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), { ...(cfg.cliAuth === "key" ? { env: cursorAccountEnv(cfg, key) } : {}) }).execute();
+        const env = cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
+        const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), Object.keys(env).length ? { env } : {}).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
@@ -255,7 +237,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, env: cursorAccountEnv(cfg, key) },
+        { signal: t.signal, cwd: t.cwd, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;

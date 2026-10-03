@@ -149,6 +149,8 @@ function useAppState() {
 
 export type AppState = ReturnType<typeof useAppState>;
 const Ctx = createContext<AppState>(null!);
+/** Exported so component tests (tests/ui) can provide a fake state. */
+export const AppContext = Ctx;
 
 export function AppProvider({ children }: { children: (s: AppState) => ReactNode }) {
   const s = useAppState();

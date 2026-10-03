@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { rovingTarget } from "../lib/dialogFocus";
 
 export type MenuEntry =
   | { label: string; icon?: ReactNode; kbd?: string; danger?: boolean; onClick: () => void }
@@ -13,6 +14,21 @@ export function Menu({ at, items, onClose }: { at: { x: number; y: number }; ite
     const r = ref.current!.getBoundingClientRect();
     setPos({ x: Math.min(at.x, innerWidth - r.width - 8), y: Math.min(at.y, innerHeight - r.height - 8) });
   }, [at.x, at.y]);
+  // Keyboard: focus moves into the menu, arrows/Home/End rove between items, Tab or Escape closes it and returns focus.
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const items = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    items()[0]?.focus();
+    return () => {
+      if (previous?.isConnected && (document.activeElement === document.body || ref.current?.contains(document.activeElement))) previous.focus?.();
+    };
+  }, []);
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Tab") return onClose();
+    const list = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    const to = rovingTarget(e.key, list.length, list.indexOf(document.activeElement as HTMLElement));
+    if (to !== null) (e.preventDefault(), list[to].focus());
+  };
   useEffect(() => {
     const down = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -24,12 +40,12 @@ export function Menu({ at, items, onClose }: { at: { x: number; y: number }; ite
     };
   }, [onClose]);
   return (
-    <div className="menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
+    <div className="menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu" aria-orientation="vertical" onKeyDown={onKeyDown}>
       {items.map((it, i) =>
         "sep" in it ? (
-          <div key={i} className="menu-sep" />
+          <div key={i} className="menu-sep" role="separator" />
         ) : "heading" in it ? (
-          <div key={i} className="menu-label">
+          <div key={i} className="menu-label" role="presentation">
             {it.heading}
           </div>
         ) : (

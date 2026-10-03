@@ -131,6 +131,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
           <Search size={16} />
           <input
             autoFocus
+            aria-label={t("searchPlaceholder")}
             role="combobox"
             aria-expanded={shown.length > 0}
             aria-controls="search-hits"

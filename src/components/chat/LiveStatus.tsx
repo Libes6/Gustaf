@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../../i18n";
 import type { ApprovalRequest } from "../../agent/agent";
 import type { Part } from "../../providers/types";
@@ -18,8 +19,19 @@ export function LiveStatus({ activities, stream, approval, retryNotice, stats, v
   visible: boolean;
 }) {
   const t = useT();
+  // One polite announcement per state change (response started / finished, retry notice), never one per streamed token.
+  const running = stream !== null;
+  const wasRunning = useRef(running);
+  const [finished, setFinished] = useState(false);
+  useEffect(() => {
+    if (running) setFinished(false);
+    else if (wasRunning.current) setFinished(true);
+    wasRunning.current = running;
+  }, [running]);
+  const status = retryNotice || (running ? t("announceResponding") : finished ? t("announceDone") : "");
   return (
     <>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{status}</div>
       {activities.map((a) => <ToolCard key={a.id} call={a} />)}
       {stream !== null &&
         (stream ? (
