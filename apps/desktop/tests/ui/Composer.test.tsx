@@ -290,3 +290,26 @@ describe("Screenshot paste",()=>{
  });
  it("leaves ordinary text paste to the textarea",()=>{renderApp(<Harness/>);const event=new Event("paste",{bubbles:true,cancelable:true});Object.defineProperty(event,"clipboardData",{value:{files:[],items:[]}});box().dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
 });
+
+describe("Composer image viewer", () => {
+  it("opens a thumbnail in a dialog, closes on Esc and returns focus; remove does not open", async () => {
+    const { container } = renderApp(<Harness images={["AAAA", "BBBB"]} />);
+    const thumb = screen.getByRole("button", { name: "Attached image 1 of 2" });
+    await userEvent.click(thumb);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(within(dialog).getByAltText("Attached image 1 of 2")).toHaveAttribute("src", "data:image/png;base64,AAAA");
+    expect(within(dialog).getByRole("button", { name: "Close image" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(thumb).toHaveFocus();
+    thumb.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close image" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(container.querySelectorAll<HTMLButtonElement>(".attach button")[0]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(container.querySelectorAll(".attach img")).toHaveLength(1);
+  });
+});

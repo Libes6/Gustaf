@@ -12,6 +12,8 @@ export type SubagentInfo = {
   agentId: string;
   /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
   title: string;
+  /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
+  bgId?: string;
   /** Claude `subagent_type`. */
   role?: string;
   action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";

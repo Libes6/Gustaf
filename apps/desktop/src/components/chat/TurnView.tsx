@@ -7,6 +7,7 @@ import type { StoredMsg } from "../../lib/data";
 import { textOf, type Part } from "../../providers/types";
 import { extractPlan, type Plan } from "../../agent/planCore";
 import { Markdown } from "../Markdown";
+import { ImageThumb } from "../ImageViewer";
 import { PlanCard } from "./PlanCard";
 import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
@@ -111,7 +112,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             <div className="bubble">
               {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
               {userText(textOf(turn.user))}
-              {turn.user.parts.filter((p) => p.type === "image").map((p: any, i) => <img key={i} src={`data:image/png;base64,${p.data}`} alt="" />)}
+              {turn.user.parts.filter((p) => p.type === "image").map((p: any, i, all) => <ImageThumb key={i} src={`data:image/png;base64,${p.data}`} alt={t("attachedImage", { n: i + 1, total: all.length })} />)}
             </div>
           </div>
           )}

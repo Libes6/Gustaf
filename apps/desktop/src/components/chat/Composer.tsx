@@ -15,6 +15,7 @@ import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
+import { ImageThumb } from "../ImageViewer";
 import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
 import { mergeSkills } from "../../agent/skillsCore";
@@ -198,7 +199,7 @@ export function Composer(p: Props) {
             <div className="attach-list">
               {images.map((d, i) => (
                 <div key={i} className="attach">
-                  <img src={`data:image/png;base64,${d}`} alt="" />
+                  <ImageThumb src={`data:image/png;base64,${d}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />
                   <button title={t("removeAttachment")} aria-label={t("removeAttachment")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
                     <X size={11} />
                   </button>
@@ -319,10 +320,10 @@ export function Composer(p: Props) {
               instructions={instructions.report}
               onOpen={instructions.reload}
             />
-            <div style={{ position: "relative" }}>
+            <div className="composer-model" style={{ position: "relative" }}>
               <button className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                {p.modelName ?? t("chooseModel")} <ChevronDown size={13} />
+                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span> <ChevronDown size={13} className="chev" />
               </button>
               {picker && <ModelPicker onClose={() => setPicker(false)} />}
             </div>
@@ -337,6 +338,7 @@ export function Composer(p: Props) {
                 <Brain size={14} /> {t(`reasoning_${app.reasoning}`)}
               </button>
             )}
+            <div className="composer-actions">
             <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
@@ -347,6 +349,7 @@ export function Composer(p: Props) {
                 <ArrowUp size={16} />
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>
