@@ -75,6 +75,19 @@ export function lightenUntilReadable(color: string, text = "#1b1b1b", min = MIN_
   return c;
 }
 
+/** WCAG 1.4.11: focus rings and other UI boundaries need 3:1 against the page. */
+export const MIN_UI_CONTRAST = 3;
+/** Page backgrounds the focus ring is derived against (same values as `--bg` in theme.css). */
+const PAGE_BG: Record<ResolvedTheme, string> = { dark: "#181818", light: "#ffffff" };
+
+/** The accent nudged toward white (dark theme) or black (light theme) until it reaches `min` against the page background. */
+export function focusRingColor(accent: string, theme: ResolvedTheme, min = MIN_UI_CONTRAST + 0.5): string {
+  const bg = PAGE_BG[theme], to = theme === "dark" ? "#ffffff" : "#000000";
+  let c = normalizeHex(accent) ?? DEFAULT_ACCENT;
+  for (let i = 0; i < 20 && contrastRatio(c, bg) < min; i++) c = mix(c, to, 0.1);
+  return c;
+}
+
 /** CSS variables derived from the accent: `--accent` itself, a soft variant for links/buttons, the message bubble and the text on top of each. */
 export function accentVars(accent: string, theme: ResolvedTheme): Record<string, string> {
   const base = normalizeHex(accent) ?? DEFAULT_ACCENT;
@@ -82,6 +95,7 @@ export function accentVars(accent: string, theme: ResolvedTheme): Record<string,
   const bubble = darkenUntilReadable(theme === "dark" ? mix(base, "#000000", 0.45) : base);
   return {
     "--accent": base,
+    "--focus": focusRingColor(base, theme),
     "--accent-soft": soft,
     "--on-accent": readableOn(soft),
     "--bubble": bubble,

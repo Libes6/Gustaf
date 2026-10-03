@@ -12,8 +12,8 @@
   --border: #2f2f2f;
   --border-strong: #3a3a3a;
   --text: #e6e6e6;
-  --text-2: #a3a3a3;
-  --text-3: #6f6f6f;
+  --text-2: #b3b3b3;
+  --text-3: #959595;
   --accent: #a884ee;
   --accent-soft: #dfbdff;
   --bubble: #5c4485;
@@ -40,7 +40,7 @@
   --btn-primary-off-bg: #555;
   --btn-primary-off-fg: #999;
   --btn-soft-hover: #3d3d3d;
-  --toggle-off: #4a4a4a;
+  --toggle-off: #6a6a6a;
   --send-off-bg: #3a3a3a;
   --send-off-fg: #777;
   --scrim: #0008;
@@ -54,7 +54,7 @@
   --hl-keyword: #c792ea;
   --hl-string: #a5d6a7;
   --hl-number: #f4a261;
-  --hl-comment: #6f6f6f;
+  --hl-comment: #959595;
   --hl-title: #82aaff;
   --hl-type: #ffcb6b;
   --badge-fg: #8fb3ff;
@@ -77,10 +77,10 @@
   --border-strong: #cfcfd7;
   --text: #1b1b1f;
   --text-2: #55555d;
-  --text-3: #6b6b74;
-  --green: #1b8a4b;
-  --red: #d13b3b;
-  --warn: #a8660a;
+  --text-3: #636370;
+  --green: #137a3e;
+  --red: #bd2f2f;
+  --warn: #8f5508;
   --on-accent: #fff;
   --scrollbar: #c6c6cf;
   --bg-tool: #f8f8fa;
@@ -95,7 +95,7 @@
   --btn-primary-off-bg: #d2d2da;
   --btn-primary-off-fg: #fff;
   --btn-soft-hover: #dcdce3;
-  --toggle-off: #c4c4cd;
+  --toggle-off: #8a8a96;
   --send-off-bg: #dcdce3;
   --send-off-fg: #8a8a93;
   --scrim: #0006;
@@ -109,7 +109,7 @@
   --hl-keyword: #8250df;
   --hl-string: #1a7f37;
   --hl-number: #bc4c00;
-  --hl-comment: #6e7781;
+  --hl-comment: #5c6670;
   --hl-title: #0550ae;
   --hl-type: #953800;
   --badge-fg: #1d4ed8;
@@ -136,7 +136,7 @@ a { color: var(--accent-soft); }
 ::selection { background: color-mix(in srgb, var(--accent) 50%, transparent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
 
 /* ---------- shell ---------- */
 .app { display: grid; grid-template-columns: 48px 256px 1fr; grid-template-rows: 36px minmax(0, 1fr); height: 100vh; overflow: hidden; }
