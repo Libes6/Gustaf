@@ -13,6 +13,23 @@ const agent = (id: string, over: Partial<SubagentActivity["subagent"]> = {}, top
 });
 
 describe("SubagentsCard", () => {
+  it("shows Codex agents read from rollout files: title, state, latest step and tokens", () => {
+    mockInvoke({});
+    const agents = [
+      agent("a", { action: "scan", state: "completed", result: "alpha ok", tokens: 1500, toolUses: 3 }, { status: "success", output: "alpha ok" }),
+      agent("b", { action: "scan", state: "running", step: "cargo test", role: "task_b" }),
+      agent("c", { action: "scan", state: "running" }),
+    ];
+    renderApp(<SubagentsCard agents={agents} />);
+    const rows = within(screen.getByRole("region", { name: "Subagents" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]).getByText("cargo test")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("task_b")).toBeInTheDocument();
+    fireEvent.click(within(rows[0]).getByRole("button", { name: /Task a/ }));
+    expect(within(rows[0]).getByText("1.5k tokens")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("3 tool uses")).toBeInTheDocument();
+  });
+
   it("shows one card with counts and one row per agent; a row expands to its task and report", () => {
     mockInvoke({});
     const agents = [

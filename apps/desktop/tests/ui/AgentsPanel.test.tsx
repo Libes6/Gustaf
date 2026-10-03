@@ -6,6 +6,8 @@ import { createRun, recordStep, resetAgentRuns, updateRun } from "../../src/agen
 import { finishCliAgents, resetCliAgents, trackCliAgents } from "../../src/agent/cliAgents";
 import { AgentsColumn, AgentsToggle } from "../../src/components/AgentsPanel";
 import { useBackgroundTasks } from "../../src/lib/useBackgroundTasks";
+import { applyActivity } from "../../src/providers/activities";
+import { createRolloutTracker } from "../../src/providers/codexRollout";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
@@ -80,6 +82,49 @@ describe("AgentsPanel: CLI-native subagents", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
     await waitFor(() => expect(screen.queryByText("Worker a")).toBeNull());
+    resetCliAgents();
+  });
+
+  it("shows three Codex cards from a mocked rollout scan (through the real tracker and the invoke command), then a finished one after the last scan", async () => {
+    resetCliAgents();
+    const rollout = (nick: string, state: string, over: Record<string, unknown> = {}) => ({
+      id: `thread-${nick}`, key: `parent:task_${nick}`, threadId: `thread-${nick}`, parentThreadId: "parent", nickname: nick, taskName: `task_${nick}`, state,
+      startedAtMs: Date.now() - 5000, toolUses: 2, step: `cargo test ${nick}`, tokens: { input: 1000, output: 200, cached: 0, reasoning: 0, total: 1500 }, ...over,
+    });
+    let phase = 0;
+    mockInvoke({
+      db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []),
+      codex_agents_scan: () => ({
+        parentFound: true, truncated: false, notes: [],
+        agents: phase === 0
+          ? [rollout("Ada", "running"), rollout("Bo", "running"), rollout("Cy", "starting", { threadId: null, id: "pending:parent:task_Cy", step: null, tokens: undefined })]
+          : [rollout("Ada", "completed", { lastMessage: "alpha is fine", endedAtMs: Date.now() }), rollout("Bo", "running"), rollout("Cy", "running")],
+      }),
+    });
+    renderApp(<Panel />);
+    const map = new Map<string, any>();
+    const tracker = createRolloutTracker({
+      intervalMs: 3_600_000,
+      onActivity: (a) => trackCliAgents({ chatId: 1, root: "/work/alpha" }, [applyActivity(map, a)]),
+    });
+    tracker.begin("parent");
+    expect(await screen.findByText("Ada")).toBeInTheDocument();
+    expect(screen.getByText("Bo")).toBeInTheDocument();
+    expect(screen.getByText("Cy")).toBeInTheDocument();
+    expect(screen.getAllByText("Agent · Codex")).toHaveLength(3);
+    expect(screen.getAllByText("cargo test Ada").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1.5k tokens").length).toBeGreaterThan(0);
+    expect(callsOf("codex_agents_scan")[0]).toMatchObject({ threadId: "parent" });
+    expect(screen.queryByRole("button", { name: /^Finished/ })).toBeNull();
+
+    phase = 1;
+    await act(async () => { await tracker.finish(true); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument());
+    // The finished row is folded while others run.
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Finished 1" }));
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getByText("alpha is fine")).toBeInTheDocument();
     resetCliAgents();
   });
 
