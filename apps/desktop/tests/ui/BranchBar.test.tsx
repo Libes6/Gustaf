@@ -33,7 +33,7 @@ describe("branch lineage", () => {
     vi.spyOn(db, "select").mockImplementation(async sql => sql.includes("from chats") ? [chat()] : [{ id: 17 }]);
     const exec = vi.spyOn(db, "exec").mockResolvedValue({ lastId: 2, changes: 1 });
     expect(await branchChat(1, "Branch", 1, 17)).toBe(2);
-    expect(exec).toHaveBeenCalledWith(expect.stringContaining("json_remove(content, '$.meta.responseId')"), [2, 1, 17]);
+    expect(exec).toHaveBeenCalledWith(expect.stringContaining("'$.meta.responseId'"), [2, 1, 17]);
     expect(exec).toHaveBeenCalledWith(expect.stringContaining("insert into chat_branches"), [2, 1, 17, "First chat"]);
     expect(exec).toHaveBeenCalledTimes(3);
     vi.restoreAllMocks();

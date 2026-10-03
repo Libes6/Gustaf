@@ -55,6 +55,8 @@ export type Msg = {
     provider?: string;
     model?: string;
     responseId?: string;
+    /** Copied history needs its inline images when replayed into a fresh native session. */
+    branchHistory?: boolean;
     checkpoint?: string;
     imported?: string;
     durationMs?: number;

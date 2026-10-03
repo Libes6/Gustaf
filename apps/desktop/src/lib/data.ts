@@ -102,7 +102,7 @@ export async function branchChat(projectId: number | null, title: string, fromCh
     if (ws) await db.exec("update chats set workspace_task_id = ?, workspace_branch = ?, workspace_base = ? where id = ?", [ws.taskId, ws.branch, ws.base, id]);
     await db.exec(
       "insert into messages(chat_id, role, content, created_at) " +
-        "select ?, role, json_remove(content, '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",
+        "select ?, role, json_remove(json_patch(content, '{\"meta\":{\"branchHistory\":true}}'), '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",
       [id, fromChatId, throughId],
     );
   } catch (e) {
