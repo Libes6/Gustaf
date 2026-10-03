@@ -24,7 +24,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 tauri-plugin-http = { version = "~2.7", features = ["stream"] }
-security-framework = "3.7.0"
 tauri-plugin-dialog = "2.8.0"
 tauri-plugin-global-shortcut = "2.4.0"
 tauri-plugin-notification = "2"
@@ -35,6 +34,12 @@ base64 = "0.23.1"
 enigo = "0.6.1"
 xcap = "0.9.8"
 tauri-plugin-shell = "2.4.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7.0"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+keyring = { version = "3", features = ["windows-native", "sync-secret-service", "crypto-rust"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
