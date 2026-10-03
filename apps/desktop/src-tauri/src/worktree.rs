@@ -503,6 +503,33 @@ fn count_untracked(path: &Path) -> (u32, bool) {
     }
 }
 
+/// Symlinks dependency directories (project-relative, e.g. `node_modules`) of the original project into the task's
+/// checkout so its setup and tools find them; same validation as the shadow copy (`review::resolve_links`).
+/// Directories missing in the project or already present in the checkout are skipped. Returns what was linked.
+pub fn link_dirs(store: &Path, root: &str, task_id: &str, dirs: &[String]) -> Result<Vec<String>, String> {
+    check_task_id(task_id)?;
+    let repo = open_repo(store, root)?;
+    let checkout = safe_existing_dir(&repo, task_id)?.ok_or_else(|| err("not_found", format!("no workspace for task {task_id}")))?;
+    let base = canonical_root(root).map_err(|e| err("invalid_root", e))?;
+    let top = repo.top.canonicalize().map_err(|e| err("invalid_root", e))?;
+    // A project in a subfolder of the repository lives at the same subfolder of the checkout.
+    let prefix = base.strip_prefix(&top).map_err(|_| err("invalid_root", "the project is outside its repository"))?.to_path_buf();
+    let target_root = checkout.join(prefix);
+    let linked = crate::review::resolve_links(&base, dirs).map_err(|e| err("unsafe_path", e))?;
+    let mut done = Vec::new();
+    for rel in linked {
+        let dest = target_root.join(&rel);
+        if fs::symlink_metadata(&dest).is_ok() {
+            continue;
+        }
+        let Some(parent) = dest.parent() else { continue };
+        fs::create_dir_all(parent).map_err(|e| err("git_error", e))?;
+        crate::review::link_dir(&base.join(&rel), &dest).map_err(|e| err("git_error", e))?;
+        done.push(rel);
+    }
+    Ok(done)
+}
+
 // ---------------------------------------------------------------------------------------------
 // Commands
 
@@ -539,6 +566,12 @@ pub async fn worktree_prune(app: AppHandle, root: String) -> Result<PruneResult,
 pub async fn worktree_diff(app: AppHandle, root: String, task_id: String) -> Result<WorktreeDiff, String> {
     let store = store(&app)?;
     blocking(move || diff(&store, &root, &task_id)).await
+}
+
+#[tauri::command]
+pub async fn worktree_link_dirs(app: AppHandle, root: String, task_id: String, link_dirs: Vec<String>) -> Result<Vec<String>, String> {
+    let store = store(&app)?;
+    blocking(move || self::link_dirs(&store, &root, &task_id, &link_dirs)).await
 }
 
 #[cfg(test)]
@@ -793,6 +826,30 @@ mod tests {
         assert!(list(&f.store, other.to_str().unwrap()).unwrap().is_empty());
         fs::create_dir_all(f.root.join("sub")).unwrap();
         assert_eq!(list(&f.store, f.root.join("sub").to_str().unwrap()).unwrap().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dependency_directories_are_symlinked_into_the_checkout() {
+        let f = fx();
+        fs::create_dir_all(f.root.join("node_modules/x")).unwrap();
+        fs::create_dir_all(f.root.join("sub/node_modules")).unwrap();
+        let w = mk(&f, "deps", "t1");
+        let done = link_dirs(&f.store, root(&f), "t1", &["node_modules".into(), "missing".into(), "node_modules/x".into()]).unwrap();
+        assert_eq!(done, vec!["node_modules".to_string()], "missing dirs are skipped, nested ones collapse");
+        let link = PathBuf::from(&w.path).join("node_modules");
+        assert_eq!(fs::read_link(&link).unwrap(), f.root.join("node_modules"));
+        // Idempotent, and the original project is untouched.
+        assert!(link_dirs(&f.store, root(&f), "t1", &["node_modules".into()]).unwrap().is_empty());
+        assert!(f.root.join("node_modules").is_dir() && !fs::symlink_metadata(f.root.join("node_modules")).unwrap().file_type().is_symlink());
+        // Unsafe requests are refused; unknown tasks are not_found.
+        assert_eq!(code(&link_dirs(&f.store, root(&f), "t1", &["../x".into()]).unwrap_err()), "unsafe_path");
+        assert_eq!(code(&link_dirs(&f.store, root(&f), "nope", &[]).unwrap_err()), "not_found");
+        // A project in a subfolder links into the same subfolder of the checkout.
+        let sub = f.root.join("sub");
+        let done = link_dirs(&f.store, sub.to_str().unwrap(), "t1", &["node_modules".into()]).unwrap();
+        assert_eq!(done, vec!["node_modules".to_string()]);
+        assert!(fs::symlink_metadata(PathBuf::from(&w.path).join("sub/node_modules")).unwrap().file_type().is_symlink());
     }
 
     #[test]

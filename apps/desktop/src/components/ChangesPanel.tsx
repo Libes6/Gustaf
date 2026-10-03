@@ -2,7 +2,7 @@ import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X
 import { createPortal } from "react-dom";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
-import { hasTerminalCommands, onTerminalCommand } from "../lib/terminalBridge";
+import { hasTerminalCommands, onTerminalCommand, takeTerminalOpen } from "../lib/terminalBridge";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
 import type { StoredMsg } from "../lib/data";
 import type { Part } from "../providers/types";
@@ -20,6 +20,8 @@ import { FeedbackQueue, FindingsBlock, FindingsList, type NewComment } from "./R
 const ProjectPreview = lazy(() => import("./ProjectPreview").then(module => ({ default: module.ProjectPreview })));
 const TerminalPanel = lazy(() => import("./TerminalPanel").then(module => ({ default: module.TerminalPanel })));
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
+import { WorkspaceChanges } from "./WorkspaceChanges";
+import { usePrefix } from "../lib/workspaceStore";
 
 function DiffView({ text }: { text: string }) {
   return (
@@ -36,10 +38,11 @@ function DiffView({ text }: { text: string }) {
   );
 }
 
-export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onReplyToAgent }: { name: string; root: string; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
+export function ChangesPanel({ name, root, workspace, busy, messages, tick, onChanged, onReplyToAgent }: { name: string; root: string; /** The chat runs in a git workspace: its net diff against the base is listed. */ workspace?: { taskId: string; branch: string; projectRoot: string }; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
   const t = useT();
   const app = useApp();
   const aiReview = useDiffReview(root);
+  const workspacePrefix = usePrefix(workspace?.projectRoot, !!workspace);
   const [comments, setComments] = useState<FeedbackComment[]>([]);
   const [focusHunk, setFocusHunk] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
   const [previewOpened, setPreviewOpened] = useState(false);
   const [tab, setTab] = useState<"changes" | "terminal" | "preview">("changes");
   useEffect(() => {
-    const show = () => { if (hasTerminalCommands(root)) { setOpen(true); setTab("terminal"); setTerminalOpened(true); } };
+    const show = () => { if (hasTerminalCommands(root) || takeTerminalOpen(root)) { setOpen(true); setTab("terminal"); setTerminalOpened(true); } };
     show(); return onTerminalCommand(show);
   }, [root]);
   const [files, setFiles] = useState<FileChange[]>([]);
@@ -229,6 +232,8 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged, onRe
             {previewOpened && <div hidden={tab !== "preview"}><Suspense fallback={<div className="term">Preview…</div>}><ProjectPreview root={reviews[0]?.[0].workspace ?? root} onSendConsole={onReplyToAgent} /></Suspense></div>}
             {tab === "changes" && (
               <>
+                {workspace && workspacePrefix !== null && <WorkspaceChanges projectRoot={workspace.projectRoot} taskId={workspace.taskId} branch={workspace.branch} root={root} prefix={workspacePrefix} tick={tick}
+                  onShowDiff={(path, text) => { setErr(""); setPicked(new Set()); setDiff({ path, text }); }} onError={setErr} />}
                 <div className="review-intro"><strong>{t("reviewPending")}</strong><p>{t("reviewHint")}</p>
                   {pending > 0 && <button className="btn-soft" disabled={!canReview} onClick={() => reviewFiles()} title={t("aiReviewHint")}><Sparkles size={13} /> {t("aiReviewAll")}</button>}
                 </div>

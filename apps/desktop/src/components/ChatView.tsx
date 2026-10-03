@@ -21,6 +21,8 @@ import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { useChatMode } from "../lib/useChatMode";
 import { planToInstruction, type Plan } from "../agent/planCore";
+import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
+import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
 import { Composer } from "./chat/Composer";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
@@ -42,7 +44,17 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
   const chat = app.chats.find((c) => c.id === session.chatId);
   const project = app.projects.find((p) => p.id === (chat?.project_id ?? session.projectId));
-  const root = project?.path ?? null;
+  // A chat linked to a workspace works in that workspace's checkout (file tools, commands, terminal, @mentions, instruction
+  // files, changes panel); it never falls back to the main checkout: while that cannot be resolved there is no root.
+  const workspace = chatWorkspace(chat);
+  const projectRoot = project?.path ?? null;
+  const workspaces = useWorkspaces(projectRoot, !!workspace);
+  const prefix = usePrefix(projectRoot, !!workspace);
+  const resolved = resolveChatRoot({ projectPath: projectRoot, workspace, known: prefix === null ? undefined : workspaces.list, prefix });
+  const root = resolved.root;
+  const blocked = resolved.state === "pending" ? t("workspacePending") : resolved.state === "missing" ? t("workspaceMissing") : undefined;
+  const [newWorkspace, setNewWorkspace] = useState(false);
+  const isGit = useIsGitProject(projectRoot);
   const provider = app.providers.find((p) => p.id === app.selection?.providerId);
   const selectedModel = app.models.find(m => m.providerId === provider?.id && m.id === app.selection?.model);
   const contextTokens = estimateContext(effectiveHistory(messages), text);
@@ -56,6 +68,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
+    workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
   });
   const { stream, error, running, approval, toolResults, activities } = run;
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
@@ -122,11 +135,12 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
-      {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
+      {root && project && <ChangesPanel name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
 
       {messages.length === 0 && stream === null && !error ? (
         <div className="empty">
           <h1>{project ? t("emptyProject", { name: project.name }) : t("emptyTitle")}</h1>
+          {blocked && resolved.state === "missing" && <div className="error-box" role="alert">{blocked}</div>}
         </div>
       ) : (
         <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
@@ -134,6 +148,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
             {turns.map((turn, i) => (
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user && root ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
             ))}
+            {blocked && <div className="error-box" role="alert">{blocked}</div>}
             <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} onRunCommand={turnHandlers.onRunCommand} projectRoot={root ?? undefined} />
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
@@ -148,6 +163,11 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
         root={root} projectName={project?.name} files={files}
+        workspace={{
+          available: !workspace && !!project && isGit && messages.length === 0 && !running,
+          on: newWorkspace, onToggle: () => setNewWorkspace(v => !v),
+          linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
+        }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
         running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
         contextTokens={contextTokens} lastInput={lastInput}

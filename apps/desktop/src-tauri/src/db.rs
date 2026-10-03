@@ -67,8 +67,28 @@ end;
 -- agent-runs:end
 ";
 
+/// Columns added to existing tables after their first release. SQLite has no `add column if not exists`, so each one is
+/// added only when `pragma table_info` does not list it; running this on every start is therefore idempotent.
+/// `chats.workspace_*`: the chat runs in a worktree of the project's repository (worktree.rs); null for ordinary chats.
+const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
+    ("chats", "workspace_task_id", "text"),
+    ("chats", "workspace_branch", "text"),
+    ("chats", "workspace_base", "text"),
+];
+
+fn add_missing_columns(conn: &Connection) -> rusqlite::Result<()> {
+    for (table, column, decl) in ADDED_COLUMNS {
+        let present: i64 = conn.query_row("select count(*) from pragma_table_info(?) where name = ?", [table, column], |r| r.get(0))?;
+        if present == 0 {
+            conn.execute_batch(&format!("alter table {table} add column {column} {decl}"))?;
+        }
+    }
+    Ok(())
+}
+
 fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(SCHEMA)
+    conn.execute_batch(SCHEMA)?;
+    add_missing_columns(conn)
 }
 
 #[cfg(test)]
@@ -603,6 +623,40 @@ mod tests {
 
         let conn = open(&path).unwrap();
         assert_eq!(count(&conn, "drafts"), 1, "re-opening keeps drafts");
+    }
+
+    #[test]
+    fn workspace_columns_are_added_to_an_old_chats_table_and_keep_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.db");
+        // A database from before workspaces: the chats table without the workspace_* columns.
+        let old = Connection::open(&path).unwrap();
+        old.execute_batch(
+            "create table projects(id integer primary key, name text not null, path text, source_id text unique, pinned integer not null default 0, created_at integer not null);
+             create table chats(id integer primary key, project_id integer references projects(id) on delete cascade, title text not null, source_id text unique, archived integer not null default 0, created_at integer not null, updated_at integer not null);
+             insert into chats(title, created_at, updated_at) values('old chat', 1, 1);",
+        )
+        .unwrap();
+        drop(old);
+
+        let conn = open(&path).unwrap();
+        let rows = select(&conn, "select title, workspace_task_id, workspace_branch, workspace_base from chats", vec![]).unwrap();
+        assert_eq!(rows[0]["title"], json!("old chat"));
+        assert_eq!(rows[0]["workspace_task_id"], Value::Null, "existing chats stay ordinary chats");
+        execute(
+            &conn,
+            "insert into chats(title, created_at, updated_at, workspace_task_id, workspace_branch, workspace_base) values('ws', 1, 1, 't1', 'gustaf/x', 'abc123')",
+            vec![],
+        )
+        .unwrap();
+        // Idempotent: opening again (and the in-memory init the other tests use) neither fails nor duplicates columns.
+        drop(conn);
+        let conn = open(&path).unwrap();
+        init(&conn).unwrap();
+        let rows = select(&conn, "select workspace_branch from chats where workspace_task_id = 't1'", vec![]).unwrap();
+        assert_eq!(rows[0]["workspace_branch"], json!("gustaf/x"));
+        let cols: i64 = conn.query_row("select count(*) from pragma_table_info('chats') where name like 'workspace_%'", [], |r| r.get(0)).unwrap();
+        assert_eq!(cols, 3);
     }
 
     #[test]

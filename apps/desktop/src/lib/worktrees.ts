@@ -62,4 +62,6 @@ export const worktrees = {
     call<WorktreeRemoveResult>("worktree_remove", { root: a.root, taskId: a.taskId, force: !!a.force, deleteBranch: !!a.deleteBranch }),
   prune: (root: string) => call<WorktreePruneResult>("worktree_prune", { root }),
   diff: (root: string, taskId: string) => call<WorktreeDiff>("worktree_diff", { root, taskId }),
+  /** Symlinks project-relative dependency directories (e.g. `node_modules`) into the task's checkout; returns those linked. */
+  linkDirs: (root: string, taskId: string, linkDirs: string[]) => call<string[]>("worktree_link_dirs", { root, taskId, linkDirs }),
 };

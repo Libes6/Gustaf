@@ -26,7 +26,7 @@ fn shadow_dir(app: &AppHandle, root: &str) -> Result<PathBuf, String> {
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         run(Command::new("git").args(["init", "-q", "--bare"]).arg(&dir))?;
         fs::create_dir_all(dir.join("info")).map_err(|e| e.to_string())?;
-        fs::write(dir.join("info/exclude"), ".git/\nnode_modules/\ntarget/\ndist/\n.DS_Store\n").map_err(|e| e.to_string())?;
+        fs::write(dir.join("info/exclude"), ".git/\nnode_modules\ntarget/\ndist/\n.DS_Store\n").map_err(|e| e.to_string())?;
     }
     Ok(dir)
 }

@@ -7,6 +7,7 @@ import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
+import { worktrees } from "./lib/worktrees";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
 export type Model = ModelInfo & { firstSeen: number };
@@ -133,6 +134,11 @@ function useAppState() {
   useEffect(() => {
     reload();
     refreshModels({ refresh: "startup" });
+    // Workspaces (git worktrees) whose folder was deleted behind our back: tidy the leftovers once per start; failures
+    // (not a git repository, git missing, a folder that moved) are of no interest here.
+    listProjects().then((ps) => {
+      for (const root of new Set(ps.map((p) => p.path).filter((p): p is string => !!p))) worktrees.prune(root).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   const openSettings = (page: SettingsPage = "general") => {
