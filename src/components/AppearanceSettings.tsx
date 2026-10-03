@@ -15,13 +15,13 @@ export function AppearanceSettings() {
   const isPreset = ACCENT_PRESETS.includes(prefs.accent);
   return (
     <>
-      <h4>{t("appearance")}</h4>
+      <h4 aria-level={2}>{t("appearance")}</h4>
       <div className="card">
         <div className="card-row">
           <div className="grow"><div className="t">{t("themeLabel")}</div></div>
-          <div className="seg" style={{ margin: 0 }}>
+          <div className="seg" role="group" aria-label={t("themeLabel")} style={{ margin: 0 }}>
             {THEME_MODES.map((m) => (
-              <button key={m} className={prefs.mode === m ? "active" : ""} onClick={() => setThemePrefs({ mode: m })}>{t(MODE_LABEL[m])}</button>
+              <button key={m} className={prefs.mode === m ? "active" : ""} aria-pressed={prefs.mode === m} onClick={() => setThemePrefs({ mode: m })}>{t(MODE_LABEL[m])}</button>
             ))}
           </div>
         </div>
@@ -34,7 +34,7 @@ export function AppearanceSettings() {
                 aria-label={c}
                 aria-pressed={prefs.accent === c}
                 onClick={() => { setCustom(""); setThemePrefs({ accent: c }); }}
-                style={{ width: 20, height: 20, borderRadius: "50%", background: c, outline: prefs.accent === c ? "2px solid var(--text)" : "none", outlineOffset: 2 }}
+                style={{ width: 24, height: 24, borderRadius: "50%", background: c, outline: prefs.accent === c ? "2px solid var(--text)" : undefined, outlineOffset: 2 }}
               />
             ))}
             <input

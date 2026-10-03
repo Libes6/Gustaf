@@ -182,7 +182,7 @@ export function BudgetsSection() {
   const chatTitle = app.chats.find(c => c.id === app.activeChat)?.title;
   const levelClass = (s: BudgetStatus) => s.level === "exceeded" ? "exceeded" : s.level === "warning" ? "warning" : "";
   return <>
-    <h4>{t("budgets")}</h4>
+    <h4 aria-level={2}>{t("budgets")}</h4>
     <p className="h4-sub">{t("budgetsLead")}</p>
     <div className="card">
       <FieldRow title={t("budgetDayLimit")} desc={t("budgetDayLimitDesc")} state={describe(t, t("budgetToday"), day, usage.day, usage.failed)} level={levelClass(day)} error={invalid.day ? t("budgetLimitInvalid") : undefined}>

@@ -35,9 +35,9 @@ export function ContextChip({ model, tokens, lastInput, busy, canCompact, canRes
   }, [open]);
   return (
     <div className="ctx-wrap" ref={ref}>
-      <button className="chip ctx" aria-expanded={open} title={t("contextEstimateHint")} onClick={() => (!open && onOpen?.(), setOpen(!open))}>
+      <button className="chip ctx" aria-expanded={open} aria-label={model?.contextWindow ? t("contextUsage", { tokens: t.num(tokens), percent: Math.min(100, Math.round((tokens / model.contextWindow) * 100)) }) : undefined} title={t("contextEstimateHint")} onClick={() => (!open && onOpen?.(), setOpen(!open))}>
         {model?.contextWindow
-          ? <span className="ctx-ring" style={{ ["--p" as string]: `${Math.min(100, Math.round((tokens / model.contextWindow) * 100))}%` }} />
+          ? <span className="ctx-ring" aria-hidden="true" style={{ ["--p" as string]: `${Math.min(100, Math.round((tokens / model.contextWindow) * 100))}%` }} />
           : <Brain size={13} />}
         ≈{t.num(tokens)}
       </button>

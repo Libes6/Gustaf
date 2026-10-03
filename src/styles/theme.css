@@ -218,7 +218,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .msg-assistant { margin: 12px 0; font-size: 14px; line-height: 1.6; }
 .msg-tools { margin: 6px 0; }
 .msg-actions { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .12s; }
-.msg-block:hover .msg-actions { opacity: 1; }
+.msg-block:hover .msg-actions, .msg-block:focus-within .msg-actions { opacity: 1; }
 
 .done-line {
   display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 12.5px;
@@ -324,7 +324,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
   border-radius: 12px; padding: 5px; box-shadow: var(--shadow-md);
 }
 .menu-item { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 9px; border-radius: 7px; width: 100%; text-align: left; }
-.menu-item:hover, .menu-item.hl { background: var(--bg-hover); }
+.menu-item:hover, .menu-item.hl, .menu-item:focus-visible { background: var(--bg-hover); }
 .menu-item .grow { flex: 1; }
 .menu-item .kbd, .kbd { color: var(--text-3); font-size: 12px; }
 .menu-item.danger { color: var(--red); }

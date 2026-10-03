@@ -67,7 +67,7 @@ Items were drafted from the README and code layout; verify against the code befo
 - [x] **Per-project system prompt / instructions file** (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, always-apply `.cursor/rules` auto-loaded with caps, dedupe, untrusted-content fencing and no repeat of files a CLI reads itself; per-project custom text in the sidebar project menu; loaded files listed in the context chip). Not done: nested/subfolder instruction files, `.cursor/rules` globs/agent-requested rules; the UI was not smoke-tested in `tauri dev`.
 - [x] **Message actions**: edit and resend, regenerate, copy, delete (disabled while a run is active; `lib/messageActions.ts`).
 - [x] **Streaming robustness**: cancel, resume after network loss, backoff on 429/5xx (`providers/retry.ts`; retry only before any output, otherwise the interrupted-request flow continues; a "Retrying in Ns…" notice is shown in the chat).
-- [ ] **Accessibility pass** (focus order, ARIA, contrast) using the design review skills.
+- [~] **Accessibility pass** (focus order, ARIA, contrast): done from code review and tests (shared `useDialogFocus`, menu/model-picker keyboard support, landmarks, labels, live status, contrast tokens + test, reduced motion, 24px hit areas, a11y lint test; see README, Accessibility). Left: a real screen reader / axe run in the app, native checkbox target size, custom-accent contrast outside the focus ring, keyboard alternative for drag-to-section is the chat menu only.
 
 ## P3
 - [ ] **Canvas**: multi-file modules, bundled extra libraries, export to HTML/PNG, revision diff.

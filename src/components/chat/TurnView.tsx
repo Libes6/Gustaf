@@ -127,7 +127,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
         </div>
       )}
       {(toolCount > 0 || inner.some((m) => textOf(m))) && (
-        <button className="done-line" style={{ width: "100%" }} onClick={() => setOpen(!expanded)}>
+        <button className="done-line" style={{ width: "100%" }} aria-expanded={expanded} onClick={() => setOpen(!expanded)}>
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           {duration != null ? t("doneIn", { s: Math.max(1, Math.round(duration / 1000)) }) : t("steps", { count: toolCount })}
         </button>

@@ -66,7 +66,7 @@ function RulesEditor() {
 
   return (
     <>
-      <h4>{t("cmdRules")}</h4>
+      <h4 aria-level={2}>{t("cmdRules")}</h4>
       <p className="h4-sub">{t("cmdRulesLead")}</p>
       <div className="card">
         <div className="card-row rules-form">
@@ -102,7 +102,7 @@ function RulesEditor() {
         ))}
       </div>
 
-      <h4>{t("cmdBuiltin")}</h4>
+      <h4 aria-level={2}>{t("cmdBuiltin")}</h4>
       <p className="h4-sub">{t("cmdBuiltinLead")}</p>
       <div className="card">
         {BUILTIN_RULES.map((b) => {
@@ -145,7 +145,7 @@ function TryCommand() {
   const verdict = result && (app.access === "readonly" ? { cls: "block", Icon: OctagonX, label: t("cmdVerdictReadonly") } : result.action === "block" ? { cls: "block", Icon: OctagonX, label: t("cmdVerdictBlock") } : result.action === "ask" ? { cls: "ask", Icon: CircleHelp, label: t("cmdVerdictAsk") } : { cls: "run", Icon: CircleCheck, label: t("cmdVerdictRun") });
   return (
     <>
-      <h4>{t("cmdTry")}</h4>
+      <h4 aria-level={2}>{t("cmdTry")}</h4>
       <p className="h4-sub">{t("cmdTryLead")}</p>
       <div className="card rules-try">
         <div className="card-row rules-form">

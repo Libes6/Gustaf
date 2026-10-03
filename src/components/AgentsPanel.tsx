@@ -104,7 +104,7 @@ export function AgentsPanel({ root }: { root: string | null }) {
   if (!runs.length) return null;
   const viewed = runs.find((r) => r.id === viewing);
   return (
-    <div className={`agents-panel${open ? " open" : ""}`}>
+    <aside className={`agents-panel${open ? " open" : ""}`} aria-label={t("agentsTitle")}>
       <button className="agents-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         {active.length ? <Loader2 size={14} className="spin" /> : <Bot size={14} />}
         <span className="grow">{t("agentsTitle")} · {t("agentsCount", { running: active.length, done: done.length })}</span>
@@ -121,6 +121,6 @@ export function AgentsPanel({ root }: { root: string | null }) {
         </div>
       )}
       {viewed && <Transcript run={viewed} onClose={() => setViewing(null)} />}
-    </div>
+    </aside>
   );
 }

@@ -141,11 +141,11 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
   const selectableShown = selectable(shown, known);
   return (
     <div>
-      <h4>{t("historyImport")}</h4>
+      <h4 aria-level={2}>{t("historyImport")}</h4>
       <p className="h4-sub">{t("historyImportSub")}</p>
-      <div className="seg" role="tablist">
+      <div className="seg" role="group" aria-label={t("historyImport")}>
         {SOURCES.map((s) => (
-          <button key={s.id} role="tab" aria-selected={source === s.id} className={source === s.id ? "active" : ""} disabled={!!progress} onClick={() => setSource(s.id)}>
+          <button key={s.id} aria-pressed={source === s.id} className={source === s.id ? "active" : ""} disabled={!!progress} onClick={() => setSource(s.id)}>
             {s.label}
           </button>
         ))}

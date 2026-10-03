@@ -83,7 +83,7 @@ function ImportPage() {
     <>
       <h1>{t("import")}</h1>
       <p className="lead">{t("importLead")}</p>
-      <h4>{t("importFromApp")}</h4>
+      <h4 aria-level={2}>{t("importFromApp")}</h4>
       <p className="h4-sub">{t("importFromAppSub")}</p>
       <div className="card">
         <div className="card-row">
@@ -100,7 +100,7 @@ function ImportPage() {
       <div style={{ marginTop: 12 }}>
         <ChatTransfer />
       </div>
-      <h4>{t("importHistory")}</h4>
+      <h4 aria-level={2}>{t("importHistory")}</h4>
       <div className="card">
         {!history.length && <div className="card-row d">{t("importHistoryEmpty")}</div>}
         {history.map((h, i) => (
@@ -252,7 +252,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
       {app.providerHealth[p.id]?.message && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{app.providerHealth[p.id].message}</div>}
       {app.providerHealth[p.id]?.status === "auth" && p.kind === "cli" && <code>{p.cli === "claude" ? "claude auth login" : p.cli === "cursor-agent" ? "cursor-agent login" : "codex login"}</code>}
       </div><button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button></div></div>
-      <h4>{t("runtime")}</h4>
+      <h4 aria-level={2}>{t("runtime")}</h4>
       <div className="card">
         {p.kind === "cli" ? (
           <div className="card-row">
@@ -284,7 +284,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
         {p.cliAuth === "key" && <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("apiKey")}</div><div className="d">{t("cursorCliAccountHint")}</div></div><input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={e => setKey(e.target.value)} /><button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button></div></div>}
         <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("reserveAccount")}</div><div className="d">{t("reserveAccountHint")}</div></div><select aria-label={t("reserveAccount")} className="input narrow" value={p.backupProviderId ?? ""} onChange={e => update({ ...p, backupProviderId: e.target.value || undefined })}><option value="">{t("noReserve")}</option>{app.providers.filter(other => other.id !== p.id && other.cli === "cursor-agent" && other.cliAuth === "key" && !other.disabled).map(other => <option key={other.id} value={other.id}>{other.name}</option>)}</select></div></div>
       </>}
-      <h4>{t("models")}</h4>
+      <h4 aria-level={2}>{t("models")}</h4>
       <div className="card">
         <div className="card-row" style={{ minHeight: 44 }}>
           <input aria-label={t("searchModels")} className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -323,7 +323,7 @@ function Usage() {
     <h1>{t("usage")}</h1><p className="lead">{t("tokenUsageLead")}</p>
     <BudgetsSection />
     <AgentSettingsSection />
-    <h4>{t("providers")}</h4>
+    <h4 aria-level={2}>{t("providers")}</h4>
     {app.providers.map(p => {
       const stats = Object.values(app.tokenStats).filter(s => s.providerId === p.id);
       const total = stats.reduce((a,s) => ({ input: a.input + s.input, output: a.output + s.output, cached: a.cached + s.cached }), { input: 0, output: 0, cached: 0 });
@@ -334,7 +334,7 @@ function Usage() {
         {!stats.length && <p className="d usage-note">{t("tokensUnavailable")}</p>}
         {stats.map(s => <div className="card-row" key={s.model}><ModelIcon model={s.model} provider={p} /><div className="grow"><div className="t">{app.models.find(m => m.providerId === p.id && m.id === s.model)?.name ?? s.model}</div><div className="d">{t("reportedTurns", { count: s.turns })}</div></div><span className="d">{format(s.input)} ↓ · {format(s.output)} ↑</span></div>)}
         <div className="card-row"><div className="grow t">{t("subscriptionLimits")}</div>{p.cli === "codex" && <button className="btn-soft" disabled={!!app.loadingLimits} onClick={() => app.refreshLimits(p)}>{t(app.loadingLimits === p.id ? "providerChecking" : "refreshLimits")}</button>}{link && <button className="btn-soft" onClick={() => openUrl(link)}>{t("usageDashboard")}</button>}</div>
-        {snapshot?.windows.length ? <div className="usage-limits">{snapshot.windows.map(w => <div key={w.id}><div className="usage-limit-label"><span>{w.label}{w.plan ? ` · ${w.plan}` : ""}</span><span>{Math.round(w.usedPercent)}% {t("used")}</span></div><progress max={100} value={w.usedPercent} />{w.resetsAt && <div className="d">{t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}</div>}</div>)}<p className="d">{t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}</p></div> : <p className="d usage-note">{t("limitsUnavailable")}</p>}
+        {snapshot?.windows.length ? <div className="usage-limits">{snapshot.windows.map(w => <div key={w.id}><div className="usage-limit-label"><span>{w.label}{w.plan ? ` · ${w.plan}` : ""}</span><span>{Math.round(w.usedPercent)}% {t("used")}</span></div><progress max={100} value={w.usedPercent} aria-label={`${w.label}: ${Math.round(w.usedPercent)}% ${t("used")}`} />{w.resetsAt && <div className="d">{t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}</div>}</div>)}<p className="d">{t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}</p></div> : <p className="d usage-note">{t("limitsUnavailable")}</p>}
         {app.limitErrors[p.id] && <div className="error-box">{app.limitErrors[p.id]}</div>}
       </div>;
     })}
@@ -367,12 +367,12 @@ function ComputerPage() {
     <>
       <h1>{t("computerUse")}</h1>
       <p className="lead">{t("computerLead")}</p>
-      <h4>{t("permissions")}</h4>
+      <h4 aria-level={2}>{t("permissions")}</h4>
       <div className="card">
         {row(perm?.accessibility, "permAccessibility", "permAccessibilityDesc", "Privacy_Accessibility")}
         {row(perm?.screen, "permScreen", "permScreenDesc", "Privacy_ScreenCapture", true)}
       </div>
-      <h4>{t("behavior")}</h4>
+      <h4 aria-level={2}>{t("behavior")}</h4>
       <div className="card">
         <div className="card-row">
           <div className="grow">

@@ -63,12 +63,12 @@ export function ActionLog() {
   let lastDay = "";
   return (
     <>
-      <h4>{t("actionLog")}</h4>
+      <h4 aria-level={2}>{t("actionLog")}</h4>
       <p className="h4-sub">{t("actionLogLead")}</p>
       <div className="log-bar">
-        <div className="seg">
+        <div className="seg" role="group" aria-label={t("actionLog")}>
           {FILTERS.map((f) => (
-            <button key={f.id} className={filter === f.id ? "active" : ""} onClick={() => setFilter(f.id)}>{t(f.label)}</button>
+            <button key={f.id} className={filter === f.id ? "active" : ""} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{t(f.label)}</button>
           ))}
         </div>
         <span className="grow" />

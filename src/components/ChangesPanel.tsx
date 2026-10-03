@@ -129,11 +129,11 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
   }, [messages]);
 
   return (
-    <div className={`panel${open ? " open" : ""}`}>
+    <aside className={`panel${open ? " open" : ""}`} aria-label={t("changes")}>
       <div className="panel-head">
         <span className="grow">{name}</span>
         {pending > 0 && <button className="btn-soft" onClick={() => { setOpen(true); setTab("changes"); }}>{t("reviewPending")} · {pending}</button>}
-        <button className="icon-btn" onClick={() => setOpen(!open)} title={open ? t("collapse") : t("changes")}>
+        <button className="icon-btn" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? t("collapse") : t("changes")} title={open ? t("collapse") : t("changes")}>
           {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       </div>
@@ -180,10 +180,10 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
       {open && (
         <>
           <div className="panel-tabs">
-            <button className={tab === "changes" ? "active" : ""} onClick={() => setTab("changes")}>
+            <button className={tab === "changes" ? "active" : ""} aria-pressed={tab === "changes"} onClick={() => setTab("changes")}>
               {t("changes")} {files.length ? `(${files.length})` : ""}
             </button>
-            <button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}>
+            <button className={tab === "terminal" ? "active" : ""} aria-pressed={tab === "terminal"} onClick={() => setTab("terminal")}>
               {t("terminal")}
             </button>
           </div>
@@ -238,6 +238,6 @@ export function ChangesPanel({ name, root, busy, messages, tick, onChanged }: { 
           </div>
         </>
       )}
-    </div>
+    </aside>
   );
 }
