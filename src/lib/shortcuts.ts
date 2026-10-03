@@ -5,6 +5,18 @@
 //   scope "composer" - handled by the message box itself; listed here for the settings screen and conflict checks only
 // Rule: app and global shortcuts need Cmd (or are Escape), so they never collide with typing/editing in the composer.
 
+import { displayKeys, type Platform } from "./platform.ts";
+
+// "Cmd" in a combo is the platform's main shortcut key: Command (metaKey) on macOS, Ctrl elsewhere.
+// The platform is set once at startup (main.tsx); it defaults to macOS so the pure logic does not depend on the host running the tests.
+let platform: Platform = "macos";
+export function setShortcutPlatform(p: Platform) {
+  platform = p;
+}
+
+/** True when the event carries the platform's main shortcut modifier (Command on macOS, Ctrl elsewhere) and not the other one. */
+export const cmdKey = (e: { metaKey: boolean; ctrlKey?: boolean }, p: Platform = platform) => (p === "macos" ? e.metaKey : !!e.ctrlKey && !e.metaKey);
+
 export type ShortcutScope = "app" | "global" | "composer";
 export type ShortcutId = "settings" | "newChat" | "search" | "closeSettings" | "stopAgent" | "send" | "newLine" | "pickModel";
 
@@ -34,6 +46,18 @@ export const SHORTCUTS: readonly Shortcut[] = [
 
 export const shortcut = (id: ShortcutId): Shortcut => SHORTCUTS.find((s) => s.id === id)!;
 
+/** Text shown for a shortcut: macOS symbols on macOS, `Ctrl+...` elsewhere (Windows reserves Ctrl+Shift+Esc for Task Manager, so the global one differs there). */
+export function shortcutDisplay(s: Shortcut, p: Platform = platform): string {
+  if (p === "windows" && s.id === "stopAgent") return "Ctrl+Alt+Shift+Esc";
+  return displayKeys(s.display, p);
+}
+
+/** Tauri accelerator of a global shortcut for the platform. */
+export function acceleratorOf(id: ShortcutId, p: Platform = platform): string {
+  if (p === "windows" && id === "stopAgent") return "Control+Alt+Shift+Escape";
+  return shortcut(id).accelerator!;
+}
+
 export type KeyLike = { key: string; code?: string; metaKey: boolean; shiftKey: boolean; altKey: boolean; ctrlKey: boolean };
 
 type Parsed = { cmd: boolean; shift: boolean; alt: boolean; ctrl: boolean; key: string };
@@ -47,9 +71,12 @@ export function parseCombo(combo: string): Parsed {
 }
 
 /** True when the keyboard event is exactly this combo (extra modifiers do not match). */
-export function matchesCombo(e: KeyLike, combo: string): boolean {
+export function matchesCombo(e: KeyLike, combo: string, plat: Platform = platform): boolean {
   const p = parseCombo(combo);
-  if (e.metaKey !== p.cmd || e.shiftKey !== p.shift || e.altKey !== p.alt || e.ctrlKey !== p.ctrl) return false;
+  const mac = plat === "macos";
+  const wantMeta = p.cmd && mac;
+  const wantCtrl = p.ctrl || (p.cmd && !mac);
+  if (e.metaKey !== wantMeta || e.shiftKey !== p.shift || e.altKey !== p.alt || e.ctrlKey !== wantCtrl) return false;
   const key = e.key.toLowerCase();
   if (p.key === "1-9") return /^[1-9]$/.test(key);
   if (p.key.length === 1 && /[a-z]/i.test(p.key)) return key === p.key.toLowerCase() || e.code === `Key${p.key.toUpperCase()}`;

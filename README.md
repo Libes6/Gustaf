@@ -24,7 +24,7 @@ The UI aims at WCAG 2.1 AA: full keyboard operation, visible focus rings in both
 
 ## Install and development
 
-Requirements: Node (version in `.nvmrc`), the Rust toolchain and the Tauri 2 prerequisites for your OS. The app is developed on macOS (Computer Use and the CI run there).
+Requirements: Node (version in `.nvmrc`), the Rust toolchain and the Tauri 2 prerequisites for your OS. The app is developed on macOS; see [Platforms](#platforms) for Windows and Linux.
 
 ```sh
 npm install
@@ -51,6 +51,29 @@ cargo test --manifest-path src-tauri/Cargo.toml           # Rust
 ```
 
 Focused node suites: `npm run test:chat`, `test:canvas`, `test:usage`, `test:cli`. Before a release, also `npm run tauri build -- --debug --bundles app`.
+
+## Platforms
+
+M Code is developed and used on **macOS**; that is the only platform on which it has been run by hand. Windows and Linux support is code-complete in the places listed below but **has never been built, launched or smoke-tested on a Windows or Linux machine**. Treat those builds as experimental.
+
+| Area | macOS | Windows | Linux |
+| --- | --- | --- | --- |
+| API keys | Keychain (`security-framework`) | Credential Manager (`keyring`) | Secret Service via D-Bus (`keyring`; needs GNOME Keyring or KWallet running) |
+| Shell for `run_command` and CLI providers | login `zsh` | Windows PowerShell 5.1 | login `bash` (`sh` as the Rust-side fallback) |
+| Window | overlay title bar, in-app header drags the window | native title bar | native title bar |
+| Installers (`tauri build`) | `.app`, `.dmg` | NSIS `.exe`, `.msi` | `.deb`, `.rpm`, AppImage |
+| Shortcuts | `⌘` | `Ctrl` (global stop: `Ctrl+Alt+Shift+Esc`) | `Ctrl` |
+| Computer Use | supported (Accessibility and Screen Recording permissions) | screenshots and input only; no permission prompts; `open_app` unsupported | X11 only: a pure Wayland session is reported unsupported; `open_app` uses `gtk-launch` |
+
+What is **not** verified outside macOS:
+
+- Nothing beyond CI compiles and tests it: the matrix in `.github/workflows/ci.yml` runs `npm run check` (i18n, `tsc`, Node tests, `cargo test`) on `macos-latest`, `windows-latest` and `ubuntu-latest`, but no installer is built there and no UI is run. Whether those jobs pass on a fresh machine has not been observed from here.
+- The Tauri bundle configuration (`tauri.windows.conf.json`, `tauri.linux.conf.json`), the shell capabilities (`capabilities/shell-*.json`) and installer output are untested. The Linux system packages in the CI file are a best guess (WebKitGTK, D-Bus, X11, PipeWire).
+- CLI providers (Claude Code, Codex, Cursor Agent) on Windows: discovery looks on `PATH` and in the npm global directory, and the exact install locations of the Windows CLIs are assumed. A `.cmd` shim receives the prompt on stdin rather than as an argument (so `cmd.exe` cannot interpret it); that relies on `claude -p` and `codex exec` reading stdin and is unverified. The Cursor/Codex Node sidecars may not be able to start a `.cmd` shim.
+- The Windows `run_command` captures stdout and stderr separately and appends stderr, so their order is not interleaved; killing a timed-out command may leave child processes running.
+- Importing history: Cursor's database is looked up in the OS config directory and Claude Code's in `~/.claude`, `%USERPROFILE%\.claude`, `CLAUDE_CONFIG_DIR` or `$XDG_CONFIG_HOME/claude`; none of these paths have been checked against real installations outside macOS.
+- Rust tests that need symlinks or POSIX hooks are skipped on Windows (`#[cfg(unix)]`); the others avoid hard-coded `/` paths but have not been run there.
+- Linux: the Secret Service backend fails when no keyring daemon is running, in which case saving a key reports an error.
 
 ## Project structure
 

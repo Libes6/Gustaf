@@ -40,7 +40,8 @@ function harness({ script = [say('all good')], root = mkdtempSync(join(tmpdir(),
     listModels: async () => [],
     turn: async (input) => {
       seen.turns.push({ access: input.access, tools: input.tools.map((t) => t.name), system: input.system, messages: [...input.messages] });
-      return script[i++] ?? say('done');
+      const next = script[i++] ?? say('done');
+      return typeof next === 'function' ? next(input) : next;
     },
   };
   const deps = {
@@ -226,4 +227,83 @@ test('runner: a thrown error from the executor is recorded, not lost', async () 
   assert.equal(store.get()[0].lastStatus, 'failed');
   assert.match(store.get()[0].lastError, /exploded/);
   assert.equal(runner.isRunning('s1'), false);
+});
+
+// ---- live in the chat and the shared run core ----
+
+const live = await import('../src/lib/liveRuns.ts');
+
+test('the chat is live while the run goes on: streamed text, then stored messages, then gone', async () => {
+  const snapshots = [];
+  const { deps } = harness({
+    script: [(turn) => {
+      snapshots.push({ ...live.getLiveRun(42) });
+      turn.onText('Hel');
+      turn.onText('lo');
+      snapshots.push({ ...live.getLiveRun(42) });
+      return say('Hello');
+    }],
+  });
+  deps.live = live.beginLiveRun;
+  const v0 = live.liveVersion(42);
+  const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
+  assert.equal(r.status, 'success');
+  assert.equal(snapshots[0].title, 'Nightly');
+  assert.equal(snapshots[0].stream, '', 'registered with the thinking state before the model answers');
+  assert.equal(snapshots[1].stream, 'Hello');
+  assert.equal(live.getLiveRun(42), undefined, 'the run is over');
+  assert.ok(live.liveVersion(42) >= v0 + 3, 'begin, the stored messages and the end each tell open chats to reload');
+});
+
+test('Stop in the chat stops the run like an outer stop', async () => {
+  const { deps, seen } = harness({ script: [() => { live.getLiveRun(42).abort(); return say('x'); }, say('never')] });
+  deps.live = live.beginLiveRun;
+  const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
+  assert.equal(r.status, 'stopped');
+  assert.ok(seen.messages.some((m) => m.msg.parts[0].text === 'stopped:'));
+  assert.equal(live.getLiveRun(42), undefined);
+});
+
+test('an approval is also offered in the open chat; answering there runs the command, the corner card is withdrawn', async () => {
+  let withdrawn = 0;
+  const { deps, seen } = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('done')], timeout: 5000 });
+  deps.live = live.beginLiveRun;
+  deps.askUser = (info) => (seen.asked.push(info), () => void withdrawn++);
+  const answered = new Promise((resolve) => {
+    const poll = setInterval(() => {
+      const a = live.getLiveRun(42)?.approval;
+      if (a) (clearInterval(poll), a.resolve(true), resolve(a.req.command));
+    }, 5);
+  });
+  const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
+  assert.equal(await answered, 'npm publish');
+  assert.equal(r.status, 'success');
+  assert.deepEqual(state.runs.map((x) => x.command), ['npm publish']);
+  assert.equal(withdrawn, 1);
+  assert.equal(seen.asked.length, 1);
+  assert.equal(seen.ended, 1);
+});
+
+test('a failed run ends its live state too', async () => {
+  const { deps } = harness({ script: [() => { throw new Error('boom'); }] });
+  deps.live = live.beginLiveRun;
+  const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
+  assert.equal(r.status, 'failed');
+  assert.equal(live.getLiveRun(42), undefined);
+});
+
+test('a writable project runs in the shadow copy and the copy is finished afterwards, also when the run fails', async () => {
+  for (const fail of [false, true]) {
+    const copy = mkdtempSync(join(tmpdir(), 'sched-copy-'));
+    writeFileSync(join(copy, 'a.txt'), 'copy\n');
+    const finished = [];
+    const { deps, seen } = harness({ script: [fail ? () => { throw new Error('boom'); } : use(call('read_file', { path: 'a.txt' })), say('ok')] });
+    deps.prepareReview = async () => ({ review: { id: 'rv', workspace: copy }, error: 'setup failed' });
+    deps.finishReview = async (id) => void finished.push(id);
+    const r = await executeScheduledRun(schedule({ access: 'auto' }), deps, new AbortController().signal);
+    assert.equal(r.status, fail ? 'failed' : 'success');
+    assert.deepEqual(finished, ['rv']);
+    assert.ok(seen.messages.some((m) => m.msg.parts[0].text === 'failed:setup failed'), 'the setup problem is noted in the chat');
+    if (!fail) assert.ok(seen.messages.some((m) => m.msg.role === 'tool' && m.msg.parts[0].output.includes('copy')), 'the tools worked in the copy');
+  }
 });
