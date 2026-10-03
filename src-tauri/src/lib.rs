@@ -8,6 +8,7 @@ mod hunks;
 mod import_sources;
 mod mcp;
 mod oauth;
+mod rawlog;
 mod review;
 mod secrets;
 mod shell;
@@ -76,6 +77,9 @@ pub fn run() {
             computer::cu_screen_size,
             attachments::attachments_save,
             attachments::attachments_clear,
+            rawlog::raw_log_append,
+            rawlog::raw_log_clear,
+            rawlog::raw_log_info,
             mcp::mcp_start,
             mcp::mcp_request,
             mcp::mcp_notify,

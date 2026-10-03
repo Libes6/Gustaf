@@ -51,9 +51,16 @@ test('a wait in flight marks the agent as waiting; a wait without receivers attr
   ]);
   assert.equal(out[0].subagent.state, 'waiting');
   assert.equal(out[0].status, 'running');
-  assert.deepEqual(nativeActivities('codex', codexEvent('item.started', { id: 'w2', tool: 'wait' })), []);
-  out = feed('codex', [codexEvent('item.completed', { id: 'w2', tool: 'wait', status: 'completed', agents_states: { a: { status: 'completed', message: 'one' }, b: { status: 'errored', message: 'boom' } } })]);
-  assert.deepEqual(out.map((o) => [o.subagent.agentId, o.subagent.state]), [['a', 'completed'], ['b', 'failed']]);
+  // Started without agents: nothing to attribute yet, so it keeps a generic card (never zero cards); the result closes that card.
+  const [pending] = nativeActivities('codex', codexEvent('item.started', { id: 'w2', tool: 'wait' }));
+  assert.equal(pending.subagent, undefined);
+  assert.equal(pending.status, 'running');
+  out = feed('codex', [
+    codexEvent('item.started', { id: 'w2', tool: 'wait' }),
+    codexEvent('item.completed', { id: 'w2', tool: 'wait', status: 'completed', agents_states: { a: { status: 'completed', message: 'one' }, b: { status: 'errored', message: 'boom' } } }),
+  ]);
+  assert.deepEqual(out.filter((o) => o.subagent).map((o) => [o.subagent.agentId, o.subagent.state]), [['a', 'completed'], ['b', 'failed']]);
+  assert.equal(out.find((o) => o.id === 'w2').status, 'success');
 });
 
 test('terminal state is sticky, send_input resumes, a failed call fails the agent, close completes it', () => {
@@ -65,10 +72,12 @@ test('terminal state is sticky, send_input resumes, a failed call fails the agen
   assert.equal(feed('codex', [...base, codexEvent('item.completed', { id: 'c', tool: 'close_agent', receiver_thread_ids: ['t1'], status: 'completed' })])[0].subagent.state, 'completed');
 });
 
-test('camelCase app-server spelling is read too, list_agents is dropped, unknown tools fall back to the generic card', () => {
+test('camelCase app-server spelling is read too, list_agents and unknown tools fall back to the generic card', () => {
   const [a] = nativeActivities('codex', { type: 'item.completed', item: { type: 'collabAgentToolCall', id: 'i', tool: 'spawnAgent', status: 'completed', receiverThreadIds: ['t9'], agentsStates: { t9: { status: 'running' } }, prompt: 'hi' } });
   assert.equal(a.subagent.agentId, 't9');
-  assert.deepEqual(nativeActivities('codex', codexEvent('item.completed', { id: 'l', tool: 'list_agents' })), []);
+  const [l] = nativeActivities('codex', codexEvent('item.completed', { id: 'l', tool: 'list_agents' }));
+  assert.equal(l.name, 'collab_tool_call');
+  assert.equal(l.subagent, undefined);
   const [g] = nativeActivities('codex', codexEvent('item.completed', { id: 'g', tool: 'brand_new_tool', status: 'completed' }));
   assert.equal(g.name, 'collab_tool_call');
   assert.equal(g.subagent, undefined);

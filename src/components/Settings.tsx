@@ -15,6 +15,7 @@ import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { DeveloperSettings } from "./DeveloperSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
@@ -74,6 +75,7 @@ function General() {
       <AppearanceSettings />
       <ShortcutsSettings />
       <ScheduledPromptsSection />
+      <DeveloperSettings />
     </>
   );
 }

@@ -6,6 +6,7 @@ declare const __SIDECAR__: string;
 import { codexArgs, resumePoint, withImagePaths } from "./cliArgs";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
+import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
 import { Command } from "@tauri-apps/plugin-shell";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
@@ -49,7 +50,7 @@ async function claudeExecutable() {
 export async function spawnLines(
   script: string,
   onLine: (e: any) => void,
-  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string> } = {},
+  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void } = {},
 ) {
   if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
@@ -58,6 +59,7 @@ export async function spawnLines(
   const line = (s: string) => {
     s = s.trim();
     if (!s) return;
+    try { o.onRaw?.(s); } catch { /* debugging aid only */ }
     try {
       onLine(JSON.parse(s));
     } catch {
@@ -203,6 +205,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
 
     async turn(t: TurnInput) {
       const point = resumePoint(t, cfg.id, false);
+      const log = createRawLogger(await rawLogEnabled(), id, t.chatId ?? null);
       let session = point.session;
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
@@ -229,13 +232,13 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           const ev = spec.parse(e);
           if (ev.session) session = ev.session;
           if (ev.text) emit(ev.text);
-          for (const action of nativeActivities(id, e)) {
+          for (const action of nativeActivities(id, e, log.unmapped)) {
             t.onActivity?.(applyActivity(actions, action));
           }
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
+        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
@@ -246,6 +249,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
       if (!text.trim() && final) emit(final);
       return { parts: [...[...actions.values()].map(a => a.status === "running" ? { ...a, status: "unknown" as const } : a), ...(text ? [{ type: "text" as const, text }] : [])], responseId: session, usage };
       } finally {
+        await log.flush();
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
       }
     },

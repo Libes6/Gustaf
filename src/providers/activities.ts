@@ -50,7 +50,7 @@ const COLLAB_ACTIONS: Record<string, SubagentInfo['action'] | 'list'> = {
  * `agents_states`), one entry per agent. Returns null for an unknown tool so the caller keeps the generic card.
  */
 function collab(ev: Json, it: Json): Activity[] | null {
-  const action = COLLAB_ACTIONS[norm(it.tool)];
+  const action = COLLAB_ACTIONS[norm(it.tool ?? it.tool_name ?? it.toolName ?? it.action ?? it.name)];
   if (!action) return null;
   if (action === 'list') return [];
   const done = ev.type === 'item.completed';
@@ -128,8 +128,37 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
   return merged;
 }
 
-/** Native CLI tools are records of completed work, never executable app tool calls. */
-export function nativeActivities(provider: string, e: unknown): Activity[] {
+/** Why an item that looks like a subagent event got the generic card; written to the raw CLI log (lib/rawCliLog.ts). */
+export type Unmapped = { type: string; tool: string; status: string; reason: 'unknown-tool' | 'no-agents' | 'invalid'; keys: string[] };
+
+/** `collab()` that can neither throw nor lose the item: an empty or unknown result is reported through `onUnmapped` and is null. */
+function collabOrFallback(ev: Json, it: Json, onUnmapped?: (u: Unmapped) => void): Activity[] | null {
+  let subs: Activity[] | null = null;
+  let invalid = false;
+  try { subs = collab(ev, it); } catch { invalid = true; }
+  if (subs?.length) return subs;
+  const known = !!COLLAB_ACTIONS[norm(it.tool ?? it.tool_name ?? it.toolName ?? it.action ?? it.name)];
+  try { onUnmapped?.({ type: str(it.type), tool: str(it.tool), status: str(it.status), reason: invalid ? 'invalid' : known ? 'no-agents' : 'unknown-tool', keys: Object.keys(it).slice(0, 30) }); } catch { /* debug only */ }
+  return null;
+}
+
+/** The generic card of a Codex item (commands, file changes, MCP calls and subagent items that could not be mapped). */
+function codexItem(ev: Json, it: Json, subagentLike: boolean): Activity {
+  const done = ev.type === 'item.completed';
+  const failed = it.status === 'failed' || (it.exit_code != null && it.exit_code !== 0) || !!it.error;
+  const path = Array.isArray(it.changes) ? it.changes.map((c) => rec(c).path).join(', ') : undefined;
+  // A subagent-like item that fell through keeps everything it said, under an id that is stable across its updates.
+  const id = str(it.id ?? it.call_id ?? it.callId) || (subagentLike ? `${norm(it.type)}:${norm(it.tool)}:${brief(it.prompt, 40)}` : '');
+  const status: Activity['status'] = !done ? 'running' : failed ? 'error' : norm(it.status) === 'completed' || it.exit_code === 0 || (it.type === 'mcp_tool_call' && it.result != null) ? 'success' : 'unknown';
+  return { type: 'activity', id, name: str(it.type), args: { command: it.command, path, server: it.server, tool: it.tool, ...(subagentLike && it.prompt ? { prompt: brief(it.prompt, 240) } : {}), ...rec(it.arguments) }, status, output: subagentLike ? clip(output(it.error ?? it) ?? '', MAX_OUTPUT) : output(it.error ?? it.aggregated_output ?? it.result ?? it.changes) };
+}
+
+/**
+ * Native CLI tools are records of completed work, never executable app tool calls. `onUnmapped` is told about every
+ * Codex item whose type mentions collab or agent but that could not become a subagent entry (those items keep a
+ * generic card with the whole item as its output: a subagent event is never dropped).
+ */
+export function nativeActivities(provider: string, e: unknown, onUnmapped?: (u: Unmapped) => void): Activity[] {
   const ev = rec(e);
   if (provider === 'claude') {
     // Events from inside a subagent are marked with the `tool_use` id of the Task call that started it.
@@ -154,15 +183,15 @@ export function nativeActivities(provider: string, e: unknown): Activity[] {
   }
   if (provider === 'codex') {
     const it = rec(ev.item);
-    if (!ev.item || !['item.started', 'item.updated', 'item.completed'].includes(str(ev.type)) || ['reasoning', 'agent_message'].includes(str(it.type))) return [];
-    if (['collabtoolcall', 'collabagenttoolcall'].includes(norm(it.type))) {
-      const subs = collab(ev, it);
-      if (subs) return subs;
+    if (!ev.item || !['item.started', 'item.updated', 'item.completed'].includes(str(ev.type)) || ['reasoning', 'agentmessage'].includes(norm(it.type))) return [];
+    const kind = norm(it.type);
+    const subagentLike = kind.includes('collab') || kind.includes('agent');
+    if (subagentLike) {
+      const subs = collabOrFallback(ev, it, onUnmapped);
+      // A wait that started without agents got a generic card (nothing else to show); close it when its result names them.
+      if (subs) return subs.length && ev.type === 'item.completed' && !list(it.receiver_thread_ids ?? it.receiverThreadIds).length && !subs.some((a) => a.subagent?.action === 'spawn') ? [...subs, (({ output: _o, ...closing }) => closing)(codexItem(ev, it, true))] : subs;
     }
-    const done = ev.type === 'item.completed';
-    const failed = it.status === 'failed' || (it.exit_code != null && it.exit_code !== 0) || !!it.error;
-    const path = Array.isArray(it.changes) ? it.changes.map((c) => rec(c).path).join(', ') : undefined;
-    return [{ type: 'activity', id: str(it.id), name: str(it.type), args: { command: it.command, path, server: it.server, tool: it.tool, ...rec(it.arguments) }, status: !done ? 'running' : failed ? 'error' : it.status === 'completed' || it.exit_code === 0 || (it.type === 'mcp_tool_call' && it.result != null) ? 'success' : 'unknown', output: output(it.error ?? it.aggregated_output ?? it.result ?? it.changes) }];
+    return [codexItem(ev, it, subagentLike)];
   }
   if (provider === 'cursor-agent' && ev.type === 'tool_call') {
     const [name, call] = Object.entries(rec(ev.tool_call))[0] ?? ['tool', {}];

@@ -22,6 +22,8 @@ export const state = {
   shadows: mkdtempSync(join(tmpdir(), 'apistub-shadow-')),
   /** Keychain entries written through `secrets`. */
   secrets: new Map(),
+  /** Batches written through `rawLog.append`: [day, lines]. */
+  rawLog: [],
   /** Fake stdio MCP servers by config id: { tools, call(name, args), epoch?, startError? }; and what was sent. */
   mcp: { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() },
   /** Unexpected errors of the SQLite stand-in (a missing table is not one: only the agent tables exist there). */
@@ -31,6 +33,7 @@ export const state = {
     this.dbErrors.length = 0;
     this.settings.clear();
     this.secrets.clear();
+    this.rawLog.length = 0;
     this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
     this.instructionFiles = [];
     this.runs.length = 0;
@@ -68,6 +71,12 @@ export const db = {
   exec: async (sql, params = []) => { try { const r = sqlite().prepare(sql).run(...params); return { changes: Number(r.changes), lastId: Number(r.lastInsertRowid) }; } catch (e) { dbFail(e); return { changes: 0, lastId: 0 }; } },
   /** Test access to the stand-in database. */
   raw: () => sqlite(),
+};
+/** Raw CLI log (src-tauri/src/rawlog.rs): appended batches by day. */
+export const rawLog = {
+  append: async (day, lines) => void state.rawLog.push([day, lines]),
+  clear: async () => void (state.rawLog.length = 0),
+  info: async () => ({ dir: '/stub/raw-cli', bytes: state.rawLog.reduce((n, [, l]) => n + l.length, 0), files: state.rawLog.length ? 1 : 0, latest: state.rawLog.length ? '/stub/raw-cli/day.jsonl' : null }),
 };
 export const secrets = {
   set: async (id, value) => void state.secrets.set(id, value),

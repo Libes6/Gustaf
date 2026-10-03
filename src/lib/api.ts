@@ -231,6 +231,14 @@ export const computer = {
   permissions: (request = false) => invoke<{ accessibility: boolean; screen: boolean }>("cu_permissions", { request }),
 };
 
+/** Opt-in capture of raw CLI event lines under the app data folder (src-tauri/src/rawlog.rs, src/lib/rawCliLog.ts). */
+export type RawLogInfo = { dir: string; bytes: number; files: number; latest: string | null };
+export const rawLog = {
+  append: (day: string, lines: string) => invoke<void>("raw_log_append", { day, lines }),
+  clear: () => invoke<void>("raw_log_clear"),
+  info: () => invoke<RawLogInfo>("raw_log_info"),
+};
+
 /** Image attachments for CLI providers, stored under the app data folder (src-tauri/src/attachments.rs). */
 export const attachments = {
   save: (chatId: number, images: string[]) => invoke<{ dir: string; files: string[] }>("attachments_save", { chatId, images }),
