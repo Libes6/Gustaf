@@ -65,6 +65,8 @@ export type ChatRunInput = {
   /** A retry: the history comes from the interrupted run, response ids are kept. */
   retry?: boolean;
   access: RunOptions["access"];
+  /** Chat mode of an interactive send; scheduled runs leave it out. */
+  mode?: RunOptions["mode"];
   /** An existing copy to keep working in (retry); `undefined` makes one when the access mode and project allow it. */
   review?: ReviewCopy | null;
   /** Chooses the provider and model; called after the copy exists (the interactive path rotates accounts here). */
@@ -95,7 +97,8 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
   let review = i.review;
   if (review === undefined) {
     review = null;
-    if (i.root && i.access !== "readonly" && deps.prepareReview) {
+    // Ask and Plan runs cannot change files, so they need no review copy.
+    if (i.root && i.access !== "readonly" && (!i.mode || i.mode === "agent") && deps.prepareReview) {
       const made = await deps.prepareReview(i.root, (command) => i.approve({ kind: "command", command }).then(Boolean));
       review = made.review;
       if (review) ui.onReview?.(review);
@@ -123,6 +126,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       model: tg.model,
       reasoning: tg.reasoning,
       access: i.access,
+      mode: i.mode,
       computerUse: tg.computerUse,
       nativeInstructions: tg.nativeInstructions,
       allowlist: i.allowlist,

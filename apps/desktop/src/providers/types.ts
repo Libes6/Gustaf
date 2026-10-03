@@ -79,6 +79,8 @@ export type TurnInput = {
   /** Chat the turn belongs to; CLI adapters use it to place image attachments on disk. */
   chatId?: number;
   access?: "readonly" | "auto" | "full";
+  /** Chat mode: CLI adapters pass their native plan / read-only flags for "plan" and "ask". */
+  mode?: "ask" | "plan" | "agent";
   signal: AbortSignal;
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;

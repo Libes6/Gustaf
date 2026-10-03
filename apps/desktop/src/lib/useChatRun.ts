@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
+import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
@@ -43,10 +44,12 @@ type Options = {
   provider: ProviderConfig | undefined;
   selectedModel: ModelInfo | undefined;
   setAtBottom: (b: boolean) => void;
+  /** Ask / Plan / Agent of this chat. */
+  mode: ChatMode;
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
-type Edit = { text: string; images: string[]; base: StoredMsg[] };
+type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode };
 
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
@@ -210,6 +213,7 @@ export function useChatRun(o: Options) {
         history,
         retry,
         access: app.access,
+        mode: edit?.mode ?? o.mode,
         review: reviewRef.current ?? undefined,
         target: async () => {
           if (activeProvider.cli === "cursor-agent") {

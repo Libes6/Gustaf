@@ -5,7 +5,9 @@ import { userText, type Turn } from "../../lib/chatTurns";
 import { editableText, turnActions } from "../../lib/messageActions";
 import type { StoredMsg } from "../../lib/data";
 import { textOf, type Part } from "../../providers/types";
+import { extractPlan, type Plan } from "../../agent/planCore";
 import { Markdown } from "../Markdown";
+import { PlanCard } from "./PlanCard";
 import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
 import "../../styles/messageActions.css";
@@ -20,6 +22,10 @@ export type TurnHandlers = {
   onDelete: (turn: Turn) => void;
   /** New chat with the history up to and including this message. */
   onBranch: (m: StoredMsg) => void;
+  /** Approve a plan card: switch the chat to Agent mode and send the plan as the next instruction. */
+  onApprovePlan: (plan: Plan) => void;
+  /** Reject a plan card: stay in Plan mode and focus the composer for feedback. */
+  onRejectPlan: () => void;
 };
 
 export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
@@ -64,12 +70,11 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
   const expanded = open || focusInSteps || (live && !finalIsText);
   const hit = (m: StoredMsg) => (m.id === focusId ? " hit-flash" : "");
 
+  const planActionable = isLastTurn && !busy;
   const renderParts = (m: StoredMsg) =>
     renderWithSubagents(m.parts, (p, i) =>
       p.type === "text" ? (
-        <div key={i} className="msg-assistant">
-          <Markdown text={p.text} />
-        </div>
+        <PlanOrMarkdown key={i} text={p.text} actionable={planActionable && m === last} handlers={handlers} />
       ) : p.type === "activity" ? (
         <ToolCard key={p.id} call={p} />
       ) : p.type === "tool_call" ? (
@@ -155,3 +160,16 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
     </>
   );
 });
+
+/** An assistant text; a valid `mcode-plan` block in it becomes a plan card, anything unparsable stays Markdown. */
+function PlanOrMarkdown({ text, actionable, handlers }: { text: string; actionable: boolean; handlers: TurnHandlers }) {
+  const found = extractPlan(text);
+  if (!found) return <div className="msg-assistant"><Markdown text={text} /></div>;
+  return (
+    <>
+      {found.before.trim() && <div className="msg-assistant"><Markdown text={found.before} /></div>}
+      <PlanCard plan={found.plan} actionable={actionable} onApprove={handlers.onApprovePlan} onReject={handlers.onRejectPlan} />
+      {found.after.trim() && <div className="msg-assistant"><Markdown text={found.after} /></div>}
+    </>
+  );
+}

@@ -1,6 +1,8 @@
 /** `addDir` is passed as `--add-dir=<dir>`: the flag is variadic, so a separate value would also swallow the positional prompt. */
-export function claudeArgs({model,session,access,addDir}:{model?:string;session?:string;access?:'readonly'|'auto'|'full';addDir?:string}) {
- return ['-p',...(addDir ? [`--add-dir=${addDir}`] : []),'--output-format','stream-json','--verbose','--include-partial-messages','--permission-mode',access === 'readonly' ? 'plan' : access === 'full' ? 'bypassPermissions' : 'acceptEdits',...(model ? ['--model',model] : []),...(session ? ['--resume',session] : [])];
+export function claudeArgs({model,session,access,mode,addDir}:{model?:string;session?:string;access?:'readonly'|'auto'|'full';mode?:'ask'|'plan'|'agent';addDir?:string}) {
+ // Claude Code has one read-only permission mode (`plan`); it serves the Ask and Plan chat modes too.
+ const readonly = access === 'readonly' || mode === 'plan' || mode === 'ask';
+ return ['-p',...(addDir ? [`--add-dir=${addDir}`] : []),'--output-format','stream-json','--verbose','--include-partial-messages','--permission-mode',readonly ? 'plan' : access === 'full' ? 'bypassPermissions' : 'acceptEdits',...(model ? ['--model',model] : []),...(session ? ['--resume',session] : [])];
 }
 export function parseClaudeEvent(e: any) {
  // Text streamed from inside a subagent (marked with the Task call's id) is not part of the answer.

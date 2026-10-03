@@ -4,6 +4,7 @@ import { sealSnapshot, snapshotFile } from "../lib/checkpoints";
 import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { READ_TOOLS, WRITE_TOOLS } from "./tools";
 import { serializeCalls } from "./subagentCore";
+import { modeAllowsTool, modeBlockedMessage, modePrompt, type ChatMode } from "./planCore";
 import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
@@ -59,6 +60,8 @@ export type RunOptions = {
   systemExtra?: string;
   /** Marks the calls of an unattended run in the action log (`"scheduled"`: a scheduled prompt). */
   source?: "scheduled";
+  /** Main chat only (Ask: no tools, Plan: read-only tools and a plan at the end, Agent/undefined: everything). Subagent and scheduled runs ignore it. */
+  mode?: ChatMode;
 };
 
 const MAX_STEPS = 50;
@@ -90,7 +93,7 @@ class ComputerFailed extends Error {
 const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
 type ToolContext = { act: string; project: string | null };
 
-async function buildSystem(root: string | null, computerUse: boolean, instructions = "") {
+async function buildSystem(root: string | null, computerUse: boolean, instructions = "", mode?: ChatMode) {
   const lines = [
     `You are M Code, a coding agent in a desktop app on ${platformLabel()} (run_command uses ${shellLabel()}).`,
     `Today is ${new Date().toDateString()}.`,
@@ -115,13 +118,17 @@ async function buildSystem(root: string | null, computerUse: boolean, instructio
         "Ask the user before purchases, sending messages to new recipients, or deleting data.",
       ].join(" "),
     );
-  else lines.push("M Code desktop control is disabled. Do not claim you can control the computer or use desktop automation; ask the user to enable Computer Use in M Code first.");
+  else if (!mode || mode === "agent") lines.push("M Code desktop control is disabled. Do not claim you can control the computer or use desktop automation; ask the user to enable Computer Use in M Code first.");
+  const extra = modePrompt(mode);
+  if (extra) lines.push(extra);
   return lines.join("\n");
 }
 
 async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions, ctx: ToolContext): Promise<string> {
   const root = o.root!;
   const a = call.args ?? {};
+  // Ask and Plan mode: a tool outside the mode's set never runs, whatever the model calls.
+  if (!modeAllowsTool(o.mode, call.name)) throw new ActionBlocked(modeBlockedMessage(o.mode));
   // Read-only runs are not offered the write tools; a model that calls one anyway must not get through.
   if (o.access === "readonly" && WRITE_NAMES.has(call.name)) throw new ActionBlocked("Blocked: read-only mode does not allow this tool.");
   if (o.toolNames && !o.toolNames.includes(call.name)) throw new ActionBlocked("Blocked: this agent type is not allowed to use this tool.");
@@ -190,6 +197,8 @@ async function runMcpTool(call: Extract<Part, { type: "tool_call" }>, o: RunOpti
 export async function runAgent(o: RunOptions) {
   // Subagents may ask for approval while the main loop (or another subagent) has a card open: ask one at a time.
   if (o.subagents) o = { ...o, approve: serializeCalls(o.approve) };
+  // Subagents (fixed tool allowlist) and unattended scheduled runs keep their own limits and ignore the chat mode.
+  if (o.toolNames || o.source || o.mode === "agent") o = { ...o, mode: undefined };
   if (o.root) beginRun(o.root);
   try {
     await runLoop(o);
@@ -201,15 +210,17 @@ export async function runAgent(o: RunOptions) {
 async function runLoop(o: RunOptions) {
   const history = [...o.history];
   const instructions = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null).then((project) => loadProjectInstructions({ root: o.root!, project, native: o.nativeInstructions })) : null;
-  let system = await buildSystem(o.root, o.computerUse, instructions?.text);
+  const planning = o.mode === "plan" || o.mode === "ask";
+  let system = await buildSystem(o.root, o.computerUse && !planning, instructions?.text, o.mode);
   if (o.reviewMode) system += "\nThis is a review workspace: all project changes MUST stay within the project root above. Paths in older history refer to the original project and are obsolete. Use relative paths here. Do not write to the original project or other paths. Proposed files will be applied only after user review. Dependencies/ignored files may be absent: report unavailable tests, do not claim they passed. The workspace has no original git history. Do not commit or publish changes.";
   if (o.reviewMode && o.reviewLinked?.length) system += `\nThese workspace directories are symlinks to the original project's dependencies: ${o.reviewLinked.join(", ")}. Use them for building and testing but treat them as read-only: never write, install or delete anything inside them. Changes there are never applied.`;
   if (o.systemExtra) system += "\n" + o.systemExtra;
   let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
-  const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly";
+  if (planning) tools = tools.filter((t) => modeAllowsTool(o.mode, t.name));
+  const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning;
   if (canSpawn) tools = [...tools, ...(await o.subagents!.tools({ providerId: o.providerId, model: o.model }))];
-  const screen = o.computerUse && o.adapter.supportsComputer ? await computer.screenSize() : null;
+  const screen = o.computerUse && !planning && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
   let computerSteps = 0;
   // "Allow for this task" lasts for this run only; Return right after a batch that ended with typing counts as risky.
@@ -217,7 +228,7 @@ async function runLoop(o: RunOptions) {
   let afterTyping = false;
   const project = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null) : null;
   // MCP tools: main loop only (subagents have a fixed allowlist), and only for models that take tools.
-  const mcp = o.supportsTools === false || o.toolNames ? null : await loadMcpToolset({ project, access: o.access, reserved: tools.map((t) => t.name), signal: o.signal }).catch(() => null);
+  const mcp = o.supportsTools === false || o.toolNames || planning ? null : await loadMcpToolset({ project, access: o.access, reserved: tools.map((t) => t.name), signal: o.signal }).catch(() => null);
   if (mcp?.defs.length) {
     tools = [...tools, ...mcp.defs];
     system += "\n" + MCP_PROMPT;
@@ -234,6 +245,7 @@ async function runLoop(o: RunOptions) {
       cwd: o.root ?? undefined,
       chatId: o.chatId,
       access: o.access,
+      mode: o.mode,
       signal: o.signal,
       onText: o.onText,
       onActivity: o.onActivity,
@@ -271,6 +283,7 @@ async function runLoop(o: RunOptions) {
       }
       try {
         if (call.computer) {
+          if (planning) throw new ActionBlocked(modeBlockedMessage(o.mode));
           if (!o.computerUse) throw new Error("Computer use is disabled by the user.");
           if (++computerSteps > MAX_COMPUTER_STEPS || Date.now() - started > COMPUTER_DEADLINE_MS)
             throw new Error("Computer use step/time limit reached. Stop and summarize for the user.");
