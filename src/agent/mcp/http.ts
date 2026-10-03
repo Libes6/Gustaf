@@ -1,6 +1,7 @@
 // MCP client over streamable HTTP: POSTs JSON-RPC, reads either a JSON body or a text/event-stream, keeps the
 // `Mcp-Session-Id` and `MCP-Protocol-Version` headers, re-initializes once when the session expired (404).
 // `fetch` is injected (the app passes Tauri's HTTP plugin; tests pass a fake), so this file has no Tauri imports.
+import { SIGN_IN_NEEDED } from "./oauth";
 import { answerServerRequest, checkInitialize, encode, errorText, initializeParams, MAX_MESSAGE_BYTES, notification, parseBody, request, SseDecoder, type Parsed, type RpcId } from "./protocol";
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -12,9 +13,16 @@ export type HttpOptions = {
   clientVersion?: string;
   /** Server notifications seen in any response stream (e.g. notifications/tools/list_changed). */
   onNotification?: (method: string, params: unknown) => void;
+  /**
+   * OAuth: `header()` gives the current `Authorization` value (refreshing an expired token first) and `refresh()` is
+   * called once after a 401 to obtain a new one; it returns false when the user has to sign in again.
+   */
+  auth?: { header: () => Promise<string | undefined>; refresh: () => Promise<boolean> };
 };
 
 class SessionExpired extends Error {}
+class Unauthorized extends Error {}
+const abortError = () => new DOMException("Aborted", "AbortError");
 
 async function readText(res: Response, max: number): Promise<string> {
   if (!res.body) return "";
@@ -43,8 +51,10 @@ export class McpHttpClient {
   private nextId = 1;
   private connecting?: Promise<InitInfo>;
   info?: InitInfo;
-  /** Bumped on notifications/tools/list_changed. */
+  /** Bumped on notifications/tools/list_changed, resources/list_changed and prompts/list_changed. */
   toolsEpoch = 0;
+  resourcesEpoch = 0;
+  promptsEpoch = 0;
 
   constructor(o: HttpOptions) {
     this.o = o;
@@ -92,14 +102,60 @@ export class McpHttpClient {
   private handle(p: Parsed) {
     if (p.kind === "notification") {
       if (p.method === "notifications/tools/list_changed") this.toolsEpoch++;
+      else if (p.method === "notifications/resources/list_changed") this.resourcesEpoch++;
+      else if (p.method === "notifications/prompts/list_changed") this.promptsEpoch++;
       this.o.onNotification?.(p.method, p.params);
     } else if (p.kind === "request") {
       this.post(answerServerRequest(p), 10_000).catch(() => {});
     }
   }
 
-  /** Sends one message. For a request, resolves with its result (or throws its error); otherwise resolves when accepted. */
+  /**
+   * Sends one message. For a request, resolves with its result (or throws its error); otherwise resolves when accepted.
+   * An abort returns at once (even if the transport ignores the signal) and, for a request the server may still be
+   * working on, tells it with `notifications/cancelled`; whatever the server answers later is never read.
+   */
   private async post(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    const expect = "method" in msg && msg.id !== undefined ? msg.id : undefined;
+    let stop: (() => void) | undefined;
+    const aborted = new Promise<never>((_, reject) => {
+      if (!signal) return;
+      const fire = () => {
+        if (expect !== undefined && msg.method !== "initialize" && this.session) {
+          // Best effort and not awaited; the caller must not wait for the server.
+          this.postOnce(notification("notifications/cancelled", { requestId: expect, reason: "cancelled by the user" }), 5_000).catch(() => {});
+        }
+        reject(abortError());
+      };
+      if (signal.aborted) return fire();
+      signal.addEventListener("abort", fire, { once: true });
+      stop = () => signal.removeEventListener("abort", fire);
+    });
+    aborted.catch(() => {});
+    try {
+      return await Promise.race([this.postAuthorized(msg, timeoutMs, signal), aborted]);
+    } finally {
+      stop?.();
+    }
+  }
+
+  /** `postOnce`, and after a 401 (OAuth only) one retry with a refreshed token. */
+  private async postAuthorized(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    try {
+      return await this.postOnce(msg, timeoutMs, signal);
+    } catch (e) {
+      if (!(e instanceof Unauthorized) || !this.o.auth) throw e;
+      if (!(await this.o.auth.refresh())) throw new Error(SIGN_IN_NEEDED);
+      try {
+        return await this.postOnce(msg, timeoutMs, signal);
+      } catch (e2) {
+        if (e2 instanceof Unauthorized) throw new Error(SIGN_IN_NEEDED);
+        throw e2;
+      }
+    }
+  }
+
+  private async postOnce(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
     const ctl = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -111,8 +167,10 @@ export class McpHttpClient {
     const expect = "method" in msg && msg.id !== undefined ? msg.id : undefined;
     const what = msg.method ?? "reply";
     try {
+      const bearer = await this.o.auth?.header();
       const headers: Record<string, string> = {
         ...this.o.headers,
+        ...(bearer ? { Authorization: bearer } : {}),
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
         ...(this.session ? { "Mcp-Session-Id": this.session } : {}),
@@ -122,6 +180,10 @@ export class McpHttpClient {
       if (res.status === 404 && this.session && msg.method !== "initialize") {
         res.body?.cancel().catch(() => {});
         throw new SessionExpired("MCP session expired");
+      }
+      if (res.status === 401 && this.o.auth) {
+        res.body?.cancel().catch(() => {});
+        throw new Unauthorized(SIGN_IN_NEEDED);
       }
       if (!res.ok) {
         const text = (await readText(res, 64 * 1024).catch(() => "")).slice(0, 500);

@@ -25,13 +25,15 @@ type Base = {
   timeoutMs?: number;
 };
 export type StdioServer = Base & { transport: "stdio"; command: string; args: string[]; env: KV[]; cwd?: string };
-export type HttpServer = Base & { transport: "http"; url: string; headers: KV[] };
+/** OAuth sign-in for an HTTP server: tokens live in the Keychain (`oauthSecretId`), never here. `clientId` skips dynamic registration. */
+export type OAuthConfig = { clientId?: string; scope?: string };
+export type HttpServer = Base & { transport: "http"; url: string; headers: KV[]; oauth?: OAuthConfig };
 export type McpServer = StdioServer | HttpServer;
 export type McpConfig = { servers: McpServer[] };
 
 export type ImportError = { name: string; code: ErrorCode };
 export type ErrorCode =
-  | "json" | "empty" | "invalid" | "name" | "nameTaken" | "command" | "args" | "envKey" | "value" | "url" | "headerName" | "project" | "cwd" | "sse" | "tooMany";
+  | "json" | "empty" | "invalid" | "name" | "nameTaken" | "command" | "args" | "envKey" | "value" | "url" | "headerName" | "project" | "cwd" | "sse" | "tooMany" | "oauth";
 
 const NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
 const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -39,6 +41,8 @@ const HEADER_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/;
 const SECRETISH = /key|token|secret|passw|pwd|auth|credential|cookie|session|private|bearer|signature/i;
 
 export const secretId = (serverId: string, kind: "env" | "header", key: string) => `mcp:${serverId}:${kind}:${key}`;
+/** Keychain entry holding a server's OAuth tokens (JSON, see oauth.ts `StoredOAuth`). */
+export const oauthSecretId = (serverId: string) => `mcp:${serverId}:oauth`;
 /** Whether a value should go to the Keychain by default (the user can change it per entry). */
 export const looksSecret = (key: string, value = "") => SECRETISH.test(key) || /^(bearer|basic)\s/i.test(value) || /^(sk|ghp|gho|github_pat|xox[abp]|glpat)[-_]/i.test(value);
 
@@ -71,6 +75,12 @@ export function validUrl(url: string): boolean {
   }
 }
 
+const validOAuth = (o: unknown) => {
+  if (!o || typeof o !== "object") return false;
+  const { clientId, scope } = o as OAuthConfig;
+  const ok = (v: unknown) => v === undefined || (typeof v === "string" && v.length <= 512 && !/[\u0000-\u001f]/.test(v));
+  return ok(clientId) && ok(scope);
+};
 const badValue = (v: unknown) => v !== undefined && (typeof v !== "string" || v.length > LIMITS.value || v.includes("\0"));
 
 /** Problems with a server, as codes (the UI translates them). `others` are the other configured servers. */
@@ -89,6 +99,7 @@ export function validateServer(s: McpServer, others: readonly McpServer[] = []):
     if (!validUrl(s.url)) errors.add("url");
     if (!Array.isArray(s.headers) || s.headers.length > LIMITS.entries || s.headers.some((h) => !HEADER_RE.test(h.key))) errors.add("headerName");
     if (s.headers?.some((h) => badValue(h.value) || /[\r\n]/.test(h.value ?? ""))) errors.add("value");
+    if (s.oauth !== undefined && !validOAuth(s.oauth)) errors.add("oauth");
   }
   return [...errors];
 }
@@ -108,6 +119,11 @@ function kvList(raw: unknown, keepValues: boolean): KV[] {
   }
   return out;
 }
+
+const oauthFrom = (o: Record<string, unknown>): OAuthConfig => ({
+  ...(typeof o.clientId === "string" && o.clientId.trim() ? { clientId: o.clientId.trim() } : {}),
+  ...(typeof o.scope === "string" && o.scope.trim() ? { scope: o.scope.trim() } : {}),
+});
 
 /** Accepts whatever was persisted and returns the valid servers; secret values are never read from settings. */
 export function normalizeConfig(raw: unknown): McpConfig {
@@ -130,7 +146,7 @@ export function normalizeConfig(raw: unknown): McpConfig {
     };
     const s: McpServer =
       r.transport === "http"
-        ? { ...base, transport: "http", url: String(r.url ?? ""), headers: kvList(r.headers, false) }
+        ? { ...base, transport: "http", url: String(r.url ?? ""), headers: kvList(r.headers, false), ...(r.oauth && typeof r.oauth === "object" ? { oauth: oauthFrom(r.oauth) } : {}) }
         : { ...base, transport: "stdio", command: String(r.command ?? ""), args: Array.isArray(r.args) ? [...r.args] : [], env: kvList(r.env, false), ...(typeof r.cwd === "string" && r.cwd ? { cwd: r.cwd } : {}) };
     if (validateServer(s, servers).length) continue;
     servers.push(s);
@@ -156,7 +172,10 @@ export function staleSecretIds(prev: McpServer | undefined, next: McpServer | nu
   if (!prev) return [];
   const ids = (s: McpServer) => (s.transport === "stdio" ? s.env.filter((e) => e.secret).map((e) => secretId(s.id, "env", e.key)) : s.headers.filter((h) => h.secret).map((h) => secretId(s.id, "header", h.key)));
   const keep = new Set(next ? ids(next) : []);
-  return ids(prev).filter((id) => !keep.has(id));
+  const stale = ids(prev).filter((id) => !keep.has(id));
+  // OAuth tokens belong to one server URL and client: dropped when the sign-in is turned off or either changes.
+  if (prev.transport === "http" && prev.oauth && !(next && next.transport === "http" && next.oauth && next.url === prev.url && next.oauth.clientId === prev.oauth.clientId)) stale.push(oauthSecretId(prev.id));
+  return stale;
 }
 
 /** Enabled servers that apply to a run in `project` (global ones plus those bound to that folder). */

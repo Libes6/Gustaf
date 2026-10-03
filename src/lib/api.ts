@@ -26,16 +26,25 @@ export const secrets = {
 };
 
 /** A stdio MCP server as src-tauri/src/mcp.rs reports it. `init` is the server's `initialize` result. */
-export type McpStatus = { id: string; state: "stopped" | "starting" | "running" | "restarting" | "error"; error: string | null; pid: number | null; restarts: number; toolsEpoch: number; init: unknown };
+export type McpStatus = { id: string; state: "stopped" | "starting" | "running" | "restarting" | "error"; error: string | null; pid: number | null; restarts: number; toolsEpoch: number; resourcesEpoch: number; promptsEpoch: number; init: unknown };
 export type McpSpec = { command: string; args: string[]; env: Record<string, string>; cwd?: string };
 
 /** Stdio MCP servers (src-tauri/src/mcp.rs): started on demand, JSON-RPC requests with a timeout, bounded stderr log. */
 export const mcpStdio = {
   start: (id: string, spec: McpSpec) => invoke<McpStatus>("mcp_start", { id, spec }),
-  request: (id: string, method: string, params?: unknown, timeoutMs?: number) => invoke<unknown>("mcp_request", { id, method, params: params ?? null, timeoutMs }),
+  /** `requestKey` lets `cancel` end this call at once (and tell the server with notifications/cancelled). */
+  request: (id: string, method: string, params?: unknown, timeoutMs?: number, requestKey?: string) => invoke<unknown>("mcp_request", { id, method, params: params ?? null, timeoutMs, requestKey }),
+  cancel: (id: string, requestKey: string) => invoke<void>("mcp_cancel", { id, requestKey }),
   stop: (id: string, forget = false) => invoke<void>("mcp_stop", { id, forget }),
   status: () => invoke<McpStatus[]>("mcp_status"),
   logs: (id: string) => invoke<string[]>("mcp_logs", { id }),
+};
+
+/** Loopback redirect receiver for the MCP OAuth sign-in (src-tauri/src/oauth.rs). `wait` resolves with the authorization code. */
+export const oauthLoopback = {
+  start: (state: string, timeoutMs?: number) => invoke<{ id: string; port: number }>("oauth_loopback_start", { state, timeoutMs }),
+  wait: (id: string) => invoke<string>("oauth_loopback_wait", { id }),
+  cancel: (id: string) => invoke<void>("oauth_loopback_cancel", { id }),
 };
 
 /** One match from the full-text index (src-tauri/src/db.rs). `snippet` marks matches with MARK_OPEN/MARK_CLOSE (see searchUtil.ts). */

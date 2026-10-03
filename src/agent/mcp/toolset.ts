@@ -3,6 +3,7 @@
 // Pure: unit-tested in tests/mcp.test.mjs.
 import type { ToolDef } from "../../providers/types";
 import type { McpServer } from "./config";
+import { RESOURCE_TOOLS, resourceToolDefs } from "./resources";
 
 export const MCP_PREFIX = "mcp__";
 export const MAX_NAME = 64;
@@ -14,7 +15,8 @@ export const MAX_RESULT_TEXT = 50_000;
 export const MAX_IMAGE_BASE64 = 5_000_000;
 
 export type McpTool = { name: string; title?: string; description: string; inputSchema: unknown; readOnlyHint?: boolean; destructiveHint?: boolean };
-export type McpRoute = { serverId: string; server: string; tool: string };
+/** `tool` is the server's tool name, or for the built-in resource tools their policy key (`mcp_list_resources` / `mcp_read_resource`). */
+export type McpRoute = { serverId: string; server: string; tool: string; kind?: "tool" | "list_resources" | "read_resource" };
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
@@ -129,7 +131,7 @@ export const isMcpToolName = (name: string) => name.startsWith(MCP_PREFIX);
  * tools). Names that collide after sanitizing or cutting get a numeric suffix; the route map gives the real target.
  */
 export function namespaceTools(
-  groups: { server: Pick<McpServer, "id" | "name">; tools: McpTool[] }[],
+  groups: { server: Pick<McpServer, "id" | "name">; tools: McpTool[]; resources?: { list: boolean; read: boolean } }[],
   reserved: Iterable<string> = [],
 ): { defs: ToolDef[]; route: Map<string, McpRoute>; dropped: number } {
   const taken = new Set(reserved);
@@ -153,6 +155,25 @@ export function namespaceTools(
         parameters: sanitizeSchema(t.inputSchema).schema,
       });
       route.set(name, { serverId: g.server.id, server: g.server.name, tool: t.name });
+    }
+    // Built-in resource tools of a server that offers resources: same naming, collision handling and caps.
+    if (g.resources && (g.resources.list || g.resources.read)) {
+      const names = { list: "", read: "" };
+      if (g.resources.list) {
+        names.list = uniqueToolName(mcpToolName(g.server.name, RESOURCE_TOOLS.list), taken);
+        taken.add(names.list);
+      }
+      names.read = uniqueToolName(mcpToolName(g.server.name, RESOURCE_TOOLS.read), taken);
+      for (const d of resourceToolDefs(g.server.name, names, g.resources)) {
+        if (defs.length >= MAX_TOOLS_TOTAL) {
+          dropped++;
+          continue;
+        }
+        taken.add(d.name);
+        defs.push(d);
+        const list = d.name === names.list;
+        route.set(d.name, { serverId: g.server.id, server: g.server.name, tool: list ? RESOURCE_TOOLS.list : RESOURCE_TOOLS.read, kind: list ? "list_resources" : "read_resource" });
+      }
     }
   }
   return { defs, route, dropped };
