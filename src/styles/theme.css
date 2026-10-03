@@ -22,8 +22,8 @@
   --warn: #e9a23b;
   --radius: 10px;
   --radius-lg: 16px;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Ubuntu, Cantarell, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   --titlebar: 44px;
   --on-accent: #1b1b1b;
   --bubble-fg: #fff;
@@ -551,6 +551,8 @@ button.split-item { width: 100%; text-align: left; }
 .resizing iframe { pointer-events: none; }
 
 .window-header { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; padding: 0 16px 0 90px; border-bottom: 1px solid var(--border); background: var(--bg-side); user-select: none; }
+/* Windows/Linux use the native title bar (no overlay), so nothing needs to clear the macOS traffic lights. */
+:root:not([data-os="macos"]) .window-header { padding-left: 12px; }
 .window-header span { pointer-events: none; color: var(--text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
 .rail { grid-column: 1; grid-row: 2; }
 .sidebar { grid-column: 2; grid-row: 2; }

@@ -137,12 +137,15 @@ impl Inner {
 }
 
 /// The user's login-shell PATH (GUI apps start with a minimal one), merged with the current PATH and common tool dirs.
+/// Separator of PATH entries on this OS.
+const PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
+
 fn search_path() -> &'static str {
     static PATH: OnceLock<String> = OnceLock::new();
     PATH.get_or_init(|| {
         let mut dirs: Vec<String> = Vec::new();
         let mut add = |p: &str| {
-            for d in p.split(':').filter(|d| !d.is_empty()) {
+            for d in p.split(PATH_SEP).filter(|d| !d.is_empty()) {
                 if !dirs.iter().any(|x| x == d) {
                     dirs.push(d.to_string());
                 }
@@ -153,17 +156,26 @@ fn search_path() -> &'static str {
         }
         add(&std::env::var("PATH").unwrap_or_default());
         if let Some(home) = dirs::home_dir() {
-            add(&format!("{}/.local/bin", home.display()));
+            add(&home.join(".local").join("bin").to_string_lossy());
         }
-        add("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
-        dirs.join(":")
+        if cfg!(not(windows)) {
+            add("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+        }
+        dirs.join(&PATH_SEP.to_string())
     })
 }
 
-/// Runs a fixed script (no user input) in an interactive login zsh to read PATH; bounded to 5 s.
+/// Windows GUI apps inherit the full user PATH, so there is nothing to ask a shell for.
+#[cfg(windows)]
+fn login_shell_path() -> Option<String> {
+    None
+}
+
+/// Runs a fixed script (no user input) in an interactive login shell (zsh on macOS, bash/sh on Linux) to read PATH; bounded to 5 s.
+#[cfg(not(windows))]
 fn login_shell_path() -> Option<String> {
     const MARK: &str = "__MCODE_PATH__";
-    let mut child = Command::new("/bin/zsh")
+    let mut child = Command::new(crate::shell::Shell::current().program())
         .args(["-ilc", &format!("printf '\\n{MARK}%s\\n' \"$PATH\"")])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -192,17 +204,35 @@ fn login_shell_path() -> Option<String> {
     text.lines().rev().find_map(|l| l.strip_prefix(MARK)).map(str::to_string).filter(|p| !p.is_empty())
 }
 
+#[cfg(unix)]
+fn is_executable(meta: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable(_meta: &std::fs::Metadata) -> bool {
+    true
+}
+
 /// Finds a bare command name in `path` (like the shell would); paths with a slash are used as given.
 fn resolve_command(command: &str, path: &str) -> Result<String, String> {
-    if command.contains('/') {
+    if command.contains('/') || (cfg!(windows) && command.contains('\\')) {
         return Ok(command.to_string());
     }
-    use std::os::unix::fs::PermissionsExt;
-    for dir in path.split(':').filter(|d| !d.is_empty()) {
-        let candidate = std::path::Path::new(dir).join(command);
-        if let Ok(meta) = std::fs::metadata(&candidate) {
-            if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
-                return Ok(candidate.to_string_lossy().into_owned());
+    // Windows resolves bare names through PATHEXT (`npx` is `npx.cmd`).
+    let names: Vec<String> = if cfg!(windows) && std::path::Path::new(command).extension().is_none() {
+        ["", ".exe", ".cmd", ".bat", ".com"].iter().map(|e| format!("{command}{e}")).collect()
+    } else {
+        vec![command.to_string()]
+    };
+    for dir in path.split(PATH_SEP).filter(|d| !d.is_empty()) {
+        for name in &names {
+            let candidate = std::path::Path::new(dir).join(name);
+            if let Ok(meta) = std::fs::metadata(&candidate) {
+                if meta.is_file() && is_executable(&meta) {
+                    return Ok(candidate.to_string_lossy().into_owned());
+                }
             }
         }
     }
@@ -289,10 +319,12 @@ fn terminate(mut child: Child) -> Option<std::process::ExitStatus> {
     if let Some(s) = wait(&mut child, 300) {
         return Some(s);
     }
+    #[cfg(unix)]
     signal_group(pid, libc::SIGTERM);
     if let Some(s) = wait(&mut child, 1500) {
         return Some(s);
     }
+    #[cfg(unix)]
     signal_group(pid, libc::SIGKILL);
     let _ = child.kill();
     child.wait().ok()
@@ -893,6 +925,7 @@ mod tests {
         assert_eq!(read_line_bounded(&mut r, 30).unwrap(), None);
     }
 
+    #[cfg(unix)]
     #[test]
     fn spec_validation_and_command_lookup() {
         assert!(validate_spec(&Spec { command: " ".into(), ..Default::default() }).is_err());
