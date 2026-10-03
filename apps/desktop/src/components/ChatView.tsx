@@ -26,6 +26,8 @@ import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
 import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
 import { loadReviewOverride, resolveReviewCopy, saveReviewOverride, type ReviewOverride } from "../lib/reviewCopy";
 import { Composer } from "./chat/Composer";
+import { BranchPicker } from "./chat/BranchPicker";
+import { BranchBar } from "./chat/BranchBar";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
 
@@ -34,6 +36,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const app = useApp();
   const [messages, setMessages] = useState<StoredMsg[]>([]);
   const [text, setText] = useState("");
+  const [branchPoint, setBranchPoint] = useState<StoredMsg | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [atBottom, setAtBottom] = useState(true);
   const [files, setFiles] = useState<string[]>([]);
@@ -94,7 +97,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     onEdit: (m, txt) => void latest.current.run.resendFrom(m, txt),
     onRegenerate: (user) => void latest.current.run.resendFrom(user, editableText(user)),
     onDelete: (turn) => void latest.current.run.removeMessages((turn.user ?? turn.steps[0]).chat_id, turnMessageIds(turn)),
-    onBranch: (m) => void latest.current.run.branchFrom(m, latest.current.title, latest.current.branchLabel),
+    onBranch: (m) => { setBranchPoint(m); },
     onApprovePlan: (plan: Plan) => {
       // Approve: Agent mode from now on, and the plan is the next instruction.
       latest.current.setMode("agent");
@@ -157,6 +160,12 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           {blocked && resolved.state === "missing" && <div className="error-box" role="alert">{blocked}</div>}
         </div>
       ) : (
+        <>
+        {session.chatId && <BranchBar chatId={session.chatId} />}
+        {branchPoint && <BranchPicker busy={running} onCancel={() => setBranchPoint(null)} onCreate={async selection => {
+          await latest.current.run.branchFrom(branchPoint, latest.current.title, latest.current.branchLabel, selection);
+          setBranchPoint(null);
+        }} />}
         <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
@@ -167,6 +176,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
         </div>
+        </>
       )}
       {!atBottom && (
         <button className="to-bottom" title={t("scrollToBottom")} aria-label={t("scrollToBottom")} onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}>

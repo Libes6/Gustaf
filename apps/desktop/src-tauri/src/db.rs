@@ -26,6 +26,13 @@ create table if not exists messages(
   id integer primary key, chat_id integer not null references chats(id) on delete cascade,
   role text not null, content text not null, created_at integer not null);
 create index if not exists messages_chat on messages(chat_id, id);
+-- Branch lineage survives deletion of the source; only the branch owns this record.
+create table if not exists chat_branches(
+  chat_id integer primary key references chats(id) on delete cascade,
+  source_chat_id integer not null, source_message_id integer not null,
+  source_title text not null);
+create index if not exists branches_source on chat_branches(source_chat_id);
+
 create table if not exists settings(key text primary key, value text not null);
 create table if not exists models_seen(
   provider text not null, model text not null, first_seen integer not null,
@@ -600,6 +607,25 @@ mod tests {
 
     fn new_chat(conn: &Connection) -> i64 {
         execute(conn, "insert into chats(title, created_at, updated_at) values('t', 1, 1)", vec![]).unwrap().1
+    }
+
+    #[test]
+    fn branch_lineage_survives_source_deletion_and_history_is_independent() {
+        let conn = Connection::open_in_memory().unwrap();
+        init(&conn).unwrap();
+        conn.execute_batch("insert into chats(id,title,created_at,updated_at) values(1,'source',1,1),(2,'branch',2,2);
+        insert into messages(chat_id,role,content,created_at) values(1,'user','{\"parts\":[{\"type\":\"image\",\"data\":\"AA\"}],\"meta\":{\"responseId\":\"session\"}}',1);
+        insert into chat_branches values(2,1,1,'source');
+        insert into messages(chat_id,role,content,created_at) select 2,role,json_remove(json_patch(content,'{\"meta\":{\"branchHistory\":true}}'),'$.meta.responseId'),created_at from messages where chat_id=1 and id<=1;").unwrap();
+        conn.execute("delete from chats where id=1", []).unwrap();
+        let title: String = conn.query_row("select source_title from chat_branches where chat_id=2", [], |r| r.get(0)).unwrap();
+        assert_eq!(title, "source");
+        let (image, session): (String, Option<String>) = conn.query_row("select json_extract(content,'$.parts[0].data'),json_extract(content,'$.meta.responseId') from messages where chat_id=2", [], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+        assert_eq!(image, "AA");
+        assert_eq!(session, None);
+        assert_eq!(conn.query_row("select json_extract(content,'$.meta.branchHistory') from messages where chat_id=2", [], |r| r.get::<_,i64>(0)).unwrap(), 1);
+        conn.execute("delete from chats where id=2", []).unwrap();
+        assert_eq!(conn.query_row("select count(*) from chat_branches", [], |r| r.get::<_,i64>(0)).unwrap(), 0);
     }
 
     #[test]

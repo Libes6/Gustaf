@@ -43,3 +43,17 @@ test('only the new turn images are sent',()=>{
  assert.deepEqual(turnImages([user(img('OLD')),asst(),user({type:'text',text:'t'},img('NEW'))],false),['NEW']);
  assert.deepEqual(turnImages([user({type:'text',text:'t'})],true),[]);
 });
+
+test('branched history without response ids starts a fresh native session and retains recorded image context', async () => {
+  const { resumePoint } = await import('../src/providers/cliArgs.ts');
+  const copied = [
+    { role: 'user', parts: [{ type: 'text', text: 'Inspect attachment' }, { type: 'image', data: 'AA' }], meta: { branchHistory: true } },
+    { role: 'assistant', parts: [{ type: 'text', text: 'Recorded result' }], meta: { provider: 'codex' } },
+    { role: 'user', parts: [{ type: 'text', text: 'Continue the branch' }] },
+  ];
+  const point = resumePoint({ messages: copied, system: 'sys' }, 'codex', false);
+  assert.equal(point.session, undefined);
+  assert.ok(point.prompt.includes('Recorded result'));
+  assert.ok(point.prompt.includes('Continue the branch'));
+  assert.deepEqual(point.images, ['AA']);
+});

@@ -494,13 +494,14 @@ export function useChatRun(o: Options) {
   }
 
   /** Copies the history up to and including message `m` into a new chat and opens it. */
-  async function branchFrom(m: StoredMsg, chatTitle: string, label: string) {
+  async function branchFrom(m: StoredMsg, chatTitle: string, label: string, selection?: { providerId: string; model: string }) {
     if (running || abortRef.current) return;
     const cutoff = branchCutoff(messages, m.id);
     if (cutoff === null) return;
     try {
       const id = await branchChat(o.projectId, branchTitle(chatTitle, label), m.chat_id, cutoff, o.workspace ?? undefined);
       await app.reload();
+      if (selection) app.setSelection(selection);
       app.openChat(id, o.projectId);
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
