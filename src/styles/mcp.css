@@ -17,3 +17,9 @@
 .mcp-kv { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .mcp-kv-row { display: flex; gap: 6px; align-items: center; width: 100%; }
 .mcp-kv-row .input { flex: 1; min-width: 0; }
+
+/* Composer: MCP prompt picker (components/McpPromptDialog.tsx) and the sign-in line in the server list */
+.review-dialog.mcp-prompt-dialog { width: min(520px, 100%); }
+.mcp-prompt-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
+.mcp-prompt-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; height: auto; padding: 6px 8px; }
+.mcp-signin { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

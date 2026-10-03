@@ -1,8 +1,10 @@
-import { ArrowUp, AtSign, Brain, ChevronDown, ImagePlus, Lock, Monitor, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import { ArrowUp, AtSign, Brain, ChevronDown, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
+import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
 import { useT } from "../../i18n";
 import { computer } from "../../lib/api";
+import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
 import { useCursorPool } from "../../providers/cursorPoolStore";
 import type { ModelInfo, ProviderConfig } from "../../providers/types";
@@ -53,6 +55,14 @@ export function Composer(p: Props) {
   const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
   const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
+  // MCP prompts: a user-invoked template picker, offered only when some MCP server is configured.
+  const [promptDialog, setPromptDialog] = useState(false);
+  const [hasMcp, setHasMcp] = useState(false);
+  useEffect(() => {
+    const load = () => loadMcpConfig().then((c) => setHasMcp(c.servers.some((s) => s.enabled)), () => {});
+    load();
+    return onMcpConfigChange(load);
+  }, []);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -150,7 +160,7 @@ export function Composer(p: Props) {
           <div className="composer-bar">
             <button
               className="icon-btn"
-              disabled={selectedModel?.images === false && !root}
+              disabled={selectedModel?.images === false && !root && !hasMcp}
               title={t("attach")}
               aria-label={t("attach")}
               aria-haspopup="menu"
@@ -158,6 +168,7 @@ export function Composer(p: Props) {
                 menu.open(e.currentTarget.getBoundingClientRect(), [
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
                   ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(text + (text && !text.endsWith(" ") ? " @" : "@")), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
+                  ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={15} />, onClick: () => setPromptDialog(true) }] : []),
                 ])
               }
             >
@@ -227,6 +238,13 @@ export function Composer(p: Props) {
         </div>
       </div>
       {menu.node}
+      {promptDialog && (
+        <McpPromptDialog
+          project={root ?? null}
+          onClose={() => (setPromptDialog(false), taRef.current?.focus())}
+          onInsert={(rendered) => (setText(text.trim() ? `${text.replace(/\s+$/, "")}\n\n${rendered}` : rendered), setPromptDialog(false), taRef.current?.focus())}
+        />
+      )}
     </>
   );
 }

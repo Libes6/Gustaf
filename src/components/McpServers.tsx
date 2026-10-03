@@ -1,7 +1,9 @@
 import { Plug, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { blankServer, parseImport, validateServer, type ErrorCode, type ImportError, type KV, type McpServer } from "../agent/mcp/config";
-import { disconnectMcpServer, listMcpTools, loadMcpConfig, onMcpConfigChange, patchMcpServer, removeMcpServer, saveMcpServer, testMcpServer } from "../agent/mcp/runtime";
+import { disconnectMcpServer, isMcpSignedIn, listMcpTools, loadMcpConfig, mcpCapabilities, onMcpConfigChange, patchMcpServer, removeMcpServer, saveMcpServer, signInMcpServer, signOutMcpServer, testMcpServer } from "../agent/mcp/runtime";
+import type { Phase } from "../agent/mcp/oauthFlow";
+import { RESOURCE_TOOLS } from "../agent/mcp/resources";
 import type { McpTool } from "../agent/mcp/toolset";
 import { useT, type Key } from "../i18n";
 import { fsx, mcpStdio, type McpStatus } from "../lib/api";
@@ -12,6 +14,7 @@ const newId = () => `mcp_${Date.now().toString(36)}${Math.random().toString(36).
 const errKey = (code: ErrorCode) => `mcpErr_${code}` as Key;
 const message = (e: unknown) => String((e as Error)?.message ?? e);
 type Info = { tools?: McpTool[]; error?: string; busy?: boolean; ok?: boolean };
+type Auth = { signedIn?: boolean; phase?: Phase; error?: string };
 
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return <button role="switch" aria-label={label} aria-checked={on} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
@@ -28,16 +31,44 @@ export function McpServers() {
   const [logs, setLogs] = useState<Record<string, string[]>>({});
   const [importText, setImportText] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [auth, setAuth] = useState<Record<string, Auth>>({});
+  const signing = useRef(new Map<string, AbortController>());
 
   useEffect(() => {
-    const load = () => loadMcpConfig().then((c) => setServers(c.servers));
+    const load = () =>
+      loadMcpConfig().then(async (c) => {
+        setServers(c.servers);
+        const entries = await Promise.all(c.servers.filter((s) => s.transport === "http" && s.oauth).map(async (s) => [s.id, await isMcpSignedIn(s).catch(() => false)] as const));
+        setAuth((m) => ({ ...m, ...Object.fromEntries(entries.map(([id, signedIn]) => [id, { ...m[id], signedIn }])) }));
+      });
     load();
     const off = onMcpConfigChange(load);
     const poll = () => mcpStdio.status().then((list) => setStatus(Object.fromEntries(list.map((s) => [s.id, s])))).catch(() => {});
     poll();
     const timer = setInterval(poll, 2000);
-    return () => (off(), clearInterval(timer));
+    return () => (off(), clearInterval(timer), signing.current.forEach((c) => c.abort()));
   }, []);
+
+  const patchAuth = (id: string, p: Auth) => setAuth((m) => ({ ...m, [id]: { ...m[id], ...p } }));
+  const signIn = async (s: McpServer) => {
+    const ctl = new AbortController();
+    signing.current.set(s.id, ctl);
+    patchAuth(s.id, { phase: "discovering", error: undefined });
+    try {
+      await signInMcpServer(s, { signal: ctl.signal, onPhase: (phase) => patchAuth(s.id, { phase }) });
+      patchAuth(s.id, { signedIn: true, phase: undefined });
+      patchInfo(s.id, { error: undefined, ok: undefined, tools: undefined });
+    } catch (e) {
+      patchAuth(s.id, { phase: undefined, ...(ctl.signal.aborted ? {} : { error: message(e) }) });
+    } finally {
+      signing.current.delete(s.id);
+    }
+  };
+  const signOut = async (s: McpServer) => {
+    await signOutMcpServer(s).catch(() => {});
+    patchAuth(s.id, { signedIn: false, error: undefined });
+    patchInfo(s.id, { ok: undefined, tools: undefined });
+  };
 
   const patchInfo = (id: string, p: Info) => setInfo((m) => ({ ...m, [id]: { ...m[id], ...p } }));
   const test = async (s: McpServer) => {
@@ -110,6 +141,18 @@ export function McpServers() {
                   <div className="d mcp-cmd">{s.transport === "stdio" ? [s.command, ...s.args].join(" ") : s.url}</div>
                   <div className="d"><span className="status-dot" style={{ background: st.color }} />{st.text}</div>
                   {st.error && <div className="d mcp-error">{st.error}</div>}
+                  {s.transport === "http" && s.oauth && (
+                    <div className="d mcp-signin">
+                      <span>{auth[s.id]?.phase ? t(`mcpOauthPhase_${auth[s.id].phase}` as Key) : auth[s.id]?.signedIn ? t("mcpSignedIn") : t("mcpSignedOut")}</span>
+                      {auth[s.id]?.phase ? (
+                        <button className="btn-soft" onClick={() => signing.current.get(s.id)?.abort()}>{t("cancel")}</button>
+                      ) : auth[s.id]?.signedIn ? (
+                        <button className="btn-soft" onClick={() => signOut(s)}>{t("mcpSignOut")}</button>
+                      ) : null}
+                      {!auth[s.id]?.phase && <button className="btn-soft" onClick={() => signIn(s)}>{auth[s.id]?.signedIn ? t("mcpSignInAgain") : t("mcpSignIn")}</button>}
+                      {auth[s.id]?.error && <span className="mcp-error">{auth[s.id].error}</span>}
+                    </div>
+                  )}
                 </div>
                 <Switch label={t("mcpEnabled")} on={s.enabled} onChange={(v) => patchMcpServer(s.id, { enabled: v })} />
               </div>
@@ -128,7 +171,7 @@ export function McpServers() {
                   <button className="btn-soft btn-danger" aria-label={t("delete")} onClick={() => setConfirm(s.id)}><Trash2 size={13} /></button>
                 )}
               </div>
-              {open[s.id] === "tools" && <ToolsPanel server={s} tools={info[s.id]?.tools} busy={!!info[s.id]?.busy} />}
+              {open[s.id] === "tools" && <ToolsPanel server={s} tools={info[s.id]?.tools} busy={!!info[s.id]?.busy} resources={!!(mcpCapabilities(s.id)?.resources)} />}
               {open[s.id] === "log" && (
                 <div className="card-row mcp-panel">
                   <pre className="mcp-log">{logs[s.id]?.length ? logs[s.id].join("\n") : t("mcpLogEmpty")}</pre>
@@ -144,8 +187,12 @@ export function McpServers() {
   );
 }
 
-function ToolsPanel({ server: s, tools, busy }: { server: McpServer; tools?: McpTool[]; busy: boolean }) {
+function ToolsPanel({ server: s, tools: listed, busy, resources }: { server: McpServer; tools?: McpTool[]; busy: boolean; resources: boolean }) {
   const t = useT();
+  // Servers that offer resources also get two built-in agent tools; they follow the same approval and read-only settings.
+  const tools = listed && resources
+    ? [...listed, { name: RESOURCE_TOOLS.list, description: t("mcpResourceListDesc"), inputSchema: {} }, { name: RESOURCE_TOOLS.read, description: t("mcpResourceReadDesc"), inputSchema: {} }]
+    : listed;
   const flip = (list: string[], name: string, on: boolean) => (on ? [...new Set([...list, name])] : list.filter((x) => x !== name));
   return (
     <div className="card-row mcp-panel">
@@ -262,6 +309,22 @@ function Editor({ initial, isNew, others, onCancel, onSaved }: { initial: McpSer
               <input className="input mono" value={s.url} placeholder="https://example.com/mcp" onChange={(e) => set({ url: e.target.value })} />
             </label>
             <div className="field"><span className="mcp-label">{t("mcpHeaders")}</span><KVRows kind="header" rows={s.headers} setRows={(headers) => set({ headers })} /></div>
+            <label className="mcp-check">
+              <input type="checkbox" checked={!!s.oauth} onChange={(e) => set({ oauth: e.target.checked ? {} : undefined } as Partial<McpServer>)} /> {t("mcpOauth")}
+            </label>
+            {s.oauth && (
+              <>
+                <div className="d" style={{ margin: "4px 0 8px" }}>{t("mcpOauthHint")}</div>
+                <label className="field">
+                  <span>{t("mcpOauthClientId")}</span>
+                  <input className="input mono" value={s.oauth.clientId ?? ""} onChange={(e) => set({ oauth: { ...s.oauth, clientId: e.target.value || undefined } } as Partial<McpServer>)} />
+                </label>
+                <label className="field">
+                  <span>{t("mcpOauthScope")}</span>
+                  <input className="input mono" value={s.oauth.scope ?? ""} onChange={(e) => set({ oauth: { ...s.oauth, scope: e.target.value || undefined } } as Partial<McpServer>)} />
+                </label>
+              </>
+            )}
           </>
         )}
         <label className="field">
