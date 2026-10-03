@@ -1,3 +1,4 @@
+import { claimChat } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
@@ -188,6 +189,7 @@ export function useChatRun(o: Options) {
     // Where this run works: the project folder, or the checkout of the workspace the chat is (or is about to be) linked to.
     let runRoot = root;
     let made: WorkspaceCreated | null = null;
+    let release: (() => void) | null = null;
     let outcome: "ok" | "failed" | "stopped" = "ok";
     if (chatId) chatStatusStore.runStarted(chatId);
     try {
@@ -210,6 +212,8 @@ export function useChatRun(o: Options) {
         await app.reload();
       }
       const cid = chatId;
+      release = claimChat(cid);
+      if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
@@ -329,6 +333,7 @@ export function useChatRun(o: Options) {
         if (failed) setError(failed);
         reviewRef.current = null;
       }
+      release?.();
       abortRef.current = null;
       setRunning(false);
       setRetryNotice("");
