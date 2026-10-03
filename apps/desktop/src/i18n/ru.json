@@ -1050,5 +1050,8 @@
   "imageReadError": "Не удалось прочитать изображение",
   "takeScreenshot": "Сделать скриншот",
   "capturingScreenshot": "Снимок экрана…",
-  "approveTerminal": "Прочитать вывод терминала"
+  "approveTerminal": "Прочитать вывод терминала",
+  "changesChipChat": "Изменено файлов · {count}",
+  "changesChipTree": "Не закоммичено · {count}",
+  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно."
 }

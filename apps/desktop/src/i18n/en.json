@@ -1022,5 +1022,8 @@
   "imageReadError": "Could not read the image",
   "takeScreenshot": "Take screenshot",
   "capturingScreenshot": "Capturing screen…",
-  "approveTerminal": "Read terminal output"
+  "approveTerminal": "Read terminal output",
+  "changesChipChat": "Changed files · {count}",
+  "changesChipTree": "Uncommitted · {count}",
+  "changesLinesUnknown": "Line counts are not available for new, untracked files."
 }
