@@ -2,8 +2,27 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
+    # Docs-only changes skip CI; any change outside these globs (code, workflows, lockfiles) still runs it.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'TASKS.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'TASKS.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
+
+# A newer push to the same branch (or new commits on the same PR) cancels the older in-progress run,
+# so merging several PRs into dev in a row fully checks only the latest dev head. Cancelled runs are expected.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
