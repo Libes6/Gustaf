@@ -17,13 +17,7 @@
         "width": 1320,
         "height": 860,
         "minWidth": 900,
-        "minHeight": 600,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "trafficLightPosition": {
-          "x": 14,
-          "y": 18
-        }
+        "minHeight": 600
       }
     ],
     "security": {
@@ -32,10 +26,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
+    "targets": "all",
     "resources": {
       "../sidecar/cursor-agent.mjs": "sidecar/cursor-agent.mjs",
       "../sidecar/package.json": "sidecar/package.json",
