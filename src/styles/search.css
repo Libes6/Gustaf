@@ -15,6 +15,13 @@
   border: 1px solid var(--border-strong); border-radius: 8px; text-overflow: ellipsis;
 }
 .search-filters select:focus-visible { outline-offset: 0; border-color: var(--accent); }
+.search-only { display: flex; align-items: center; gap: 6px; flex: none; font-size: 12.5px; color: var(--text-2); white-space: nowrap; cursor: pointer; }
+.search-more {
+  flex: none; margin: 4px 12px 8px; height: 28px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--bg-input); color: var(--text); font-size: 12.5px; cursor: pointer;
+}
+.search-more:hover:not(:disabled) { background: var(--bg-active); }
+.search-more:disabled { color: var(--text-3); cursor: default; }
 .search-hits { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
 .search-empty { padding: 28px 12px; text-align: center; color: var(--text-3); overflow-wrap: anywhere; user-select: text; }
 .search-hit { padding: 8px 10px; border-radius: 8px; cursor: pointer; }

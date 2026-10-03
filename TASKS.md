@@ -18,6 +18,7 @@ Items were drafted from the README and code layout; verify against the code befo
 ## P1
 - [x] **Persist drafts and attachments** across restarts (SQLite `drafts` table, debounced writes, bounded payloads; see `lib/chatSessions.ts`, `lib/useComposerDraft.ts`).
 - [x] **Full-text search across chats** (SQLite FTS5 index `messages_fts` kept in sync by triggers and backfilled on start; `search_messages` in `db.rs`; Cmd+K `SearchPalette` with project/model filters, snippets, keyboard navigation and jump to the message).
+  - [x] Follow-up: `ё`/`е` folded at index and query time (index version 2), paged results (`limit`/`offset`, bounded total "1000+", Load more and Arrow Down past the end), "Only this project" toggle, newest-first order for queries matching more than 5000 messages, page-only snippets (first page of a match-everything query on 30k messages: ~4 ms in a debug build). The 2-character minimum stays on purpose. Not done: highlighting of a decomposed `е` + diaeresis, keyset paging (offset can shift if messages arrive between pages).
 - [x] **Run setup and tests in the shadow copy** (opt-in per project: symlinked dependency dirs that review never applies, setup command, "Run tests" result shown in `ChangesPanel`; commands follow the approval rules). Not done: sandboxing writes through linked dirs, streaming command output.
 
 ## P1.5 — CLI image attachments

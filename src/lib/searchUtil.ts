@@ -6,8 +6,8 @@ export const MARK_OPEN = "\u0001";
 export const MARK_CLOSE = "\u0002";
 /** Shorter queries are not searched: one letter matches (as a prefix) most of the history. */
 export const MIN_QUERY_CHARS = 2;
-/** Hits requested per search; the palette says so when a search returns this many. */
-export const RESULT_LIMIT = 40;
+/** Hits requested per page (db.rs clamps to 100). */
+export const PAGE_SIZE = 40;
 /** A pending jump older than this is dropped (the chat never became visible). */
 export const JUMP_TTL_MS = 10_000;
 
@@ -49,6 +49,25 @@ export function parseSnippet(snippet: string): SnippetPart[] {
 export function searchableQuery(input: string): string | null {
   const q = input.trim();
   return [...q].length >= MIN_QUERY_CHARS && /[\p{L}\p{N}]/u.test(q) ? q : null;
+}
+
+/** Appends a page to the hits already shown, skipping messages that are already there (a new message can shift pages). */
+export function mergeHits<T extends { messageId: number }>(shown: readonly T[], page: readonly T[]): T[] {
+  const seen = new Set(shown.map((h) => h.messageId));
+  const merged = [...shown];
+  for (const h of page) {
+    if (!seen.has(h.messageId)) (seen.add(h.messageId), merged.push(h));
+  }
+  return merged;
+}
+
+/**
+ * What Arrow Down does. On the last row with more results available it asks for the next page (and stays put until it
+ * arrives); otherwise it moves like `moveHighlight` (wrapping at the ends, also when everything is loaded).
+ */
+export function arrowDown(current: number, count: number, hasMore: boolean): { next: number; loadMore: boolean } {
+  if (hasMore && count > 0 && current >= count - 1) return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
+  return { next: moveHighlight(current, 1, count), loadMore: false };
 }
 
 /** Next highlighted row for an arrow key, wrapping around at both ends. */

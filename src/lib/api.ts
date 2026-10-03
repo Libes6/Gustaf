@@ -53,10 +53,20 @@ export type SearchHit = {
   snippet: string;
 };
 
+/** One page of search results (see `SearchPage` in db.rs). `total` counts matches up to 1000 (`totalCapped`: more exist). */
+export type SearchPage = {
+  hits: SearchHit[];
+  total: number;
+  totalCapped: boolean;
+  /** Very common query: hits are newest first instead of ranked. */
+  byRecency: boolean;
+  hasMore: boolean;
+};
+
 export const chatSearch = {
-  /** Best matches first. The query is escaped on the Rust side, so any user input is safe. */
-  messages: (query: string, opts: { projectId?: number | null; model?: string | null; limit?: number } = {}) =>
-    invoke<SearchHit[]>("search_messages", { query, projectId: opts.projectId ?? null, model: opts.model ?? null, limit: opts.limit }),
+  /** One page of the best matches; `offset` continues a previous page. The query is escaped on the Rust side, so any user input is safe. */
+  messages: (query: string, opts: { projectId?: number | null; model?: string | null; limit?: number; offset?: number } = {}) =>
+    invoke<SearchPage>("search_messages", { query, projectId: opts.projectId ?? null, model: opts.model ?? null, limit: opts.limit, offset: opts.offset ?? 0 }),
   /** Models that have indexed messages, for the filter. */
   models: () => invoke<string[]>("search_models"),
 };

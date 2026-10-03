@@ -2,7 +2,7 @@ import { Bot, Search, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { chatSearch, type SearchHit } from "../lib/api";
-import { isSearchShortcut, moveHighlight, parseSnippet, RESULT_LIMIT, searchableQuery } from "../lib/searchUtil";
+import { arrowDown, isSearchShortcut, mergeHits, moveHighlight, PAGE_SIZE, parseSnippet, searchableQuery } from "../lib/searchUtil";
 import { useApp } from "../state";
 import "../styles/search.css";
 
@@ -26,11 +26,17 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   const [model, setModel] = useState<string | null>(null);
   const [models, setModels] = useState<string[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [more, setMore] = useState({ hasMore: false, total: 0, capped: false, byRecency: false });
+  const [loadingMore, setLoadingMore] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [active, setActive] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(0);
+  // What the visible list was searched with, and whether a next page is already requested.
+  const searchedRef = useRef<{ q: string; projectId: number | null; model: string | null } | null>(null);
+  const loadingMoreRef = useRef(false);
+  const advanceRef = useRef<number | null>(null); // row to highlight when the requested page arrives
   const previousFocus = useRef(document.activeElement as HTMLElement | null);
   const debounced = useDebounced(query, DEBOUNCE_MS);
   const live = searchableQuery(query) !== null;
@@ -48,18 +54,25 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const q = searchableQuery(debounced);
     const id = ++requestRef.current;
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+    advanceRef.current = null;
     if (!q) {
+      searchedRef.current = null;
       setHits([]);
+      setMore({ hasMore: false, total: 0, capped: false, byRecency: false });
       setStatus("idle");
       setError("");
       return;
     }
     setStatus("loading");
+    searchedRef.current = { q, projectId, model };
     chatSearch
-      .messages(q, { projectId, model, limit: RESULT_LIMIT })
+      .messages(q, { projectId, model, limit: PAGE_SIZE, offset: 0 })
       .then((result) => {
         if (id !== requestRef.current) return;
-        setHits(result);
+        setHits(result.hits);
+        setMore({ hasMore: result.hasMore, total: result.total, capped: result.totalCapped, byRecency: result.byRecency });
         setActive(0);
         setError("");
         setStatus("done");
@@ -67,6 +80,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
       .catch((e) => {
         if (id !== requestRef.current) return;
         setHits([]);
+        setMore({ hasMore: false, total: 0, capped: false, byRecency: false });
         setError(String(e instanceof Error ? e.message : e));
         setStatus("error");
       });
@@ -75,6 +89,35 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     document.getElementById(`search-hit-${active}`)?.scrollIntoView({ block: "nearest" });
   }, [active, hits]);
+
+  // The next page of the current search. A new search (or closing the palette) bumps `requestRef`, so a late page is dropped.
+  const loadMore = (advanceTo?: number) => {
+    const searched = searchedRef.current;
+    if (!searched || !more.hasMore || loadingMoreRef.current) return;
+    const id = requestRef.current;
+    loadingMoreRef.current = true;
+    advanceRef.current = advanceTo ?? null;
+    setLoadingMore(true);
+    chatSearch
+      .messages(searched.q, { projectId: searched.projectId, model: searched.model, limit: PAGE_SIZE, offset: hits.length })
+      .then((result) => {
+        if (id !== requestRef.current) return;
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+        setHits((prev) => mergeHits(prev, result.hits));
+        setMore({ hasMore: result.hasMore && result.hits.length > 0, total: result.total, capped: result.totalCapped, byRecency: result.byRecency });
+        if (advanceRef.current !== null) setActive(advanceRef.current);
+        advanceRef.current = null;
+      })
+      .catch((e) => {
+        if (id !== requestRef.current) return;
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+        advanceRef.current = null;
+        setError(String(e instanceof Error ? e.message : e));
+        setStatus("error");
+      });
+  };
 
   const dismiss = () => {
     onClose();
@@ -96,7 +139,9 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
       dismiss();
     } else if (e.key === "ArrowDown" && !inSelect) {
       e.preventDefault();
-      setActive(moveHighlight(active, 1, shown.length));
+      const step = arrowDown(active, shown.length, more.hasMore);
+      if (step.loadMore) loadMore(shown.length);
+      else setActive(step.next);
     } else if (e.key === "ArrowUp" && !inSelect) {
       e.preventDefault();
       setActive(moveHighlight(active, -1, shown.length));
@@ -105,7 +150,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
       open(shown[active]);
     } else if (e.key === "Tab") {
       // Keep focus inside the dialog.
-      const items = [...(dialogRef.current?.querySelectorAll<HTMLElement>("input, select") ?? [])];
+      const items = [...(dialogRef.current?.querySelectorAll<HTMLElement>("input, select, button") ?? [])];
       const at = items.indexOf(document.activeElement as HTMLElement);
       const next = items[(at + (e.shiftKey ? -1 : 1) + items.length) % items.length];
       if (next) (e.preventDefault(), next.focus());
@@ -121,8 +166,10 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
     : !live ? t("searchHint")
     : searching ? t("searchSearching")
     : !shown.length ? null
-    : shown.length >= RESULT_LIMIT ? t("searchTopResults", { count: shown.length })
+    : more.capped ? t("searchShowingCapped", { count: shown.length, total: more.total })
+    : more.hasMore ? t("searchShowing", { count: shown.length, total: more.total })
     : t("searchResults", { count: shown.length });
+  const currentProject = app.draftProject;
 
   return (
     <div className="overlay search-overlay" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
@@ -161,6 +208,12 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
             ))}
             {model && !models.includes(model) && <option value={model}>{model}</option>}
           </select>
+          {currentProject !== null && (
+            <label className="search-only">
+              <input type="checkbox" checked={projectId === currentProject} onChange={(e) => setProjectId(e.target.checked ? currentProject : null)} />
+              {t("searchOnlyProject")}
+            </label>
+          )}
         </div>
         <div className="search-hits" id="search-hits" role="listbox" aria-label={t("searchAllChats")}>
           {status === "error" && (
@@ -198,8 +251,14 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
+        {live && status !== "error" && shown.length > 0 && more.hasMore && (
+          <button type="button" className="search-more" disabled={loadingMore} onClick={() => loadMore()}>
+            {loadingMore ? t("searchLoadingMore") : t("searchLoadMore")}
+          </button>
+        )}
         <div className="search-foot" role="status">
           <span>{footer}</span>
+          {live && more.byRecency && shown.length > 0 && <span>{t("searchRecentFirst")}</span>}
           <span className="grow" />
           <span>{t("searchKeys")}</span>
         </div>
