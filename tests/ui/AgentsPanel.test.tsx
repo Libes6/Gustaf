@@ -1,6 +1,8 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resetAgentRuns } from "../../src/agent/agentRuns";
+import { finishCliAgents, resetCliAgents, trackCliAgents } from "../../src/agent/cliAgents";
 import { AgentsPanel } from "../../src/components/AgentsPanel";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -28,6 +30,57 @@ function setup(onContinue = vi.fn()) {
   renderApp(<AgentsPanel root="/work/alpha" onContinue={onContinue} />);
   return onContinue;
 }
+
+describe("AgentsPanel: CLI-native subagents", () => {
+  const cliAct = (id: string, state: "running" | "completed", over: Record<string, unknown> = {}) => ({
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+    subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state, prompt: "Count the files", ...over },
+    ...(state === "completed" ? { output: "42 files in total" } : {}),
+  });
+  // The run store loads its rows once per module: leave it untouched for the tests below.
+  afterEach(() => { resetAgentRuns(); resetCliAgents(); });
+  const render = () => {
+    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
+    renderApp(<AgentsPanel root="/work/alpha" />);
+  };
+
+  it("mirrors a live Codex subagent read-only, then lists it as finished once the run ends; stop says it stops the whole run", async () => {
+    resetCliAgents();
+    render();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    const stop = vi.fn();
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "running", { step: "reading files" })]));
+    // The panel opens by itself when the first agent starts.
+    expect(await screen.findByText("Worker a")).toBeInTheDocument();
+    expect(screen.getByText("Codex")).toBeInTheDocument();
+    expect(screen.getByText("reading files")).toBeInTheDocument();
+    const stopBtn = screen.getByRole("button", { name: /Stop/ });
+    expect(stopBtn).toHaveAttribute("title", "Stops the whole Codex run, not just this agent.");
+    expect(screen.queryByRole("button", { name: "Continue this agent" })).toBeNull();
+    fireEvent.click(stopBtn);
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    act(() => { trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "completed")]); finishCliAgents(1); });
+    expect(screen.getByText("Finished")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Stop/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "View transcript" }));
+    const dialog = await screen.findByRole("dialog", { name: "Worker a" });
+    expect(within(dialog).getByText("Count the files")).toBeInTheDocument();
+    expect(within(dialog).getByText("42 files in total")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
+    await waitFor(() => expect(screen.queryByText("Worker a")).toBeNull());
+    resetCliAgents();
+  });
+
+  it("does not show subagents of another project", async () => {
+    resetCliAgents();
+    render();
+    act(() => trackCliAgents({ chatId: 1, root: "/work/other" }, [cliAct("z", "running")]));
+    expect(screen.queryByText("Worker z")).toBeNull();
+    resetCliAgents();
+  });
+});
 
 describe("AgentsPanel", () => {
   it("lists the runs stored in SQLite and reads the full transcript only when it is opened", async () => {

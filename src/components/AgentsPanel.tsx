@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import { loadRunSteps, removeFinished, stopRun, useAgentRuns } from "../agent/agentRuns";
+import { clearFinishedCliAgents, isCliAgentActive, useCliAgents, type CliAgent } from "../agent/cliAgents";
 import { elapsed, formatTokens, isActiveStatus, type AgentRun, type TranscriptStep } from "../agent/agentRunsModel";
 import { canContinue, continueRequest } from "../agent/agentTranscript";
 import { useDialogFocus } from "../lib/useDialogFocus";
@@ -123,41 +124,118 @@ function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onO
   );
 }
 
+const PROVIDER_KEY = { codex: "agentsProviderCodex", claude: "agentsProviderClaude" } as const;
+const CLI_STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", ended: "subagentEnded" } as const;
+const cliTitle = (a: CliAgent, unnamed: (id: string) => string) => a.title || unnamed(a.agentId.slice(-6) || "…");
+
+/** Task and report of a CLI-native subagent (the CLI does not expose its transcript). */
+function CliDetail({ agent, onClose }: { agent: CliAgent; onClose: () => void }) {
+  const t = useT();
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef);
+  const title = cliTitle(agent, (id) => t("subagentUnnamed", { id }));
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    addEventListener("keydown", k);
+    return () => removeEventListener("keydown", k);
+  }, [onClose]);
+  return createPortal(
+    <div className="review-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section ref={dialogRef} className="review-dialog" role="dialog" aria-modal="true" aria-label={title}>
+        <header>
+          <strong>{title}</strong>
+          <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose}><X size={17} /></button>
+        </header>
+        <div className="agent-transcript">
+          <div className="agent-meta">{t(PROVIDER_KEY[agent.provider])} · {t(CLI_STATE_KEY[agent.state])}{agent.role ? ` · ${agent.role}` : ""}{agent.toolUses ? ` · ${t("agentsToolUses", { count: agent.toolUses })}` : ""}</div>
+          <div className="hint">{t("agentsCliReadOnly", { provider: t(PROVIDER_KEY[agent.provider]) })}</div>
+          {agent.prompt && <div className="agent-step"><div className="agent-step-head">{t("subagentTask")}</div><pre>{agent.prompt}</pre></div>}
+          {agent.step && isCliAgentActive(agent) && <div className="agent-step"><div className="agent-step-head">{agent.step}</div></div>}
+          {agent.output || agent.result ? <div className="agent-step"><div className="agent-step-head">{t("agentsReport")}</div><pre>{agent.output ?? agent.result}</pre></div> : <div className="hint">{t("subagentNoResult")}</div>}
+        </div>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: () => void }) {
+  const t = useT();
+  const active = isCliAgentActive(agent);
+  const provider = t(PROVIDER_KEY[agent.provider]);
+  const title = cliTitle(agent, (id) => t("subagentUnnamed", { id }));
+  const time = elapsed({ status: active ? "running" : "completed", startedAt: agent.startedAt, endedAt: agent.endedAt }, now);
+  return (
+    <div className="agent-row">
+      <div className="agent-line">
+        <span className="agent-title" title={title}>{title}</span>
+        <span className="agent-type">{provider}</span>
+        {!active && <span className={`agent-status ${agent.state === "completed" ? "completed" : agent.state === "failed" ? "failed" : "cancelled"}`}>{t(CLI_STATE_KEY[agent.state])}</span>}
+      </div>
+      <div className="agent-meta">
+        {agent.role && <span>{agent.role}</span>}
+        {time && <span>{time}</span>}
+        {agent.toolUses > 0 && <span>{t("agentsToolUses", { count: agent.toolUses })}</span>}
+      </div>
+      {active && <div className="agent-step-line">{agent.step || (agent.state === "waiting" ? t("subagentWaiting") : t("agentsThinking"))}</div>}
+      {!active && agent.result && <div className="agent-step-line" title={agent.result}>{agent.result}</div>}
+      <div className="agent-actions">
+        {active && agent.stop && <button className="btn-soft" title={t("agentsStopCli", { provider })} onClick={agent.stop}><Square size={11} /> {t("stop")}</button>}
+        <button className="btn-ghost small" onClick={onOpen}>{t("agentsTranscript")}</button>
+      </div>
+    </div>
+  );
+}
+
 /**
- * "Background tasks": subagent runs of this project, running first, then finished (see agent/subagents.ts).
+ * "Background tasks": subagent runs of this project, running first, then finished (see agent/subagents.ts), plus the
+ * subagents Codex and Claude Code run inside their own CLI process (read-only, this session only).
  * `onContinue` receives the message that asks the main agent to continue a finished run (the chat puts it in the composer).
  */
 export function AgentsPanel({ root, onContinue }: { root: string | null; onContinue?: (message: string) => void }) {
   const t = useT();
   const runs = useAgentRuns(root);
+  const cli = useCliAgents(root);
   const [open, setOpen] = useState(false);
   const [viewing, setViewing] = useState<{ id: string; continuing: boolean } | null>(null);
+  const [viewingCli, setViewingCli] = useState<string | null>(null);
   const active = runs.filter((r) => isActiveStatus(r.status));
   const done = runs.filter((r) => !isActiveStatus(r.status));
-  const now = useNow(active.length > 0);
+  const cliActive = cli.filter(isCliAgentActive);
+  const cliDone = cli.filter((a) => !isCliAgentActive(a));
+  const running = active.length + cliActive.length;
+  const finished = done.length + cliDone.length;
+  const now = useNow(running > 0);
   // Open by itself when the first agent of a burst starts.
-  useEffect(() => { if (active.length) setOpen(true); }, [active.length > 0]);
-  if (!runs.length) return null;
+  useEffect(() => { if (running) setOpen(true); }, [running > 0]);
+  if (!runs.length && !cli.length) return null;
   const viewed = viewing ? runs.find((r) => r.id === viewing.id) : undefined;
-  const rows = (list: AgentRun[]) => list.map((r) => <Row key={r.id} run={r} now={now} onOpen={() => setViewing({ id: r.id, continuing: false })} onContinue={onContinue ? () => setViewing({ id: r.id, continuing: true }) : undefined} />);
+  const viewedCli = viewingCli ? cli.find((a) => a.key === viewingCli) : undefined;
+  const rows = (list: AgentRun[], cliList: CliAgent[]) => (
+    <>
+      {cliList.map((a) => <CliRow key={a.key} agent={a} now={now} onOpen={() => setViewingCli(a.key)} />)}
+      {list.map((r) => <Row key={r.id} run={r} now={now} onOpen={() => setViewing({ id: r.id, continuing: false })} onContinue={onContinue ? () => setViewing({ id: r.id, continuing: true }) : undefined} />)}
+    </>
+  );
   return (
     <aside className={`agents-panel${open ? " open" : ""}`} aria-label={t("agentsTitle")}>
       <button className="agents-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {active.length ? <Loader2 size={14} className="spin" /> : <Bot size={14} />}
-        <span className="grow">{t("agentsTitle")} · {t("agentsCount", { running: active.length, done: done.length })}</span>
+        {running ? <Loader2 size={14} className="spin" /> : <Bot size={14} />}
+        <span className="grow">{t("agentsTitle")} · {t("agentsCount", { running, done: finished })}</span>
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
       {open && (
         <div className="agents-body">
-          {active.length > 0 && <div className="agents-group">{t("agentsRunning")}</div>}
-          {rows(active)}
-          {done.length > 0 && (
-            <div className="agents-group">{t("agentsFinished")}<button className="btn-ghost small" onClick={() => removeFinished(root ?? undefined)}>{t("agentsClear")}</button></div>
+          {running > 0 && <div className="agents-group">{t("agentsRunning")}</div>}
+          {rows(active, cliActive)}
+          {finished > 0 && (
+            <div className="agents-group">{t("agentsFinished")}<button className="btn-ghost small" onClick={() => { removeFinished(root ?? undefined); clearFinishedCliAgents(root ?? undefined); }}>{t("agentsClear")}</button></div>
           )}
-          {rows(done)}
+          {rows(done, cliDone)}
         </div>
       )}
       {viewed && viewing && <Transcript key={viewed.id} run={viewed} continuing={viewing.continuing} onContinue={onContinue} onClose={() => setViewing(null)} />}
+      {viewedCli && <CliDetail key={viewedCli.key} agent={viewedCli} onClose={() => setViewingCli(null)} />}
     </aside>
   );
 }
