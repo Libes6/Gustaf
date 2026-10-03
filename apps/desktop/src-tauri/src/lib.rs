@@ -1,4 +1,5 @@
 mod attachments;
+mod codex_agents;
 mod computer;
 mod cursor_accounts;
 mod cursor_import;
@@ -80,6 +81,7 @@ pub fn run() {
             rawlog::raw_log_append,
             rawlog::raw_log_clear,
             rawlog::raw_log_info,
+            codex_agents::codex_agents_scan,
             mcp::mcp_start,
             mcp::mcp_request,
             mcp::mcp_notify,
