@@ -4,7 +4,7 @@ import { claudeArgs, parseClaudeEvent } from "./claudeCli";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
-import { codexArgs, resumePoint, withImagePaths } from "./cliArgs";
+import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
@@ -108,7 +108,7 @@ type Spec = {
   name: string;
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
   /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
-  args(o: { model?: string; session?: string; access: TurnInput["access"]; images?: string[]; attachDir?: string }): string[];
+  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string }): string[];
   /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
   imageFlag?: boolean;
   parse(e: any): Ev;
@@ -136,13 +136,7 @@ const SPECS: Record<CliId, Spec> = {
       if (!out.length) throw new Error(cmd.stderr || cmd.stdout || "cursor-agent --list-models: empty");
       return out;
     },
-    args: ({ model, session, access, attachDir }) => [
-      "-p", "--output-format", "stream-json", "--stream-partial-output", "--trust",
-      ...(access === "readonly" ? ["--mode", "plan"] : access === "full" ? ["--force"] : []),
-      ...(model ? ["--model", model] : []),
-      ...(session ? ["--resume", session] : []),
-      ...(attachDir ? ["--add-dir", attachDir] : []),
-    ],
+    args: cursorArgs,
     parse: (e) => {
       // With --stream-partial-output the deltas carry timestamp_ms; the aggregate repeats without it.
       if (e.type === "assistant" && e.timestamp_ms) return { text: (e.message?.content ?? []).map((c: any) => c.text ?? "").join(""), session: e.session_id };
@@ -211,7 +205,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", images: saved?.files, attachDir: saved?.dir });
+      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir });
       const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
       let text = "";
       const actions = new Map<string, Activity>();

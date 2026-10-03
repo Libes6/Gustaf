@@ -111,10 +111,10 @@ Items were drafted from the README and code layout; verify against the code befo
 Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, Warp, Cline/Roo/Kilo, OpenCode, Msty, LibreChat and user discussions. Checked against the code on 2026-10-03: the API agent tools are only `read_file`, `list_dir`, `search`, `edit_file`, `write_file`, `run_command` (+ MCP, computer, subagents); no plan mode, skills, memory, terminal pane or semantic index exist.
 
 ### R1 — expected by users (do first)
-- [ ] **Plan mode** in the main chat (Claude Code, Cursor `--plan`, Roo). The agent may only read/search and must end with a step-by-step plan; edits start after the user clicks Approve.
-  - [ ] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
-  - [ ] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
-  - [ ] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
+- [x] **Plan mode** in the main chat (Claude Code, Cursor `--plan`, Roo). The agent may only read/search and must end with a step-by-step plan; edits start after the user clicks Approve.
+  - [x] Mode switch in the composer (Ask / Plan / Agent), persisted per chat; read-only tool set while planning (reuse the `plan` subagent type's allowlist).
+  - [x] Plan rendered as a checklist card with Approve / Edit / Reject; Approve switches to Agent mode and sends the plan as the next instruction.
+  - [x] CLI providers: pass their native plan flags (`cursor-agent --plan`, Claude `--permission-mode plan`, Codex read-only sandbox).
 - [ ] **Persistent memory** (most requested on Reddit; Kilo Memory Bank). Facts about the project and the user survive across chats.
   - [ ] Store: per-project and global memory entries in SQLite (text, source chat, created/updated), editable list in Settings and the project menu.
   - [ ] Agent tools `remember` / `forget` (with approval option) and automatic injection of relevant entries into the system prompt (capped, fenced like project instructions).
