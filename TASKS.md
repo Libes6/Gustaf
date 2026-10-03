@@ -150,8 +150,8 @@ Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, 
 
 ### R3 — convenience
 - [ ] **Quick ask window** on a global shortcut (Spotlight-like): small always-on-top window, default model, answer inline, "Open in M Code" to continue as a chat; optional clipboard/selection as context.
-- [ ] **Chat status in the sidebar** (Warp, Conductor): running / waiting for approval / done (unread) / failed badges per chat and project; filter "needs attention".
-- [ ] **Share a chat as a page**: export a chat (messages, tool cards, diffs) to a self-contained HTML file; redact secrets/paths option. Hosted links are out of scope.
+- [x] **Chat status in the sidebar** (Warp, Conductor): running / waiting for approval / done (unread) / failed badges per chat; filter "needs attention". Done per chat (`lib/chatStatus.ts`); project-level badges and the filter are not done.
+- [x] **Share a chat as a page**: export a chat (messages, tool cards, diffs) to a self-contained HTML file; redact secrets/paths option. Hosted links are out of scope.
 - [ ] **Knowledge base** (Msty Knowledge Stacks, LibreChat RAG): attach folders/PDFs/Markdown as a named collection; reuse the semantic index; pick collections per chat; cite sources in answers.
 
 ### R4 — large, later

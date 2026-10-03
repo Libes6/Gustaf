@@ -117,7 +117,9 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
     for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
   }
   const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length));
-  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx'], 'only the canvas panel may create an iframe');
+  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only the canvas panel and the share-as-HTML preview may create an iframe');
+  const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
+  assert.match(share, /sandbox=""/, 'the share preview frame must be fully sandboxed (no scripts)');
   const panel = readFileSync(join(root, 'src/components/CanvasPanel.tsx'), 'utf8');
   assert.match(panel, /sandbox="allow-scripts"/, 'canvas iframe must keep sandbox="allow-scripts"');
   assert.ok(!/allow-same-origin|allow-top-navigation|allow-popups|allow-forms|allow-modals/.test(panel), 'canvas sandbox must not gain capabilities');

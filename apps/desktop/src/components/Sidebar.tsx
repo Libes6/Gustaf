@@ -1,18 +1,20 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, LayoutList, LogOut, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
+  Columns2, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
 } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
 import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
 import { useApp } from "../state";
-import { useApprovalChats } from "../lib/attention";
+import { useApprovalChats, useChatFlags } from "../lib/attention";
+import { deriveStatus, type ChatStatus } from "../lib/chatStatus";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { ShareHtmlDialog } from "./ShareHtmlDialog";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
   const t = useT();
@@ -32,6 +34,18 @@ function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | nul
       }}
     />
   );
+}
+
+/** One badge per chat, same size and slot for every state; each has an icon shape of its own and a text alternative. */
+function ChatBadge({ status }: { status: ChatStatus | null }) {
+  const t = useT();
+  if (!status) return null;
+  const label = t(status === "waiting" ? "approvalPendingBadge" : status === "running" ? "thinking" : status === "failed" ? "chatStatusFailed" : "chatStatusUnread");
+  const common = { className: `chat-badge ${status}`, "aria-label": label, title: label };
+  if (status === "running") return <span {...common} role="img"><Loader2 size={12} className="spin" aria-hidden="true" /></span>;
+  if (status === "waiting") return <span {...common} role="status">!</span>;
+  if (status === "failed") return <span {...common} role="status"><XCircle size={13} aria-hidden="true" /></span>;
+  return <span {...common} role="img"><span className="dot" aria-hidden="true" /></span>;
 }
 
 export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => void; onCompare: () => void }) {
@@ -101,6 +115,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const app = useApp();
   const menu = useMenu();
   const waiting = useApprovalChats();
+  const flags = useChatFlags();
   // Chats a scheduled run is writing to (also when they are not open as a session).
   const scheduledLive = useSyncExternalStore(subscribeLiveRuns, getLiveChats);
   const [query, setQuery] = useState<string | null>(null);
@@ -113,6 +128,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [projectLimit, setProjectLimit] = useState(8);
   const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
+  const [sharing, setSharing] = useState<Chat | null>(null);
 
   const q = query?.toLowerCase() ?? "";
   const chatsByProject = useMemo(() => {
@@ -149,6 +165,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { sep: true },
       { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
+      { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -187,8 +204,14 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       >
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
-          {waiting.has(c.id) && <span className="approval-badge" role="status" aria-label={t("approvalPendingBadge")} title={t("approvalPendingBadge")}>!</span>}
-          {(scheduledLive.has(c.id) || app.sessions.items.some(s => s.chatId === c.id && s.busy)) &&<span className="status-dot spin" role="img" aria-label={t("thinking")} style={{ background: "var(--accent)" }} />}
+          <ChatBadge
+            status={deriveStatus({
+              waiting: waiting.has(c.id),
+              running: scheduledLive.has(c.id) || app.sessions.items.some((s) => s.chatId === c.id && s.busy),
+              failed: flags.failed.has(c.id),
+              unread: flags.unread.has(c.id),
+            })}
+          />
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
@@ -331,6 +354,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
 
       </div>
       {menu.node}
+      {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
       {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );

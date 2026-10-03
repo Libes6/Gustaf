@@ -14,6 +14,7 @@ import {
 import { matchOrCreateProject } from "../lib/importers/store";
 import { useApp } from "../state";
 import { HistoryImport } from "./HistoryImport";
+import { ShareHtmlDialog } from "./ShareHtmlDialog";
 
 type T = ReturnType<typeof useT>;
 const errorText = (e: unknown) => String(e instanceof Error ? e.message : e);
@@ -103,6 +104,9 @@ export function ChatTransfer() {
   const t = useT();
   const app = useApp();
   const [count, setCount] = useState(0);
+  const [list, setList] = useState<Chat[]>([]);
+  const [shareId, setShareId] = useState("");
+  const [sharing, setSharing] = useState<Chat | null>(null);
   const [images, setImages] = useState(false);
   const [busy, setBusy] = useState<ExportFormat | "import" | null>(null);
   const [progress, setProgress] = useState<[number, number] | null>(null);
@@ -110,7 +114,7 @@ export function ChatTransfer() {
   const [error, setError] = useState("");
   const file = useRef<HTMLInputElement>(null);
 
-  const refresh = () => allChats().then((c) => setCount(c.length), () => {});
+  const refresh = () => allChats().then((c) => (setCount(c.length), setList(c)), () => {});
   useEffect(() => void refresh(), []);
 
   const run = async (kind: ExportFormat | "import", job: () => Promise<string>) => {
@@ -165,6 +169,18 @@ export function ChatTransfer() {
                 </button>
               ))}
             </div>
+            <div className="card-row">
+              <FileDown size={15} />
+              <div className="grow">
+                <div className="t">{t("shareHtmlTitle")}</div>
+                <div className="d">{t("shareHtmlIntro")}</div>
+              </div>
+              <select className="input" aria-label={t("shareHtmlChat")} style={{ maxWidth: 180 }} value={shareId} onChange={(e) => setShareId(e.target.value)}>
+                <option value="">{t("shareHtmlChat")}</option>
+                {list.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+              <button className="btn-soft" disabled={!shareId} onClick={() => setSharing(list.find((c) => String(c.id) === shareId) ?? null)}>{t("shareHtml")}</button>
+            </div>
             <label className="card-row">
               <input type="checkbox" className="check" checked={images} onChange={(e) => setImages(e.target.checked)} />
               <div className="grow">
@@ -191,6 +207,7 @@ export function ChatTransfer() {
       )}
       {status && <div className="ok" role="status" style={{ fontSize: 12.5, marginTop: 8, wordBreak: "break-all" }}>{status}</div>}
       {error && <div className="error-box" role="alert">{error}</div>}
+      {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
     </>
   );
 }

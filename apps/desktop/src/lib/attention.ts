@@ -1,4 +1,6 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { getSetting, setSetting } from "./api";
+import { chatStatusStore, UNREAD_KEY } from "./chatStatus";
 import { useAgentRuns } from "../agent/agentRuns";
 import { isActiveStatus, type RunStatus } from "../agent/agentRunsModel";
 import { getAgentSettings, loadAgentSettings } from "../agent/agentSettingsStore";
@@ -103,5 +105,49 @@ export function useAttentionNotifications() {
     };
     addEventListener("focus", clear);
     return () => removeEventListener("focus", clear);
+  }, []);
+}
+
+/** Flags of the sidebar status badges: chats that finished unseen ("unread") and chats whose last run failed. */
+export const useChatFlags = () => useSyncExternalStore(chatStatusStore.subscribe, chatStatusStore.get);
+
+type NoticeT = (key: "notifyAgentDone" | "notifyAgentFailed", vars: { title: string }) => string;
+
+/**
+ * A chat run ended. Updates the sidebar flags; with `notify` and the window in the background it also raises the same
+ * native notification and dock badge as a finished background agent (scheduled runs notify on their own).
+ */
+export function reportChatRun(chatId: number | null | undefined, outcome: "ok" | "failed" | "stopped", notify?: { title: string; detail?: string; t: NoticeT }) {
+  if (chatId == null) return;
+  chatStatusStore.runEnded(chatId, outcome);
+  if (notify && outcome !== "stopped") void notifyUnfocused(notify.t(outcome === "ok" ? "notifyAgentDone" : "notifyAgentFailed", { title: notify.title }), (notify.detail ?? "").slice(0, 180));
+}
+
+/** Mounted once (App): tells the status store which chat is in front (visible, window focused); restores and persists the unread ids. */
+export function useChatStatusSync(activeChat: number | null, view: string) {
+  const [focused, setFocused] = useState(() => !inBrowser() || document.hasFocus());
+  useEffect(() => {
+    if (!inBrowser()) return;
+    const on = () => setFocused(true);
+    const off = () => setFocused(false);
+    addEventListener("focus", on);
+    addEventListener("blur", off);
+    return () => {
+      removeEventListener("focus", on);
+      removeEventListener("blur", off);
+    };
+  }, []);
+  useEffect(() => {
+    chatStatusStore.setViewing(view === "chat" && focused ? activeChat : null);
+  }, [activeChat, view, focused]);
+  useEffect(() => {
+    let last = "[]";
+    void getSetting<unknown>(UNREAD_KEY, []).then((v) => chatStatusStore.load(v)).catch(() => {});
+    return chatStatusStore.subscribe(() => {
+      const now = JSON.stringify(chatStatusStore.unreadIds());
+      if (now === last) return;
+      last = now;
+      void setSetting(UNREAD_KEY, JSON.parse(now)).catch(() => {});
+    });
   }, []);
 }

@@ -4,7 +4,8 @@ import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget, subagentModelResolver } from "./modelRouting";
-import { beginApproval } from "./attention";
+import { beginApproval, reportChatRun } from "./attention";
+import { chatStatusStore } from "./chatStatus";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
@@ -165,6 +166,8 @@ export function useChatRun(o: Options) {
       onLimits: app.recordLimits,
     };
     let chatId = retry ? retryRef.current?.chatId ?? session.chatId : session.chatId;
+    let outcome: "ok" | "failed" | "stopped" = "ok";
+    if (chatId) chatStatusStore.runStarted(chatId);
     try {
       if (!chatId) {
         chatId = await createChat(o.projectId, body.split("\n")[0].slice(0, 60) || t("newChat"));
@@ -270,6 +273,7 @@ export function useChatRun(o: Options) {
           return quota ? await parkExhausted(activeProvider, quota, m) : "";
         },
       }, deps);
+      outcome = message === null ? "stopped" : "failed";
       if (message !== null) setError(message);
     } finally {
       if (reviewRef.current && !retryRef.current) {
@@ -281,6 +285,7 @@ export function useChatRun(o: Options) {
       setRunning(false);
       setRetryNotice("");
       app.setSessionBusy(session.key, false);
+      reportChatRun(chatId, outcome, { title: app.chats.find(c => c.id === chatId)?.title ?? t("newChat"), t });
       setStream(null);
       setActivities([]);
       setToolResults([]);
