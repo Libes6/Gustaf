@@ -1,40 +1,44 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window. Every entry is used by the frontend; see docs/ARCHITECTURE.md (Security) before adding one.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "core:window:allow-show",
-    "core:window:allow-hide",
-    "core:window:allow-set-focus",
+    "core:window:allow-toggle-maximize",
     "core:window:allow-set-badge-count",
     "core:window:allow-request-user-attention",
-    "notification:default",
-    "opener:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "opener:allow-default-urls",
     {
       "identifier": "opener:allow-open-url",
       "allow": [
         {
           "url": "x-apple.systempreferences:*"
-        },
-        {
-          "url": "https://*"
         }
       ]
     },
     "opener:allow-reveal-item-in-dir",
-    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
     {
       "identifier": "shell:allow-spawn",
       "allow": [
         {
           "name": "zsh",
           "cmd": "/bin/zsh",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     },
@@ -44,7 +48,12 @@
         {
           "name": "zsh",
           "cmd": "/bin/zsh",
-          "args": true
+          "args": [
+            "-lc",
+            {
+              "validator": "(?s).+"
+            }
+          ]
         }
       ]
     },
@@ -59,16 +68,66 @@
           "url": "https://*"
         },
         {
+          "url": "https://*:*"
+        },
+        {
           "url": "http://localhost:*"
         },
         {
           "url": "http://127.0.0.1:*"
         },
         {
-          "url": "http://*"
+          "url": "http://\\[\\:\\:1\\]:*"
+        },
+        {
+          "url": "http://([^.]+):*"
+        },
+        {
+          "url": "http://(10\\.\\d+\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.1[6-9]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.2\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.3[01]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(192\\.168\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(169\\.254\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.6[4-9]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.[7-9]\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.1[01]\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.12[0-7]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://*.local:*"
+        },
+        {
+          "url": "http://*.lan:*"
+        },
+        {
+          "url": "http://*.internal:*"
+        },
+        {
+          "url": "http://*.home.arpa:*"
+        },
+        {
+          "url": "http://*.ts.net:*"
         }
       ]
-    },
-    "core:window:allow-toggle-maximize"
+    }
   ]
 }
