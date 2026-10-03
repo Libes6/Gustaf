@@ -22,11 +22,11 @@ export const state = {
   /** Keychain entries written through `secrets`. */
   secrets: new Map(),
   /** Fake stdio MCP servers by config id: { tools, call(name, args), epoch?, startError? }; and what was sent. */
-  mcp: { servers: {}, starts: [], requests: [], stops: [] },
+  mcp: { servers: {}, starts: [], requests: [], stops: [], cancels: [] },
   reset() {
     this.settings.clear();
     this.secrets.clear();
-    this.mcp = { servers: {}, starts: [], requests: [], stops: [] };
+    this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
     this.instructionFiles = [];
     this.runs.length = 0;
     this.runResult = { code: 0, output: 'ran', timed_out: false };
@@ -56,7 +56,11 @@ const fakeMcp = (id) => {
   if (!s) throw new Error(`unknown MCP server ${id}`);
   return s;
 };
-const mcpStatus = (id) => ({ id, state: 'running', error: null, pid: 1, restarts: 0, toolsEpoch: state.mcp.servers[id]?.epoch ?? 0, init: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: id } } });
+const mcpStatus = (id) => {
+  const s = state.mcp.servers[id];
+  const capabilities = { ...(s?.resources ? { resources: {} } : {}), ...(s?.prompts ? { prompts: {} } : {}) };
+  return { id, state: 'running', error: null, pid: 1, restarts: 0, toolsEpoch: s?.epoch ?? 0, resourcesEpoch: s?.resourcesEpoch ?? 0, promptsEpoch: s?.promptsEpoch ?? 0, init: { protocolVersion: '2025-06-18', capabilities, serverInfo: { name: id } } };
+};
 export const mcpStdio = {
   start: async (id, spec) => {
     state.mcp.starts.push({ id, spec });
@@ -64,16 +68,35 @@ export const mcpStdio = {
     if (s.startError) throw new Error(s.startError);
     return mcpStatus(id);
   },
-  request: async (id, method, params) => {
-    state.mcp.requests.push({ id, method, params });
+  /** A server's `hang` function (name, args) => true makes that tools/call wait until `cancel` (like a slow server). */
+  request: async (id, method, params, _timeoutMs, requestKey) => {
+    state.mcp.requests.push({ id, method, params, requestKey });
     const s = fakeMcp(id);
     if (method === 'tools/list') return { tools: s.tools };
-    if (method === 'tools/call') return s.call(params.name, params.arguments);
+    if (method === 'tools/call') {
+      if (s.hang?.(params.name, params.arguments)) return new Promise((_, reject) => state.mcp.waiting.set(requestKey, () => reject(new Error('MCP request cancelled'))));
+      return s.call(params.name, params.arguments);
+    }
+    if (method === 'resources/list') return { resources: s.resources };
+    if (method === 'resources/read') return s.read(params.uri);
+    if (method === 'prompts/list') return { prompts: s.prompts };
+    if (method === 'prompts/get') return s.getPrompt(params.name, params.arguments);
     throw new Error(`MCP error -32601: Method not found: ${method}`);
+  },
+  cancel: async (id, requestKey) => {
+    state.mcp.cancels.push({ id, requestKey });
+    state.mcp.waiting.get(requestKey)?.();
   },
   stop: async (id) => void state.mcp.stops.push(id),
   status: async () => Object.keys(state.mcp.servers).map(mcpStatus),
   logs: async () => [],
+};
+export const oauthLoopback = {
+  start: async () => {
+    throw new Error('oauthLoopback is faked per test through setMcpOAuthDeps');
+  },
+  wait: async () => '',
+  cancel: async () => {},
 };
 export const cursor = { scan: async () => [], messages: async () => [] };
 
