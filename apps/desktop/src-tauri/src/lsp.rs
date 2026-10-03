@@ -191,7 +191,8 @@ while True:
     sys.stdout.buffer.flush()
 "#).unwrap();
         let server=Server { language:"typescript".into(),command:"/usr/bin/python3".into(),args:vec![script.to_str().unwrap().into()] };
-        let report=check_with_server(dir.path().to_str().unwrap(),"a b.ts",2000,Some(server), None).unwrap();
+        // Allow cold interpreter startup on hosted CI runners; production keeps its own timeout.
+        let report=check_with_server(dir.path().to_str().unwrap(),"a b.ts",15000,Some(server), None).unwrap();
         assert_eq!(report.status,"complete"); assert_eq!(report.diagnostics[0].line,1); assert_eq!(report.diagnostics[0].column,7);
         assert_eq!(report.diagnostics[0].path,"a b.ts");
         assert!(check(dir.path().to_str().unwrap(),"../outside.ts",1000).is_err());
