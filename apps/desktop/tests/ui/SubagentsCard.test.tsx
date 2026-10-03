@@ -63,6 +63,23 @@ describe("SubagentsCard", () => {
     expect(screen.getByRole("button", { name: /Agent abcdef/ })).toBeInTheDocument();
   });
 
+  it("an interrupted agent reads as Stopped (neutral, counted apart from failures) and shows no live step", () => {
+    mockInvoke({});
+    const agents = [
+      agent("a", { action: "scan", state: "stopped", step: "cargo test", endedAt: 5 }, { status: "unknown" }),
+      agent("b", { action: "scan", state: "failed", result: "stream failed" }, { status: "error" }),
+      agent("c", { action: "scan", state: "running" }),
+    ];
+    renderApp(<SubagentsCard agents={agents} />);
+    const rows = within(screen.getByRole("region", { name: "Subagents" })).getAllByRole("listitem");
+    expect(within(rows[0]).getByText("Stopped")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Failed")).toBeInTheDocument();
+    expect(screen.getByText(/1 stopped/)).toBeInTheDocument();
+    expect(screen.getByText(/1 failed/)).toBeInTheDocument();
+    fireEvent.click(within(rows[0]).getByRole("button", { name: /Task a/ }));
+    expect(within(rows[0]).queryByText("cargo test", { selector: ".subagent-step" })).toBeNull();
+  });
+
   it("replaces a run of subagent activities by a single card and leaves other parts alone", () => {
     mockInvoke({});
     const parts: Part[] = [

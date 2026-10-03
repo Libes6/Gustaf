@@ -44,8 +44,8 @@ function setup(onContinue = vi.fn()) {
 }
 
 describe("AgentsPanel: CLI-native subagents", () => {
-  const cliAct = (id: string, state: "running" | "completed", over: Record<string, unknown> = {}) => ({
-    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+  const cliAct = (id: string, state: "running" | "completed" | "stopped" | "failed", over: Record<string, unknown> = {}) => ({
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : state === "completed" ? ("success" as const) : ("unknown" as const),
     subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state, prompt: "Count the files", ...over },
     ...(state === "completed" ? { output: "42 files in total" } : {}),
   });
@@ -118,13 +118,37 @@ describe("AgentsPanel: CLI-native subagents", () => {
     expect(screen.queryByRole("button", { name: /^Finished/ })).toBeNull();
 
     phase = 1;
-    await act(async () => { await tracker.finish(true); });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument());
-    // The finished row is folded while others run.
-    expect(screen.getAllByRole("article")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "Finished 1" }));
+    // (providers/cli.ts publishes what `finish` returns the same way)
+    await act(async () => { for (const a of await tracker.finish(true)) trackCliAgents({ chatId: 1, root: "/work/alpha" }, [applyActivity(map, a)]); });
+    // The turn is over: Bo and Cy were still running in the last scan, and the Codex process that ran them is gone, so they
+    // are settled as stopped instead of ticking on; nothing is left under Running.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Finished 3" })).toBeInTheDocument());
+    expect(screen.queryByRole("region", { name: "Running" })).toBeNull();
     expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getAllByText("Stopped")).toHaveLength(2);
     expect(screen.getByText("alpha is fine")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Background tasks · 0 running" })).toBeInTheDocument();
+    resetCliAgents();
+  });
+
+  it("stopped agents sit under Finished with a neutral Stopped label, never under Running, and do not count in the badge", async () => {
+    resetCliAgents();
+    render();
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop: vi.fn() }, [
+      cliAct("a", "running"),
+      cliAct("b", "stopped", { endedAt: Date.now() }),
+      cliAct("c", "failed", { endedAt: Date.now() }),
+    ]));
+    expect(await screen.findByRole("button", { name: "Background tasks · 1 running" })).toBeInTheDocument();
+    const running = screen.getByRole("region", { name: "Running" });
+    expect(within(running).getAllByRole("article")).toHaveLength(1);
+    expect(within(running).getByRole("article", { name: "Worker a" })).toBeInTheDocument();
+    const finished = screen.getByRole("region", { name: "Finished" });
+    fireEvent.click(within(finished).getByRole("button", { name: "Finished 2" }));
+    const stopped = within(finished).getByRole("article", { name: "Worker b" });
+    expect(within(stopped).getByText("Stopped")).toBeInTheDocument();
+    expect(within(stopped).queryByRole("button", { name: "Stop" })).toBeNull();
+    expect(within(within(finished).getByRole("article", { name: "Worker c" })).getByText("Failed")).toBeInTheDocument();
     resetCliAgents();
   });
 
@@ -220,7 +244,7 @@ describe("AgentsPanel", () => {
 
 describe("Background tasks column", () => {
   const cliAct = (id: string, state: "running" | "completed") => ({
-    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : state === "completed" ? ("success" as const) : ("unknown" as const),
     subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state },
   });
   const ctx = { chatId: 1, root: "/work/alpha" };

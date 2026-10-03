@@ -24,15 +24,16 @@ function resultText(content: unknown): string | undefined {
 // ---- CLI-native subagents ----
 
 const sub = (s: Partial<SubagentInfo> & Pick<SubagentInfo, 'provider' | 'agentId' | 'action' | 'state'>): SubagentInfo => ({ title: '', ...s });
-const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : 'running';
-const isTerminal = (s?: SubagentState) => s === 'completed' || s === 'failed';
+const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : state === 'stopped' ? 'unknown' : 'running';
+const isTerminal = (s?: SubagentState) => s === 'completed' || s === 'failed' || s === 'stopped';
 
 /** Codex `CollabAgentStatus` (pendingInit, running, interrupted, completed, errored, shutdown, notFound) to our state. */
 function agentState(status: unknown): SubagentState | undefined {
   switch (norm(status)) {
     case 'pendinginit': case 'running': return 'running';
     case 'completed': case 'shutdown': return 'completed';
-    case 'errored': case 'notfound': case 'interrupted': return 'failed';
+    case 'errored': case 'notfound': return 'failed';
+    case 'interrupted': return 'stopped';
     default: return undefined;
   }
 }

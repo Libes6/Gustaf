@@ -1111,5 +1111,7 @@
   "branchUnavailable": "source unavailable",
   "branchTransfer": "Context transfer",
   "branchChooseModel": "Choose provider and model before branching",
-  "branchTransferDetails": "Only history through the selected turn is copied, including attachments and recorded tool results. Creating a branch never executes tools. The next run starts a fresh provider session from copied context; native session state and provider-private context do not transfer. Switching models may change capabilities. Branch histories are independent; workspace files remain shared."
+  "branchTransferDetails": "Only history through the selected turn is copied, including attachments and recorded tool results. Creating a branch never executes tools. The next run starts a fresh provider session from copied context; native session state and provider-private context do not transfer. Switching models may change capabilities. Branch histories are independent; workspace files remain shared.",
+  "subagentStopped": "Stopped",
+  "subagentsStoppedCount": "{count} stopped"
 }
