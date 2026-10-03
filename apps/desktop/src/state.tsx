@@ -8,6 +8,7 @@ import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
 import { worktrees } from "./lib/worktrees";
+import { removeLegacyReviewOverrides } from "./lib/reviewCopy";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
 export type Model = ModelInfo & { firstSeen: number };
@@ -135,6 +136,7 @@ function useAppState() {
   useEffect(() => {
     reload();
     refreshModels({ refresh: "startup" });
+    removeLegacyReviewOverrides();
     // Workspaces (git worktrees) whose folder was deleted behind our back: tidy the leftovers once per start; failures
     // (not a git repository, git missing, a folder that moved) are of no interest here.
     listProjects().then((ps) => {

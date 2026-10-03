@@ -19,6 +19,8 @@ export const setSetting = (key: string, value: unknown) =>
     JSON.stringify(value),
   ]);
 
+export const deleteSetting = (key: string) => db.exec("delete from settings where key = ?", [key]);
+
 export const secrets = {
   set: (id: string, value: string) => invoke<void>("secret_set", { id, value }),
   get: (id: string) => invoke<string | null>("secret_get", { id }),

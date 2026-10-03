@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ChatView } from "../../src/components/ChatView";
@@ -41,7 +41,6 @@ const view = (over: Record<string, unknown> = {}) => {
   return renderApp(<ChatView session={session} visible />, makeApp({ projects: [project()], chats: [chat({ id: 6, project_id: 1 })], providers: [provider()], selection, sessions: { active: "k", items: [session] }, ...over }));
 };
 const send = async () => { await userEvent.type(screen.getByRole("textbox"), "hello{Enter}"); await screen.findByText("done"); };
-const chip = () => screen.findByRole("button", { name: /Review copy:/ });
 const answer = () => { model.turn = vi.fn(async () => ({ parts: [{ type: "text", text: "done" }], usage })); };
 
 describe("review copy setting", () => {
@@ -64,14 +63,12 @@ describe("review copy setting", () => {
 });
 
 describe("review copy in a chat", () => {
-  it("off (default): the run edits the project folder, no copy, and the chip says edits are direct", async () => {
+  it("off (default): the run edits the project folder, no copy, and the composer has no review chip", async () => {
     answer();
     backend();
     view({ reviewCopy: false });
-    const c = await chip();
-    expect(c).toHaveTextContent("Review copy: off");
-    expect(c).toHaveAttribute("title", expect.stringContaining("edits are applied directly"));
     await flush();
+    expect(screen.queryByRole("button", { name: /Review copy/ })).not.toBeInTheDocument();
     await send();
     expect(callsOf("review_prepare")).toEqual([]);
     expect((model.turn as any).mock.calls[0][0].cwd).toBe("/work/alpha");
@@ -83,48 +80,30 @@ describe("review copy in a chat", () => {
     answer();
     backend();
     view({ reviewCopy: true });
-    expect(await chip()).toHaveTextContent("Review copy: on");
     await flush();
+    expect(screen.queryByRole("button", { name: /Review copy/ })).not.toBeInTheDocument();
     await send();
     expect(callsOf("review_prepare")).toHaveLength(1);
     expect((model.turn as any).mock.calls[0][0].cwd).toBe("/shadow/work");
   });
 
-  it("the chip menu sets a per-chat override that wins over the global setting and is stored", async () => {
+  it("a stored legacy per-chat override is ignored: global on still uses a copy, global off still edits directly", async () => {
     answer();
-    const stored = backend();
+    const stored = backend({ chatReviewOverrides: { 6: "off" } });
+    const first = view({ reviewCopy: true });
+    await flush();
+    await send();
+    expect(callsOf("review_prepare")).toHaveLength(1);
+    expect((model.turn as any).mock.calls[0][0].cwd).toBe("/shadow/work");
+    // The run path never touches the old key.
+    expect(stored.chatReviewOverrides).toEqual({ 6: "off" });
+    first.unmount();
+
+    answer();
+    backend({ chatReviewOverrides: { 6: "on" } });
     view({ reviewCopy: false });
-    await userEvent.click(await chip());
-    const menu = screen.getByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: /Default \(off\)/ })).toBeInTheDocument();
-    await userEvent.click(within(menu).getByRole("menuitem", { name: /^on/ }));
-    await waitFor(() => expect(stored.chatReviewOverrides).toEqual({ 6: "on" }));
-    expect(await chip()).toHaveTextContent("Review copy: on");
     await flush();
     await send();
-    expect(callsOf("review_prepare")).toHaveLength(1);
-  });
-
-  it("a stored override is applied when the chat opens: off wins over a global on", async () => {
-    answer();
-    backend({ chatReviewOverrides: { 6: "off" } });
-    view({ reviewCopy: true });
-    await waitFor(() => expect(screen.getByRole("button", { name: /Review copy:/ })).toHaveTextContent("Review copy: off"));
-    await flush();
-    await send();
-    expect(callsOf("review_prepare")).toEqual([]);
     expect((model.turn as any).mock.calls[0][0].cwd).toBe("/work/alpha");
-  });
-
-  it("a draft chat's choice is stored under the new chat id", async () => {
-    answer();
-    const stored = backend({}, 91);
-    const draft = { key: "k", chatId: null, projectId: 1 };
-    renderApp(<ChatView session={draft} visible />, makeApp({ projects: [project()], chats: [], providers: [provider()], selection, reviewCopy: false, sessions: { active: "k", items: [draft] } }));
-    await userEvent.click(await chip());
-    await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: /^on/ }));
-    await send();
-    expect(stored.chatReviewOverrides).toEqual({ 91: "on" });
-    expect(callsOf("review_prepare")).toHaveLength(1);
   });
 });

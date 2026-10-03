@@ -610,7 +610,8 @@ button.split-item { width: 100%; text-align: left; }
 .chip.ctx { font-size:12px; font-variant-numeric:tabular-nums; }
 .ctx-ring { width:14px; height:14px; border-radius:50%; flex:none; background:conic-gradient(var(--accent-soft) var(--p, 0%), var(--border) 0); -webkit-mask:radial-gradient(circle, transparent 4px, #000 5px); mask:radial-gradient(circle, transparent 4px, #000 5px); }
 .context-pop { position:absolute; right:0; bottom:calc(100% + 8px); width:340px; max-width:calc(100vw - 48px); z-index:20; display:flex; flex-wrap:wrap; gap:8px 16px; padding:12px; border:1px solid var(--border); border-radius:12px; font-size:12px; color:var(--text-2); background:var(--bg-elev); box-shadow:var(--shadow-sm); }
-.context-pop > div:first-child, .context-pop .hint { width:100%; }
+.context-pop > div:first-child, .context-pop .hint, .context-pop .ctx-computer { width:100%; }
+.context-pop .ctx-computer { color:var(--accent-soft); }
 .live-meter { font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--text-3); font-size:12px; margin-left:6px; }
 .summary-label { display:block; margin-bottom:8px; }
 .review-intro { padding:12px; font-size:12px; border-bottom:1px solid var(--border); }

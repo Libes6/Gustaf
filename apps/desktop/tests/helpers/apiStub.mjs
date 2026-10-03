@@ -57,6 +57,7 @@ const confine = (root, rel) => {
 
 export const getSetting = async (key, fallback) => (state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback);
 export const setSetting = async (key, value) => void state.settings.set(key, JSON.stringify(value));
+export const deleteSetting = async (key) => void state.settings.delete(key);
 // SQL bridge: a real in-memory SQLite (node:sqlite) holding only the agent_runs / agent_messages tables, created from the
 // statements in src-tauri/src/db.rs (between its agent-runs markers). Anything else behaves like an empty database.
 let agentDb = null;
