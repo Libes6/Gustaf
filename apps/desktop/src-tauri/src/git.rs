@@ -144,7 +144,7 @@ pub struct CommitResult {
     pub created_branch: bool,
 }
 
-fn canonical_root(root: &str) -> Result<PathBuf, String> {
+pub(crate) fn canonical_root(root: &str) -> Result<PathBuf, String> {
     let base = Path::new(root).canonicalize().map_err(|e| format!("project root: {e}"))?;
     if !base.is_dir() {
         return Err(format!("project root is not a directory: {root}"));
@@ -157,7 +157,7 @@ fn repo_lock(key: &Path) -> Arc<Mutex<()>> {
     map.entry(key.to_path_buf()).or_default().clone()
 }
 
-fn tail_chars(text: &str, max: usize) -> String {
+pub(crate) fn tail_chars(text: &str, max: usize) -> String {
     let count = text.chars().count();
     if count <= max {
         return text.to_string();
@@ -166,7 +166,7 @@ fn tail_chars(text: &str, max: usize) -> String {
     format!("…\n{tail}")
 }
 
-fn repo_command(root: &Path) -> Command {
+pub(crate) fn repo_command(root: &Path) -> Command {
     let mut cmd = Command::new("git");
     cmd.current_dir(root)
         // Read-only calls must not take index.lock behind the user's back; repo-configured
@@ -188,7 +188,7 @@ where
     repo_command(root).args(args).output().map_err(|e| format!("git: {e}"))
 }
 
-fn failure_text(out: &Output) -> String {
+pub(crate) fn failure_text(out: &Output) -> String {
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parts: Vec<&str> = [stderr.trim(), stdout.trim()].into_iter().filter(|s| !s.is_empty()).collect();
@@ -198,7 +198,7 @@ fn failure_text(out: &Output) -> String {
     tail_chars(&parts.join("\n"), MAX_ERROR_CHARS)
 }
 
-fn run_git<I, S>(root: &Path, args: I) -> Result<String, String>
+pub(crate) fn run_git<I, S>(root: &Path, args: I) -> Result<String, String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -254,7 +254,7 @@ fn repo_info(root: &Path) -> Option<RepoInfo> {
     Some(RepoInfo { toplevel, prefix, git_dir })
 }
 
-fn current_branch(root: &Path) -> Option<String> {
+pub(crate) fn current_branch(root: &Path) -> Option<String> {
     run_git(root, ["symbolic-ref", "--short", "-q", "HEAD"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
@@ -587,7 +587,7 @@ pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&
     Ok(CommitResult { sha, short, branch: current_branch(root), files, created_branch: created.is_some() })
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+pub(crate) async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
 }
 

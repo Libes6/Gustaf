@@ -5,6 +5,7 @@ mod cursor_accounts;
 mod cursor_import;
 mod db;
 mod git;
+mod git_publish;
 mod hunks;
 mod import_sources;
 mod mcp;
@@ -65,6 +66,10 @@ pub fn run() {
             git::git_status,
             git::git_commit_context,
             git::git_commit,
+            git_publish::git_publish_info,
+            git_publish::git_push,
+            git_publish::gh_status,
+            git_publish::git_create_pr,
             review::review_prepare,
             review::review_run,
             review::review_list,
