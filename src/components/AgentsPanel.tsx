@@ -1,5 +1,5 @@
-import { Bot, ChevronDown, ChevronRight, ChevronUp, Loader2, RotateCcw, Square, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Bot, ChevronDown, ChevronRight, Maximize2, Minimize2, RotateCcw, Square, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import { loadRunSteps, removeFinished, stopRun, useAgentRuns } from "../agent/agentRuns";
@@ -7,6 +7,7 @@ import { clearFinishedCliAgents, isCliAgentActive, useCliAgents, type CliAgent }
 import { elapsed, formatTokens, isActiveStatus, type AgentRun, type TranscriptStep } from "../agent/agentRunsModel";
 import { canContinue, continueRequest } from "../agent/agentTranscript";
 import { useDialogFocus } from "../lib/useDialogFocus";
+import type { BackgroundTasks } from "../lib/useBackgroundTasks";
 import "../styles/agents.css";
 
 const TYPE_KEY = { explore: "agentTypeExplore", plan: "agentTypePlan", general: "agentTypeGeneral", review: "agentTypeReview" } as const;
@@ -136,7 +137,9 @@ type CardProps = {
   kind: string;
   /** Status chip of a finished agent. */
   status?: { label: string; tone: string };
-  /** model · elapsed · tokens · tool uses */
+  /** Elapsed time, shown after the type line. */
+  time?: string;
+  /** model · tokens · tool uses */
   meta: string[];
   /** The line under the meta: the current step while running, the report start when finished. */
   step?: string;
@@ -148,7 +151,7 @@ type CardProps = {
 };
 
 /** One agent: bold title, muted type line, meta line, current step with the transcript link and a square stop button. */
-function Card({ title, kind, status, meta, step, active, onOpen, onContinue, stop, extra }: CardProps) {
+function Card({ title, kind, status, time, meta, step, active, onOpen, onContinue, stop, extra }: CardProps) {
   const t = useT();
   return (
     <article className={`agent-card${active ? " running" : ""}`} aria-label={title}>
@@ -157,7 +160,7 @@ function Card({ title, kind, status, meta, step, active, onOpen, onContinue, sto
           <strong title={title}>{title}</strong>
           {status && <span className={`agent-status ${status.tone}`}>{status.label}</span>}
         </div>
-        <div className="agent-card-kind">{kind}</div>
+        <div className="agent-card-kind"><span>{kind}</span>{time && <span className="agent-card-time">{time}</span>}</div>
         <div className="agent-card-meta">{meta.map((m, i) => <span key={i} title={m}>{m}</span>)}</div>
         <div className="agent-card-step">
           {step ? <span className="step-text" title={step}>{step}</span> : <span className="step-text" />}
@@ -181,7 +184,8 @@ function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onO
       title={run.title}
       kind={t("agentsKind", { type: t(TYPE_KEY[run.type]) })}
       status={active ? undefined : { label: t(STATUS_KEY[run.status as keyof typeof STATUS_KEY]), tone: run.status }}
-      meta={[run.model, ...(time ? [time] : []), t("agentsTokens", { tokens: formatTokens(run.tokens) }), t("agentsToolUses", { count: run.toolUses })]}
+      time={time || undefined}
+      meta={[run.model, t("agentsTokens", { tokens: formatTokens(run.tokens) }), t("agentsToolUses", { count: run.toolUses })]}
       step={step}
       active={active}
       onOpen={onOpen}
@@ -209,7 +213,8 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
       title={title}
       kind={t("agentsKind", { type: provider })}
       status={active ? undefined : { label: t(CLI_STATE_KEY[agent.state]), tone: agent.state === "completed" ? "completed" : agent.state === "failed" ? "failed" : "cancelled" }}
-      meta={[...(agent.role ? [agent.role] : []), ...(time ? [time] : []), ...(agent.toolUses > 0 ? [t("agentsToolUses", { count: agent.toolUses })] : [])]}
+      time={time || undefined}
+      meta={[...(agent.role ? [agent.role] : []), ...(agent.toolUses > 0 ? [t("agentsToolUses", { count: agent.toolUses })] : [])]}
       step={step}
       active={active}
       onOpen={onOpen}
@@ -218,17 +223,29 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
   );
 }
 
+/** The "Background tasks" button of the chat header area: a bot icon with the number of running agents. Hidden until an agent exists. */
+export function AgentsToggle({ tasks, buttonRef }: { tasks: BackgroundTasks; buttonRef?: RefObject<HTMLButtonElement | null> }) {
+  const t = useT();
+  if (!tasks.hasAgents && !tasks.open) return null;
+  return (
+    <button ref={buttonRef} className={`agents-toggle${tasks.open ? " on" : ""}`} aria-expanded={tasks.open} aria-controls="agents-column" aria-label={t("agentsToggle", { running: tasks.running })} title={t("agentsTitle")} onClick={() => (tasks.open ? tasks.close() : tasks.setOpen(true))}>
+      <Bot size={15} aria-hidden="true" />
+      {tasks.running > 0 && <span className="agents-badge" aria-hidden="true">{tasks.running}</span>}
+    </button>
+  );
+}
+
 /**
- * "Background tasks": subagent runs of this project, running first, then a collapsible "Finished" list (see
- * agent/subagents.ts), plus the subagents Codex and Claude Code run inside their own CLI process (read-only, this
- * session only). `onContinue` receives the message that asks the main agent to continue a finished run (the chat puts
- * it in the composer).
+ * The right-hand "Background tasks" column (rendered by `CanvasWorkspace` at the far right of the chat layout): subagent
+ * runs of this project, running first, then a collapsible "Finished" list (see agent/subagents.ts), plus the subagents
+ * Codex and Claude Code run inside their own CLI process (read-only, this session only). `onContinue` receives the
+ * message that asks the main agent to continue a finished run (the chat puts it in the composer). The header has an
+ * expand button (the column covers the chat area) and a close button; Escape closes it too.
  */
-export function AgentsPanel({ root, onContinue }: { root: string | null; onContinue?: (message: string) => void }) {
+export function AgentsColumn({ root, tasks, onContinue, toggleRef }: { root: string | null; tasks: BackgroundTasks; onContinue?: (message: string) => void; toggleRef?: RefObject<HTMLButtonElement | null> }) {
   const t = useT();
   const runs = useAgentRuns(root);
   const cli = useCliAgents(root);
-  const [open, setOpen] = useState(false);
   // Until the user toggles it, the finished list is open when nothing runs and folded away while something does.
   const [finishedOpen, setFinishedOpen] = useState<boolean | null>(null);
   const [viewing, setViewing] = useState<{ id: string; continuing: boolean } | null>(null);
@@ -240,9 +257,8 @@ export function AgentsPanel({ root, onContinue }: { root: string | null; onConti
   const running = active.length + cliActive.length;
   const finished = done.length + cliDone.length;
   const now = useNow(running > 0);
-  // Open by itself when the first agent of a burst starts.
-  useEffect(() => { if (running) setOpen(true); }, [running > 0]);
-  if (!runs.length && !cli.length) return null;
+  const { expanded } = tasks;
+  const close = () => { tasks.close(); toggleRef?.current?.focus(); };
   const viewed = viewing ? runs.find((r) => r.id === viewing.id) : undefined;
   const viewedCli = viewingCli ? cli.find((a) => a.key === viewingCli) : undefined;
   const showFinished = finishedOpen ?? running === 0;
@@ -253,34 +269,35 @@ export function AgentsPanel({ root, onContinue }: { root: string | null; onConti
     </>
   );
   return (
-    <aside className={`agents-panel${open ? " open" : ""}`} aria-label={t("agentsTitle")}>
-      <button className="agents-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {running ? <Loader2 size={14} className="spin" /> : <Bot size={14} />}
-        <span className="grow">{t("agentsTitle")} · {t("agentsCount", { running, done: finished })}</span>
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
-      {open && (
-        <div className="agents-body">
-          {running > 0 && (
-            <section aria-label={t("agentsRunning")}>
-              <h3 className="agents-group">{t("agentsRunning")}</h3>
-              {cards(active, cliActive)}
-            </section>
-          )}
-          {finished > 0 && (
-            <section aria-label={t("agentsFinished")}>
-              <div className="agents-group">
-                <button className="agents-group-toggle" aria-expanded={showFinished} onClick={() => setFinishedOpen(!showFinished)}>
-                  {showFinished ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
-                  {t("agentsFinishedCount", { count: finished })}
-                </button>
-                <button className="icon-btn" title={t("agentsClear")} aria-label={t("agentsClear")} onClick={() => { removeFinished(root ?? undefined); clearFinishedCliAgents(root ?? undefined); }}><Trash2 size={14} /></button>
-              </div>
-              {showFinished && cards(done, cliDone)}
-            </section>
-          )}
-        </div>
-      )}
+    <aside id="agents-column" className={`tasks-column${expanded ? " expanded" : ""}`} aria-label={t("agentsTitle")} onKeyDown={(e) => { if (e.key === "Escape" && e.currentTarget.contains(e.target as Node)) { e.stopPropagation(); close(); } }}>
+      <header className="tasks-head">
+        <h2>{t("agentsTitle")}</h2>
+        <button className="icon-btn" aria-pressed={expanded} title={expanded ? t("agentsRestore") : t("agentsExpand")} aria-label={expanded ? t("agentsRestore") : t("agentsExpand")} onClick={() => tasks.setExpanded(!expanded)}>
+          {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+        <button className="icon-btn" title={t("agentsClose")} aria-label={t("agentsClose")} onClick={close}><X size={15} /></button>
+      </header>
+      <div className="tasks-body">
+        {running === 0 && finished === 0 && <div className="hint">{t("agentsEmpty")}</div>}
+        {running > 0 && (
+          <section aria-label={t("agentsRunning")}>
+            <h3 className="agents-group">{t("agentsRunning")}</h3>
+            {cards(active, cliActive)}
+          </section>
+        )}
+        {finished > 0 && (
+          <section aria-label={t("agentsFinished")}>
+            <div className="agents-group">
+              <button className="agents-group-toggle" aria-expanded={showFinished} onClick={() => setFinishedOpen(!showFinished)}>
+                {t("agentsFinishedCount", { count: finished })}
+                {showFinished ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
+              </button>
+              <button className="icon-btn" title={t("agentsClear")} aria-label={t("agentsClear")} onClick={() => { removeFinished(root ?? undefined); clearFinishedCliAgents(root ?? undefined); }}><Trash2 size={14} /></button>
+            </div>
+            {showFinished && cards(done, cliDone)}
+          </section>
+        )}
+      </div>
       {viewed && viewing && <Transcript key={viewed.id} run={viewed} continuing={viewing.continuing} onContinue={onContinue} onClose={() => setViewing(null)} />}
       {viewedCli && <CliDetail key={viewedCli.key} agent={viewedCli} onClose={() => setViewingCli(null)} />}
     </aside>

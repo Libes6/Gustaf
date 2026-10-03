@@ -1,11 +1,21 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { useRef } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createRun, recordStep, resetAgentRuns, updateRun } from "../../src/agent/agentRuns";
 import { finishCliAgents, resetCliAgents, trackCliAgents } from "../../src/agent/cliAgents";
-import { AgentsPanel } from "../../src/components/AgentsPanel";
+import { AgentsColumn, AgentsToggle } from "../../src/components/AgentsPanel";
+import { useBackgroundTasks } from "../../src/lib/useBackgroundTasks";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
+
+/** What ChatView does: the toggle in the chat and the column when it is open. */
+function Panel({ onContinue }: { onContinue?: (m: string) => void }) {
+  const tasks = useBackgroundTasks("/work/alpha");
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  return <><AgentsToggle tasks={tasks} buttonRef={toggleRef} />{tasks.open && <AgentsColumn root="/work/alpha" tasks={tasks} onContinue={onContinue} toggleRef={toggleRef} />}</>;
+}
+const openColumn = async () => { fireEvent.click(await screen.findByRole("button", { name: /Background tasks/ })); };
 
 const runRow = (id: string, title: string, status: string, over: Record<string, unknown> = {}) => ({
   id, chat_id: 1, title, type: "explore", model: "m1", status, started_at: 1000, ended_at: 5000, tokens: 1200, tool_uses: 2, error: null, summary: "short report",
@@ -27,7 +37,7 @@ function setup(onContinue = vi.fn()) {
       return [];
     },
   });
-  renderApp(<AgentsPanel root="/work/alpha" onContinue={onContinue} />);
+  renderApp(<Panel onContinue={onContinue} />);
   return onContinue;
 }
 
@@ -41,7 +51,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
   afterEach(() => { resetAgentRuns(); resetCliAgents(); });
   const render = () => {
     mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
-    renderApp(<AgentsPanel root="/work/alpha" />);
+    renderApp(<Panel />);
   };
 
   it("mirrors a live Codex subagent read-only, then lists it as finished once the run ends; stop says it stops the whole run", async () => {
@@ -85,8 +95,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
 describe("AgentsPanel", () => {
   it("lists the runs stored in SQLite and reads the full transcript only when it is opened", async () => {
     setup();
-    const header = await screen.findByRole("button", { name: /Background agents/i });
-    fireEvent.click(header);
+    await openColumn();
     expect(await screen.findByText("Parser scout")).toBeInTheDocument();
     expect(screen.getByText("Over budget")).toBeInTheDocument();
     expect(callsOf("db_select").some((a: any) => /from agent_messages/.test(a.sql))).toBe(false);
@@ -101,7 +110,7 @@ describe("AgentsPanel", () => {
 
   it("continues a finished run: the follow-up becomes a request for the main agent; cancelled runs cannot be continued", async () => {
     const onContinue = setup();
-    fireEvent.click(await screen.findByRole("button", { name: /Background agents/i }));
+    await openColumn();
     await screen.findByText("Parser scout");
     // One continue button per continuable run (the budget-stopped and the completed one, not the cancelled one).
     const buttons = screen.getAllByRole("button", { name: "Continue this agent" });
@@ -131,8 +140,8 @@ describe("AgentsPanel", () => {
       },
     });
     const stop = vi.fn();
-    renderApp(<AgentsPanel root="/work/alpha" />);
-    await screen.findByRole("button", { name: /Background agents/i });
+    renderApp(<Panel />);
+    await screen.findByRole("button", { name: /Background tasks/ });
     act(() => {
       const id = createRun({ title: "Live scout", type: "explore", providerId: "p1", model: "m1", projectRoot: "/work/alpha" }, stop);
       updateRun(id, { status: "running", startedAt: Date.now() });
@@ -162,4 +171,91 @@ describe("AgentsPanel", () => {
     expect(screen.getByRole("article", { name: "Live scout" })).toBeInTheDocument();
   });
   afterAll(() => resetAgentRuns());
+});
+
+describe("Background tasks column", () => {
+  const cliAct = (id: string, state: "running" | "completed") => ({
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+    subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state },
+  });
+  const ctx = { chatId: 1, root: "/work/alpha" };
+  afterEach(() => { resetAgentRuns(); resetCliAgents(); });
+  const render = () => {
+    resetCliAgents();
+    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
+    renderApp(<Panel />);
+  };
+
+  it("is a region with a header (expand, close), has no toggle until an agent exists and opens by itself for the first run only", async () => {
+    render();
+    expect(screen.queryByRole("button", { name: /Background tasks/ })).toBeNull();
+    act(() => trackCliAgents(ctx, [cliAct("a", "running")]));
+    const region = await screen.findByRole("complementary", { name: "Background tasks" });
+    expect(within(region).getByRole("heading", { name: "Background tasks" })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: "Expand" })).toBeInTheDocument();
+    // The toggle carries the number of running agents.
+    const toggle = screen.getByRole("button", { name: "Background tasks · 1 running" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveTextContent("1");
+
+    // The user closes it: focus returns to the toggle and further updates of the same run do not reopen it.
+    fireEvent.click(within(region).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    act(() => trackCliAgents(ctx, [{ ...cliAct("a", "running"), subagent: { ...cliAct("a", "running").subagent, step: "reading" } }]));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    // A new run opens it again.
+    act(() => trackCliAgents(ctx, [cliAct("b", "running")]));
+    expect(await screen.findByRole("complementary", { name: "Background tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Worker b" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Background tasks · 2 running" })).toBeInTheDocument();
+  });
+
+  it("does not open for agents that were already running when the view mounted, and the toggle opens it", async () => {
+    resetCliAgents();
+    act(() => trackCliAgents(ctx, [cliAct("old", "running")]));
+    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
+    renderApp(<Panel />);
+    const toggle = await screen.findByRole("button", { name: /Background tasks/ });
+    expect(screen.queryByRole("complementary")).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("article", { name: "Worker old" })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("expands to cover the chat area and restores; Escape inside it closes it, Escape inside a transcript dialog only closes the dialog", async () => {
+    render();
+    act(() => trackCliAgents(ctx, [cliAct("a", "running")]));
+    const region = await screen.findByRole("complementary", { name: "Background tasks" });
+    expect(region).not.toHaveClass("expanded");
+    fireEvent.click(within(region).getByRole("button", { name: "Expand" }));
+    expect(region).toHaveClass("expanded");
+    fireEvent.click(within(region).getByRole("button", { name: "Restore size" }));
+    expect(region).not.toHaveClass("expanded");
+
+    fireEvent.click(within(region).getByRole("button", { name: "View transcript" }));
+    const dialog = await screen.findByRole("dialog", { name: "Worker a" });
+    fireEvent.keyDown(within(dialog).getByRole("button", { name: "Cancel" }), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("complementary", { name: "Background tasks" })).toBeInTheDocument();
+
+    fireEvent.keyDown(within(screen.getByRole("complementary")).getByRole("button", { name: "Expand" }), { key: "Escape" });
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("shows an empty hint when opened without agents and lists finished agents under a collapsible row", async () => {
+    render();
+    act(() => trackCliAgents(ctx, [cliAct("a", "completed")]));
+    await openColumn();
+    // Nothing runs, so Finished starts open; its chevron row toggles the list.
+    const toggle = screen.getByRole("button", { name: "Finished 1" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("article", { name: "Worker a" })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.queryByRole("article", { name: "Worker a" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
+    await waitFor(() => expect(screen.getByText(/No background agents yet/)).toBeInTheDocument());
+  });
 });

@@ -10,11 +10,12 @@ import type { ChatSession } from "../lib/chatSessions";
 import { groupTurns } from "../lib/chatTurns";
 import { editableText, turnMessageIds } from "../lib/messageActions";
 import { useChatRun } from "../lib/useChatRun";
+import { useBackgroundTasks } from "../lib/useBackgroundTasks";
 import { useComposerDraft } from "../lib/useComposerDraft";
 import { useMessageJump } from "../lib/useMessageJump";
 import { turnHasMessage } from "../lib/searchUtil";
 import { useApp } from "../state";
-import { AgentsPanel } from "./AgentsPanel";
+import { AgentsColumn, AgentsToggle } from "./AgentsPanel";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { Composer } from "./chat/Composer";
@@ -31,6 +32,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const [files, setFiles] = useState<string[]>([]);
   const feedRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [loaded, setLoaded] = useState(session.chatId === null);
   const draft = useComposerDraft(session, text, images, (d) => { setText(d.text); setImages(d.images); });
   const flashId = useMessageJump({ jump: app.jump, clearJump: app.clearJump, chatId: session.chatId, visible, loaded, messages, feedRef, onJump: () => setAtBottom(false) });
@@ -45,6 +47,8 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const modelName = app.models.find((m) => m.providerId === provider?.id && m.id === app.selection?.model)?.name ?? app.selection?.model;
   const [supports, setSupports] = useState({ computer: false, reasoning: false });
 
+  const tasks = useBackgroundTasks(root);
+  const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom,
@@ -101,11 +105,11 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const canvasSources = useMemo(() => messages.filter((m) => m.role === "assistant").map(textOf), [messages]);
 
   return (
-    <CanvasWorkspace sources={canvasSources} scope={session.key} onRepair={(prompt) => { setText(prompt); taRef.current?.focus(); }}>
+    <CanvasWorkspace sources={canvasSources} scope={session.key} onRepair={(prompt) => { setText(prompt); taRef.current?.focus(); }}
+      aside={root && tasks.open ? <AgentsColumn root={root} tasks={tasks} onContinue={continueAgent} toggleRef={toggleRef} /> : undefined}>
     <main className="main">
 
-
-      {root && <AgentsPanel root={root} onContinue={(message) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); }} />}
+      {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
       {root && project && <ChangesPanel name={project.name} root={root} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} />}
 
       {messages.length === 0 && stream === null && !error ? (

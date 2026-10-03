@@ -8,7 +8,7 @@ import { callsOf, mockInvoke } from "./tauri";
 
 // The project panels have their own backends; they are not under test here.
 vi.mock("../../src/components/ChangesPanel", () => ({ ChangesPanel: () => null }));
-vi.mock("../../src/components/AgentsPanel", () => ({ AgentsPanel: () => null }));
+vi.mock("../../src/components/AgentsPanel", () => ({ AgentsColumn: () => null, AgentsToggle: () => null }));
 
 // The model of the interactive tests below: a scripted adapter.
 const model = vi.hoisted(() => ({ turn: undefined as undefined | ((input: any) => Promise<any>) }));
