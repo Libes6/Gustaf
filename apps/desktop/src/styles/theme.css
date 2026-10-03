@@ -668,3 +668,5 @@ button:disabled { cursor:default; opacity:.45; }
 .skill-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
 .skill-option-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; color: var(--text-2); }
 .skill-option-source { font-size: 11px; line-height: 1.4; color: var(--text-3); }
+.chat-reference { padding: 10px; margin: 6px 0; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.chat-reference pre { white-space: pre-wrap; max-height: 240px; overflow: auto; font-size: 12px; }

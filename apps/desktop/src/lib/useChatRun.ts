@@ -1,3 +1,4 @@
+import { transformRequest } from "./chatContext";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
@@ -70,9 +71,11 @@ type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides t
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
   if (!root) return s;
-  const paths = [...new Set([...s.matchAll(/@([\w./-]+)/g)].map((m) => m[1]))].filter((p) => files.includes(p));
+  return transformRequest(s, async (body) => {
+  const paths = [...new Set([...body.matchAll(/@([\w./-]+)/g)].map((m) => m[1]))].filter((p) => files.includes(p));
   const blocks = await Promise.all(paths.map(async (p) => `<file path="${p}">\n${await fsx.read(root, p, 1, 400).catch(() => "")}\n</file>`));
-  return blocks.length ? `${s}\n\n${blocks.join("\n")}` : s;
+  return blocks.length ? `${body}\n\n${blocks.join("\n")}` : body;
+  });
 }
 
 /**
