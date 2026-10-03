@@ -132,3 +132,69 @@ export function resolveAccount(o: { pool: CursorPool; providers: ProviderConfig[
     ...(to !== model ? { modelFallback: { from: model, to } } : {}),
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Quota detection. Pure and conservative: a false positive parks a working account for an hour, a false
+// negative just shows the CLI's own error. Patterns come from Cursor's usage-limit wording; the real
+// cursor-agent output could not be captured here (the CLI is not logged in), so extend with real samples.
+
+export type Quota = { resetAt?: number };
+
+const STRONG = [
+  /usage[ -]limit/i,
+  /out of (?:fast |premium )?(?:requests|usage|credits)/i,
+  /(?:quota|usage|request) (?:limit )?(?:exceeded|exhausted|reached)/i,
+  /exceeded (?:your |the )?(?:usage|quota|monthly|plan|request)/i,
+  /(?:hit|reached|used up) (?:your |the )?(?:\w+ )?(?:usage |monthly |plan |request )?(?:limit|quota)/i,
+];
+// Not account quota: per-request size limits and credential problems.
+const NOT_QUOTA = /context (?:length|window)|too many tokens|prompt is too long|max(?:imum)? (?:output )?tokens|invalid api key|unauthori[sz]ed|not logged in/i;
+const RATE_LIMIT = /rate[ -]limit|too many requests|resource_exhausted|\b429\b/i;
+const UPGRADE = /\bupgrade\b/i;
+const LIMITISH = /limit|quota|usage/i;
+const UNITS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 };
+const MAX_RESET_MS = 40 * 86_400_000;
+
+/** "in 2 hours 30 minutes", "in 1h 5m", "after 90 seconds", "in 3 days". */
+function relativeMs(text: string): number | undefined {
+  const m = /\b(?:in|after|again in|retry after)\s+((?:\d+\s*(?:days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b[\s,and]*)+)/i.exec(text);
+  if (!m) return;
+  let total = 0;
+  for (const [, n, unit] of m[1].matchAll(/(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/gi)) total += Number(n) * UNITS[unit[0].toLowerCase()];
+  return total > 0 ? total : undefined;
+}
+
+/** "resets at 2026-10-04T00:00:00Z", "resets on Nov 1", "resets October 12, 2026". */
+function absoluteMs(text: string, now: number): number | undefined {
+  const m = /resets?(?: (?:at|on))?\s*:?\s*([A-Za-z0-9][A-Za-z0-9 ,:.+\-/]{3,40})/i.exec(text);
+  if (!m) return;
+  const raw = m[1].trim().replace(/[.,]$/, '');
+  const year = new Date(now).getUTCFullYear();
+  // The capture may run on into following words ("... 13:00:00Z usage"): shorten from the right until a date parses.
+  const words = raw.split(/\s+/);
+  for (let n = words.length; n > 0; n--) {
+    const head = words.slice(0, n).join(' ').replace(/[.,]$/, '');
+    for (const candidate of [head, `${head} ${year}`, `${head} ${year + 1}`]) {
+      const t = Date.parse(candidate);
+      if (Number.isFinite(t) && t > now && /\d{4}/.test(candidate)) return t;
+    }
+  }
+}
+
+/** Returns null for anything that is not clearly an exhausted account quota. `resetAt` is a ms timestamp when
+ *  the text names one within the next 40 days. */
+export function classifyQuota(text: string, now: number): Quota | null {
+  const s = text.slice(0, 4000);
+  if (!s.trim()) return null;
+  const rel = relativeMs(s);
+  const at = rel !== undefined ? now + rel : absoluteMs(s, now);
+  const resetAt = at !== undefined && at > now && at - now <= MAX_RESET_MS ? at : undefined;
+  const strong = STRONG.some(re => re.test(s));
+  if (NOT_QUOTA.test(s) && !strong) return null;
+  // A bare rate limit is usually transient; it counts only when the text says when it clears.
+  const quota = strong || (UPGRADE.test(s) && LIMITISH.test(s)) || ((RATE_LIMIT.test(s) || /\bresets?\b/i.test(s)) && LIMITISH.test(s) && resetAt !== undefined);
+  return quota ? { resetAt } : null;
+}
+
+/** When to try the account again: the stated reset time, else an hour from now (never less than a minute). */
+export const exhaustedUntil = (q: Quota, now: number) => Math.max(q.resetAt ?? now + DEFAULT_RESET_MS, now + 60_000);

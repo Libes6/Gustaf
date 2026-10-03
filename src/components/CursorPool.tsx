@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { useT } from "../i18n";
-import { addToPool, isCursorAccount, moveInPool, pickAccount, removeFromPool } from "../providers/cursorAccounts";
+import { addToPool, isCursorAccount, markAvailable, moveInPool, pickAccount, removeFromPool } from "../providers/cursorAccounts";
 import { updatePool, useCursorPool } from "../providers/cursorPoolStore";
 import { useApp } from "../state";
 
@@ -13,6 +13,8 @@ export function CursorPool() {
   const members = pool.ids.map((id) => accounts.find((p) => p.id === id)).filter((p) => !!p);
   const free = accounts.filter((p) => !pool.ids.includes(p.id));
   const active = pickAccount(pool, app.providers, Date.now());
+  const now = Date.now();
+  const exhaustedUntil = (id: string) => (pool.exhausted[id]?.until ?? 0) > now ? pool.exhausted[id].until : undefined;
   const kind = (p: { cliProfile?: string; cliAuth?: string }) => t(p.cliProfile ? "cursorKindLogin" : p.cliAuth === "key" ? "cursorKindKey" : "cursorKindShared");
   return (
     <div className="card">
@@ -32,8 +34,9 @@ export function CursorPool() {
         <div className="card-row" key={p!.id}>
           <div className="grow">
             <div className="t">{i + 1}. {p!.name}</div>
-            <div className="d">{kind(p!)}{active.ok && active.id === p!.id ? ` · ${t("cursorPoolActive")}` : ""}</div>
+            <div className="d">{kind(p!)}{active.ok && active.id === p!.id ? ` · ${t("cursorPoolActive")}` : ""}{exhaustedUntil(p!.id) ? ` · ${t("cursorPoolExhausted", { time: t.date(exhaustedUntil(p!.id)!) })}` : ""}</div>
           </div>
+          {exhaustedUntil(p!.id) && <button className="btn-soft" onClick={() => updatePool((s) => markAvailable(s, p!.id))}>{t("cursorPoolMarkAvailable")}</button>}
           <button className="icon-btn" disabled={i === 0} title={t("moveUp")} onClick={() => updatePool((s) => moveInPool(s, p!.id, -1))}><ArrowUp size={14} /></button>
           <button className="icon-btn" disabled={i === members.length - 1} title={t("moveDown")} onClick={() => updatePool((s) => moveInPool(s, p!.id, 1))}><ArrowDown size={14} /></button>
           <button className="icon-btn" title={t("cursorPoolRemove")} onClick={() => updatePool((s) => removeFromPool(s, p!.id))}><X size={14} /></button>

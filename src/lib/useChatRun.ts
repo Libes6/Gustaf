@@ -8,7 +8,7 @@ import { beginApproval } from "./attention";
 import type { LiveStats } from "../components/LiveMeter";
 import { useT } from "../i18n";
 import { getAdapter } from "../providers";
-import { resolveAccount, setActive } from "../providers/cursorAccounts";
+import { classifyQuota, exhaustedUntil, markExhausted, pickAccount, resolveAccount, setActive, type Quota } from "../providers/cursorAccounts";
 import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
 import { type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
@@ -99,6 +99,7 @@ export function useChatRun(o: Options) {
     if ((!retry && !body && !imgs.length) || running || !loaded || abortRef.current) return;
     if (!provider || !app.selection) return app.openSettings("providers");
     let activeProvider: ProviderConfig = provider;
+    let allBlocked = false;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
     let activeModel = app.selection.model;
     setError("");
@@ -167,6 +168,7 @@ export function useChatRun(o: Options) {
         // Account rotation: the pool decides which Cursor account (and so which isolated profile) serves this message.
         const { pool, providers } = await loadPool();
         const r = resolveAccount({ pool, providers, models: app.models, selected: activeProvider, model: activeModel, now: Date.now() });
+        if (!r.ok) allBlocked = true;
         if (!r.ok) throw new Error(r.earliest ? t("cursorAllExhausted", { time: t.date(r.earliest) }) : t("cursorAllExhaustedUnknown"));
         activeProvider = r.provider;
         activeModel = r.model;
@@ -229,7 +231,14 @@ export function useChatRun(o: Options) {
         const mid = await addMessage(chatId, partial);
         setMessages(ms => [...ms, { ...partial, id: mid, chat_id: chatId!, created_at: Date.now() }]);
       }
-      if (!ctl.signal.aborted) { const message = String(e?.message ?? e); setError(message); app.recordProviderResult(activeProvider.id, message); }
+      if (!ctl.signal.aborted) {
+        let message = String(e?.message ?? e);
+        // Quota exhausted on a Cursor account: park it until its reset (the next message goes to the next account).
+        const quota = !allBlocked && activeProvider.cli === "cursor-agent" ? classifyQuota(message, Date.now()) : null;
+        if (quota) message += await parkExhausted(activeProvider, quota, message);
+        setError(message);
+        app.recordProviderResult(activeProvider.id, message);
+      }
     } finally {
       if (reviewRef.current && !retryRef.current) { await review.finish(reviewRef.current.id).catch(e => setError(String(e))); reviewRef.current = null; }
       abortRef.current = null;
@@ -243,6 +252,16 @@ export function useChatRun(o: Options) {
       app.reload();
       bumpTick();
     }
+  }
+
+  /** Marks a Cursor account exhausted until the reset time and describes who serves the next message. */
+  async function parkExhausted(account: ProviderConfig, quota: Quota, reason: string) {
+    const until = exhaustedUntil(quota, Date.now());
+    const pool = await updatePool(p => markExhausted(p, account.id, until, reason));
+    if (!pool.ids.includes(account.id)) return "";
+    const next = pickAccount(pool, app.providers, Date.now());
+    const to = next.ok && next.id !== account.id ? app.providers.find(p => p.id === next.id) : undefined;
+    return `\n\n${t("cursorQuotaExhausted", { name: account.name, time: t.date(until) })} ${to ? t("cursorQuotaNext", { to: to.name }) : next.ok ? "" : next.earliest ? t("cursorAllExhausted", { time: t.date(next.earliest) }) : t("cursorAllExhaustedUnknown")}`;
   }
 
   /** Re-runs the last request after a failure (resuming from the completed steps when there are any). */
