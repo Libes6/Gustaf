@@ -30,7 +30,7 @@ const BRANCH_PREFIX: &str = "gustaf/";
 /// Serialises create / remove / prune: they share branch names, the managed directory and git's own locks.
 static STORE_LOCK: Mutex<()> = Mutex::new(());
 
-fn err(code: &str, msg: impl std::fmt::Display) -> String {
+pub(crate) fn err(code: &str, msg: impl std::fmt::Display) -> String {
     format!("{code}: {msg}")
 }
 
@@ -44,12 +44,12 @@ where
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-struct Meta {
-    task_id: String,
-    root: String,
-    branch: String,
-    base_commit: String,
-    base_branch: Option<String>,
+pub(crate) struct Meta {
+    pub(crate) task_id: String,
+    pub(crate) root: String,
+    pub(crate) branch: String,
+    pub(crate) base_commit: String,
+    pub(crate) base_branch: Option<String>,
     created_at: u64,
     provider: Option<String>,
     model: Option<String>,
@@ -146,14 +146,14 @@ fn fnv(text: &str) -> String {
     format!("{h:016x}")
 }
 
-struct Repo {
+pub(crate) struct Repo {
     /// Toplevel of the checkout `root` is in.
-    top: PathBuf,
+    pub(crate) top: PathBuf,
     /// `<store>/<hash>`: everything Gustaf manages for this repository.
-    managed: PathBuf,
+    pub(crate) managed: PathBuf,
 }
 
-fn open_repo(store: &Path, root: &str) -> Result<Repo, String> {
+pub(crate) fn open_repo(store: &Path, root: &str) -> Result<Repo, String> {
     let base = canonical_root(root).map_err(|e| err("invalid_root", e))?;
     match run_git(&base, ["rev-parse", "--is-bare-repository"]) {
         Err(_) => return Err(err("not_a_git_repo", "the project folder is not inside a git repository")),
@@ -191,7 +191,7 @@ fn write_meta(repo: &Repo, meta: &Meta) -> Result<(), String> {
     })
 }
 
-fn read_meta(repo: &Repo, id: &str) -> Result<Meta, String> {
+pub(crate) fn read_meta(repo: &Repo, id: &str) -> Result<Meta, String> {
     check_task_id(id)?;
     let text = fs::read_to_string(meta_path(repo, id)).map_err(|_| err("not_found", format!("no workspace for task {id}")))?;
     let meta: Meta = serde_json::from_str(&text).map_err(|e| err("not_found", format!("unreadable metadata for task {id}: {e}")))?;
@@ -216,7 +216,7 @@ fn all_meta(repo: &Repo) -> Vec<Meta> {
 }
 
 /// The checkout directory when it is a real (non-symlink) direct child of the managed dir; `None` when absent.
-fn safe_existing_dir(repo: &Repo, id: &str) -> Result<Option<PathBuf>, String> {
+pub(crate) fn safe_existing_dir(repo: &Repo, id: &str) -> Result<Option<PathBuf>, String> {
     let path = work_path(repo, id);
     let Ok(md) = fs::symlink_metadata(&path) else { return Ok(None) };
     if md.file_type().is_symlink() || !md.is_dir() {
@@ -230,11 +230,11 @@ fn safe_existing_dir(repo: &Repo, id: &str) -> Result<Option<PathBuf>, String> {
     Ok(Some(path))
 }
 
-fn ref_exists(dir: &Path, name: &str) -> bool {
+pub(crate) fn ref_exists(dir: &Path, name: &str) -> bool {
     run_git(dir, ["rev-parse", "--verify", "-q", &format!("{name}^{{commit}}")]).is_ok()
 }
 
-fn local_branch_exists(dir: &Path, branch: &str) -> bool {
+pub(crate) fn local_branch_exists(dir: &Path, branch: &str) -> bool {
     run_git(dir, ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")]).is_ok()
 }
 
@@ -249,7 +249,7 @@ fn unique_branch(top: &Path, slug: &str) -> Result<String, String> {
     Err(err("git_error", "no free branch name"))
 }
 
-fn now() -> u64 {
+pub(crate) fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
@@ -533,7 +533,7 @@ pub fn link_dirs(store: &Path, root: &str, task_id: &str, dirs: &[String]) -> Re
 // ---------------------------------------------------------------------------------------------
 // Commands
 
-fn store(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn store(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app.path().app_data_dir().map_err(|e| err("git_error", e))?.join("worktrees"))
 }
 

@@ -33,3 +33,4 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [scheduled-prompts.md](features/scheduled-prompts.md) | Prompts that run on a schedule while the app is open |
 | Agent | [computer-use.md](features/computer-use.md) | Computer Use (desktop control) |
 | UI | [accessibility.md](features/accessibility.md) | Keyboard, focus, semantics, contrast, motion and target size; regression tests; known gaps |
+| Agent | [merge-queue.md](features/merge-queue.md) | Early conflict detection (`git merge-tree`) and a merge queue for workspace worktrees: strategies, test hand-off, halting, state and locking; UI and conflict resolver not built |
