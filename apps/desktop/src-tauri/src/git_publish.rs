@@ -4,7 +4,7 @@
 //! shell), prompts are disabled (a missing credential fails with a message instead of hanging), output and run
 //! time are bounded, only the current branch is pushed to an existing, validated remote, and force is never
 //! used or accepted. Protected branches (`main`, `master`, `develop`, ...) need an explicit confirmation.
-use crate::git::{blocking, canonical_root, current_branch, repo_command, run_git, tail_chars};
+use crate::git::{blocking, canonical_root, current_branch, repo_command, run_git, run_git_capped, tail_chars, CommitContext, BIG_FILE};
 use serde::Serialize;
 use std::{
     io::Read,
@@ -341,6 +341,52 @@ pub fn create_pr(gh: Option<&Path>, root: &Path, title: &str, body: &str, base: 
 }
 
 // ---------------------------------------------------------------------------------------------
+// New branch (the protected-branch guard offers this before a push)
+
+/// Creates `name` at HEAD and switches to it. The commit stays on the branch it was made on too; nothing is
+/// moved, reset or pushed, and uncommitted changes come along.
+pub fn create_branch(root: &Path, name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if !valid_ref_name(root, name) || is_protected(name) {
+        return Err(format!("Invalid branch name: {name:?}"));
+    }
+    if run_git(root, ["rev-parse", "--verify", "-q", &format!("refs/heads/{name}")]).is_ok() {
+        return Err(format!("A branch named {name:?} already exists."));
+    }
+    run_git(root, ["switch", "-q", "-c", name])?;
+    Ok(name.to_string())
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pull request context
+
+/// What the branch adds over `base_ref` (a remote-tracking branch such as `origin/main`): changed files, diffstat,
+/// a bounded diff and the subjects of the new commits. Input for the pull request description.
+pub fn pr_context(root: &Path, base_ref: &str, max_bytes: usize) -> Result<CommitContext, String> {
+    let known = publish_info(root)?;
+    if !known.repo {
+        return Err("Not a git repository.".into());
+    }
+    if !known.remote_branches.iter().any(|b| b == base_ref) {
+        return Err(format!("Unknown base branch: {base_ref:?}"));
+    }
+    let full = format!("refs/remotes/{base_ref}");
+    let max = max_bytes.clamp(2_000, 200_000);
+    let range = format!("{full}...HEAD");
+    // textconv and external diff drivers are repository-configured commands; never run them.
+    let diff = |extra: &[&str]| -> Vec<String> {
+        ["-c", BIG_FILE, "diff", "--no-color", "--no-ext-diff", "--no-textconv"].iter().chain(extra).map(|s| s.to_string()).chain([range.clone(), "--".to_string()]).collect()
+    };
+    let files: Vec<String> = run_git(root, diff(&["--name-only"]))?.lines().take(200).map(String::from).collect();
+    let (stat, _) = run_git_capped(root, diff(&["--stat=100,60,40"]), 4_000, &[0])?;
+    let (text, truncated) = run_git_capped(root, diff(&["--unified=2"]), max, &[0])?;
+    let recent = run_git(root, ["log", "-n", "30", "--format=%s", "--no-color", "--no-show-signature", &format!("{full}..HEAD")])
+        .map(|out| out.lines().map(|l| l.chars().take(200).collect::<String>()).filter(|l| !l.trim().is_empty()).collect())
+        .unwrap_or_default();
+    Ok(CommitContext { files, stat, diff: text, truncated, recent })
+}
+
+// ---------------------------------------------------------------------------------------------
 // Commands
 
 /// Remotes, upstream, ahead/behind, remote branches and whether the current branch is protected.
@@ -349,10 +395,22 @@ pub async fn git_publish_info(root: String) -> Result<PublishInfo, String> {
     blocking(move || publish_info(&canonical_root(&root)?)).await
 }
 
+/// Creates a branch at HEAD and switches to it (before pushing, to keep a protected branch untouched on the remote).
+#[tauri::command]
+pub async fn git_create_branch(root: String, name: String) -> Result<String, String> {
+    blocking(move || create_branch(&canonical_root(&root)?, &name)).await
+}
+
 /// Pushes the current branch (never force) to an existing remote.
 #[tauri::command]
 pub async fn git_push(root: String, remote: String, branch: String, set_upstream: bool, confirm_protected: Option<bool>) -> Result<PushResult, String> {
     blocking(move || push(&canonical_root(&root)?, &remote, &branch, set_upstream, confirm_protected.unwrap_or(false))).await
+}
+
+/// Bounded diff, diffstat and commit subjects of the current branch against a remote-tracking base branch.
+#[tauri::command]
+pub async fn git_pr_context(root: String, base_ref: String, max_bytes: Option<usize>) -> Result<CommitContext, String> {
+    blocking(move || pr_context(&canonical_root(&root)?, &base_ref, max_bytes.unwrap_or(24_000))).await
 }
 
 /// Whether `gh` is installed and signed in (bounded by a timeout).
@@ -511,6 +569,34 @@ mod tests {
         g(&f.root, &["commit", "-q", "-am", "local work"]);
         let e = push(&f.root, "origin", "main", false, true).err().unwrap();
         assert!(e.contains("never force-pushes"), "{e}");
+    }
+
+    #[test]
+    fn pr_context_covers_the_branch_against_a_known_base_only() {
+        let f = fx();
+        push(&f.root, "origin", "main", true, true).unwrap();
+        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        fs::write(f.root.join("b.txt"), "new\n").unwrap();
+        g(&f.root, &["add", "."]);
+        g(&f.root, &["commit", "-q", "-m", "Add b"]);
+        let ctx = pr_context(&f.root, "origin/main", 24_000).unwrap();
+        assert_eq!(ctx.files, ["b.txt"]);
+        assert!(ctx.diff.contains("+new") && ctx.stat.contains("b.txt") && !ctx.truncated);
+        assert_eq!(ctx.recent, ["Add b"]);
+        for bad in ["origin/nope", "--output=x", "HEAD", "main"] {
+            assert!(pr_context(&f.root, bad, 24_000).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn creates_a_branch_for_the_commit_and_refuses_bad_or_existing_names() {
+        let f = fx();
+        assert_eq!(create_branch(&f.root, "mcode/new").unwrap(), "mcode/new");
+        assert_eq!(current_branch(&f.root).as_deref(), Some("mcode/new"));
+        for bad in ["", "--orphan", "a..b", "main", "mcode/new", "x y"] {
+            assert!(create_branch(&f.root, bad).is_err(), "{bad:?}");
+        }
+        assert_eq!(current_branch(&f.root).as_deref(), Some("mcode/new"));
     }
 
     #[test]

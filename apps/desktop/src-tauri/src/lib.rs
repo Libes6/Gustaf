@@ -68,6 +68,8 @@ pub fn run() {
             git::git_commit,
             git_publish::git_publish_info,
             git_publish::git_push,
+            git_publish::git_create_branch,
+            git_publish::git_pr_context,
             git_publish::gh_status,
             git_publish::git_create_pr,
             review::review_prepare,

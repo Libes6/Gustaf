@@ -82,7 +82,7 @@ const MAX_UNTRACKED_DIFFS: usize = 20;
 const RECENT_SUBJECTS: usize = 8;
 const DEFAULT_DIFF_BYTES: usize = 24_000;
 /// Files above this size are diffed as "Binary files differ", so one huge file cannot flood memory.
-const BIG_FILE: &str = "core.bigFileThreshold=1m";
+pub(crate) const BIG_FILE: &str = "core.bigFileThreshold=1m";
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -213,7 +213,7 @@ where
 
 /// Runs git and keeps at most `cap` bytes of its output: when there is more, git is killed and the flag is
 /// set. Succeeds when git exits with one of `ok_codes` (or was cut off), otherwise returns its error text.
-fn run_git_capped<I, S>(root: &Path, args: I, cap: usize, ok_codes: &[i32]) -> Result<(String, bool), String>
+pub(crate) fn run_git_capped<I, S>(root: &Path, args: I, cap: usize, ok_codes: &[i32]) -> Result<(String, bool), String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,

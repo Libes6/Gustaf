@@ -9,6 +9,7 @@ import { getAdapter } from "../providers";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget } from "../lib/modelRouting";
 import { useDialogFocus } from "../lib/useDialogFocus";
+import { GitPublishPanel } from "./GitPublishPanel";
 import { useApp } from "../state";
 import "../styles/gitCommit.css";
 
@@ -24,7 +25,8 @@ const KIND_LETTER: Record<GitFileKind, string> = { modified: "M", added: "A", de
 /**
  * Commit dialog for the project's repository: pick files (the ones accepted in review are pre-selected),
  * write or generate a message with the model selected in the composer, optionally create a branch first.
- * Only the ticked files are committed; hooks run as usual and nothing is pushed.
+ * Only the ticked files are committed; hooks run as usual. Nothing is pushed automatically: after the commit the
+ * dialog offers Push and Create pull request (GitPublishPanel), each an explicit click.
  */
 export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root: string; accepted: string[]; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
   const t = useT();
@@ -40,6 +42,7 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
   const [committing, setCommitting] = useState(false);
   const [branch, setBranch] = useState({ create: false, name: "" });
   const [error, setError] = useState("");
+  const [done, setDone] = useState<CommitResult | null>(null);
   const generation = useRef<AbortController | null>(null);
 
   const selection = app.selection;
@@ -126,7 +129,9 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
     setCommitting(true);
     setError("");
     try {
-      onCommitted(await gitRepo.commit(root, message, [...selected], branch.create ? branchName : null));
+      const result = await gitRepo.commit(root, message, [...selected], branch.create ? branchName : null);
+      setDone(result);
+      onCommitted(result);
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
@@ -162,14 +167,15 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
     <div className="review-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !committing) onClose(); }}>
       <section ref={dialogRef} className="review-dialog git-dialog" role="dialog" aria-modal="true" aria-label={t("gitCommitTitle")}>
         <header>
-          <strong>{t("gitCommitTitle")}</strong>
+          <strong>{done ? t("gitCommitDone") : t("gitCommitTitle")}</strong>
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose} disabled={committing}><X size={17} /></button>
         </header>
         <div className="git-body">
-          {!status && !loadError && <div className="git-state"><Loader2 size={14} className="spin" /> {t("gitLoading")}</div>}
-          {loadError && <div className="error-box git-error" role="alert">{loadError}</div>}
-          {status && !status.repo && <div className="git-state">{t("gitNotRepo")}</div>}
-          {status?.repo && (
+          {done && <GitPublishPanel root={root} message={message} />}
+          {!done && !status && !loadError && <div className="git-state"><Loader2 size={14} className="spin" /> {t("gitLoading")}</div>}
+          {!done && loadError && <div className="error-box git-error" role="alert">{loadError}</div>}
+          {!done && status && !status.repo && <div className="git-state">{t("gitNotRepo")}</div>}
+          {!done && status?.repo && (
             <>
               <div className="git-state">
                 <GitBranch size={14} aria-label={t("gitBranchLabel")} />
@@ -219,14 +225,19 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
             </>
           )}
         </div>
-        {error && <div className="error-box git-error git-error-foot" role="alert">{error}</div>}
-        <div className="review-actions git-actions">
+        {error && !done && <div className="error-box git-error git-error-foot" role="alert">{error}</div>}
+        {done ? (
+          <div className="review-actions git-actions">
+            <span className="git-note muted grow">{t("gitPublishNote")}</span>
+            <button className="btn btn-primary" onClick={onClose}>{t("gitDone")}</button>
+          </div>
+        ) : <div className="review-actions git-actions">
           <span className="git-note muted grow">{problemText || t("gitSafetyNote")}</span>
           <button className="btn btn-ghost" onClick={onClose} disabled={committing}>{t("cancel")}</button>
           <button className="btn btn-primary" disabled={!!problem || busy} onClick={commit}>
             {committing && <Loader2 size={13} className="spin" />} {committing ? t("gitCommitting") : t("gitCommitButton", { count: selected.size })}
           </button>
-        </div>
+        </div>}
       </section>
     </div>,
     document.body,
