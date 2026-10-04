@@ -40,7 +40,7 @@ function agentState(status: unknown): SubagentState | undefined {
 const COLLAB_ACTIONS: Record<string, SubagentInfo['action'] | 'list'> = {
   spawnagent: 'spawn', spawn: 'spawn',
   wait: 'wait', waitagent: 'wait',
-  sendinput: 'send', sendmessage: 'send', followuptask: 'send', resumeagent: 'send',
+  sendinput: 'send', sendmessage: 'progress', followuptask: 'send', resumeagent: 'send',
   closeagent: 'close', interruptagent: 'close',
   listagents: 'list',
 };
@@ -102,11 +102,22 @@ function taskNotice(text: string): Activity | null {
 /** What a subagent just did, from one of its own `tool_use` blocks. */
 const stepOf = (name: string, input: Json) => brief(`${name} ${str(input.command ?? input.file_path ?? input.path ?? input.pattern ?? input.description ?? input.query ?? input.url ?? '')}`, 90);
 
-/** An entry read from a rollout file (providers/codexRollout.ts) is authoritative: its state and counters replace the old ones. */
+/** Rollout counters are cumulative; a lagging file must not reopen a terminal stream event. */
 function applyScan(actions: Map<string, Activity>, next: Activity, patch: SubagentInfo): Activity {
   const key = actions.has(next.id) ? next.id : [...actions].find(([, a]) => patch.agentId && a.subagent?.agentId === patch.agentId)?.[0] ?? next.id;
-  const old = actions.get(key);
-  const info: SubagentInfo = { ...old?.subagent, ...patch, title: patch.title || old?.subagent?.title || '', prompt: patch.prompt ?? old?.subagent?.prompt, result: patch.result ?? old?.subagent?.result };
+  const aliases = [...actions].filter(([id, a]) => id !== key && patch.agentId && a.subagent?.agentId === patch.agentId);
+  let old = actions.get(key) ?? aliases[0]?.[1];
+  for (const [, alias] of aliases) {
+    if (alias.subagent && isTerminal(alias.subagent.state) && (!old?.subagent?.turnStartedAt || (alias.subagent.endedAt ?? Infinity) >= old.subagent.turnStartedAt)) {
+      old = { ...old, ...alias, subagent: { ...old?.subagent, ...alias.subagent } };
+    }
+  }
+  for (const [id] of aliases) actions.delete(id);
+  const previous = old?.subagent;
+  const newerTurn = patch.turnStartedAt !== undefined && previous?.endedAt !== undefined && patch.turnStartedAt > previous.endedAt;
+  const staleTerminal = previous?.turnStartedAt !== undefined && patch.endedAt !== undefined && patch.endedAt < previous.turnStartedAt;
+  const state = previous && ((isTerminal(previous.state) && !isTerminal(patch.state) && !newerTurn) || staleTerminal) ? previous.state : patch.state;
+  const info: SubagentInfo = { ...previous, ...patch, state, turnStartedAt: Math.max(previous?.turnStartedAt ?? 0, patch.turnStartedAt ?? 0) || undefined, ...(state !== patch.state ? { endedAt: previous?.endedAt, durationMs: previous?.durationMs, step: undefined } : {}), title: patch.title || old?.subagent?.title || '', prompt: patch.prompt ?? old?.subagent?.prompt, result: patch.result ?? old?.subagent?.result };
   const merged: Activity = { ...old, ...next, id: key, name: old?.name || next.name || 'subagent', status: statusOf(info.state), output: next.output ?? old?.output, subagent: info };
   actions.set(key, merged);
   return merged;
@@ -148,7 +159,7 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     key = [...actions].find(([, a]) => a.subagent?.action === 'scan' && a.subagent.agentId === patch.agentId)?.[0] ?? next.id;
   }
   if (patch.action !== 'spawn' && patch.action !== 'task' && patch.action !== 'progress' && patch.agentId) {
-    key = [...actions].find(([, a]) => a.subagent?.agentId === patch.agentId || (!!a.subagent?.bgId && a.subagent.bgId === patch.agentId))?.[0] ?? next.id;
+    key = [...actions].find(([, a]) => a.subagent?.agentId === patch.agentId || a.subagent?.agentPath === patch.agentId || (!!a.subagent?.bgId && a.subagent.bgId === patch.agentId))?.[0] ?? next.id;
   }
   const old = actions.get(key);
   const p = old?.subagent;
@@ -156,11 +167,13 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
   const state: SubagentState = !p ? patch.state : progress || (isTerminal(p.state) && patch.action !== 'send') ? p.state : patch.state;
   const info: SubagentInfo = {
     ...p, ...patch,
-    agentId: patch.agentId || p?.agentId || '',
+    agentId: p?.agentPath === patch.agentId ? p.agentId : patch.agentId || p?.agentId || '',
     title: p?.title || patch.title,
     role: p?.role ?? patch.role,
     action: progress && p ? p.action : patch.action,
     state,
+    ...(patch.action === 'send' && !isTerminal(state) ? { turnStartedAt: Date.now() } : {}),
+    ...(isTerminal(state) ? { endedAt: patch.endedAt ?? p?.endedAt ?? Date.now() } : patch.action === 'send' ? { endedAt: undefined, durationMs: undefined } : {}),
     prompt: p?.prompt ?? patch.prompt,
     result: patch.result ?? p?.result,
     ...((p?.waits ?? 0) + (patch.waits ?? 0) ? { waits: (p?.waits ?? 0) + (patch.waits ?? 0) } : {}),

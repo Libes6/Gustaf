@@ -221,8 +221,8 @@ button.row, button.section-title { width: 100%; text-align: left; }
   max-width: 80%; white-space: pre-wrap; word-wrap: break-word;
 }
 /* Pictures sit above the text bubble with no bubble background or padding: rounded corners only. */
-.msg-user .msg-images { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 80%; }
-.msg-user .msg-images img { display: block; min-width: 0; max-width: min(240px, 100%); max-height: 320px; border-radius: 12px; }
+.msg-user .msg-images { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: 6px; max-width: 80%; }
+.msg-user .msg-images img { display: block; flex: 0 0 auto; width: auto; height: auto; min-width: 0; max-width: min(240px, 100%); max-height: 320px; object-fit: contain; border-radius: 12px; }
 .msg-assistant { margin: 12px 0; font-size: 14px; line-height: 1.6; }
 .msg-tools { margin: 6px 0; }
 .msg-actions { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .12s; }
@@ -337,7 +337,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .image-viewer-backdrop { position: absolute; inset: 0; }
 .image-viewer img { position: relative; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; cursor: default; }
 .image-viewer-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-active); color: inherit; }
-.attach img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; display: block; }
+.attach img { width: 48px; height: 48px; object-fit: contain; border-radius: 8px; display: block; }
 .attach button { position: absolute; top: -6px; right: -6px; background: var(--bg-active); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; }
 .mention-list { position: absolute; bottom: calc(100% + 6px); left: 0; width: 420px; max-height: 260px; overflow-y: auto; }
 
@@ -678,6 +678,20 @@ button:disabled { cursor:default; opacity:.45; }
 .branch-bar p, .branch-picker p { max-width: 70ch; font-size: 12px; }
 .branch-picker { padding: 16px; border-bottom: 1px solid var(--border); }
 
-.queue-panel { max-height: 30vh; overflow-y: auto; padding: 8px 16px; border-top: 1px solid var(--border); }
-.queue-panel > div { margin-top: 8px; }
-.queue-panel textarea { width: 100%; min-height: 44px; resize: vertical; }
+.queue-panel { margin: 0 16px 6px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; min-width: 0; }
+.queue-header, .queue-row, .queue-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.queue-header { justify-content: space-between; flex-wrap: wrap; }
+.queue-count { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.queue-controls { flex-wrap: wrap; }
+.queue-panel .chip { font-size: 11px; padding: 4px 6px; }
+.queue-list { max-height: 160px; overflow-y: auto; }
+.queue-row { min-height: 30px; }
+.queue-index { color: var(--text-3); width: 14px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.queue-preview { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.queue-attachments { color: var(--text-3); flex-shrink: 0; }
+.queue-icon { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 6px; color: var(--text-3); }
+.queue-icon:hover, .queue-icon:focus-visible { color: var(--text); background: var(--bg-hover); }
+.queue-editor { padding: 4px 0 6px 20px; }
+.queue-editor textarea { width: 100%; min-height: 54px; resize: vertical; }
+.queue-editor > .queue-controls { justify-content: flex-end; }
+.queue-recovery { margin: 4px 0; color: var(--text-3); }

@@ -56,7 +56,7 @@ pub struct Tokens {
 pub struct Agent {
     /// The agent's thread id; `pending:<parent>:<task>` while only the `spawn_agent` call exists.
     pub id: String,
-    /// Stable across polls (the pending entry and the later thread are the same agent): `<parent thread>:<task name>`, else the thread id.
+    /// Stable across polls (pending and later thread share one entry): `<parent thread>:<original task name>`, else the thread id.
     pub key: String,
     pub thread_id: Option<String>,
     pub parent_thread_id: String,
@@ -71,6 +71,7 @@ pub struct Agent {
     /// by the parent ending its turn) or the agent never wrote an end; it is not a failure.
     pub state: String,
     pub started_at_ms: Option<i64>,
+    pub turn_started_at_ms: Option<i64>,
     pub ended_at_ms: Option<i64>,
     pub duration_ms: Option<i64>,
     pub last_message: Option<String>,
@@ -267,6 +268,8 @@ struct Meta {
 struct Spawn {
     call_id: String,
     task_name: String,
+    /// The arguments name is stable even when the result adds a canonical /root/ prefix.
+    key_task: String,
     message: String,
     ts: Option<i64>,
 }
@@ -289,6 +292,9 @@ impl Life {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Control { call_id: String, target: String, name: String, life: Option<Life>, ts: Option<i64> }
+
 #[derive(Debug, Default)]
 struct FileState {
     offset: u64,
@@ -297,6 +303,8 @@ struct FileState {
     meta: Option<Meta>,
     start_ordinal: i64,
     spawns: Vec<Spawn>,
+    controls: Vec<Control>,
+    turn_started_ms: Option<i64>,
     life: Life,
     first_started_ms: Option<i64>,
     ended_ms: Option<i64>,
@@ -381,6 +389,7 @@ fn ingest(st: &mut FileState, line: &str) {
             let started = secs_to_ms(&p["started_at"]).or(ts);
             st.life = Life::Started;
             st.first_started_ms = st.first_started_ms.or(started);
+            st.turn_started_ms = started;
             st.ended_ms = None;
             st.duration_ms = None;
             st.error = None;
@@ -421,12 +430,19 @@ fn ingest(st: &mut FileState, line: &str) {
             st.step = Some(describe_step(name, p["input"].as_str().unwrap_or("")));
         }
         ("response_item", "function_call") => {
-            let name = p["name"].as_str().unwrap_or("");
+            let name = p["name"].as_str().unwrap_or("").rsplit(['.', ':']).next().unwrap_or("");
+            if ["interrupt_agent", "close_agent", "followup_task", "resume_agent", "send_input"].contains(&name) {
+                let a: Value = p["arguments"].as_str().and_then(|x| serde_json::from_str(x).ok()).unwrap_or(Value::Null);
+                if let Some(target) = s(&a["target"]).or_else(|| s(&a["id"])) {
+                    st.controls.push(Control { call_id: p["call_id"].as_str().unwrap_or("").into(), target, name: name.into(), life: None, ts });
+                }
+            }
             if name == "spawn_agent" {
                 let a: Value = p["arguments"].as_str().and_then(|x| serde_json::from_str(x).ok()).unwrap_or(Value::Null);
                 if let Some(task_name) = s(&a["task_name"]).or_else(|| s(&a["name"])) {
                     st.spawns.push(Spawn {
                         call_id: p["call_id"].as_str().unwrap_or("").to_string(),
+                        key_task: task_name.clone(),
                         task_name,
                         message: clip(&redact(&s(&a["message"]).or_else(|| s(&a["prompt"])).unwrap_or_default()), SUMMARY_CHARS),
                         ts,
@@ -440,6 +456,23 @@ fn ingest(st: &mut FileState, line: &str) {
         ("response_item", "function_call_output") => {
             // The call's own answer names the task it created (it wins over the arguments).
             let call = p["call_id"].as_str().unwrap_or("");
+            if let Some(c) = st.controls.iter_mut().find(|x| !x.call_id.is_empty() && x.call_id == call) {
+                let text = output_text(&p["output"]);
+                if let Ok(o) = serde_json::from_str::<Value>(&text) {
+                    if !o["error"].is_null() || o["is_error"].as_bool() == Some(true) { return; }
+                    // Interrupt returns the PREVIOUS status: only an active turn was actually interrupted.
+                    let previous = &o["previous_status"];
+                    let status = previous.as_str().or_else(|| previous.as_object().and_then(|m| m.keys().next().map(String::as_str)));
+                    c.life = match status {
+                        Some("completed") => Some(Life::Complete),
+                        Some("errored" | "failed") => Some(Life::Error),
+                        Some("interrupted" | "shutdown") => Some(Life::Aborted),
+                        Some("running" | "pendingInit" | "pending_init") if c.name == "interrupt_agent" || c.name == "close_agent" => Some(Life::Aborted),
+                        _ => None,
+                    };
+                    c.ts = ts.or(c.ts);
+                }
+            }
             if let Some(sp) = st.spawns.iter_mut().find(|x| !x.call_id.is_empty() && x.call_id == call) {
                 let text = output_text(&p["output"]);
                 if let Some(t) = serde_json::from_str::<Value>(&text).ok().and_then(|o| s(&o["task_name"])) {
@@ -682,7 +715,14 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         }
         // An agent that never wrote an end is over when the parent's turn is (Codex interrupts its children then, usually a
         // second later and not always at all), and when nothing was written since before this run began (an earlier turn's).
-        let (life, ended_ms) = if !st.life.open() {
+        let control = node_of.get(&parent).and_then(|pp| cache.get(pp)).and_then(|pst| pst.controls.iter().rev().find(|c| {
+            c.life.is_some() && (c.target == m.id || m.agent_path.as_deref() == Some(c.target.as_str()) || spawn.is_some_and(|sp| task_matches(&c.target, &sp.task_name)))
+                && c.ts.zip(st.turn_started_ms).is_none_or(|(at, start)| at >= start)
+                && c.ts.zip(st.ended_ms).is_none_or(|(at, end)| at >= end)
+        }));
+        let (life, ended_ms) = if let Some(c) = control {
+            (c.life.unwrap_or(st.life), c.ts)
+        } else if !st.life.open() {
             (st.life, st.ended_ms)
         } else if let (true, Some(end)) = (parent_over && parent == thread_id, parent_end_ms) {
             (Life::Aborted, Some(end))
@@ -704,7 +744,7 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
             started.unwrap_or(0),
             Agent {
                 id: m.id.clone(),
-                key: spawn.map(|x| format!("{parent}:{}", x.task_name)).unwrap_or_else(|| m.id.clone()),
+                key: spawn.map(|x| format!("{parent}:{}", x.key_task)).unwrap_or_else(|| m.id.clone()),
                 thread_id: Some(m.id.clone()),
                 parent_thread_id: parent,
                 depth: m.depth,
@@ -715,6 +755,7 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                 message: spawn.map(|x| x.message.clone()).filter(|x| !x.is_empty()),
                 state: state.into(),
                 started_at_ms: started,
+                turn_started_at_ms: st.turn_started_ms,
                 ended_at_ms: ended_ms,
                 duration_ms: st.duration_ms,
                 last_message: st.last_message.clone(),
@@ -737,11 +778,12 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                 continue;
             }
             let over = parent_over && owner == thread_id;
+            let control = cache[p].controls.iter().rev().find(|c| c.life.is_some() && task_matches(&c.target, &sp.task_name));
             agents.push((
                 sp.ts.unwrap_or(i64::MAX),
                 Agent {
                     id: format!("pending:{owner}:{}", sp.task_name),
-                    key: format!("{owner}:{}", sp.task_name),
+                    key: format!("{owner}:{}", sp.key_task),
                     thread_id: None,
                     parent_thread_id: owner.clone(),
                     depth: 1,
@@ -750,9 +792,10 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                     task_name: Some(sp.task_name.clone()),
                     role: None,
                     message: Some(sp.message.clone()).filter(|x| !x.is_empty()),
-                    state: if over { "stopped" } else { "starting" }.into(),
+                    state: match control.and_then(|c| c.life) { Some(Life::Complete) => "completed", Some(Life::Error) => "failed", Some(Life::Aborted) => "stopped", _ if over => "stopped", _ => "starting" }.into(),
                     started_at_ms: sp.ts,
-                    ended_at_ms: if over { parent_end_ms } else { None },
+                    turn_started_at_ms: None,
+                    ended_at_ms: control.and_then(|c| c.ts).or(if over { parent_end_ms } else { None }),
                     duration_ms: None,
                     last_message: None,
                     error: None,
@@ -1224,4 +1267,61 @@ mod tests {
         // The card of the spawn call goes on with the newer thread.
         assert_eq!(r.agents[0].key, format!("{PARENT}:alpha_task"));
     }
+    fn interrupt(call: &str, target: &str, previous: Value, ord: i64) -> Vec<String> {
+        vec![
+            serde_json::json!({"timestamp":"2026-01-05T10:01:00.000Z","ordinal":ord,"type":"response_item","payload":{"type":"function_call","name":"collaboration.interrupt_agent","arguments":serde_json::json!({"target":target}).to_string(),"call_id":call}}).to_string(),
+            serde_json::json!({"timestamp":"2026-01-05T10:01:01.000Z","ordinal":ord+1,"type":"response_item","payload":{"type":"function_call_output","call_id":call,"output":serde_json::json!({"previous_status":previous}).to_string()}}).to_string(),
+        ]
+    }
+
+    #[test]
+    fn interrupt_response_settles_originals_while_replacements_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta(), parent_started(1)];
+        lines.extend(spawn("s1", "context", "original", 2));
+        lines.extend(spawn("s2", "branching", "original", 4));
+        lines.extend(spawn("s3", "queue", "original", 6));
+        put(dir.path(), PARENT, &lines);
+        let child = put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/context", 1, 0), started(1, 1767607205), exec(2, "ls"), tokens(3, 1000, 50)]);
+        let mut cache = Cache::new();
+        assert!(scan(dir.path(), &mut cache).agents.iter().all(|a| a.state == "running" || a.state == "starting"));
+        for (i, task) in ["context", "branching", "queue"].iter().enumerate() {
+            lines.extend(interrupt(&format!("i{i}"), &format!("/root/{task}"), Value::String("running".into()), 8 + i as i64 * 2));
+            lines.extend(spawn(&format!("r{i}"), &format!("{task}_resume"), "replacement", 20 + i as i64 * 2));
+        }
+        put(dir.path(), PARENT, &lines);
+        let r = scan(dir.path(), &mut cache);
+        assert_eq!(r.agents.len(), 6);
+        assert_eq!(r.agents.iter().filter(|a| a.state == "stopped").count(), 3);
+        assert_eq!(r.agents.iter().filter(|a| a.state == "starting").count(), 3);
+        let a = r.agents.iter().find(|a| a.thread_id.as_deref() == Some(C1)).unwrap();
+        assert_eq!((a.tool_uses, a.tokens.total), (1, 1050));
+        assert_eq!(a.ended_at_ms, Some(1767607261000));
+        // An unchanged child's file does not undo the parent's interruption.
+        assert_eq!(scan(dir.path(), &mut cache), r);
+        append(&child, &[started(4, 1767607300)]);
+        let r = scan(dir.path(), &mut cache);
+        assert_eq!(r.agents.iter().find(|a| a.thread_id.as_deref() == Some(C1)).unwrap().state, "running");
+    }
+
+    #[test]
+    fn canonical_spawn_result_keeps_pending_key_and_completed_interrupt_stays_complete() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut lines = vec![parent_meta(), parent_started(1)];
+        let calls = spawn("s1", "context", "original", 2);
+        lines.push(calls[0].clone());
+        let parent = put(dir.path(), PARENT, &lines);
+        let mut cache = Cache::new();
+        let key = scan(dir.path(), &mut cache).agents[0].key.clone();
+        append(&parent, &[serde_json::json!({"timestamp":"2026-01-05T10:00:03.000Z","ordinal":3,"type":"response_item","payload":{"type":"function_call_output","call_id":"s1","output":serde_json::json!({"task_name":"/root/context"}).to_string()}}).to_string()]);
+        assert_eq!(scan(dir.path(), &mut cache).agents[0].key, key);
+        append(&parent, &interrupt("i1", "/root/context", serde_json::json!({"completed":"already finished"}), 4));
+        let a = &scan(dir.path(), &mut cache).agents[0];
+        assert_eq!((a.key.as_str(), a.state.as_str()), (key.as_str(), "completed"));
+        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/context", 1, 0), started(1, 1767607205)]);
+        let r = scan(dir.path(), &mut cache);
+        assert_eq!(r.agents.len(), 1);
+        assert_eq!((r.agents[0].key.as_str(), r.agents[0].state.as_str()), (key.as_str(), "completed"));
+    }
+
 }

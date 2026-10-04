@@ -175,3 +175,55 @@ test('canvas: a tsx-canvas fence becomes a card that renders in its sandboxed if
     await shown(page.locator('.canvas-source').getByText('Canvas says hi'));
   });
 });
+
+test('compact queue at narrow and wide widths: keyboard enqueue/edit/remove, clear, FIFO delivery', { skip: skipReason }, async () => {
+  await scenario(suite, 'compact-message-queue', { setup: ready }, async ({ page, backend, origin }) => {
+    const stream = backend.provider.reply({ text: 'First response finished', hold: true });
+    backend.provider.reply({ text: 'Queued response finished' });
+    await openApp(page, origin);
+    await ask(page, 'first request');
+    await shown(page.getByRole('button', { name: 'Stop', exact: true }));
+    const composer = page.getByRole('textbox', { name: 'Ask anything' });
+    await composer.fill('Long pending request '.repeat(40));
+    await composer.press('Enter');
+    const queue = page.getByRole('region', { name: 'Queued messages' });
+    await shown(queue);
+    assert.equal(await queue.getByRole('textbox').count(), 0, 'editors are hidden until requested');
+    assert.equal(await page.getByRole('button', { name: 'Send next', exact: true }).count(), 0);
+    for (const width of [600, 900, 1400]) {
+      await page.setViewportSize({ width, height: 900 });
+      if (process.env.QUEUE_SCREENSHOT && width === 600) await page.screenshot({ path: process.env.QUEUE_SCREENSHOT });
+      const box = await queue.boundingBox();
+      assert.ok(box.width <= width && box.height < 110, `queue stays compact at ${width}px`);
+      assert.equal(await queue.evaluate(el => el.scrollWidth <= el.clientWidth), true, 'no horizontal overflow');
+      for (const name of ['Edit queued message', 'Remove', 'Clear']) await shown(queue.getByRole('button', { name, exact: true }));
+    }
+    await queue.getByRole('button', { name: 'Edit queued message' }).click();
+    const editor = queue.getByRole('textbox');
+    await editor.fill('Edited pending request');
+    await editor.press('Shift+Enter');
+    await editor.press('Enter');
+    await gone(editor);
+    await shown(queue.getByText('Edited pending request', { exact: true }));
+    await composer.fill('remove this');
+    await composer.press('Enter');
+    await shown(queue.getByRole('status').filter({ hasText: '2' }));
+    await queue.getByRole('button', { name: 'Remove' }).last().focus();
+    await page.keyboard.press('Enter');
+    await shown(queue.getByRole('status').filter({ hasText: '1' }));
+    stream.release();
+    await shown(page.getByText('Queued response finished'));
+    await gone(queue);
+    assert.equal(backend.provider.chatBodies.at(-1).messages.at(-1).content.trim(), 'Edited pending request');
+    const held = backend.provider.reply({ text: 'Clear test finished', hold: true });
+    await ask(page, 'clear test');
+    await shown(page.getByRole('button', { name: 'Stop', exact: true }));
+    await composer.fill('clear this');
+    await composer.press('Enter');
+    await shown(queue);
+    await queue.getByRole('button', { name: 'Clear', exact: true }).click();
+    await gone(queue);
+    held.release();
+    await shown(page.getByText('Clear test finished'));
+  });
+});
