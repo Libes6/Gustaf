@@ -437,6 +437,15 @@ test('sse parses data events across chunk boundaries, CRLF, multi-line data, [DO
   assert.deepEqual(seen, [{ a: 1 }, { b: 2 }, { c: 3 }]);
 });
 
+test('sse: a CRLF pair split between two chunks still separates the events', async () => {
+  const enc = new TextEncoder();
+  const chunks = ['data: {"a":1}\r\n\r', '\ndata: {"b":2}\r', '\n\r\n'];
+  const body = new ReadableStream({ start(c) { for (const ch of chunks) c.enqueue(enc.encode(ch)); c.close(); } });
+  const seen = [];
+  for await (const ev of sse(new Response(body))) seen.push(ev);
+  assert.deepEqual(seen, [{ a: 1 }, { b: 2 }]);
+});
+
 test('sse: a connection that breaks mid-stream becomes a retryable network error after the events already read', async () => {
   const body = sseStream([{ n: 1 }, { n: 2 }], { failWith: new TypeError('terminated') });
   const seen = [];
