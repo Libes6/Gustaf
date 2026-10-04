@@ -38,7 +38,7 @@ describe("Settings: Quick ask window", () => {
     await user.click(sw("Quick ask window"));
     await waitFor(() => expect(configure).toHaveBeenCalledWith(true, "Control+Alt+Space", true));
     expect(sw("Quick ask window")).toHaveAttribute("aria-checked", "true");
-    expect(saved().at(-1)).toEqual({ enabled: true, accelerator: null, hideOnBlur: true });
+    expect(saved().slice(-1)[0]).toEqual({ enabled: true, accelerator: null, hideOnBlur: true });
     expect(await screen.findByText("Active: Ctrl+Alt+Space")).toBeInTheDocument();
     await user.click(sw("Quick ask window"));
     await waitFor(() => expect(configure).toHaveBeenLastCalledWith(false, "Control+Alt+Space", true));
@@ -75,7 +75,7 @@ describe("Settings: Quick ask window", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.keyDown(field, { key: "k", code: "KeyK", ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(configure).toHaveBeenLastCalledWith(true, "Control+Shift+K", true));
-    expect(saved().at(-1)).toMatchObject({ accelerator: "Control+Shift+K" });
+    expect(saved().slice(-1)[0]).toMatchObject({ accelerator: "Control+Shift+K" });
     expect(screen.getByText("Ctrl+Shift+K")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reset to default" }));
     await waitFor(() => expect(configure).toHaveBeenLastCalledWith(true, "Control+Alt+Space", true));
@@ -103,7 +103,7 @@ describe("Settings: Quick ask window", () => {
     await waitFor(() => expect(sw("Hide when the window loses focus")).toHaveAttribute("aria-checked", "true"));
     await user.click(sw("Hide when the window loses focus"));
     await waitFor(() => expect(configure).toHaveBeenLastCalledWith(true, "Control+Alt+Space", false));
-    expect(saved().at(-1)).toMatchObject({ hideOnBlur: false });
+    expect(saved().slice(-1)[0]).toMatchObject({ hideOnBlur: false });
   });
 
   it("is part of the keyboard shortcuts section", async () => {
