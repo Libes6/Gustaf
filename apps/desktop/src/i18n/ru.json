@@ -1144,5 +1144,13 @@
   "sentImageAlt": "Прикреплённое изображение {n}",
   "changesChipChat": "Изменено файлов · {count}",
   "changesChipTree": "Не закоммичено · {count}",
-  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно."
+  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно.",
+  "mcpTransport": "Транспорт",
+  "mcpTransportAuto": "Определять автоматически (streamable HTTP, затем SSE)",
+  "mcpTransportStreamable": "Streamable HTTP",
+  "mcpTransportSse": "Устаревший SSE (GET /sse + POST endpoint)",
+  "mcpTransportHint": "Автоопределение сначала пробует streamable HTTP и переключается на устаревший транспорт SSE, если сервер отклоняет первый запрос ошибкой 4xx (кроме 401, 403 и 429). Выберите один вариант, чтобы пропустить определение.",
+  "mcpErr_transport": "Неизвестный транспорт.",
+  "mcpRevokeNote": "При выходе Gustaf просит сервер авторизации отозвать токены, если он это поддерживает (по возможности), и затем удаляет их из {store}.",
+  "mcpResourceTemplatesDesc": "Встроенный: позволяет агенту получить список шаблонов ресурсов сервера (читать их нужно инструментом чтения)"
 }
