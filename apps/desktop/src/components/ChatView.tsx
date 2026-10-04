@@ -21,6 +21,7 @@ import { AgentsColumn, AgentsToggle } from "./AgentsPanel";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { useChatMode } from "../lib/useChatMode";
+import { useChatKnowledge } from "../lib/useChatKnowledge";
 import { planToInstruction, type Plan } from "../agent/planCore";
 import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
 import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
@@ -71,6 +72,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const tasks = useBackgroundTasks(root);
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
   const [mode, setMode] = useChatMode(session.chatId);
+  const knowledge = useChatKnowledge(session.chatId);
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
@@ -187,7 +189,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       </div>}
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
-        root={root} projectName={project?.name} files={files}
+        root={root} projectName={project?.name} files={files} knowledge={{ ...knowledge, onManage: () => app.openSettings("knowledge") }}
         workspace={{
           available: !workspace && !!project && isGit && messages.length === 0 && !running,
           on: newWorkspace, onToggle: () => setNewWorkspace(v => !v),

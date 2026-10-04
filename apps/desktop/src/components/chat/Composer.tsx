@@ -22,6 +22,7 @@ import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
 import { mergeSkills } from "../../agent/skillsCore";
 import type { ChatMode } from "../../agent/planCore";
+import { knowledgeEntries, type KnowledgePick } from "./knowledgeMenu";
 
 const ACCESS_ICON: Record<Access, typeof Lock> = { readonly: Lock, auto: ShieldCheck, full: Unlock };
 
@@ -57,6 +58,8 @@ type Props = {
    * Git workspaces: `available` offers the "new workspace" toggle for the next message (a git project and a chat without
    * messages); `linkedBranch` marks a chat that already runs in a workspace. Absent or unavailable: nothing is shown.
    */
+  /** Knowledge collections to toggle for this chat (a section of the plus menu). */
+  knowledge?: KnowledgePick;
   workspace?: { available: boolean; on: boolean; onToggle: () => void; linkedBranch?: string };
 };
 
@@ -281,6 +284,7 @@ export function Composer(p: Props) {
                   { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
                   ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
+                  ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
                   { sep: true },
                   { heading: t("modeSwitch") },
                   ...(["ask", "plan", "agent"] as const).map(m => ({

@@ -1,4 +1,6 @@
 import { SemanticSettings } from "./SemanticSettings";
+import { KnowledgeSettings } from "./KnowledgeSettings";
+import { BookOpen } from "lucide-react";
 import { VoiceSettings } from "./VoiceSettings";
 import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
@@ -46,7 +48,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }] },
+  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }] },
   { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
@@ -489,7 +491,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage,
+  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings,
 };
 
 export function Settings() {
