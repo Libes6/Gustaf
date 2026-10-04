@@ -2917,6 +2917,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "dirs",
+ "dunce",
  "enigo",
  "futures-util",
  "getrandom 0.3.4",

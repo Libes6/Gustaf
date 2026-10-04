@@ -170,7 +170,10 @@ pub(crate) fn open_repo(store: &Path, root: &str) -> Result<Repo, String> {
             return Err(err("unsafe_path", "the worktree directory would be inside the project folder"));
         }
     }
-    Ok(Repo { top, managed: store.join(fnv(&common.to_string_lossy())) })
+    // Git for Windows cannot create worktrees from ordinary paths carrying
+    // Rust's canonicalize-produced verbatim prefix. Keep filesystem safety
+    // checks canonical, but use the equivalent normal path for the store.
+    Ok(Repo { top, managed: dunce::simplified(store).join(fnv(&common.to_string_lossy())) })
 }
 
 fn meta_path(repo: &Repo, id: &str) -> PathBuf {
