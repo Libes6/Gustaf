@@ -30,10 +30,13 @@ export type ActionEntry = {
   builtin?: boolean;
   detail?: string;
   undo?: UndoRecord;
-  /** `"scheduled"`: a call made by an unattended run (a scheduled prompt). `"hook"`: the entry is a hook run, see `hook`. */
-  source?: "scheduled" | "hook";
+  /** `"scheduled"`: a call made by an unattended run (a scheduled prompt). `"hook"`: the entry is a hook run, see `hook`. `"gate"`: a verification check, see `gate`. */
+  source?: "scheduled" | "hook" | "gate";
   hook?: HookMeta;
+  gate?: GateMeta;
 };
+/** What is recorded of a verification check run (docs/features/verification-gates.md); its output is the entry's `detail`. */
+export type GateMeta = { check: string; command: string; exitCode?: number | null; timedOut?: boolean; attempt?: number };
 /** What is recorded of a hook run (its output is the entry's `detail`). */
 export type HookMeta = { event: string; command: string; exitCode?: number | null; timedOut?: boolean; scope?: "global" | "project" };
 
@@ -55,10 +58,24 @@ function normalizeHook(raw: unknown): HookMeta | undefined {
   };
 }
 
+function normalizeGate(raw: unknown): GateMeta | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const g = raw as Record<string, unknown>;
+  if (typeof g.check !== "string" || typeof g.command !== "string") return undefined;
+  return {
+    check: clip(g.check, 60),
+    command: clip(g.command, MAX_SUMMARY),
+    ...(typeof g.exitCode === "number" || g.exitCode === null ? { exitCode: g.exitCode as number | null } : {}),
+    ...(g.timedOut === true ? { timedOut: true } : {}),
+    ...(typeof g.attempt === "number" && Number.isFinite(g.attempt) ? { attempt: g.attempt } : {}),
+  };
+}
+
 export const isEditTool = (name: string) => name === "edit_file" || name === "write_file";
-export type ActionKind = "command" | "edit" | "read" | "computer" | "hook" | "other";
+export type ActionKind = "command" | "edit" | "read" | "computer" | "hook" | "gate" | "other";
 export function actionKind(tool: string): ActionKind {
   if (tool === "hook") return "hook";
+  if (tool === "gate") return "gate";
   if (tool === "run_command") return "command";
   if (isEditTool(tool)) return "edit";
   if (tool === "read_file" || tool === "list_dir" || tool === "search") return "read";
@@ -115,8 +132,9 @@ export function normalizeActionLog(raw: unknown): ActionEntry[] {
       ...(typeof e.approval === "string" && APPROVALS.includes(e.approval) ? { approval: e.approval as Approval } : {}),
       ...(optText(e.rule, 400) ? { rule: optText(e.rule, 400) } : {}),
       ...(e.builtin === true ? { builtin: true } : {}),
-      ...(e.source === "scheduled" || e.source === "hook" ? { source: e.source } : {}),
+      ...(e.source === "scheduled" || e.source === "hook" || e.source === "gate" ? { source: e.source } : {}),
       ...(e.source === "hook" && normalizeHook(e.hook) ? { hook: normalizeHook(e.hook) } : {}),
+      ...(e.source === "gate" && normalizeGate(e.gate) ? { gate: normalizeGate(e.gate) } : {}),
       ...(optText(e.detail, MAX_DETAIL) ? { detail: optText(e.detail, MAX_DETAIL) } : {}),
       ...(undo ? { undo } : {}),
     });

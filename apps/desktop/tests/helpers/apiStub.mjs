@@ -12,7 +12,10 @@ export const state = {
   instructionFiles: [],
   /** Commands the agent asked to run: { root, command }. */
   runs: [],
+  /** A result object, or ({ root, command, timeoutMs }) => result. */
   runResult: { code: 0, output: 'ran', timed_out: false },
+  /** Timeout argument of every command in `runs`, in the same order. */
+  runTimeouts: [],
   /** Hook commands that were run: { root, command, timeoutMs, stdin, env }. */
   hookRuns: [],
   hookResult: () => ({ code: 0, output: '', timed_out: false }),
@@ -40,6 +43,7 @@ export const state = {
     this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
     this.instructionFiles = [];
     this.runs.length = 0;
+    this.runTimeouts.length = 0;
     this.hookRuns.length = 0;
     this.hookResult = () => ({ code: 0, output: '', timed_out: false });
     this.runResult = { code: 0, output: 'ran', timed_out: false };
@@ -170,9 +174,10 @@ export const fsx = {
   /** Instruction files the test put in `state.instructionFiles` ({ name, text }). */
   instructions: async () => state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
   homeFile: async () => null,
-  run: async (root, command) => {
+  run: async (root, command, timeoutMs) => {
     state.runs.push({ root, command });
-    return state.runResult;
+    state.runTimeouts.push(timeoutMs);
+    return typeof state.runResult === 'function' ? state.runResult({ root, command, timeoutMs }) : state.runResult;
   },
 };
 

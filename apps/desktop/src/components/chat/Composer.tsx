@@ -15,6 +15,7 @@ import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
+import { OPEN_MODEL_PICKER_EVENT } from "../../agent/verificationCore";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
 import { ImageThumb } from "../ImageViewer";
@@ -129,6 +130,13 @@ export function Composer(p: Props) {
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
   useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
+  // The "Try another model" button of a verification card (docs/features/verification-gates.md) opens the picker; it never re-runs anything.
+  useEffect(() => {
+    if (!p.visible) return;
+    const open = () => app.providers.length && setPicker(true);
+    addEventListener(OPEN_MODEL_PICKER_EVENT, open);
+    return () => removeEventListener(OPEN_MODEL_PICKER_EVENT, open);
+  }, [p.visible, app.providers.length]);
 
   const mentionList = mention ? [
     ...p.files.filter(f => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(path => ({ path, chat: undefined as Chat | undefined, label: path })),
