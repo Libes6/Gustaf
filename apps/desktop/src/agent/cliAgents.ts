@@ -92,13 +92,16 @@ export function trackCliAgents(ctx: { chatId: number; root: string | null; stop?
   }
 }
 
-/** The chat run ended: whatever was still running is over (the CLI never reported its result). */
-export function finishCliAgents(chatId: number, now = Date.now()) {
+/**
+ * The chat run ended: whatever was still running is over. `stopped`: the user stopped the run, so those agents are
+ * "stopped" (as Codex reports an interrupted turn); otherwise "ended" (the CLI never reported their result).
+ */
+export function finishCliAgents(chatId: number, now = Date.now(), stopped = false) {
   if (!entries.some((e) => e.chatId === chatId && isCliAgentActive(e))) return;
   entries = entries.map((e) => {
     if (e.chatId !== chatId) return e;
     const { stop: _stop, ...rest } = e;
-    return isCliAgentActive(e) ? { ...rest, state: "ended" as const, endedAt: now } : rest;
+    return isCliAgentActive(e) ? { ...rest, state: stopped ? ("stopped" as const) : ("ended" as const), endedAt: now } : rest;
   });
   emit();
 }

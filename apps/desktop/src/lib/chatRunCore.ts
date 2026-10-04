@@ -172,7 +172,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
     }
     throw e;
   } finally {
-    finishCliAgents(i.chatId);
+    finishCliAgents(i.chatId, Date.now(), i.signal.aborted);
   }
 }
 
