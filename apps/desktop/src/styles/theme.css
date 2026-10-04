@@ -221,8 +221,8 @@ button.row, button.section-title { width: 100%; text-align: left; }
   max-width: 80%; white-space: pre-wrap; word-wrap: break-word;
 }
 /* Pictures sit above the text bubble with no bubble background or padding: rounded corners only. */
-.msg-user .msg-images { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 80%; }
-.msg-user .msg-images img { display: block; min-width: 0; max-width: min(240px, 100%); max-height: 320px; border-radius: 12px; }
+.msg-user .msg-images { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: 6px; max-width: 80%; }
+.msg-user .msg-images img { display: block; flex: 0 0 auto; width: auto; height: auto; min-width: 0; max-width: min(240px, 100%); max-height: 320px; object-fit: contain; border-radius: 12px; }
 .msg-assistant { margin: 12px 0; font-size: 14px; line-height: 1.6; }
 .msg-tools { margin: 6px 0; }
 .msg-actions { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .12s; }
@@ -337,7 +337,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .image-viewer-backdrop { position: absolute; inset: 0; }
 .image-viewer img { position: relative; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; cursor: default; }
 .image-viewer-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-active); color: inherit; }
-.attach img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; display: block; }
+.attach img { width: 48px; height: 48px; object-fit: contain; border-radius: 8px; display: block; }
 .attach button { position: absolute; top: -6px; right: -6px; background: var(--bg-active); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; }
 .mention-list { position: absolute; bottom: calc(100% + 6px); left: 0; width: 420px; max-height: 260px; overflow-y: auto; }
 

@@ -116,3 +116,86 @@ for (const theme of ['light', 'dark']) {
     });
   });
 }
+
+// The old flex layout could shrink widths and stretch heights independently. Measure the
+// actual TurnView images against decoded PNG dimensions, rather than only checking overflow.
+const MIXED = [png(1000, 250, [230, 120, 60]), png(600, 300, [90, 110, 220]), png(240, 960, [60, 160, 120]), png(500, 500, [160, 90, 180])];
+const CANVAS = '```tsx-canvas id="image-check" title="Image layout canvas"\nexport default function Preview() { return <p>Image layout canvas</p>; }\n```';
+for (const count of [1, 2, 3, 8]) {
+  test(`mixed sent images preserve natural proportions: ${count}, narrow/wide, canvas open/closed`, { skip: skipReason }, async () => {
+    await scenario(suite, `image-ratios-${count}`, { setup: (b) => {
+      b.seedReady();
+      const { chatId, messageIds } = b.seedChat('Image ratios', [['user', 'Pictures'], ['assistant', CANVAS]]);
+      const parts = Array.from({ length: count }, (_, i) => ({ type: 'image', data: MIXED[i % MIXED.length] }));
+      b.db.prepare('update messages set content = ? where id = ?').run(JSON.stringify({ role: 'user', parts }), messageIds[0]);
+    } }, async ({ page, origin }) => {
+      await openApp(page, origin);
+      await page.getByRole('complementary', { name: 'Chats and projects' }).getByText('Image ratios', { exact: true }).first().click();
+      for (const canvas of [false, true]) {
+        await page.setViewportSize({ width: 1500, height: 1000 });
+        if (canvas) {
+          await page.getByRole('button', { name: /Image layout canvas/ }).first().click();
+          await shown(page.locator('.canvas-panel'));
+        }
+        for (const width of [1500, 900]) {
+          await page.setViewportSize({ width, height: 1000 });
+          await page.waitForFunction(() => [...document.querySelectorAll('.msg-images img')].every((i) => i.complete && i.naturalWidth));
+          const layout = await page.locator('.msg-images').evaluate((gallery) => {
+            const box = gallery.getBoundingClientRect();
+            return { box: { left: box.left, right: box.right }, images: [...gallery.querySelectorAll('img')].map((i) => {
+              const r = i.getBoundingClientRect();
+              return { width: r.width, height: r.height, left: r.left, right: r.right, top: r.top, bottom: r.bottom, ratio: i.naturalWidth / i.naturalHeight };
+            }) };
+          });
+          assert.equal(layout.images.length, count);
+          for (const image of layout.images) {
+            assert.ok(Math.abs(image.width / image.height / image.ratio - 1) < 0.002, `distorted PNG at ${width}px, canvas ${canvas}: ${JSON.stringify(image)}`);
+            assert.ok(image.width > 50 && image.height > 30, 'preview remains usable');
+            assert.ok(image.width <= 240.5 && image.height <= 320.5, 'preview remains bounded');
+            assert.ok(image.left >= layout.box.left - 0.5 && image.right <= layout.box.right + 0.5, 'image fits the gallery');
+          }
+          for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) {
+            const a = layout.images[i], b = layout.images[j];
+            assert.ok(a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5, 'previews do not overlap');
+          }
+          if (process.env.E2E_SHOT_DIR) {
+            mkdirSync(process.env.E2E_SHOT_DIR, { recursive: true });
+            await page.screenshot({ path: join(process.env.E2E_SHOT_DIR, `image-ratios-${count}-${width}-canvas-${canvas}.png`) });
+          }
+        }
+      }
+      const thumb = page.locator('.msg-images img').first();
+      await thumb.focus();
+      await page.keyboard.press('Enter');
+      await shown(page.getByRole('dialog'));
+      assert.equal(await page.locator('.image-viewer img').getAttribute('src'), await thumb.getAttribute('src'), 'viewer uses the complete original');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.getByRole('dialog').count(), 0);
+      assert.ok(await thumb.evaluate((i) => i === document.activeElement), 'viewer restores thumbnail focus');
+    });
+  });
+}
+
+test('composer keeps mixed thumbnail content visible and opens the full original', { skip: skipReason }, async () => {
+  await scenario(suite, 'composer-image-ratios', { setup: (b) => b.seedReady() }, async ({ page, origin }) => {
+    await openApp(page, origin);
+    await page.getByRole('textbox', { name: 'Ask anything' }).evaluate((textarea, pics) => {
+      const transfer = new DataTransfer();
+      for (let i = 0; i < pics.length; i++) {
+        const bytes = Uint8Array.from(atob(pics[i]), (c) => c.charCodeAt(0));
+        transfer.items.add(new File([bytes], `image-${i}.png`, { type: 'image/png' }));
+      }
+      textarea.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+    }, MIXED);
+    await page.waitForFunction(() => document.querySelectorAll('.attach img').length === 4 && [...document.querySelectorAll('.attach img')].every((i) => i.complete && i.naturalWidth));
+    const thumbs = await page.locator('.attach img').evaluateAll((images) => images.map((image) => {
+      const r = image.getBoundingClientRect();
+      return { fit: getComputedStyle(image).objectFit, width: r.width, height: r.height };
+    }));
+    assert.ok(thumbs.every((i) => i.fit === 'contain' && i.width === 48 && i.height === 48), 'bounded thumbnails contain the entire image');
+    await page.locator('.attach img').first().click();
+    await shown(page.getByRole('dialog'));
+    assert.equal(await page.locator('.image-viewer img').getAttribute('src'), await page.locator('.attach img').first().getAttribute('src'));
+    await page.keyboard.press('Escape');
+  });
+});
