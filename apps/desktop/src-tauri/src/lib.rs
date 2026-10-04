@@ -19,6 +19,7 @@ mod shell;
 mod tools;
 mod preview;
 mod semantic;
+mod knowledge;
 mod lsp;
 mod web_tools;
 mod updater;
@@ -26,6 +27,7 @@ mod worktree;
 mod merge_queue;
 mod terminal;
 
+pub use knowledge::{extract_pdf_with_exe, pdf_child_main};
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -58,6 +60,18 @@ pub fn run() {
             semantic::semantic_build,
             semantic::semantic_query,
             semantic::semantic_clear,
+            knowledge::knowledge_list,
+            knowledge::knowledge_create,
+            knowledge::knowledge_rename,
+            knowledge::knowledge_delete,
+            knowledge::knowledge_add_source,
+            knowledge::knowledge_remove_source,
+            knowledge::knowledge_set_include,
+            knowledge::knowledge_set_config,
+            knowledge::knowledge_estimate,
+            knowledge::knowledge_reindex,
+            knowledge::knowledge_cancel,
+            knowledge::knowledge_search,
             lsp::lsp_detect,
             lsp::lsp_diagnostics,
             terminal::terminal_list,
