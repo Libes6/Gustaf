@@ -177,3 +177,15 @@ test('a lagging rollout cannot revive an interrupted agent; a genuine new turn c
   // No timestamp for the interruption: only an explicit send can prove a restart.
   assert.equal([...map.values()][0].subagent.state, 'stopped');
 });
+
+test('message delivery keeps an interrupted agent stopped; followup ignores an older terminal scan', () => {
+  const map = new Map();
+  const event = (tool, status) => codexEvent('item.completed', { id: tool, tool, receiver_thread_ids: ['t1'], agents_states: { t1: { status } } });
+  for (const tool of ['spawn_agent', 'interrupt_agent', 'send_message']) {
+    for (const a of nativeActivities('codex', event(tool, tool === 'interrupt_agent' ? 'interrupted' : 'running'))) applyActivity(map, a);
+  }
+  assert.equal([...map.values()][0].subagent.state, 'stopped');
+  for (const a of nativeActivities('codex', event('followup_task', 'running'))) applyActivity(map, a);
+  applyActivity(map, { type: 'activity', id: 'scan-t1', name: 'subagent', args: {}, status: 'unknown', subagent: { provider: 'codex', agentId: 't1', title: '', action: 'scan', state: 'stopped', endedAt: 1, turnStartedAt: 0 } });
+  assert.equal([...map.values()][0].subagent.state, 'running');
+});

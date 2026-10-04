@@ -81,10 +81,11 @@ export function trackCliAgents(ctx: { chatId: number; root: string | null; stop?
   for (const a of activities) {
     if (!a.subagent) continue;
     const key = `${ctx.chatId}:${a.id}`;
-    const prev = next.find((e) => e.key === key);
+    const prev = next.find((e) => e.key === key) ?? next.find((e) => e.chatId === ctx.chatId && e.provider === a.subagent!.provider && !!a.subagent!.agentId && e.agentId === a.subagent!.agentId);
     const entry = cliAgentFrom(a, { chatId: ctx.chatId, root, stop: ctx.stop }, prev, now);
     if (!entry || (prev && same(prev, entry))) continue;
     next = prev ? next.map((e) => (e === prev ? entry : e)) : [entry, ...next];
+    next = next.filter((e) => e === entry || e.chatId !== entry.chatId || e.provider !== entry.provider || !entry.agentId || e.agentId !== entry.agentId);
   }
   if (next !== entries) {
     entries = next;

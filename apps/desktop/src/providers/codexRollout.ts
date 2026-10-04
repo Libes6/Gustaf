@@ -55,6 +55,7 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
     const info: SubagentInfo = {
       provider: "codex",
       agentId: threadId || text(a.id) || key,
+      ...(text(a.agentPath) || task.startsWith("/") ? { agentPath: text(a.agentPath) || task } : {}),
       title: brief(readable || nickname || (threadId ? threadId.slice(0, 8) : ""), 60),
       action: "scan",
       state,
