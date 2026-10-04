@@ -15,6 +15,7 @@ import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
+import { OPEN_MODEL_PICKER_EVENT } from "../../agent/verificationCore";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
 import { ImageThumb } from "../ImageViewer";
@@ -22,6 +23,7 @@ import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
 import { mergeSkills } from "../../agent/skillsCore";
 import type { ChatMode } from "../../agent/planCore";
+import { knowledgeEntries, type KnowledgePick } from "./knowledgeMenu";
 
 const ACCESS_ICON: Record<Access, typeof Lock> = { readonly: Lock, auto: ShieldCheck, full: Unlock };
 
@@ -57,6 +59,8 @@ type Props = {
    * Git workspaces: `available` offers the "new workspace" toggle for the next message (a git project and a chat without
    * messages); `linkedBranch` marks a chat that already runs in a workspace. Absent or unavailable: nothing is shown.
    */
+  /** Knowledge collections to toggle for this chat (a section of the plus menu). */
+  knowledge?: KnowledgePick;
   workspace?: { available: boolean; on: boolean; onToggle: () => void; linkedBranch?: string };
 };
 
@@ -129,6 +133,13 @@ export function Composer(p: Props) {
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
   useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
+  // The "Try another model" button of a verification card (docs/features/verification-gates.md) opens the picker; it never re-runs anything.
+  useEffect(() => {
+    if (!p.visible) return;
+    const open = () => app.providers.length && setPicker(true);
+    addEventListener(OPEN_MODEL_PICKER_EVENT, open);
+    return () => removeEventListener(OPEN_MODEL_PICKER_EVENT, open);
+  }, [p.visible, app.providers.length]);
 
   const mentionList = mention ? [
     ...p.files.filter(f => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(path => ({ path, chat: undefined as Chat | undefined, label: path })),
@@ -281,6 +292,7 @@ export function Composer(p: Props) {
                   { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
                   ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
+                  ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
                   { sep: true },
                   { heading: t("modeSwitch") },
                   ...(["ask", "plan", "agent"] as const).map(m => ({

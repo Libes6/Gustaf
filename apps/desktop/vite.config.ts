@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
@@ -7,6 +8,8 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  // Two HTML entries: the app (index.html) and the quick-ask window (quick-ask.html, created on demand by src-tauri/src/quick_ask.rs).
+  build: { rollupOptions: { input: { main: resolve(process.cwd(), "index.html"), "quick-ask": resolve(process.cwd(), "quick-ask.html") } } },
   define: { __SIDECAR__: JSON.stringify(`${process.cwd()}/sidecar/cursor-agent.mjs`) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

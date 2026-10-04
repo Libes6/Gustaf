@@ -1,9 +1,9 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, GitBranch, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages, Terminal,
+  Columns2, GitBranch, GitMerge, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages, Terminal,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
 import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
@@ -14,9 +14,17 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { Brain } from "lucide-react";
+import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
 import { ConfirmDialog, NewWorkspaceDialog, useConfirm } from "./WorkspaceDialogs";
+import { ConflictBadge } from "./ConflictBadge";
+import { MergeQueueDialog, type QueueWorkspace } from "./MergeQueueDialog";
+import { requestComposerDraft } from "../lib/composerBridge";
+import type { QueueItem } from "../lib/mergeQueue";
+import { conflictBadge, hasUnfinished, resolveDraft, summarizeQueue } from "../lib/mergeQueueView";
+import { conflictReport, queueRun, useConflictChecks, useMergeQueueVersion, type QueuePolicy } from "../lib/mergeQueueStore";
 import { requestTerminalOpen } from "../lib/terminalBridge";
 import { archiveChoices, chatWorkspace, joinCheckout, splitWorkspaceChats, workspaceRow } from "../lib/workspaces";
 import { createWorkspace, setupWorkspace } from "../lib/workspaceCreate";
@@ -138,9 +146,13 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [projectLimit, setProjectLimit] = useState(8);
   const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
   const [sharing, setSharing] = useState<Chat | null>(null);
+  const memoryUi = useMemoryDialogs();
   // Workspaces (git worktrees): the data lives in lib/workspaceStore.ts; this component re-renders when it changes.
   useWorkspaceVersion();
+  useMergeQueueVersion();
   const confirm = useConfirm();
+  // Merge queue dialog: for a whole project, optionally with one workspace preselected ("Merge into <target>…").
+  const [mergeFor, setMergeFor] = useState<{ project: Project; preselect: string | null } | null>(null);
   const [newWorkspaceFor, setNewWorkspaceFor] = useState<Project | null>(null);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
@@ -174,7 +186,10 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     () => app.projects.filter((p) => p.path && (expanded[p.id] ?? true) && app.chats.some((c) => c.project_id === p.id && chatWorkspace(c))).map((p) => p.path!),
     [app.projects, app.chats, expanded],
   );
-  useWorkspacePolling(workspaceRoots, app.sessions.items.filter((s) => s.busy).map((s) => s.chatId).join(","));
+  const busyKey = app.sessions.items.filter((s) => s.busy).map((s) => s.chatId).join(",");
+  useWorkspacePolling(workspaceRoots, busyKey);
+  // Conflict badges: throttled and never awaited by the render (see lib/mergeQueueStore.ts).
+  useConflictChecks(workspaceRoots.map((root) => ({ root, list: workspaceEntry(root).list })), busyKey);
 
   const openChat = (c: Chat) => {
     app.openChat(c.id, c.project_id);
@@ -198,6 +213,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
+      { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -215,7 +231,9 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
       })),
       ...(p.path && gitProjects.has(p.id) ? [{ label: t("workspaceNew"), icon: <GitBranch size={15} />, onClick: () => (setWorkspaceError(""), setNewWorkspaceFor(p)) }] : []),
+      ...(p.path && gitProjects.has(p.id) && chatsOf(p.id).some((c) => chatWorkspace(c)) ? [{ label: t("mqMenu"), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: null }) }] : []),
       ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
+      ...(p.path ? [{ label: t("memoryMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openProject(p) }] : []),
       ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
@@ -281,6 +299,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       ...(info && choice.canArchive ? [
         { label: t("workspaceOpenTerminal"), icon: <Terminal size={15} />, onClick: () => void openInTerminal(p, c, info.path) },
         { label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(info.path) },
+        { label: t("mqMergeInto", { target: info.baseBranch ?? t("mqTargetFallback") }), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: ws!.taskId }) },
         { sep: true as const },
         { label: t("workspaceArchive"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c) },
         ...(choice.offerDeleteBranch ? [{ label: t("workspaceArchiveDelete"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c, { deleteBranch: true }) }] : []),
@@ -303,8 +322,10 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         </div>
       );
     }
+    const badge = row.active ? conflictBadge(conflictReport(p.path, ws.taskId)) : null;
     return (
-      <div key={c.id} className={`row workspace${row.active ? "" : " gone"}${current ? " active" : ""}`} data-workspace={row.taskId} onContextMenu={(e) => workspaceMenu(e, p, c)}>
+      <Fragment key={c.id}>
+      <div className={`row workspace${row.active ? "" : " gone"}${current ? " active" : ""}`} data-workspace={row.taskId} onContextMenu={(e) => workspaceMenu(e, p, c)}>
         <button className="row-main" aria-current={current ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="ws-branch">
             <GitBranch size={13} aria-hidden="true" />
@@ -328,7 +349,30 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           </button>
         </span>
       </div>
+      {badge && <div className="ws-conflict-line"><ConflictBadge badge={badge} title={c.title} /></div>}
+      </Fragment>
     );
+  };
+
+  // ---- merge queue ----
+  const queuePolicy = (): QueuePolicy => ({ access: app.access, allowlist: app.allowlist, texts: { declined: t("mqTestDeclined"), blocked: t("mqTestBlocked") } });
+  const queueWorkspaces = (p: Project): QueueWorkspace[] => {
+    const list = workspaceEntry(p.path).list ?? [];
+    return chatsOf(p.id).filter((c) => chatWorkspace(c)).flatMap((c) => {
+      const info = list.find((w) => w.taskId === c.workspace_task_id);
+      return info ? [{ taskId: info.taskId, title: c.title, branch: info.branch, target: info.baseBranch, ahead: info.ahead, dirty: info.dirty, active: info.existsOnDisk }] : [];
+    });
+  };
+  const resolveConflicts = (p: Project, item: QueueItem) => {
+    const c = app.chats.find((x) => x.project_id === p.id && x.workspace_task_id === item.taskId);
+    if (!c) return;
+    requestComposerDraft(c.id, resolveDraft({ target: item.targetBranch, files: item.conflicts, testCommand: item.testCommand, t }));
+    setMergeFor(null);
+    openChat(c);
+  };
+  const archiveMerged = (p: Project, taskId: string) => {
+    const c = app.chats.find((x) => x.project_id === p.id && x.workspace_task_id === taskId);
+    if (c) void archiveWorkspace(p, c);
   };
 
   const chatRow = (c: Chat, child: boolean) =>
@@ -464,6 +508,17 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                 {open && workspaces.length > 0 && (
                   <div role="group" aria-label={t("workspaceGroup", { name: p.name })}>{workspaces.map((c) => workspaceRowEl(p, c))}</div>
                 )}
+                {open && p.path && (() => {
+                  const q = queueRun(p.path);
+                  if (!(q.busy || q.approval || hasUnfinished(q.state))) return null;
+                  const sum = summarizeQueue(q.state);
+                  return (
+                    <button className="row child muted mq-active" onClick={() => setMergeFor({ project: p, preselect: null })}>
+                      <GitMerge size={13} aria-hidden="true" />
+                      <span className="label">{q.approval ? t("mqSidebarApproval") : q.state?.halted ? t("mqSidebarHalted") : t("mqSidebarActive", { merged: sum.merged, total: sum.total })}</span>
+                    </button>
+                  );
+                })()}
                 {open && list.length > 5 && !showAll[p.id] && (
                   <button className="row child muted" onClick={() => setShowAll({ ...showAll, [p.id]: true })}>
                     {t("showMore")}
@@ -506,7 +561,12 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           <p>{t("workspaceArchiveDirtyBody", { branch: dirtyArchive.chat.workspace_branch ?? dirtyArchive.chat.workspace_task_id ?? "" })}</p>
         </ConfirmDialog>
       )}
+      {mergeFor?.project.path && (
+        <MergeQueueDialog root={mergeFor.project.path} projectName={mergeFor.project.name} workspaces={queueWorkspaces(mergeFor.project)} preselect={mergeFor.preselect} policy={queuePolicy()}
+          onClose={() => setMergeFor(null)} onResolve={(item) => resolveConflicts(mergeFor.project, item)} onArchive={(id) => archiveMerged(mergeFor.project, id)} />
+      )}
       {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
+      {memoryUi.node}
       {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );

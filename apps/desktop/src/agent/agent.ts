@@ -1,4 +1,5 @@
 import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
+import { KNOWLEDGE_TOOL, knowledgeForChat, runKnowledgeSearch } from "./knowledge";
 import { SEMANTIC_TOOL, semanticSearch, formatSemanticHits, loadSemantic } from "./semanticSearch";
 import { WEB_TOOLS, webConfig, webDomain, webResult } from "./web";
 import { computer, fsx, getSetting, type CuAction } from "../lib/api";
@@ -23,6 +24,9 @@ import { callMcpResourceTool, callMcpTool, loadMcpConfig, loadMcpToolset, type M
 import { decideMcp } from "./mcp/toolset";
 import { approvalTool, createHooks } from "./hooks";
 import { loadHooksView } from "./hooksStore";
+import { createGate } from "./verification";
+import { loadVerificationConfig } from "./verificationStore";
+import type { GateReason } from "./verificationCore";
 
 export type { Access };
 /** `reason` names the "ask" rule that stopped the command, when one did. */
@@ -75,6 +79,14 @@ export type RunOptions = {
   subagent?: boolean;
   /** Main chat only (Ask: no tools, Plan: read-only tools and a plan at the end, Agent/undefined: everything). Subagent and scheduled runs ignore it. */
   mode?: ChatMode;
+  /** The project folder when `root` is a workspace checkout (the verification settings belong to the project, not to its worktree). */
+  project?: string | null;
+};
+
+/** What a finished run reports to its caller (nothing for runs without a verification gate). */
+export type RunOutcome = {
+  /** The last verification gate of the run: `failed` means the run ends as "failed verification". */
+  verification?: { outcome: "passed" | "failed"; reason?: GateReason; summary: string };
 };
 
 const MAX_STEPS = 50;
@@ -151,6 +163,7 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
       if(typeof a.query!=="string"||!a.query.trim()||a.query.length>2000)throw Error("Invalid semantic query");
       return formatSemanticHits(await semanticSearch(root,a.query,typeof a.limit==="number"?a.limit:8,ctx.project??root));
     }
+    case "knowledge_search": return runKnowledgeSearch(o.chatId, o.signal, a);
     case "read_terminal": {
       if(!root || o.source || o.subagent || o.toolNames)throw new ActionBlocked("Terminal output is available only in an interactive project chat.");
       if(!await o.approve({kind:"terminal",text:a.id == null ? "List terminals in this project." : `Read terminal #${a.id} output (may include credentials).`}))throw new ActionDeclined("User declined reading terminal output.");
@@ -271,20 +284,20 @@ async function runMcpTool(call: Extract<Part, { type: "tool_call" }>, o: RunOpti
 }
 
 /** While a run is active in a folder the action log does not offer to undo edits made there. */
-export async function runAgent(o: RunOptions) {
+export async function runAgent(o: RunOptions): Promise<RunOutcome> {
   // Subagents may ask for approval while the main loop (or another subagent) has a card open: ask one at a time.
   if (o.subagents) o = { ...o, approve: serializeCalls(o.approve) };
   // Subagents (fixed tool allowlist) and unattended scheduled runs keep their own limits and ignore the chat mode.
   if (o.toolNames || o.source || o.mode === "agent") o = { ...o, mode: undefined };
   if (o.root) beginRun(o.root);
   try {
-    await runLoop(o);
+    return await runLoop(o);
   } finally {
     if (o.root) endRun(o.root);
   }
 }
 
-async function runLoop(o: RunOptions) {
+async function runLoop(o: RunOptions): Promise<RunOutcome> {
   const history = [...o.history];
   const instructions = o.root ? await projectRootFor(o.root, !!o.reviewMode).catch(() => null).then((project) => loadProjectInstructions({ root: o.root!, project, native: o.nativeInstructions })) : null;
   const skillRoot = o.root ? await projectRootFor(o.root,!!o.reviewMode).catch(()=>o.root) : null;
@@ -311,6 +324,9 @@ async function runLoop(o: RunOptions) {
     if((await loadSemantic(skillRoot??o.root)).enabled)tools=[...tools,SEMANTIC_TOOL];
     tools=[...tools,TERMINAL_READ_TOOL];
   }
+  // Knowledge base (docs/features/knowledge-base.md): read-only search of the collections selected for this chat.
+  const kb = o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames ? await knowledgeForChat(o.chatId).catch(() => null) : null;
+  if (kb) { tools = [...tools, KNOWLEDGE_TOOL]; system += "\n" + kb.prompt; }
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   if (planning) tools = tools.filter((t) => t.name === "use_skill" || modeAllowsTool(o.mode, t.name));
   const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning;
@@ -329,6 +345,13 @@ async function runLoop(o: RunOptions) {
     o = { ...o, approve: (req) => (hooks.approval(approvalTool(req as any), req), ask(req)) };
   }
   let stopReruns = 0;
+  // Verification gate (docs/features/verification-gates.md): the project's required checks run when the agent stops after
+  // editing files. Not in Plan/Ask mode, read-only access, runs without tools or subagents of a read-only type.
+  const gateScope = o.project ?? project;
+  const gateConfig = o.root && o.supportsTools !== false && o.access !== "readonly" && !planning && !o.toolNames && gateScope ? await loadVerificationConfig(gateScope).catch(() => null) : null;
+  const gate = gateConfig?.checks.length ? createGate({ config: gateConfig, root: o.root!, project, access: o.access, allowlist: o.allowlist, approve: o.approve, signal: o.signal, onProgress: (p) => o.onActivity?.(p) }) : null;
+  if (gate) system += `\nThe project defines required checks (${gateConfig!.checks.map((c) => c.name).join(", ")}). When you stop after editing files, Gustaf runs them; if one fails you get its output and must fix the cause. Never claim the work is done or verified before they pass.`;
+  let verification: RunOutcome["verification"];
   // MCP tools: main loop only (subagents have a fixed allowlist), and only for models that take tools.
   const mcp = o.supportsTools === false || o.toolNames || planning ? null : await loadMcpToolset({ project, access: o.access, reserved: tools.map((t) => t.name), signal: o.signal }).catch(() => null);
   if (mcp?.defs.length) {
@@ -363,22 +386,47 @@ async function runLoop(o: RunOptions) {
       meta: { provider: o.providerId, model: o.model, responseId: out.responseId, usage: out.usage, durationMs: calls.length ? undefined : Date.now() - started },
     };
     history.push(assistant);
-    await o.onMessage(assistant);
+    // The agent's last message of a turn is stored after the gate has run, so the verification card sits with it (and the
+    // final text stays the last message of the turn). Everything else is stored right away.
+    let stored = false;
+    const store = async (extra: Part[] = []) => {
+      if (stored) return;
+      stored = true;
+      await o.onMessage(extra.length ? { ...assistant, parts: [...assistant.parts, ...extra] } : assistant);
+    };
+    if (calls.length || !gate?.pending()) await store();
     if (!calls.length) {
-      const clarifications = await o.takeClarifications?.() ?? [];
-      if (clarifications.length) { for (const msg of clarifications) { history.push(msg); await o.onMessage(msg); } continue; }
-      // A stop hook may send the agent back to work once per turn (exit 2); after that one re-run stop hooks stay quiet.
-      if (hooks?.active && !o.subagent && !o.toolNames && stopReruns < 1 && !o.signal.aborted) {
-        const follow = await hooks.stop(out.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
-        if (follow && !o.signal.aborted) {
-          stopReruns++;
-          const msg: Msg = { role: "user", parts: [{ type: "text", text: follow }] };
-          history.push(msg);
-          await o.onMessage(msg);
-          continue;
+      try {
+        const clarifications = await o.takeClarifications?.() ?? [];
+        if (clarifications.length) { await store(); for (const msg of clarifications) { history.push(msg); await o.onMessage(msg); } continue; }
+        // A stop hook may send the agent back to work once per turn (exit 2); after that one re-run stop hooks stay quiet.
+        if (hooks?.active && !o.subagent && !o.toolNames && stopReruns < 1 && !o.signal.aborted) {
+          const follow = await hooks.stop(out.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+          if (follow && !o.signal.aborted) {
+            stopReruns++;
+            await store();
+            const msg: Msg = { role: "user", parts: [{ type: "text", text: follow }] };
+            history.push(msg);
+            await o.onMessage(msg);
+            continue;
+          }
         }
+        // Gates run after the stop hooks: one cycle per stop (not per tool call), only when this run edited files.
+        if (gate?.pending()) {
+          const g = await gate.run();
+          await store([g.part]);
+          verification = g.report.outcome === "passed" ? { outcome: "passed", summary: g.part.output ?? "" } : { outcome: "failed", ...(g.report.reason ? { reason: g.report.reason } : {}), summary: g.part.output ?? "" };
+          if (g.feedback && !o.signal.aborted) {
+            const msg: Msg = { role: "user", parts: [{ type: "text", text: g.feedback }] };
+            history.push(msg);
+            await o.onMessage(msg);
+            continue;
+          }
+        }
+        return { verification };
+      } finally {
+        await store();
       }
-      return;
     }
 
     const results: Part[] = [];
@@ -435,6 +483,8 @@ async function runLoop(o: RunOptions) {
           results.push({ ...res, output: r.v });
         } else {
           results.push({ ...res, output: await runTool(call, o, { act, project, skills }) });
+          // A successful edit makes the next stop need a verification gate.
+          if (gate && (call.name === "edit_file" || call.name === "write_file")) gate.noteEdit();
         }
         if (hooked) {
           const done = results[results.length - 1] as Extract<Part, { type: "tool_result" }>;
@@ -455,4 +505,5 @@ async function runLoop(o: RunOptions) {
     history.push(toolMsg);
     await o.onMessage(toolMsg);
   }
+  return { verification };
 }

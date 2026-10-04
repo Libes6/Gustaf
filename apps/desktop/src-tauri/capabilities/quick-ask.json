@@ -1,0 +1,82 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quick-ask",
+  "description": "Capability for the quick-ask window (label quick-ask). Show, hide, resize and focus go through app commands in quick_ask.rs, so only events, dragging the borderless window and the HTTP scope for model requests are granted: no shell, dialog, opener, notification or global shortcut permissions. See docs/features/quick-ask.md.",
+  "windows": [
+    "quick-ask"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:allow-emit-to",
+    "core:window:allow-start-dragging",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "https://*:*"
+        },
+        {
+          "url": "http://localhost:*"
+        },
+        {
+          "url": "http://127.0.0.1:*"
+        },
+        {
+          "url": "http://\\[\\:\\:1\\]:*"
+        },
+        {
+          "url": "http://([^.]+):*"
+        },
+        {
+          "url": "http://(10\\.\\d+\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.1[6-9]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.2\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(172\\.3[01]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(192\\.168\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(169\\.254\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.6[4-9]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.[7-9]\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.1[01]\\d\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://(100\\.12[0-7]\\.\\d+\\.\\d+):*"
+        },
+        {
+          "url": "http://*.local:*"
+        },
+        {
+          "url": "http://*.lan:*"
+        },
+        {
+          "url": "http://*.internal:*"
+        },
+        {
+          "url": "http://*.home.arpa:*"
+        },
+        {
+          "url": "http://*.ts.net:*"
+        }
+      ]
+    }
+  ]
+}

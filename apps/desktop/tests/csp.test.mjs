@@ -161,17 +161,21 @@ const KNOWN_HOSTS = new Set([
   'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com',
 ]);
 
-test('build: index.html has no inline script, inline handler, style block or external reference', (t) => {
+/** The two HTML entries: the app and the quick-ask window (src-tauri/src/quick_ask.rs loads `quick-ask.html`). */
+const ENTRIES = ['index.html', 'quick-ask.html'];
+
+for (const entry of ENTRIES) test(`build: ${entry} has no inline script, inline handler, style block or external reference`, (t) => {
   if (!built) return t.skip('build skipped');
-  const html = readFileSync(join(dist, 'index.html'), 'utf8');
+  assert.ok(existsSync(join(dist, entry)), `${entry} missing from the build output (vite.config.ts build.rollupOptions.input)`);
+  const html = readFileSync(join(dist, entry), 'utf8');
   for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(m[1], /\bsrc="\/assets\//, `inline <script> in index.html (CSP script-src has no 'unsafe-inline'): ${m[0].slice(0, 120)}`);
+    assert.match(m[1], /\bsrc="\/assets\//, `inline <script> in ${entry} (CSP script-src has no 'unsafe-inline'): ${m[0].slice(0, 120)}`);
     assert.equal(m[2].trim(), '', 'script with src must be empty');
   }
-  assert.ok(!/\son[a-z]+\s*=/i.test(html), 'inline event handler attribute in index.html');
-  assert.ok(!/<style\b/i.test(html), 'a <style> block in index.html would need a hash/nonce');
-  assert.ok(!/\sstyle\s*=/i.test(html), 'inline style attribute in index.html');
-  for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)) assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `external reference in index.html: ${m[1]}`);
+  assert.ok(!/\son[a-z]+\s*=/i.test(html), `inline event handler attribute in ${entry}`);
+  assert.ok(!/<style\b/i.test(html), `a <style> block in ${entry} would need a hash/nonce`);
+  assert.ok(!/\sstyle\s*=/i.test(html), `inline style attribute in ${entry}`);
+  for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)) assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `external reference in ${entry}: ${m[1]}`);
 });
 
 test('build: the main bundle needs no eval, so script-src unsafe-eval is only for the canvas frame', (t) => {
@@ -271,6 +275,20 @@ test('browser: the production build boots under the production CSP without viola
   } finally { server.close(); await chrome.close(); }
 });
 
+test('browser: the quick-ask entry boots under the production CSP without violations', async (t) => {
+  if (!built) return t.skip('build skipped');
+  const chrome = await launchChrome();
+  if (!chrome) return t.skip('no local Chrome (set CHROME_BIN)');
+  const { server, origin } = await serve(dist, cspString(security.csp));
+  try {
+    const page = await chrome.open(`${origin}/quick-ask.html`, { init: TAURI_STUB });
+    const rendered = await page.waitFor("document.querySelector('[role=dialog] textarea') !== null");
+    await new Promise((r) => setTimeout(r, 1000));
+    assert.deepEqual(violations(page.messages), [], 'CSP violations while loading the quick-ask window:\n' + page.messages.join('\n'));
+    assert.ok(rendered, 'the quick-ask window did not render its input:\n' + page.messages.join('\n'));
+  } finally { server.close(); await chrome.close(); }
+});
+
 test('browser: canvas srcdoc iframe still runs under the parent CSP and stays isolated', async (t) => {
   if (!built) return t.skip('build skipped');
   const chrome = await launchChrome();
@@ -350,4 +368,31 @@ test('capabilities: broad plugin defaults stay replaced by the permissions actua
   for (const broad of ['dialog:default', 'opener:default', 'notification:default', 'shell:default', 'global-shortcut:default', 'core:window:default']) assert.ok(!ids.includes(broad), `${broad} grants more than the app uses`);
   for (const unused of ['core:window:allow-show', 'core:window:allow-hide', 'core:window:allow-set-focus']) assert.ok(!ids.includes(unused), `${unused} is not called from the frontend (computer.rs hides/shows the window in Rust)`);
   assert.equal(new Set(ids).size, ids.length, 'duplicate permission entries');
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 5. The quick-ask window has its own, much smaller capability
+// ---------------------------------------------------------------------------------------------------------------------
+
+const quickCaps = JSON.parse(readFileSync(join(root, 'src-tauri/capabilities/quick-ask.json'), 'utf8'));
+const quickIds = quickCaps.permissions.map((p) => typeof p === 'string' ? p : p.identifier);
+
+test('capabilities: quick-ask applies to its own window only and main does not get it', () => {
+  assert.deepEqual(quickCaps.windows, ['quick-ask']);
+  assert.deepEqual(caps.windows, ['main'], 'the default capability must not grow to the quick-ask window');
+  assert.equal(conf.app.windows.some((w) => w.label === 'quick-ask'), false, 'the window is created on demand by Rust, not at startup');
+});
+
+test('capabilities: quick-ask grants exactly events, dragging and the model-request http scope', () => {
+  assert.deepEqual([...quickIds].sort(), ['core:event:allow-emit-to', 'core:event:allow-listen', 'core:event:allow-unlisten', 'core:window:allow-start-dragging', 'http:default'].sort());
+  for (const forbidden of ['shell', 'dialog', 'opener', 'notification', 'global-shortcut', 'updater', 'process', 'core:default']) {
+    assert.ok(!quickIds.some((id) => id.startsWith(forbidden)), `quick-ask must not hold ${forbidden}*: window operations are Rust commands in quick_ask.rs`);
+  }
+  assert.equal(new Set(quickIds).size, quickIds.length, 'duplicate permission entries');
+});
+
+test('capabilities: the quick-ask http scope is the same as the main window (it makes the same provider requests) and has no catch-all', () => {
+  const mine = quickCaps.permissions.find((p) => typeof p === 'object' && p.identifier === 'http:default').allow.map((a) => a.url);
+  assert.deepEqual(mine, scoped('http:default').allow.map((a) => a.url));
+  assert.ok(!mine.some((u) => /^http:\/\/\*(:\*)?$/.test(u)));
 });

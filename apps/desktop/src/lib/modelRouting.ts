@@ -69,3 +69,14 @@ export function cheapTarget(s: AgentSettings, c: Catalog, fallback: { provider: 
   const model = provider === fallback.provider && ref.providerId !== fallback.provider.id ? fallback.model : ref.model;
   return { provider, model, info: findModel(c, { providerId: provider.id, model }) };
 }
+
+/**
+ * Provider and model for the AI review of changes: the model configured for the `review` agent type when it is usable
+ * (Settings > Agents), else the cheap model, else the given one.
+ */
+export function reviewTarget(s: AgentSettings, c: Catalog, fallback: { provider: ProviderConfig; model: string }): { provider: ProviderConfig; model: string; info?: ModelInfo } {
+  const ref = s.models.review;
+  const provider = ref && isUsable(c, ref) ? findProvider(c, ref) : undefined;
+  if (ref && provider) return { provider, model: ref.model, info: findModel(c, ref) };
+  return cheapTarget(s, c, fallback);
+}

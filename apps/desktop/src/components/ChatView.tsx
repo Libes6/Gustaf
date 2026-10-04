@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { requestTerminalCommand } from "../lib/terminalBridge";
+import { onComposerDraft, takeComposerDraft } from "../lib/composerBridge";
 import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
@@ -21,6 +22,7 @@ import { AgentsColumn, AgentsToggle } from "./AgentsPanel";
 import { ChangesPanel } from "./ChangesPanel";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { useChatMode } from "../lib/useChatMode";
+import { useChatKnowledge } from "../lib/useChatKnowledge";
 import { planToInstruction, type Plan } from "../agent/planCore";
 import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
 import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
@@ -30,6 +32,8 @@ import { BranchPicker } from "./chat/BranchPicker";
 import { BranchBar } from "./chat/BranchBar";
 import { LiveStatus } from "./chat/LiveStatus";
 import { TurnView, type TurnHandlers } from "./chat/TurnView";
+import { useAutoMemorySuggest } from "../lib/useAutoMemorySuggest";
+import { MemorySuggestDialog } from "./MemoryDialogs";
 
 export function ChatView({ session, visible }: { session: ChatSession; visible: boolean }) {
   const t = useT();
@@ -70,13 +74,22 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
   const tasks = useBackgroundTasks(root);
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
+  // A draft requested from outside (the merge queue's "Resolve with agent") lands in this chat's message box; it is never sent.
+  useEffect(() => {
+    if (!visible || session.chatId === null) return;
+    const take = () => { const d = takeComposerDraft(session.chatId); if (d) continueAgent(d); };
+    take();
+    return onComposerDraft(take);
+  }, [visible, session.chatId]);
   const [mode, setMode] = useChatMode(session.chatId);
+  const knowledge = useChatKnowledge(session.chatId);
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
     workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
   });
   const { stream, error, running, approval, toolResults, activities } = run;
+  const autoMemory = useAutoMemorySuggest({ chatId: session.chatId, running: run.ownRunning, active: visible, projectRoot: projectRoot });
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
   const latest = useRef({ run, title: "", branchLabel: "", messages, setMode });
   latest.current = { run, title: chat?.title ?? "", branchLabel: t("branchSuffix"), messages, setMode };
@@ -187,7 +200,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       </div>}
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
-        root={root} projectName={project?.name} files={files}
+        root={root} projectName={project?.name} files={files} knowledge={{ ...knowledge, onManage: () => app.openSettings("knowledge") }}
         workspace={{
           available: !workspace && !!project && isGit && messages.length === 0 && !running,
           on: newWorkspace, onToggle: () => setNewWorkspace(v => !v),
@@ -200,6 +213,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         canRestore={messages.some(m => m.meta?.compacted)}
         onCompact={run.compact} onRestore={run.restoreContext}
       />
+      {autoMemory.found && chat && autoMemory.found.chatId === chat.id && <MemorySuggestDialog chat={chat} project={project ?? null} initial={autoMemory.found.suggestions} onClose={autoMemory.dismiss} />}
     </main>
     </CanvasWorkspace>
   );

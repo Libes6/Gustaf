@@ -299,8 +299,9 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       };
       const timer = setTimeout(() => stopFor("time"), budget.maxMs);
 
+      let gateNote = "";
       try {
-        await runAgent({
+        const outcome = await runAgent({
           root: workspace,
           reviewMode,
           reviewLinked: linked,
@@ -358,6 +359,8 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
             }
           },
         });
+        // A verification gate (the project's required checks) that this agent could not satisfy is reported with the run.
+        if (outcome?.verification?.outcome === "failed") gateNote = `Failed verification. ${outcome.verification.summary}`;
       } catch (e) {
         if (!(ctl.signal.aborted || isAbortError(e))) failure = String((e as Error)?.message ?? e);
       } finally {
@@ -372,6 +375,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       const { changed, warnings } = await collectChanges(reviewId, discard);
 
       if (runner.note) warnings.push(runner.note);
+      if (gateNote) warnings.push(gateNote.slice(0, 600));
       if (stopReason) recordStep(id, { at: now(), kind: "note", text: stopReason === "budget" ? `Stopped: ${reason}.` : `Stopped at its ${reason}.`, error: true });
       const report = buildReport({ title, type, status, text: lastText, reason, changed, warnings, ...(runner.via ? { via: runner.via } : {}) });
       finish(status, { summary: clip(lastText, MAX_SUMMARY), report: lastText, ...(failure ? { error: clip(failure, 1000) } : stopReason ? { error: stopReason === "budget" ? `Stopped: ${reason}` : `Stopped at its ${reason}` } : {}), ...(changed.length ? { changed } : {}), ...(warnings.length ? { warnings } : {}) });
