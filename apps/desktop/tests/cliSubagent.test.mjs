@@ -511,3 +511,49 @@ test('without provider or role nothing changes: the API subagent loop runs as be
   assert.equal(s.calls.length, 0);
   assert.ok(seen[0].tools.length > 0, 'the loop offers its own tools');
 });
+
+// ---- hardening (docs/subagents-review.md) ----
+
+test('stopped while its worktree is being created: the CLI never starts and the untouched worktree is removed', async () => {
+  const base = fakeWorktrees({ touched: false });
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const wt = { ...base, create: async (a) => { await gate; return base.create(a); } };
+  const { host, parent, calls } = setup({ defs: cliDefs(finishWith('should not run')), wt });
+  const pending = host.spawn({ title: 'Slow setup', prompt: 'p', type: 'general', provider: 'codex1' }, parent);
+  await sleep(20);
+  stopRun(getRuns()[0].id);
+  release();
+  const out = await pending;
+  assert.equal(calls.length, 0, 'no CLI process for a stopped task');
+  assert.deepEqual(base.log.removed, ['w1'], 'the cleanup setting is off, but an untouched worktree of a task that never ran is not kept');
+  assert.equal(getRuns()[0].status, 'cancelled');
+  assert.match(out, /was cancelled/);
+});
+
+test('a parent stop that lands after the slot was granted never prepares a directory or starts the CLI', async () => {
+  const wt = fakeWorktrees();
+  let s;
+  // The budget check is the last await before the run starts: the parent is stopped right there.
+  s = setup({ defs: cliDefs(finishWith('x')), wt, hostCfg: { checkBudget: async () => (s.ctl.abort(), null), settings: settingsWith({ allowedProviders: ['codex1'], stopOnBudget: true }) } });
+  const out = await s.host.spawn({ title: 'Late stop', prompt: 'p', type: 'general', provider: 'codex1' }, s.parent);
+  assert.equal(wt.log.created.length, 0);
+  assert.equal(s.calls.length, 0);
+  assert.equal(getRuns()[0].status, 'cancelled');
+  assert.match(out, /Cancelled before it started/);
+});
+
+test('gitSubagentWorktrees.inspect: a checkout whose status cannot be listed counts as touched (never removed)', async () => {
+  const { worktrees } = await import('../src/lib/worktrees.ts');
+  const { gitSubagentWorktrees } = await import('../src/lib/subagentWorktrees.ts');
+  const saved = { diff: worktrees.diff, list: worktrees.list };
+  try {
+    worktrees.diff = async () => ({ files: [] });
+    worktrees.list = async () => { throw new Error('ps'); };
+    assert.equal((await gitSubagentWorktrees.inspect('/p', 'w1')).touched, true);
+    worktrees.list = async () => [{ taskId: 'w1', dirty: false, headSha: 'abc', baseCommit: 'abc', ahead: 0 }];
+    assert.equal((await gitSubagentWorktrees.inspect('/p', 'w1')).touched, false, 'a clean, known checkout is untouched');
+  } finally {
+    Object.assign(worktrees, saved);
+  }
+});

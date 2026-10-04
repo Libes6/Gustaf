@@ -204,6 +204,9 @@ export const git = async (root, args, shadow) => {
   return r.stdout;
 };
 
+/** Git repository info (src-tauri/src/git.rs): not available in tests; only imported by the workspace store. */
+export const gitRepo = new Proxy({}, { get: () => async () => { throw new Error('gitRepo is not available in tests'); } });
+
 export const review = {
   prepare: async () => { throw new Error('not in tests'); },
   list: async () => [],

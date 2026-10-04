@@ -258,6 +258,11 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
         recordStep(id, { at: now(), kind: "note", text: `Not started: ${reason}.`, error: true });
         return { status: "budget", report: buildReport({ title, type, status: "budget", text: "", reason: `not started, ${reason}` }) };
       }
+      // Stopped (or the parent stopped) while the budget was checked: never prepare a copy or worktree, never start the CLI.
+      if (ctl.signal.aborted) {
+        finish("cancelled");
+        return { status: "cancelled", report: buildReport({ title, type, status: "cancelled", text: "Cancelled before it started." }) };
+      }
       updateRun(id, { status: "running", startedAt });
       if (runner.cli) return executeCli(startedAt);
       let workspace = parent.root;
@@ -366,7 +371,8 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       } finally {
         clearTimeout(timer);
       }
-      if (!stopReason && !ctl.signal.aborted && !failure && lastRole === "tool" && use.steps >= budget.maxSteps) stopReason = "steps";
+      // The loop ran out of steps while work was still pending: a tool result, or a verification gate's feedback (a user message).
+      if (!stopReason && !ctl.signal.aborted && !failure && lastRole !== "assistant" && use.steps >= budget.maxSteps) stopReason = "steps";
       const status: RunStatus = stopReason === "budget" ? "budget" : stopReason ? "limit" : failure ? "failed" : ctl.signal.aborted ? "cancelled" : "completed";
       const reason = stopReason === "budget" ? budgetStopMessage(overScope ?? "day") : stopReason ? breachMessage(stopReason, budget) : failure;
       const discard = !!opts.discardIfFailed && status === "failed";
@@ -478,8 +484,11 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
         recordMessage(id, "tool", [{ type: "tool_result", id: key, name: a.name || "tool", output: a.output ?? "", ...(a.status === "error" ? { isError: true } : {}) }], now());
         recordStep(id, activityStep(a, now()), {}, "");
       };
+      // Stopped while its directory was prepared: the CLI is never started and an untouched worktree is not left behind.
+      const launched = !ctl.signal.aborted;
       const timer = setTimeout(() => stopFor("time"), budget.maxMs);
       try {
+        if (!launched) throw new DOMException("Aborted", "AbortError");
         const out = await runner.adapter.turn({
           system: cliSubagentSystem(type, files),
           messages: [{ role: "user", parts: [{ type: "text", text: prompt }] }],
@@ -546,8 +555,8 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
         const seen = await worktreeHost.inspect(cfg.projectRoot, ws.taskId).catch(() => null);
         changed = seen?.files ?? [];
         let removed = false;
-        // An untouched worktree goes only when the user asked for that, or when this failed attempt is replaced by a retry; anything else stays.
-        if (seen && !seen.touched && (settings.cleanupUntouchedWorktrees || discard)) removed = await worktreeHost.remove(cfg.projectRoot, ws.taskId).catch(() => false);
+        // An untouched worktree goes only when the user asked for that, when this failed attempt is replaced by a retry, or when the CLI never started; anything else stays.
+        if (seen && !seen.touched && (settings.cleanupUntouchedWorktrees || discard || !launched)) removed = await worktreeHost.remove(cfg.projectRoot, ws.taskId).catch(() => false);
         if (!seen) warnings.push(`Could not read the changes of worktree ${ws.path}; it was left in place on branch ${ws.branch}.`);
         else if (!removed) warnings.push(`Worktree left in place on branch ${ws.branch} (${ws.path}); nothing was committed, merged or pushed.`);
         branch = { name: ws.branch, path: ws.path, ...(removed ? { removed: true } : {}) };

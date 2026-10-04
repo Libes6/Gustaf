@@ -29,7 +29,8 @@ export const gitSubagentWorktrees: SubagentWorktrees = {
   async inspect(projectRoot, taskId) {
     const [diff, list] = await Promise.all([worktrees.diff(projectRoot, taskId), worktrees.list(projectRoot).catch(() => [])]);
     const info = list.find((w) => w.taskId === taskId);
-    const committed = !!info && ((info.headSha != null && info.headSha !== info.baseCommit) || (info.ahead ?? 0) > 0);
+    // Without the checkout's status (listing failed or it is missing) its dirty and commit state are unknown: it counts as touched, so it is never removed.
+    const committed = !info || (info.headSha != null && info.headSha !== info.baseCommit) || (info.ahead ?? 0) > 0;
     return { files: diff.files.map((f) => f.path), touched: diff.files.length > 0 || !!info?.dirty || committed };
   },
 
