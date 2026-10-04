@@ -4,6 +4,7 @@ import { buildPairingUri, countdown, formatCode, groupFingerprint, qrMatrix, qrP
 import { mobileServer, type MobileDevice, type MobileStatus } from "../lib/mobileServer";
 
 const POLL_MS = 2000;
+const list = (v: MobileDevice[] | undefined | null): MobileDevice[] => (Array.isArray(v) ? v : []);
 
 function Qr({ text, label }: { text: string; label: string }) {
   const matrix = qrMatrix(text);
@@ -29,8 +30,8 @@ export function MobileSettings() {
   const refresh = useCallback(async () => {
     try {
       const s = await mobileServer.status();
-      setStatus(s);
-      setDevices(await mobileServer.devices());
+      setStatus(s ?? null);
+      setDevices(list(await mobileServer.devices()));
     } catch (e) {
       setError(String(e));
     }
@@ -56,7 +57,7 @@ export function MobileSettings() {
     try {
       const s = await action();
       if (s) setStatus(s);
-      setDevices(await mobileServer.devices());
+      setDevices(list(await mobileServer.devices()));
     } catch (e) {
       setError(String(e));
     } finally {
