@@ -178,23 +178,26 @@ impl Loopback {
         let state = state.to_string();
         std::thread::spawn(move || {
             let deadline = Instant::now() + timeout;
-            loop {
+            let outcome = loop {
                 if entry.cancel.load(Ordering::SeqCst) {
-                    return finish(&entry, Err("sign-in cancelled".into()));
+                    break Err("sign-in cancelled".into());
                 }
                 if Instant::now() >= deadline {
-                    return finish(&entry, Err("timed out waiting for the browser sign-in".into()));
+                    break Err("timed out waiting for the browser sign-in".into());
                 }
                 match listener.accept() {
                     Ok((mut stream, _)) => {
                         if let Verdict::Done(r) = handle(&mut stream, port, &state) {
-                            return finish(&entry, r);
+                            break r;
                         }
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(25)),
-                    Err(e) => return finish(&entry, Err(format!("redirect listener failed: {e}"))),
+                    Err(e) => break Err(format!("redirect listener failed: {e}")),
                 }
-            }
+            };
+            // wait() must not return while the redirect port is still open.
+            drop(listener);
+            finish(&entry, outcome);
         });
         Ok(Started { id, port })
     }

@@ -600,6 +600,7 @@ mod tests {
         let (root, store) = (base.join("repo"), base.join("store"));
         fs::create_dir_all(&root).unwrap();
         g(&root, &["init", "-q", "-b", "main"]);
+        g(&root, &["config", "core.autocrlf", "false"]);
         for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false"), ("core.hooksPath", base.join("nohooks").to_str().unwrap())] {
             g(&root, &["config", k, v]);
         }
