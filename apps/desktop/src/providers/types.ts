@@ -85,6 +85,8 @@ export type TurnInput = {
   access?: "readonly" | "auto" | "full";
   /** Chat mode: CLI adapters pass their native plan / read-only flags for "plan" and "ask". */
   mode?: "ask" | "plan" | "agent";
+  /** CLI adapters: on abort kill the CLI's whole process tree, not only the process itself (used by CLI subagents). */
+  killTree?: boolean;
   signal: AbortSignal;
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;

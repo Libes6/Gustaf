@@ -26,6 +26,7 @@ mod updater;
 mod worktree;
 mod merge_queue;
 mod terminal;
+mod proc_tree;
 mod quick_ask;
 
 pub use knowledge::{extract_pdf_with_exe, pdf_child_main};
@@ -117,6 +118,7 @@ pub fn run() {
             tools::read_home_file,
             tools::run_command,
             hook_exec::run_hook,
+            proc_tree::process_kill_tree,
             git::git,
             git::git_status,
             git::git_commit_context,

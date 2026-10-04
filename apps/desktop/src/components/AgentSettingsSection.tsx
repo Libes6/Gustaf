@@ -8,6 +8,7 @@ import { parseTokenLimit } from "../lib/budgets";
 import { rolloutEnabled, setRolloutEnabled } from "../providers/codexRollout";
 import { runsOwnTools } from "../lib/modelRouting";
 import { useApp } from "../state";
+import { AgentRolesSection } from "./AgentRolesSection";
 import "../styles/agents.css";
 
 // Settings > Usage: models, limits, orchestration default and notifications of background agents (stored as "agentSettings").
@@ -217,6 +218,7 @@ export function AgentSettingsSection() {
         </div>
         <CodexSessionsRow />
       </div>
+      <AgentRolesSection />
     </>
   );
 }

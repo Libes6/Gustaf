@@ -7,7 +7,7 @@ import { commandAllowed, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
-import { cheapTarget, subagentModelResolver } from "./modelRouting";
+import { cheapTarget, parkCliAccount, providerDirectory, subagentModelResolver } from "./modelRouting";
 import { beginApproval, reportChatRun } from "./attention";
 import { chatStatusStore } from "./chatStatus";
 import type { LiveStats } from "../components/LiveMeter";
@@ -330,7 +330,7 @@ export function useChatRun(o: Options) {
         signal: ctl.signal,
         stop: () => ctl.abort(),
         approve,
-        subagents: runRoot ? createSubagentHost({ projectRoot: runRoot, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app) }) : undefined,
+        subagents: runRoot ? createSubagentHost({ projectRoot: runRoot, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app), providers: providerDirectory(app), onCliFailure: parkCliAccount }) : undefined,
       }, deps, {
         onReview: r => { reviewRef.current = r; },
         onNotice: setError,

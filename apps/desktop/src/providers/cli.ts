@@ -48,11 +48,19 @@ async function claudeExecutable() {
   return probe.stdout.trim();
 }
 
+/** Kills a child process and everything below it (src-tauri/src/proc_tree.rs); never throws. */
+async function killProcessTree(pid: number) {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("process_kill_tree", { pid });
+  } catch { /* the plain kill that follows still ends the process itself */ }
+}
+
 /** Runs a login-shell script and feeds each stdout JSON line to onLine; non-JSON lines are skipped. */
 export async function spawnLines(
   script: string,
   onLine: (e: any) => void,
-  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void } = {},
+  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void; /** On abort kill the whole process tree, not only the child. */ killTree?: boolean } = {},
 ) {
   if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
@@ -79,7 +87,7 @@ export async function spawnLines(
   });
   cmd.stderr.on("data", (s: string) => (stderr += s));
   const child = await cmd.spawn();
-  const kill = () => { child.kill().catch(() => {}); };
+  const kill = () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); };
   o.signal?.addEventListener("abort", kill, { once: true });
   if (o.signal?.aborted) kill();
   if (o.stdin != null) await child.write(o.stdin);
@@ -244,7 +252,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
+        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, killTree: t.killTree, env: cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       } finally {
         // The turn is over: one last scan unless it was stopped, then the polling ends.
