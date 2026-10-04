@@ -25,6 +25,7 @@ mod updater;
 mod worktree;
 mod merge_queue;
 mod terminal;
+mod quick_ask;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -34,6 +35,12 @@ pub fn run() {
     tauri::Builder::default()
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
+        .manage(quick_ask::QuickAsk::default())
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                quick_ask::on_main_destroyed(window.app_handle());
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
@@ -146,6 +153,13 @@ pub fn run() {
             oauth::oauth_loopback_start,
             oauth::oauth_loopback_wait,
             oauth::oauth_loopback_cancel,
+            quick_ask::quick_ask_configure,
+            quick_ask::quick_ask_show,
+            quick_ask::quick_ask_hide,
+            quick_ask::quick_ask_toggle,
+            quick_ask::quick_ask_ready,
+            quick_ask::quick_ask_resize,
+            quick_ask::quick_ask_open_main,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

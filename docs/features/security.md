@@ -46,3 +46,5 @@ After changing the CSP, run once in `npm run tauri dev` (dev policy) and in a de
 - look for "Refused to ..." in the web inspector console.
 
 To switch the CSP off temporarily, set `"csp": null` (and remove `devCsp`) under `app.security` in `src-tauri/tauri.conf.json`.
+
+The quick-ask window (`docs/features/quick-ask.md`) has its own capability file `capabilities/quick-ask.json`: events (listen, unlisten, emit-to), window dragging and the same `http:default` scope. Showing, hiding and resizing it are Rust commands, so it holds no shell, dialog, opener, notification or global-shortcut permission. `tests/csp.test.mjs` pins the list.
