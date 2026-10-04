@@ -5,11 +5,13 @@ import type { RetryInfo } from "./retry";
 
 /** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. `stopped`: interrupted or cut off (the turn or the whole run ended first); neutral, not a failure. */
 export type SubagentState = "running" | "waiting" | "completed" | "failed" | "stopped";
-/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose values replace the old ones. */
+/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose cumulative counters supplement stream lifecycle updates. */
 export type SubagentInfo = {
   provider: "codex" | "claude";
   /** Codex thread id or Claude `tool_use` id; empty while a Codex spawn is still in flight. */
   agentId: string;
+  /** Canonical Codex task path, also accepted by collaboration tools. */
+  agentPath?: string;
   /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
   title: string;
   /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
@@ -31,6 +33,8 @@ export type SubagentInfo = {
   /** Codex rollout scan only (providers/codexRollout.ts): total tokens, start and end (Unix ms) and run time. */
   tokens?: number;
   startedAt?: number;
+  /** Latest genuine Codex task_started, distinct from the thread creation time. */
+  turnStartedAt?: number;
   endedAt?: number;
   durationMs?: number;
 };
