@@ -1144,5 +1144,20 @@
   "sentImageAlt": "Прикреплённое изображение {n}",
   "changesChipChat": "Изменено файлов · {count}",
   "changesChipTree": "Не закоммичено · {count}",
-  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно."
+  "changesLinesUnknown": "Для новых неотслеживаемых файлов число строк недоступно.",
+  "agentRolesTitle": "Роли и провайдеры агентов",
+  "agentRolesLead": "Делегированная задача может указать роль или провайдера (Codex, Claude Code, Cursor Agent) вместо модели.",
+  "agentRolesDesc": "Роль — это пресет: провайдер и модель, на которых запускается задача с этой ролью. Её провайдер должен быть разрешён ниже; выбор здесь разрешает его.",
+  "agentRolePlanner": "Планировщик",
+  "agentRoleImplementer": "Исполнитель",
+  "agentRoleReviewer": "Ревьюер",
+  "agentRoleTester": "Тестировщик",
+  "agentRoleModel": "Провайдер и модель для роли «{role}»",
+  "agentRoleNone": "Не задано",
+  "agentAllowedProviders": "Провайдеры, которых могут запрашивать агенты",
+  "agentAllowedProvidersDesc": "Провайдеры, которых могут указывать spawn_agent и delegate_tasks. CLI-агент работает в собственном git worktree на ветке gustaf/, которую вы вливаете сами; он никогда не вливает и не отправляет.",
+  "agentAllowedProviderAdd": "Разрешить провайдера",
+  "agentAllowedProviderRemove": "Больше не разрешать {provider}",
+  "agentCleanupWorktrees": "Удалять нетронутые worktree субагентов",
+  "agentCleanupWorktreesDesc": "Если CLI-субагент завершился без изменений, удалить его worktree и ветку. Выключено: они всегда сохраняются."
 }
