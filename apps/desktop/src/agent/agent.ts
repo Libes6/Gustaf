@@ -1,4 +1,5 @@
 import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
+import { KNOWLEDGE_TOOL, knowledgeForChat, runKnowledgeSearch } from "./knowledge";
 import { SEMANTIC_TOOL, semanticSearch, formatSemanticHits, loadSemantic } from "./semanticSearch";
 import { WEB_TOOLS, webConfig, webDomain, webResult } from "./web";
 import { computer, fsx, getSetting, type CuAction } from "../lib/api";
@@ -151,6 +152,7 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
       if(typeof a.query!=="string"||!a.query.trim()||a.query.length>2000)throw Error("Invalid semantic query");
       return formatSemanticHits(await semanticSearch(root,a.query,typeof a.limit==="number"?a.limit:8,ctx.project??root));
     }
+    case "knowledge_search": return runKnowledgeSearch(o.chatId, o.signal, a);
     case "read_terminal": {
       if(!root || o.source || o.subagent || o.toolNames)throw new ActionBlocked("Terminal output is available only in an interactive project chat.");
       if(!await o.approve({kind:"terminal",text:a.id == null ? "List terminals in this project." : `Read terminal #${a.id} output (may include credentials).`}))throw new ActionDeclined("User declined reading terminal output.");
@@ -311,6 +313,9 @@ async function runLoop(o: RunOptions) {
     if((await loadSemantic(skillRoot??o.root)).enabled)tools=[...tools,SEMANTIC_TOOL];
     tools=[...tools,TERMINAL_READ_TOOL];
   }
+  // Knowledge base (docs/features/knowledge-base.md): read-only search of the collections selected for this chat.
+  const kb = o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames ? await knowledgeForChat(o.chatId).catch(() => null) : null;
+  if (kb) { tools = [...tools, KNOWLEDGE_TOOL]; system += "\n" + kb.prompt; }
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   if (planning) tools = tools.filter((t) => t.name === "use_skill" || modeAllowsTool(o.mode, t.name));
   const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning;
