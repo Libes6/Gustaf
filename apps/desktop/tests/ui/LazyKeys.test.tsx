@@ -6,7 +6,7 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSettings } from "../../src/components/WebSettings";
 import { invalidateSecret, readSecret } from "../../src/lib/keys";
-import { deleteProvider, getAdapter, listAllModels, MODEL_TTL_MS, resetModelState, saveProvider } from "../../src/providers";
+import { deleteProvider, getAdapter, listAllModels, MODEL_TTL_MS, modelListLimits, resetModelState, saveProvider } from "../../src/providers";
 import type { ProviderConfig, TurnInput } from "../../src/providers/types";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -104,7 +104,12 @@ describe("lazy API keys", () => {
   it("concurrent first requests share one read", async () => {
     http();
     const a = await getAdapter(claude);
-    await Promise.all([a.listModels(), a.listModels(), a.turn(turn()).catch(() => {})]);
+    // The fake answers /v1/messages with no stream, which the adapter retries: the turn is stopped once the lists are in.
+    const ctl = new AbortController();
+    const sent = a.turn({ ...turn(), signal: ctl.signal }).catch(() => {});
+    await Promise.all([a.listModels(), a.listModels()]);
+    ctl.abort();
+    await sent;
     expect(reads()).toEqual(["provider:an"]);
   });
 
@@ -164,6 +169,52 @@ describe("lazy API keys", () => {
     // Not retried on every picker open.
     await listAllModels([openai], "stale");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a denied Keychain read names the key, records no 'absent' flag and is retried next time", async () => {
+    const log = http();
+    let deny = true;
+    mockInvoke({ secret_get: ({ id }: { id: string }) => { if (deny) throw "User canceled the operation."; return keychain.get(id) ?? null; } });
+    const a = await getAdapter(router);
+    await expect(a.turn(turn())).rejects.toThrow(/OpenRouter from the Keychain: User canceled the operation\. Allow/);
+    expect(log).toHaveLength(0);
+    expect(JSON.parse(settings.get("secretFlags") ?? "{}")).not.toHaveProperty("provider:or");
+    deny = false;
+    await a.turn(turn());
+    expect(log.map((r) => r.headers.Authorization)).toEqual(["Bearer key-or"]);
+  });
+
+  it("an adapter is rebuilt when its provider's settings changed elsewhere (e.g. in another window)", async () => {
+    const log = http();
+    await (await getAdapter(router)).listModels();
+    await (await getAdapter({ ...router, baseUrl: "https://moved.test/v1" })).listModels();
+    expect(log.map((r) => new URL(r.url).host)).toEqual(["openrouter.test", "moved.test"]);
+    expect(await getAdapter(router)).toBe(await getAdapter({ ...router }));
+  });
+
+  it("saving a new key lets the picker refetch at once instead of waiting out the failed attempt", async () => {
+    fetchMock.mockImplementation((async () => new Response("{}", { status: 401 })) as unknown as typeof tauriFetch);
+    const first = await listAllModels([openai], "stale");
+    expect(first.errors.oa).toBeTruthy();
+    http();
+    await saveProvider(openai, "fixed");
+    const next = await listAllModels([openai], "stale");
+    expect(next.errors).toEqual({});
+    expect(next.models.map((m) => m.id)).toEqual(["fresh-api.openai.test"]);
+  });
+
+  it("a provider that never answers does not hold back the other lists", async () => {
+    http();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(((url: string, init?: RequestInit) => (url.includes("openrouter") ? new Promise(() => {}) : answer(url, init))) as typeof tauriFetch);
+    modelListLimits.timeoutMs = 20;
+    try {
+      const { models, errors } = await listAllModels(api, "force");
+      expect(models.map((m) => m.id).sort()).toEqual(["fresh-api.anthropic.test", "fresh-api.openai.test"]);
+      expect(errors.or).toMatch(/did not answer/);
+    } finally {
+      modelListLimits.timeoutMs = 30_000;
+    }
   });
 
   it("readSecret caches a value but retries a missing one", async () => {

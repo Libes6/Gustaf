@@ -36,7 +36,7 @@ export function useAutoMemorySuggest(o: { chatId: number | null; running: boolea
       ctl.current?.abort();
       const c = new AbortController();
       ctl.current = c;
-      const r = await suggestMemories(latest.current.app, { chatId, projectRoot: latest.current.o.projectRoot, signal: c.signal });
+      const r = await suggestMemories(latest.current.app, { chatId, projectRoot: latest.current.o.projectRoot, signal: c.signal, auto: true });
       if (!c.signal.aborted && r.suggestions.length) setFound({ chatId, suggestions: r.suggestions });
     })().catch(() => {});
   }, [o.running]);

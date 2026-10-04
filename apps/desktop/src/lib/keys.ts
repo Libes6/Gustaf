@@ -63,10 +63,18 @@ export const invalidateSecret = (id?: string) => void (id === undefined ? values
 
 export const providerSecretId = (providerId: string) => `provider:${providerId}`;
 
-/** The lazy key of a provider. A provider known to have no key never touches the Keychain. */
-export const providerKey = (providerId: string): KeyGetter => async () => {
+/**
+ * The lazy key of a provider. A provider known to have no key never touches the Keychain. A failed read (the user
+ * denied access, the Keychain is locked) is reported with the provider's name instead of the bare OS message.
+ */
+export const providerKey = (providerId: string, label = providerId): KeyGetter => async () => {
   const id = providerSecretId(providerId);
   // Known to be absent: remembered as "no value" until the user saves one.
   if (!values.has(id) && (await secretPresence(id)) === false && !values.has(id)) values.set(id, Promise.resolve(null));
-  return (await readSecret(id)) ?? "";
+  try {
+    return (await readSecret(id)) ?? "";
+  } catch (e) {
+    const why = String((e as Error)?.message ?? e).replace(/\.$/, "");
+    throw new Error(`Could not read the API key of ${label} from the Keychain: ${why}. Allow access when the system asks, or enter the key again in Settings.`);
+  }
 };

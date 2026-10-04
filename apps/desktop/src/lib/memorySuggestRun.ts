@@ -4,7 +4,7 @@ import { buildSuggestPrompt, dedupeSuggestions, suggestBudget, suggestionsFromPa
 import { getAdapter } from "../providers";
 import type { ModelInfo, ProviderConfig, TokenUsage } from "../providers/types";
 import { loadMessages } from "./data";
-import { cheapTarget } from "./modelRouting";
+import { cheapTarget, runsOwnTools } from "./modelRouting";
 
 /** The parts of the app state the request needs (a subset of `AppState`, so it is easy to fake in tests). */
 export type SuggestApp = {
@@ -24,11 +24,13 @@ export class SuggestParseError extends Error {
  * from the agent settings, else the selected model, as a tool-less read-only turn. Returns the parsed suggestions that are not
  * already saved (global or this project). Nothing is stored here.
  */
-export async function suggestMemories(app: SuggestApp, o: { chatId: number; projectRoot: string | null; signal: AbortSignal }): Promise<{ suggestions: Suggestion[]; model: string }> {
+export async function suggestMemories(app: SuggestApp, o: { chatId: number; projectRoot: string | null; signal: AbortSignal; /** The end-of-chat run, not the user's request. */ auto?: boolean }): Promise<{ suggestions: Suggestion[]; model: string }> {
   const selection = app.selection;
   const provider = app.providers.find((p) => p.id === selection?.providerId);
   if (!provider || !selection) throw new Error("No model selected.");
   const target = cheapTarget(await loadAgentSettings(), app, { provider, model: selection.model });
+  // Like the automatic review: a CLI agent would start a whole agent run in the project folder (and spend its quota) unasked.
+  if (o.auto && runsOwnTools(target.provider)) return { suggestions: [], model: target.info?.name ?? target.model };
   const messages = await loadMessages(o.chatId);
   const hasProject = !!o.projectRoot;
   const { system, user } = buildSuggestPrompt(messages, { hasProject, budget: suggestBudget(target.info?.contextWindow) });

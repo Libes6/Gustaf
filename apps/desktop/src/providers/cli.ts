@@ -33,7 +33,11 @@ export function codexExecutable() {
     const probe = await shellCommand(findScript("codex", true)).execute();
     if (probe.code !== 0 || !probe.stdout.trim()) throw new Error("Codex CLI is unavailable");
     return probe.stdout.trim();
-  })();
+  })().catch((e) => {
+    // Not remembered: Codex installed (or logged in) after a failed probe must work without restarting the app.
+    codexPath = undefined;
+    throw e;
+  });
 }
 
 export async function cursorExecutable() {
