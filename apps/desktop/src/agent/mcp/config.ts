@@ -27,13 +27,16 @@ type Base = {
 export type StdioServer = Base & { transport: "stdio"; command: string; args: string[]; env: KV[]; cwd?: string };
 /** OAuth sign-in for an HTTP server: tokens live in the Keychain (`oauthSecretId`), never here. `clientId` skips dynamic registration. */
 export type OAuthConfig = { clientId?: string; scope?: string };
-export type HttpServer = Base & { transport: "http"; url: string; headers: KV[]; oauth?: OAuthConfig };
+/** How an HTTP server is spoken to: streamable HTTP, the legacy HTTP+SSE transport, or detect (streamable first, SSE when the initialize POST gets a 4xx). Absent means "auto". */
+export type HttpTransport = "auto" | "streamable" | "sse";
+export const HTTP_TRANSPORTS: readonly HttpTransport[] = ["auto", "streamable", "sse"];
+export type HttpServer = Base & { transport: "http"; url: string; headers: KV[]; oauth?: OAuthConfig; httpTransport?: HttpTransport };
 export type McpServer = StdioServer | HttpServer;
 export type McpConfig = { servers: McpServer[] };
 
 export type ImportError = { name: string; code: ErrorCode };
 export type ErrorCode =
-  | "json" | "empty" | "invalid" | "name" | "nameTaken" | "command" | "args" | "envKey" | "value" | "url" | "headerName" | "project" | "cwd" | "sse" | "tooMany" | "oauth";
+  | "json" | "empty" | "invalid" | "name" | "nameTaken" | "command" | "args" | "envKey" | "value" | "url" | "headerName" | "project" | "cwd" | "sse" | "tooMany" | "oauth" | "transport";
 
 const NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
 const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -104,6 +107,7 @@ export function validateServer(s: McpServer, others: readonly McpServer[] = []):
     if (!Array.isArray(s.headers) || s.headers.length > LIMITS.entries || s.headers.some((h) => !HEADER_RE.test(h.key))) errors.add("headerName");
     if (s.headers?.some((h) => badValue(h.value) || /[\r\n]/.test(h.value ?? ""))) errors.add("value");
     if (s.oauth !== undefined && !validOAuth(s.oauth)) errors.add("oauth");
+    if (s.httpTransport !== undefined && !HTTP_TRANSPORTS.includes(s.httpTransport)) errors.add("transport");
   }
   return [...errors];
 }
@@ -150,7 +154,7 @@ export function normalizeConfig(raw: unknown): McpConfig {
     };
     const s: McpServer =
       r.transport === "http"
-        ? { ...base, transport: "http", url: String(r.url ?? ""), headers: kvList(r.headers, false), ...(r.oauth && typeof r.oauth === "object" ? { oauth: oauthFrom(r.oauth) } : {}) }
+        ? { ...base, transport: "http", url: String(r.url ?? ""), headers: kvList(r.headers, false), ...(r.oauth && typeof r.oauth === "object" ? { oauth: oauthFrom(r.oauth) } : {}), ...(r.httpTransport === "streamable" || r.httpTransport === "sse" ? { httpTransport: r.httpTransport as HttpTransport } : {}) }
         : { ...base, transport: "stdio", command: String(r.command ?? ""), args: Array.isArray(r.args) ? [...r.args] : [], env: kvList(r.env, false), ...(typeof r.cwd === "string" && r.cwd ? { cwd: r.cwd } : {}) };
     if (validateServer(s, servers).length) continue;
     servers.push(s);
@@ -198,7 +202,7 @@ function kvFrom(raw: unknown, kind: "env" | "header"): KV[] | null {
 /**
  * Parses pasted JSON in the common shapes: `{ "mcpServers": { name: {...} } }`, VS Code's `{ "servers": {...} }`, or a
  * bare `{ name: {...} }` map (also without the outer braces). Entries: `command`/`args`/`env`/`cwd` (stdio) or
- * `url`/`headers` (streamable HTTP); `type: "sse"` (the legacy transport) is refused. Names are made unique against
+ * `url`/`headers` (HTTP: `type: "sse"` selects the legacy SSE transport, `"http"` / `"streamable-http"` streamable HTTP, otherwise it is detected). Names are made unique against
  * `existing`. Returned servers still carry their secret values; `splitSecrets` runs when they are saved.
  */
 export function parseImport(text: string, existing: readonly McpServer[], newId: () => string): { servers: McpServer[]; errors: ImportError[] } {
@@ -234,8 +238,8 @@ export function parseImport(text: string, existing: readonly McpServer[], newId:
     }
     const v = value as Record<string, any>;
     const type = String(v.type ?? v.transport ?? "").toLowerCase();
-    if (type === "sse") {
-      errors.push({ name: label, code: "sse" });
+    if (type === "sse" && typeof (v.url ?? v.serverUrl) !== "string") {
+      errors.push({ name: label, code: "url" });
       continue;
     }
     const name = uniqueName(slugName(label), [...existing, ...servers].map((s) => s.name));
@@ -248,7 +252,7 @@ export function parseImport(text: string, existing: readonly McpServer[], newId:
         errors.push({ name: label, code: "headerName" });
         continue;
       }
-      server = { ...base, transport: "http", url, headers };
+      server = { ...base, transport: "http", url, headers, ...(type === "sse" ? { httpTransport: "sse" as const } : type === "http" || type === "streamable-http" || type === "streamablehttp" ? { httpTransport: "streamable" as const } : {}) };
     } else if (typeof v.command === "string") {
       let command = v.command.trim();
       let args: unknown = v.args ?? [];

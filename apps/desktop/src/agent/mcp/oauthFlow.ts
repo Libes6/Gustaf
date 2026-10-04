@@ -9,6 +9,7 @@ import {
   authServerMetadataUrls,
   buildAuthorizationUrl,
   canonicalResource,
+  defaultAuthServer,
   isSecureEndpoint,
   parseAuthServerMetadata,
   parseProtectedResource,
@@ -21,6 +22,7 @@ import {
   randomToken,
   redirectUri,
   registrationBody,
+  revocationRequestBody,
   tokenDecision,
   tokenRequestBody,
   MAX_DOC_BYTES,
@@ -37,9 +39,11 @@ export type OAuthDeps = {
   store: { get: (id: string) => Promise<string | null>; set: (id: string, value: string) => Promise<void>; delete: (id: string) => Promise<void> };
   now?: () => number;
   rng?: Rng;
+  /** Deadline of each revocation request (default 5 s). */
+  revokeTimeoutMs?: number;
 };
 export type Phase = "discovering" | "registering" | "browser" | "exchanging";
-export type SignInOptions = { serverUrl: string; secretId: string; headers?: Record<string, string>; clientId?: string; scope?: string; signal?: AbortSignal; onPhase?: (p: Phase) => void; timeoutMs?: number };
+export type SignInOptions = { serverUrl: string; secretId: string; headers?: Record<string, string>; clientId?: string; scope?: string; signal?: AbortSignal; onPhase?: (p: Phase) => void; onDiscovered?: (via: DiscoverySource) => void; timeoutMs?: number };
 
 const DOC_TIMEOUT_MS = 15_000;
 const now = (d: OAuthDeps) => (d.now ?? Date.now)();
@@ -65,10 +69,10 @@ async function readBounded(res: Response, max: number): Promise<string> {
 }
 
 /** One bounded request with a deadline; resolves with the status, headers and the JSON body (null when it is not JSON). */
-async function send(d: OAuthDeps, url: string, init: RequestInit, signal?: AbortSignal): Promise<{ status: number; headers: Headers; json: unknown }> {
+async function send(d: OAuthDeps, url: string, init: RequestInit, signal?: AbortSignal, timeoutMs = DOC_TIMEOUT_MS): Promise<{ status: number; headers: Headers; json: unknown }> {
   if (!isSecureEndpoint(url)) throw new OAuthError("refusing to contact a non-https authorization endpoint", "insecure_endpoint");
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), DOC_TIMEOUT_MS);
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
   const onAbort = () => ctl.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
@@ -91,49 +95,90 @@ async function send(d: OAuthDeps, url: string, init: RequestInit, signal?: Abort
   }
 }
 
-const getJson = async (d: OAuthDeps, url: string, signal?: AbortSignal) => {
-  const r = await send(d, url, { method: "GET", headers: { Accept: "application/json" } }, signal);
-  return r.status >= 200 && r.status < 300 ? r.json : null;
-};
+/** What a metadata lookup found: a document, a clean 404 (the server has none), or anything else (error, timeout, junk). */
+type Lookup = { kind: "ok"; json: unknown } | { kind: "missing" } | { kind: "failed" };
+
+async function lookup(d: OAuthDeps, url: string, signal?: AbortSignal): Promise<Lookup> {
+  try {
+    const r = await send(d, url, { method: "GET", headers: { Accept: "application/json" } }, signal);
+    if (r.status >= 200 && r.status < 300) return r.json && typeof r.json === "object" ? { kind: "ok", json: r.json } : { kind: "failed" };
+    return r.status === 404 || r.status === 410 ? { kind: "missing" } : { kind: "failed" };
+  } catch (e) {
+    if (e instanceof OAuthError && e.code === "cancelled") throw e;
+    return { kind: "failed" };
+  }
+}
+
+/** Where the endpoints used for a sign-in came from. */
+export type DiscoverySource = "protected_resource" | "legacy_metadata" | "default_endpoints";
 
 /** Asks the server without a token and reads the challenge (`WWW-Authenticate`) of its 401. */
 async function probe(d: OAuthDeps, o: SignInOptions) {
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "Gustaf", version: "0" } } });
   const headers = { ...(o.headers ?? {}), "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
   const r = await send(d, o.serverUrl, { method: "POST", headers, body }, o.signal);
-  if (r.status !== 401) {
-    if (r.status >= 200 && r.status < 300) throw new OAuthError("the server did not ask for authorization", "no_auth_required");
-    return {};
-  }
-  return parseWwwAuthenticate(r.headers.get("www-authenticate"));
+  if (r.status === 401) return parseWwwAuthenticate(r.headers.get("www-authenticate"));
+  if (r.status >= 200 && r.status < 300) throw new OAuthError("the server did not ask for authorization", "no_auth_required");
+  // A legacy SSE server answers a POST to its stream URL with 4xx (405, ...) and asks for the token on the GET instead.
+  if (r.status >= 400 && r.status < 500) return (await probeStream(d, o)) ?? {};
+  return {};
 }
 
-/** Finds the authorization server for an MCP server URL (protected resource metadata, then the origin as the issuer). */
-async function discover(d: OAuthDeps, o: SignInOptions): Promise<{ server: AuthServer; scope?: string }> {
+/** `GET` of the server URL as an event stream, only to read a 401 challenge; the body is never read. */
+async function probeStream(d: OAuthDeps, o: SignInOptions) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), DOC_TIMEOUT_MS);
+  const onAbort = () => ctl.abort();
+  o.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const res = await d.fetch(o.serverUrl, { method: "GET", headers: { ...(o.headers ?? {}), Accept: "text/event-stream" }, signal: ctl.signal });
+    res.body?.cancel().catch(() => {});
+    return res.status === 401 ? parseWwwAuthenticate(res.headers.get("www-authenticate")) : null;
+  } catch {
+    if (o.signal?.aborted) throw new OAuthError("sign-in cancelled", "cancelled");
+    return null;
+  } finally {
+    clearTimeout(timer);
+    o.signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/**
+ * Finds the endpoints for an MCP server URL, in this order:
+ *  1. protected resource metadata (RFC 9728), then the authorization server's metadata (RFC 8414 / OpenID Connect);
+ *  2. servers without protected resource metadata: their own origin as the issuer (`/.well-known/oauth-authorization-server`);
+ *  3. 2025-03-26 last resort, only when every lookup on the origin was a clean 404: `/authorize`, `/token`, `/register`.
+ * A document that is found but invalid (wrong issuer, no S256, insecure endpoint) is an error, never a reason to fall
+ * back. Lookups that fail for other reasons (5xx, timeout, junk) end discovery with `discovery_failed` instead of
+ * guessing endpoints.
+ */
+async function discover(d: OAuthDeps, o: SignInOptions): Promise<{ server: AuthServer; scope?: string; via: DiscoverySource }> {
   const challenge = await probe(d, o);
+  const origin = new URL(o.serverUrl).origin;
   let issuer: string | undefined;
   let scopes: string | undefined;
+  // The challenge named a metadata URL we then could not read: the server wants RFC 9728, so no guessing.
+  let uncertain = !!challenge.resourceMetadata && isSecureEndpoint(challenge.resourceMetadata);
   for (const url of protectedResourceMetadataUrls(o.serverUrl, challenge.resourceMetadata)) {
-    const doc = await getJson(d, url, o.signal).catch((e) => {
-      if (e instanceof OAuthError && e.code === "cancelled") throw e;
-      return null;
-    });
-    if (!doc) continue;
-    const pr = parseProtectedResource(doc, o.serverUrl);
+    const r = await lookup(d, url, o.signal);
+    if (r.kind === "failed") uncertain = true;
+    if (r.kind !== "ok") continue;
+    const pr = parseProtectedResource(r.json, o.serverUrl);
     issuer = pr.authorizationServers[0];
     scopes = pr.scopes?.join(" ");
+    uncertain = false;
     break;
   }
-  // Servers that predate protected resource metadata: their own origin acts as the authorization server.
-  issuer ??= new URL(o.serverUrl).origin;
+  const viaPrm = issuer !== undefined;
+  issuer ??= origin;
   for (const url of authServerMetadataUrls(issuer)) {
-    const doc = await getJson(d, url, o.signal).catch((e) => {
-      if (e instanceof OAuthError && e.code === "cancelled") throw e;
-      return null;
-    });
-    if (doc) return { server: parseAuthServerMetadata(doc, issuer), scope: challenge.scope ?? scopes };
+    const r = await lookup(d, url, o.signal);
+    if (r.kind === "failed") uncertain = true;
+    if (r.kind === "ok") return { server: parseAuthServerMetadata(r.json, issuer), scope: challenge.scope ?? scopes, via: viaPrm ? "protected_resource" : "legacy_metadata" };
   }
-  throw new OAuthError("could not find the authorization server metadata", "no_metadata");
+  if (uncertain) throw new OAuthError(`OAuth discovery failed: the metadata of ${issuer} could not be read (the server answered with an error or did not respond); try again later`, "discovery_failed");
+  if (viaPrm) throw new OAuthError(`OAuth discovery failed: the authorization server ${issuer} publishes no metadata (404)`, "no_metadata");
+  return { server: defaultAuthServer(o.serverUrl), scope: challenge.scope, via: "default_endpoints" };
 }
 
 async function tokenCall(d: OAuthDeps, endpoint: string, body: string, signal?: AbortSignal) {
@@ -150,7 +195,8 @@ async function tokenCall(d: OAuthDeps, endpoint: string, body: string, signal?: 
 export async function signIn(d: OAuthDeps, o: SignInOptions): Promise<void> {
   const phase = (p: Phase) => o.onPhase?.(p);
   phase("discovering");
-  const { server, scope: advertised } = await discover(d, o);
+  const { server, scope: advertised, via } = await discover(d, o);
+  o.onDiscovered?.(via);
   const resource = canonicalResource(o.serverUrl);
   const scope = o.scope || advertised;
   const state = randomToken(24, d.rng);
@@ -167,7 +213,13 @@ export async function signIn(d: OAuthDeps, o: SignInOptions): Promise<void> {
       if (!server.registrationEndpoint) throw new OAuthError("the authorization server does not support dynamic client registration; enter a client ID in the server settings", "no_registration");
       phase("registering");
       const r = await send(d, server.registrationEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(registrationBody(redirect)) }, o.signal);
-      if (r.status < 200 || r.status >= 300) throw new OAuthError(`client registration was refused (HTTP ${r.status})`, "registration_failed");
+      if (r.status < 200 || r.status >= 300)
+        throw new OAuthError(
+          via === "default_endpoints"
+            ? `this server publishes no OAuth metadata, and registering a client at the default endpoint ${server.registrationEndpoint} failed (HTTP ${r.status}); enter a client ID in the server settings`
+            : `client registration was refused (HTTP ${r.status})`,
+          "registration_failed",
+        );
       ({ clientId, clientSecret } = parseRegistration(r.json));
     }
     waiting = d.loopback.wait(listener.id);
@@ -179,7 +231,7 @@ export async function signIn(d: OAuthDeps, o: SignInOptions): Promise<void> {
     const doc = await tokenCall(d, server.tokenEndpoint, tokenRequestBody({ grant: "authorization_code", code, redirectUri: redirect, clientId, ...(clientSecret ? { clientSecret } : {}), verifier, resource }), o.signal);
     // The scope that was requested stands when the server does not echo one back.
     const t = parseTokenResponse(doc, now(d), { scope });
-    const stored: StoredOAuth = { ...t, tokenEndpoint: server.tokenEndpoint, clientId, ...(clientSecret ? { clientSecret } : {}), resource, issuer: server.issuer };
+    const stored: StoredOAuth = { ...t, tokenEndpoint: server.tokenEndpoint, clientId, ...(clientSecret ? { clientSecret } : {}), resource, issuer: server.issuer, ...(server.revocationEndpoint ? { revocationEndpoint: server.revocationEndpoint } : {}) };
     await d.store.set(o.secretId, JSON.stringify(stored));
   } catch (e) {
     await d.loopback.cancel(listener.id).catch(() => {});
@@ -233,3 +285,40 @@ export async function authorizationHeader(d: OAuthDeps, secretId: string): Promi
 }
 
 export const isSignedIn = async (d: Pick<OAuthDeps, "store">, secretId: string) => !!parseStored(await d.store.get(secretId));
+
+const REVOKE_TIMEOUT_MS = 5_000;
+
+/**
+ * Asks the authorization server to revoke the stored tokens (RFC 7009): the refresh token first, then the access token,
+ * each with its own short deadline. Best effort: it never throws and never takes longer than two deadlines, so a dead
+ * or hostile server cannot block a local sign-out. Without a `revocation_endpoint` in the stored metadata nothing is sent.
+ */
+export async function revokeTokens(d: OAuthDeps, t: StoredOAuth | null): Promise<{ attempted: number; revoked: number }> {
+  const out = { attempted: 0, revoked: 0 };
+  if (!t?.revocationEndpoint) return out;
+  const targets: [string, "refresh_token" | "access_token"][] = [];
+  if (t.refreshToken) targets.push([t.refreshToken, "refresh_token"]);
+  targets.push([t.accessToken, "access_token"]);
+  for (const [token, hint] of targets) {
+    out.attempted++;
+    try {
+      const r = await send(d, t.revocationEndpoint, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: revocationRequestBody(token, hint, t.clientId, t.clientSecret) }, undefined, d.revokeTimeoutMs ?? REVOKE_TIMEOUT_MS);
+      if (r.status >= 200 && r.status < 300) out.revoked++;
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+}
+
+/** Reads the entry, revokes its tokens (bounded, never throws), and deletes the entry whatever happened. */
+export async function signOut(d: OAuthDeps, secretId: string): Promise<{ attempted: number; revoked: number }> {
+  let result = { attempted: 0, revoked: 0 };
+  try {
+    result = await revokeTokens(d, parseStored(await d.store.get(secretId)));
+  } catch {
+    /* never blocks the local sign-out */
+  }
+  await d.store.delete(secretId);
+  return result;
+}

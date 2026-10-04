@@ -1391,5 +1391,13 @@
   "knowledgeConfirmGo": "Send and index",
   "knowledgeMenu": "Knowledge",
   "knowledgeMenuSetup": "Set up knowledge collections",
-  "knowledgeMenuNotIndexed": "Not indexed yet"
+  "knowledgeMenuNotIndexed": "Not indexed yet",
+  "mcpTransport": "Transport",
+  "mcpTransportAuto": "Detect automatically (streamable HTTP, then SSE)",
+  "mcpTransportStreamable": "Streamable HTTP",
+  "mcpTransportSse": "Legacy SSE (GET /sse + POST endpoint)",
+  "mcpTransportHint": "Automatic detection tries streamable HTTP first and switches to the legacy SSE transport when the server rejects the first request with a 4xx error (not 401, 403 or 429). Choose one to skip the detection.",
+  "mcpErr_transport": "Unknown transport.",
+  "mcpRevokeNote": "Sign out asks the authorization server to revoke the tokens when it supports that (best effort), then deletes them from {store}.",
+  "mcpResourceTemplatesDesc": "Built-in: lets the agent list this server's resource templates (read them with the read tool)"
 }

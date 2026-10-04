@@ -22,9 +22,25 @@ export type HttpOptions = {
 
 class SessionExpired extends Error {}
 class Unauthorized extends Error {}
-const abortError = () => new DOMException("Aborted", "AbortError");
+/** A non-2xx answer of the server. `initialize` is set when it answered the initialize POST (the transport auto-detect looks at it). */
+export class HttpStatusError extends Error {
+  status: number;
+  initialize = false;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+/**
+ * What the runtime needs from a remote transport: streamable HTTP (`McpHttpClient`) and the legacy HTTP+SSE transport
+ * (`McpSseClient`, sse.ts) both provide it.
+ */
+export type RemoteClient = Pick<McpHttpClient, "connect" | "request" | "close" | "info" | "toolsEpoch" | "resourcesEpoch" | "promptsEpoch">;
+/** Statuses of the initialize POST after which the server is probed as a legacy SSE server (not auth, rate limit or timeout answers). */
+export const isLegacySseHint = (e: unknown): e is HttpStatusError => e instanceof HttpStatusError && e.initialize && e.status >= 400 && e.status < 500 && ![401, 403, 408, 429].includes(e.status);
+export const abortError = () => new DOMException("Aborted", "AbortError");
 
-async function readText(res: Response, max: number): Promise<string> {
+export async function readText(res: Response, max: number): Promise<string> {
   if (!res.body) return "";
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -63,7 +79,10 @@ export class McpHttpClient {
   /** Runs the initialize handshake once; a failure lets the next call try again. */
   connect(timeoutMs = 30_000): Promise<InitInfo> {
     this.connecting ??= (async () => {
-      const result = await this.post(request(this.nextId++, "initialize", initializeParams(this.o.clientVersion ?? "0")), timeoutMs);
+      const result = await this.post(request(this.nextId++, "initialize", initializeParams(this.o.clientVersion ?? "0")), timeoutMs).catch((e) => {
+        if (e instanceof HttpStatusError) e.initialize = true;
+        throw e;
+      });
       const info = checkInitialize(result);
       this.version = info.protocolVersion;
       this.info = info;
@@ -188,7 +207,7 @@ export class McpHttpClient {
       }
       if (!res.ok) {
         const text = (await readText(res, 64 * 1024).catch(() => "")).slice(0, 500);
-        throw new Error(`MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`);
+        throw new HttpStatusError(res.status, `MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`);
       }
       const sid = res.headers.get("mcp-session-id");
       if (sid && msg.method === "initialize") this.session = sid.slice(0, 1024);
