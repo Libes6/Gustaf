@@ -31,6 +31,8 @@ export type SubagentInfo = {
   /** Codex rollout scan only (providers/codexRollout.ts): total tokens, start and end (Unix ms) and run time. */
   tokens?: number;
   startedAt?: number;
+  /** Latest genuine Codex task_started, distinct from the thread creation time. */
+  turnStartedAt?: number;
   endedAt?: number;
   durationMs?: number;
 };

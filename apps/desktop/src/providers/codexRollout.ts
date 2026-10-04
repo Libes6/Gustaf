@@ -64,6 +64,7 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
       toolUses: num(a.toolUses) ?? 0,
       ...(text(a.step) && state === "running" ? { step: brief(text(a.step), 120) } : {}),
       ...(tokens ? { tokens } : {}),
+      ...(num(a.turnStartedAtMs) ? { turnStartedAt: num(a.turnStartedAtMs) } : {}),
       ...(num(a.startedAtMs) ? { startedAt: num(a.startedAtMs) } : {}),
       ...(num(a.endedAtMs) && state !== "running" ? { endedAt: num(a.endedAtMs) } : {}),
       ...(num(a.durationMs) && state !== "running" ? { durationMs: num(a.durationMs) } : {}),

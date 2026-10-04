@@ -282,6 +282,7 @@ export type RolloutAgent = {
   /** starting | running | completed | failed | stopped (interrupted or cut off, neutral) | shutdown */
   state: string;
   startedAtMs?: number | null;
+  turnStartedAtMs?: number | null;
   endedAtMs?: number | null;
   durationMs?: number | null;
   lastMessage?: string | null;

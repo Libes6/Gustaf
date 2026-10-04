@@ -102,11 +102,14 @@ function taskNotice(text: string): Activity | null {
 /** What a subagent just did, from one of its own `tool_use` blocks. */
 const stepOf = (name: string, input: Json) => brief(`${name} ${str(input.command ?? input.file_path ?? input.path ?? input.pattern ?? input.description ?? input.query ?? input.url ?? '')}`, 90);
 
-/** An entry read from a rollout file (providers/codexRollout.ts) is authoritative: its state and counters replace the old ones. */
+/** Rollout counters are cumulative; a lagging file must not reopen a terminal stream event. */
 function applyScan(actions: Map<string, Activity>, next: Activity, patch: SubagentInfo): Activity {
   const key = actions.has(next.id) ? next.id : [...actions].find(([, a]) => patch.agentId && a.subagent?.agentId === patch.agentId)?.[0] ?? next.id;
   const old = actions.get(key);
-  const info: SubagentInfo = { ...old?.subagent, ...patch, title: patch.title || old?.subagent?.title || '', prompt: patch.prompt ?? old?.subagent?.prompt, result: patch.result ?? old?.subagent?.result };
+  const previous = old?.subagent;
+  const newerTurn = patch.turnStartedAt !== undefined && patch.turnStartedAt > (previous?.endedAt ?? previous?.turnStartedAt ?? Infinity);
+  const state = previous && isTerminal(previous.state) && !isTerminal(patch.state) && !newerTurn ? previous.state : patch.state;
+  const info: SubagentInfo = { ...previous, ...patch, state, ...(state !== patch.state ? { endedAt: previous?.endedAt, durationMs: previous?.durationMs, step: undefined } : {}), title: patch.title || old?.subagent?.title || '', prompt: patch.prompt ?? old?.subagent?.prompt, result: patch.result ?? old?.subagent?.result };
   const merged: Activity = { ...old, ...next, id: key, name: old?.name || next.name || 'subagent', status: statusOf(info.state), output: next.output ?? old?.output, subagent: info };
   actions.set(key, merged);
   return merged;

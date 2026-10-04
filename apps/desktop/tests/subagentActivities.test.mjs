@@ -163,3 +163,17 @@ test('a failed completion notice marks the background subagent failed', () => {
   assert.equal(out[0].subagent.state, 'failed');
   assert.equal(out[0].status, 'error');
 });
+
+test('a lagging rollout cannot revive an interrupted agent; a genuine new turn can', () => {
+  const map = new Map();
+  const scan = (state, turnStartedAt) => ({ type: 'activity', id: 'codex:root:context', name: 'subagent', args: {}, status: 'running', subagent: { provider: 'codex', agentId: 'thread-context', title: 'context', action: 'scan', state, startedAt: 1000, turnStartedAt, toolUses: 7, tokens: 900 } });
+  applyActivity(map, scan('running', 1000));
+  for (const a of nativeActivities('codex', codexEvent('item.completed', { id: 'interrupt', tool: 'interrupt_agent', receiver_thread_ids: ['thread-context'], agents_states: { 'thread-context': { status: 'interrupted' } } }))) applyActivity(map, a);
+  applyActivity(map, scan('running', 1000));
+  assert.equal(map.size, 1);
+  assert.equal([...map.values()][0].subagent.state, 'stopped');
+  assert.equal([...map.values()][0].subagent.tokens, 900);
+  applyActivity(map, scan('running', 2000));
+  // No timestamp for the interruption: only an explicit send can prove a restart.
+  assert.equal([...map.values()][0].subagent.state, 'stopped');
+});
