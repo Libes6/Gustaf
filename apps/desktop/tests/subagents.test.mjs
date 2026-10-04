@@ -18,6 +18,7 @@ const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings } = await import('../src/
 const { localDayKey } = await import('../src/lib/budgets.ts');
 const { saveRulesConfig } = await import('../src/agent/rulesStore.ts');
 const { DEFAULT_RULES, normalizeRulesConfig } = await import('../src/agent/rules.ts');
+const { verificationKey } = await import('../src/agent/verificationStore.ts');
 
 let n = 0;
 const call = (name, args) => ({ type: 'tool_call', id: `c${n++}`, name, args });
@@ -766,4 +767,57 @@ test('with stopOnBudget off budgets stay warnings: nothing is stopped or refused
   });
   assert.equal(r.runs[0].status, 'completed');
   assert.equal(r.outputs[0].isError, false);
+});
+
+// ---- verification gates in general subagents (docs/subagents-review.md) ----
+
+/** Shadow copies laid out like the real ones (`<base>/reviews/<id>/work` next to `review.json`), so the gate finds the project's checks. */
+function gatedReviews(root) {
+  const base = mkdtempSync(join(tmpdir(), 'sub-gate-'));
+  const made = [];
+  const prepare = async (projectRoot) => {
+    const id = `1-${made.length + 1}`;
+    const dir = join(base, 'reviews', id);
+    const workspace = join(dir, 'work');
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(dir, 'review.json'), JSON.stringify({ root: projectRoot }));
+    for (const f of readdirSync(projectRoot)) copyFileSync(join(projectRoot, f), join(workspace, f));
+    made.push({ id, root: projectRoot, workspace });
+    return { review: { id, root: projectRoot, workspace }, setup: null };
+  };
+  review.list = async () => [];
+  review.finish = async () => {};
+  return { made, prepare, stored: { [verificationKey(root)]: { checks: [{ name: 'npm test', command: 'npm test' }], maxFixAttempts: 1, useProjectFile: false } } };
+}
+const failingCheck = { code: 1, output: 'FAIL a.test.ts', timed_out: false };
+
+test('a general subagent runs the project gate; a failed gate is a warning on the run and in the report', async () => {
+  const root = project();
+  const g = gatedReviews(root);
+  const r = await run({
+    root,
+    stored: g.stored,
+    hostCfg: { prepare: g.prepare },
+    parentScript: [use(spawn('Gated', 'gated work', 'general')), say('ok')],
+    children: { 'gated work': [() => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))), say('done'), say('still done')] },
+  });
+  const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
+  assert.ok(state.runs.some((x) => x.command === 'npm test'), 'the check ran in the subagent');
+  assert.match(out, /Failed verification/);
+  assert.equal(r.runs[0].status, 'completed');
+  assert.ok(r.runs[0].warnings.some((w) => /Failed verification/.test(w)));
+});
+
+test('a subagent that runs out of steps right after gate feedback is limit-stopped, not completed', async () => {
+  const root = project();
+  const g = gatedReviews(root);
+  const r = await run({
+    root,
+    stored: g.stored,
+    hostCfg: { prepare: g.prepare, budgets: { general: { maxSteps: 2 } } },
+    parentScript: [use(spawn('Short', 'short work', 'general')), say('ok')],
+    children: { 'short work': [() => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))), say('done')] },
+  });
+  assert.equal(r.runs[0].status, 'limit');
+  assert.match(r.outputs.find((o) => o.name === 'spawn_agent').output, /step limit \(2\)/);
 });
