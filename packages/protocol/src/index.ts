@@ -17,6 +17,18 @@ export const PROTOCOL_VERSION = 1;
 /** Milliseconds since the Unix epoch, as the desktop database stores them. */
 export type Timestamp = number;
 
+/** Every route of the desktop server lives under this prefix (`POST /v1/pair`, `GET /v1/projects`, ...). */
+export const API_BASE_PATH = "/v1";
+
+/** `GET /v1/info` */
+export interface ServerInfo {
+  protocol: number;
+  app: string;
+  appVersion: string;
+  /** Computer name shown on the phone. */
+  desktopName: string;
+}
+
 // ---- Pairing ---------------------------------------------------------------------------------------------------------
 
 /** The JSON a desktop encodes into the pairing QR code. */
@@ -37,6 +49,8 @@ export interface PairRequest {
   code: string;
   /** Human-readable device name shown in the desktop's device list. */
   deviceName: string;
+  /** Optional small object (platform, model, app version); validated and bounded by the server, not stored. */
+  publicInfo?: Record<string, unknown>;
 }
 
 export interface PairResponse {
@@ -55,14 +69,19 @@ export interface ProjectSummary {
   pinned: boolean;
 }
 
+/** What the sidebar badge of the desktop shows: `done` = finished while nobody looked at the chat. */
+export type ChatRunStatus = "idle" | "running" | "waiting" | "done" | "failed";
+
 export interface ChatSummary {
   id: number;
   projectId: number;
   title: string;
   archived: boolean;
   updatedAt: Timestamp;
-  /** True while a request is running in this chat on the desktop. */
+  /** True while a request is running in this chat on the desktop (also while it waits for an approval). */
   running: boolean;
+  /** Finer than `running`; sent by the desktop server, absent in older mocks. */
+  status?: ChatRunStatus;
 }
 
 export type MessageRole = "user" | "assistant";

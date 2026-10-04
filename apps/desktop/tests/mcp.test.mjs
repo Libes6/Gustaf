@@ -26,8 +26,10 @@ test('imports the Claude Desktop / Cursor mcpServers shape', () => {
     },
   });
   const { servers, errors } = cfg.parseImport(text, [], newId);
-  assert.deepEqual(servers.map((s) => s.name), ['github', 'my_db', 'remote', 'off']);
-  const [gh, db, remote, off] = servers;
+  assert.deepEqual(servers.map((s) => s.name), ['github', 'my_db', 'remote', 'legacy', 'off']);
+  const [gh, db, remote, legacy, off] = servers;
+  assert.equal(legacy.httpTransport, 'sse');
+  assert.equal(remote.httpTransport, undefined, 'detected by default');
   assert.equal(gh.transport, 'stdio');
   assert.deepEqual(gh.args, ['-y', '@modelcontextprotocol/server-github']);
   assert.deepEqual(gh.env, [{ key: 'GITHUB_PERSONAL_ACCESS_TOKEN', value: 'ghp_abc', secret: true }, { key: 'LOG_LEVEL', value: 'info', secret: false }]);
@@ -37,7 +39,7 @@ test('imports the Claude Desktop / Cursor mcpServers shape', () => {
   assert.equal(off.enabled, false);
   assert.equal(gh.enabled, true);
   assert.equal(gh.scope, 'global');
-  assert.deepEqual(errors, [{ name: 'legacy', code: 'sse' }, { name: 'broken', code: 'command' }, { name: 'plain', code: 'url' }]);
+  assert.deepEqual(errors, [{ name: 'broken', code: 'command' }, { name: 'plain', code: 'url' }]);
 });
 
 test('import accepts VS Code "servers", bare maps and snippets; names stay unique', () => {

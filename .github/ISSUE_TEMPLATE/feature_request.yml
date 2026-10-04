@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest a new feature or an improvement to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues first, and check the [feature documentation](https://github.com/Libes6/Gustaf/blob/dev/docs/README.md) in case it already exists.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should it work? Mention where in the app it would live (chat, Settings page, changes panel, ...).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use now, or how other tools solve it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Chat and providers
+        - Agents and subagents
+        - Code review and git
+        - Tools (MCP, web, terminal, LSP, memory, skills)
+        - Canvas
+        - Computer Use
+        - Search, import and export
+        - Settings, usage and updates
+        - Mobile companion app
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider(s) it concerns
+      description: Optional, for example "all", "API providers", "Codex CLI".

@@ -1,9 +1,9 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages,
+  Columns2, GitBranch, GitMerge, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages, Terminal,
 } from "lucide-react";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
 import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
@@ -14,8 +14,22 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
+import { Brain } from "lucide-react";
+import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
+import { ConfirmDialog, NewWorkspaceDialog, useConfirm } from "./WorkspaceDialogs";
+import { ConflictBadge } from "./ConflictBadge";
+import { MergeQueueDialog, type QueueWorkspace } from "./MergeQueueDialog";
+import { requestComposerDraft } from "../lib/composerBridge";
+import type { QueueItem } from "../lib/mergeQueue";
+import { conflictBadge, hasUnfinished, resolveDraft, summarizeQueue } from "../lib/mergeQueueView";
+import { conflictReport, queueRun, useConflictChecks, useMergeQueueVersion, type QueuePolicy } from "../lib/mergeQueueStore";
+import { requestTerminalOpen } from "../lib/terminalBridge";
+import { archiveChoices, chatWorkspace, joinCheckout, splitWorkspaceChats, workspaceRow } from "../lib/workspaces";
+import { createWorkspace, setupWorkspace } from "../lib/workspaceCreate";
+import { isGitProject, refreshWorkspaces, repoPrefix, useWorkspacePolling, useWorkspaceVersion, workspaceEntry } from "../lib/workspaceStore";
+import { parseWorktreeError, worktrees } from "../lib/worktrees";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
   const t = useT();
@@ -96,7 +110,7 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           menu.open(r, [
-            { heading: "M Code" },
+            { heading: "Gustaf" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
             { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },
             { label: t("settings"), icon: <Settings size={15} />, kbd: displayKeys("⌘,"), onClick: () => app.openSettings() },
@@ -132,6 +146,27 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [projectLimit, setProjectLimit] = useState(8);
   const [instructionsFor, setInstructionsFor] = useState<Project | null>(null);
   const [sharing, setSharing] = useState<Chat | null>(null);
+  const memoryUi = useMemoryDialogs();
+  // Workspaces (git worktrees): the data lives in lib/workspaceStore.ts; this component re-renders when it changes.
+  useWorkspaceVersion();
+  useMergeQueueVersion();
+  const confirm = useConfirm();
+  // Merge queue dialog: for a whole project, optionally with one workspace preselected ("Merge into <target>…").
+  const [mergeFor, setMergeFor] = useState<{ project: Project; preselect: string | null } | null>(null);
+  const [newWorkspaceFor, setNewWorkspaceFor] = useState<Project | null>(null);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
+  const [dirtyArchive, setDirtyArchive] = useState<{ project: Project; chat: Chat } | null>(null);
+  const [workspaceNotice, setWorkspaceNotice] = useState("");
+  // Projects that are git repositories (offered "New workspace…"); asked once per project (cached).
+  const [gitProjects, setGitProjects] = useState<ReadonlySet<number>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    for (const p of app.projects.slice(0, 40)) {
+      if (p.path) isGitProject(p.path).then((ok) => { if (ok && !cancelled) setGitProjects((s) => (s.has(p.id) ? s : new Set(s).add(p.id))); });
+    }
+    return () => { cancelled = true; };
+  }, [app.projects]);
 
   const q = query?.toLowerCase() ?? "";
   const chatsByProject = useMemo(() => {
@@ -146,6 +181,15 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   }, [app.chats, q]);
   const match = (c: Chat) => !q || c.title.toLowerCase().includes(q);
   const chatsOf = (pid: number | null) => chatsByProject.get(pid) ?? [];
+  // Polled while a project is expanded (and again when a run starts or ends): only projects that have workspace chats.
+  const workspaceRoots = useMemo(
+    () => app.projects.filter((p) => p.path && (expanded[p.id] ?? true) && app.chats.some((c) => c.project_id === p.id && chatWorkspace(c))).map((p) => p.path!),
+    [app.projects, app.chats, expanded],
+  );
+  const busyKey = app.sessions.items.filter((s) => s.busy).map((s) => s.chatId).join(",");
+  useWorkspacePolling(workspaceRoots, busyKey);
+  // Conflict badges: throttled and never awaited by the render (see lib/mergeQueueStore.ts).
+  useConflictChecks(workspaceRoots.map((root) => ({ root, list: workspaceEntry(root).list })), busyKey);
 
   const openChat = (c: Chat) => {
     app.openChat(c.id, c.project_id);
@@ -169,6 +213,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
+      { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -185,12 +230,150 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         onClick: () =>
           app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
       })),
+      ...(p.path && gitProjects.has(p.id) ? [{ label: t("workspaceNew"), icon: <GitBranch size={15} />, onClick: () => (setWorkspaceError(""), setNewWorkspaceFor(p)) }] : []),
+      ...(p.path && gitProjects.has(p.id) && chatsOf(p.id).some((c) => chatWorkspace(c)) ? [{ label: t("mqMenu"), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: null }) }] : []),
       ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
+      ...(p.path ? [{ label: t("memoryMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openProject(p) }] : []),
       ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
       { sep: true },
       { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
       { label: t("removeProject"), icon: <X size={15} />, onClick: () => removeProject(p.id).then(app.reload) },
     ]);
+
+  const statusOf = (c: Chat) =>
+    deriveStatus({
+      waiting: waiting.has(c.id),
+      running: scheduledLive.has(c.id) || app.sessions.items.some((s) => s.chatId === c.id && s.busy),
+      failed: flags.failed.has(c.id),
+      unread: flags.unread.has(c.id),
+    });
+
+  // ---- workspaces ----
+  const startWorkspace = async (p: Project, title: string) => {
+    if (!p.path || workspaceBusy) return;
+    setWorkspaceBusy(true);
+    setWorkspaceError("");
+    try {
+      const made = await createWorkspace({ projectId: p.id, root: p.path, title, provider: app.selection?.providerId, model: app.selection?.model });
+      if (!made.ok) return setWorkspaceError(made.fallback ? t("workspaceFallback", { reason: made.message }) : t("workspaceFailed", { message: made.message }));
+      const problem = await setupWorkspace(p.path, made, {
+        access: app.access, allowlist: app.allowlist,
+        approve: (command) => confirm.ask({ title: t("workspaceSetupAskTitle"), body: <><p>{t("workspaceSetupAskBody")}</p><code>{command}</code></>, confirmLabel: t("workspaceSetupRun"), cancelLabel: t("workspaceSetupSkip") }),
+      }, t);
+      setWorkspaceNotice(problem);
+      setNewWorkspaceFor(null);
+      await app.reload();
+      app.openChat(made.chatId, p.id);
+      app.setView("chat");
+    } finally { setWorkspaceBusy(false); }
+  };
+
+  const archiveWorkspace = async (p: Project, c: Chat, o: { force?: boolean; deleteBranch?: boolean } = {}) => {
+    const ws = chatWorkspace(c);
+    if (!p.path || !ws) return;
+    setWorkspaceNotice("");
+    try {
+      const r = await worktrees.remove({ root: p.path, taskId: ws.taskId, force: o.force, deleteBranch: o.deleteBranch });
+      if (o.deleteBranch && r.branchKeptReason) setWorkspaceNotice(t("workspaceBranchKept", { branch: ws.branch ?? ws.taskId, reason: r.branchKeptReason }));
+    } catch (e) {
+      const err = parseWorktreeError(e);
+      if (err.code === "dirty" && !o.force) return setDirtyArchive({ project: p, chat: c });
+      // Already gone is as good as archived.
+      if (err.code !== "not_found") setWorkspaceNotice(t("workspaceArchiveFailed", { message: err.message }));
+    }
+    await refreshWorkspaces(p.path, { force: true });
+  };
+
+  const openInTerminal = async (p: Project, c: Chat, checkout: string) => {
+    openChat(c);
+    requestTerminalOpen(joinCheckout(checkout, p.path ? await repoPrefix(p.path) : ""));
+  };
+
+  const workspaceMenu = (anchor: DOMRect | React.MouseEvent, p: Project, c: Chat) => {
+    if ("preventDefault" in anchor) anchor.preventDefault();
+    const ws = chatWorkspace(c);
+    const info = ws ? workspaceEntry(p.path).list?.find((w) => w.taskId === ws.taskId) : undefined;
+    const choice = archiveChoices(info);
+    menu.open(anchor, [
+      { label: t("rename"), icon: <Pencil size={15} />, onClick: () => setEditing(`c${c.id}`) },
+      ...(info && choice.canArchive ? [
+        { label: t("workspaceOpenTerminal"), icon: <Terminal size={15} />, onClick: () => void openInTerminal(p, c, info.path) },
+        { label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(info.path) },
+        { label: t("mqMergeInto", { target: info.baseBranch ?? t("mqTargetFallback") }), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: ws!.taskId }) },
+        { sep: true as const },
+        { label: t("workspaceArchive"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c) },
+        ...(choice.offerDeleteBranch ? [{ label: t("workspaceArchiveDelete"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c, { deleteBranch: true }) }] : []),
+      ] : []),
+      { sep: true },
+      { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
+    ]);
+  };
+
+  const workspaceRowEl = (p: Project, c: Chat) => {
+    const ws = chatWorkspace(c)!;
+    const entry = workspaceEntry(p.path);
+    const info = entry.list?.find((w) => w.taskId === ws.taskId);
+    const row = workspaceRow(c, info, !!entry.list)!;
+    const current = app.activeChat === c.id && app.view === "chat";
+    if (editing === `c${c.id}`) {
+      return (
+        <div key={c.id} className="row workspace">
+          <InlineEdit value={c.title} onDone={(v) => (setEditing(null), v && renameChat(c.id, v).then(app.reload))} />
+        </div>
+      );
+    }
+    const badge = row.active ? conflictBadge(conflictReport(p.path, ws.taskId)) : null;
+    return (
+      <Fragment key={c.id}>
+      <div className={`row workspace${row.active ? "" : " gone"}${current ? " active" : ""}`} data-workspace={row.taskId} onContextMenu={(e) => workspaceMenu(e, p, c)}>
+        <button className="row-main" aria-current={current ? "page" : undefined} onClick={() => openChat(c)}>
+          <span className="ws-branch">
+            <GitBranch size={13} aria-hidden="true" />
+            <span className="label">{c.title}</span>
+            <ChatBadge status={statusOf(c)} />
+          </span>
+          <span className="ws-meta">
+            <span className="branch" title={row.branch}>{row.branch}</span>
+            {!row.active ? <span>{t("workspaceArchived")}</span> : (
+              <>
+                {row.dirty && <span className="dirty" role="img" aria-label={t("workspaceChanged", { count: row.changedFiles ?? 0 })} />}
+                {row.sync && <span className="sync" title={t("workspaceSyncTitle", { ahead: row.ahead ?? 0, behind: row.behind ?? 0, base: info?.baseBranch ?? "base" })}>{row.sync}</span>}
+                {!!row.changedFiles && <span className="changed">{t("workspaceChanged", { count: row.changedFiles })}</span>}
+              </>
+            )}
+          </span>
+        </button>
+        <span className="actions">
+          <button className="icon-btn" title={t("more")} aria-label={t("workspaceMenu", { title: c.title })} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), workspaceMenu(e.currentTarget.getBoundingClientRect(), p, c))}>
+            <MoreHorizontal size={14} />
+          </button>
+        </span>
+      </div>
+      {badge && <div className="ws-conflict-line"><ConflictBadge badge={badge} title={c.title} /></div>}
+      </Fragment>
+    );
+  };
+
+  // ---- merge queue ----
+  const queuePolicy = (): QueuePolicy => ({ access: app.access, allowlist: app.allowlist, texts: { declined: t("mqTestDeclined"), blocked: t("mqTestBlocked") } });
+  const queueWorkspaces = (p: Project): QueueWorkspace[] => {
+    const list = workspaceEntry(p.path).list ?? [];
+    return chatsOf(p.id).filter((c) => chatWorkspace(c)).flatMap((c) => {
+      const info = list.find((w) => w.taskId === c.workspace_task_id);
+      return info ? [{ taskId: info.taskId, title: c.title, branch: info.branch, target: info.baseBranch, ahead: info.ahead, dirty: info.dirty, active: info.existsOnDisk }] : [];
+    });
+  };
+  const resolveConflicts = (p: Project, item: QueueItem) => {
+    const c = app.chats.find((x) => x.project_id === p.id && x.workspace_task_id === item.taskId);
+    if (!c) return;
+    requestComposerDraft(c.id, resolveDraft({ target: item.targetBranch, files: item.conflicts, testCommand: item.testCommand, t }));
+    setMergeFor(null);
+    openChat(c);
+  };
+  const archiveMerged = (p: Project, taskId: string) => {
+    const c = app.chats.find((x) => x.project_id === p.id && x.workspace_task_id === taskId);
+    if (c) void archiveWorkspace(p, c);
+  };
 
   const chatRow = (c: Chat, child: boolean) =>
     editing === `c${c.id}` ? (
@@ -207,14 +390,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       >
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
-          <ChatBadge
-            status={deriveStatus({
-              waiting: waiting.has(c.id),
-              running: scheduledLive.has(c.id) || app.sessions.items.some((s) => s.chatId === c.id && s.busy),
-              failed: flags.failed.has(c.id),
-              unread: flags.unread.has(c.id),
-            })}
-          />
+          <ChatBadge status={statusOf(c)} />
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
@@ -245,7 +421,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     <aside className="sidebar" aria-label={t("sidebar")}>
       <div className="side-head drag">
         <div className="title">
-          M Code <ChevronDown size={14} color="var(--text-2)" />
+          Gustaf <ChevronDown size={14} color="var(--text-2)" />
         </div>
         <span className="grow" />
         <button className="icon-btn" title={t("notifications")} aria-label={t("notifications")}>
@@ -300,7 +476,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         {projectsOpen &&
           projects.slice(0, projectLimit).map((p) => {
             const open = expanded[p.id] ?? true;
-            const list = chatsOf(p.id);
+            const { plain: list, workspaces } = splitWorkspaceChats(chatsOf(p.id));
             const shown = showAll[p.id] ? list : list.slice(0, 5);
             return (
               <div key={p.id}>
@@ -329,6 +505,20 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                   </div>
                 )}
                 {open && shown.map((c) => chatRow(c, true))}
+                {open && workspaces.length > 0 && (
+                  <div role="group" aria-label={t("workspaceGroup", { name: p.name })}>{workspaces.map((c) => workspaceRowEl(p, c))}</div>
+                )}
+                {open && p.path && (() => {
+                  const q = queueRun(p.path);
+                  if (!(q.busy || q.approval || hasUnfinished(q.state))) return null;
+                  const sum = summarizeQueue(q.state);
+                  return (
+                    <button className="row child muted mq-active" onClick={() => setMergeFor({ project: p, preselect: null })}>
+                      <GitMerge size={13} aria-hidden="true" />
+                      <span className="label">{q.approval ? t("mqSidebarApproval") : q.state?.halted ? t("mqSidebarHalted") : t("mqSidebarActive", { merged: sum.merged, total: sum.total })}</span>
+                    </button>
+                  );
+                })()}
                 {open && list.length > 5 && !showAll[p.id] && (
                   <button className="row child muted" onClick={() => setShowAll({ ...showAll, [p.id]: true })}>
                     {t("showMore")}
@@ -357,7 +547,26 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
 
       </div>
       {menu.node}
+      {workspaceNotice && (
+        <div className="hint" role="status" style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+          <span style={{ flex: 1, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{workspaceNotice}</span>
+          <button className="icon-btn" title={t("dismiss")} aria-label={t("dismiss")} onClick={() => setWorkspaceNotice("")}><X size={13} /></button>
+        </div>
+      )}
+      {confirm.node}
+      {newWorkspaceFor && <NewWorkspaceDialog projectName={newWorkspaceFor.name} busy={workspaceBusy} error={workspaceError} onCancel={() => setNewWorkspaceFor(null)} onCreate={(title) => void startWorkspace(newWorkspaceFor, title)} />}
+      {dirtyArchive && (
+        <ConfirmDialog title={t("workspaceArchiveDirtyTitle")} confirmLabel={t("workspaceArchiveAnyway")} danger onCancel={() => setDirtyArchive(null)}
+          onConfirm={() => { const d = dirtyArchive; setDirtyArchive(null); void archiveWorkspace(d.project, d.chat, { force: true }); }}>
+          <p>{t("workspaceArchiveDirtyBody", { branch: dirtyArchive.chat.workspace_branch ?? dirtyArchive.chat.workspace_task_id ?? "" })}</p>
+        </ConfirmDialog>
+      )}
+      {mergeFor?.project.path && (
+        <MergeQueueDialog root={mergeFor.project.path} projectName={mergeFor.project.name} workspaces={queueWorkspaces(mergeFor.project)} preselect={mergeFor.preselect} policy={queuePolicy()}
+          onClose={() => setMergeFor(null)} onResolve={(item) => resolveConflicts(mergeFor.project, item)} onArchive={(id) => archiveMerged(mergeFor.project, id)} />
+      )}
       {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
+      {memoryUi.node}
       {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
     </aside>
   );

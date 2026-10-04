@@ -2,7 +2,7 @@
 // dependencies, cycles), write-ownership conflicts between concurrent general agents, the scheduling step, a runner over
 // an injected `run` function, and the merged summary returned to the parent. No app imports.
 import type { ToolDef } from "../providers/types";
-import { AGENT_TYPES, isReadOnlyType, parseSpawnArgs, safeRelativePath, truncateReport, type SpawnArgs } from "./subagentCore";
+import { AGENT_ROLES, AGENT_TYPES, MAX_FALLBACK_PROVIDERS, isReadOnlyType, parseSpawnArgs, routingNote, safeRelativePath, truncateReport, type RoutingHints, type SpawnArgs } from "./subagentCore";
 
 export const DELEGATE_TOOL_NAME = "delegate_tasks";
 export const MAX_PLAN_TASKS = 12;
@@ -37,6 +37,9 @@ export const DELEGATE_TOOL: ToolDef = {
             files: { type: "array", items: { type: "string" }, description: "Project-relative files or folders this task owns (writes) or focuses on" },
             dependsOn: { type: "array", items: { type: "string" }, description: "Ids of tasks that must finish first" },
             model: { type: "string", description: "Optional model from the allowed list" },
+            provider: { type: "string", description: "Optional provider id from the allowed providers list (API or CLI agent); a CLI task runs in its own git worktree" },
+            role: { type: "string", enum: [...AGENT_ROLES], description: "Optional role preset (provider and model); cannot be combined with provider or model" },
+            fallbackProviders: { type: "array", items: { type: "string" }, maxItems: MAX_FALLBACK_PROVIDERS, description: "Providers to move to, in order, when an attempt fails because of quota or sign-in (used with retries)" },
           },
           required: ["id", "title", "prompt", "type"],
         },
@@ -48,8 +51,10 @@ export const DELEGATE_TOOL: ToolDef = {
   },
 };
 
-export const delegateToolFor = (allowedModels: readonly string[]): ToolDef =>
-  allowedModels.length > 1 ? { ...DELEGATE_TOOL, description: `${DELEGATE_TOOL.description} Models you may pass in \`model\`: ${allowedModels.join(", ")}.` } : DELEGATE_TOOL;
+export const delegateToolFor = (allowedModels: readonly string[], hints?: RoutingHints): ToolDef => {
+  const note = `${allowedModels.length > 1 ? ` Models you may pass in \`model\`: ${allowedModels.join(", ")}.` : ""}${routingNote(hints)}`;
+  return note ? { ...DELEGATE_TOOL, description: `${DELEGATE_TOOL.description}${note}` } : DELEGATE_TOOL;
+};
 
 export type PlanTask = SpawnArgs & { id: string; dependsOn: string[] };
 export type Plan = { tasks: PlanTask[]; cancelDependents: boolean; /** Re-runs of a failed task (0-2). */ retries?: number };
@@ -266,7 +271,7 @@ export function mergeReports(plan: Plan, outcomes: ReadonlyMap<string, Outcome>,
     const n = outcomes.get(id)?.attempts;
     return n && plan.retries ? `, ${n} attempt${n === 1 ? "" : "s"}` : "";
   };
-  const lines = plan.tasks.map((t) => `- ${t.id} "${t.title}" (${t.type}${t.dependsOn.length ? `, after ${t.dependsOn.join(", ")}` : ""}): ${outcomes.get(t.id)?.status ?? "skipped"}${attemptsOf(t.id)}`);
+  const lines = plan.tasks.map((t) => `- ${t.id} "${t.title}" (${t.type}${t.role ? `, role ${t.role}` : t.provider ? `, ${t.provider}` : ""}${t.dependsOn.length ? `, after ${t.dependsOn.join(", ")}` : ""}): ${outcomes.get(t.id)?.status ?? "skipped"}${attemptsOf(t.id)}`);
   const each = Math.max(500, Math.floor((max - head.length - lines.join("\n").length) / plan.tasks.length) - 40);
   const reports = plan.tasks.map((t) => `### ${t.id}: ${t.title}\n${truncateReport(outcomes.get(t.id)?.report ?? "", each)}`);
   return [head, "", ...lines, "", ...reports].join("\n");

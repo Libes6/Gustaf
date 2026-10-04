@@ -6,6 +6,7 @@ import { Markdown } from "../Markdown";
 import { LiveMeter, type LiveStats } from "../LiveMeter";
 import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
+import { isVerificationPart, VerificationCard } from "../VerificationCard";
 import { ApprovalCard } from "./ApprovalCard";
 
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void } | null;
@@ -35,7 +36,7 @@ export function LiveStatus({ activities, stream, approval, retryNotice, stats, v
   return (
     <>
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{status}</div>
-      {renderWithSubagents(activities, (a) => <ToolCard key={a.id} call={a} onRunCommand={onRunCommand} projectRoot={projectRoot} />)}
+      {renderWithSubagents(activities, (a) => isVerificationPart(a) ? <VerificationCard key={a.id} part={a} /> : <ToolCard key={a.id} call={a} onRunCommand={onRunCommand} projectRoot={projectRoot} />)}
       {stream !== null &&
         (stream ? (
           <div className="msg-assistant caret">

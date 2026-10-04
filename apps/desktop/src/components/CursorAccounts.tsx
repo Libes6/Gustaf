@@ -73,7 +73,7 @@ export function CursorAccounts() {
         await updatePool((pool) => addToPool(pool, id));
       }
       setWho((w) => ({ ...w, [id]: identity! }));
-      await app.refreshModels();
+      await app.refreshModels({ only: [id] });
       setFlow(null);
     } catch (e: any) {
       if (!existing) await cursorProfiles.remove(name).catch(() => {});
@@ -86,7 +86,7 @@ export function CursorAccounts() {
 
   const remove = async (a: ProviderConfig) => {
     await deleteProvider(a.id);
-    await app.refreshModels();
+    await app.refreshModels({ refresh: "startup" });
   };
 
   const link = flow ? loginUrl(flow.output) : undefined;

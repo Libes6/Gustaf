@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, MessageSquarePlus, Send, X } from "lucide-react";
 import { useState } from "react";
 import { useT } from "../i18n";
+import { REVIEW_RULES_CAP } from "../lib/autoReview";
 import { MAX_COMMENT, sortFindings, type FeedbackComment, type Finding } from "../lib/diffReview";
 import "../styles/diffReview.css";
 
@@ -66,13 +67,18 @@ export function FindingsBlock({ file, findings, onDismiss, onComment }: { file: 
 }
 
 /** Findings of every reviewed file at the top of the panel: live status, summary, and a jump to the file/hunk. */
-export function FindingsList({ findings, summary, statusText, running, error, onJump, onDismiss, onCancel }: {
-  findings: (Finding & { reviewId: string })[]; summary: string; statusText: string; running: boolean; error: string;
-  onJump: (f: Finding & { reviewId: string }) => void; onDismiss: (id: string) => void; onCancel: () => void;
+export function FindingsList({ findings, summary, statusText, running, error, rules, onJump, onDismiss, onCancel }: {
+  findings: (Finding & { reviewId?: string })[]; summary: string; statusText: string; running: boolean; error: string;
+  /** The project's review rules file, shown while it is in use. */
+  rules?: { status: string; path: string };
+  onJump: (f: Finding & { reviewId?: string }) => void; onDismiss: (id: string) => void; onCancel: () => void;
 }) {
   const t = useT();
+  const rulesLabel = !rules || rules.status === "none" || rules.status === "empty" ? ""
+    : rules.status === "truncated" ? t("reviewRulesTruncated", { path: rules.path, kb: REVIEW_RULES_CAP / 1024 }) : t("reviewRulesLabel", { path: rules.path });
   return (
     <div className="findings-list">
+      {rulesLabel && <div className="hint findings-rules">{rulesLabel}</div>}
       <div className="findings-status" role="status" aria-live="polite">{statusText}</div>
       {running && <button className="btn-soft" onClick={onCancel}>{t("cancel")}</button>}
       {error && <div className="error-box" role="alert">{error}</div>}

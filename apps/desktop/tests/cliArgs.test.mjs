@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codexArgs, withImagePaths, turnImages } from '../src/providers/cliArgs.ts';
+import { codexArgs, withImagePaths, turnImages, sidecarFailure } from '../src/providers/cliArgs.ts';
 import { claudeArgs } from '../src/providers/claudeCli.ts';
 test('new Codex requests retain explicit sandbox permissions', () => {
  assert.deepEqual(codexArgs({access:'readonly'}), ['exec','--json','--skip-git-repo-check','--sandbox','read-only']);
@@ -42,4 +42,29 @@ test('only the new turn images are sent',()=>{
  // replayed history: old images stay out, only the latest user message counts
  assert.deepEqual(turnImages([user(img('OLD')),asst(),user({type:'text',text:'t'},img('NEW'))],false),['NEW']);
  assert.deepEqual(turnImages([user({type:'text',text:'t'})],true),[]);
+});
+
+test('branched history without response ids starts a fresh native session and retains recorded image context', async () => {
+  const { resumePoint } = await import('../src/providers/cliArgs.ts');
+  const copied = [
+    { role: 'user', parts: [{ type: 'text', text: 'Inspect attachment' }, { type: 'image', data: 'AA' }], meta: { branchHistory: true } },
+    { role: 'assistant', parts: [{ type: 'text', text: 'Recorded result' }], meta: { provider: 'codex' } },
+    { role: 'user', parts: [{ type: 'text', text: 'Continue the branch' }] },
+  ];
+  const point = resumePoint({ messages: copied, system: 'sys' }, 'codex', false);
+  assert.equal(point.session, undefined);
+  assert.ok(point.prompt.includes('Recorded result'));
+  assert.ok(point.prompt.includes('Continue the branch'));
+  assert.deepEqual(point.images, ['AA']);
+});
+
+test('sidecarFailure: a crashed Cursor sidecar is an error, not an empty answer or model list', () => {
+  const ok = { code: 0, stderr: '', reported: false, aborted: false };
+  assert.equal(sidecarFailure(ok), '');
+  assert.match(sidecarFailure({ ...ok, code: 1, stderr: 'SyntaxError: Unexpected token\n' }), /exit code 1.*SyntaxError/s);
+  assert.match(sidecarFailure({ ...ok, code: null }), /Cursor sidecar/);
+  assert.match(sidecarFailure({ ...ok, code: 127, stderr: 'zsh: command not found: node' }), /^Cursor sidecar: zsh: command not found: node/);
+  // The sidecar's own error event is reported by the caller; a stop is not a failure.
+  assert.equal(sidecarFailure({ ...ok, code: 1, stderr: 'x', reported: true }), '');
+  assert.equal(sidecarFailure({ ...ok, code: null, aborted: true }), '');
 });

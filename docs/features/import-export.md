@@ -1,6 +1,6 @@
 # Export and import
 
-Part of the [M Code documentation](../README.md). Moving chats in and out of M Code.
+Part of the [Gustaf documentation](../README.md). Moving chats in and out of Gustaf.
 
 ## Export and import chats
 
@@ -26,7 +26,7 @@ Logic lives in `src/lib/shareHtml.ts` (pure; tested in `tests/shareHtml.test.mjs
 
 ## Import from Claude Code, Codex and ChatGPT
 
-Settings, Import (and onboarding) list the conversations of other assistants with checkboxes, a search box (title, folder, id) and "Select shown"; sessions that are already in M Code are marked and cannot be ticked again. Sources:
+Settings, Import (and onboarding) list the conversations of other assistants with checkboxes, a search box (title, folder, id) and "Select shown"; sessions that are already in Gustaf are marked and cannot be ticked again. Sources:
 
 - **Claude Code**: `~/.claude/projects/<project>/*.jsonl` (or `$CLAUDE_CONFIG_DIR/projects`). User and assistant text, `tool_use` and `tool_result` blocks become messages with tool calls and results; thinking blocks, sub-agent (`isSidechain`), `isMeta` and compaction-summary lines, hooks, snapshots and attachments are skipped. A rewound session keeps its file order (abandoned branches included). The title is the session's custom or AI title, else the first prompt.
 - **Codex CLI**: `~/.codex/sessions/**/rollout-*.jsonl` (or `$CODEX_HOME/sessions`). `response_item` messages, function / custom / shell tool calls and their outputs; reasoning, developer prompts and injected context (`<environment_context>`, AGENTS.md text) are skipped, and so are sub-agent threads. The older rollout layout is accepted.

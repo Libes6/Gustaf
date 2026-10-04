@@ -1,3 +1,5 @@
+import * as chatData from "../../src/lib/data";
+import { joinChatReferences, freezeChat } from "../../src/lib/chatContext";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
@@ -236,14 +238,49 @@ describe("Composer", () => {
     });
   });
 
-  it("shows the reasoning and computer-use chips only when the model supports them", () => {
+  it("shows the reasoning chip only when the model supports it, and never a Computer Use chip", () => {
     const { unmount } = renderApp(<Harness />);
     expect(screen.queryByRole("button", { name: /Medium/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
     unmount();
     renderApp(<Harness supports={{ computer: true, reasoning: true }} />);
     expect(screen.getByRole("button", { name: /Medium/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Computer use/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
+  });
+
+  it("the bar holds only mode, access, context ring, model, mic and send: no Computer Use or Review copy chip", () => {
+    // Everything that used to add a chip is on: a project, a computer-capable model, Computer Use and the review copy.
+    const { container } = renderApp(
+      <Harness root="/work/alpha" supports={{ computer: true, reasoning: false }} />,
+      makeApp({ computerUse: true, reviewCopy: true, providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }),
+    );
+    const bar = container.querySelector(".composer-bar")!;
+    expect(bar.querySelector(".composer-mode")).toHaveTextContent("Agent");
+    // Keyboard (DOM) order: attach menu, access, context ring, model, voice input, send.
+    expect(within(bar as HTMLElement).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
+      "Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Voice input", "Send",
+    ]);
+    expect(screen.queryByText(/Computer use/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Review copy/i)).not.toBeInTheDocument();
+  });
+
+  it("the context ring popover says Computer Use is on when it is on (and the model can use it), else nothing", async () => {
+    const supports = { computer: true, reasoning: false };
+    const on = renderApp(<Harness supports={supports} />, makeApp({ computerUse: true }));
+    await userEvent.click(on.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Computer Use on")).toBeInTheDocument();
+    on.unmount();
+
+    const off = renderApp(<Harness supports={supports} />, makeApp({ computerUse: false }));
+    await userEvent.click(off.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Compress chat")).toBeInTheDocument();
+    expect(screen.queryByText("Computer Use on")).not.toBeInTheDocument();
+    off.unmount();
+
+    // On, but this model has no computer support: the agent gets no computer tools, so nothing is claimed.
+    const unsupported = renderApp(<Harness supports={{ computer: false, reasoning: false }} />, makeApp({ computerUse: true }));
+    await userEvent.click(unsupported.container.querySelector(".chip.ctx")!);
+    expect(screen.getByText("Compress chat")).toBeInTheDocument();
+    expect(screen.queryByText("Computer Use on")).not.toBeInTheDocument();
   });
 
   it("the access chip lists the three modes and switches the mode", async () => {
@@ -289,4 +326,66 @@ describe("Screenshot paste",()=>{
  expect(box().value).toBe("");
  });
  it("leaves ordinary text paste to the textarea",()=>{renderApp(<Harness/>);const event=new Event("paste",{bubbles:true,cancelable:true});Object.defineProperty(event,"clipboardData",{value:{files:[],items:[]}});box().dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
+});
+
+describe("Composer image viewer", () => {
+  it("opens a thumbnail in a dialog, closes on Esc and returns focus; remove does not open", async () => {
+    const { container } = renderApp(<Harness images={["AAAA", "BBBB"]} />);
+    const thumb = screen.getByRole("button", { name: "Attached image 1 of 2" });
+    await userEvent.click(thumb);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(within(dialog).getByAltText("Attached image 1 of 2")).toHaveAttribute("src", "data:image/png;base64,AAAA");
+    expect(within(dialog).getByRole("button", { name: "Close image" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(thumb).toHaveFocus();
+    thumb.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close image" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(container.querySelectorAll<HTMLButtonElement>(".attach button")[0]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(container.querySelectorAll(".attach img")).toHaveLength(1);
+  });
+});
+
+
+describe("chat reference attachments", () => {
+  it("accepts sidebar drag, offers full or short versions and previews the chosen snapshot", async () => {
+    const read = vi.spyOn(chatData, "loadMessages").mockResolvedValue([{ id: 1, chat_id: 5, created_at: 0, role: "user", parts: [{ type: "text", text: "a".repeat(30_000) }] }]);
+    const app = makeApp({ chats: [{ id: 5, title: "Large source", project_id: null }] });
+    const { container } = renderApp(<Harness />, app);
+    fireEvent.drop(container.querySelector(".composer")!, { dataTransfer: { getData: () => "5", files: [] } });
+    await screen.findByRole("button", { name: "Attach shortened version" });
+    expect(screen.getByRole("button", { name: "Attach full version" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Attach shortened version" }));
+    expect(box().value).toBe("");
+    await userEvent.click(screen.getByText("Exact text to send"));
+    expect(screen.getByText(/Middle omitted by user choice/)).toBeInTheDocument();
+    read.mockRestore();
+  });
+
+  it("shows an exact snapshot separate from textarea, preserves it while typing and removes it", async () => {
+    const ref = freezeChat(5, "Source chat", [{ role: "user", parts: [{ type: "text", text: "frozen content" }] }]);
+    renderApp(<Harness text={joinChatReferences("Question", [ref])} />);
+    expect(box().value).toBe("Question");
+    await userEvent.click(screen.getByText("Exact text to send"));
+    expect(screen.getByText("user: frozen content")).toBeInTheDocument();
+    await userEvent.type(box(), " edited");
+    expect(screen.getByText("user: frozen content")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove attachment" }));
+    expect(screen.queryByText("Source chat")).not.toBeInTheDocument();
+    expect(box().value).toBe("Question edited");
+  });
+  it("offers chats in the @ picker without a project and keeps source navigation", async () => {
+    const ref = freezeChat(5, "Source chat", []);
+    const app = makeApp({ chats: [{ id: 5, title: "Source chat", project_id: null }] });
+    renderApp(<Harness text={joinChatReferences("", [ref])} />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Source chat" }));
+    expect(app.openChat).toHaveBeenCalledWith(5, null);
+    await userEvent.type(box(), "@Source");
+    expect(screen.getByRole("option", { name: "💬 Source chat" })).toBeInTheDocument();
+  });
 });

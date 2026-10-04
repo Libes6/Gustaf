@@ -1,0 +1,64 @@
+/* Workspaces (git worktrees): sidebar rows, dialogs, the composer chip and the changes list. */
+.review-dialog.ws-dialog { width: min(520px, 100%); }
+.ws-dialog .git-body code { display: block; padding: 6px 8px; border-radius: var(--radius); background: var(--bg-hover); font: 12px var(--mono); overflow-wrap: anywhere; user-select: text; }
+.ws-dialog .review-actions .grow { flex: 1; }
+
+.row.workspace { height: auto; min-height: 42px; padding: 4px 8px 4px 32px; color: var(--text); }
+.row.workspace.gone .label, .row.workspace.gone .ws-meta { color: var(--text-3); }
+.row.workspace .row-main { flex-direction: column; align-items: stretch; justify-content: center; gap: 1px; height: auto; }
+.row.workspace .ws-branch { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.row.workspace .ws-meta { display: flex; align-items: center; gap: 6px; padding-left: 20px; font-size: 11px; color: var(--text-3); min-width: 0; }
+.row.workspace .ws-meta .branch { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.row.workspace .ws-meta .sync { flex: none; }
+.row.workspace .ws-meta .changed { flex: none; color: var(--warn); }
+.row.workspace .ws-meta .dirty { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+
+.chip.workspace-chip { max-width: 220px; }
+.chip.workspace-chip span.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ws-diff { border-bottom: 1px solid var(--border); }
+.ws-diff .file-row .status { flex: none; font-size: 11px; color: var(--text-3); }
+.ws-diff .file-row .status.untracked, .ws-diff .file-row .status.added { color: var(--green); }
+.ws-diff .file-row .status.deleted { color: var(--red); }
+
+/* Conflict badge and popover (sidebar), merge queue dialog. */
+.ws-conflict-line { padding: 0 8px 4px 52px; }
+.ws-conflict { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 1px 6px; border: 1px solid var(--warn); border-radius: 999px; background: transparent; color: var(--warn); font-size: 11px; cursor: pointer; }
+.ws-conflict .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-conflict:hover { background: var(--bg-hover); }
+.ws-conflict-pop { position: fixed; z-index: 60; width: 320px; max-height: 60vh; overflow: auto; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-elev); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ws-conflict-pop h4 { margin: 0 0 4px; font-size: 11.5px; color: var(--text-2); font-weight: 600; }
+.ws-conflict-pop ul, .mq-files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.ws-conflict-pop li, .mq-files li { display: flex; gap: 8px; justify-content: space-between; min-width: 0; }
+.ws-conflict-pop .path, .mq-files .path { font-family: var(--mono); overflow-wrap: anywhere; user-select: text; }
+.ws-conflict-pop .kind, .mq-files .kind { flex: none; color: var(--text-3); }
+
+.row.mq-active { color: var(--text-2); }
+.review-dialog.mq-dialog { width: min(660px, 100%); }
+.mq-list, .mq-items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.mq-pick { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius); }
+.mq-pick.dragging { opacity: 0.5; }
+.mq-pick .grip { flex: none; color: var(--text-3); cursor: grab; }
+.mq-pick label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.mq-name { font-weight: 500; }
+.mq-branch { font: 11.5px var(--mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.mq-hint { font-size: 11.5px; color: var(--text-3); }
+.mq-strategy { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.mq-strategy label { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mq-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.mq-item.fail { border-color: var(--red); }
+.mq-item.ok { border-color: var(--green); }
+.mq-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mq-item-head .mq-status { margin-left: auto; }
+.mq-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
+.mq-status.ok { color: var(--green); }
+.mq-status.fail { color: var(--red); }
+.mq-status.active { color: var(--warn); }
+.mq-status.skipped { color: var(--text-3); }
+.mq-fail { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.mq-output { margin: 0; max-height: 160px; overflow: auto; width: 100%; font: 12px/1.5 var(--mono); white-space: pre-wrap; user-select: text; }
+.mq-archive { align-self: flex-start; }
+.mq-error-actions { margin-top: 6px; }
+.mq-error { font: inherit; }
+.mq-approval { margin: 0; }
+.mq-recent ul { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }

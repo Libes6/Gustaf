@@ -54,7 +54,7 @@ describe("ApprovalCard", () => {
   it("offers 'Allow for this task' for a risky desktop batch in Full access, and answers always=true", async () => {
     const onAnswer = vi.fn();
     renderApp(<ApprovalCard req={computerRequest(typeThenEnter, "full")} onAnswer={onAnswer} />);
-    expect(screen.getByText("Perform these actions on your Mac?")).toBeInTheDocument();
+    expect(screen.getByText("Perform these actions on your computer?")).toBeInTheDocument();
     expect(screen.getByText('type "hello" · Return')).toBeInTheDocument();
     expect(screen.getByText(/Pressing Return after typing/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Allow for this task" }));

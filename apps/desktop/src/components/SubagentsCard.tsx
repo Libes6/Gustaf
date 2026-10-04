@@ -13,7 +13,7 @@ export type ShownState = SubagentInfo["state"] | "ended";
 export const shownState = (a: SubagentActivity): ShownState => (a.status !== "running" && (a.subagent.state === "running" || a.subagent.state === "waiting") ? "ended" : a.subagent.state);
 export const agentTitle = (a: SubagentActivity, unnamed: (id: string) => string) => a.subagent.title || unnamed(a.subagent.agentId.slice(-6) || "…");
 
-const STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", ended: "subagentEnded" } as const;
+const STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", stopped: "subagentStopped", ended: "subagentEnded" } as const;
 export const stateKey = (s: ShownState) => STATE_KEY[s];
 
 function Row({ agent }: { agent: SubagentActivity }) {
@@ -45,7 +45,7 @@ function Row({ agent }: { agent: SubagentActivity }) {
               {s.tokens ? <span>{t("agentsTokens", { tokens: formatTokens(s.tokens) })}</span> : null}
             </div>
           ) : null}
-          {s.step && state !== "completed" && <div className="subagent-step">{s.step}</div>}
+          {s.step && (state === "running" || state === "waiting") && <div className="subagent-step">{s.step}</div>}
           {agent.output ? <div><div className="subagent-label">{t("agentsReport")}</div><pre className={state === "failed" ? "err" : ""}>{agent.output}</pre></div> : <p className="hint">{t("subagentNoResult")}</p>}
         </div>
       )}
@@ -62,12 +62,13 @@ export function SubagentsCard({ agents }: { agents: SubagentActivity[] }) {
   const running = states.filter((s) => s === "running" || s === "waiting").length;
   const done = states.filter((s) => s === "completed").length;
   const failed = states.filter((s) => s === "failed").length;
+  const stopped = states.filter((s) => s === "stopped" || s === "ended").length;
   return (
     <section className="tool-card subagents-card" aria-label={t("subagentsTitle")}>
       <button className="tool-head" style={{ width: "100%" }} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
         <Users size={14} aria-hidden="true" />
         <span className="name">{t("subagentsTitle")}</span>
-        <span className="arg">{t("subagentsSummary", { running, done })}{failed ? ` · ${t("subagentsFailedCount", { count: failed })}` : ""}</span>
+        <span className="arg">{t("subagentsSummary", { running, done })}{failed ? ` · ${t("subagentsFailedCount", { count: failed })}` : ""}{stopped ? ` · ${t("subagentsStoppedCount", { count: stopped })}` : ""}</span>
         {running > 0 ? <Loader2 size={13} className="spin" aria-hidden="true" /> : failed ? <X size={13} className="err" aria-hidden="true" /> : <Check size={13} color="var(--green)" aria-hidden="true" />}
       </button>
       {open && (

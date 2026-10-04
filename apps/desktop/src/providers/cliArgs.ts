@@ -29,6 +29,18 @@ export function codexArgs({ model, session, access, mode, images = [] }: { model
   return ['exec', ...(session ? ['resume'] : []), '--json', '--skip-git-repo-check', ...images.map((p) => `--image=${p}`), ...permissions, ...(model ? ['-m', model] : []), ...(session ? [session] : [])];
 }
 
+/**
+ * Why a Cursor SDK sidecar run failed, or "" when it did not. The sidecar reports its own errors as an `error` event
+ * (`reported`) and exits 0; a non-zero exit without one means Node could not run it (old Node, missing modules, a crash),
+ * which must not pass for an empty answer or an empty model list.
+ */
+export function sidecarFailure(o: { code: number | null; stderr: string; reported: boolean; aborted: boolean }): string {
+  if (/command not found: node|not recognized|Cannot find package/.test(o.stderr)) return `Cursor sidecar: ${o.stderr.slice(0, 300)}`;
+  if (o.reported || o.aborted || o.code === 0) return "";
+  const tail = o.stderr.trim().slice(-600);
+  return `Cursor sidecar failed (exit code ${o.code ?? "none"})${tail ? `: ${tail}` : "."}`;
+}
+
 /** Claude and Cursor Agent have no image flag: the prompt points them at the files, and their tool permissions must cover the folder. */
 export function withImagePaths(prompt: string, images: string[]): string {
   if (!images.length) return prompt;
@@ -69,5 +81,5 @@ export function resumePoint(t: TurnInput, providerId: string, withSystem: boolea
     : (withSystem ? `${t.system}\n\n` : "") +
       (rest.length === 1 ? textOf(rest[0]) : rest.map((m) => `${m.role.toUpperCase()}:\n${flattenMsg(m)}`).join("\n\n"));
   // Resumed CLI sessions may predate canvas support and don't receive the API system message.
-  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session) };
+  return { session, prompt: session || !withSystem ? `${t.system}\n\n${prompt}` : prompt, images: turnImages(rest, !!session || rest.some(m => m.meta?.branchHistory)) };
 }

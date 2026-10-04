@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "../lib/api";
 import { undoFileEdit } from "../lib/checkpoints";
 import type { UndoResult } from "../lib/fileUndo";
-import { ACTION_LOG_SETTING, appendEntry, clipDetail, mergeLogs, normalizeActionLog, patchEntry, undoBlocker, type ActionEntry, type ActionStatus } from "./actionLog";
+import { ACTION_LOG_SETTING, appendEntry, clipDetail, mergeLogs, normalizeActionLog, patchEntry, undoBlocker, type ActionEntry, type ActionStatus, type HookMeta, type GateMeta } from "./actionLog";
 
 // One shared in-memory log (several chats can run at once), persisted to the app settings shortly after each change.
 let entries: ActionEntry[] = [];
@@ -50,7 +50,7 @@ const change = (next: ActionEntry[], now = false) => {
   schedule(now);
 };
 
-export type ActionStart = { tool: string; summary: string; root?: string; project?: string; source?: "scheduled" };
+export type ActionStart = { tool: string; summary: string; root?: string; project?: string; source?: "scheduled" | "hook" | "gate"; hook?: HookMeta; gate?: GateMeta };
 
 /** Records a tool call that is about to run; returns its id. */
 export function logStart(a: ActionStart): string {

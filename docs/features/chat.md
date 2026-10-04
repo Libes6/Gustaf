@@ -1,6 +1,6 @@
 # Chat
 
-Part of the [M Code documentation](../README.md). Chat sessions, streaming, message actions, model comparison and appearance.
+Part of the [Gustaf documentation](../README.md). Chat sessions, streaming, message actions, model comparison and appearance.
 
 ## Chat state and window controls
 
@@ -43,3 +43,11 @@ All shortcuts are defined in `src/lib/shortcuts.ts` and listed read-only under S
 Each chat row shows at most one badge, always in the same slot with a text alternative (screen readers and the tooltip), never colour alone: a spinner while the chat runs (also a scheduled run writing to it), an amber "!" while an approval request waits, a red cross icon when the last run ended in an error, and an accent dot when a run finished while the chat was not in front of you (another chat open, Settings, or the window in the background). The most urgent wins: waiting, running, failed, done-unread. The dot and the cross clear when you open the chat; the cross also clears when the next run starts or succeeds. A stopped run changes nothing. When the window is in the background, a finished or failed chat run raises the same notification and dock badge as a background agent (if notifications are on). Only the unread dots survive a restart (setting `unreadChats`, the newest 200 chats).
 
 Logic: `src/lib/chatStatus.ts` (pure: `deriveStatus` and the flag store; `tests/chatStatus.test.mjs`); `lib/attention.ts` feeds it (`reportChatRun`, `useChatStatusSync`) and `components/Sidebar.tsx` draws the badge (`tests/ui/Sidebar.test.tsx`).
+
+## Chat reference attachments
+
+Type `@` or choose **Attach chat** in the composer menu to search active chat titles. A sidebar chat can also be dragged into the composer. Select full or shortened text after inspecting the snapshot; shortening explicitly omits the middle of a long conversation. Images are not copied. The attachment card shows the exact selected text and links to the source. Removing the attachment leaves the request text untouched.
+
+The snapshot is captured when the chat is selected and retained in the draft, sent message, and branch history independently of later source edits. It is serialized as JSON in a labelled reference-data block; copied `@file` strings never trigger project file reads. User text remains outside that block. Historical draft rows remain compatible because the existing text field stores the block. Attachments which exceed the 200,000-character draft budget are refused with an explicit message; select the shortened version instead. Provider context limits still apply to the full request.
+
+Sent messages expose the source link and saved snapshot. If the source is deleted or archived, its link is disabled while the snapshot remains readable. Search currently covers active chat titles, not transcript text. This snapshot transfers text reference material, not a provider session or executable tool history.

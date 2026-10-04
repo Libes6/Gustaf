@@ -130,3 +130,36 @@ test('text streamed inside a Claude subagent is not part of the answer', () => {
   assert.equal(parseClaudeEvent({ type: 'stream_event', parent_tool_use_id: 'tu1', event: { delta: { type: 'text_delta', text: 'inner' } } }).text, undefined);
   assert.equal(parseClaudeEvent({ type: 'stream_event', parent_tool_use_id: null, event: { delta: { type: 'text_delta', text: 'outer' } } }).text, 'outer');
 });
+
+// Synthetic fixtures: the launch text and the `<task-notification>` user message follow Claude Code's background-agent flow; verify against a real stream.
+const bgEvents = (notice) => [
+  { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'tu9', name: 'Agent', input: { description: 'Sleep', subagent_type: 'general-purpose', prompt: 'sleep 10', run_in_background: true } }] } },
+  { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tu9', content: 'Async agent launched successfully.\nagentId: a1b2c3 (internal ID)' }] } },
+  ...(notice ? [{ type: 'user', message: { content: [{ type: 'text', text: notice }] } }] : []),
+];
+
+test('a background Task launch result keeps the subagent running with no report', () => {
+  const [a] = feed('claude', bgEvents());
+  assert.equal(a.subagent.state, 'running');
+  assert.equal(a.status, 'running');
+  assert.equal(a.subagent.bgId, 'a1b2c3');
+  assert.equal(a.subagent.result, undefined);
+});
+
+test('the completion notice closes the background subagent with its report, tokens and time', () => {
+  const notice = '<task-notification><task-id>a1b2c3</task-id><status>completed</status><summary>Agent finished</summary><result>Slept 10s</result><usage><total_tokens>16373</total_tokens><tool_uses>2</tool_uses><duration_ms>15495</duration_ms></usage></task-notification>';
+  const out = feed('claude', bgEvents(notice));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].subagent.state, 'completed');
+  assert.equal(out[0].status, 'success');
+  assert.equal(out[0].subagent.result, 'Slept 10s');
+  assert.equal(out[0].subagent.tokens, 16373);
+  assert.equal(out[0].subagent.durationMs, 15495);
+  assert.equal(out[0].subagent.title, 'Sleep');
+});
+
+test('a failed completion notice marks the background subagent failed', () => {
+  const out = feed('claude', bgEvents('<task-notification><task-id>a1b2c3</task-id><status>failed</status><summary>Boom</summary></task-notification>'));
+  assert.equal(out[0].subagent.state, 'failed');
+  assert.equal(out[0].status, 'error');
+});

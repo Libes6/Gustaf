@@ -1,0 +1,85 @@
+name: Bug report
+description: Something in Gustaf does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please search existing issues first.
+
+        **Before you paste anything, remove API keys, tokens, passwords and private file contents.** Logs, exported chats and raw CLI captures are scrubbed on a best-effort basis only.
+        Security problems must not be reported here: see [SECURITY.md](https://github.com/Libes6/Gustaf/blob/dev/SECURITY.md).
+  - type: input
+    id: gustaf-version
+    attributes:
+      label: Gustaf version
+      description: Settings → General shows the installed version. For a source build, give the commit (`git rev-parse --short HEAD`).
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - macOS DMG
+        - Windows NSIS installer (.exe)
+        - Windows MSI
+        - Linux AppImage
+        - Linux DEB
+        - Linux RPM
+        - Built from source (npm run tauri dev / tauri build)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      description: Include the architecture (Apple Silicon / Intel / x64) and, on Linux, the distribution and X11 or Wayland.
+      placeholder: "macOS 15.4, Apple Silicon"
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+      description: For example "Anthropic API, claude-…", "OpenAI API", "Ollama, llama3", "Codex CLI 0.x", "Claude Code CLI", "Cursor Agent CLI". Write "n/a" if no model is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project …
+        2. Select …
+        3. Send …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the exact error text. Screenshots help for UI problems.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Optional. Useful sources: errors in the web inspector console (in a debug build), the MCP server "Log" in Settings, or for CLI providers the raw CLI capture (Settings → General → Developer → "Record raw CLI events", files in `<app data>/raw-cli/`). Strip API keys and tokens before pasting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed API keys, tokens and other secrets from everything above.
+          required: true

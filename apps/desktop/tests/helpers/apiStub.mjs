@@ -12,7 +12,13 @@ export const state = {
   instructionFiles: [],
   /** Commands the agent asked to run: { root, command }. */
   runs: [],
+  /** A result object, or ({ root, command, timeoutMs }) => result. */
   runResult: { code: 0, output: 'ran', timed_out: false },
+  /** Timeout argument of every command in `runs`, in the same order. */
+  runTimeouts: [],
+  /** Hook commands that were run: { root, command, timeoutMs, stdin, env }. */
+  hookRuns: [],
+  hookResult: () => ({ code: 0, output: '', timed_out: false }),
   /** (id, path) => diff text for the review panel; empty string = nothing pending. */
   reviewDiff: () => '',
   /** Computer action batches the agent executed (nothing touches the real desktop). */
@@ -37,6 +43,9 @@ export const state = {
     this.mcp = { servers: {}, starts: [], requests: [], stops: [], cancels: [], waiting: new Map() };
     this.instructionFiles = [];
     this.runs.length = 0;
+    this.runTimeouts.length = 0;
+    this.hookRuns.length = 0;
+    this.hookResult = () => ({ code: 0, output: '', timed_out: false });
     this.runResult = { code: 0, output: 'ran', timed_out: false };
     this.reviewDiff = () => '';
     this.executed = [];
@@ -52,6 +61,7 @@ const confine = (root, rel) => {
 
 export const getSetting = async (key, fallback) => (state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback);
 export const setSetting = async (key, value) => void state.settings.set(key, JSON.stringify(value));
+export const deleteSetting = async (key) => void state.settings.delete(key);
 // SQL bridge: a real in-memory SQLite (node:sqlite) holding only the agent_runs / agent_messages tables, created from the
 // statements in src-tauri/src/db.rs (between its agent-runs markers). Anything else behaves like an empty database.
 let agentDb = null;
@@ -116,6 +126,7 @@ export const mcpStdio = {
       return s.call(params.name, params.arguments);
     }
     if (method === 'resources/list') return { resources: s.resources };
+    if (method === 'resources/templates/list' && s.resourceTemplates) return { resourceTemplates: s.resourceTemplates };
     if (method === 'resources/read') return s.read(params.uri);
     if (method === 'prompts/list') return { prompts: s.prompts };
     if (method === 'prompts/get') return s.getPrompt(params.name, params.arguments);
@@ -164,9 +175,19 @@ export const fsx = {
   /** Instruction files the test put in `state.instructionFiles` ({ name, text }). */
   instructions: async () => state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
   homeFile: async () => null,
-  run: async (root, command) => {
+  run: async (root, command, timeoutMs) => {
     state.runs.push({ root, command });
-    return state.runResult;
+    state.runTimeouts.push(timeoutMs);
+    return typeof state.runResult === 'function' ? state.runResult({ root, command, timeoutMs }) : state.runResult;
+  },
+};
+
+/** Hook runner (src-tauri/src/hook_exec.rs): calls are recorded in `state.hookRuns`, the answer comes from `state.hookResult(call)`. */
+export const hookRunner = {
+  run: async (root, command, timeoutMs, stdin, env) => {
+    const call = { root, command, timeoutMs, stdin, env };
+    state.hookRuns.push(call);
+    return state.hookResult(call);
   },
 };
 
@@ -182,6 +203,9 @@ export const git = async (root, args, shadow) => {
   if (r.status !== 0) throw new Error(r.stderr.trim() || `git exited with ${r.status}`);
   return r.stdout;
 };
+
+/** Git repository info (src-tauri/src/git.rs): not available in tests; only imported by the workspace store. */
+export const gitRepo = new Proxy({}, { get: () => async () => { throw new Error('gitRepo is not available in tests'); } });
 
 export const review = {
   prepare: async () => { throw new Error('not in tests'); },

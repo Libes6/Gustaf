@@ -30,3 +30,15 @@
 .feedback-queue li .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-queue code { font: 11.5px var(--mono); }
 .review-ai { margin: 6px 12px; }
+/* Automatic review: rules label, badge on the Changes tab, and the high-severity confirm step. */
+.findings-rules { font-size: 12px; }
+.review-badge { display: inline-block; min-width: 16px; margin-left: 6px; padding: 0 5px; border-radius: 8px; font-size: 11px; font-weight: 600; line-height: 16px; text-align: center; background: var(--bg-elev); color: var(--text-2); }
+.review-badge.high { background: var(--red); color: #fff; }
+.review-gate { margin: 8px 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--red); border-radius: 8px; background: var(--bg-elev); }
+.review-gate .gate-title { display: flex; align-items: center; gap: 6px; color: var(--red); }
+.review-gate ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.review-gate li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.review-gate .gate-what { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+.review-gate .gate-what code { font: 11.5px var(--mono); }
+.review-gate li .input { flex: 1; min-width: 120px; font-size: 12.5px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.review-gate .gate-actions { display: flex; gap: 8px; justify-content: flex-end; }

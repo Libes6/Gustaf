@@ -52,6 +52,16 @@ test('finishing a run marks running agents ended, drops their stop handle and cl
   assert.deepEqual(getCliAgents().map((e) => e.key), ['2:c']);
 });
 
+test('agents still running when the user stopped the chat run are "stopped", not "ended"', () => {
+  trackCliAgents({ chatId: 3, root: '/p', stop: () => {} }, [act('s', 'running'), act('t', 'completed')], 100);
+  finishCliAgents(3, 600, true);
+  const [s, t] = ['3:s', '3:t'].map((k) => getCliAgents().find((e) => e.key === k));
+  assert.equal(s.state, 'stopped');
+  assert.equal(s.endedAt, 600);
+  assert.equal(s.stop, undefined);
+  assert.equal(t.state, 'completed');
+});
+
 test('runChatCore feeds the store while the run is live and finishes it afterwards (also when the run fails)', async () => {
   const seenLive = [];
   const deps = {

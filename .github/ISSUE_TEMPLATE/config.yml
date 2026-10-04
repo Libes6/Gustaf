@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Libes6/Gustaf/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Documentation
+    url: https://github.com/Libes6/Gustaf/blob/dev/docs/README.md
+    about: Feature pages, architecture and release notes.

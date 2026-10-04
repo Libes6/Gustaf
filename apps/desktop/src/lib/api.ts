@@ -19,6 +19,8 @@ export const setSetting = (key: string, value: unknown) =>
     JSON.stringify(value),
   ]);
 
+export const deleteSetting = (key: string) => db.exec("delete from settings where key = ?", [key]);
+
 export const secrets = {
   set: (id: string, value: string) => invoke<void>("secret_set", { id, value }),
   get: (id: string) => invoke<string | null>("secret_get", { id }),
@@ -139,6 +141,12 @@ export const fsx = {
   homeFile: (rel: string) => invoke<string | null>("read_home_file", { rel }),
   run: (root: string, command: string, timeoutMs?: number) =>
     invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs }),
+};
+
+/** Runs a hook command (src-tauri/src/hook_exec.rs): JSON on stdin, scrubbed environment plus `env` (GUSTAF_* only), hard timeout, process tree killed on timeout. */
+export const hookRunner = {
+  run: (root: string, command: string, timeoutMs: number, stdin: string, env: Record<string, string>) =>
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_hook", { root, command, timeoutMs, stdin, env: Object.entries(env) }),
 };
 
 export const git = (root: string, args: string[], shadow = false) => invoke<string>("git", { root, args, shadow });
@@ -271,7 +279,7 @@ export type RolloutAgent = {
   taskName?: string | null;
   role?: string | null;
   message?: string | null;
-  /** starting | running | completed | failed | shutdown */
+  /** starting | running | completed | failed | stopped (interrupted or cut off, neutral) | shutdown */
   state: string;
   startedAtMs?: number | null;
   endedAtMs?: number | null;

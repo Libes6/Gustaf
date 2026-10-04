@@ -1,10 +1,13 @@
+import { transformRequest } from "./chatContext";
+import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
+import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatMode } from "../agent/planCore";
 import { commandAllowed, type ApprovalRequest } from "../agent/agent";
 import { nativeInstructionFiles } from "../agent/instructions";
 import { createSubagentHost } from "../agent/subagents";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
-import { cheapTarget, subagentModelResolver } from "./modelRouting";
+import { cheapTarget, parkCliAccount, providerDirectory, subagentModelResolver } from "./modelRouting";
 import { beginApproval, reportChatRun } from "./attention";
 import { chatStatusStore } from "./chatStatus";
 import type { LiveStats } from "../components/LiveMeter";
@@ -21,6 +24,9 @@ import type { ChatSession } from "./chatSessions";
 import { getLiveRun, liveVersion, subscribeLiveRuns } from "./liveRuns";
 import { checkpoint, restoreAll } from "./checkpoints";
 import { prepareShadowCopy } from "./reviewSetupStore";
+import { resolveReviewCopy } from "./reviewCopy";
+import { createWorkspace, setupWorkspace, type WorkspaceCreated } from "./workspaceCreate";
+import type { ChatWorkspace } from "./workspaces";
 import { effectiveHistory, estimateContext, summaryChunks } from "./context";
 import { addMessage, branchChat, createChat, deleteMessages, deleteMessagesFrom, loadMessages, type StoredMsg } from "./data";
 import { branchCutoff, branchTitle, editableText, messageImages, messagesBefore } from "./messageActions";
@@ -47,17 +53,29 @@ type Options = {
   setAtBottom: (b: boolean) => void;
   /** Ask / Plan / Agent of this chat. */
   mode: ChatMode;
+  /** The chat is linked to a workspace (git worktree); `root` is then its checkout, never the main checkout. */
+  workspace?: ChatWorkspace | null;
+  /** The project folder itself (`root` is the workspace checkout for a linked chat). */
+  projectRoot?: string | null;
+  /** The linked workspace cannot be resolved (still loading, or archived): sending is refused with this text. */
+  blocked?: string;
+  /** "Run in new workspace" is on: the first message creates a workspace and a chat linked to it. */
+  newWorkspace?: boolean;
+  /** The option was used (or the send failed before using it): the composer switches it off again. */
+  onWorkspaceUsed?: () => void;
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
-type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode };
+type Edit = { text: string; images: string[]; base: StoredMsg[]; /** Overrides the chat mode for this send (an approved plan runs in Agent mode before the switch has rendered). */ mode?: ChatMode; queuedId?: string };
 
 /** Appends `<file>` blocks with the contents of the `@path` mentions found in the message. */
 async function expandMentions(root: string | null, files: string[], s: string) {
   if (!root) return s;
-  const paths = [...new Set([...s.matchAll(/@([\w./-]+)/g)].map((m) => m[1]))].filter((p) => files.includes(p));
+  return transformRequest(s, async (body) => {
+  const paths = [...new Set([...body.matchAll(/@([\w./-]+)/g)].map((m) => m[1]))].filter((p) => files.includes(p));
   const blocks = await Promise.all(paths.map(async (p) => `<file path="${p}">\n${await fsx.read(root, p, 1, 400).catch(() => "")}\n</file>`));
-  return blocks.length ? `${s}\n\n${blocks.join("\n")}` : s;
+  return blocks.length ? `${body}\n\n${blocks.join("\n")}` : body;
+  });
 }
 
 /**
@@ -93,6 +111,29 @@ export function useChatRun(o: Options) {
   const ownLive = useRef<LiveStats>({ start: 0, chars: 0, input: 0 });
   const live = external ? { current: external.stats } : ownLive;
   const busyError = useRef("");
+  const coordinatorBusy = useSyncExternalStore(subscribeChatCoordinator, () => session.chatId ? chatBusy(session.chatId) : false);
+  const draining = useRef(false);
+  const queue = useSyncExternalStore(subscribeQueue, () => getQueue(session.chatId));
+  const sendLatest = useRef(send); sendLatest.current = send;
+  const scopeLatest = useRef(session.key); scopeLatest.current = session.key;
+  useEffect(() => { if (session.chatId) void loadQueue(session.chatId).catch(e => setError(String(e))); }, [session.chatId]);
+  useEffect(() => {
+    if (!session.chatId || !queue || queue.paused || running || coordinatorBusy || draining.current || abortRef.current || !loaded || !queue.items.length) return;
+    const queueChatId = session.chatId; const queueScope = session.key;
+    draining.current = true;
+    const item = queue.items[0];
+    void (async () => {
+      const base = await loadMessages(queueChatId);
+      if (scopeLatest.current !== queueScope) return;
+      await sendLatest.current(false, { text: item.text, images: item.images, base, queuedId: item.id });
+    })().catch(e => setError(String(e))).finally(() => { draining.current = false; });
+  }, [queue, running, coordinatorBusy, loaded]);
+  async function enqueue(clarify = false) {
+    if (!session.chatId || (!text.trim() && !images.length)) return;
+    try { await updateQueue(session.chatId, q => ({ ...q, items: [...q.items, { id: crypto.randomUUID(), text, images: [...images], clarify }], paused: q.interrupted && !running ? true : q.items.length ? q.paused : false })); } catch (e) { setError(String(e)); return; }
+    o.setText(""); o.setImages([]); o.draft.clearSent(session.chatId);
+  }
+  const changeQueue = (fn: Parameters<typeof updateQueue>[1]) => { if (session.chatId) void updateQueue(session.chatId, fn).catch(e => setError(String(e))); };
 
   const stop = () => {
     abortRef.current?.abort();
@@ -136,9 +177,11 @@ export function useChatRun(o: Options) {
     const body = (edit?.text ?? text).trim();
     const imgs = edit?.images ?? images;
     const prior = edit?.base ?? messages;
+    if (!edit && (running || coordinatorBusy)) return enqueue();
     if ((!retry && !body && !imgs.length) || ownRunning || !loaded || abortRef.current) return;
     if (external) return setError(busyError.current = t("scheduledChatBusy", { title: external.title }));
     if (!provider || !app.selection) return app.openSettings("providers");
+    if (o.blocked) return setError(o.blocked);
     let activeProvider: ProviderConfig = provider;
     let allBlocked = false;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
@@ -169,25 +212,47 @@ export function useChatRun(o: Options) {
       onLimits: app.recordLimits,
     };
     let chatId = retry ? retryRef.current?.chatId ?? session.chatId : session.chatId;
+    // Where this run works: the project folder, or the checkout of the workspace the chat is (or is about to be) linked to.
+    let runRoot = root;
+    let made: WorkspaceCreated | null = null;
+    let release: (() => void) | null = null;
+    let steeringIds: string[] = [];
     let outcome: "ok" | "failed" | "stopped" = "ok";
     if (chatId) chatStatusStore.runStarted(chatId);
     try {
       if (!chatId) {
-        chatId = await createChat(o.projectId, body.split("\n")[0].slice(0, 60) || t("newChat"));
+        const title = body.split("\n")[0].slice(0, 60) || t("newChat");
+        if (o.newWorkspace && !retry && o.projectId && o.projectRoot) {
+          setRetryNotice(t("workspaceCreating"));
+          const r = await createWorkspace({ projectId: o.projectId, root: o.projectRoot, title, slugSource: body, provider: activeProvider.id, model: activeModel });
+          setRetryNotice("");
+          o.onWorkspaceUsed?.();
+          if (r.ok) made = r;
+          // No usable repository: say so and carry on in the project folder, as without the option.
+          else if (r.fallback) setError(t("workspaceFallback", { reason: r.message }));
+          else { outcome = "failed"; return setError(t("workspaceFailed", { message: r.message })); }
+        }
+        if (made) runRoot = made.root;
+        chatId = made ? made.chatId : await createChat(o.projectId, title);
         app.promoteChat(session.key, chatId);
         await app.reload();
       }
       const cid = chatId;
+      release = claimChat(cid);
+      if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
+      await loadQueue(cid);
+      await updateQueue(cid, q => ({ ...q, active: true }));
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
         if (history[history.length - 1]?.role !== "user") history.push({ role: "user", parts: [{ type: "text", text: "Continue the interrupted request from the completed steps. Do not repeat completed actions." }] });
       } else {
-        const expanded = await expandMentions(root, o.files, body);
-        const made = await appendUserMessage(deps, { chatId: cid, root, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
-        const shown: Msg = { ...made.msg, parts: [{ type: "text", text: body }, ...made.msg.parts.slice(1)] };
-        history = made.history;
-        setMessages([...prior, { ...shown, id: made.stored.id, chat_id: cid, created_at: made.stored.created_at } as StoredMsg]);
+        const expanded = await expandMentions(runRoot, o.files, body);
+        const added = await appendUserMessage(deps, { chatId: cid, root: runRoot, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
+        if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, active: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
+        const shown: Msg = { ...added.msg, parts: [{ type: "text", text: body }, ...added.msg.parts.slice(1)] };
+        history = added.history;
+        setMessages([...prior, { ...shown, id: added.stored.id, chat_id: cid, created_at: added.stored.created_at } as StoredMsg]);
         if (!edit) {
           o.setText("");
           o.setImages([]);
@@ -210,14 +275,35 @@ export function useChatRun(o: Options) {
           if (always && req.kind === "command") app.setAllowlist(list => commandAllowed(req.command, list) ? list : [...list, req.command]);
         },
       });
+      if (made) {
+        // Dependency links and the project's setup command in the new checkout, with the usual approval.
+        const problem = await setupWorkspace(o.projectRoot!, made, {
+          access: app.access, allowlist: app.allowlist,
+          approve: command => approve({ kind: "command", command }).then(Boolean),
+          onSetup: running => setRetryNotice(running ? t("workspaceSetupRunning") : ""),
+        }, t);
+        if (problem) setError(problem);
+      }
       await runChatCore({
         chatId: cid,
-        root,
+        takeClarifications: !activeProvider.cli && activeProvider.kind !== "cli" && activeProvider.kind !== "cursor" ? async () => {
+          const q = getQueue(cid);
+          if (!q || q.paused) return [];
+          // Preserve FIFO: only a leading clarification may join this run.
+          const pending: NonNullable<ReturnType<typeof getQueue>>["items"] = []; for (const item of q.items) { if (!item.clarify) break; pending.push(item); }
+          steeringIds = pending.map(i => i.id);
+          return Promise.all(pending.map(async i => ({ role: "user" as const, parts: [{ type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) }, ...i.images.map(data => ({ type: "image" as const, data }))] })));
+        } : undefined,
+        root: runRoot,
+        project: o.projectRoot ?? undefined,
         history,
         retry,
         access: app.access,
         mode: edit?.mode ?? o.mode,
-        review: reviewRef.current ?? undefined,
+        // A workspace is its own isolation (the edits land in its checkout, never in the main one): no shadow copy.
+        // Review copy off (the global setting): the agent edits the project directly, like a workspace chat;
+        // the pre-run checkpoint and the action log still apply. An existing copy (retry) is kept.
+        review: o.workspace || made ? null : reviewRef.current ?? (resolveReviewCopy(app.reviewCopy) ? undefined : null),
         target: async () => {
           if (activeProvider.cli === "cursor-agent") {
             // Account rotation: the pool decides which Cursor account (and so which isolated profile) serves this message.
@@ -244,7 +330,7 @@ export function useChatRun(o: Options) {
         signal: ctl.signal,
         stop: () => ctl.abort(),
         approve,
-        subagents: root ? createSubagentHost({ projectRoot: root, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app) }) : undefined,
+        subagents: runRoot ? createSubagentHost({ projectRoot: runRoot, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app), providers: providerDirectory(app), onCliFailure: parkCliAccount }) : undefined,
       }, deps, {
         onReview: r => { reviewRef.current = r; },
         onNotice: setError,
@@ -259,6 +345,7 @@ export function useChatRun(o: Options) {
         onActivity: setActivities,
         onAccepted: m => { retryRef.current?.history.push(m); },
         onMessage: (m, mid) => {
+          if (m.role === "user" && steeringIds.length) { const id = steeringIds.shift()!; void updateQueue(cid, q => ({ ...q, items: q.items.filter(i => i.id !== id) })).catch(e => setError(String(e))); }
           setMessages((ms) => [...ms, { ...m, id: mid, chat_id: cid, created_at: Date.now() }]);
           setStream("");
           setActivities([]);
@@ -285,6 +372,8 @@ export function useChatRun(o: Options) {
         if (failed) setError(failed);
         reviewRef.current = null;
       }
+      if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
+      release?.();
       abortRef.current = null;
       setRunning(false);
       setRetryNotice("");
@@ -328,6 +417,7 @@ export function useChatRun(o: Options) {
 
   async function compact() {
     if (running || !loaded || !session.chatId || !provider || !app.selection || abortRef.current) return;
+    const release = claimChat(session.chatId); if (!release) return;
     const ctl = new AbortController(); abortRef.current = ctl;
     setRunning(true); app.setSessionBusy(session.key, true); setError(""); setStream("");
     const cid = session.chatId;
@@ -361,7 +451,7 @@ export function useChatRun(o: Options) {
       setMessages(ms => [...ms, { ...message, id, chat_id: cid, created_at: Date.now() }]);
       retryRef.current = null;
     } catch (e) { if (!ctl.signal.aborted) setError(String(e instanceof Error ? e.message : e)); }
-    finally { abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
+    finally { release(); abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
   }
 
   const rewind = useCallback(async (m: StoredMsg) => {
@@ -402,16 +492,17 @@ export function useChatRun(o: Options) {
   }
 
   /** Copies the history up to and including message `m` into a new chat and opens it. */
-  async function branchFrom(m: StoredMsg, chatTitle: string, label: string) {
+  async function branchFrom(m: StoredMsg, chatTitle: string, label: string, selection?: { providerId: string; model: string }) {
     if (running || abortRef.current) return;
     const cutoff = branchCutoff(messages, m.id);
     if (cutoff === null) return;
     try {
-      const id = await branchChat(o.projectId, branchTitle(chatTitle, label), m.chat_id, cutoff);
+      const id = await branchChat(o.projectId, branchTitle(chatTitle, label), m.chat_id, cutoff, o.workspace ?? undefined);
       await app.reload();
+      if (selection) app.setSelection(selection);
       app.openChat(id, o.projectId);
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
 }

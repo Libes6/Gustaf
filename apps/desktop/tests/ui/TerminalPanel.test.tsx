@@ -52,14 +52,55 @@ it("streams bytes and forwards keyboard data to its own PTY", async () => {
   mocks.terms[0].data("pwd\r");
   expect(mocks.invoke).toHaveBeenCalledWith("terminal_write", { id: 1, data: "pwd\r" });
 });
-it("queues a tool command in the visible review workspace but never sends it before Run", async () => {
+const queue = async (root: string, command: string) => {
   const { requestTerminalCommand } = await import("../../src/lib/terminalBridge");
   const { act } = await import("@testing-library/react");
+  act(() => requestTerminalCommand(root, command));
+};
+const writes = () => mocks.invoke.mock.calls.filter(([cmd]) => cmd === "terminal_write").map(([, a]) => a as { id: number; data: string });
+
+it("types a single-line tool command in the visible review workspace without Enter", async () => {
   renderApp(<TerminalPanel root="/review/project" commandScope="/project" />);
-  act(() => requestTerminalCommand("/project", "printf 'approved'"));
-  expect(await screen.findByText("printf 'approved'")).toBeInTheDocument();
-  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("terminal_create", expect.objectContaining({ root:"/review/project" })));
-  expect(mocks.invoke.mock.calls.filter(([cmd]) => cmd === "terminal_write")).toHaveLength(0);
-  await userEvent.click(screen.getByRole("button", { name:"Run command" }));
-  expect(mocks.invoke).toHaveBeenCalledWith("terminal_write", { id:1, data:"printf 'approved'\r" });
+  await queue("/project", "printf 'approved'");
+  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("terminal_create", expect.objectContaining({ root: "/review/project" })));
+  await waitFor(() => expect(writes()).toEqual([{ id: 1, data: "printf 'approved'" }]));
+  expect(await screen.findByText(/typed but not run/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Run command" })).toBeNull();
+  expect(writes().some(w => /[\r\n]/.test(w.data))).toBe(false);
+});
+it("drops trailing newlines so a typed command can never execute by itself", async () => {
+  renderApp(<TerminalPanel root="/project" />);
+  await queue("/project", "npm test\n\n");
+  await waitFor(() => expect(writes()).toEqual([{ id: 1, data: "npm test" }]));
+});
+it("shows a multi-line command and only sends it after the Run click", async () => {
+  renderApp(<TerminalPanel root="/project" />);
+  await queue("/project", "cd src\r\nls");
+  expect(await screen.findByText(/multi-line/)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Run command" })).toBeEnabled());
+  expect(writes()).toHaveLength(0);
+  await userEvent.click(screen.getByRole("button", { name: "Run command" }));
+  expect(writes()).toEqual([{ id: 1, data: "cd src\nls\r" }]);
+});
+it("opens one more tab for a request while a terminal is already open, in the same root", async () => {
+  renderApp(<TerminalPanel root="/project" />);
+  await userEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+  await queue("/project", "ls");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Terminal 2" })).toBeInTheDocument());
+  await waitFor(() => expect(writes()).toEqual([{ id: 2, data: "ls" }]));
+  expect(mocks.invoke.mock.calls.filter(([cmd]) => cmd === "terminal_create").map(([, a]) => (a as any).root)).toEqual(["/project", "/project"]);
+});
+it("ignores commands queued for another project", async () => {
+  renderApp(<TerminalPanel root="/project" />);
+  await queue("/other", "ls");
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  const { takeTerminalCommands } = await import("../../src/lib/terminalBridge");
+  expect(takeTerminalCommands("/other")).toHaveLength(1);
+});
+it("refuses a seventeenth terminal with a visible notice", async () => {
+  renderApp(<TerminalPanel root="/project" />);
+  await userEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+  for (let i = 1; i < 16; i++) await userEvent.click(screen.getByRole("button", { name: "New terminal" }));
+  await queue("/project", "ls");
+  expect(await screen.findByRole("alert")).toHaveTextContent("maximum is 16");
 });

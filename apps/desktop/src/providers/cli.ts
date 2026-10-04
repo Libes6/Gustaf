@@ -1,3 +1,4 @@
+import { resolveKey, type KeySource } from "../lib/keys";
 import { nativeActivities, applyActivity, isBareCollabWait, type Activity } from "./activities";
 import { createRolloutTracker, rolloutEnabled } from "./codexRollout";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
@@ -32,7 +33,11 @@ export function codexExecutable() {
     const probe = await shellCommand(findScript("codex", true)).execute();
     if (probe.code !== 0 || !probe.stdout.trim()) throw new Error("Codex CLI is unavailable");
     return probe.stdout.trim();
-  })();
+  })().catch((e) => {
+    // Not remembered: Codex installed (or logged in) after a failed probe must work without restarting the app.
+    codexPath = undefined;
+    throw e;
+  });
 }
 
 export async function cursorExecutable() {
@@ -47,11 +52,19 @@ async function claudeExecutable() {
   return probe.stdout.trim();
 }
 
+/** Kills a child process and everything below it (src-tauri/src/proc_tree.rs); never throws. */
+async function killProcessTree(pid: number) {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("process_kill_tree", { pid });
+  } catch { /* the plain kill that follows still ends the process itself */ }
+}
+
 /** Runs a login-shell script and feeds each stdout JSON line to onLine; non-JSON lines are skipped. */
 export async function spawnLines(
   script: string,
   onLine: (e: any) => void,
-  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void } = {},
+  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void; /** On abort kill the whole process tree, not only the child. */ killTree?: boolean } = {},
 ) {
   if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
@@ -78,7 +91,7 @@ export async function spawnLines(
   });
   cmd.stderr.on("data", (s: string) => (stderr += s));
   const child = await cmd.spawn();
-  const kill = () => { child.kill().catch(() => {}); };
+  const kill = () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); };
   o.signal?.addEventListener("abort", kill, { once: true });
   if (o.signal?.aborted) kill();
   if (o.stdin != null) await child.write(o.stdin);
@@ -175,7 +188,9 @@ export async function detectClis(): Promise<{ id: CliId; version: string }[]> {
 }
 
 /** An installed agent CLI: it runs its own tools and auth in the project folder; we relay text and tool activity. */
-export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
+export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
+  // Only Cursor API-key accounts need the key; other CLIs keep their own auth and never touch the Keychain.
+  const accountKey = async () => (cfg.cliAuth === "key" ? resolveKey(key) : "");
   const id = cfg.cli!;
   const spec = SPECS[id];
   return {
@@ -185,7 +200,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
-        const env = cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
+        const env = cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
         const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), Object.keys(env).length ? { env } : {}).execute();
         const models = cmd.stdout.split('\n').flatMap(l => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
@@ -241,7 +256,7 @@ export function cliAdapter(cfg: ProviderConfig, key = ""): Adapter {
           if (ev.final) final = ev.final;
           if (ev.error) error = ev.error;
         },
-        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, env: cursorAccountEnv(cfg, key, cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
+        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, killTree: t.killTree, env: cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
       );
       } finally {
         // The turn is over: one last scan unless it was stopped, then the polling ends.

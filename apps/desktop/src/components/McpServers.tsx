@@ -1,12 +1,13 @@
 import { Plug, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { blankServer, parseImport, validateServer, type ErrorCode, type ImportError, type KV, type McpServer } from "../agent/mcp/config";
+import { blankServer, parseImport, validateServer, type ErrorCode, type HttpTransport, type ImportError, type KV, type McpServer } from "../agent/mcp/config";
 import { disconnectMcpServer, isMcpSignedIn, listMcpTools, loadMcpConfig, mcpCapabilities, onMcpConfigChange, patchMcpServer, removeMcpServer, saveMcpServer, signInMcpServer, signOutMcpServer, testMcpServer } from "../agent/mcp/runtime";
 import type { Phase } from "../agent/mcp/oauthFlow";
 import { RESOURCE_TOOLS } from "../agent/mcp/resources";
 import type { McpTool } from "../agent/mcp/toolset";
 import { useT, type Key } from "../i18n";
 import { fsx, mcpStdio, type McpStatus } from "../lib/api";
+import { keyStoreKey } from "../lib/platform";
 import { useApp } from "../state";
 import "../styles/mcp.css";
 
@@ -191,7 +192,7 @@ function ToolsPanel({ server: s, tools: listed, busy, resources }: { server: Mcp
   const t = useT();
   // Servers that offer resources also get two built-in agent tools; they follow the same approval and read-only settings.
   const tools = listed && resources
-    ? [...listed, { name: RESOURCE_TOOLS.list, description: t("mcpResourceListDesc"), inputSchema: {} }, { name: RESOURCE_TOOLS.read, description: t("mcpResourceReadDesc"), inputSchema: {} }]
+    ? [...listed, { name: RESOURCE_TOOLS.list, description: t("mcpResourceListDesc"), inputSchema: {} }, { name: RESOURCE_TOOLS.read, description: t("mcpResourceReadDesc"), inputSchema: {} }, { name: RESOURCE_TOOLS.templates, description: t("mcpResourceTemplatesDesc"), inputSchema: {} }]
     : listed;
   const flip = (list: string[], name: string, on: boolean) => (on ? [...new Set([...list, name])] : list.filter((x) => x !== name));
   return (
@@ -236,7 +237,7 @@ function KVRows({ rows, setRows, kind }: { rows: KV[]; setRows: (r: KV[]) => voi
             value={r.value ?? ""}
             onChange={(e) => set(i, { value: e.target.value })}
           />
-          <label className="mcp-check" title={t("mcpSecretHint")}>
+          <label className="mcp-check" title={t("mcpSecretHint", { store: t(keyStoreKey()) })}>
             <input type="checkbox" checked={r.secret} onChange={(e) => set(i, { secret: e.target.checked })} /> {t("mcpSecret")}
           </label>
           <button className="btn-soft" aria-label={t("delete")} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
@@ -308,13 +309,23 @@ function Editor({ initial, isNew, others, onCancel, onSaved }: { initial: McpSer
               <span>{t("mcpUrl")}</span>
               <input className="input mono" value={s.url} placeholder="https://example.com/mcp" onChange={(e) => set({ url: e.target.value })} />
             </label>
+            <label className="field">
+              <span>{t("mcpTransport")}</span>
+              <select className="input" aria-label={t("mcpTransport")} value={s.httpTransport ?? "auto"} onChange={(e) => set({ httpTransport: e.target.value === "auto" ? undefined : (e.target.value as HttpTransport) } as Partial<McpServer>)}>
+                <option value="auto">{t("mcpTransportAuto")}</option>
+                <option value="streamable">{t("mcpTransportStreamable")}</option>
+                <option value="sse">{t("mcpTransportSse")}</option>
+              </select>
+              <span className="d">{t("mcpTransportHint")}</span>
+            </label>
             <div className="field"><span className="mcp-label">{t("mcpHeaders")}</span><KVRows kind="header" rows={s.headers} setRows={(headers) => set({ headers })} /></div>
             <label className="mcp-check">
               <input type="checkbox" checked={!!s.oauth} onChange={(e) => set({ oauth: e.target.checked ? {} : undefined } as Partial<McpServer>)} /> {t("mcpOauth")}
             </label>
             {s.oauth && (
               <>
-                <div className="d" style={{ margin: "4px 0 8px" }}>{t("mcpOauthHint")}</div>
+                <div className="d" style={{ margin: "4px 0 8px" }}>{t("mcpOauthHint", { store: t(keyStoreKey()) })}</div>
+                <div className="d" style={{ margin: "0 0 8px" }}>{t("mcpRevokeNote", { store: t(keyStoreKey()) })}</div>
                 <label className="field">
                   <span>{t("mcpOauthClientId")}</span>
                   <input className="input mono" value={s.oauth.clientId ?? ""} onChange={(e) => set({ oauth: { ...s.oauth, clientId: e.target.value || undefined } } as Partial<McpServer>)} />
@@ -366,7 +377,7 @@ function ImportBox({ text, setText, existing }: { text: string; setText: (v: str
   return (
     <div className="card mcp-editor">
       <div className="card-row" style={{ display: "block" }}>
-        <div className="d" style={{ marginBottom: 8 }}>{t("mcpImportHint")}</div>
+        <div className="d" style={{ marginBottom: 8 }}>{t("mcpImportHint", { store: t(keyStoreKey()) })}</div>
         <textarea className="input mono" aria-label={t("mcpImport")} rows={8} value={text} placeholder={'{\n  "mcpServers": {\n    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] }\n  }\n}'} onChange={(e) => setText(e.target.value)} />
         {parsed?.servers.length ? <div className="d" style={{ marginTop: 6 }}>{t("mcpImportFound", { names: parsed.servers.map((s) => s.name).join(", ") })}</div> : null}
         {parsed?.errors.map((e, i) => <div key={i} className="d warn">{errText(e)}</div>)}

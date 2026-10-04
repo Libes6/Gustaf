@@ -1,5 +1,6 @@
 import { fetch } from "../providers/http";
-import { getSetting, secrets } from "./api";
+import { getSetting } from "./api";
+import { providerKey } from "./keys";
 import type { ProviderConfig } from "../providers/types";
 export type VoiceConfig = { providerId: string; model: string };
 export const voiceConfig = () => getSetting<VoiceConfig>("voice", {providerId:"",model:"whisper-1"});
@@ -12,7 +13,7 @@ export function transcriptionUrl(base: string) {
 }
 export async function transcribe(blob: Blob, provider: ProviderConfig, model: string, signal: AbortSignal) {
  if(!blob.size||blob.size>16*1024*1024)throw Error("Audio must be between 1 byte and 16 MB.");
- const key=await secrets.get(`provider:${provider.id}`);
+ const key=await providerKey(provider.id)(); // same once-per-session cache as the chat adapters
  const form=new FormData();form.append("file",blob,blob.type.includes("mp4")?"voice.m4a":blob.type.includes("ogg")?"voice.ogg":"voice.webm");form.append("model",model.trim()||"whisper-1");
  // Serialize multipart with the browser; Tauri HTTP transports the bytes without changing the boundary.
  const request=new Request(transcriptionUrl(provider.baseUrl),{method:"POST",body:form});

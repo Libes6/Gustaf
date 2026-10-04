@@ -7,6 +7,7 @@ import { BudgetBanner } from "./components/Budgets";
 import { Compare } from "./components/Compare";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
 import { Onboarding } from "./components/Onboarding";
+import { MobileStatusBridge } from "./components/MobileBridge";
 import { ScheduledPromptsRuntime } from "./components/ScheduledPromptsRuntime";
 import { SearchPalette } from "./components/SearchPalette";
 import { Settings } from "./components/Settings";
@@ -15,6 +16,7 @@ import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
 import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
+import { useQuickAskHost } from "./lib/quickAskHost";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -23,6 +25,7 @@ function Shell({ app }: { app: AppState }) {
   const [comparing, setComparing] = useState(false);
   useAttentionNotifications();
   useChatStatusSync(app.activeChat, app.view);
+  useQuickAskHost(app);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -47,6 +50,7 @@ function Shell({ app }: { app: AppState }) {
     <div className={`app${app.sideHidden && app.view === "chat" ? " side-hidden" : ""}`}>
       <WindowHeader />
       <ScheduledPromptsRuntime />
+      <MobileStatusBridge />
       <BudgetBanner />
       <Rail onCreateProject={() => setCreating(true)} onCompare={() => setComparing(true)} />
       {app.view === "settings" ? (

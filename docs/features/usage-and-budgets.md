@@ -1,6 +1,6 @@
 # Usage and budgets
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
 ## Usage telemetry
 
