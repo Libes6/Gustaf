@@ -29,6 +29,18 @@ export function codexArgs({ model, session, access, mode, images = [] }: { model
   return ['exec', ...(session ? ['resume'] : []), '--json', '--skip-git-repo-check', ...images.map((p) => `--image=${p}`), ...permissions, ...(model ? ['-m', model] : []), ...(session ? [session] : [])];
 }
 
+/**
+ * Why a Cursor SDK sidecar run failed, or "" when it did not. The sidecar reports its own errors as an `error` event
+ * (`reported`) and exits 0; a non-zero exit without one means Node could not run it (old Node, missing modules, a crash),
+ * which must not pass for an empty answer or an empty model list.
+ */
+export function sidecarFailure(o: { code: number | null; stderr: string; reported: boolean; aborted: boolean }): string {
+  if (/command not found: node|not recognized|Cannot find package/.test(o.stderr)) return `Cursor sidecar: ${o.stderr.slice(0, 300)}`;
+  if (o.reported || o.aborted || o.code === 0) return "";
+  const tail = o.stderr.trim().slice(-600);
+  return `Cursor sidecar failed (exit code ${o.code ?? "none"})${tail ? `: ${tail}` : "."}`;
+}
+
 /** Claude and Cursor Agent have no image flag: the prompt points them at the files, and their tool permissions must cover the folder. */
 export function withImagePaths(prompt: string, images: string[]): string {
   if (!images.length) return prompt;
