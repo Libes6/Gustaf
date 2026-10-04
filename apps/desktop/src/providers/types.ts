@@ -3,8 +3,8 @@ export type LimitWindow = { id: string; label: string; usedPercent: number; rese
 import type { CuAction } from "../lib/api";
 import type { RetryInfo } from "./retry";
 
-/** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. */
-export type SubagentState = "running" | "waiting" | "completed" | "failed";
+/** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. `stopped`: interrupted or cut off (the turn or the whole run ended first); neutral, not a failure. */
+export type SubagentState = "running" | "waiting" | "completed" | "failed" | "stopped";
 /** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose values replace the old ones. */
 export type SubagentInfo = {
   provider: "codex" | "claude";
@@ -12,6 +12,8 @@ export type SubagentInfo = {
   agentId: string;
   /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
   title: string;
+  /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
+  bgId?: string;
   /** Claude `subagent_type`. */
   role?: string;
   action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";
@@ -53,6 +55,8 @@ export type Msg = {
     provider?: string;
     model?: string;
     responseId?: string;
+    /** Copied history needs its inline images when replayed into a fresh native session. */
+    branchHistory?: boolean;
     checkpoint?: string;
     imported?: string;
     durationMs?: number;
@@ -81,6 +85,8 @@ export type TurnInput = {
   access?: "readonly" | "auto" | "full";
   /** Chat mode: CLI adapters pass their native plan / read-only flags for "plan" and "ask". */
   mode?: "ask" | "plan" | "agent";
+  /** CLI adapters: on abort kill the CLI's whole process tree, not only the process itself (used by CLI subagents). */
+  killTree?: boolean;
   signal: AbortSignal;
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;

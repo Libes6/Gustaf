@@ -1,6 +1,7 @@
 // Pure model of the background-agent runs (tests/agentRuns.test.mjs): types, bounds, mapping to and from `agent_runs` rows,
 // normalization of the legacy `agentRuns` setting (migrated once into SQLite), marking of runs interrupted by a restart,
 // and small formatting helpers. The store in agentRuns.ts holds the state, agentRunsDb.ts talks to SQLite.
+import { formatDuration, type DurationT } from "../lib/formatDuration";
 import { isAgentType, type AgentType } from "./subagentCore";
 
 /** The old home of the runs (bounded list with clipped steps); read once by the migration, then emptied. */
@@ -164,14 +165,10 @@ export const appendStep = (steps: readonly TranscriptStep[], step: TranscriptSte
 
 export const runTokens = (u?: { input: number; output: number }) => (u ? Math.max(0, u.input) + Math.max(0, u.output) : 0);
 
-/** `m:ss` (or `h:mm:ss`) elapsed time of a run; queued runs show nothing. */
-export function elapsed(run: Pick<AgentRun, "status" | "startedAt" | "endedAt">, now: number): string {
+/** Elapsed time of a run as `45 s` / `2 min 42 s` / `1 h 30 min` (see lib/formatDuration); queued runs show nothing. */
+export function elapsed(run: Pick<AgentRun, "status" | "startedAt" | "endedAt">, now: number, t: DurationT): string {
   if (run.status === "queued" || !run.startedAt) return "";
-  const s = Math.max(0, Math.floor(((run.endedAt ?? now) - run.startedAt) / 1000));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
+  return formatDuration(((run.endedAt ?? now) - run.startedAt) / 1000, t);
 }
 
 export const formatTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n));

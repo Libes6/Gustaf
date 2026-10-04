@@ -20,7 +20,8 @@ export async function* sse(res: Response, signal?: AbortSignal): AsyncGenerator<
         throw networkError(e);
       }
       if (chunk.done) break;
-      buf += dec.decode(chunk.value, { stream: true }).replace(/\r\n/g, "\n");
+      // Normalised on the joined buffer: a CRLF pair may be split between two chunks.
+      buf = (buf + dec.decode(chunk.value, { stream: true })).replace(/\r\n/g, "\n");
       let i;
       while ((i = buf.indexOf("\n\n")) >= 0) {
         const block = buf.slice(0, i);

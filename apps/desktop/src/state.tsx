@@ -5,15 +5,17 @@ import type { Access } from "./agent/agent";
 import { detectLocale, type Locale } from "./i18n";
 import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
-import { getAdapter, listAllModels, loadProviders } from "./providers";
+import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
+import { worktrees } from "./lib/worktrees";
+import { removeLegacyReviewOverrides } from "./lib/reviewCopy";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
 export type Model = ModelInfo & { firstSeen: number };
 export const modelKey = (m: { providerId: string; id: string }) => `${m.providerId}\n${m.id}`;
 export type Selection = { providerId: string; model: string };
 export type Section = { id: string; name: string; chatIds: number[] };
-export type SettingsPage = "general" | "import" | "providers" | "usage" | "computer" | "mcp" | "git" | "rules" | "memory" | "archive";
+export type SettingsPage = "general" | "import" | "providers" | "usage" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile";
 
 function usePersisted<T>(key: string, initial: T, ready: boolean) {
   const [value, setValue] = useState<T>(initial);
@@ -44,6 +46,7 @@ function useAppState() {
   const [reasoning, setReasoning] = usePersisted<Reasoning>("reasoning", "medium", true);
   const [access, setAccess] = usePersisted<Access>("access", "auto", true);
   const [computerUse, setComputerUse] = usePersisted("computerUse", false, true);
+  const [reviewCopy, setReviewCopy] = usePersisted<boolean>("reviewCopy", false, true);
   const [favorites, setFavorites] = usePersisted<string[]>("favorites", [], true);
   const [hiddenModels, setHiddenModels] = usePersisted<string[]>("hiddenModels", [], true);
   const [checkedAt, setCheckedAt] = useState(0);
@@ -114,19 +117,31 @@ function useAppState() {
     setChats(c);
   }, []);
 
-  const refreshModels = useCallback(async (list?: ProviderConfig[]) => {
-    const ps = list ?? (await loadProviders());
+  /**
+   * Reloads providers and model lists. Default ("force"): fetch fresh lists (only the `only` providers when given; the
+   * rest from cache). "startup" shows cached lists and reads no API key; "stale" (the model picker) fetches lists older
+   * than 10 minutes. See listAllModels.
+   */
+  const refreshModels = useCallback(async (o: { refresh?: ModelRefresh; only?: string[] } = {}) => {
+    const ps = await loadProviders();
     setProviders(ps);
-    const { models, errors } = await listAllModels(ps);
+    const { models, errors } = await listAllModels(ps, o.refresh ?? "force", o.only);
     setModels(models);
     setModelErrors(errors);
     setCheckedAt(Date.now());
     return models;
   }, []);
+  const ensureModels = useCallback(() => refreshModels({ refresh: "stale" }), [refreshModels]);
 
   useEffect(() => {
     reload();
-    refreshModels();
+    refreshModels({ refresh: "startup" });
+    removeLegacyReviewOverrides();
+    // Workspaces (git worktrees) whose folder was deleted behind our back: tidy the leftovers once per start; failures
+    // (not a git repository, git missing, a folder that moved) are of no interest here.
+    listProjects().then((ps) => {
+      for (const root of new Set(ps.map((p) => p.path).filter((p): p is string => !!p))) worktrees.prune(root).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   const openSettings = (page: SettingsPage = "general") => {
@@ -139,9 +154,9 @@ function useAppState() {
   return {
     ready: localeLoaded && onboardedLoaded,
     locale, setLocale, onboarded, setOnboarded,
-    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse,
+    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
-    projects, chats, reload, providers, models, modelErrors, refreshModels,
+    projects, chats, reload, providers, models, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
     view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
   };

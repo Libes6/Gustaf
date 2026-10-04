@@ -32,4 +32,4 @@ createInterface({ input: child.stdout }).on('line', line => {
     finish({ type: 'limits', result: { rateLimits: pick(ev.result?.rateLimits), rateLimitsByLimitId: ev.result?.rateLimitsByLimitId ? Object.fromEntries(Object.entries(ev.result.rateLimitsByLimitId).map(([k,v]) => [k,pick(v)])) : undefined } });
   }
 });
-send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'mcode', title: 'M Code', version: '0.1.0' } } });
+send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'mcode', title: 'Gustaf', version: '0.1.0' } } });

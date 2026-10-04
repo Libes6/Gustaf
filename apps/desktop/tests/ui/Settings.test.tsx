@@ -13,6 +13,7 @@ const PAGES: [SettingsPage, string][] = [
   ["usage", "Usage"],
   ["computer", "Computer use"],
   ["mcp", "MCP"],
+  ["scheduled", "Scheduled"],
   ["git", "Git & commands"],
   ["rules", "Rules"],
   ["archive", "Archived chats"],

@@ -13,6 +13,9 @@ import { MARK_CLOSE, MARK_OPEN } from '../../src/lib/searchUtil.ts';
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const SCHEMA = /const SCHEMA: &str = "([\s\S]*?)";/.exec(readFileSync(`${root}/src-tauri/src/db.rs`, 'utf8'))[1];
 
+// Columns added to existing tables by the idempotent migration (ADDED_COLUMNS in db.rs), applied the same way.
+const ADDED_COLUMNS = [...(/const ADDED_COLUMNS[^=]*= &\[([\s\S]*?)\];/.exec(readFileSync(`${root}/src-tauri/src/db.rs`, 'utf8'))?.[1] ?? '').matchAll(/\("(\w+)", "(\w+)", "(\w+)"\)/g)];
+
 export const FAKE_BASE_URL = 'https://fake-llm.test/v1';
 const enc = new TextEncoder();
 const sse = (obj) => enc.encode(`data: ${typeof obj === 'string' ? obj : JSON.stringify(obj)}\n\n`);
@@ -93,6 +96,8 @@ export class FakeBackend {
   shellCommands = [];
   /** Files the app wrote through `fs_write` (export): absolute path -> content. */
   files = new Map();
+  /** Workspaces made through `worktree_create` (src-tauri/src/worktree.rs); `worktree_list` answers with them. */
+  worktrees = [];
   /** What the native "save" dialog answers (`null` = cancelled). */
   savePath = '/exports/mcode-export.json';
   #overrides = new Map();
@@ -101,6 +106,7 @@ export class FakeBackend {
 
   constructor() {
     this.db.exec(SCHEMA);
+    for (const [, table, column, decl] of ADDED_COLUMNS) this.db.exec(`alter table ${table} add column ${column} ${decl}`);
   }
 
   /** Handler override for one command: `backend.on('git_status', (args) => ...)`. */
@@ -178,6 +184,15 @@ export class FakeBackend {
       case 'git': // checkpoints and the project badge: a repository on `main` with one commit and a clean tree
         return args.args?.includes('--abbrev-ref') ? 'main\n' : args.args?.includes('rev-parse') ? 'c0ffee0123456789\n' : '';
       case 'git_status': return { branch: 'main', files: [] };
+      case 'worktree_create': {
+        const info = { taskId: args.taskId, path: `/fake/worktrees/${args.taskId}`, branch: `gustaf/${args.slug}`, baseCommit: 'c0ffee0123456789', baseBranch: 'main', createdAt: 1, provider: args.provider, model: args.model, headSha: 'c0ffee0123456789', changedFiles: 0, ahead: 0, behind: 0, dirty: false, existsOnDisk: true };
+        this.worktrees.push(info);
+        return info;
+      }
+      case 'worktree_list': return this.worktrees;
+      case 'worktree_remove': this.worktrees = this.worktrees.filter((w) => w.taskId !== args.taskId); return { removed: true, branchDeleted: false, branchKeptReason: null };
+      case 'worktree_link_dirs': return [];
+      case 'worktree_prune': return { removed: [] };
       case 'cu_permissions': return { accessibility: true, screen: true };
       case 'cu_screen_size': return { width: 1440, height: 900 };
       case 'mcp_status': return [];

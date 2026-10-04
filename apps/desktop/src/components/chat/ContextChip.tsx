@@ -8,7 +8,7 @@ import type { ModelInfo } from "../../providers/types";
 const formatSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 
 /** Context-size chip with its popover (capabilities, compact / restore). */
-export function ContextChip({ model, tokens, lastInput, busy, canCompact, canRestore, onCompact, onRestore, instructions, onOpen }: {
+export function ContextChip({ model, tokens, lastInput, busy, canCompact, canRestore, onCompact, onRestore, instructions, onOpen, computerUse }: {
   model: ModelInfo | undefined;
   tokens: number;
   lastInput: number | undefined;
@@ -21,6 +21,8 @@ export function ContextChip({ model, tokens, lastInput, busy, canCompact, canRes
   /** Project instruction files and custom text the next run loads; listed in the popover. */
   instructions?: InstructionPrompt | null;
   onOpen?: () => void;
+  /** Computer Use is on and the model can use it: the next run gets the computer tools. Nothing is shown when off. */
+  computerUse?: boolean;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -47,6 +49,7 @@ export function ContextChip({ model, tokens, lastInput, busy, canCompact, canRes
         <div>{t("contextLastInput")}: {lastInput != null ? t.num(lastInput) : t("capabilityUnknown")}</div>
         <div>{t("capImages")}: {model?.images == null ? t("capabilityUnknown") : t(model.images ? "capabilityYes" : "capabilityNo")}</div>
         <div>{t("capTools")}: {model?.tools == null ? t("capabilityUnknown") : t(model.tools ? "capabilityYes" : "capabilityNo")}</div>
+        {computerUse && <div className="ctx-computer">{t("computerUseOn")}</div>}
         {instructions && (instructions.entries.length > 0 || instructions.custom.chars > 0) && (
           <div className="ctx-instructions">
             <div>{t("instructionsLoaded")}</div>

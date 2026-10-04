@@ -10,6 +10,10 @@ export type Chat = {
   archived: number;
   created_at: number;
   updated_at: number;
+  /** Set when the chat runs in its own git worktree (see lib/workspaces.ts); null/undefined for ordinary chats. */
+  workspace_task_id?: string | null;
+  workspace_branch?: string | null;
+  workspace_base?: string | null;
 };
 export type StoredMsg = Msg & { id: number; chat_id: number; created_at: number };
 
@@ -41,6 +45,16 @@ export async function createChat(projectId: number | null, title: string) {
     now,
     now,
   ]);
+  return r.lastId;
+}
+
+/** A chat linked to a workspace (`worktrees.create` made it). The checkout path itself is looked up with `worktrees.list`. */
+export async function createWorkspaceChat(projectId: number, title: string, ws: { taskId: string; branch: string; base: string }) {
+  const now = Date.now();
+  const r = await db.exec(
+    "insert into chats(project_id, title, created_at, updated_at, workspace_task_id, workspace_branch, workspace_base) values(?, ?, ?, ?, ?, ?, ?)",
+    [projectId, title, now, now, ws.taskId, ws.branch, ws.base],
+  );
   return r.lastId;
 }
 
@@ -77,12 +91,18 @@ export async function deleteMessages(chatId: number, ids: number[]) {
  * (see `branchCutoff`). Content is copied verbatim except for the provider response id, which points at server
  * state of the original chat. Returns the new chat id; a failed copy removes the half-made chat.
  */
-export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number) {
+export async function branchChat(projectId: number | null, title: string, fromChatId: number, throughId: number, ws?: { taskId: string; branch: string | null; base: string | null }) {
+  const [source] = await db.select<Chat>("select * from chats where id = ?", [fromChatId]);
+  const [point] = await db.select<{ id: number }>("select id from messages where chat_id = ? and id = ?", [fromChatId, throughId]);
+  if (!source || !point) throw new Error("The branch point no longer exists");
   const id = await createChat(projectId, title);
   try {
+    await db.exec("insert into chat_branches(chat_id, source_chat_id, source_message_id, source_title) values(?, ?, ?, ?)", [id, fromChatId, throughId, source.title]);
+    // A branch of a workspace chat keeps working in the same workspace, never in the main checkout.
+    if (ws) await db.exec("update chats set workspace_task_id = ?, workspace_branch = ?, workspace_base = ? where id = ?", [ws.taskId, ws.branch, ws.base, id]);
     await db.exec(
       "insert into messages(chat_id, role, content, created_at) " +
-        "select ?, role, json_remove(content, '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",
+        "select ?, role, json_remove(json_patch(content, '{\"meta\":{\"branchHistory\":true}}'), '$.meta.responseId'), created_at from messages where chat_id = ? and id <= ? order by id",
       [id, fromChatId, throughId],
     );
   } catch (e) {
@@ -91,6 +111,15 @@ export async function branchChat(projectId: number | null, title: string, fromCh
   }
   return id;
 }
+
+export type ChatBranch = { chat_id: number; source_chat_id: number; source_message_id: number; source_title: string };
+export const loadChatBranch = async (id: number) => (await db.select<ChatBranch>("select * from chat_branches where chat_id = ?", [id]))[0] ?? null;
+export const loadBranchSource = async (link: ChatBranch) => {
+  const [chat] = await db.select<Chat>("select * from chats where id = ?", [link.source_chat_id]);
+  const [point] = await db.select<{ id: number }>("select id from messages where chat_id = ? and id = ?", [link.source_chat_id, link.source_message_id]);
+  return chat && point ? chat : null;
+};
+export const listChatBranches = (sourceId: number) => db.select<Chat>("select chats.* from chats join chat_branches on chats.id = chat_branches.chat_id where source_chat_id = ? order by chats.created_at", [sourceId]);
 
 export const renameChat =(id: number, title: string) => db.exec("update chats set title = ? where id = ?", [title, id]);
 export const archiveChat = (id: number, archived = true) =>

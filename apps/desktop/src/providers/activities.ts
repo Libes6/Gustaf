@@ -24,15 +24,16 @@ function resultText(content: unknown): string | undefined {
 // ---- CLI-native subagents ----
 
 const sub = (s: Partial<SubagentInfo> & Pick<SubagentInfo, 'provider' | 'agentId' | 'action' | 'state'>): SubagentInfo => ({ title: '', ...s });
-const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : 'running';
-const isTerminal = (s?: SubagentState) => s === 'completed' || s === 'failed';
+const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : state === 'stopped' ? 'unknown' : 'running';
+const isTerminal = (s?: SubagentState) => s === 'completed' || s === 'failed' || s === 'stopped';
 
 /** Codex `CollabAgentStatus` (pendingInit, running, interrupted, completed, errored, shutdown, notFound) to our state. */
 function agentState(status: unknown): SubagentState | undefined {
   switch (norm(status)) {
     case 'pendinginit': case 'running': return 'running';
     case 'completed': case 'shutdown': return 'completed';
-    case 'errored': case 'notfound': case 'interrupted': return 'failed';
+    case 'errored': case 'notfound': return 'failed';
+    case 'interrupted': return 'stopped';
     default: return undefined;
   }
 }
@@ -79,6 +80,25 @@ function collab(ev: Json, it: Json): Activity[] | null {
 }
 
 const TASK_TOOLS = new Set(['task', 'agent']);
+/** The immediate result of a background `Task`/`Agent` call: the agent only started, its report comes later. */
+const BG_LAUNCH = /async agent launched/i;
+const tag = (xml: string, name: string) => xml.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))?.[1]?.trim() ?? '';
+const num = (v: string) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+/** The completion notice Claude Code sends as a user message when a background agent ends (`<task-notification>`). */
+function taskNotice(text: string): Activity | null {
+  const xml = text.match(/<task-notification>([\s\S]*?)<\/task-notification>/)?.[1];
+  if (xml === undefined) return null;
+  const agentId = tag(xml, 'tool-use-id') || tag(xml, 'task-id');
+  if (!agentId) return null;
+  const status = tag(xml, 'status').toLowerCase();
+  const state: SubagentState = status === 'completed' ? 'completed' : status === 'running' ? 'running' : 'failed';
+  const report = tag(xml, 'result') || tag(xml, 'summary');
+  const usage = tag(xml, 'usage');
+  const pick = (k: string) => num(tag(usage || xml, k)) ?? num(xml.match(new RegExp(`${k}[:=]\\s*(\\d+)`))?.[1] ?? '');
+  const tokens = pick('total_tokens');
+  const durationMs = pick('duration_ms');
+  return { type: 'activity', id: `bg:${agentId}`, name: '', args: {}, status: statusOf(state), ...(report ? { output: clip(report, MAX_OUTPUT) } : {}), subagent: sub({ provider: 'claude', agentId, bgId: tag(xml, 'task-id') || undefined, action: 'close', state, ...(report ? { result: brief(report, 300) } : {}), ...(tokens ? { tokens } : {}), ...(durationMs ? { durationMs } : {}) }) };
+}
 /** What a subagent just did, from one of its own `tool_use` blocks. */
 const stepOf = (name: string, input: Json) => brief(`${name} ${str(input.command ?? input.file_path ?? input.path ?? input.pattern ?? input.description ?? input.query ?? input.url ?? '')}`, 90);
 
@@ -104,8 +124,17 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     const merged = mergeActivity(prev, next);
     if (prev?.subagent) {
       // The result of a Claude `Task` call.
-      const state: SubagentState = next.status === 'error' ? 'failed' : next.status === 'success' ? 'completed' : prev.subagent.state;
       const text = next.output ?? '';
+      if (next.status === 'success' && BG_LAUNCH.test(text) && !isTerminal(prev.subagent.state)) {
+        // A background agent only started: stay running until its completion notice arrives.
+        const bgId = text.match(/agentId:\s*([\w-]+)/)?.[1];
+        merged.status = 'running';
+        merged.output = prev.output;
+        merged.subagent = { ...prev.subagent, state: 'running', ...(bgId ? { bgId } : {}) };
+        actions.set(next.id, merged);
+        return merged;
+      }
+      const state: SubagentState = next.status === 'error' ? 'failed' : next.status === 'success' ? 'completed' : prev.subagent.state;
       merged.subagent = { ...prev.subagent, state, ...(text ? { result: brief(text, 300) } : {}) };
       merged.output = text ? clip(text, MAX_OUTPUT) : prev.output;
     }
@@ -119,7 +148,7 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     key = [...actions].find(([, a]) => a.subagent?.action === 'scan' && a.subagent.agentId === patch.agentId)?.[0] ?? next.id;
   }
   if (patch.action !== 'spawn' && patch.action !== 'task' && patch.action !== 'progress' && patch.agentId) {
-    key = [...actions].find(([, a]) => a.subagent?.agentId === patch.agentId)?.[0] ?? next.id;
+    key = [...actions].find(([, a]) => a.subagent?.agentId === patch.agentId || (!!a.subagent?.bgId && a.subagent.bgId === patch.agentId))?.[0] ?? next.id;
   }
   const old = actions.get(key);
   const p = old?.subagent;
@@ -187,7 +216,13 @@ export function nativeActivities(provider: string, e: unknown, onUnmapped?: (u: 
   if (provider === 'claude') {
     // Events from inside a subagent are marked with the `tool_use` id of the Task call that started it.
     const parent = typeof ev.parent_tool_use_id === 'string' && ev.parent_tool_use_id ? ev.parent_tool_use_id : '';
-    return list(rec(ev.message).content).flatMap((item): Activity[] => {
+    const body = rec(ev.message).content;
+    if (ev.type === 'user') {
+      const text = typeof body === 'string' ? body : list(body).map((b) => str(rec(b).text)).join('\n');
+      const notice = text.includes('<task-notification>') ? taskNotice(text) : null;
+      if (notice) return [notice];
+    }
+    return list(body).flatMap((item): Activity[] => {
       const c = rec(item);
       if (c.type === 'tool_use') {
         if (parent) return [{ type: 'activity', id: parent, name: '', args: {}, status: 'running', subagent: sub({ provider: 'claude', agentId: parent, action: 'progress', state: 'running', toolUses: 1, step: stepOf(str(c.name), rec(c.input)) }) }];

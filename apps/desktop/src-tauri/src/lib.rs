@@ -6,6 +6,7 @@ mod cursor_import;
 mod db;
 mod git;
 mod git_publish;
+mod hook_exec;
 mod hunks;
 mod import_sources;
 mod mcp;
@@ -18,11 +19,18 @@ mod shell;
 mod tools;
 mod preview;
 mod semantic;
+mod knowledge;
 mod lsp;
 mod web_tools;
 mod updater;
+mod worktree;
+mod merge_queue;
 mod terminal;
+mod mobile_server;
+mod proc_tree;
+mod quick_ask;
 
+pub use knowledge::{extract_pdf_with_exe, pdf_child_main};
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -31,6 +39,13 @@ pub fn run() {
     tauri::Builder::default()
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
+        .manage(mobile_server::MobileServer::default())
+        .manage(quick_ask::QuickAsk::default())
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                quick_ask::on_main_destroyed(window.app_handle());
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
@@ -43,6 +58,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db(Mutex::new(db::open(&dir.join("app.db"))?)));
             mcp::init(app);
+            mobile_server::init(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -55,6 +71,18 @@ pub fn run() {
             semantic::semantic_build,
             semantic::semantic_query,
             semantic::semantic_clear,
+            knowledge::knowledge_list,
+            knowledge::knowledge_create,
+            knowledge::knowledge_rename,
+            knowledge::knowledge_delete,
+            knowledge::knowledge_add_source,
+            knowledge::knowledge_remove_source,
+            knowledge::knowledge_set_include,
+            knowledge::knowledge_set_config,
+            knowledge::knowledge_estimate,
+            knowledge::knowledge_reindex,
+            knowledge::knowledge_cancel,
+            knowledge::knowledge_search,
             lsp::lsp_detect,
             lsp::lsp_diagnostics,
             terminal::terminal_list,
@@ -92,6 +120,8 @@ pub fn run() {
             tools::read_instructions,
             tools::read_home_file,
             tools::run_command,
+            hook_exec::run_hook,
+            proc_tree::process_kill_tree,
             git::git,
             git::git_status,
             git::git_commit_context,
@@ -102,6 +132,19 @@ pub fn run() {
             git_publish::git_pr_context,
             git_publish::gh_status,
             git_publish::git_create_pr,
+            worktree::worktree_create,
+            worktree::worktree_list,
+            worktree::worktree_remove,
+            worktree::worktree_prune,
+            worktree::worktree_diff,
+            worktree::worktree_link_dirs,
+            merge_queue::conflicts_check,
+            merge_queue::queue_enqueue,
+            merge_queue::queue_status,
+            merge_queue::queue_cancel,
+            merge_queue::queue_resume,
+            merge_queue::queue_run_next,
+            merge_queue::queue_report_test,
             review::review_prepare,
             review::review_run,
             review::review_list,
@@ -129,6 +172,21 @@ pub fn run() {
             oauth::oauth_loopback_start,
             oauth::oauth_loopback_wait,
             oauth::oauth_loopback_cancel,
+            mobile_server::mobile_server_start,
+            mobile_server::mobile_server_stop,
+            mobile_server::mobile_server_status,
+            mobile_server::mobile_pairing_start,
+            mobile_server::mobile_pairing_cancel,
+            mobile_server::mobile_devices,
+            mobile_server::mobile_device_revoke,
+            mobile_server::mobile_report_status,
+            quick_ask::quick_ask_configure,
+            quick_ask::quick_ask_show,
+            quick_ask::quick_ask_hide,
+            quick_ask::quick_ask_toggle,
+            quick_ask::quick_ask_ready,
+            quick_ask::quick_ask_resize,
+            quick_ask::quick_ask_open_main,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
@@ -138,6 +196,7 @@ pub fn run() {
                 mcp::shutdown(app);
                 terminal::shutdown(app);
                 preview::shutdown(app);
+                mobile_server::shutdown(app);
             }
         });
 }

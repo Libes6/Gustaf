@@ -2,13 +2,16 @@
 // Keychain), keeps one connection per server (stdio via src-tauri/src/mcp.rs, HTTP via McpHttpClient over Tauri's
 // fetch), caches tool lists until the server announces a change, and builds the toolset a run is offered.
 import { getSetting, mcpStdio, oauthLoopback, secrets, setSetting } from "../../lib/api";
+import { readSecret, removeSecret, storeSecret } from "../../lib/keys";
 import type { ToolDef } from "../../providers/types";
 import { MCP_SETTING, normalizeConfig, oauthSecretId, secretId, serversFor, splitSecrets, staleSecretIds, type KV, type McpConfig, type McpServer } from "./config";
-import { McpHttpClient, type FetchLike } from "./http";
-import { authorizationHeader, isSignedIn, refreshTokens, signIn, type OAuthDeps, type Phase } from "./oauthFlow";
+import { isLegacySseHint, McpHttpClient, type FetchLike, type HttpOptions, type RemoteClient } from "./http";
+import { McpSseClient } from "./sse";
+import { parseStored } from "./oauth";
+import { authorizationHeader, isSignedIn, refreshTokens, revokeTokens, signIn, signOut, type OAuthDeps, type Phase } from "./oauthFlow";
 import { buildPromptArguments, normalizePrompts, renderPromptMessages, type McpPrompt } from "./prompts";
 import { checkInitialize } from "./protocol";
-import { formatResourceList, mapReadResult, normalizeResources, readResourceUri, RESOURCE_TOOLS, type McpResource } from "./resources";
+import { formatResourceList, formatTemplateList, mapReadResult, normalizeResources, normalizeResourceTemplates, readResourceTarget, resolveTemplateUri, RESOURCE_TOOLS, type McpResource, type McpResourceTemplate } from "./resources";
 import { mapCallResult, namespaceTools, normalizeTools, type McpRoute, type McpTool } from "./toolset";
 
 const CLIENT_VERSION = "0.1.0";
@@ -41,15 +44,30 @@ export function updateMcpConfig(fn: (c: McpConfig) => McpConfig): Promise<McpCon
 /** Saves a server (new or edited): secret values go to the Keychain, unused Keychain entries are removed. */
 export async function saveMcpServer(draft: McpServer): Promise<void> {
   const { server, secrets: toStore } = splitSecrets(draft);
-  for (const s of toStore) await secrets.set(s.id, s.value);
+  for (const s of toStore) await storeSecret(s.id, s.value);
   let stale: string[] = [];
   await updateMcpConfig((c) => {
     const prev = c.servers.find((s) => s.id === server.id);
     stale = staleSecretIds(prev, server);
     return { servers: prev ? c.servers.map((s) => (s.id === server.id ? server : s)) : [...c.servers, server] };
   });
-  for (const id of stale) await secrets.delete(id).catch(() => {});
+  await dropSecrets(stale);
   await disconnectMcpServer(server.id);
+}
+
+/**
+ * Deletes Keychain entries. OAuth tokens that are dropped because the server was edited or removed are also revoked
+ * (RFC 7009, best effort, in the background with the copy read before the delete); a failure never blocks anything.
+ */
+async function dropSecrets(ids: string[]) {
+  for (const id of ids) {
+    if (/^mcp:.+:oauth$/.test(id)) {
+      const d = await oauthDeps();
+      const stored = parseStored(await d.store.get(id).catch(() => null));
+      await removeSecret(id, true).catch(() => {});
+      if (stored?.revocationEndpoint) void revokeTokens(d, stored).catch(() => {});
+    } else await removeSecret(id, true).catch(() => {});
+  }
 }
 
 export async function removeMcpServer(id: string): Promise<void> {
@@ -58,7 +76,7 @@ export async function removeMcpServer(id: string): Promise<void> {
     prev = c.servers.find((s) => s.id === id);
     return { servers: c.servers.filter((s) => s.id !== id) };
   });
-  for (const sid of staleSecretIds(prev, null)) await secrets.delete(sid).catch(() => {});
+  await dropSecrets(staleSecretIds(prev, null));
   await disconnectMcpServer(id, true);
 }
 
@@ -75,7 +93,7 @@ export const allowMcpTool = (id: string, tool: string) =>
 // ---- connections ---------------------------------------------------------------------------------------------------
 
 type Cache<T> = { epoch: number; list: T[] };
-type Conn = { key: string; http?: McpHttpClient; tools?: Cache<McpTool>; resources?: Cache<McpResource>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
+type Conn = { key: string; http?: RemoteClient; transport?: "streamable" | "sse"; tools?: Cache<McpTool>; resources?: Cache<McpResource>; templates?: Cache<McpResourceTemplate>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
 const conns = new Map<string, Conn>();
 let httpFetch: FetchLike | null = null;
 /** Tests replace the HTTP transport's fetch. */
@@ -95,6 +113,8 @@ const oauthDeps = async (): Promise<OAuthDeps> => ({
 
 /** Capabilities the server announced in `initialize` (undefined until it was connected once). */
 export const mcpCapabilities = (id: string) => conns.get(id)?.info?.capabilities;
+/** Which HTTP transport a connected server ended up on (after auto-detection). */
+export const mcpTransport = (id: string) => conns.get(id)?.transport;
 const hasCapability = (conn: Conn, name: "resources" | "prompts") => !!conn.info?.capabilities && typeof conn.info.capabilities[name] === "object" && conn.info.capabilities[name] !== null;
 
 async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): Promise<Record<string, string>> {
@@ -102,7 +122,8 @@ async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): 
   for (const e of list) {
     if (!e.secret) out[e.key] = e.value ?? "";
     else {
-      const v = await secrets.get(secretId(serverId, kind, e.key)).catch(() => null);
+      // Read only when this server is started (never at app launch), at most once per session (lib/keys.ts).
+      const v = await readSecret(secretId(serverId, kind, e.key)).catch(() => null);
       if (v == null) throw new Error(`the secret ${e.key} is missing from the Keychain; edit the server and enter it again`);
       out[e.key] = v;
     }
@@ -133,9 +154,10 @@ async function connect(server: McpServer): Promise<Conn> {
     return conn;
   }
   const headers = await resolveKV(server.id, "header", server.headers);
-  const key = JSON.stringify([server.url, headers, !!server.oauth]);
+  const mode = server.httpTransport ?? "auto";
+  const key = JSON.stringify([server.url, headers, !!server.oauth, mode]);
   const old = conns.get(server.id);
-  if (old?.key === key && old.http) {
+  if (old?.key === key && old.http && old.info) {
     old.info = await old.http.connect(START_TIMEOUT_MS);
     return old;
   }
@@ -147,10 +169,23 @@ async function connect(server: McpServer): Promise<Conn> {
         refresh: async () => refreshTokens(await oauthDeps(), oauthSecretId(server.id)),
       }
     : undefined;
-  const http = new McpHttpClient({ url: server.url, headers, fetch: await getFetch(), clientVersion: CLIENT_VERSION, ...(auth ? { auth } : {}) });
-  const conn: Conn = { key, http };
+  const opts: HttpOptions = { url: server.url, headers, fetch: await getFetch(), clientVersion: CLIENT_VERSION, ...(auth ? { auth } : {}) };
+  // "auto": streamable HTTP first; a 4xx answer to its initialize POST (not 401/403/408/429) means a legacy HTTP+SSE server.
+  const conn: Conn = { key, http: mode === "sse" ? new McpSseClient(opts) : new McpHttpClient(opts), transport: mode === "sse" ? "sse" : "streamable" };
   conns.set(server.id, conn);
-  conn.info = await http.connect(START_TIMEOUT_MS);
+  try {
+    conn.info = await conn.http!.connect(START_TIMEOUT_MS);
+  } catch (e) {
+    if (mode !== "auto" || !isLegacySseHint(e)) throw e;
+    await conn.http!.close().catch(() => {});
+    conn.http = new McpSseClient(opts);
+    conn.transport = "sse";
+    try {
+      conn.info = await conn.http.connect(START_TIMEOUT_MS);
+    } catch (e2) {
+      throw new Error(`${(e2 as Error)?.message ?? e2} (streamable HTTP failed first: HTTP ${e.status}; set the transport in the server settings to skip detection)`);
+    }
+  }
   return conn;
 }
 
@@ -216,6 +251,40 @@ export async function listMcpResources(server: McpServer, force = false, signal?
   return list;
 }
 
+/**
+ * The server's resource templates (`resources/templates/list`), cached until `notifications/resources/list_changed`.
+ * A server that does not implement the method (JSON-RPC -32601) simply has none.
+ */
+export async function listMcpResourceTemplates(server: McpServer, force = false, signal?: AbortSignal): Promise<McpResourceTemplate[]> {
+  const conn = await connect(server);
+  if (!hasCapability(conn, "resources")) throw new Error(`MCP server ${server.name} does not offer resources`);
+  const ep = await epoch(server, conn, "resources");
+  if (!force && conn.templates && conn.templates.epoch === ep && ep >= 0) return conn.templates.list;
+  let list: McpResourceTemplate[];
+  try {
+    list = await listTemplatePages(server, conn, signal);
+  } catch (e) {
+    if (!/-32601|method not found/i.test(String((e as Error)?.message ?? e))) throw e;
+    list = [];
+  }
+  conn.templates = { epoch: ep, list };
+  return list;
+}
+
+async function listTemplatePages(server: McpServer, conn: Conn, signal?: AbortSignal): Promise<McpResourceTemplate[]> {
+  const list: McpResourceTemplate[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const result = await rpc(server, conn, "resources/templates/list", cursor ? { cursor } : undefined, LIST_TIMEOUT_MS, signal);
+    const seen = new Set(list.map((t) => t.uriTemplate));
+    list.push(...normalizeResourceTemplates(result).filter((t) => !seen.has(t.uriTemplate)));
+    const next = (result as { nextCursor?: unknown } | null)?.nextCursor;
+    if (typeof next !== "string" || !next || next === cursor) break;
+    cursor = next;
+  }
+  return list;
+}
+
 /** `resources/read` for one URI, mapped to text (capped) with at most one PNG attached. */
 export async function readMcpResource(server: McpServer, uri: string, signal?: AbortSignal) {
   const conn = await connect(server);
@@ -223,10 +292,23 @@ export async function readMcpResource(server: McpServer, uri: string, signal?: A
   return mapReadResult(await rpc(server, conn, "resources/read", { uri }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal));
 }
 
-/** Runs the agent's built-in `mcp_list_resources` / `mcp_read_resource` tool. */
-export async function callMcpResourceTool(server: McpServer, kind: "list_resources" | "read_resource", args: unknown, signal?: AbortSignal) {
+/**
+ * Reads what `mcp_read_resource` asked for: a URI as is, or a template the server listed (the list is refreshed once
+ * when the template is not in the cached one) expanded with validated arguments.
+ */
+export async function readMcpResourceTarget(server: McpServer, args: unknown, signal?: AbortSignal) {
+  const target = readResourceTarget(args);
+  if ("uri" in target) return readMcpResource(server, target.uri, signal);
+  let templates = await listMcpResourceTemplates(server, false, signal);
+  if (!templates.some((t) => t.uriTemplate === target.template)) templates = await listMcpResourceTemplates(server, true, signal);
+  return readMcpResource(server, resolveTemplateUri(templates, target.template, target.arguments), signal);
+}
+
+/** Runs the agent's built-in `mcp_list_resources` / `mcp_list_resource_templates` / `mcp_read_resource` tool. */
+export async function callMcpResourceTool(server: McpServer, kind: "list_resources" | "read_resource" | "list_resource_templates", args: unknown, signal?: AbortSignal) {
   if (kind === "list_resources") return { output: formatResourceList(await listMcpResources(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
-  return { image: undefined as string | undefined, ...(await readMcpResource(server, readResourceUri(args), signal)) };
+  if (kind === "list_resource_templates") return { output: formatTemplateList(await listMcpResourceTemplates(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
+  return { image: undefined as string | undefined, ...(await readMcpResourceTarget(server, args, signal)) };
 }
 
 /** The server's prompts (`prompts/list`), cached until `notifications/prompts/list_changed`. */
@@ -300,10 +382,19 @@ export async function signInMcpServer(server: McpServer, o: { signal?: AbortSign
   await disconnectMcpServer(server.id);
 }
 
-/** Deletes the stored tokens and ends the session. (No token revocation request is sent.) */
-export async function signOutMcpServer(server: McpServer): Promise<void> {
-  await secrets.delete(oauthSecretId(server.id)).catch(() => {});
+/**
+ * Asks the authorization server to revoke the tokens when its metadata had a `revocation_endpoint` (RFC 7009, best
+ * effort, a few seconds at most), then deletes the stored tokens whatever happened and ends the session.
+ */
+export async function signOutMcpServer(server: McpServer): Promise<{ attempted: number; revoked: number }> {
+  let result = { attempted: 0, revoked: 0 };
+  try {
+    result = await signOut(await oauthDeps(), oauthSecretId(server.id));
+  } catch {
+    await secrets.delete(oauthSecretId(server.id)).catch(() => {});
+  }
   await disconnectMcpServer(server.id);
+  return result;
 }
 
 // ---- the agent's view ----------------------------------------------------------------------------------------------
@@ -330,7 +421,7 @@ export async function loadMcpToolset(o: { project: string | null; access: "reado
         // Servers that offer resources also get the two built-in resource tools (read-only mode: only those the user marked read-only).
         const caps = conns.get(server.id)?.info?.capabilities;
         const allow = (name: string) => o.access !== "readonly" || server.readOnlyTools.includes(name);
-        const resources = caps && typeof caps.resources === "object" && caps.resources !== null ? { list: allow(RESOURCE_TOOLS.list), read: allow(RESOURCE_TOOLS.read) } : undefined;
+        const resources = caps && typeof caps.resources === "object" && caps.resources !== null ? { list: allow(RESOURCE_TOOLS.list), read: allow(RESOURCE_TOOLS.read), templates: allow(RESOURCE_TOOLS.templates) } : undefined;
         return { server, tools: o.access === "readonly" ? tools.filter((t) => server.readOnlyTools.includes(t.name)) : tools, ...(resources ? { resources } : {}) };
       } catch (e) {
         errors.push({ server: server.name, message: String((e as Error)?.message ?? e).slice(0, 500) });

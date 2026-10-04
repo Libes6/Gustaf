@@ -97,7 +97,7 @@ function Transcript({ run, continuing, onContinue, onClose }: { run: AgentRun; c
 }
 
 const PROVIDER_KEY = { codex: "agentsProviderCodex", claude: "agentsProviderClaude" } as const;
-const CLI_STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", ended: "subagentEnded" } as const;
+const CLI_STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", stopped: "subagentStopped", ended: "subagentEnded" } as const;
 const cliTitle = (a: CliAgent, unnamed: (id: string) => string) => a.title || unnamed(a.agentId.slice(-6) || "…");
 
 /** Task and report of a CLI-native subagent (the CLI does not expose its transcript). */
@@ -146,7 +146,7 @@ type CardProps = {
   active: boolean;
   onOpen: () => void;
   onContinue?: () => void;
-  stop?: { onClick: () => void; title: string };
+  stop?: { onClick: () => void; title: string; label: string };
   extra?: ReactNode;
 };
 
@@ -169,7 +169,7 @@ function Card({ title, kind, status, time, meta, step, active, onOpen, onContinu
         {extra}
         {onContinue && <div className="agent-card-actions"><button className="btn-soft" onClick={onContinue}><RotateCcw size={11} /> {t("agentsContinue")}</button></div>}
       </div>
-      {active && stop && <button className="agent-stop" aria-label={t("stop")} title={stop.title} onClick={stop.onClick}><Square size={11} fill="currentColor" /></button>}
+      {active && stop && <button className="agent-stop" aria-label={stop.label} title={stop.title} onClick={stop.onClick}><Square size={11} fill="currentColor" /></button>}
     </article>
   );
 }
@@ -177,7 +177,7 @@ function Card({ title, kind, status, time, meta, step, active, onOpen, onContinu
 function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onOpen: () => void; onContinue?: () => void }) {
   const t = useT();
   const active = isActiveStatus(run.status);
-  const time = elapsed(run, now);
+  const time = elapsed(run, now, t);
   const step = active ? (run.status === "queued" ? t("agentsWaiting") : run.currentStep || t("agentsThinking")) : run.summary ? run.summary.replace(/\s+/g, " ").trim() : undefined;
   return (
     <Card
@@ -190,7 +190,7 @@ function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onO
       active={active}
       onOpen={onOpen}
       onContinue={onContinue && canContinue(run.status) ? onContinue : undefined}
-      stop={{ onClick: () => stopRun(run.id), title: t("stop") }}
+      stop={{ onClick: () => stopRun(run.id), title: t("stop"), label: t("stop") }}
       extra={(run.changed?.length || run.warnings?.length) ? (
         <>
           {run.changed?.length ? <div className="agent-card-note">{t("agentsChanged", { count: run.changed.length })}</div> : null}
@@ -206,7 +206,7 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
   const active = isCliAgentActive(agent);
   const provider = t(PROVIDER_KEY[agent.provider]);
   const title = cliTitle(agent, (id) => t("subagentUnnamed", { id }));
-  const time = elapsed({ status: active ? "running" : "completed", startedAt: agent.startedAt, endedAt: agent.endedAt }, now);
+  const time = elapsed({ status: active ? "running" : "completed", startedAt: agent.startedAt, endedAt: agent.endedAt }, now, t);
   const step = active ? agent.step || (agent.state === "waiting" ? t("subagentWaiting") : t("agentsThinking")) : agent.result;
   return (
     <Card
@@ -218,7 +218,7 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
       step={step}
       active={active}
       onOpen={onOpen}
-      stop={agent.stop ? { onClick: agent.stop, title: t("agentsStopCli", { provider }) } : undefined}
+      stop={agent.stop ? { onClick: agent.stop, title: t("agentsStopCli", { provider }), label: t("agentsStopCliLabel", { provider }) } : undefined}
     />
   );
 }

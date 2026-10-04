@@ -1,6 +1,6 @@
 # Command rules and project instructions
 
-Part of the [M Code documentation](../README.md).
+Part of the [Gustaf documentation](../README.md).
 
 ## Command rules and the action log
 

@@ -1,10 +1,12 @@
 import { SemanticSettings } from "./SemanticSettings";
+import { KnowledgeSettings } from "./KnowledgeSettings";
+import { BookOpen } from "lucide-react";
 import { VoiceSettings } from "./VoiceSettings";
 import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
+  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -19,19 +21,23 @@ import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
+import { HooksSettings } from "./HooksSettings";
+import { VerificationSettings } from "./VerificationSettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
+import { MobileSettings } from "./MobileSettings";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
-import { ScheduledPromptsSection } from "./ScheduledPromptsSection";
+import { ScheduledPage } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
@@ -45,7 +51,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }] },
+  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
   { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
@@ -81,7 +87,6 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
-      <ScheduledPromptsSection />
       <DeveloperSettings />
     <VoiceSettings /><WebSettings /><UpdaterPanel /></>
   );
@@ -152,7 +157,14 @@ function Providers() {
   };
 
   const refresh = async () => (setBusy(true), await app.refreshModels().finally(() => setBusy(false)));
-  const update = async (p: ProviderConfig, key: string | null = null) => (await saveProvider(p, key), refresh());
+  // Only a new key, base URL or re-enabling refetches that provider's models; a rename keeps the cached list (no Keychain read).
+  const update = async (p: ProviderConfig, key: string | null = null) => {
+    const old = app.providers.find((x) => x.id === p.id);
+    await saveProvider(p, key);
+    const refetch = key !== null || !old || old.baseUrl !== p.baseUrl || (!!old.disabled && !p.disabled);
+    setBusy(true);
+    await app.refreshModels(refetch ? { only: [p.id] } : { refresh: "startup" }).finally(() => setBusy(false));
+  };
   const connect = async (id: CliId) => {
     const c: ProviderConfig = { id: `cli-${id}-${Date.now().toString(36)}`, kind: "cli", name: cliName(id), baseUrl: "", cli: id };
     await update(c);
@@ -214,7 +226,7 @@ function Providers() {
             <ProviderForm
               onCancel={app.providers[0] ? () => setSel(null) : undefined}
               onSaved={async (cfg, models) => {
-                await app.refreshModels();
+                await app.refreshModels({ only: [cfg.id] });
                 setSel(cfg.id);
                 if (!app.selection && models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });
               }}
@@ -260,7 +272,7 @@ function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: Provider
             <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
           </div>
           <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels())}><Trash2 size={14} /></button>
+          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels({ refresh: "startup" }))}><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="card"><div className="card-row"><div className="grow"><div className="t">{t(app.providerHealth[p.id]?.status === "auth" ? "providerAuth" : app.providerHealth[p.id]?.status === "ok" ? "providerOn" : "providerAvailable")}</div><div className="d">{t("providerCheckHint")}</div>
@@ -409,12 +421,24 @@ function ComputerPage() {
 
 function GitPage() {
   const t = useT();
+  const app = useApp();
   return (
     <>
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
+      <div className="card">
+        <div className="card-row">
+          <div className="grow">
+            <div className="t">{t("reviewCopySetting")}</div>
+            <div className="d">{t("reviewCopySettingDesc")}</div>
+          </div>
+          <Toggle on={app.reviewCopy === true} label={t("reviewCopySetting")} onChange={app.setReviewCopy} />
+        </div>
+      </div>
+      <AutoReviewSettings />
       <CommandRules />
-      <DiagnosticsSettings /><SemanticSettings />
+      <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
+      <VerificationSettings />
     </>
   );
 }
@@ -472,7 +496,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, git: GitPage, rules: Rules, archive: ArchivePage,
+  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {

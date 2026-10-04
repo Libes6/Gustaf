@@ -44,7 +44,8 @@ export function ToolCard({ call, result, onRunCommand, projectRoot }: { call: Ca
         <span className={`action-status ${status}`}>{t(`action_${status}`)}</span>
         {status === "running" ? <Loader2 size={13} className="spin" /> : status === "error" ? <X size={13} className="err" /> : status === "success" ? <Check size={13} color="var(--green)" /> : null}
       </button>
-      {onRunCommand && typeof call.args?.command === "string" && ["run_command", "shell", "bash", "command_execution"].includes(call.name.toLowerCase()) && <button className="btn-soft" onClick={() => { try { onRunCommand(call.args.command); setCommandError(""); } catch(e) { setCommandError(String(e)); } }}><SquareTerminal size={13} /> {t.locale === "ru" ? "Открыть команду в терминале" : "Open command in terminal"}</button>}
+      {/* Shown for every shell-like card, CLI providers included: it types the exact text in the project terminal, nothing more. */}
+      {onRunCommand && typeof call.args?.command === "string" && call.args.command.trim() && ["run_command", "shell", "bash", "command_execution"].includes(call.name.toLowerCase()) && <button className="btn-soft" onClick={() => { try { onRunCommand(call.args.command); setCommandError(""); } catch(e) { setCommandError(String(e)); } }}><SquareTerminal size={13} /> {t.locale === "ru" ? "Открыть команду в терминале" : "Open command in terminal"}</button>}
       {commandError && <div className="error-box" role="alert">{commandError}</div>}
       {status === "error" && output && <div className="action-error" role="alert">{output.slice(0, 400)}</div>}
       {open && (

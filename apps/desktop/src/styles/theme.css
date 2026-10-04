@@ -215,12 +215,14 @@ button.row, button.section-title { width: 100%; text-align: left; }
 
 .feed { flex: 1; min-height: 0; overflow-y: auto; user-select: text; }
 .feed-inner { max-width: 720px; margin: 0 auto; padding: 16px 24px 32px; }
-.msg-user { display: flex; justify-content: flex-end; margin: 20px 0; }
+.msg-user { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: 20px 0; }
 .msg-user .bubble {
   background: var(--bubble); color: var(--bubble-fg); padding: 8px 14px; border-radius: 18px;
   max-width: 80%; white-space: pre-wrap; word-wrap: break-word;
 }
-.msg-user .bubble img { max-width: 240px; border-radius: 8px; display: block; margin-top: 6px; }
+/* Pictures sit above the text bubble with no bubble background or padding: rounded corners only. */
+.msg-user .msg-images { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 80%; }
+.msg-user .msg-images img { display: block; min-width: 0; max-width: min(240px, 100%); max-height: 320px; border-radius: 12px; }
 .msg-assistant { margin: 12px 0; font-size: 14px; line-height: 1.6; }
 .msg-tools { margin: 6px 0; }
 .msg-actions { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .12s; }
@@ -307,6 +309,15 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .composer textarea::placeholder { color: var(--text-3); }
 .composer-bar { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .composer-bar .grow { flex: 1; }
+.composer-bar { flex-wrap: wrap; row-gap: 4px; padding-right: 2px; }
+.composer-bar > * { flex-shrink: 0; }
+.composer-bar .grow { flex: 1 1 0; min-width: 0; }
+.composer-bar .composer-model { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.composer-model .chip { max-width: 100%; min-width: 0; }
+.composer-model .chip .chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.composer-model .chip svg { flex: none; }
+.composer-bar .send { flex-shrink: 0; margin-left: 2px; }
+.composer-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; padding-left: 2px; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border-radius: 8px;
   color: var(--text-2); white-space: nowrap;
@@ -320,6 +331,12 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .send:disabled { background: var(--send-off-bg); color: var(--send-off-fg); }
 .attach-list { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .attach { position: relative; }
+.image-thumb { cursor: zoom-in; }
+.image-thumb:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.image-viewer { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(0, 0, 0, 0.75); padding: 24px; }
+.image-viewer-backdrop { position: absolute; inset: 0; }
+.image-viewer img { position: relative; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; cursor: default; }
+.image-viewer-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-active); color: inherit; }
 .attach img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; display: block; }
 .attach button { position: absolute; top: -6px; right: -6px; background: var(--bg-active); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; }
 .mention-list { position: absolute; bottom: calc(100% + 6px); left: 0; width: 420px; max-height: 260px; overflow-y: auto; }
@@ -595,8 +612,9 @@ button.split-item { width: 100%; text-align: left; }
 .chip.ctx { font-size:12px; font-variant-numeric:tabular-nums; }
 .ctx-ring { width:14px; height:14px; border-radius:50%; flex:none; background:conic-gradient(var(--accent-soft) var(--p, 0%), var(--border) 0); -webkit-mask:radial-gradient(circle, transparent 4px, #000 5px); mask:radial-gradient(circle, transparent 4px, #000 5px); }
 .context-pop { position:absolute; right:0; bottom:calc(100% + 8px); width:340px; max-width:calc(100vw - 48px); z-index:20; display:flex; flex-wrap:wrap; gap:8px 16px; padding:12px; border:1px solid var(--border); border-radius:12px; font-size:12px; color:var(--text-2); background:var(--bg-elev); box-shadow:var(--shadow-sm); }
-.context-pop > div:first-child, .context-pop .hint { width:100%; }
-.live-meter { font-variant-numeric:tabular-nums; color:var(--text-3); font-size:12px; margin-left:6px; }
+.context-pop > div:first-child, .context-pop .hint, .context-pop .ctx-computer { width:100%; }
+.context-pop .ctx-computer { color:var(--accent-soft); }
+.live-meter { font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--text-3); font-size:12px; margin-left:6px; }
 .summary-label { display:block; margin-bottom:8px; }
 .review-intro { padding:12px; font-size:12px; border-bottom:1px solid var(--border); }
 .review-intro p { color:var(--text-2); line-height:1.5; margin:6px 0 0; }
@@ -653,3 +671,13 @@ button:disabled { cursor:default; opacity:.45; }
 .skill-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
 .skill-option-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; color: var(--text-2); }
 .skill-option-source { font-size: 11px; line-height: 1.4; color: var(--text-3); }
+.chat-reference { padding: 10px; margin: 6px 0; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.chat-reference pre { white-space: pre-wrap; max-height: 240px; overflow: auto; font-size: 12px; }
+
+.branch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.branch-bar p, .branch-picker p { max-width: 70ch; font-size: 12px; }
+.branch-picker { padding: 16px; border-bottom: 1px solid var(--border); }
+
+.queue-panel { max-height: 30vh; overflow-y: auto; padding: 8px 16px; border-top: 1px solid var(--border); }
+.queue-panel > div { margin-top: 8px; }
+.queue-panel textarea { width: 100%; min-height: 44px; resize: vertical; }

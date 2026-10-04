@@ -26,6 +26,13 @@ create table if not exists messages(
   id integer primary key, chat_id integer not null references chats(id) on delete cascade,
   role text not null, content text not null, created_at integer not null);
 create index if not exists messages_chat on messages(chat_id, id);
+-- Branch lineage survives deletion of the source; only the branch owns this record.
+create table if not exists chat_branches(
+  chat_id integer primary key references chats(id) on delete cascade,
+  source_chat_id integer not null, source_message_id integer not null,
+  source_title text not null);
+create index if not exists branches_source on chat_branches(source_chat_id);
+
 create table if not exists settings(key text primary key, value text not null);
 create table if not exists models_seen(
   provider text not null, model text not null, first_seen integer not null,
@@ -65,10 +72,37 @@ create trigger if not exists agent_runs_chat_deleted after delete on chats begin
   delete from agent_runs where chat_id = old.id;
 end;
 -- agent-runs:end
+-- mobile:begin
+-- Phones paired with the mobile companion server (src/mobile_server.rs). Only the SHA-256 of the device token is stored;
+-- the token itself is shown to the phone once. A revoked device keeps its row (revoked_at) but is rejected at once.
+create table if not exists paired_devices(
+  id text primary key, name text not null, token_hash text not null unique,
+  created_at integer not null, last_seen_at integer, revoked_at integer);
+-- mobile:end
 ";
 
+/// Columns added to existing tables after their first release. SQLite has no `add column if not exists`, so each one is
+/// added only when `pragma table_info` does not list it; running this on every start is therefore idempotent.
+/// `chats.workspace_*`: the chat runs in a worktree of the project's repository (worktree.rs); null for ordinary chats.
+const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
+    ("chats", "workspace_task_id", "text"),
+    ("chats", "workspace_branch", "text"),
+    ("chats", "workspace_base", "text"),
+];
+
+fn add_missing_columns(conn: &Connection) -> rusqlite::Result<()> {
+    for (table, column, decl) in ADDED_COLUMNS {
+        let present: i64 = conn.query_row("select count(*) from pragma_table_info(?) where name = ?", [table, column], |r| r.get(0))?;
+        if present == 0 {
+            conn.execute_batch(&format!("alter table {table} add column {column} {decl}"))?;
+        }
+    }
+    Ok(())
+}
+
 fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(SCHEMA)
+    conn.execute_batch(SCHEMA)?;
+    add_missing_columns(conn)
 }
 
 #[cfg(test)]
@@ -583,6 +617,25 @@ mod tests {
     }
 
     #[test]
+    fn branch_lineage_survives_source_deletion_and_history_is_independent() {
+        let conn = Connection::open_in_memory().unwrap();
+        init(&conn).unwrap();
+        conn.execute_batch("insert into chats(id,title,created_at,updated_at) values(1,'source',1,1),(2,'branch',2,2);
+        insert into messages(chat_id,role,content,created_at) values(1,'user','{\"parts\":[{\"type\":\"image\",\"data\":\"AA\"}],\"meta\":{\"responseId\":\"session\"}}',1);
+        insert into chat_branches values(2,1,1,'source');
+        insert into messages(chat_id,role,content,created_at) select 2,role,json_remove(json_patch(content,'{\"meta\":{\"branchHistory\":true}}'),'$.meta.responseId'),created_at from messages where chat_id=1 and id<=1;").unwrap();
+        conn.execute("delete from chats where id=1", []).unwrap();
+        let title: String = conn.query_row("select source_title from chat_branches where chat_id=2", [], |r| r.get(0)).unwrap();
+        assert_eq!(title, "source");
+        let (image, session): (String, Option<String>) = conn.query_row("select json_extract(content,'$.parts[0].data'),json_extract(content,'$.meta.responseId') from messages where chat_id=2", [], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+        assert_eq!(image, "AA");
+        assert_eq!(session, None);
+        assert_eq!(conn.query_row("select json_extract(content,'$.meta.branchHistory') from messages where chat_id=2", [], |r| r.get::<_,i64>(0)).unwrap(), 1);
+        conn.execute("delete from chats where id=2", []).unwrap();
+        assert_eq!(conn.query_row("select count(*) from chat_branches", [], |r| r.get::<_,i64>(0)).unwrap(), 0);
+    }
+
+    #[test]
     fn schema_is_idempotent_and_migrates_an_old_database() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("app.db");
@@ -603,6 +656,40 @@ mod tests {
 
         let conn = open(&path).unwrap();
         assert_eq!(count(&conn, "drafts"), 1, "re-opening keeps drafts");
+    }
+
+    #[test]
+    fn workspace_columns_are_added_to_an_old_chats_table_and_keep_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.db");
+        // A database from before workspaces: the chats table without the workspace_* columns.
+        let old = Connection::open(&path).unwrap();
+        old.execute_batch(
+            "create table projects(id integer primary key, name text not null, path text, source_id text unique, pinned integer not null default 0, created_at integer not null);
+             create table chats(id integer primary key, project_id integer references projects(id) on delete cascade, title text not null, source_id text unique, archived integer not null default 0, created_at integer not null, updated_at integer not null);
+             insert into chats(title, created_at, updated_at) values('old chat', 1, 1);",
+        )
+        .unwrap();
+        drop(old);
+
+        let conn = open(&path).unwrap();
+        let rows = select(&conn, "select title, workspace_task_id, workspace_branch, workspace_base from chats", vec![]).unwrap();
+        assert_eq!(rows[0]["title"], json!("old chat"));
+        assert_eq!(rows[0]["workspace_task_id"], Value::Null, "existing chats stay ordinary chats");
+        execute(
+            &conn,
+            "insert into chats(title, created_at, updated_at, workspace_task_id, workspace_branch, workspace_base) values('ws', 1, 1, 't1', 'gustaf/x', 'abc123')",
+            vec![],
+        )
+        .unwrap();
+        // Idempotent: opening again (and the in-memory init the other tests use) neither fails nor duplicates columns.
+        drop(conn);
+        let conn = open(&path).unwrap();
+        init(&conn).unwrap();
+        let rows = select(&conn, "select workspace_branch from chats where workspace_task_id = 't1'", vec![]).unwrap();
+        assert_eq!(rows[0]["workspace_branch"], json!("gustaf/x"));
+        let cols: i64 = conn.query_row("select count(*) from pragma_table_info('chats') where name like 'workspace_%'", [], |r| r.get(0)).unwrap();
+        assert_eq!(cols, 3);
     }
 
     #[test]
@@ -688,6 +775,42 @@ mod tests {
         init(&conn).unwrap();
         run_row(&conn, "r2", None, "running", 2, None);
         assert_eq!(count(&conn, "agent_runs"), 1);
+    }
+
+    #[test]
+    fn paired_devices_table_is_added_to_an_old_database_and_keeps_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.db");
+        let conn = open(&path).unwrap();
+        let chat = new_chat(&conn);
+        conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d1', 'Pixel', 'h1', 5)", []).unwrap();
+        drop(conn);
+
+        // Re-opening is a no-op for the existing table and its rows.
+        let conn = open(&path).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 1);
+        // A database from before the mobile server just gets the table; the rest of the data is untouched.
+        conn.execute_batch("drop table paired_devices").unwrap();
+        drop(conn);
+        let conn = open(&path).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 0);
+        assert_eq!(count(&conn, "chats"), 1);
+        init(&conn).unwrap();
+        init(&conn).unwrap();
+        let columns: Vec<String> = conn
+            .prepare("select name from pragma_table_info('paired_devices') order by cid")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(columns, ["id", "name", "token_hash", "created_at", "last_seen_at", "revoked_at"]);
+        conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d2', 'iPhone', 'h2', 6)", []).unwrap();
+        // Token hashes are unique, and revoking keeps the row.
+        assert!(conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d3', 'x', 'h2', 7)", []).is_err());
+        conn.execute("update paired_devices set revoked_at = 9 where id = 'd2'", []).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 1);
+        let _ = chat;
     }
 
     #[test]

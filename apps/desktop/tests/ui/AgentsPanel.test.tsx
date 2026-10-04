@@ -44,8 +44,8 @@ function setup(onContinue = vi.fn()) {
 }
 
 describe("AgentsPanel: CLI-native subagents", () => {
-  const cliAct = (id: string, state: "running" | "completed", over: Record<string, unknown> = {}) => ({
-    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+  const cliAct = (id: string, state: "running" | "completed" | "stopped" | "failed", over: Record<string, unknown> = {}) => ({
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : state === "completed" ? ("success" as const) : ("unknown" as const),
     subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state, prompt: "Count the files", ...over },
     ...(state === "completed" ? { output: "42 files in total" } : {}),
   });
@@ -66,7 +66,9 @@ describe("AgentsPanel: CLI-native subagents", () => {
     expect(await screen.findByText("Worker a")).toBeInTheDocument();
     expect(screen.getByText("Agent · Codex")).toBeInTheDocument();
     expect(screen.getByText("reading files")).toBeInTheDocument();
-    const stopBtn = screen.getByRole("button", { name: "Stop" });
+    // The CLI cannot stop one subagent: the button aborts the whole run, and its accessible name says so.
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    const stopBtn = screen.getByRole("button", { name: "Stop the whole Codex run" });
     expect(stopBtn).toHaveAttribute("title", "Stops the whole Codex run, not just this agent.");
     expect(screen.queryByRole("button", { name: "Continue this agent" })).toBeNull();
     fireEvent.click(stopBtn);
@@ -74,7 +76,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
 
     act(() => { trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [cliAct("a", "completed")]); finishCliAgents(1); });
     expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Stop/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "View transcript" }));
     const dialog = await screen.findByRole("dialog", { name: "Worker a" });
     expect(within(dialog).getByText("Count the files")).toBeInTheDocument();
@@ -118,13 +120,37 @@ describe("AgentsPanel: CLI-native subagents", () => {
     expect(screen.queryByRole("button", { name: /^Finished/ })).toBeNull();
 
     phase = 1;
-    await act(async () => { await tracker.finish(true); });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument());
-    // The finished row is folded while others run.
-    expect(screen.getAllByRole("article")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "Finished 1" }));
+    // (providers/cli.ts publishes what `finish` returns the same way)
+    await act(async () => { for (const a of await tracker.finish(true)) trackCliAgents({ chatId: 1, root: "/work/alpha" }, [applyActivity(map, a)]); });
+    // The turn is over: Bo and Cy were still running in the last scan, and the Codex process that ran them is gone, so they
+    // are settled as stopped instead of ticking on; nothing is left under Running.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Finished 3" })).toBeInTheDocument());
+    expect(screen.queryByRole("region", { name: "Running" })).toBeNull();
     expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getAllByText("Stopped")).toHaveLength(2);
     expect(screen.getByText("alpha is fine")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Background tasks · 0 running" })).toBeInTheDocument();
+    resetCliAgents();
+  });
+
+  it("stopped agents sit under Finished with a neutral Stopped label, never under Running, and do not count in the badge", async () => {
+    resetCliAgents();
+    render();
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop: vi.fn() }, [
+      cliAct("a", "running"),
+      cliAct("b", "stopped", { endedAt: Date.now() }),
+      cliAct("c", "failed", { endedAt: Date.now() }),
+    ]));
+    expect(await screen.findByRole("button", { name: "Background tasks · 1 running" })).toBeInTheDocument();
+    const running = screen.getByRole("region", { name: "Running" });
+    expect(within(running).getAllByRole("article")).toHaveLength(1);
+    expect(within(running).getByRole("article", { name: "Worker a" })).toBeInTheDocument();
+    const finished = screen.getByRole("region", { name: "Finished" });
+    fireEvent.click(within(finished).getByRole("button", { name: "Finished 2" }));
+    const stopped = within(finished).getByRole("article", { name: "Worker b" });
+    expect(within(stopped).getByText("Stopped")).toBeInTheDocument();
+    expect(within(stopped).queryByRole("button", { name: "Stop" })).toBeNull();
+    expect(within(within(finished).getByRole("article", { name: "Worker c" })).getByText("Failed")).toBeInTheDocument();
     resetCliAgents();
   });
 
@@ -175,6 +201,18 @@ describe("AgentsPanel", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("in Russian the CLI stop button says it stops the whole run", async () => {
+    resetCliAgents();
+    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/from settings where key/.test(sql) ? [{ value: "true" }] : []) });
+    renderApp(<Panel />, undefined, "ru");
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop: vi.fn() }, [{
+      type: "activity" as const, id: "a", name: "subagent", args: {}, status: "running" as const,
+      subagent: { provider: "codex" as const, agentId: "thread-a", title: "Worker a", action: "wait" as const, state: "running" as const },
+    }]));
+    expect(await screen.findByText("Worker a")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Остановить весь запуск Codex" })).toHaveAttribute("title", "Останавливает весь запуск Codex, а не только этого агента.");
+  });
+
   it("shows a card per run (title, muted type line, model · tokens · tool uses, current step) with a square stop button; finished runs fold into a collapsible row", async () => {
     resetAgentRuns(); // the store loads its rows once per module
     mockInvoke({
@@ -198,6 +236,9 @@ describe("AgentsPanel", () => {
     expect(within(live).getByText("15k tokens")).toBeInTheDocument();
     expect(within(live).getByText("4 tool uses")).toBeInTheDocument();
     expect(within(live).getByText("reading parser.ts")).toBeInTheDocument();
+    expect(within(live).getByText("0 s")).toBeInTheDocument(); // unit format, not a clock-style 0:00
+    // Our own agents stop individually: plain "Stop", no "whole run" wording.
+    expect(within(live).queryByRole("button", { name: /whole/ })).toBeNull();
     fireEvent.click(within(live).getByRole("button", { name: "Stop" }));
     expect(stop).toHaveBeenCalledTimes(1);
     expect(within(live).getByRole("button", { name: "View transcript" })).toBeInTheDocument();
@@ -210,6 +251,7 @@ describe("AgentsPanel", () => {
     const done = screen.getByRole("article", { name: "Done one" });
     expect(within(done).getByText("Done")).toBeInTheDocument();
     expect(within(done).getByText("short report")).toBeInTheDocument();
+    expect(within(done).getByText("4 s")).toBeInTheDocument(); // started_at 1000, ended_at 5000
     expect(within(done).queryByRole("button", { name: "Stop" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Clear finished" }));
     await waitFor(() => expect(screen.queryByRole("article", { name: "Done one" })).toBeNull());
@@ -220,7 +262,7 @@ describe("AgentsPanel", () => {
 
 describe("Background tasks column", () => {
   const cliAct = (id: string, state: "running" | "completed") => ({
-    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : ("success" as const),
+    type: "activity" as const, id, name: "subagent", args: {}, status: state === "running" ? ("running" as const) : state === "completed" ? ("success" as const) : ("unknown" as const),
     subagent: { provider: "codex" as const, agentId: `thread-${id}`, title: `Worker ${id}`, action: "wait" as const, state },
   });
   const ctx = { chatId: 1, root: "/work/alpha" };

@@ -23,6 +23,7 @@ export type ExportedChat = {
   project: { name: string; path: string | null } | null;
   messages: ExportedMessage[];
 };
+// `app` stays "M Code": it is part of the file format, not a display name.
 export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: "M Code"; exportedAt: string; chats: ExportedChat[] };
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
@@ -342,7 +343,7 @@ export type MdLabels = {
 };
 
 export const DEFAULT_MD_LABELS: MdLabels = {
-  exported: "Exported from M Code on {date}",
+  exported: "Exported from Gustaf on {date}",
   project: "Project",
   created: "Created",
   updated: "Updated",
@@ -429,6 +430,16 @@ function outputBlock(output: string | undefined, L: MdLabels): string {
   return output?.trim() ? fence("text", clip(output, L)) : `*${L.noOutput}*`;
 }
 
+/**
+ * A sent message shows its pictures above the text, so the exports do the same. An omitted picture (the placeholder
+ * text left by an export without images) counts as a picture. Other roles keep the order the model produced.
+ */
+export function partsInDisplayOrder(role: string, parts: Part[]): Part[] {
+  if (role !== "user") return parts;
+  const lead = (p: Part) => p.type === "image" || (p.type === "text" && p.text === IMAGE_OMITTED);
+  return [...parts.filter(lead), ...parts.filter((p) => !lead(p))];
+}
+
 function renderPart(p: Part, L: MdLabels): string[] {
   switch (p.type) {
     case "text":
@@ -466,7 +477,7 @@ function renderChat(chat: ExportedChat, level: number, L: MdLabels): { head: str
     // Tool messages continue the assistant turn that requested them, so they get no heading of their own.
     if (m.role === "user") body.push(`${h(level + 1)} ${L.user}`);
     else if (m.role === "assistant") body.push(`${h(level + 1)} ${L.assistant}${m.meta?.model ? ` (${m.meta.model})` : ""}`);
-    for (const p of m.parts) body.push(...renderPart(p, L));
+    for (const p of partsInDisplayOrder(m.role, m.parts)) body.push(...renderPart(p, L));
   }
   return { head, body };
 }
@@ -479,7 +490,7 @@ export function toMarkdown(bundle: ChatBundle, labels: MdLabels = DEFAULT_MD_LAB
     const { head, body } = renderChat(bundle.chats[0], 1, labels);
     blocks = [...head, note, ...body];
   } else {
-    blocks = ["# M Code", `${note}\n\n- ${labels.chats}: ${bundle.chats.length}`];
+    blocks = ["# Gustaf", `${note}\n\n- ${labels.chats}: ${bundle.chats.length}`];
     for (const chat of bundle.chats) {
       const { head, body } = renderChat(chat, 2, labels);
       blocks.push("---", ...head, ...body);

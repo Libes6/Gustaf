@@ -1,0 +1,32 @@
+/* Quick-ask window (quick-ask.html). The window is borderless; the page draws its own frame. The content height drives the
+   window height (QuickAsk.tsx -> quick_ask_resize), so `.qa` is as tall as its content, capped at the window maximum. */
+html, body { height: auto; background: var(--bg); }
+.qa {
+  display: flex; flex-direction: column; gap: 8px; min-height: 160px; max-height: 520px; padding: 0 12px 10px;
+  background: var(--bg); border: 1px solid var(--border-strong); overflow: hidden;
+}
+.qa-drag { height: 14px; margin: 0 -12px; flex: none; }
+.qa-input { display: flex; align-items: flex-end; gap: 8px; flex: none; }
+.qa-input textarea {
+  flex: 1; min-height: 38px; max-height: 120px; resize: none; padding: 9px 12px; border-radius: 10px; field-sizing: content;
+  border: 1px solid var(--border-strong); background: var(--bg-input); outline: none; user-select: text; font-size: 14px;
+}
+.qa-input textarea:focus { border-color: var(--accent); }
+.qa-input .send { margin-bottom: 4px; }
+.qa-options { display: flex; align-items: center; gap: 10px; flex: none; }
+.qa-model {
+  max-width: 300px; height: 26px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg-input);
+  color: var(--text-2); font-size: 12px; padding: 0 6px;
+}
+.qa-switch { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px; }
+.qa-note { color: var(--text-2); font-size: 12px; flex: none; }
+.qa-clip { flex: none; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-code); padding: 8px 10px; }
+.qa-clip pre {
+  margin: 0 0 6px; max-height: 90px; overflow: auto; white-space: pre-wrap; word-break: break-word; user-select: text;
+  font: 12px/1.4 var(--mono); color: var(--text-2);
+}
+.qa-answer { flex: 1 1 auto; min-height: 0; overflow: auto; user-select: text; padding: 2px 2px 0; }
+.qa-error { color: var(--error-fg); }
+.qa-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.qa .d { color: var(--text-3); font-size: 12px; }
+.qa .grow { flex: 1; }

@@ -47,6 +47,8 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
     setTimeout(() => addEventListener("mousedown", down));
     return () => removeEventListener("mousedown", down);
   }, []);
+  // Opening the picker is when API providers' lists are refreshed (at most every 10 minutes each); launch shows the cache.
+  useEffect(() => void Promise.resolve(app.ensureModels?.()).catch(() => {}), []);
   useEffect(() => setHl(0), [tab, q]);
   useEffect(() => { document.getElementById(`model-opt-${hl}`)?.scrollIntoView({ block: "nearest" }); }, [hl]);
 

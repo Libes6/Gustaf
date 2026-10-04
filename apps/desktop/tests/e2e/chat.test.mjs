@@ -89,7 +89,7 @@ test('projects: create a project and chat inside it', { skip: skipReason }, asyn
   });
 });
 
-test('Cmd+K search finds a message in another chat and jumps to it', { skip: skipReason }, async () => {
+test('platform search shortcut finds a message in another chat and jumps to it', { skip: skipReason }, async () => {
   await scenario(suite, 'search-jump', {
     setup: (b) => {
       b.seedReady();
@@ -99,7 +99,7 @@ test('Cmd+K search finds a message in another chat and jumps to it', { skip: ski
   }, async ({ page, backend, origin }) => {
     await openApp(page, origin);
     await shown(page.getByRole('complementary', { name: 'Chats and projects' }).getByText('Garden plans'));
-    await page.keyboard.press('Meta+k');
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
     const palette = page.getByRole('dialog', { name: 'Search all chats' });
     await shown(palette);
     await palette.getByRole('combobox', { name: 'Search messages in all chats…' }).fill('spaghetti');

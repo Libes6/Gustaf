@@ -1,6 +1,7 @@
 // MCP authorization (spec 2025-06-18, built on OAuth 2.1, RFC 9728 protected resource metadata, RFC 8414 authorization
 // server metadata, RFC 7591 dynamic client registration, RFC 7636 PKCE, RFC 8707 resource indicators, RFC 8252
-// loopback redirects): the pure parts. Documents are parsed and validated here, requests and URLs are built here, the
+// loopback redirects, RFC 7009 token revocation) plus the 2025-03-26 fallback for servers without any metadata
+// (`defaultAuthServer`): the pure parts. Documents are parsed and validated here, requests and URLs are built here, the
 // token policy lives here. The network, the browser and the Keychain are reached through `oauthFlow.ts`.
 // Pure: unit-tested in tests/mcpOauth.test.mjs. Nothing in this file logs.
 
@@ -106,7 +107,22 @@ export function authServerMetadataUrls(issuer: string): string[] {
   return [`${u.origin}/.well-known/oauth-authorization-server${path}`, `${u.origin}/.well-known/openid-configuration${path}`, `${u.origin}${path}/.well-known/openid-configuration`];
 }
 
-export type AuthServer = { issuer: string; authorizationEndpoint: string; tokenEndpoint: string; registrationEndpoint?: string };
+export type AuthServer = { issuer: string; authorizationEndpoint: string; tokenEndpoint: string; registrationEndpoint?: string; revocationEndpoint?: string };
+
+/**
+ * The 2025-03-26 spec's last resort for servers that publish no metadata at all: `/authorize`, `/token` and
+ * `/register` on the MCP server's origin (the URL with its path discarded). The same https / loopback rules apply as to
+ * discovered endpoints (a non-https server URL cannot reach this point: every request is checked first).
+ */
+export function defaultAuthServer(serverUrl: string): AuthServer {
+  const origin = new URL(serverUrl).origin;
+  return {
+    issuer: origin,
+    authorizationEndpoint: mustBeSecure(`${origin}/authorize`, "the default authorization endpoint"),
+    tokenEndpoint: mustBeSecure(`${origin}/token`, "the default token endpoint"),
+    registrationEndpoint: mustBeSecure(`${origin}/register`, "the default registration endpoint"),
+  };
+}
 
 const normIssuer = (s: string) => s.replace(/\/+$/, "");
 
@@ -123,6 +139,8 @@ export function parseAuthServerMetadata(doc: unknown, issuer: string): AuthServe
     authorizationEndpoint: mustBeSecure(d.authorization_endpoint, "the authorization endpoint"),
     tokenEndpoint: mustBeSecure(d.token_endpoint, "the token endpoint"),
     ...(d.registration_endpoint !== undefined ? { registrationEndpoint: mustBeSecure(d.registration_endpoint, "the registration endpoint") } : {}),
+    // Revocation is best effort: an unusable endpoint is ignored instead of failing the sign-in.
+    ...(isSecureEndpoint(d.revocation_endpoint) ? { revocationEndpoint: d.revocation_endpoint } : {}),
   };
 }
 
@@ -172,7 +190,7 @@ export function buildAuthorizationUrl(o: { endpoint: string; clientId: string; r
 }
 
 /** RFC 7591 request body: a public native client using the authorization code flow. */
-export const registrationBody = (redirect: string, clientName = "M Code") => ({
+export const registrationBody = (redirect: string, clientName = "Gustaf") => ({
   client_name: clientName,
   redirect_uris: [redirect],
   grant_types: ["authorization_code", "refresh_token"],
@@ -207,6 +225,16 @@ export function tokenRequestBody(g: CodeGrant | RefreshGrant): string {
   return p.toString();
 }
 
+/** application/x-www-form-urlencoded body of an RFC 7009 revocation request. */
+export function revocationRequestBody(token: string, hint: "refresh_token" | "access_token", clientId: string, clientSecret?: string): string {
+  const p = new URLSearchParams();
+  p.set("token", token);
+  p.set("token_type_hint", hint);
+  p.set("client_id", clientId);
+  if (clientSecret) p.set("client_secret", clientSecret);
+  return p.toString();
+}
+
 // ---- tokens --------------------------------------------------------------------------------------------------------
 
 /** What is kept in the Keychain under `mcp:<id>:oauth` (JSON). */
@@ -221,6 +249,8 @@ export type StoredOAuth = {
   resource: string;
   issuer: string;
   scope?: string;
+  /** RFC 7009 endpoint from the authorization server metadata (absent: nothing to revoke on sign-out). */
+  revocationEndpoint?: string;
 };
 
 /** Reads a token endpoint answer. `prev` supplies the refresh token a refresh response may omit. */
@@ -260,6 +290,7 @@ export function parseStored(text: string | null | undefined): StoredOAuth | null
       resource: d.resource,
       issuer: d.issuer,
       ...(typeof d.scope === "string" && d.scope ? { scope: d.scope } : {}),
+      ...(isSecureEndpoint(d.revocationEndpoint) ? { revocationEndpoint: d.revocationEndpoint } : {}),
     };
   } catch {
     return null;

@@ -196,6 +196,24 @@ for (const [name, p] of Object.entries(providers)) {
   });
 }
 
+test('anthropic: a stream that ends without message_stop is an error, not a truncated answer or tool call', async () => {
+  const cut = [
+    { type: 'message_start', message: { usage: { input_tokens: 3 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't1', name: 'write_file', input: {} } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"path":"a.txt","con' } },
+  ];
+  // Nothing was shown yet: retried, and the complete second answer wins.
+  const calls = mockFetch(ok(cut), ok(providers.anthropic.hello()));
+  const t = turnInput();
+  const out = await providers.anthropic.make().turn(t.input);
+  assert.equal(textOf(out), 'Hi');
+  assert.equal(out.parts.some((p) => p.type === 'tool_call'), false);
+  assert.equal(calls.length, 2);
+  // Text was already shown: surfaced as a network error instead of a silent partial reply.
+  mockFetch(ok(providers.anthropic.hello().slice(0, 3)));
+  await assert.rejects(providers.anthropic.make().turn(turnInput().input), (e) => e.kind === 'network');
+});
+
 test('listModels uses the same error classification (no retry)', async () => {
   const calls = mockFetch(http(401, 'bad key'), ok([]));
   await assert.rejects(providers.anthropic.make().listModels(), (e) => e.kind === 'auth' && /401/.test(e.message));
