@@ -25,6 +25,7 @@ mod updater;
 mod worktree;
 mod merge_queue;
 mod terminal;
+mod proc_tree;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -96,6 +97,7 @@ pub fn run() {
             tools::read_home_file,
             tools::run_command,
             hook_exec::run_hook,
+            proc_tree::process_kill_tree,
             git::git,
             git::git_status,
             git::git_commit_context,

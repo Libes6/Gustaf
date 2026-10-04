@@ -1,7 +1,7 @@
 // Pure settings of background agents (tests/agentSettings.test.mjs): default model per agent type, the allow-list of models
 // an agent call may request explicitly, per-type budget defaults, the cheap model for summaries/commit messages, the
 // orchestration default and notifications. Stored in the app `settings` table under "agentSettings" (agentSettingsStore.ts).
-import { AGENT_TYPES, HARD_CAPS, type AgentType, type Budget, type BudgetOverrides } from "./subagentCore";
+import { AGENT_ROLES, AGENT_TYPES, HARD_CAPS, type AgentRole, type AgentType, type Budget, type BudgetOverrides } from "./subagentCore";
 
 export const AGENT_SETTINGS = "agentSettings";
 export const MAX_ALLOWED_MODELS = 20;
@@ -22,9 +22,16 @@ export type AgentSettings = {
   stopOnBudget: boolean;
   /** Native notification / dock badge when a background agent finishes, fails or waits for approval while the app is unfocused. */
   notifications: boolean;
+  /** Role presets (planner, implementer, reviewer, tester): the provider and model a task naming the role runs on. The provider must also be allowed (see `allowedProviderIds`). */
+  roles: Partial<Record<AgentRole, ModelRef>>;
+  /** Provider ids a task may name in `provider` (API or CLI), besides the chat's own provider and the providers of the type defaults and allowed models. */
+  allowedProviders: string[];
+  /** Remove the worktree and branch of a CLI subagent when it ends without any change (committed or not). Off by default: worktrees are always kept. */
+  cleanupUntouchedWorktrees: boolean;
 };
 
-export const DEFAULT_AGENT_SETTINGS: AgentSettings = { models: {}, allowedModels: [], budgets: {}, cheapModel: null, cancelDependents: true, stopOnBudget: true, notifications: true };
+export const MAX_ALLOWED_PROVIDERS = 20;
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = { models: {}, allowedModels: [], budgets: {}, cheapModel: null, cancelDependents: true, stopOnBudget: true, notifications: true, roles: {}, allowedProviders: [], cleanupUntouchedWorktrees: false };
 
 export const refKey = (r: ModelRef) => `${r.providerId}/${r.model}`;
 export const sameRef = (a: ModelRef | null | undefined, b: ModelRef | null | undefined) => !!a && !!b && a.providerId === b.providerId && a.model === b.model;
@@ -65,6 +72,13 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
     .map(normalizeRef)
     .filter((x): x is ModelRef => !!x && !seen.has(refKey(x)) && !!seen.add(refKey(x)))
     .slice(0, MAX_ALLOWED_MODELS);
+  const roles: AgentSettings["roles"] = {};
+  const rr = r.roles && typeof r.roles === "object" ? (r.roles as Record<string, unknown>) : {};
+  for (const role of AGENT_ROLES) {
+    const ref = normalizeRef(rr[role]);
+    if (ref) roles[role] = ref;
+  }
+  const allowedProviders = [...new Set((Array.isArray(r.allowedProviders) ? r.allowedProviders : []).filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim().slice(0, 100)))].slice(0, MAX_ALLOWED_PROVIDERS);
   return {
     models,
     allowedModels,
@@ -73,6 +87,9 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
     cancelDependents: r.cancelDependents !== false,
     stopOnBudget: r.stopOnBudget !== false,
     notifications: r.notifications !== false,
+    roles,
+    allowedProviders,
+    cleanupUntouchedWorktrees: r.cleanupUntouchedWorktrees === true,
   };
 }
 
@@ -112,3 +129,64 @@ export function selectModel(type: AgentType, s: AgentSettings, parent: ModelRef,
 
 /** The model for compaction and commit messages: the configured cheap model when it is usable, else the chat's own. */
 export const cheapModelFor = (s: AgentSettings, fallback: ModelRef, usable: (r: ModelRef) => boolean): ModelRef => (s.cheapModel && usable(s.cheapModel) ? s.cheapModel : fallback);
+
+// ---- providers and roles ----
+
+/** A provider a task may be routed to, as the host's provider directory lists it (enabled providers only). */
+export type ProviderLite = { id: string; name: string; /** A CLI agent that runs its own tools. */ cli?: boolean };
+
+/** Provider ids a task may name: the chat's own, those of the type defaults and of the allowed models, and the allow-list. Roles are NOT included: a role's provider has to be allowed on its own. */
+export function allowedProviderIds(s: AgentSettings, parentProviderId: string): string[] {
+  return [...new Set([parentProviderId, ...Object.values(s.models).map((r) => r.providerId), ...s.allowedModels.map((r) => r.providerId), ...s.allowedProviders])];
+}
+
+/** Matches a `provider` argument: an exact id, else a name (case-insensitive) that only one provider has. */
+export function matchProviderArg(arg: string, known: readonly ProviderLite[]): ProviderLite | null {
+  const a = arg.trim();
+  if (!a) return null;
+  const byId = known.find((p) => p.id === a);
+  if (byId) return byId;
+  const byName = known.filter((p) => p.name.trim().toLowerCase() === a.toLowerCase());
+  return byName.length === 1 ? byName[0] : null;
+}
+
+export type ProviderRoute = { providerId: string; /** Absent: the provider's default model. */ model?: string; via: "role" | "provider"; role?: AgentRole };
+export type RouteChoice = { ok: true; route: ProviderRoute } | { ok: false; error: string };
+
+const listProviders = (ids: readonly string[], known: readonly ProviderLite[]) => ids.map((id) => known.find((p) => p.id === id)).filter((p): p is ProviderLite => !!p).map((p) => `${p.id} (${p.name})`).join(", ") || "none";
+
+/** One provider id (or name) checked against the known providers and the allowed ones. */
+function allowedProvider(arg: string, s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[], what: string): { ok: true; id: string } | { ok: false; error: string } {
+  const p = matchProviderArg(arg, known);
+  const allowed = allowedProviderIds(s, parentProviderId);
+  if (!p) return { ok: false, error: `${what} "${arg.trim()}" is not a known, enabled provider. Allowed: ${listProviders(allowed, known)}.` };
+  if (!allowed.includes(p.id)) return { ok: false, error: `${what} "${p.id}" is not allowed for subagents (Settings > Usage > Agents > Allowed providers). Allowed: ${listProviders(allowed, known)}.` };
+  return { ok: true, id: p.id };
+}
+
+/**
+ * Where a task runs when it names a provider or a role; null when it names neither (the existing model routing applies).
+ * A role resolves to its preset, which must name an enabled and allowed provider. An explicit provider must be allowed.
+ */
+export function selectProviderRoute(a: { provider?: string; role?: AgentRole; model?: string }, s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[]): RouteChoice | null {
+  if (a.role) {
+    const preset = s.roles[a.role];
+    if (!preset) return { ok: false, error: `Role "${a.role}" has no provider configured (Settings > Usage > Agents > Roles).` };
+    const p = allowedProvider(preset.providerId, s, parentProviderId, known, `Provider of role "${a.role}"`);
+    return p.ok ? { ok: true, route: { providerId: p.id, model: preset.model, via: "role", role: a.role } } : p;
+  }
+  if (!a.provider) return null;
+  const p = allowedProvider(a.provider, s, parentProviderId, known, "Provider");
+  return p.ok ? { ok: true, route: { providerId: p.id, ...(a.model?.trim() ? { model: a.model.trim() } : {}), via: "provider" } } : p;
+}
+
+/** The fallback providers of a task, each checked like an explicit provider. */
+export function selectFallbacks(ids: readonly string[], s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[]): { ok: true; routes: ProviderRoute[] } | { ok: false; error: string } {
+  const routes: ProviderRoute[] = [];
+  for (const id of ids) {
+    const p = allowedProvider(id, s, parentProviderId, known, "Fallback provider");
+    if (!p.ok) return p;
+    routes.push({ providerId: p.id, via: "provider" });
+  }
+  return { ok: true, routes };
+}
