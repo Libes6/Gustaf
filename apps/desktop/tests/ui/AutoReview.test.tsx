@@ -384,7 +384,7 @@ describe("settings", () => {
     expect(screen.getByText(/each review is one more model request that sends the diff to the provider/)).toBeInTheDocument();
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-checked", "true");
-    expect(saved().at(-1)).toMatchObject({ enabled: true, trigger: "afterRun" });
+    expect(saved().slice(-1)[0]).toMatchObject({ enabled: true, trigger: "afterRun" });
   });
 
   it("chooses the trigger and a per-project override", async () => {
@@ -392,12 +392,12 @@ describe("settings", () => {
     view();
     await waitFor(() => expect(screen.getByRole("switch", { name: "Review changes automatically" })).toHaveAttribute("aria-checked", "true"));
     await userEvent.selectOptions(screen.getByLabelText("When to review"), "beforeAccept");
-    expect(saved().at(-1)).toMatchObject({ enabled: true, trigger: "beforeAccept" });
+    expect(saved().slice(-1)[0]).toMatchObject({ enabled: true, trigger: "beforeAccept" });
     const beta = screen.getByLabelText("Automatic review for Beta");
     expect(beta).toHaveValue("default");
     await userEvent.selectOptions(beta, "off");
-    expect(saved().at(-1).projects).toEqual({ "/work/beta": false });
+    expect(saved().slice(-1)[0].projects).toEqual({ "/work/beta": false });
     await userEvent.selectOptions(beta, "default");
-    expect(saved().at(-1).projects).toEqual({});
+    expect(saved().slice(-1)[0].projects).toEqual({});
   });
 });
