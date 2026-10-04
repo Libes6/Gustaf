@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { Markdown } from "../components/Markdown";
 import { detectLocale, I18nProvider, useT, type Locale } from "../i18n";
 import { db, getSetting } from "../lib/api";
+import { invalidateSecret } from "../lib/keys";
 import { currentBudgetStop } from "../lib/budgetUsage";
 import { addMessage, createChat } from "../lib/data";
 import {
@@ -23,6 +24,9 @@ const modelId = (m: { providerId: string; id: string }) => `${m.providerId}\n${m
 
 /** Providers, the model list from the cache and the app's default model (the same "selection" the main window uses). */
 async function loadConfig(): Promise<Config> {
+  // This window keeps its own key cache: a key saved in the main window since the last show must not be shadowed by the
+  // old one (or by a remembered "no key"). Rust keeps successful reads, so this asks the Keychain nothing new.
+  invalidateSecret();
   const [providers, selection, hidden] = await Promise.all([loadProviders(), getSetting<Selection | null>("selection", null), getSetting<string[]>("hiddenModels", [])]);
   const { models } = await listAllModels(providers, "startup");
   const usable = usableModels(providers, models, hidden);

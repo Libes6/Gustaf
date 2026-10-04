@@ -25,6 +25,7 @@ export const loadProviders = () => getSetting<ProviderConfig[]>("providers", [])
 export async function saveProvider(cfg: ProviderConfig, key: string | null) {
   const list = await loadProviders();
   const i = list.findIndex((p) => p.id === cfg.id);
+  const old = i >= 0 ? list[i] : undefined;
   if (i >= 0) list[i] = cfg;
   else list.push(cfg);
   // An empty key is not stored: the provider is then known to have none and never touches the Keychain.
@@ -32,6 +33,8 @@ export async function saveProvider(cfg: ProviderConfig, key: string | null) {
   else if (key !== null) await removeSecret(providerSecretId(cfg.id));
   await setSetting("providers", list);
   adapters.delete(cfg.id);
+  // A new key or endpoint makes the last failed listing (and its 10-minute throttle) moot; a list still in flight used the old one.
+  if (key !== null || !old || old.baseUrl !== cfg.baseUrl) forgetModelState(cfg.id);
 }
 
 export async function deleteProvider(id: string) {
@@ -42,8 +45,7 @@ export async function deleteProvider(id: string) {
   await setSetting("providers", list.filter((p) => p.id !== id));
   await removeSecret(providerSecretId(id), true);
   adapters.delete(id);
-  modelErrors.delete(id);
-  lastAttempt.delete(id);
+  forgetModelState(id);
   await writeModelCache((c) => (delete c[id], c));
 }
 
@@ -60,16 +62,21 @@ export function makeAdapter(cfg: ProviderConfig, key: KeySource): Adapter {
   return withComputer(rawAdapter(cfg, key), cfg.kind === "cli" || cfg.kind === "cursor");
 }
 
-const adapters = new Map<string, Adapter>();
+const adapters = new Map<string, { cfg: string; adapter: Adapter }>();
 
-/** Building an adapter never reads the Keychain: its key is fetched (once per session) by the first request that needs it. */
+/**
+ * Building an adapter never reads the Keychain: its key is fetched (once per session) by the first request that needs it.
+ * The adapter is rebuilt when the provider's settings differ from the ones it was built with (they may have been saved
+ * in another window, which keeps its own adapters).
+ */
 export async function getAdapter(cfg: ProviderConfig) {
+  const sig = JSON.stringify(cfg);
   let a = adapters.get(cfg.id);
-  if (!a) {
-    a = makeAdapter(cfg, providerKey(cfg.id));
+  if (!a || a.cfg !== sig) {
+    a = { cfg: sig, adapter: makeAdapter(cfg, providerKey(cfg.id, cfg.name)) };
     adapters.set(cfg.id, a);
   }
-  return a;
+  return a.adapter;
 }
 
 // ---- model lists ---------------------------------------------------------------------------------------------------
@@ -86,6 +93,7 @@ export type ModelRefresh = "startup" | "stale" | "force";
 const modelErrors = new Map<string, string>();
 const lastAttempt = new Map<string, number>();
 const inflight = new Map<string, Promise<ModelInfo[]>>();
+const forgetModelState = (id: string) => void (modelErrors.delete(id), lastAttempt.delete(id), inflight.delete(id));
 let cacheWrites: Promise<unknown> = Promise.resolve();
 
 const readModelCache = () => getSetting<Record<string, CachedModels>>(MODEL_CACHE, {}).catch(() => ({}) as Record<string, CachedModels>);
