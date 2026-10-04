@@ -19,6 +19,7 @@ import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
@@ -430,6 +431,7 @@ function GitPage() {
           <Toggle on={app.reviewCopy === true} label={t("reviewCopySetting")} onChange={app.setReviewCopy} />
         </div>
       </div>
+      <AutoReviewSettings />
       <CommandRules />
       <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
     </>
