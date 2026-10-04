@@ -3,13 +3,13 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { KnowledgeSettings } from "../../src/components/KnowledgeSettings";
-import type { KnowledgeCollection } from "../../src/agent/knowledgeCore";
+import type { KnowledgeCollection, KnowledgeStatus } from "../../src/agent/knowledgeCore";
 import { makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
-const status = (over = {}) => ({ state: "new", files: 0, chunks: 0, bytes: 0, indexedAt: null, issues: [], warnings: [], lastError: null, ...over });
+const status = (over: Partial<KnowledgeStatus> = {}): KnowledgeStatus => ({ state: "new", files: 0, chunks: 0, bytes: 0, indexedAt: null, issues: [], warnings: [], lastError: null, ...over });
 const collection = (over: Partial<KnowledgeCollection> = {}): KnowledgeCollection => ({
   id: A, name: "Team wiki", sources: [{ path: "/docs/wiki", kind: "folder" }], include: ["**/*.md"], createdAt: 1, consentedAt: null, indexing: false,
   config: { kind: "ollama", endpoint: "http://127.0.0.1:11434", model: "embeddinggemma", keyId: null }, status: status(), ...over,
