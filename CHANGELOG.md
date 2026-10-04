@@ -4,7 +4,7 @@ All notable user-visible changes to Gustaf are recorded here. The format follows
 
 ## [Unreleased]
 
-## [0.1.0] - TBD
+## [0.1.0] - 2026-10-04
 
 First public release. Installers: macOS (Apple Silicon and Intel, DMG), Windows x64 (NSIS and MSI), Linux x64 (AppImage, DEB, RPM). See the [README](README.md#install) for installation.
 
@@ -16,6 +16,9 @@ First public release. Installers: macOS (Apple Silicon and Intel, DMG), Windows 
 - Model picker per chat, Ask / Plan / Agent modes with a plan card (Approve, Edit, Reject).
 - Streaming with automatic retries for transient errors, Stop, Retry and resume of interrupted requests; classified errors (rate limit, quota, auth, network, server).
 - Message actions: edit and resend, regenerate, delete, branch into a new chat.
+- Queue follow-up messages and clarify an active task; shared per-chat coordination for interactive and scheduled runs.
+- Linked chat branches with independent histories and provider/session context handling.
+- Attach another chat as reference context through the composer, with a frozen snapshot.
 - Compare 2-4 models side by side on one prompt.
 - Drafts (text and images) restored after a restart; image attachments (also for CLI providers); paste or take a screenshot; voice input through an OpenAI-compatible transcription model.
 - Cursor account pool with browser-login profiles and rotation when a quota runs out.
