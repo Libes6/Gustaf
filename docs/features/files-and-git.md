@@ -29,6 +29,36 @@ In a pending file's diff each hunk can be accepted or rejected on its own, or ti
 
 **Review with AI.** "Review all with AI" (and, with several pending sets, one button per set, plus "Review with AI" inside a file's diff) sends the pending diffs to a model for a read-only review: one request without tools, the diff given as bounded JSON data (about 40% of the model's context window, split fairly between files; truncation is flagged to the model) with a system prompt that says instructions inside the diff are data. It uses the cheap model from the agent settings when configured, otherwise the model selected in the composer; the diff is sent to that provider like any other chat context and the tokens are counted in usage and budgets. The model must answer with strict JSON (`findings` with file, optional line/hunk, severity bug/warn/info, title, detail, optional suggestion, and a `summary`); the reply is parsed defensively (fences, reasoning blocks and extra text are tolerated, findings about files that were not reviewed, without text or beyond 40 are dropped, malformed output shows an error). Findings are listed at the top of the panel (click one to open the file and scroll to its hunk), shown under their hunk in the diff (collapsible, severity chip) and can be dismissed one by one; they are kept in memory only. Nothing is ever applied automatically. Progress and results are announced through a live status line.
 
+**Review all with AI covers every kind of pending change.** The button is offered for review copies, for the checkpoint diff of direct-edit chats (the default) and for the net diff of a workspace chat; findings are keyed by file path, so they show inline in whichever diff view the file opens in.
+
+### Review rules: `.mcode/REVIEW.md`
+
+A project can tell the reviewer what to look for. Put plain Markdown in `<project>/.mcode/REVIEW.md` (read-only, at most 16 KB: a longer file is cut at 16 KB and the panel says so). When the file exists the Changes panel shows "Rules: .mcode/REVIEW.md" and its text is appended to the review prompt as "Project review rules", in a fenced block that is marked untrusted, like project instructions (`agent/instructions.ts`). It is guidance only: the file is never executed, the review keeps its tool-less read-only request whatever the file says (the rules go into the system prompt after the base prompt; they cannot add tools, allow commands or file changes, or change the JSON reply format), and a closing tag inside the file cannot end the fence. The file is read again for every review. It applies to manual and automatic reviews alike.
+
+Example:
+
+```markdown
+# Review rules
+
+- Every SQL string must use bound parameters; flag any concatenation of user input.
+- Public functions in `src/api/` need a test in `tests/api/`; say which one is missing.
+- Skip formatting and naming nits; the formatter and linter cover them.
+- `legacy/` is frozen: only report crashes there.
+- Treat a missing `await` on a database call as high severity.
+```
+
+### Automatic review
+
+Settings > Git & commands > "Review changes automatically" (off by default; per-project override "Follow default / On / Off" on the same page) runs the same read-only review in the background without a click. Choose when: after each agent run that left changes (default), or only when you accept a file or open the commit dialog ("only before accepting or committing", which starts the review at that click if this run has none yet). Rules:
+
+- Trigger: once per agent run at most, and only if something is pending (a review copy, a non-empty checkpoint diff, a non-empty workspace diff). Sending a new message cancels a review that is still running; findings from a cancelled review are dropped. A manual review that is already running is never interrupted, and then no automatic one starts.
+- Model: the model set for the `review` agent type (Settings > Agents), else the cheap model, else the chat's model. If that is a CLI agent (it would run its own tools) the review is skipped with a note; pick an API model for review.
+- What is sent: never binary files, files ignored by `.gitignore` or by path (`node_modules/`, `dist/`, `target/`, ...), lock files and minified output, or secret-looking files (`.env*` except `.env.example`, `*.pem`, `*.key`, `id_rsa*`, `credentials*`, `secrets.*`, `.aws/`, `.ssh/`, ...). The remaining diffs are redacted with the same scrubbing as exported chats (API keys, tokens, `password=...`, private keys). Unlike a manual review, an automatic one never truncates: above 48,000 characters (or a smaller budget for a small-context model) or 60 files it is skipped, with a visible note in the findings status line.
+- Cost: each automatic review is one more model request that sends the diff to the provider and counts in usage and budgets; the settings page says so.
+- Results: findings appear exactly like manual ones (list at the top of the panel, inline on hunks, dismiss, reply to the agent) and a small badge with their number sits on the Changes tab and the panel's header chip (red when a high-severity finding is open). Provider errors, an empty diff and malformed JSON become a short status notice, never an alert and never an error in the run.
+
+Severity: the review's top severity `bug` is the "high" severity (the parser maps `high`, `critical`, `blocker` and `major` to it). With automatic review on for the project and undismissed high-severity findings, accepting a file or hunks, and committing, first show a confirm step: "N high-severity findings - review or dismiss first", listing each finding with file and line. It is a warning, never a block: "Accept anyway" / "Commit anyway" always proceeds, "Back to review" returns. Each finding can be dismissed in that step with an optional reason (up to 300 characters); the reason is kept with the dismissed finding in memory for the session only. The commit step only counts findings about the files ticked in the dialog. With automatic review off, manual reviews never add a confirm step.
+
 **Reply to the agent from the diff.** In a pending file's hunk view, "Comment" on a hunk (with a line picker) or on a line (the + at the line start, or Reply on a finding) adds a comment to a queue at the top of the panel. "Send to the agent" turns the queue into one message marked as review feedback (each item: file:line, hunk header, the quoted diff line, the comment; the quoted code is labelled as data) and puts it into the chat's message box so it can be edited and is sent as the next user message. While the agent is running the button is disabled with an explanation, so feedback never interrupts a run.
 
 ## Committing accepted changes

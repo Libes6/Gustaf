@@ -19,6 +19,7 @@ mod shell;
 mod tools;
 mod preview;
 mod semantic;
+mod knowledge;
 mod lsp;
 mod web_tools;
 mod updater;
@@ -26,7 +27,10 @@ mod worktree;
 mod merge_queue;
 mod terminal;
 mod mobile_server;
+mod proc_tree;
+mod quick_ask;
 
+pub use knowledge::{extract_pdf_with_exe, pdf_child_main};
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -36,6 +40,12 @@ pub fn run() {
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
         .manage(mobile_server::MobileServer::default())
+        .manage(quick_ask::QuickAsk::default())
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                quick_ask::on_main_destroyed(window.app_handle());
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
@@ -61,6 +71,18 @@ pub fn run() {
             semantic::semantic_build,
             semantic::semantic_query,
             semantic::semantic_clear,
+            knowledge::knowledge_list,
+            knowledge::knowledge_create,
+            knowledge::knowledge_rename,
+            knowledge::knowledge_delete,
+            knowledge::knowledge_add_source,
+            knowledge::knowledge_remove_source,
+            knowledge::knowledge_set_include,
+            knowledge::knowledge_set_config,
+            knowledge::knowledge_estimate,
+            knowledge::knowledge_reindex,
+            knowledge::knowledge_cancel,
+            knowledge::knowledge_search,
             lsp::lsp_detect,
             lsp::lsp_diagnostics,
             terminal::terminal_list,
@@ -99,6 +121,7 @@ pub fn run() {
             tools::read_home_file,
             tools::run_command,
             hook_exec::run_hook,
+            proc_tree::process_kill_tree,
             git::git,
             git::git_status,
             git::git_commit_context,
@@ -157,6 +180,13 @@ pub fn run() {
             mobile_server::mobile_devices,
             mobile_server::mobile_device_revoke,
             mobile_server::mobile_report_status,
+            quick_ask::quick_ask_configure,
+            quick_ask::quick_ask_show,
+            quick_ask::quick_ask_hide,
+            quick_ask::quick_ask_toggle,
+            quick_ask::quick_ask_ready,
+            quick_ask::quick_ask_resize,
+            quick_ask::quick_ask_open_main,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::{Hash, Hasher}, io::Read, path::{Path, PathBuf}, time::Duration};
 use tauri::{AppHandle, Manager};
 static INDEX_LOCKS: std::sync::OnceLock<std::sync::Mutex<HashMap<String,std::sync::Arc<std::sync::Mutex<()>>>>> = std::sync::OnceLock::new();
-fn index_lock(path: &Path) -> Result<std::sync::Arc<std::sync::Mutex<()>>,String> {
+pub(crate) fn index_lock(path: &Path) -> Result<std::sync::Arc<std::sync::Mutex<()>>,String> {
     let mut locks=INDEX_LOCKS.get_or_init(||std::sync::Mutex::new(HashMap::new())).lock().map_err(|e|e.to_string())?;
     Ok(locks.entry(path.to_string_lossy().into_owned()).or_insert_with(||std::sync::Arc::new(std::sync::Mutex::new(()))).clone())
 }
@@ -26,7 +26,7 @@ fn root_dir(root: &str) -> Result<PathBuf, String> { let p = Path::new(root).can
 fn cache_dir(app: &AppHandle, root: &Path) -> Result<PathBuf, String> { Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("semantic").join(hash(&root.to_string_lossy()))) }
 fn cache_file(app: &AppHandle, root: &Path, config: &Config) -> Result<PathBuf, String> { Ok(cache_dir(app,root)?.join(format!("{}.json", hash(&serde_json::to_string(config).map_err(|e| e.to_string())?)))) }
 fn local(url: &reqwest::Url) -> bool { matches!(url.host_str(),Some("localhost"|"127.0.0.1"|"[::1]"|"::1")) }
-fn endpoint(config: &Config) -> Result<reqwest::Url, String> {
+pub(crate) fn endpoint(config: &Config) -> Result<reqwest::Url, String> {
     if config.model.trim().is_empty() || config.model.len() > 200 { return Err("Choose an embeddings model".into()); }
     let base = reqwest::Url::parse(config.endpoint.trim()).map_err(|e| e.to_string())?;
     if !base.username().is_empty() || base.password().is_some() || base.query().is_some() || base.fragment().is_some() { return Err("Embedding endpoint cannot contain credentials, query or fragment".into()); }
@@ -35,7 +35,7 @@ fn endpoint(config: &Config) -> Result<reqwest::Url, String> {
     if base.scheme() != "https" && !(base.scheme() == "http" && local(&base)) { return Err("Remote embedding endpoints require HTTPS".into()); }
     reqwest::Url::parse(&format!("{}/{}", config.endpoint.trim().trim_end_matches('/'), if config.kind == "ollama" { "api/embed" } else { "embeddings" })).map_err(|e| e.to_string())
 }
-fn embed(config: &Config, texts: &[String]) -> Result<Vec<Vec<f32>>,String> {
+pub(crate) fn embed(config: &Config, texts: &[String]) -> Result<Vec<Vec<f32>>,String> {
     let endpoint = endpoint(config)?;
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(60)).redirect(reqwest::redirect::Policy::none()).build().map_err(|e|e.to_string())?;
     let body=if config.kind=="ollama"{serde_json::json!({"model":config.model,"input":texts,"truncate":false})}else{serde_json::json!({"model":config.model,"input":texts})};
@@ -64,10 +64,10 @@ fn embed(config: &Config, texts: &[String]) -> Result<Vec<Vec<f32>>,String> {
     }
     Ok(result)
 }
-fn excluded(path: &Path) -> bool {
+pub(crate) fn excluded(path: &Path) -> bool {
     path.components().any(|c| matches!(c.as_os_str().to_str(), Some("node_modules"|"target"|"dist"|"build"|"venv"|"__pycache__"|".git"|".next"|".env"))) || path.file_name().and_then(|s|s.to_str()).is_some_and(|s|s.starts_with(".env") || s.ends_with(".pem") || s.ends_with(".key") || s=="package-lock.json" || s=="pnpm-lock.yaml" || s=="yarn.lock" || s=="Cargo.lock")
 }
-fn split(path: &str, text: &str) -> Vec<Chunk> {
+pub(crate) fn split(path: &str, text: &str) -> Vec<Chunk> {
     let lines: Vec<_> = text.lines().collect(); let mut out = Vec::new(); let mut start=0;
     while start < lines.len() {
         let mut end=start; let mut size=0;
@@ -125,7 +125,7 @@ fn build_at(root: &Path, config: &Config, file: PathBuf) -> Result<(Index,Stats)
     std::fs::rename(&temp,file).map_err(|e|e.to_string())?;
     Ok((index,stats))
 }
-fn cosine(a:&[f32],b:&[f32])->f32 { if a.len()!=b.len() || a.is_empty(){return 0.0;} let mut dot=0.0f64;let mut aa=0.0f64;let mut bb=0.0f64;for(x,y)in a.iter().zip(b){dot+=*x as f64 * *y as f64;aa+=(*x as f64).powi(2);bb+=(*y as f64).powi(2);} if aa==0.0||bb==0.0 {0.0}else{(dot/(aa.sqrt()*bb.sqrt())) as f32} }
+pub(crate) fn cosine(a:&[f32],b:&[f32])->f32 { if a.len()!=b.len() || a.is_empty(){return 0.0;} let mut dot=0.0f64;let mut aa=0.0f64;let mut bb=0.0f64;for(x,y)in a.iter().zip(b){dot+=*x as f64 * *y as f64;aa+=(*x as f64).powi(2);bb+=(*y as f64).powi(2);} if aa==0.0||bb==0.0 {0.0}else{(dot/(aa.sqrt()*bb.sqrt())) as f32} }
 #[tauri::command]
 pub async fn semantic_build(app:AppHandle,root:String,config:Config)->Result<Stats,String>{tauri::async_runtime::spawn_blocking(move||build(&app,&root,&config).map(|(_,s)|s)).await.map_err(|e|e.to_string())?}
 #[tauri::command]

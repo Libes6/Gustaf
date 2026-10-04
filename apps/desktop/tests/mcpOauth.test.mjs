@@ -138,7 +138,7 @@ const j = (obj, status = 200, headers = {}) => new Response(JSON.stringify(obj),
 
 /** A fake world: MCP server, authorization server, browser, loopback listener, Keychain and clock. */
 function world(over = {}) {
-  const log = { fetches: [], opened: [], loopbackStates: [], cancelled: [], registered: [], tokenBodies: [] };
+  const log = { fetches: [], opened: [], loopbackStates: [], cancelled: [], registered: [], tokenBodies: [], revoked: [] };
   const store = new Map();
   let clock = 1_000_000;
   let resolveCode;
@@ -146,6 +146,15 @@ function world(over = {}) {
   const meta = { issuer: AS, authorization_endpoint: `${AS}/authorize`, token_endpoint: `${AS}/token`, registration_endpoint: `${AS}/register`, code_challenge_methods_supported: ['S256'], ...over.meta };
   const fetch = async (url, init) => {
     log.fetches.push({ url, method: init.method });
+    if (over.hook) {
+      const r = await over.hook(url, init);
+      if (r) return r;
+    }
+    if (url === `${AS}/revoke`) {
+      const body = Object.fromEntries(new URLSearchParams(init.body));
+      log.revoked.push(body);
+      return over.revoke ? over.revoke(body) : new Response('', { status: 200 });
+    }
     if (url === SERVER) return over.probe ? over.probe() : new Response('', { status: 401, headers: { 'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp", scope="read"` } });
     if (url === 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp') return over.prm ? over.prm() : j({ resource: 'https://mcp.example/api/mcp', authorization_servers: [AS] });
     if (url === `${AS}/.well-known/oauth-authorization-server`) return over.asm ? over.asm() : j(meta);
@@ -211,11 +220,7 @@ test('sign-in: discovery, dynamic registration, PKCE authorization URL, code exc
   assert.ok(w.log.fetches.every((f) => f.url.startsWith('https://')));
 });
 
-test('sign-in with a configured client id skips registration; a server without metadata falls back to its origin', async () => {
-  const w = world({ prm: () => new Response('', { status: 404 }), probe: () => new Response('', { status: 401 }) });
-  // The default PRM lookups 404; the issuer is then the server's origin (https://mcp.example), which has no metadata here.
-  await assert.rejects(flow.signIn(w.deps, opts()), /could not find the authorization server metadata/);
-  assert.deepEqual(w.log.loopbackStates, [], 'nothing was opened before discovery succeeded');
+test('sign-in with a configured client id skips registration; no registration endpoint is an error', async () => {
   const w2 = world();
   await flow.signIn(w2.deps, opts({ clientId: 'mine', scope: 'custom' }));
   assert.equal(w2.log.registered.length, 0);
@@ -225,6 +230,223 @@ test('sign-in with a configured client id skips registration; a server without m
   const w3 = world({ meta: { registration_endpoint: undefined } });
   await assert.rejects(flow.signIn(w3.deps, opts()), /dynamic client registration/);
   assert.deepEqual(w3.log.cancelled, ['lb1'], 'the listener is closed when sign-in fails');
+});
+
+// ---- discovery paths: metadata present / only legacy metadata / only default endpoints / nothing ---------------------
+
+const ORIGIN = 'https://mcp.example';
+const notFound = () => new Response('', { status: 404 });
+/** No RFC 9728 document anywhere (the world's own PRM answers 404 and the challenge carries no hint). */
+const noPrm = { prm: notFound, probe: () => new Response('', { status: 401, headers: { 'www-authenticate': 'Bearer realm="x"' } }) };
+
+test('discovery path 1: protected resource metadata, then the authorization server metadata (2025-06-18)', async () => {
+  const w = world();
+  let via;
+  await flow.signIn(w.deps, opts({ onDiscovered: (v) => (via = v) }));
+  assert.equal(via, 'protected_resource');
+  assert.ok(!w.log.fetches.some((f) => f.url === `${ORIGIN}/authorize` || f.url === `${ORIGIN}/register`));
+});
+
+test('discovery path 2: no protected resource metadata, legacy /.well-known/oauth-authorization-server on the server origin (2025-03-26)', async () => {
+  const meta = { issuer: ORIGIN, authorization_endpoint: `${ORIGIN}/oauth/authz`, token_endpoint: `${ORIGIN}/oauth/tok`, registration_endpoint: `${ORIGIN}/oauth/reg`, code_challenge_methods_supported: ['S256'] };
+  const w = world({
+    ...noPrm,
+    hook: (url, init) => {
+      if (url === `${ORIGIN}/.well-known/oauth-authorization-server`) return j(meta);
+      if (url === `${ORIGIN}/oauth/reg`) return j({ client_id: 'legacy-client' }, 201);
+      if (url === `${ORIGIN}/oauth/tok`) return j({ access_token: 'LAT', token_type: 'Bearer', expires_in: 60, refresh_token: 'LRT' });
+    },
+  });
+  let via;
+  await flow.signIn(w.deps, opts({ onDiscovered: (v) => (via = v) }));
+  assert.equal(via, 'legacy_metadata');
+  const u = new URL(w.log.opened[0]);
+  assert.equal(u.origin + u.pathname, `${ORIGIN}/oauth/authz`);
+  const q = Object.fromEntries(u.searchParams);
+  assert.equal(q.client_id, 'legacy-client');
+  assert.equal(q.code_challenge_method, 'S256');
+  assert.equal(q.resource, 'https://mcp.example/api/mcp', 'the resource parameter is unchanged');
+  assert.equal(o.parseStored(w.store.get('mcp:s1:oauth')).tokenEndpoint, `${ORIGIN}/oauth/tok`);
+  // Found but invalid legacy metadata is an error, never a reason to guess the default endpoints.
+  const bad = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? j({ ...meta, issuer: 'https://evil.example' }) : undefined) });
+  await assert.rejects(flow.signIn(bad.deps, opts()), (e) => e.code === 'issuer_mismatch');
+  const nopkce = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? j({ ...meta, code_challenge_methods_supported: undefined }) : undefined) });
+  await assert.rejects(flow.signIn(nopkce.deps, opts()), (e) => e.code === 'no_pkce');
+  assert.ok(!nopkce.log.fetches.some((f) => f.url === `${ORIGIN}/register`));
+});
+
+test('discovery path 3: no metadata at all (every lookup 404), the default /authorize, /token, /register endpoints (2025-03-26)', async () => {
+  const w = world({
+    ...noPrm,
+    hook: (url, init) => {
+      if (url === `${ORIGIN}/register`) {
+        w.log.registered.push(JSON.parse(init.body));
+        return j({ client_id: 'default-client' }, 201);
+      }
+      if (url === `${ORIGIN}/token`) {
+        const body = Object.fromEntries(new URLSearchParams(init.body));
+        w.log.tokenBodies.push(body);
+        return j({ access_token: 'DAT', token_type: 'Bearer', expires_in: 60, refresh_token: 'DRT' });
+      }
+    },
+  });
+  let via;
+  const phases = [];
+  await flow.signIn(w.deps, opts({ onDiscovered: (v) => (via = v), onPhase: (p) => phases.push(p) }));
+  assert.equal(via, 'default_endpoints');
+  assert.deepEqual(phases, ['discovering', 'registering', 'browser', 'exchanging']);
+  // Every metadata location was tried before the defaults were used.
+  for (const url of [`${ORIGIN}/.well-known/oauth-protected-resource/api/mcp`, `${ORIGIN}/.well-known/oauth-protected-resource`, `${ORIGIN}/.well-known/oauth-authorization-server`, `${ORIGIN}/.well-known/openid-configuration`])
+    assert.ok(w.log.fetches.some((f) => f.url === url), url);
+  const u = new URL(w.log.opened[0]);
+  assert.equal(u.origin + u.pathname, `${ORIGIN}/authorize`);
+  const q = Object.fromEntries(u.searchParams);
+  assert.equal(q.client_id, 'default-client');
+  assert.equal(q.code_challenge_method, 'S256');
+  assert.equal(q.resource, 'https://mcp.example/api/mcp');
+  assert.equal(q.redirect_uri, 'http://127.0.0.1:4455/callback', 'loopback redirect unchanged');
+  assert.deepEqual(w.log.registered[0].redirect_uris, ['http://127.0.0.1:4455/callback']);
+  const tb = w.log.tokenBodies[0];
+  assert.equal(await o.codeChallenge(tb.code_verifier), q.code_challenge);
+  const stored = o.parseStored(w.store.get('mcp:s1:oauth'));
+  assert.equal(stored.tokenEndpoint, `${ORIGIN}/token`);
+  assert.equal(stored.issuer, ORIGIN);
+  assert.equal(stored.revocationEndpoint, undefined);
+  // A configured client id skips the registration call in this path too.
+  const w2 = world({ ...noPrm });
+  await assert.rejects(flow.signIn(w2.deps, opts({ clientId: 'mine' })), (e) => e.code === 'http_404');
+  assert.equal(new URL(w2.log.opened[0]).origin + new URL(w2.log.opened[0]).pathname, `${ORIGIN}/authorize`);
+  assert.equal(w2.log.fetches.filter((f) => f.url === `${ORIGIN}/register`).length, 0);
+});
+
+test('discovery path 4: nothing works, clear error codes', async () => {
+  // Defaults used but the server has no /register: a message that says what was tried and what to do.
+  const w = world({ ...noPrm });
+  await assert.rejects(flow.signIn(w.deps, opts()), (e) => e.code === 'registration_failed' && /no OAuth metadata/.test(e.message) && /https:\/\/mcp\.example\/register/.test(e.message) && /client ID/.test(e.message));
+  assert.deepEqual(w.log.cancelled, ['lb1']);
+  assert.equal(w.store.size, 0);
+  // Metadata lookups that fail with something other than 404 end discovery: no guessing endpoints.
+  const flaky = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? new Response('', { status: 503 }) : undefined) });
+  await assert.rejects(flow.signIn(flaky.deps, opts()), (e) => e.code === 'discovery_failed' && /could not be read/.test(e.message));
+  assert.deepEqual(flaky.log.loopbackStates, [], 'nothing was opened before discovery succeeded');
+  assert.ok(!flaky.log.fetches.some((f) => f.url === `${ORIGIN}/register`));
+  const junk = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/openid-configuration` ? new Response('<html>', { status: 200 }) : undefined) });
+  await assert.rejects(flow.signIn(junk.deps, opts()), (e) => e.code === 'discovery_failed');
+  const down = world({
+    ...noPrm,
+    hook: (url) => {
+      if (url === `${ORIGIN}/.well-known/oauth-authorization-server`) throw new Error('network down');
+    },
+  });
+  await assert.rejects(flow.signIn(down.deps, opts()), (e) => e.code === 'discovery_failed');
+  // The challenge named a metadata document we could not read: the server wants RFC 9728, so the defaults are not used.
+  const hinted = world({ prm: () => new Response('', { status: 500 }) });
+  await assert.rejects(flow.signIn(hinted.deps, opts()), (e) => e.code === 'discovery_failed');
+  // A protected resource names an authorization server without metadata: no_metadata, never the defaults of the MCP origin.
+  const noAs = world({ asm: notFound });
+  await assert.rejects(flow.signIn(noAs.deps, opts()), (e) => e.code === 'no_metadata' && /publishes no metadata/.test(e.message));
+  assert.ok(!noAs.log.fetches.some((f) => f.url === `${ORIGIN}/authorize` || f.url === `${ORIGIN}/register`));
+});
+
+test('discovery fallback never weakens the endpoint rules', async () => {
+  // Plain http to a non-loopback server is refused before any request.
+  const w = world();
+  await assert.rejects(flow.signIn(w.deps, { serverUrl: 'http://mcp.example/mcp', secretId: 'x' }), (e) => e.code === 'insecure_endpoint');
+  assert.equal(w.log.fetches.length, 0);
+  assert.throws(() => o.defaultAuthServer('http://mcp.example/mcp'), /https/);
+  assert.deepEqual(o.defaultAuthServer('https://mcp.example:8443/a/b?q=1'), { issuer: 'https://mcp.example:8443', authorizationEndpoint: 'https://mcp.example:8443/authorize', tokenEndpoint: 'https://mcp.example:8443/token', registrationEndpoint: 'https://mcp.example:8443/register' });
+  // A local development server may use http on loopback, defaults included.
+  assert.equal(o.defaultAuthServer('http://localhost:3000/mcp').tokenEndpoint, 'http://localhost:3000/token');
+});
+
+test('a legacy SSE server that answers the probe POST with 405 gets its challenge from the GET', async () => {
+  const seen = [];
+  const w = world({
+    prm: notFound,
+    probe: () => new Response('', { status: 405 }),
+    hook: (url, init) => {
+      if (url === SERVER && init.method === 'GET') {
+        seen.push(init.headers.Accept);
+        return new Response('', { status: 401, headers: { 'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp"` } });
+      }
+    },
+  });
+  // The challenge's metadata hint is what makes the flow continue with RFC 9728 (the fake PRM answers 404 here, so discovery refuses to guess).
+  await assert.rejects(flow.signIn(w.deps, opts()), (e) => e.code === 'discovery_failed');
+  assert.deepEqual(seen, ['text/event-stream']);
+});
+
+// ---- revocation (RFC 7009) -----------------------------------------------------------------------------------------
+
+test('revocation endpoint: parsed leniently from the metadata and stored with the tokens', () => {
+  const good = { issuer: AS, authorization_endpoint: `${AS}/authorize`, token_endpoint: `${AS}/token`, code_challenge_methods_supported: ['S256'] };
+  assert.equal(o.parseAuthServerMetadata({ ...good, revocation_endpoint: `${AS}/revoke` }, AS).revocationEndpoint, `${AS}/revoke`);
+  assert.equal(o.parseAuthServerMetadata({ ...good, revocation_endpoint: 'http://auth.example/revoke' }, AS).revocationEndpoint, undefined, 'an insecure revocation endpoint is ignored, not fatal');
+  assert.equal(o.parseAuthServerMetadata(good, AS).revocationEndpoint, undefined);
+  const st = { accessToken: 'a', tokenEndpoint: `${AS}/token`, clientId: 'c', resource: 'r', issuer: AS, revocationEndpoint: `${AS}/revoke` };
+  assert.deepEqual(o.parseStored(JSON.stringify(st)), st);
+  assert.equal(o.parseStored(JSON.stringify({ ...st, revocationEndpoint: 'http://evil.example/r' })).revocationEndpoint, undefined, 'a tampered insecure endpoint is dropped');
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(o.revocationRequestBody('T', 'refresh_token', 'cid', 'sec'))), { token: 'T', token_type_hint: 'refresh_token', client_id: 'cid', client_secret: 'sec' });
+});
+
+const revMeta = { revocation_endpoint: `${AS}/revoke` };
+
+test('sign-out revokes the refresh and the access token, then deletes the Keychain entry', async () => {
+  const w = await signedIn({ meta: revMeta });
+  assert.equal(o.parseStored(w.store.get('mcp:s1:oauth')).revocationEndpoint, `${AS}/revoke`);
+  const r = await flow.signOut(w.deps, 'mcp:s1:oauth');
+  assert.deepEqual(r, { attempted: 2, revoked: 2 });
+  assert.deepEqual(w.log.revoked, [
+    { token: 'RT1', token_type_hint: 'refresh_token', client_id: 'dyn-client' },
+    { token: 'AT1', token_type_hint: 'access_token', client_id: 'dyn-client' },
+  ]);
+  assert.equal(w.store.size, 0);
+  assert.equal(await flow.isSignedIn(w.deps, 'mcp:s1:oauth'), false);
+  // The revocation requests are POSTs with a form body to the https endpoint only.
+  assert.ok(w.log.fetches.filter((f) => f.url === `${AS}/revoke`).every((f) => f.method === 'POST'));
+});
+
+test('sign-out without a revocation endpoint sends nothing and still deletes the tokens', async () => {
+  const w = await signedIn();
+  const before = w.log.fetches.length;
+  assert.deepEqual(await flow.signOut(w.deps, 'mcp:s1:oauth'), { attempted: 0, revoked: 0 });
+  assert.equal(w.log.fetches.length, before);
+  assert.equal(w.store.size, 0);
+  // Nothing stored at all: nothing to do, no error.
+  assert.deepEqual(await flow.signOut(world().deps, 'mcp:s1:oauth'), { attempted: 0, revoked: 0 });
+});
+
+test('a failing, hanging or erroring revocation never blocks the local sign-out', { timeout: 30_000 }, async () => {
+  const bad = await signedIn({ meta: revMeta, revoke: () => j({ error: 'server_error' }, 503) });
+  assert.deepEqual(await flow.signOut(bad.deps, 'mcp:s1:oauth'), { attempted: 2, revoked: 0 });
+  assert.equal(bad.store.size, 0);
+  const net = await signedIn({ meta: revMeta });
+  const inner = net.deps.fetch;
+  net.deps.fetch = async (url, init) => {
+    if (url === `${AS}/revoke`) throw new Error('connection refused');
+    return inner(url, init);
+  };
+  assert.deepEqual(await flow.signOut(net.deps, 'mcp:s1:oauth'), { attempted: 2, revoked: 0 });
+  assert.equal(net.store.size, 0);
+  // A server that never answers is cut off by the deadline (5 s per request, shortened here).
+  const hang = await signedIn({ meta: revMeta });
+  hang.deps.revokeTimeoutMs = 100;
+  const inner2 = hang.deps.fetch;
+  hang.deps.fetch = (url, init) => (url === `${AS}/revoke` ? new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new Error('aborted')))) : inner2(url, init));
+  const t0 = Date.now();
+  const r = await flow.signOut(hang.deps, 'mcp:s1:oauth');
+  assert.equal(r.revoked, 0);
+  assert.ok(Date.now() - t0 < 2_000);
+  assert.equal(hang.store.size, 0);
+});
+
+test('revocation requests carry no tokens in URLs and use the stored client secret when there is one', async () => {
+  const w = await signedIn({ meta: revMeta });
+  const stored = o.parseStored(w.store.get('mcp:s1:oauth'));
+  w.store.set('mcp:s1:oauth', JSON.stringify({ ...stored, clientSecret: 'CS' }));
+  await flow.signOut(w.deps, 'mcp:s1:oauth');
+  assert.ok(w.log.revoked.every((b) => b.client_secret === 'CS'));
+  assert.ok(!w.log.fetches.some((f) => /AT1|RT1/.test(f.url)));
 });
 
 test('sign-in refuses insecure or inconsistent authorization servers and servers that need no sign-in', async () => {

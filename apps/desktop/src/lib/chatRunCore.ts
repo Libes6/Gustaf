@@ -1,4 +1,4 @@
-import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions } from "../agent/agent";
+import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions, type RunOutcome } from "../agent/agent";
 import { finishCliAgents, trackCliAgents } from "../agent/cliAgents";
 import type { Adapter, LimitWindow, Msg, Part, Reasoning, TokenUsage } from "../providers/types";
 
@@ -35,7 +35,7 @@ export type ChatRunDeps = {
   recordResult(providerId: string, error?: string): void;
   onLimits?(providerId: string, windows: LimitWindow[]): void;
   /** For tests: the agent loop. */
-  runAgent?: (o: RunOptions) => Promise<void>;
+  runAgent?: (o: RunOptions) => Promise<RunOutcome | void>;
 };
 
 /** What the UI wants to see of a run (all optional; an unattended run without a visible chat passes only a few). */
@@ -61,6 +61,8 @@ export type ChatRunInput = {
   takeClarifications?: RunOptions["takeClarifications"];
   chatId: number;
   root: string | null;
+  /** The project folder when `root` is a workspace checkout (settings such as the verification checks belong to the project). */
+  project?: string | null;
   /** Final history for the model (already includes the new user message). */
   history: Msg[];
   /** A retry: the history comes from the interrupted run, response ids are kept. */
@@ -94,7 +96,7 @@ export async function appendUserMessage(
 }
 
 /** Runs the agent once. Throws on failure (after storing the partial activities); use `reportRunFailure` in the catch. */
-export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRunUi = {}): Promise<{ review: ReviewCopy | null; target: RunTarget }> {
+export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRunUi = {}): Promise<{ review: ReviewCopy | null; target: RunTarget; /** Last verification gate of the run (docs/features/verification-gates.md). */ verification?: RunOutcome["verification"] }> {
   let review = i.review;
   if (review === undefined) {
     review = null;
@@ -115,8 +117,9 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
   try {
     const tg = (target = await i.target());
     deps.bumpUsage(tg.providerId);
-    await (deps.runAgent ?? runAgent)({
+    const outcome = await (deps.runAgent ?? runAgent)({
       root: workspace,
+      ...(i.project !== undefined ? { project: i.project } : {}),
       chatId: i.chatId,
       reviewMode: !!review,
       reviewLinked: review?.linked,
@@ -158,7 +161,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       approve: i.approve,
     });
     if (!i.signal.aborted) deps.recordResult(tg.providerId);
-    return { review: review ?? null, target: tg };
+    return { review: review ?? null, target: tg, ...(outcome && outcome.verification ? { verification: outcome.verification } : {}) };
   } catch (e) {
     // The interrupted step's tool cards are kept (still-running ones as "unknown") so the chat shows what happened.
     if (target && activities.length) {

@@ -7,6 +7,11 @@ export const AGENT_TYPES = ["explore", "plan", "general", "review"] as const;
 export type AgentType = (typeof AGENT_TYPES)[number];
 export const isAgentType = (v: unknown): v is AgentType => AGENT_TYPES.includes(v as AgentType);
 
+/** Role presets of Settings > Usage > Agents > Roles: a role names a default provider and model (agentSettings.ts). */
+export const AGENT_ROLES = ["planner", "implementer", "reviewer", "tester"] as const;
+export type AgentRole = (typeof AGENT_ROLES)[number];
+export const isAgentRole = (v: unknown): v is AgentRole => AGENT_ROLES.includes(v as AgentRole);
+
 export const SPAWN_TOOL_NAME = "spawn_agent";
 
 export const SPAWN_TOOL: ToolDef = {
@@ -24,15 +29,28 @@ export const SPAWN_TOOL: ToolDef = {
       type: { type: "string", enum: [...AGENT_TYPES], description: "explore | plan | general | review" },
       files: { type: "array", items: { type: "string" }, description: "Optional project-relative files the subagent should focus on" },
       model: { type: "string", description: "Optional model (`provider/model`) from the allowed list; omit to use the default for the type" },
+      provider: { type: "string", description: "Optional provider id from the allowed providers list (an API provider, or a CLI agent such as Codex, Claude Code or Cursor Agent that runs its own tools in its own git worktree); omit to use the default" },
+      role: { type: "string", enum: [...AGENT_ROLES], description: "Optional role preset (planner | implementer | reviewer | tester) that chooses provider and model; cannot be combined with `provider` or `model`" },
       continue_from: { type: "string", description: "Optional id of a finished, failed or limit-stopped subagent run to continue (the run id is given in the user's message). The new run starts with a summary of that run and `prompt` as the follow-up; use the same `type` unless told otherwise" },
     },
     required: ["title", "prompt", "type"],
   },
 };
 
-/** The spawn tool as offered to the model: the allowed models are named in the description. */
-export const spawnToolFor = (allowedModels: readonly string[]): ToolDef =>
-  allowedModels.length > 1 ? { ...SPAWN_TOOL, description: `${SPAWN_TOOL.description} Models you may pass in \`model\`: ${allowedModels.join(", ")}.` } : SPAWN_TOOL;
+/** What the model may name besides models: allowed provider ids (with a label) and the roles that have a preset. */
+export type RoutingHints = { providers?: readonly string[]; roles?: readonly string[] };
+/** The sentences naming `providers` and `roles` in a tool description (empty when there is nothing to name). */
+export const routingNote = (h?: RoutingHints) =>
+  [
+    h?.providers?.length ? ` Providers you may pass in \`provider\`: ${h.providers.join(", ")}. A CLI provider runs in its own git worktree on a \`gustaf/...\` branch that is left in place for you to merge; it never merges or pushes.` : "",
+    h?.roles?.length ? ` Roles you may pass in \`role\`: ${h.roles.join(", ")}.` : "",
+  ].join("");
+
+/** The spawn tool as offered to the model: the allowed models (and providers and roles) are named in the description. */
+export const spawnToolFor = (allowedModels: readonly string[], hints?: RoutingHints): ToolDef => {
+  const note = `${allowedModels.length > 1 ? ` Models you may pass in \`model\`: ${allowedModels.join(", ")}.` : ""}${routingNote(hints)}`;
+  return note ? { ...SPAWN_TOOL, description: `${SPAWN_TOOL.description}${note}` } : SPAWN_TOOL;
+};
 
 export const MAX_TITLE = 80;
 export const MAX_PROMPT = 20_000;
@@ -48,7 +66,15 @@ export type SpawnArgs = {
   model?: string;
   /** Run id to continue (the host seeds the prompt with that run's summary). */
   continueFrom?: string;
+  /** Explicitly requested provider id (or unambiguous name); checked against the allowed providers later. */
+  provider?: string;
+  /** Role preset name (planner, implementer, reviewer, tester); resolved by the host from the agent settings. */
+  role?: AgentRole;
+  /** delegate_tasks: providers to move to, in order, when an attempt fails because of quota or sign-in. */
+  fallbackProviders?: string[];
 };
+
+export const MAX_FALLBACK_PROVIDERS = 3;
 
 /** A project-relative path that cannot leave the project (no absolute path, no `..`). */
 export const safeRelativePath = (p: string) => !!p && !p.startsWith("/") && !p.startsWith("~") && !/^[a-z]:[\\/]/i.test(p) && !p.split(/[\\/]/).includes("..") && !p.includes("\0");
@@ -65,7 +91,20 @@ export function parseSpawnArgs(raw: unknown): { ok: true; value: SpawnArgs } | {
   const files = Array.isArray(a.files) ? [...new Set(a.files.filter((f): f is string => typeof f === "string").map((f) => f.trim().replace(/^\.\//, "")).filter(safeRelativePath))].slice(0, MAX_FILES) : [];
   const model = typeof a.model === "string" && a.model.trim() ? a.model.trim().slice(0, 300) : undefined;
   const continueFrom = typeof a.continue_from === "string" && a.continue_from.trim() ? a.continue_from.trim().slice(0, 100) : undefined;
-  return { ok: true, value: { title, prompt, type, files, ...(model ? { model } : {}), ...(continueFrom ? { continueFrom } : {}) } };
+  const provider = typeof a.provider === "string" && a.provider.trim() ? a.provider.trim().slice(0, 100) : undefined;
+  if (a.role !== undefined && a.role !== null && a.role !== "" && !isAgentRole(a.role)) return { ok: false, error: `spawn_agent \`role\` must be one of: ${AGENT_ROLES.join(", ")} (got ${JSON.stringify(String(a.role).slice(0, 40))}).` };
+  const role = isAgentRole(a.role) ? a.role : undefined;
+  if (role && (provider || model)) return { ok: false, error: "spawn_agent: use either `role` or `provider`/`model`, not both." };
+  let fallbackProviders: string[] | undefined;
+  if (a.fallbackProviders !== undefined && a.fallbackProviders !== null) {
+    if (!Array.isArray(a.fallbackProviders) || a.fallbackProviders.some((f) => typeof f !== "string" || !f.trim())) return { ok: false, error: "spawn_agent `fallbackProviders` must be a list of provider ids." };
+    fallbackProviders = [...new Set((a.fallbackProviders as string[]).map((f) => f.trim().slice(0, 100)))];
+    if (fallbackProviders.length > MAX_FALLBACK_PROVIDERS) return { ok: false, error: `spawn_agent \`fallbackProviders\` takes at most ${MAX_FALLBACK_PROVIDERS} providers.` };
+  }
+  return {
+    ok: true,
+    value: { title, prompt, type, files, ...(model ? { model } : {}), ...(continueFrom ? { continueFrom } : {}), ...(provider ? { provider } : {}), ...(role ? { role } : {}), ...(fallbackProviders?.length ? { fallbackProviders } : {}) },
+  };
 }
 
 // ---- per-type tool allowlists ----
@@ -171,14 +210,24 @@ export type ReportInput = {
   changed?: readonly string[];
   warnings?: readonly string[];
   max?: number;
+  /** A CLI subagent that worked in a git worktree: its branch is left in place (nothing merged or pushed) instead of a pending review copy. */
+  branch?: { name: string; path?: string; removed?: boolean };
+  /** The provider that ran it, named in the report when it is not the parent's own. */
+  via?: string;
 };
 
 /** The only thing the parent sees of a subagent run. Bounded in length. */
 export function buildReport(r: ReportInput): string {
-  const head = `Subagent "${r.title}" (${r.type}) ${r.status === "completed" ? "finished" : r.status === "limit" ? `stopped at its ${r.reason}` : r.status === "budget" ? `was stopped: ${r.reason}` : r.status === "cancelled" ? "was cancelled" : "failed"}${r.status === "failed" && r.reason ? `: ${r.reason}` : ""}.`;
+  const head = `Subagent "${r.title}" (${r.type}${r.via ? `, via ${r.via}` : ""}) ${r.status === "completed" ? "finished" : r.status === "limit" ? `stopped at its ${r.reason}` : r.status === "budget" ? `was stopped: ${r.reason}` : r.status === "cancelled" ? "was cancelled" : "failed"}${r.status === "failed" && r.reason ? `: ${r.reason}` : ""}.`;
   const body = r.text.trim() ? truncateReport(r.text, r.max ?? MAX_REPORT_CHARS) : "(no report text)";
   const lines = [head, "", body];
-  if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}, pending in a separate review in the Changes panel, nothing applied yet): ${r.changed.slice(0, 30).join(", ")}${r.changed.length > 30 ? ", ..." : ""}`);
+  const list = r.changed ? `${r.changed.slice(0, 30).join(", ")}${r.changed.length > 30 ? ", ..." : ""}` : "";
+  if (r.branch) {
+    const where = r.branch.path ? ` (worktree ${r.branch.path})` : "";
+    if (r.branch.removed) lines.push("", `No files were changed; its worktree and branch ${r.branch.name} were removed.`);
+    else if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}) on branch ${r.branch.name}${where}, left in place; nothing was committed, merged or pushed. Commit and merge it from the workspace or the merge queue: ${list}`);
+    else lines.push("", `No files were changed. Branch ${r.branch.name} was left in place${where}.`);
+  } else if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}, pending in a separate review in the Changes panel, nothing applied yet): ${list}`);
   else if (r.type === "general") lines.push("", "No files were changed.");
   for (const w of r.warnings ?? []) lines.push("", w);
   return lines.join("\n");

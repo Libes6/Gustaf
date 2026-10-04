@@ -10,6 +10,8 @@ import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget } from "../lib/modelRouting";
 import { useDialogFocus } from "../lib/useDialogFocus";
 import { GitPublishPanel } from "./GitPublishPanel";
+import { ReviewGate } from "./ReviewGate";
+import type { GateFinding } from "../lib/autoReview";
 import { useApp } from "../state";
 import "../styles/gitCommit.css";
 
@@ -28,7 +30,15 @@ const KIND_LETTER: Record<GitFileKind, string> = { modified: "M", added: "A", de
  * Only the ticked files are committed; hooks run as usual. Nothing is pushed automatically: after the commit the
  * dialog offers Push and Create pull request (GitPublishPanel), each an explicit click.
  */
-export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root: string; accepted: string[]; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
+export type CommitGate = {
+  /** Waits for the automatic review (starting it first under "only before accepting or committing"). */
+  ensure: () => Promise<void>;
+  /** The undismissed high-severity findings about these project-relative files. */
+  high: (paths: string[]) => GateFinding[];
+  dismiss: (id: string, reason: string) => void;
+};
+
+export function GitCommitDialog({ root, accepted, gate, onClose, onCommitted }: { root: string; accepted: string[]; /** Present when automatic review is on: a confirm step lists high-severity findings (never a block). */ gate?: CommitGate; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
   const t = useT();
   const app = useApp();
   const dialogRef = useRef<HTMLElement>(null);
@@ -49,7 +59,9 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
   const provider = app.providers.find((p) => p.id === selection?.providerId);
   const model = app.models.find((m) => m.providerId === provider?.id && m.id === selection?.model);
   const modelName = model?.name ?? selection?.model ?? "";
-  const busy = generating || committing;
+  const [checking, setChecking] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const busy = generating || committing || checking;
 
   useEffect(() => {
     let cancelled = false;
@@ -124,8 +136,14 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
     }
   }
 
-  async function commit() {
+  async function commit(confirmed = false) {
     if (problem || busy) return;
+    if (gate && !confirmed) {
+      setChecking(true);
+      try { await gate.ensure(); } catch { /* a failed review never blocks a commit */ } finally { setChecking(false); }
+      if (gate.high([...selected]).length) return setConfirming(true);
+    }
+    setConfirming(false);
     setCommitting(true);
     setError("");
     try {
@@ -225,6 +243,8 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
             </>
           )}
         </div>
+        {confirming && gate && !done && <ReviewGate findings={gate.high([...selected])} confirmLabel={gate.high([...selected]).length ? t("gateCommitAnyway") : t("gateContinue")}
+          onDismiss={gate.dismiss} onBack={() => setConfirming(false)} onConfirm={() => void commit(true)} />}
         {error && !done && <div className="error-box git-error git-error-foot" role="alert">{error}</div>}
         {done ? (
           <div className="review-actions git-actions">
@@ -234,8 +254,8 @@ export function GitCommitDialog({ root, accepted, onClose, onCommitted }: { root
         ) : <div className="review-actions git-actions">
           <span className="git-note muted grow">{problemText || t("gitSafetyNote")}</span>
           <button className="btn btn-ghost" onClick={onClose} disabled={committing}>{t("cancel")}</button>
-          <button className="btn btn-primary" disabled={!!problem || busy} onClick={commit}>
-            {committing && <Loader2 size={13} className="spin" />} {committing ? t("gitCommitting") : t("gitCommitButton", { count: selected.size })}
+          <button className="btn btn-primary" disabled={!!problem || busy} onClick={() => void commit()}>
+            {(committing || checking) && <Loader2 size={13} className="spin" />} {committing ? t("gitCommitting") : t("gitCommitButton", { count: selected.size })}
           </button>
         </div>}
       </section>

@@ -1,7 +1,8 @@
 import { useT } from "../i18n";
 import { SHORTCUTS, shortcutDisplay } from "../lib/shortcuts";
+import { QuickAskSettings } from "./QuickAskSettings";
 
-/** Read-only list of the shortcuts from lib/shortcuts.ts. */
+/** Read-only list of the shortcuts from lib/shortcuts.ts, then the quick-ask window switch and its recordable shortcut. */
 export function ShortcutsSettings() {
   const t = useT();
   return (
@@ -16,6 +17,7 @@ export function ShortcutsSettings() {
           </div>
         ))}
       </div>
+      <QuickAskSettings />
     </>
   );
 }

@@ -1,12 +1,12 @@
-import { FilePen, FileText, FolderTree, Monitor, Search, SquareTerminal, Undo2, Webhook, Wrench } from "lucide-react";
+import { FilePen, FileText, FolderTree, Monitor, Search, SquareTerminal, ShieldCheck, Undo2, Webhook, Wrench } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import { actionKind, undoBlocker, type ActionEntry } from "../agent/actionLog";
 import { clearActionLog, undoLogEntry, useActionLog, type UndoOutcome } from "../agent/actionLogStore";
 import { useT, type Key } from "../i18n";
 import "../styles/rules.css";
 
-const ICONS: Record<string, typeof Wrench> = { read_file: FileText, list_dir: FolderTree, search: Search, edit_file: FilePen, write_file: FilePen, run_command: SquareTerminal, computer: Monitor, hook: Webhook };
-const TOOL_LABEL: Record<string, Key> = { read_file: "actionRead", list_dir: "actionList", search: "actionSearch", edit_file: "actionEdit", write_file: "actionWrite", run_command: "actionCommand", computer: "actionComputer", hook: "actionHook" };
+const ICONS: Record<string, typeof Wrench> = { read_file: FileText, list_dir: FolderTree, search: Search, edit_file: FilePen, write_file: FilePen, run_command: SquareTerminal, computer: Monitor, hook: Webhook, gate: ShieldCheck };
+const TOOL_LABEL: Record<string, Key> = { read_file: "actionRead", list_dir: "actionList", search: "actionSearch", edit_file: "actionEdit", write_file: "actionWrite", run_command: "actionCommand", computer: "actionComputer", hook: "actionHook", gate: "actionGate" };
 const STATUS_LABEL: Record<ActionEntry["status"], Key> = {
   running: "action_running", success: "action_success", error: "action_error", blocked: "action_blocked", declined: "action_declined", cancelled: "action_cancelled", interrupted: "action_interrupted",
 };
@@ -89,7 +89,8 @@ export function ActionLog() {
           const block = e.undo ? undoBlocker(entries, e, active) : "none";
           const blockText = block === "running" ? t("undoBusy") : block === "later" ? t("undoLater") : undefined;
           const hookInfo = e.hook ? [e.hook.event, e.hook.scope, e.hook.timedOut ? t("logHookTimedOut") : e.hook.exitCode != null ? t("logHookExit", { code: e.hook.exitCode }) : undefined] : [];
-          const sub = [...hookInfo, e.source === "scheduled" ? t("logSourceScheduled") : undefined,e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
+          const gateInfo = e.gate ? [e.gate.timedOut ? t("logHookTimedOut") : e.gate.exitCode != null ? t("logHookExit", { code: e.gate.exitCode }) : undefined] : [];
+          const sub = [...hookInfo, ...gateInfo, e.source === "scheduled" ? t("logSourceScheduled") : undefined,e.project ? folderName(e.project) : undefined, approval(e), e.durationMs !== undefined && e.status !== "running" ? duration(e.durationMs) : undefined].filter(Boolean).join(" · ");
           return (
             <Fragment key={e.id}>
               {header}
@@ -103,7 +104,7 @@ export function ActionLog() {
                   </div>
                   {sub && <div className="log-sub">{sub}</div>}
                   {e.status === "error" && e.detail && <div className="log-sub problem">{e.detail}</div>}
-                  {e.source === "hook" && e.status !== "error" && e.detail && <div className="log-sub">{e.detail}</div>}
+                  {(e.source === "hook" || e.source === "gate") && e.status !== "error" && e.detail && <div className="log-sub">{e.detail}</div>}
                   {notes[e.id] && <div className="log-note" role="alert">{notes[e.id]}</div>}
                 </div>
                 <span className={`log-status ${e.status}`}>{t(STATUS_LABEL[e.status])}</span>

@@ -1,4 +1,6 @@
 import { SemanticSettings } from "./SemanticSettings";
+import { KnowledgeSettings } from "./KnowledgeSettings";
+import { BookOpen } from "lucide-react";
 import { VoiceSettings } from "./VoiceSettings";
 import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
@@ -19,6 +21,7 @@ import { cliName, detectClis } from "../providers/cli";
 import type { CliId, ProviderConfig } from "../providers/types";
 import { modelKey, useApp, type SettingsPage } from "../state";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
@@ -26,6 +29,7 @@ import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
 import { HooksSettings } from "./HooksSettings";
+import { VerificationSettings } from "./VerificationSettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
@@ -47,7 +51,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
+  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
   { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
@@ -431,8 +435,10 @@ function GitPage() {
           <Toggle on={app.reviewCopy === true} label={t("reviewCopySetting")} onChange={app.setReviewCopy} />
         </div>
       </div>
+      <AutoReviewSettings />
       <CommandRules />
       <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
+      <VerificationSettings />
     </>
   );
 }
@@ -490,7 +496,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, mobile: MobileSettings,
+  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {
