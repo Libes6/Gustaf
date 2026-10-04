@@ -695,4 +695,3 @@ button:disabled { cursor:default; opacity:.45; }
 .queue-editor textarea { width: 100%; min-height: 54px; resize: vertical; }
 .queue-editor > .queue-controls { justify-content: flex-end; }
 .queue-recovery { margin: 4px 0; color: var(--text-3); }
-
