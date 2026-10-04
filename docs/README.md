@@ -34,3 +34,4 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [computer-use.md](features/computer-use.md) | Computer Use (desktop control) |
 | UI | [accessibility.md](features/accessibility.md) | Keyboard, focus, semantics, contrast, motion and target size; regression tests; known gaps |
 | Agent | [merge-queue.md](features/merge-queue.md) | Early conflict detection (`git merge-tree`) and a merge queue for workspace worktrees: strategies, test hand-off, halting, state and locking; UI and conflict resolver not built |
+| UI | [quick-ask.md](features/quick-ask.md) | Quick ask window: a global shortcut (off by default) opens a small always-on-top window with a streamed answer from the default model; Open in Gustaf stores it as a chat; clipboard option, capability, what could not be verified |
