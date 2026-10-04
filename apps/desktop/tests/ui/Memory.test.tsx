@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryExportDialog } from "../../src/components/MemoryExportDialog";
 import { MemorySuggestDialog } from "../../src/components/MemoryDialogs";
 import { MemorySettings } from "../../src/components/MemorySettings";
+import { suggestMemories } from "../../src/lib/memorySuggestRun";
 import { Sidebar } from "../../src/components/Sidebar";
 import { chat, makeApp, project, provider, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -310,5 +311,24 @@ describe("MemoryExportDialog", () => {
     open();
     expect(await screen.findByText("There are no facts to export.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Write AGENTS.md" })).toBeDisabled();
+  });
+});
+
+describe("automatic memory suggestions", () => {
+  it("never run a CLI agent on their own (it would start a full agent turn in the project); a manual request still may", async () => {
+    backend();
+    messages = [{ role: "user", parts: [{ type: "text", text: "We always use pnpm" }] }];
+    const app = {
+      providers: [provider({ id: "cli1", kind: "cli", cli: "claude", name: "Claude Code" })],
+      models: [{ id: "default", name: "default", providerId: "cli1", created: 0 }],
+      selection: { providerId: "cli1", model: "default" },
+      bumpUsage: () => {}, recordTokens: () => {},
+    };
+    const signal = new AbortController().signal;
+    expect(await suggestMemories(app, { chatId: 7, projectRoot: ROOT, signal, auto: true })).toEqual({ suggestions: [], model: "default" });
+    expect(model.requests).toHaveLength(0);
+    model.reply = async () => ({ parts: [{ type: "text", text: JSON.stringify({ facts: [] }) }] });
+    await suggestMemories(app, { chatId: 7, projectRoot: ROOT, signal });
+    expect(model.requests).toHaveLength(1);
   });
 });
