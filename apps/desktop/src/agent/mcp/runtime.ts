@@ -10,7 +10,7 @@ import { parseStored } from "./oauth";
 import { authorizationHeader, isSignedIn, refreshTokens, revokeTokens, signIn, signOut, type OAuthDeps, type Phase } from "./oauthFlow";
 import { buildPromptArguments, normalizePrompts, renderPromptMessages, type McpPrompt } from "./prompts";
 import { checkInitialize } from "./protocol";
-import { formatResourceList, mapReadResult, normalizeResources, readResourceUri, RESOURCE_TOOLS, type McpResource } from "./resources";
+import { formatResourceList, formatTemplateList, mapReadResult, normalizeResources, normalizeResourceTemplates, readResourceTarget, resolveTemplateUri, RESOURCE_TOOLS, type McpResource, type McpResourceTemplate } from "./resources";
 import { mapCallResult, namespaceTools, normalizeTools, type McpRoute, type McpTool } from "./toolset";
 
 const CLIENT_VERSION = "0.1.0";
@@ -92,7 +92,7 @@ export const allowMcpTool = (id: string, tool: string) =>
 // ---- connections ---------------------------------------------------------------------------------------------------
 
 type Cache<T> = { epoch: number; list: T[] };
-type Conn = { key: string; http?: McpHttpClient; tools?: Cache<McpTool>; resources?: Cache<McpResource>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
+type Conn = { key: string; http?: McpHttpClient; tools?: Cache<McpTool>; resources?: Cache<McpResource>; templates?: Cache<McpResourceTemplate>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
 const conns = new Map<string, Conn>();
 let httpFetch: FetchLike | null = null;
 /** Tests replace the HTTP transport's fetch. */
@@ -234,6 +234,40 @@ export async function listMcpResources(server: McpServer, force = false, signal?
   return list;
 }
 
+/**
+ * The server's resource templates (`resources/templates/list`), cached until `notifications/resources/list_changed`.
+ * A server that does not implement the method (JSON-RPC -32601) simply has none.
+ */
+export async function listMcpResourceTemplates(server: McpServer, force = false, signal?: AbortSignal): Promise<McpResourceTemplate[]> {
+  const conn = await connect(server);
+  if (!hasCapability(conn, "resources")) throw new Error(`MCP server ${server.name} does not offer resources`);
+  const ep = await epoch(server, conn, "resources");
+  if (!force && conn.templates && conn.templates.epoch === ep && ep >= 0) return conn.templates.list;
+  let list: McpResourceTemplate[];
+  try {
+    list = await listTemplatePages(server, conn, signal);
+  } catch (e) {
+    if (!/-32601|method not found/i.test(String((e as Error)?.message ?? e))) throw e;
+    list = [];
+  }
+  conn.templates = { epoch: ep, list };
+  return list;
+}
+
+async function listTemplatePages(server: McpServer, conn: Conn, signal?: AbortSignal): Promise<McpResourceTemplate[]> {
+  const list: McpResourceTemplate[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const result = await rpc(server, conn, "resources/templates/list", cursor ? { cursor } : undefined, LIST_TIMEOUT_MS, signal);
+    const seen = new Set(list.map((t) => t.uriTemplate));
+    list.push(...normalizeResourceTemplates(result).filter((t) => !seen.has(t.uriTemplate)));
+    const next = (result as { nextCursor?: unknown } | null)?.nextCursor;
+    if (typeof next !== "string" || !next || next === cursor) break;
+    cursor = next;
+  }
+  return list;
+}
+
 /** `resources/read` for one URI, mapped to text (capped) with at most one PNG attached. */
 export async function readMcpResource(server: McpServer, uri: string, signal?: AbortSignal) {
   const conn = await connect(server);
@@ -241,10 +275,23 @@ export async function readMcpResource(server: McpServer, uri: string, signal?: A
   return mapReadResult(await rpc(server, conn, "resources/read", { uri }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal));
 }
 
-/** Runs the agent's built-in `mcp_list_resources` / `mcp_read_resource` tool. */
-export async function callMcpResourceTool(server: McpServer, kind: "list_resources" | "read_resource", args: unknown, signal?: AbortSignal) {
+/**
+ * Reads what `mcp_read_resource` asked for: a URI as is, or a template the server listed (the list is refreshed once
+ * when the template is not in the cached one) expanded with validated arguments.
+ */
+export async function readMcpResourceTarget(server: McpServer, args: unknown, signal?: AbortSignal) {
+  const target = readResourceTarget(args);
+  if ("uri" in target) return readMcpResource(server, target.uri, signal);
+  let templates = await listMcpResourceTemplates(server, false, signal);
+  if (!templates.some((t) => t.uriTemplate === target.template)) templates = await listMcpResourceTemplates(server, true, signal);
+  return readMcpResource(server, resolveTemplateUri(templates, target.template, target.arguments), signal);
+}
+
+/** Runs the agent's built-in `mcp_list_resources` / `mcp_list_resource_templates` / `mcp_read_resource` tool. */
+export async function callMcpResourceTool(server: McpServer, kind: "list_resources" | "read_resource" | "list_resource_templates", args: unknown, signal?: AbortSignal) {
   if (kind === "list_resources") return { output: formatResourceList(await listMcpResources(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
-  return { image: undefined as string | undefined, ...(await readMcpResource(server, readResourceUri(args), signal)) };
+  if (kind === "list_resource_templates") return { output: formatTemplateList(await listMcpResourceTemplates(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
+  return { image: undefined as string | undefined, ...(await readMcpResourceTarget(server, args, signal)) };
 }
 
 /** The server's prompts (`prompts/list`), cached until `notifications/prompts/list_changed`. */
@@ -357,7 +404,7 @@ export async function loadMcpToolset(o: { project: string | null; access: "reado
         // Servers that offer resources also get the two built-in resource tools (read-only mode: only those the user marked read-only).
         const caps = conns.get(server.id)?.info?.capabilities;
         const allow = (name: string) => o.access !== "readonly" || server.readOnlyTools.includes(name);
-        const resources = caps && typeof caps.resources === "object" && caps.resources !== null ? { list: allow(RESOURCE_TOOLS.list), read: allow(RESOURCE_TOOLS.read) } : undefined;
+        const resources = caps && typeof caps.resources === "object" && caps.resources !== null ? { list: allow(RESOURCE_TOOLS.list), read: allow(RESOURCE_TOOLS.read), templates: allow(RESOURCE_TOOLS.templates) } : undefined;
         return { server, tools: o.access === "readonly" ? tools.filter((t) => server.readOnlyTools.includes(t.name)) : tools, ...(resources ? { resources } : {}) };
       } catch (e) {
         errors.push({ server: server.name, message: String((e as Error)?.message ?? e).slice(0, 500) });

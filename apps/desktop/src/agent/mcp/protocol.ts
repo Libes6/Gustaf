@@ -72,23 +72,30 @@ export class SseDecoder {
   constructor(maxEvent = MAX_MESSAGE_BYTES) {
     this.maxEvent = maxEvent;
   }
-  push(chunk: string): string[] {
+  /** Complete events as `{ event, data }` (`event` is "message" unless the stream names one, e.g. the legacy `endpoint`). */
+  pushEvents(chunk: string): { event: string; data: string }[] {
     this.buf += chunk.replace(/\r\n?/g, "\n");
-    const out: string[] = [];
+    const out: { event: string; data: string }[] = [];
     let i: number;
     while ((i = this.buf.indexOf("\n\n")) >= 0) {
       const block = this.buf.slice(0, i);
       this.buf = this.buf.slice(i + 2);
       if (block.length > this.maxEvent) throw new Error(`MCP event exceeded ${this.maxEvent >> 20} MB`);
-      const data = block
-        .split("\n")
+      const lines = block.split("\n");
+      const data = lines
         .filter((l) => l.startsWith("data:"))
         .map((l) => (l.startsWith("data: ") ? l.slice(6) : l.slice(5)))
         .join("\n");
-      if (data) out.push(data);
+      const named = lines.find((l) => l.startsWith("event:"));
+      const event = named ? named.slice(6).trim() || "message" : "message";
+      if (data) out.push({ event, data });
     }
     if (this.buf.length > this.maxEvent) throw new Error(`MCP event exceeded ${this.maxEvent >> 20} MB`);
     return out;
+  }
+  /** The `data` payloads of complete events. */
+  push(chunk: string): string[] {
+    return this.pushEvents(chunk).map((e) => e.data);
   }
 }
 

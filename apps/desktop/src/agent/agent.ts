@@ -265,7 +265,7 @@ async function runMcpTool(call: Extract<Part, { type: "tool_call" }>, o: RunOpti
     if (!(await o.approve({ kind: "mcp", server: server.name, serverId: server.id, tool: route.tool, args: call.args ?? {} }))) throw new ActionDeclined("User declined this MCP tool call.");
     logPatch(act, { approval: "user" });
   } else logPatch(act, { approval: "rule", rule: d.reason === "server" ? `always allow MCP server ${server.name}` : `always allow MCP tool ${server.name}/${route.tool}` });
-  const r = route.kind === "list_resources" || route.kind === "read_resource" ? await callMcpResourceTool(server, route.kind, call.args, o.signal) : await callMcpTool(server, route.tool, call.args, o.signal);
+  const r = route.kind === "list_resources" || route.kind === "read_resource" || route.kind === "list_resource_templates" ? await callMcpResourceTool(server, route.kind, call.args, o.signal) : await callMcpTool(server, route.tool, call.args, o.signal);
   if (r.isError) throw new Error(r.output);
   return r;
 }

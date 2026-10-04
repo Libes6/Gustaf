@@ -122,6 +122,7 @@ export const mcpStdio = {
       return s.call(params.name, params.arguments);
     }
     if (method === 'resources/list') return { resources: s.resources };
+    if (method === 'resources/templates/list' && s.resourceTemplates) return { resourceTemplates: s.resourceTemplates };
     if (method === 'resources/read') return s.read(params.uri);
     if (method === 'prompts/list') return { prompts: s.prompts };
     if (method === 'prompts/get') return s.getPrompt(params.name, params.arguments);
