@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { requestTerminalCommand } from "../lib/terminalBridge";
+import { onComposerDraft, takeComposerDraft } from "../lib/composerBridge";
 import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
@@ -70,6 +71,13 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
   const tasks = useBackgroundTasks(root);
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
+  // A draft requested from outside (the merge queue's "Resolve with agent") lands in this chat's message box; it is never sent.
+  useEffect(() => {
+    if (!visible || session.chatId === null) return;
+    const take = () => { const d = takeComposerDraft(session.chatId); if (d) continueAgent(d); };
+    take();
+    return onComposerDraft(take);
+  }, [visible, session.chatId]);
   const [mode, setMode] = useChatMode(session.chatId);
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
