@@ -4,7 +4,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
+  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -29,6 +29,7 @@ import { HooksSettings } from "./HooksSettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
+import { MobileSettings } from "./MobileSettings";
 import { ProviderForm } from "./ProviderForm";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
@@ -46,7 +47,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }] },
+  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
   { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
@@ -489,7 +490,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage,
+  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, mobile: MobileSettings,
 };
 
 export function Settings() {
