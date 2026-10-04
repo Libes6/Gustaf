@@ -5,7 +5,8 @@ import { getSetting, mcpStdio, oauthLoopback, secrets, setSetting } from "../../
 import { readSecret, removeSecret, storeSecret } from "../../lib/keys";
 import type { ToolDef } from "../../providers/types";
 import { MCP_SETTING, normalizeConfig, oauthSecretId, secretId, serversFor, splitSecrets, staleSecretIds, type KV, type McpConfig, type McpServer } from "./config";
-import { McpHttpClient, type FetchLike } from "./http";
+import { isLegacySseHint, McpHttpClient, type FetchLike, type HttpOptions, type RemoteClient } from "./http";
+import { McpSseClient } from "./sse";
 import { parseStored } from "./oauth";
 import { authorizationHeader, isSignedIn, refreshTokens, revokeTokens, signIn, signOut, type OAuthDeps, type Phase } from "./oauthFlow";
 import { buildPromptArguments, normalizePrompts, renderPromptMessages, type McpPrompt } from "./prompts";
@@ -92,7 +93,7 @@ export const allowMcpTool = (id: string, tool: string) =>
 // ---- connections ---------------------------------------------------------------------------------------------------
 
 type Cache<T> = { epoch: number; list: T[] };
-type Conn = { key: string; http?: McpHttpClient; tools?: Cache<McpTool>; resources?: Cache<McpResource>; templates?: Cache<McpResourceTemplate>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
+type Conn = { key: string; http?: RemoteClient; transport?: "streamable" | "sse"; tools?: Cache<McpTool>; resources?: Cache<McpResource>; templates?: Cache<McpResourceTemplate>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
 const conns = new Map<string, Conn>();
 let httpFetch: FetchLike | null = null;
 /** Tests replace the HTTP transport's fetch. */
@@ -112,6 +113,8 @@ const oauthDeps = async (): Promise<OAuthDeps> => ({
 
 /** Capabilities the server announced in `initialize` (undefined until it was connected once). */
 export const mcpCapabilities = (id: string) => conns.get(id)?.info?.capabilities;
+/** Which HTTP transport a connected server ended up on (after auto-detection). */
+export const mcpTransport = (id: string) => conns.get(id)?.transport;
 const hasCapability = (conn: Conn, name: "resources" | "prompts") => !!conn.info?.capabilities && typeof conn.info.capabilities[name] === "object" && conn.info.capabilities[name] !== null;
 
 async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): Promise<Record<string, string>> {
@@ -151,9 +154,10 @@ async function connect(server: McpServer): Promise<Conn> {
     return conn;
   }
   const headers = await resolveKV(server.id, "header", server.headers);
-  const key = JSON.stringify([server.url, headers, !!server.oauth]);
+  const mode = server.httpTransport ?? "auto";
+  const key = JSON.stringify([server.url, headers, !!server.oauth, mode]);
   const old = conns.get(server.id);
-  if (old?.key === key && old.http) {
+  if (old?.key === key && old.http && old.info) {
     old.info = await old.http.connect(START_TIMEOUT_MS);
     return old;
   }
@@ -165,10 +169,23 @@ async function connect(server: McpServer): Promise<Conn> {
         refresh: async () => refreshTokens(await oauthDeps(), oauthSecretId(server.id)),
       }
     : undefined;
-  const http = new McpHttpClient({ url: server.url, headers, fetch: await getFetch(), clientVersion: CLIENT_VERSION, ...(auth ? { auth } : {}) });
-  const conn: Conn = { key, http };
+  const opts: HttpOptions = { url: server.url, headers, fetch: await getFetch(), clientVersion: CLIENT_VERSION, ...(auth ? { auth } : {}) };
+  // "auto": streamable HTTP first; a 4xx answer to its initialize POST (not 401/403/408/429) means a legacy HTTP+SSE server.
+  const conn: Conn = { key, http: mode === "sse" ? new McpSseClient(opts) : new McpHttpClient(opts), transport: mode === "sse" ? "sse" : "streamable" };
   conns.set(server.id, conn);
-  conn.info = await http.connect(START_TIMEOUT_MS);
+  try {
+    conn.info = await conn.http!.connect(START_TIMEOUT_MS);
+  } catch (e) {
+    if (mode !== "auto" || !isLegacySseHint(e)) throw e;
+    await conn.http!.close().catch(() => {});
+    conn.http = new McpSseClient(opts);
+    conn.transport = "sse";
+    try {
+      conn.info = await conn.http.connect(START_TIMEOUT_MS);
+    } catch (e2) {
+      throw new Error(`${(e2 as Error)?.message ?? e2} (streamable HTTP failed first: HTTP ${e.status}; set the transport in the server settings to skip detection)`);
+    }
+  }
   return conn;
 }
 
