@@ -26,6 +26,7 @@ import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
 import { HooksSettings } from "./HooksSettings";
+import { VerificationSettings } from "./VerificationSettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
@@ -432,6 +433,7 @@ function GitPage() {
       </div>
       <CommandRules />
       <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
+      <VerificationSettings />
     </>
   );
 }

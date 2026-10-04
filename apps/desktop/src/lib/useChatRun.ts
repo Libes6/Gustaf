@@ -295,6 +295,7 @@ export function useChatRun(o: Options) {
           return Promise.all(pending.map(async i => ({ role: "user" as const, parts: [{ type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) }, ...i.images.map(data => ({ type: "image" as const, data }))] })));
         } : undefined,
         root: runRoot,
+        project: o.projectRoot ?? undefined,
         history,
         retry,
         access: app.access,

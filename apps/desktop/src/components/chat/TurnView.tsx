@@ -13,6 +13,7 @@ import { ImageThumb } from "../ImageViewer";
 import { PlanCard } from "./PlanCard";
 import { renderWithSubagents } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
+import { isVerificationPart, VerificationCard } from "../VerificationCard";
 import "../../styles/messageActions.css";
 
 // `focusId` is the message a search result points at: it is highlighted, and expanded if it sits in the collapsed steps.
@@ -82,6 +83,8 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
     renderWithSubagents(m.parts, (p, i) =>
       p.type === "text" ? (
         <PlanOrMarkdown key={i} text={p.text} actionable={planActionable && m === last} handlers={handlers} />
+      ) : isVerificationPart(p) ? (
+        <VerificationCard key={`verification-${i}`} part={p} />
       ) : p.type === "activity" ? (
         <ToolCard key={p.id} call={p} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : p.type === "tool_call" ? (
