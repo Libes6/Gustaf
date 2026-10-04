@@ -1,0 +1,17 @@
+# macOS installer layout
+
+Run `npm ci` then `npm run tauri -- build` from the repository root. The same npm command is used by the release workflow. macOS builds use the committed Gustaf background, 720 × 440 window, 112-point native icons, Gustaf on the left and an Applications shortcut on the right. Other platforms pass through to Tauri unchanged. `--bundles app` builds only the app; DMG processing runs only when this build reports an actual DMG, with its original architecture/version filename.
+
+Tauri's standard DMG builder writes its Finder layout through AppleScript and skips that step in CI. The npm wrapper sets `CI=true` and `TAURI_BUNDLER_DMG_IGNORE_CI=false` for macOS builds, so that no Finder automation runs locally either. It then recreates the emitted DMG with [dmgbuild](https://github.com/dmgbuild/dmgbuild), writing the background alias and `.DS_Store` directly. `bundle.macOS.dmg` in Tauri config is the source of positions and dimensions. Platform config and JSON `--config` overrides are merged for the final image. Use the npm command, rather than invoking the raw Tauri executable, to get the branded layout.
+
+Packaging requires macOS `hdiutil`, Xcode command-line tools, Python 3 with venv, and access to PyPI. The wrapper creates and deletes an isolated temporary venv; all three Python dependencies are pinned in `scripts/dmg-requirements.txt`. It leaves system Python and the application's npm dependencies untouched. Both 1× and 2× committed background images are combined into the installed TIFF by dmgbuild. Finder labels remain native; FinderInfo attributes are not added to the signed app.
+
+Tauri still builds/signs/notarizes the app and generates its updater archive/signature. Recreating the installer does not modify those updater artifacts. For Developer ID installers, the wrapper reads the original resolved signing authority, re-signs the final DMG, and uses supplied Apple ID or API key credentials to notarize and staple the final image. An already stapled DMG cannot be replaced without complete notarization credentials. Ad-hoc builds remain unnotarized. Any failed packaging/signature/notarization check fails the build before release staging.
+
+The wrapper verifies the DMG checksum, mounts it read-only with `-nobrowse`, checks saved Finder metadata/background/app/Applications link, verifies the mounted app signature, and detaches it. This checks the artifact data without driving Finder.
+
+## Verification record, 2026-10-04
+
+On macOS Apple Silicon, `npm run tauri -- build --debug --bundles app,dmg` built an actual Gustaf.app and Gustaf_0.1.0_aarch64.dmg in an isolated worktree/target. The DMG checksum and saved metadata were verified by a read-only mount: 720 × 440 at (200, 120); icon size 112; Gustaf (180, 228), Applications (540, 228); packaged background alias; Applications link points to `/Applications`. The app is ad-hoc signed. Release-script tests cover filename routing for arm64/x64/universal, config overrides, CLI environment preservation and notarization credential selection.
+
+Finder visual rendering, drag-to-Applications installation, installed launch, Intel/universal builds, CI execution, updater installation and Developer ID/notarization remain unverified. No desktop automation or installation into `/Applications` was performed. To finish the task's manual acceptance: open the built DMG in Finder, inspect alignment/labels/background at standard and Retina scale, drag Gustaf to Applications, eject the image and launch the installed app.

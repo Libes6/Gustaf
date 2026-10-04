@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "build:release": "node scripts/install-sidecar.mjs && npm run build",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node ../../scripts/tauri.mjs",
     "check": "node scripts/check-i18n.mjs && tsc --noEmit && npm test && npm run test:ui && npm run test:e2e && cargo test --manifest-path src-tauri/Cargo.toml",
     "predev": "node scripts/build-canvas.mjs",
     "prebuild": "node scripts/build-canvas.mjs",
