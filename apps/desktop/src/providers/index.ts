@@ -113,11 +113,22 @@ async function listsWithoutKey(p: ProviderConfig) {
 /** Test hook: forgets in-memory adapters and model-list state (errors, throttling). */
 export const resetModelState = () => (modelErrors.clear(), lastAttempt.clear(), inflight.clear(), adapters.clear());
 
+/** A listing that takes longer (an unreachable host can hang for over a minute) is reported as failed, so it never holds back the other providers' lists. */
+export const modelListLimits = { timeoutMs: 30_000 };
+
 function fetchModels(p: ProviderConfig) {
   let run = inflight.get(p.id);
   if (!run) {
     lastAttempt.set(p.id, Date.now());
-    run = getAdapter(p).then((a) => a.listModels()).finally(() => inflight.delete(p.id));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${p.name} did not answer within ${Math.round(modelListLimits.timeoutMs / 1000)}s.`)), modelListLimits.timeoutMs);
+    });
+    const mine: Promise<ModelInfo[]> = Promise.race([getAdapter(p).then((a) => a.listModels()), timeout]).finally(() => {
+      clearTimeout(timer);
+      if (inflight.get(p.id) === mine) inflight.delete(p.id);
+    });
+    run = mine;
     inflight.set(p.id, run);
   }
   return run;

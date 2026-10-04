@@ -6,7 +6,7 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSettings } from "../../src/components/WebSettings";
 import { invalidateSecret, readSecret } from "../../src/lib/keys";
-import { deleteProvider, getAdapter, listAllModels, MODEL_TTL_MS, resetModelState, saveProvider } from "../../src/providers";
+import { deleteProvider, getAdapter, listAllModels, MODEL_TTL_MS, modelListLimits, resetModelState, saveProvider } from "../../src/providers";
 import type { ProviderConfig, TurnInput } from "../../src/providers/types";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -201,6 +201,20 @@ describe("lazy API keys", () => {
     const next = await listAllModels([openai], "stale");
     expect(next.errors).toEqual({});
     expect(next.models.map((m) => m.id)).toEqual(["fresh-api.openai.test"]);
+  });
+
+  it("a provider that never answers does not hold back the other lists", async () => {
+    http();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(((url: string, init?: RequestInit) => (url.includes("openrouter") ? new Promise(() => {}) : answer(url, init))) as typeof tauriFetch);
+    modelListLimits.timeoutMs = 20;
+    try {
+      const { models, errors } = await listAllModels(api, "force");
+      expect(models.map((m) => m.id).sort()).toEqual(["fresh-api.anthropic.test", "fresh-api.openai.test"]);
+      expect(errors.or).toMatch(/did not answer/);
+    } finally {
+      modelListLimits.timeoutMs = 30_000;
+    }
   });
 
   it("readSecret caches a value but retries a missing one", async () => {
