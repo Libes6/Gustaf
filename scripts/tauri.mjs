@@ -35,6 +35,18 @@ export function notarizationArgs(env) {
   return null;
 }
 
+export function verifyMountedApp(source, mounted, exec, probe) {
+  const signature = probe(source);
+  if (signature.error) throw signature.error;
+  if (signature.status === 0) {
+    exec('codesign', ['--verify', '--deep', '--strict', mounted]);
+    return true;
+  }
+  // --no-sign and an explicitly unsigned macOS config are valid Tauri builds.
+  // A signed source must still pass strict verification after packaging.
+  return false;
+}
+
 export function run(args) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const desktop = join(root, 'apps/desktop');
@@ -104,7 +116,9 @@ export function run(args) {
       exec('hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, dmg]);
       try {
         exec(python, [join(root, 'scripts/verify-dmg.py'), mount, resolvedConfig]);
-        exec('codesign', ['--verify', '--deep', '--strict', join(mount, `${config.productName}.app`)]);
+        const verified = verifyMountedApp(app, join(mount, `${config.productName}.app`), exec,
+          source => spawnSync('codesign', ['--display', source], { stdio: 'ignore' }));
+        console.log(verified ? 'Mounted app signature verified.' : 'Source app intentionally unsigned; signature check skipped.');
       } finally {
         exec('hdiutil', ['detach', mount]);
       }

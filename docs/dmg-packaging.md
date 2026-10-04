@@ -8,7 +8,7 @@ Packaging requires macOS `hdiutil`, Xcode command-line tools, Python 3 with venv
 
 Tauri still builds/signs/notarizes the app and generates its updater archive/signature. Recreating the installer does not modify those updater artifacts. For Developer ID installers, the wrapper reads the original resolved signing authority, re-signs the final DMG, and uses supplied Apple ID or API key credentials to notarize and staple the final image. An already stapled DMG cannot be replaced without complete notarization credentials. Ad-hoc builds remain unnotarized. Any failed packaging/signature/notarization check fails the build before release staging.
 
-The wrapper verifies the DMG checksum, mounts it read-only with `-nobrowse`, checks saved Finder metadata/background/app/Applications link, verifies the mounted app signature, and detaches it. This checks the artifact data without driving Finder.
+The wrapper verifies the DMG checksum, mounts it read-only with `-nobrowse`, checks saved Finder metadata/background/app/Applications link, verifies the mounted app signature when the source app is signed, and detaches it. Tauri CLI 2 documents `--no-sign` as skipping app code signing; intentionally unsigned sources remain supported, while a signed source always requires strict verification of the mounted copy. This checks the artifact data without driving Finder.
 
 ## Verification record, 2026-10-04
 

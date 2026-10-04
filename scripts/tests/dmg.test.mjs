@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dmgPaths, buildEnvironment, mergeConfig, notarizationArgs } from '../tauri.mjs';
+import { dmgPaths, buildEnvironment, mergeConfig, notarizationArgs, verifyMountedApp } from '../tauri.mjs';
 
 test('only successful build output identifies exact app/dmg/all architecture artifacts', () => {
   assert.deepEqual(dmgPaths('Bundled /tmp/Gustaf.app (app)'), []);
@@ -31,4 +31,17 @@ test('signed final DMG notarization accepts complete credentials only', () => {
     ['--apple-id','user','--password','password','--team-id','team']);
   assert.deepEqual(notarizationArgs({APPLE_API_KEY:'key',APPLE_API_ISSUER:'issuer',APPLE_API_KEY_PATH:'/tmp/key.p8'}),
     ['--key','/tmp/key.p8','--key-id','key','--issuer','issuer']);
+});
+
+test('unsigned source supports --no-sign; signed source requires strict mounted verification', () => {
+  const commands = [];
+  const execute = (...command) => commands.push(command);
+  assert.equal(verifyMountedApp('/source.app', '/mounted.app', execute, () => ({status:1})), false);
+  assert.deepEqual(commands, []);
+  assert.equal(verifyMountedApp('/source.app', '/mounted.app', execute, () => ({status:0})), true);
+  assert.deepEqual(commands, [['codesign', ['--verify','--deep','--strict','/mounted.app']]]);
+  assert.throws(() => verifyMountedApp('/source.app', '/mounted.app', () => { throw Error('invalid signature'); },
+    () => ({status:0})), /invalid signature/);
+  assert.throws(() => verifyMountedApp('/source.app', '/mounted.app', execute,
+    () => ({error:Error('codesign missing')})), /codesign missing/);
 });
