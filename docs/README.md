@@ -34,3 +34,4 @@ Behaviour, design decisions and test pointers per feature. The [project README](
 | Agent | [computer-use.md](features/computer-use.md) | Computer Use (desktop control) |
 | UI | [accessibility.md](features/accessibility.md) | Keyboard, focus, semantics, contrast, motion and target size; regression tests; known gaps |
 | Agent | [merge-queue.md](features/merge-queue.md) | Early conflict detection (`git merge-tree`) and a merge queue for workspace worktrees: strategies, test hand-off, halting, state and locking; UI and conflict resolver not built |
+| Agent | [verification-gates.md](features/verification-gates.md) | Verification gates: per-project required checks (definition of done) run when an agent stops after editing files, fix loop, kill criteria, project `.mcode/done.json` switch |
