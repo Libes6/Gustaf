@@ -47,13 +47,17 @@ fn process_table() -> Result<Vec<(u32, u32)>, String> {
 }
 
 #[cfg(unix)]
-fn kill_pid(pid: u32) {
+fn signal_pid(pid: u32, sig: i32) {
     unsafe {
-        libc::kill(pid as i32, libc::SIGKILL);
+        libc::kill(pid as i32, sig);
     }
 }
 
-/// Kills `pid` and its descendants (deepest first) when `pid` is `app` itself's descendant. Returns the pids signalled.
+/// Kills `pid` and its descendants when `pid` is `app` itself's descendant. Returns the pids signalled.
+///
+/// The tree is frozen first (SIGSTOP, parents before children, re-reading the table until no new descendant shows up),
+/// then killed deepest first. Killing a live tree child-first would let a parent that is still running (a shell loop, a
+/// CLI that restarts its tool) start a new child after the table was read, and that child would survive.
 #[cfg(unix)]
 pub fn kill_tree_below(app: u32, pid: u32) -> Result<Vec<u32>, String> {
     if pid <= 1 || pid == app {
@@ -63,10 +67,33 @@ pub fn kill_tree_below(app: u32, pid: u32) -> Result<Vec<u32>, String> {
     if !descendants(&table, app).contains(&pid) {
         return Err("not a child process of this app".into());
     }
+    signal_pid(pid, libc::SIGSTOP);
+    let mut frozen: Vec<u32> = Vec::new();
+    let mut table = table;
+    for round in 0..5 {
+        // Parents first: `descendants` lists children before parents, so walk it backwards.
+        let fresh: Vec<u32> = descendants(&table, pid).into_iter().rev().filter(|p| !frozen.contains(p)).collect();
+        if fresh.is_empty() {
+            break;
+        }
+        for &p in &fresh {
+            signal_pid(p, libc::SIGSTOP);
+        }
+        frozen.extend(fresh);
+        if round < 4 {
+            table = process_table().unwrap_or_default();
+        }
+    }
+    // Deepest first: every frozen pid, ordered by the last table where possible, then the root.
     let mut killed = descendants(&table, pid);
+    for p in frozen {
+        if !killed.contains(&p) {
+            killed.insert(0, p);
+        }
+    }
     killed.push(pid);
     for &p in &killed {
-        kill_pid(p);
+        signal_pid(p, libc::SIGKILL);
     }
     Ok(killed)
 }
@@ -148,6 +175,27 @@ mod tests {
         }
         assert!(grandchildren.iter().all(|&g| !alive(g) || is_zombie(g)), "grandchildren are gone");
         assert!(kill_tree_below(me, pid).is_err(), "a finished process is not ours any more");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_parent_that_restarts_its_child_leaves_nothing_behind() {
+        use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
+        // A loop that starts a new sleep as soon as the old one dies: killed child-first it could respawn one.
+        let marker = format!("{}.{}", 600 + std::process::id() % 100, 4242);
+        let mut child = Command::new("sh").args(["-c", &format!("while :; do sleep {marker}; done")]).stdout(Stdio::null()).spawn().unwrap();
+        let pid = child.id();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while descendants(&process_table().unwrap(), pid).is_empty() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        kill_tree_below(std::process::id(), pid).unwrap();
+        child.wait().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let out = Command::new("pgrep").args(["-f", &format!("sleep {marker}")]).output().unwrap();
+        let left: Vec<u32> = String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.trim().parse().ok()).filter(|&p| !is_zombie(p)).collect();
+        assert!(left.is_empty(), "no sleep survives: {left:?}");
     }
 
     /// A killed grandchild stays a zombie until init reaps it; it is dead for our purposes.
