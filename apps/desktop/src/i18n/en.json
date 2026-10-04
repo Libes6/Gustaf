@@ -1,4 +1,8 @@
 {
+  "queueTitle": "Queued messages",
+  "queueClear": "Clear",
+  "queueImages": "Images",
+  "queueAttachments": "Attached images and chats",
   "sendNext": "Send next",
   "clarifyTask": "Clarify current task",
   "queueInterrupted": "Previous run was interrupted. Resume queued requests explicitly.",

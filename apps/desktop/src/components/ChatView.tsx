@@ -1,4 +1,4 @@
-import { splitChatReferences, joinChatReferences } from "../lib/chatContext";
+import { QueuePanel } from "./chat/QueuePanel";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -186,18 +186,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         </button>
       )}
 
-      {run.queue && (run.queue.items.length > 0 || run.queue.interrupted) && <div className="queue-panel">
-        {run.queue.interrupted && <p>{t("queueInterrupted")}</p>}
-        <button className="chip" onClick={() => run.changeQueue(q => ({ ...q, paused: !q.paused, interrupted: false }))}>{t(run.queue.paused ? "queueResume" : "queuePause")}</button>
-        {run.queue.items.map(item => {
-          const pending = splitChatReferences(item.text);
-          return <div key={item.id}>
-            <textarea aria-label={t("queueEdit")} value={pending.body} onChange={e => run.changeQueue(q => ({ ...q, items: q.items.map(i => i.id === item.id ? { ...i, text: joinChatReferences(e.target.value, splitChatReferences(i.text).references) } : i) }))} />
-            {pending.references.map((ref, index) => <details className="chat-reference" key={`${ref.sourceId}:${index}`}><summary>{ref.title}</summary><pre>{ref.snapshot}</pre></details>)}
-            <button className="chip" onClick={() => run.changeQueue(q => ({ ...q, items: q.items.filter(i => i.id !== item.id) }))}>{t("queueRemove")}</button>
-          </div>;
-        })}
-      </div>}
+      {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}
         root={root} projectName={project?.name} files={files} knowledge={{ ...knowledge, onManage: () => app.openSettings("knowledge") }}
@@ -207,7 +196,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
         }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
-        running={running} onClarify={run.canClarify ? () => { void run.enqueue(true); } : undefined} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
+        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
         contextTokens={contextTokens} lastInput={lastInput}
         canCompact={!(running || !loaded || messages.length < 4 || !provider)}
         canRestore={messages.some(m => m.meta?.compacted)}
