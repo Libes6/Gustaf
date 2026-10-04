@@ -72,6 +72,13 @@ create trigger if not exists agent_runs_chat_deleted after delete on chats begin
   delete from agent_runs where chat_id = old.id;
 end;
 -- agent-runs:end
+-- mobile:begin
+-- Phones paired with the mobile companion server (src/mobile_server.rs). Only the SHA-256 of the device token is stored;
+-- the token itself is shown to the phone once. A revoked device keeps its row (revoked_at) but is rejected at once.
+create table if not exists paired_devices(
+  id text primary key, name text not null, token_hash text not null unique,
+  created_at integer not null, last_seen_at integer, revoked_at integer);
+-- mobile:end
 ";
 
 /// Columns added to existing tables after their first release. SQLite has no `add column if not exists`, so each one is
@@ -768,6 +775,42 @@ mod tests {
         init(&conn).unwrap();
         run_row(&conn, "r2", None, "running", 2, None);
         assert_eq!(count(&conn, "agent_runs"), 1);
+    }
+
+    #[test]
+    fn paired_devices_table_is_added_to_an_old_database_and_keeps_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.db");
+        let conn = open(&path).unwrap();
+        let chat = new_chat(&conn);
+        conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d1', 'Pixel', 'h1', 5)", []).unwrap();
+        drop(conn);
+
+        // Re-opening is a no-op for the existing table and its rows.
+        let conn = open(&path).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 1);
+        // A database from before the mobile server just gets the table; the rest of the data is untouched.
+        conn.execute_batch("drop table paired_devices").unwrap();
+        drop(conn);
+        let conn = open(&path).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 0);
+        assert_eq!(count(&conn, "chats"), 1);
+        init(&conn).unwrap();
+        init(&conn).unwrap();
+        let columns: Vec<String> = conn
+            .prepare("select name from pragma_table_info('paired_devices') order by cid")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(columns, ["id", "name", "token_hash", "created_at", "last_seen_at", "revoked_at"]);
+        conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d2', 'iPhone', 'h2', 6)", []).unwrap();
+        // Token hashes are unique, and revoking keeps the row.
+        assert!(conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d3', 'x', 'h2', 7)", []).is_err());
+        conn.execute("update paired_devices set revoked_at = 9 where id = 'd2'", []).unwrap();
+        assert_eq!(count(&conn, "paired_devices"), 1);
+        let _ = chat;
     }
 
     #[test]

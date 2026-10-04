@@ -25,6 +25,7 @@ mod updater;
 mod worktree;
 mod merge_queue;
 mod terminal;
+mod mobile_server;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -34,6 +35,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
+        .manage(mobile_server::MobileServer::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
@@ -46,6 +48,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db(Mutex::new(db::open(&dir.join("app.db"))?)));
             mcp::init(app);
+            mobile_server::init(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -146,6 +149,14 @@ pub fn run() {
             oauth::oauth_loopback_start,
             oauth::oauth_loopback_wait,
             oauth::oauth_loopback_cancel,
+            mobile_server::mobile_server_start,
+            mobile_server::mobile_server_stop,
+            mobile_server::mobile_server_status,
+            mobile_server::mobile_pairing_start,
+            mobile_server::mobile_pairing_cancel,
+            mobile_server::mobile_devices,
+            mobile_server::mobile_device_revoke,
+            mobile_server::mobile_report_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
@@ -155,6 +166,7 @@ pub fn run() {
                 mcp::shutdown(app);
                 terminal::shutdown(app);
                 preview::shutdown(app);
+                mobile_server::shutdown(app);
             }
         });
 }
