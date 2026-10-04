@@ -2,7 +2,7 @@ import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
 import { request, sse } from "./http";
 import { resolveKey, type KeySource } from "../lib/keys";
-import { streamError, withRetry } from "./retry";
+import { makeError, streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
 
 type XY = [number, number] | undefined;
@@ -120,6 +120,7 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
         async (onText) => {
           const blocks: any[] = [];
           let usageRaw = {};
+          let stopped = false;
           const res = await request(`${base}/v1/messages`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
           for await (const ev of sse(res, t.signal)) {
             if (ev.type === "message_start") usageRaw = { ...usageRaw, ...ev.message?.usage };
@@ -131,8 +132,11 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
                 b.text = (b.text ?? "") + ev.delta.text;
                 onText(ev.delta.text);
               } else if (ev.delta.type === "input_json_delta") b.json += ev.delta.partial_json;
-            } else if (ev.type === "error") throw streamError(ev.error);
+            } else if (ev.type === "message_stop") stopped = true;
+            else if (ev.type === "error") throw streamError(ev.error);
           }
+          // A connection closed early would otherwise pass for a complete reply (and a cut tool call would run with partial input).
+          if (!stopped) throw makeError("network", { detail: "the stream ended before the reply was complete" });
           return { blocks, usageRaw };
         },
         { signal: t.signal, onText: t.onText, onRetry: t.onRetry },
