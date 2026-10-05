@@ -695,3 +695,25 @@ button:disabled { cursor:default; opacity:.45; }
 .queue-editor textarea { width: 100%; min-height: 54px; resize: vertical; }
 .queue-editor > .queue-controls { justify-content: flex-end; }
 .queue-recovery { margin: 4px 0; color: var(--text-3); }
+
+/* Providers page (ProvidersPage.tsx) and the "Add provider" wizard (AddProviderDialog.tsx). */
+.providers-split .split-item[data-tone="warn"] .sub { color: var(--text-2); }
+.split-item.unset .t { color: var(--text-2); }
+.split-item.unset .link { color: var(--accent); }
+.detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.detail-head h3 { margin: 0; font-size: 16px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog.wide { width: 620px; }
+.wizard-steps { display: flex; gap: 18px; list-style: none; margin: 0 0 18px; padding: 0; font-size: 12.5px; color: var(--text-3); }
+.wizard-steps li { display: flex; align-items: center; gap: 6px; }
+.wizard-steps li.on { color: var(--text); font-weight: 500; }
+.wizard-steps .n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--border-strong); font-size: 11px; }
+.wizard-steps li.on .n { border-color: var(--accent); background: var(--accent); color: #fff; }
+.wizard-steps li.done .n { border-color: var(--accent); color: var(--accent); }
+.wizard .dialog-foot .grow { flex: 1; }
+.kind.soon { opacity: .45; cursor: default; }
+.kind.soon:hover { background: none; }
+.soon-tag { font-size: 10.5px; color: var(--text-3); }
+.method-list { margin-bottom: 14px; }
+.method-list .card-row { cursor: pointer; }
+.picker-manage { border-top: 1px solid var(--border); padding: 8px 10px; flex: none; }
+.picker-manage:hover { color: var(--text); }

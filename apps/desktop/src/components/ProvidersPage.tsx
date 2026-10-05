@@ -182,12 +182,12 @@ function UnsetDriver({ driver, cli, version, busy, onConnectCli, onAdd }: { driv
               <div className="t">{cliName(cli)} CLI</div>
               <div className="d">{version ? t("provCliFound", { version }) : t("provCliMissing")}</div>
             </div>
-            <button className="btn-soft" disabled={busy || !version} onClick={() => onConnectCli(cli)}>{t("cliConnect")}</button>
+            <button className="btn-soft" aria-label={`${t("cliConnect")} ${cliName(cli)} CLI`} disabled={busy || !version} onClick={() => onConnectCli(cli)}>{t("cliConnect")}</button>
           </div>
         </div>
       )}
       <div className="dialog-foot" style={{ justifyContent: "flex-start" }}>
-        <button className="btn btn-primary" onClick={onAdd}><Plus size={13} /> {t("addProvider")}</button>
+        <button className="btn btn-primary" onClick={onAdd}><Plus size={13} /> {t("provConnect")} {DRIVER_NAMES[driver]}</button>
       </div>
     </>
   );
