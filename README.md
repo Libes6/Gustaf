@@ -181,13 +181,13 @@ Release builds run under a strict Content Security Policy and a narrowed capabil
 
 ## Providers and models
 
-Add providers in Settings, Model providers. API keys are stored by the Rust backend (`secrets.rs`), not in the database.
+Add providers in Settings, Model providers: Claude, GPT / Codex, Cursor and Grok are pinned at the top, every instance has its own row with its status, and "+" opens a three-step wizard ([providers](docs/features/providers.md)). API keys are stored by the Rust backend (`secrets.rs`), not in the database.
 
 | Provider | Kind | Notes |
 | --- | --- | --- |
 | Anthropic | API | Messages API with tool use |
 | OpenAI | API | Responses API |
-| Gemini, OpenRouter | API | OpenAI-compatible endpoints |
+| Gemini, OpenRouter, Grok (xAI) | API | OpenAI-compatible endpoints |
 | Ollama, LM Studio | local API | No key; detected on their default ports |
 | Custom | API | Any OpenAI-compatible base URL |
 | Cursor | SDK | Cursor API key; runs through the sidecar |

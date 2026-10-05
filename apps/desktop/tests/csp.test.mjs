@@ -158,7 +158,7 @@ after(() => { if (dist) rmSync(dist, { recursive: true, force: true }); });
 const KNOWN_HOSTS = new Set([
   // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
   'api.search.brave.com', 'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
-  'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com',
+  'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com', 'api.x.ai', 'console.x.ai',
 ]);
 
 /** The two HTML entries: the app and the quick-ask window (src-tauri/src/quick_ask.rs loads `quick-ask.html`). */
