@@ -1,9 +1,10 @@
-import { ChevronDown, ChevronRight, Search, Star } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Settings2, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { cmdKey } from "../lib/shortcuts";
 import { displayKeys } from "../lib/platform";
 import { useDialogFocus } from "../lib/useDialogFocus";
+import { orderProviders } from "../providers/drivers";
 import { modelKey as favKey, useApp, type Model } from "../state";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
@@ -23,7 +24,9 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
   const kindOf = (id: string) => app.providers.find((p) => p.id === id)?.kind ?? "custom";
   const nameOf = (id: string) => app.providers.find((p) => p.id === id)?.name ?? id;
 
-  const providers = app.providers.filter((p) => !p.disabled);
+  // Same order as the providers page: Claude, GPT / Codex, Cursor, Grok, then the rest.
+  const providers = orderProviders(app.providers.filter((p) => !p.disabled));
+  const rank = new Map(providers.map((p, i) => [p.id, i]));
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
     const models = app.models.filter((m) => !app.hiddenModels.includes(favKey(m)));
@@ -32,9 +35,10 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
       : tab === "fav"
         ? models.filter((m) => app.favorites.includes(favKey(m)))
         : models.filter((m) => m.providerId === tab);
-    ms = [...ms].sort((a, b) => b.created - a.created || a.name.localeCompare(b.name));
+    // Grouped by provider (pinned order) when several providers are listed (search, favourites), newest first within each.
+    ms = [...ms].sort((a, b) => (rank.get(a.providerId) ?? 1e9) - (rank.get(b.providerId) ?? 1e9) || b.created - a.created || a.name.localeCompare(b.name));
     return ms;
-  }, [app.models, app.favorites, app.hiddenModels, tab, q]);
+  }, [app.models, app.favorites, app.hiddenModels, app.providers, tab, q]);
   const visible = more || q ? list : list.slice(0, VISIBLE);
 
   const pick = (m: Model) => {
@@ -130,6 +134,9 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
             </button>
           )}
         </div>
+        <button className="picker-more picker-manage" onClick={() => (onClose(), app.openSettings("providers"))}>
+          <Settings2 size={13} /> {t("provManage")}
+        </button>
       </div>
     </div>
   );

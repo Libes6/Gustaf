@@ -18,6 +18,7 @@ export const PRESETS: Record<ProviderKind, { name: string; baseUrl: string; need
   custom: { name: "Custom", baseUrl: "", needsKey: false },
   cursor: { name: "Cursor", baseUrl: "", needsKey: true, keyUrl: "https://cursor.com/dashboard/integrations" },
   cli: { name: "CLI", baseUrl: "", needsKey: false },
+  xai: { name: "Grok", baseUrl: "https://api.x.ai/v1", needsKey: true, keyUrl: "https://console.x.ai" },
 };
 
 export const loadProviders = () => getSetting<ProviderConfig[]>("providers", []);
