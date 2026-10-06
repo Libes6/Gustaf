@@ -9,7 +9,7 @@ const toRow = (c: { name: string; command: string; timeoutMs: number }): Row => 
 
 /**
  * Settings > Git and commands: the per-project "definition of done" (docs/features/verification-gates.md). The checks are
- * edited here and saved per project; the read-only `.mcode/done.json` of the project runs only with its own switch (off by
+ * edited here and saved per project; the read-only `.gustaf/done.json` of the project runs only with its own switch (off by
  * default, with a warning). "Suggest checks" only fills in rows from the installed scripts: nothing runs from this page.
  */
 export function VerificationSettings() {

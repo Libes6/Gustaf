@@ -5,10 +5,10 @@ import qrcode from "qrcode-generator";
 
 export type PairingParts = { host: string; port: number; code: string; fingerprint: string; protocol: number };
 
-/** `mcode://pair?host=…&port=…&code=…&fp=<sha256 hex>&v=<protocol version>` */
+/** `gustaf://pair?host=…&port=…&code=…&fp=<sha256 hex>&v=<protocol version>` */
 export function buildPairingUri(p: PairingParts): string {
   const q = (v: string | number) => encodeURIComponent(String(v));
-  return `mcode://pair?host=${q(p.host)}&port=${q(p.port)}&code=${q(p.code)}&fp=${q(p.fingerprint.toLowerCase())}&v=${q(p.protocol)}`;
+  return `gustaf://pair?host=${q(p.host)}&port=${q(p.port)}&code=${q(p.code)}&fp=${q(p.fingerprint.toLowerCase())}&v=${q(p.protocol)}`;
 }
 
 /** `K7Q2X9PM` is shown as `K7Q2-X9PM` (the server accepts it with or without the dash, in any case). */

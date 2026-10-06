@@ -13,7 +13,7 @@ export type HooksConfig = { hooks: Hook[]; issues: HookIssue[] };
 
 export const GLOBAL_HOOKS_SETTING = "hooks";
 export const PROJECT_HOOKS_SETTING = "hooksProjects";
-export const PROJECT_HOOKS_FILE = ".mcode/hooks.json";
+export const PROJECT_HOOKS_FILE = ".gustaf/hooks.json";
 export const MAX_HOOKS = 20;
 export const DEFAULT_HOOK_TIMEOUT_MS = 10_000;
 export const MIN_HOOK_TIMEOUT_MS = 100;

@@ -58,7 +58,7 @@ test('open_app names: plain names only', () => {
 });
 
 test('CLI replay keeps only the newest screenshot', () => {
-  const res = (id, image) => ({ type: 'tool_result', id, name: 'mcode_computer', output: 'ok', ...(image ? { image } : {}) });
+  const res = (id, image) => ({ type: 'tool_result', id, name: 'gustaf_computer', output: 'ok', ...(image ? { image } : {}) });
   const msgs = [
     { role: 'user', parts: [{ type: 'text', text: 'go' }] },
     { role: 'tool', parts: [res('a', 'old')] },

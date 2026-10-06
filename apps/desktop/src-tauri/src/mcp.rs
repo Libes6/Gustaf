@@ -187,7 +187,7 @@ fn login_shell_path() -> Option<String> {
 /// Runs a fixed script (no user input) in an interactive login shell (zsh on macOS, bash/sh on Linux) to read PATH; bounded to 5 s.
 #[cfg(not(windows))]
 fn login_shell_path() -> Option<String> {
-    const MARK: &str = "__MCODE_PATH__";
+    const MARK: &str = "__GUSTAF_PATH__";
     let mut child = Command::new(crate::shell::Shell::current().program())
         .args(["-ilc", &format!("printf '\\n{MARK}%s\\n' \"$PATH\"")])
         .stdin(Stdio::null())

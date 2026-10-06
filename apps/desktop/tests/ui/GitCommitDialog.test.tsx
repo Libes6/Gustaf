@@ -200,8 +200,8 @@ describe("GitCommitDialog", () => {
 
   describe("after the commit: push and pull request", () => {
     const pub = (over: Partial<PublishInfo> = {}): PublishInfo => ({
-      repo: true, branch: "mcode/x", hasCommits: true, remotes: [{ name: "origin", url: "https://github.com/o/r.git" }], upstream: null, ahead: null, behind: null,
-      remoteBranches: ["origin/main", "origin/mcode/x"], defaultBase: "main", protected: false, ...over,
+      repo: true, branch: "gustaf/x", hasCommits: true, remotes: [{ name: "origin", url: "https://github.com/o/r.git" }], upstream: null, ahead: null, behind: null,
+      remoteBranches: ["origin/main", "origin/gustaf/x"], defaultBase: "main", protected: false, ...over,
     });
     const commitNow = async (info: PublishInfo, extra: Record<string, unknown> = {}) => {
       mockInvoke({ git_commit: { ...result, branch: info.branch }, git_publish_info: info, gh_status: { installed: true, authenticated: true, detail: "" }, ...extra });
@@ -215,11 +215,11 @@ describe("GitCommitDialog", () => {
     it("pushes only on click, shows the new ahead/behind and never sends a force option", async () => {
       await commitNow(pub());
       expect(callsOf("git_push")).toEqual([]);
-      mockInvoke({ git_push: { remote: "origin", branch: "mcode/x", output: "", info: pub({ upstream: "origin/mcode/x", ahead: 0, behind: 0 }) } });
-      await userEvent.click(screen.getByRole("button", { name: "Push mcode/x" }));
-      expect(await screen.findByText("Pushed mcode/x to origin.")).toBeInTheDocument();
-      expect(callsOf("git_push")).toEqual([{ root: "/work/alpha", remote: "origin", branch: "mcode/x", setUpstream: true, confirmProtected: false }]);
-      expect(screen.getByText(/origin\/mcode\/x: 0 ahead, 0 behind/)).toBeInTheDocument();
+      mockInvoke({ git_push: { remote: "origin", branch: "gustaf/x", output: "", info: pub({ upstream: "origin/gustaf/x", ahead: 0, behind: 0 }) } });
+      await userEvent.click(screen.getByRole("button", { name: "Push gustaf/x" }));
+      expect(await screen.findByText("Pushed gustaf/x to origin.")).toBeInTheDocument();
+      expect(callsOf("git_push")).toEqual([{ root: "/work/alpha", remote: "origin", branch: "gustaf/x", setUpstream: true, confirmProtected: false }]);
+      expect(screen.getByText(/origin\/gustaf\/x: 0 ahead, 0 behind/)).toBeInTheDocument();
     });
 
     it("asks before pushing a protected branch and can switch to a new branch instead", async () => {
@@ -245,13 +245,13 @@ describe("GitCommitDialog", () => {
 
     it("shows a push failure with the manual command", async () => {
       await commitNow(pub(), { git_push: () => Promise.reject(new Error("could not read Username")) });
-      await userEvent.click(screen.getByRole("button", { name: "Push mcode/x" }));
+      await userEvent.click(screen.getByRole("button", { name: "Push gustaf/x" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("could not read Username");
-      expect(screen.getByText("Manual command: git push -u origin mcode/x")).toBeInTheDocument();
+      expect(screen.getByText("Manual command: git push -u origin gustaf/x")).toBeInTheDocument();
     });
 
     it("creates a pull request from the commit subject once pushed and offers the https link", async () => {
-      await commitNow(pub({ upstream: "origin/mcode/x", ahead: 0, behind: 0 }));
+      await commitNow(pub({ upstream: "origin/gustaf/x", ahead: 0, behind: 0 }));
       await userEvent.click(screen.getByRole("button", { name: "Create pull request…" }));
       expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Add parser");
       expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveValue("main");
@@ -266,7 +266,7 @@ describe("GitCommitDialog", () => {
       await commitNow(pub(), { gh_status: { installed: false, authenticated: false, detail: "" } });
       await userEvent.click(screen.getByRole("button", { name: "Create pull request…" }));
       expect(screen.getAllByText(/GitHub CLI \(gh\) is not installed/).length).toBeGreaterThan(0);
-      expect(screen.getByText(/gh pr create --base main --head mcode\/x/)).toBeInTheDocument();
+      expect(screen.getByText(/gh pr create --base main --head gustaf\/x/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Create pull request" })).toBeDisabled();
     });
   });

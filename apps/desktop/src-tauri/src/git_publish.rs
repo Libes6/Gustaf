@@ -493,7 +493,7 @@ mod tests {
         for b in ["main", "master", "develop"] {
             assert!(is_protected(b));
         }
-        for b in ["mcode/fix", "main2", "feature/main", ""] {
+        for b in ["gustaf/fix", "main2", "feature/main", ""] {
             assert!(!is_protected(b));
         }
     }
@@ -531,11 +531,11 @@ mod tests {
     #[test]
     fn pushes_the_current_branch_and_sets_the_upstream() {
         let f = fx();
-        g(&f.root, &["checkout", "-q", "-b", "mcode/feature"]);
-        let res = push(&f.root, "origin", "mcode/feature", true, false).unwrap();
-        assert!(remote_has(&f, "mcode/feature"));
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/feature"]);
+        let res = push(&f.root, "origin", "gustaf/feature", true, false).unwrap();
+        assert!(remote_has(&f, "gustaf/feature"));
         assert!(!remote_has(&f, "main"), "only the current branch is pushed");
-        assert_eq!(res.info.upstream.as_deref(), Some("origin/mcode/feature"));
+        assert_eq!(res.info.upstream.as_deref(), Some("origin/gustaf/feature"));
         assert_eq!(res.info.ahead, Some(0));
     }
 
@@ -579,7 +579,7 @@ mod tests {
     fn pr_context_covers_the_branch_against_a_known_base_only() {
         let f = fx();
         push(&f.root, "origin", "main", true, true).unwrap();
-        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/x"]);
         fs::write(f.root.join("b.txt"), "new\n").unwrap();
         g(&f.root, &["add", "."]);
         g(&f.root, &["commit", "-q", "-m", "Add b"]);
@@ -595,12 +595,12 @@ mod tests {
     #[test]
     fn creates_a_branch_for_the_commit_and_refuses_bad_or_existing_names() {
         let f = fx();
-        assert_eq!(create_branch(&f.root, "mcode/new").unwrap(), "mcode/new");
-        assert_eq!(current_branch(&f.root).as_deref(), Some("mcode/new"));
-        for bad in ["", "--orphan", "a..b", "main", "mcode/new", "x y"] {
+        assert_eq!(create_branch(&f.root, "gustaf/new").unwrap(), "gustaf/new");
+        assert_eq!(current_branch(&f.root).as_deref(), Some("gustaf/new"));
+        for bad in ["", "--orphan", "a..b", "main", "gustaf/new", "x y"] {
             assert!(create_branch(&f.root, bad).is_err(), "{bad:?}");
         }
-        assert_eq!(current_branch(&f.root).as_deref(), Some("mcode/new"));
+        assert_eq!(current_branch(&f.root).as_deref(), Some("gustaf/new"));
     }
 
     #[test]
@@ -629,9 +629,9 @@ mod tests {
     fn gh_missing_is_reported_with_the_manual_command() {
         let f = fx();
         assert!(!gh_auth_status(None, &f.root, Duration::from_secs(1)).installed);
-        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/x"]);
         let e = create_pr(None, &f.root, "Title", "Body", "main", false).err().unwrap();
-        assert!(e.contains("not installed") && e.contains("gh pr create --base main --head mcode/x"), "{e}");
+        assert!(e.contains("not installed") && e.contains("gh pr create --base main --head gustaf/x"), "{e}");
     }
 
     #[cfg(unix)]
@@ -640,7 +640,7 @@ mod tests {
         let f = fx();
         let log = f.base.join("calls.log");
         let gh = fake_gh(&f, &format!("echo \"$@\" >> '{}'\nif [ \"$1\" = auth ]; then echo 'You are not logged in' >&2; exit 1; fi\necho https://github.com/o/r/pull/1", log.display()));
-        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/x"]);
         assert!(!gh_auth_status(Some(&gh), &f.root, Duration::from_secs(5)).authenticated);
         let e = create_pr(Some(&gh), &f.root, "Title", "Body", "main", false).err().unwrap();
         assert!(e.contains("gh auth login") && e.contains("not logged in"), "{e}");
@@ -652,25 +652,25 @@ mod tests {
     fn creates_a_pr_with_an_argument_array_and_returns_the_url() {
         let f = fx();
         let log = f.base.join("calls.log");
-        let gh = fake_gh(&f, &format!("if [ \"$1\" = auth ]; then exit 0; fi\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\necho 'Creating pull request for mcode/x into main'\necho\necho https://github.com/o/r/pull/42", log.display()));
-        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        let gh = fake_gh(&f, &format!("if [ \"$1\" = auth ]; then exit 0; fi\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\necho 'Creating pull request for gustaf/x into main'\necho\necho https://github.com/o/r/pull/42", log.display()));
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/x"]);
         let res = create_pr(Some(&gh), &f.root, "-Fix $(rm -rf) things", "line1\n`x`; rm -rf /", "main", true).unwrap();
         assert_eq!(res.url, "https://github.com/o/r/pull/42");
         let args: Vec<String> = fs::read_to_string(&log).unwrap().lines().map(String::from).collect();
         assert_eq!(args[..2], ["pr", "create"]);
         assert!(args.contains(&"--title=-Fix $(rm -rf) things".to_string()));
-        assert!(args.contains(&"--base=main".to_string()) && args.contains(&"--head=mcode/x".to_string()) && args.contains(&"--draft".to_string()));
+        assert!(args.contains(&"--base=main".to_string()) && args.contains(&"--head=gustaf/x".to_string()) && args.contains(&"--draft".to_string()));
     }
 
     #[cfg(unix)]
     #[test]
     fn a_failing_gh_reports_its_output_and_bad_inputs_are_refused() {
         let f = fx();
-        let gh = fake_gh(&f, "if [ \"$1\" = auth ]; then exit 0; fi\necho 'GraphQL: No commits between main and mcode/x' >&2\nexit 1");
-        g(&f.root, &["checkout", "-q", "-b", "mcode/x"]);
+        let gh = fake_gh(&f, "if [ \"$1\" = auth ]; then exit 0; fi\necho 'GraphQL: No commits between main and gustaf/x' >&2\nexit 1");
+        g(&f.root, &["checkout", "-q", "-b", "gustaf/x"]);
         let e = create_pr(Some(&gh), &f.root, "T", "B", "main", false).err().unwrap();
         assert!(e.contains("No commits between") && e.contains("gh pr create"), "{e}");
-        for (title, base) in [("", "main"), ("a\nb", "main"), ("T", "--web"), ("T", "a..b"), ("T", ""), ("T", "mcode/x")] {
+        for (title, base) in [("", "main"), ("a\nb", "main"), ("T", "--web"), ("T", "a..b"), ("T", ""), ("T", "gustaf/x")] {
             assert!(create_pr(Some(&gh), &f.root, title, "B", base, false).is_err(), "{title:?} {base:?}");
         }
     }

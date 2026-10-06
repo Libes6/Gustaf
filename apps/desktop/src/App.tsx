@@ -41,7 +41,7 @@ function Shell({ app }: { app: AppState }) {
   useEffect(() => {
     const accelerator = acceleratorOf("stopAgent");
     let disposed = false;
-    register(accelerator, () => dispatchEvent(new Event("mcode-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
+    register(accelerator, () => dispatchEvent(new Event("gustaf-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
     return () => { disposed = true; unregister(accelerator).catch(() => {}); };
   }, []);
   if (!app.ready) return null;

@@ -168,9 +168,9 @@ export function useChatRun(o: Options) {
   useEffect(() => {
     const stopKey = (e: KeyboardEvent) => { if (o.visible && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Escape") { e.preventDefault(); stop(); } };
     const stopGlobal = () => { if (o.visible) stop(); };
-    addEventListener("mcode-stop", stopGlobal);
+    addEventListener("gustaf-stop", stopGlobal);
     addEventListener("keydown", stopKey);
-    return () => { removeEventListener("keydown", stopKey); removeEventListener("mcode-stop", stopGlobal); };
+    return () => { removeEventListener("keydown", stopKey); removeEventListener("gustaf-stop", stopGlobal); };
   }, [o.visible, approval, external]);
 
   async function send(retry = false, edit?: Edit) {

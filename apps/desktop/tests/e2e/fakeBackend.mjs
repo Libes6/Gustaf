@@ -99,7 +99,7 @@ export class FakeBackend {
   /** Workspaces made through `worktree_create` (src-tauri/src/worktree.rs); `worktree_list` answers with them. */
   worktrees = [];
   /** What the native "save" dialog answers (`null` = cancelled). */
-  savePath = '/exports/mcode-export.json';
+  savePath = '/exports/gustaf-export.json';
   #overrides = new Map();
   #fetches = new Map();
   #nextRid = 1;

@@ -12,7 +12,7 @@ fn client(url:&Url)->Result<Client,String>{
  let host=url.host_str().ok_or("Missing hostname")?;
  let addresses:Vec<_>=(host,url.port_or_known_default().unwrap_or(443)).to_socket_addrs().map_err(|e|e.to_string())?.collect();
  if addresses.is_empty()||addresses.iter().any(|a|!public(a.ip())){return Err("Private/reserved network addresses are blocked".into());}
- Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(20)).resolve_to_addrs(host,&addresses).user_agent("MCode/0.1 web-fetch").build().map_err(|e|e.to_string())
+ Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(20)).resolve_to_addrs(host,&addresses).user_agent("Gustaf/0.1 web-fetch").build().map_err(|e|e.to_string())
 }
 fn clean(html:&str)->String {
  let headings=regex::Regex::new(r"(?is)<h([1-6])\b[^>]*>(.*?)</h[1-6]\s*>").unwrap().replace_all(html, |c:&regex::Captures| format!("\n{} {}\n", "#".repeat(c[1].parse::<usize>().unwrap_or(1)), &c[2]));

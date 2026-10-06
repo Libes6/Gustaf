@@ -26,7 +26,7 @@ export default function CanvasPanel({ artifact, versions, onSelect, onClose, onR
   useEffect(() => {
     setError("");
     const receive = (event: MessageEvent) => {
-      if (event.source !== frame.current?.contentWindow || event.data?.type !== "mcode-canvas-error" || typeof event.data.message !== "string") return;
+      if (event.source !== frame.current?.contentWindow || event.data?.type !== "gustaf-canvas-error" || typeof event.data.message !== "string") return;
       setError(event.data.message.slice(0, 4000));
     };
     window.addEventListener("message", receive);

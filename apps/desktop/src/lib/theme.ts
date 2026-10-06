@@ -3,7 +3,7 @@
 import { getSetting, setSetting } from "./api";
 import { accentVars, parsePrefs, resolveTheme, type ThemeMode } from "./themeUtil";
 
-const CACHE_KEY = "mcode-theme";
+const CACHE_KEY = "gustaf-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 type Prefs = { mode: ThemeMode; accent: string };

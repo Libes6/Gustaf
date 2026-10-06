@@ -73,8 +73,8 @@ function validate(raw: Record<string, unknown>): PairingParseResult {
 }
 
 /**
- * Parses what the QR scanner (or a paste box) delivers: either `mcode://pair?host=..&port=..&code=..&fingerprint=..&v=1`
- * (`fp` is accepted for `fingerprint`, `protocol` for `v`) or the JSON `{ host, port, code, fingerprint, v }`.
+ * Parses what the QR scanner (or a paste box) delivers: either `gustaf://pair?host=..&port=..&code=..&fingerprint=..&v=1`
+ * (`fp` is accepted for `fingerprint`, `protocol` for `v`; the `mcode://` scheme of builds from before the rename too) or the JSON `{ host, port, code, fingerprint, v }`.
  * Pure: no network, no React.
  */
 export function parsePairingPayload(input: string): PairingParseResult {
@@ -92,7 +92,7 @@ export function parsePairingPayload(input: string): PairingParseResult {
     return validate(json as Record<string, unknown>);
   }
 
-  const m = /^mcode:\/\/pair\/?\?(.*)$/i.exec(text);
+  const m = /^(?:gustaf|mcode):\/\/pair\/?\?(.*)$/i.exec(text);
   if (m) {
     const params: Record<string, unknown> = {};
     for (const pair of (m[1] ?? "").split("&")) {

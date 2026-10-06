@@ -3,7 +3,9 @@
 // (tests/exportChats.test.mjs). Only `import type` is allowed because Node runs this file directly.
 import type { Msg, Part, TokenUsage } from "../providers/types";
 
-export const EXPORT_FORMAT = "mcode-chats";
+export const EXPORT_FORMAT = "gustaf-chats";
+/** `format` of files exported before the rename; import accepts it. */
+export const LEGACY_EXPORT_FORMAT = "mcode-chats";
 /** Bump when the JSON shape changes incompatibly; `parseBundle` rejects newer versions. */
 export const EXPORT_VERSION = 1;
 export const REDACTED = "[REDACTED]";
@@ -23,7 +25,7 @@ export type ExportedChat = {
   project: { name: string; path: string | null } | null;
   messages: ExportedMessage[];
 };
-// `app` names the exporting app. Files written before the rename say "M Code"; import does not check it.
+// `app` names the exporting app; import does not check it (older files carry the previous app name).
 export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: string; exportedAt: string; chats: ExportedChat[] };
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
@@ -241,7 +243,7 @@ export function parseBundle(text: string): ChatBundle {
   } catch {
     throw new ImportError("invalid_json");
   }
-  if (!rec(raw) || raw.format !== EXPORT_FORMAT || !Number.isInteger(raw.version) || raw.version < 1) throw new ImportError("not_export");
+  if (!rec(raw) || (raw.format !== EXPORT_FORMAT && raw.format !== LEGACY_EXPORT_FORMAT) || !Number.isInteger(raw.version) || raw.version < 1) throw new ImportError("not_export");
   if (raw.version > EXPORT_VERSION) throw new ImportError("unsupported_version");
   const chats = (Array.isArray(raw.chats) ? raw.chats : []).map(cleanChat).filter((c: ExportedChat | null): c is ExportedChat => c !== null);
   if (!chats.length) throw new ImportError("empty");

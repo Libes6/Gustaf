@@ -54,7 +54,7 @@ describe("TurnView plan blocks", () => {
   const handlers = { onEdit: vi.fn(), onRegenerate: vi.fn(), onDelete: vi.fn(), onBranch: vi.fn(), onApprovePlan: vi.fn(), onRejectPlan: vi.fn() };
   const view = (text: string, busy = false) => renderApp(<TurnView turn={turn(text)} live={false} liveResults={[]} busy={busy} isLastTurn handlers={handlers} />);
 
-  it("shows a plan card for a valid mcode-plan block and Approve reaches the handler", async () => {
+  it("shows a plan card for a valid gustaf-plan block and Approve reaches the handler", async () => {
     view(`Findings.\n\n${serializePlan(plan)}`);
     expect(screen.getByText("Findings.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
@@ -62,7 +62,7 @@ describe("TurnView plan blocks", () => {
   });
 
   it("falls back to Markdown for an unparsable block", () => {
-    view("```mcode-plan\n{not json\n```");
+    view("```gustaf-plan\n{not json\n```");
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.getByText("{not json")).toBeInTheDocument();
   });

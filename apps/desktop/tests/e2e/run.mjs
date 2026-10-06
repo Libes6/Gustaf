@@ -22,7 +22,7 @@ if (major < 22 || (major === 22 && minor < 13)) {
 }
 console.log(`test:e2e using ${chrome}`);
 
-const dist = mkdtempSync(join(tmpdir(), 'mcode-e2e-dist-'));
+const dist = mkdtempSync(join(tmpdir(), 'gustaf-e2e-dist-'));
 let code = 1;
 try {
   buildFrontend(dist);

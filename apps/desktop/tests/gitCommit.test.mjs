@@ -55,7 +55,7 @@ test('candidates list accepted files first and pre-select only those', () => {
 });
 
 test('branch names follow git check-ref-format', () => {
-  for (const ok of ['feature/x', 'mcode/fix-login', 'a', 'v1.2', 'a/b/c', 'ünï/cødé', 'x@y']) assert.equal(branchNameProblem(ok), null, ok);
+  for (const ok of ['feature/x', 'gustaf/fix-login', 'a', 'v1.2', 'a/b/c', 'ünï/cødé', 'x@y']) assert.equal(branchNameProblem(ok), null, ok);
   assert.equal(branchNameProblem(''), 'empty');
   assert.equal(branchNameProblem('   '), 'empty');
   for (const bad of ['a b', '-x', '--detach', 'a..b', 'a~1', 'a^', 'a:b', 'a?b', 'a*b', 'a[b', 'a\\b', 'x.lock', 'a/x.lock', '/x', 'x/', 'a//b', '.hidden', 'a/.hidden', 'x.', '@{u}', '@', 'HEAD', 'tab\tname', 'nl\nname', 'x'.repeat(201)]) {

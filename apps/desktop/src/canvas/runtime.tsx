@@ -7,7 +7,7 @@ import { parseFiles, loadModules } from "./modules.ts";
 const payload = JSON.parse(document.getElementById("canvas-source")!.textContent!);
 const report = (error: unknown) => {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  parent.postMessage({ type: "mcode-canvas-error", message: message.slice(0, 4000) }, "*");
+  parent.postMessage({ type: "gustaf-canvas-error", message: message.slice(0, 4000) }, "*");
   const root = document.getElementById("root")!;
   root.replaceChildren();
   const pre = document.createElement("pre");

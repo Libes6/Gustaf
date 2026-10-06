@@ -103,7 +103,7 @@ function settingsDb(initial: Record<string, unknown>) {
   return settings;
 }
 const key = "verification:/work/alpha";
-const files = (done: unknown) => ({ fs_read: ({ path }: any) => { if (path === "package.json") return JSON.stringify({ scripts: { lint: "eslint .", test: "vitest" }, devDependencies: { typescript: "5" } }); if (path === ".mcode/done.json" && done) return JSON.stringify(done); throw new Error("no such file"); } });
+const files = (done: unknown) => ({ fs_read: ({ path }: any) => { if (path === "package.json") return JSON.stringify({ scripts: { lint: "eslint .", test: "vitest" }, devDependencies: { typescript: "5" } }); if (path === ".gustaf/done.json" && done) return JSON.stringify(done); throw new Error("no such file"); } });
 
 it("starts empty, suggestions only fill the rows (nothing runs), and Save stores the checks per project", async () => {
   const settings = settingsDb({});
@@ -147,7 +147,7 @@ it("the project file is listed but off by default, with a warning that it runs s
   const settings = settingsDb({});
   mockInvoke(files({ checks: [{ name: "build", command: "npm run build" }, { command: "" }], maxFixAttempts: 9 }));
   renderApp(<VerificationSettings />, makeApp({ projects: [project({ path: "/work/alpha" })] }));
-  const sw = await screen.findByRole("checkbox", { name: /\.mcode\/done\.json/ });
+  const sw = await screen.findByRole("checkbox", { name: /\.gustaf\/done\.json/ });
   expect(sw).not.toBeChecked();
   expect(screen.getByRole("note")).toHaveTextContent(/run shell commands/);
   expect(await screen.findByText("npm run build")).toBeInTheDocument();
@@ -164,7 +164,7 @@ it("says so when the project has no done.json", async () => {
   settingsDb({});
   mockInvoke(files(null));
   renderApp(<VerificationSettings />, makeApp({ projects: [project({ path: "/work/alpha" })] }));
-  expect(await screen.findByText("This project has no .mcode/done.json.")).toBeInTheDocument();
+  expect(await screen.findByText("This project has no .gustaf/done.json.")).toBeInTheDocument();
 });
 
 it("asks for a project first when there is none", () => {
