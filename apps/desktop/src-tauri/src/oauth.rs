@@ -301,8 +301,16 @@ mod tests {
         let t = Instant::now();
         assert!(lb.wait(&st.id).unwrap_err().contains("timed out"));
         assert!(t.elapsed() < Duration::from_secs(3));
-        // The port is released after the end.
-        assert!(TcpStream::connect(("127.0.0.1", st.port)).is_err());
+        // The port is released after the end. Tests run in parallel and the OS may hand the same ephemeral port to another
+        // test's short-lived listener, so allow a moment for it to go before calling the port still held.
+        let released = (0..40).any(|_| {
+            if TcpStream::connect(("127.0.0.1", st.port)).is_err() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            false
+        });
+        assert!(released);
         let st = lb.start(STATE, Duration::from_secs(30)).unwrap();
         lb.cancel(&st.id);
         assert!(lb.wait(&st.id).unwrap_err().contains("cancelled"));
