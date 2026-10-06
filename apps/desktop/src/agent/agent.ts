@@ -396,6 +396,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
       onActivity: o.onActivity,
       onLimits: o.onLimits,
       onRetry: o.onRetry,
+      approve: async (req) => (await o.approve(req)) !== false,
     });
     if (o.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const calls = out.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");

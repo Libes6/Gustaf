@@ -100,7 +100,7 @@ test('a spawn of two agents makes two entries with their model; child frames tha
     item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])),
     turnDone(ROOT),
   ] }));
-  const r = await runAppServerTurn(conn, P, h);
+  const r = await runAppServerTurn(conn, P, { ...h, childWaitMs: 20 });
   const subs = [...out.acts.values()].filter((a) => a.subagent);
   assert.equal(subs.length, 2);
   const ca = subs.find((a) => a.subagent.agentId === 'ca').subagent;
@@ -135,6 +135,42 @@ test('child status is monotone; only a new turn of that child reopens it', () =>
   assert.equal(get().state, 'stopped');
 });
 
+test('children that outlive the parent turn are waited for until they report an end', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])), turnDone(ROOT)] }));
+  const p = runAppServerTurn(conn, P, h);
+  let settled = false;
+  p.then(() => { settled = true; });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(settled, false, 'the turn stays open while children run');
+  conn.emit(turnDone('ca'));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(settled, false);
+  conn.emit(item('item/completed', 'cb', { type: 'agentMessage', id: 'x', text: 'late result' }));
+  conn.emit(turnDone('cb'));
+  const r = await p;
+  assert.deepEqual(r.running, []);
+  const by = (id) => [...out.acts.values()].find((a) => a.subagent?.agentId === id).subagent;
+  assert.equal(by('ca').state, 'completed');
+  assert.match(by('cb').result, /late result/);
+});
+
+test('waiting for children is bounded and stoppable, and does not decide their fate', async () => {
+  const mk = () => fakeConn(base({ then: [item('item/completed', ROOT, spawn('s1', ['ca'])), turnDone(ROOT)] }));
+  const r = await runAppServerTurn(mk(), P, { ...handlers().h, childWaitMs: 40 });
+  assert.deepEqual(r.running, ['ca'], 'still running, left for the caller to show as unknown');
+  const ac = new AbortController();
+  const p = runAppServerTurn(mk(), P, { ...handlers().h, signal: ac.signal });
+  await new Promise((r2) => setTimeout(r2, 30));
+  ac.abort();
+  await assert.rejects(p, (e) => e.name === 'AbortError');
+  const c3 = mk();
+  const q = runAppServerTurn(c3, P, handlers().h);
+  await new Promise((r2) => setTimeout(r2, 30));
+  c3.exit(1);
+  assert.deepEqual((await q).running, ['ca'], 'a process that exits ends the wait');
+});
+
 test('a child that errors or is interrupted ends in its own state without failing the parent', async () => {
   const { out, h } = handlers();
   const conn = fakeConn(base({ then: [
@@ -160,17 +196,35 @@ test('frames of unknown threads are bounded and never become entries', () => {
   assert.deepEqual(rd.onMessage(note('turn/started', { threadId: 'ghost1', turn: { id: 'x' } })), []);
 });
 
-test('approval requests are declined, unknown server requests answered with an error', async () => {
-  const { h } = handlers();
-  const conn = fakeConn(base({ then: [
-    { jsonrpc: '2.0', id: 77, method: 'item/commandExecution/requestApproval', params: { threadId: ROOT, itemId: 'c', command: 'rm -rf x' } },
+test('approval requests: declined without a handler, asked with one; unknown server requests get an error', async () => {
+  const reqs = [
+    { jsonrpc: '2.0', id: 77, method: 'item/commandExecution/requestApproval', params: { threadId: ROOT, itemId: 'c', command: 'rm -rf x', reason: 'outside the sandbox' } },
+    { jsonrpc: '2.0', id: 79, method: 'item/fileChange/requestApproval', params: { threadId: ROOT, itemId: 'f', grantRoot: '/etc' } },
     { jsonrpc: '2.0', id: 78, method: 'item/tool/requestUserInput', params: { threadId: ROOT } },
-    turnDone(ROOT),
-  ] }));
-  await runAppServerTurn(conn, P, h);
-  const reply = (id) => conn.written.find((m) => m.id === id && !m.method);
-  assert.deepEqual(reply(77).result, { decision: 'decline' });
-  assert.equal(reply(78).error.code, -32601);
+  ];
+  let conn = fakeConn(base({ then: [...reqs, turnDone(ROOT)] }));
+  await runAppServerTurn(conn, P, handlers().h);
+  const reply = (c, id) => c.written.find((m) => m.id === id && !m.method);
+  assert.deepEqual(reply(conn, 77).result, { decision: 'decline' });
+  assert.deepEqual(reply(conn, 79).result, { decision: 'decline' });
+  assert.equal(reply(conn, 78).error.code, -32601);
+  const asked = [];
+  conn = fakeConn(base({ then: [...reqs.slice(0, 2), turnDone(ROOT)] }));
+  await runAppServerTurn(conn, P, { ...handlers().h, onApproval: async (a) => { asked.push(a); return a.command === 'rm -rf x'; } });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(asked[0].command, 'rm -rf x');
+  assert.equal(asked[0].reason, 'outside the sandbox');
+  assert.match(asked[1].reason, /\/etc/);
+  assert.deepEqual(reply(conn, 77).result, { decision: 'accept' });
+  assert.deepEqual(reply(conn, 79).result, { decision: 'decline' });
+});
+
+test('approvals are only requested when the caller can ask, and only in workspace-write', () => {
+  assert.equal(threadRequest({ ...P, approvals: true }).params.approvalPolicy, 'on-request');
+  assert.equal(threadRequest(P).params.approvalPolicy, 'never');
+  assert.equal(threadRequest({ ...P, approvals: true, access: 'full' }).params.approvalPolicy, 'never');
+  assert.equal(threadRequest({ ...P, approvals: true, mode: 'plan' }).params.approvalPolicy, 'never');
+  assert.equal(turnRequest('t', { ...P, approvals: true }).approvalPolicy, 'on-request');
 });
 
 test('a failed turn reports its message; an interrupted turn is not an error', async () => {

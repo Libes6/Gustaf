@@ -290,8 +290,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       if (id === "codex" && (await codexTransport()) === "app-server") {
         try {
           const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
-          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)) }, {
-            signal: t.signal, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
+          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)), approvals: !!t.approve }, {
+            signal: t.signal, onApproval: t.approve, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
           });
           viaServer = true;
           session = r.session;
