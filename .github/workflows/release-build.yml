@@ -1,7 +1,8 @@
 name: Gustaf desktop releases
 
 # Push to main: if tag v<version from tauri.conf.json> does not exist yet, build every platform, then tag the
-# commit and create a DRAFT release (never published here). If the tag exists (docs-only push, no bump), skip.
+# commit and create a DRAFT release (never published here). If the tag and its release (draft or published)
+# exist (docs-only push, no bump), skip. If the tag exists without any release (stray tag), fail.
 # Manual run (any branch): build artifacts only, no tag, no draft. Decision logic: scripts/release-plan.mjs.
 on:
   push:
@@ -24,6 +25,10 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    # write: `gh release view` only sees DRAFT releases with push access; with read it would report a draft
+    # as missing and fail the run as a stray tag. This job only reads (git ls-remote/fetch, gh release view).
+    permissions:
+      contents: write
     outputs:
       build: ${{ steps.plan.outputs.build }}
       release: ${{ steps.plan.outputs.release }}
@@ -34,8 +39,11 @@ jobs:
         with:
           node-version-file: .nvmrc
       # Refuses (fails) unless the push is to main in Libes6/Gustaf and the commit is on origin/main;
-      # emits a ::notice:: and build=false when the version tag already exists.
+      # emits a ::notice:: and build=false when the version tag and its release already exist;
+      # fails when the tag exists without a release (stray tag), or when gh cannot tell.
       - id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/release-plan.mjs
 
   bundle:
