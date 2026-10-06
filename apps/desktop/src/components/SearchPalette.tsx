@@ -17,6 +17,8 @@ const SETTINGS_PAGES: { id: SettingsPage; label: Key }[] = [
   { id: "knowledge", label: "knowledgeNav" }, { id: "mobile", label: "mobileTitle" }, { id: "git", label: "gitAndCommands" }, { id: "rules", label: "rules" },
   { id: "archive", label: "archivedChats" },
 ];
+/** Asks the chat in front to forget its provider sessions (ChatView listens). */
+export const RESTART_SESSION_EVENT = "gustaf-restart-session";
 type Jump = { key: string; kind: "settings" | "chat" | "shortcut"; label: string; detail: string; go: () => void };
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -152,6 +154,9 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
     ...(q.length >= 2 ? SETTINGS_PAGES.filter((p) => t(p.label).toLowerCase().includes(q) || p.id.includes(q)) : []).slice(0, 3).map((p): Jump => ({
       key: `s${p.id}`, kind: "settings", label: t(p.label), detail: t("settings"), go: () => app.openSettings(p.id),
     })),
+    ...(q.length >= 2 && app.activeChat !== null && app.view === "chat" && t("restartSession").toLowerCase().includes(q) ? [{
+      key: "restart", kind: "shortcut" as const, label: t("restartSession"), detail: t("restartSessionHint"), go: () => dispatchEvent(new Event(RESTART_SESSION_EVENT)),
+    }] : []),
     ...(q.length >= 2 ? SHORTCUTS.filter((s) => t(s.label).toLowerCase().includes(q)).slice(0, 3).map((s): Jump => ({
       key: `k${s.id}`, kind: "shortcut", label: t(s.label), detail: shortcutDisplay(s), go: () => app.openSettings("general"),
     })) : []),

@@ -5,6 +5,7 @@ import { useAgentRuns } from "../agent/agentRuns";
 import { isActiveStatus, type RunStatus } from "../agent/agentRunsModel";
 import { getAgentSettings, loadAgentSettings } from "../agent/agentSettingsStore";
 import { useT } from "../i18n";
+import { isMuted } from "./mutedChats";
 
 // What needs the user's attention outside the visible chat: pending approval requests per chat (the sidebar shows a badge
 // on those chats) and, while the window is unfocused, a native notification (tauri-plugin-notification) plus the dock
@@ -93,7 +94,7 @@ export function useAttentionNotifications() {
     if (seq <= asked.current) return;
     asked.current = seq;
     const last = pending.get(seq);
-    if (last) void notifyUnfocused(t("notifyApproval"), t("notifyApprovalBody", { who: last.who || t("notifyMainAgent") }));
+    if (last && !isMuted(last.chatId)) void notifyUnfocused(t("notifyApproval"), t("notifyApprovalBody", { who: last.who || t("notifyMainAgent") }));
   }, [approvals, t]);
 
   useEffect(() => {
@@ -120,7 +121,7 @@ type NoticeT = (key: "notifyAgentDone" | "notifyAgentFailed", vars: { title: str
 export function reportChatRun(chatId: number | null | undefined, outcome: "ok" | "failed" | "stopped", notify?: { title: string; detail?: string; t: NoticeT }) {
   if (chatId == null) return;
   chatStatusStore.runEnded(chatId, outcome);
-  if (notify && outcome !== "stopped") void notifyUnfocused(notify.t(outcome === "ok" ? "notifyAgentDone" : "notifyAgentFailed", { title: notify.title }), (notify.detail ?? "").slice(0, 180));
+  if (notify && outcome !== "stopped" && !isMuted(chatId)) void notifyUnfocused(notify.t(outcome === "ok" ? "notifyAgentDone" : "notifyAgentFailed", { title: notify.title }), (notify.detail ?? "").slice(0, 180));
 }
 
 /** Mounted once (App): tells the status store which chat is in front (visible, window focused); restores and persists the unread ids. */

@@ -12,13 +12,14 @@ import { useApprovalChats, useChatFlags } from "../lib/attention";
 import { chatStatusStore, deriveStatus, type ChatStatus } from "../lib/chatStatus";
 import { getGoal, goalsVersion, subscribeGoals } from "../lib/goalStore";
 import { isScratch, loadScratch, scratchRoot, startScratchChat } from "../lib/scratch";
+import { isMuted, loadMuted, mutedVersion, setMuted, subscribeMuted } from "../lib/mutedChats";
 import { placeOf, settle, snooze, snoozePresets, wakeUps, without, type Place } from "../lib/triageCore";
 import { changeTriage, dismissUndo, getTriage, lastUndo, loadTriage, subscribeTriage, undoTriage } from "../lib/triageStore";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
-import { AlarmClock, Brain, CheckCheck, Flag, FolderPen } from "lucide-react";
+import { AlarmClock, BellOff, Brain, CheckCheck, Flag, FolderPen } from "lucide-react";
 import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
@@ -180,7 +181,8 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [snoozedOpen, setSnoozedOpen] = useState(false);
   const [snoozeFor, setSnoozeFor] = useState<Chat | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { void loadScratch(); }, []);
+  useEffect(() => { void loadScratch(); loadMuted(); }, []);
+  useSyncExternalStore(subscribeMuted, mutedVersion);
   useEffect(() => { loadTriage(); const id = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(id); }, []);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [showAll, setShowAll] = useState<Record<number, boolean>>({});
@@ -257,6 +259,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
+      { label: isMuted(c.id) ? t("chatUnmute") : t("chatMute"), icon: isMuted(c.id) ? <Bell size={15} /> : <BellOff size={15} />, onClick: () => setMuted(c.id, !isMuted(c.id)) },
       ...(c.project_id === null && isScratch(c.id) ? [{ label: t("scratchFolder"), icon: <FolderOpen size={15} />, onClick: () => void scratchRoot(c.id, c.title).then((d) => revealItemInDir(d)).catch(() => {}) }] : []),
       { sep: true },
       ...triageItems(c),
@@ -474,7 +477,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       >
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
-          <GoalMark chatId={c.id} /><ChatBadge status={statusOf(c)} />
+          <GoalMark chatId={c.id} />{isMuted(c.id) && <BellOff size={11} className="chat-muted-mark" aria-label={t("chatMuted")} />}<ChatBadge status={statusOf(c)} />
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
