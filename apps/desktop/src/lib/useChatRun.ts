@@ -1,4 +1,6 @@
 import { transformRequest } from "./chatContext";
+import { afterTurn, goalPrompt, newGoal, parseGoalCommand } from "./goalCore";
+import { getGoal, loadGoal, setGoal } from "./goalStore";
 import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
 import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
@@ -16,7 +18,7 @@ import { getAdapter } from "../providers";
 import { classifyQuota, exhaustedUntil, markExhausted, pickAccount, resolveAccount, setActive, type Quota } from "../providers/cursorAccounts";
 import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
-import { type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
+import { textOf, type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
 import { db, fsx, review } from "./api";
 import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ChatRunDeps, type ReviewCopy } from "./chatRunCore";
@@ -186,6 +188,12 @@ export function useChatRun(o: Options) {
     let allBlocked = false;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
     let activeModel = app.selection.model;
+    // `/goal <objective>` starts a goal: the agent then keeps going turn after turn (lib/goalCore.ts).
+    const goalObjective = retry ? null : parseGoalCommand(body);
+    const sentBody = goalObjective ? goalPrompt(goalObjective) : body;
+    let goalRun = false;
+    let runTokens = 0;
+    let lastAssistant = "";
     setError("");
     setActivities([]);
     setToolResults([]);
@@ -206,7 +214,10 @@ export function useChatRun(o: Options) {
         return { review: made.review, error };
       },
       finishReview: id => review.finish(id),
-      recordUsage: app.recordTokens,
+      recordUsage: (providerId, model, usage) => {
+        if (usage) runTokens += (usage.input ?? 0) + (usage.output ?? 0);
+        app.recordTokens(providerId, model, usage);
+      },
       bumpUsage: app.bumpUsage,
       recordResult: app.recordProviderResult,
       onLimits: app.recordLimits,
@@ -221,7 +232,7 @@ export function useChatRun(o: Options) {
     if (chatId) chatStatusStore.runStarted(chatId);
     try {
       if (!chatId) {
-        const title = body.split("\n")[0].slice(0, 60) || t("newChat");
+        const title = (goalObjective ?? body).split("\n")[0].slice(0, 60) || t("newChat");
         if (o.newWorkspace && !retry && o.projectId && o.projectRoot) {
           setRetryNotice(t("workspaceCreating"));
           const r = await createWorkspace({ projectId: o.projectId, root: o.projectRoot, title, slugSource: body, provider: activeProvider.id, model: activeModel });
@@ -242,15 +253,18 @@ export function useChatRun(o: Options) {
       if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
       await loadQueue(cid);
       await updateQueue(cid, q => ({ ...q, active: true }));
+      await loadGoal(cid).catch(() => {});
+      if (goalObjective) await setGoal(cid, newGoal(goalObjective, Date.now()));
+      goalRun = getGoal(cid)?.status === "active";
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
         if (history[history.length - 1]?.role !== "user") history.push({ role: "user", parts: [{ type: "text", text: "Continue the interrupted request from the completed steps. Do not repeat completed actions." }] });
       } else {
-        const expanded = await expandMentions(runRoot, o.files, body);
+        const expanded = await expandMentions(runRoot, o.files, sentBody);
         const added = await appendUserMessage(deps, { chatId: cid, root: runRoot, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
         if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, active: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
-        const shown: Msg = { ...added.msg, parts: [{ type: "text", text: body }, ...added.msg.parts.slice(1)] };
+        const shown: Msg = { ...added.msg, parts: [{ type: "text", text: sentBody }, ...added.msg.parts.slice(1)] };
         history = added.history;
         setMessages([...prior, { ...shown, id: added.stored.id, chat_id: cid, created_at: added.stored.created_at } as StoredMsg]);
         if (!edit) {
@@ -346,6 +360,7 @@ export function useChatRun(o: Options) {
         onAccepted: m => { retryRef.current?.history.push(m); },
         onMessage: (m, mid) => {
           if (m.role === "user" && steeringIds.length) { const id = steeringIds.shift()!; void updateQueue(cid, q => ({ ...q, items: q.items.filter(i => i.id !== id) })).catch(e => setError(String(e))); }
+          if (m.role === "assistant" && textOf(m).trim()) lastAssistant = textOf(m);
           setMessages((ms) => [...ms, { ...m, id: mid, chat_id: cid, created_at: Date.now() }]);
           setStream("");
           setActivities([]);
@@ -373,6 +388,17 @@ export function useChatRun(o: Options) {
         reviewRef.current = null;
       }
       if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
+      // A goal turn ended: count it, and queue the next turn unless the agent reported done/blocked, the user stopped
+      // or paused it, the run failed or the turn limit is reached.
+      const goalNow = chatId ? getGoal(chatId) : null;
+      if (chatId && goalRun && goalNow) {
+        const next = afterTurn(goalNow, { outcome, lastText: lastAssistant, tokens: runTokens });
+        await setGoal(chatId, next.goal).catch(() => {});
+        if (next.continueWith) {
+          const text = next.continueWith;
+          await updateQueue(chatId, q => ({ ...q, paused: false, interrupted: false, items: [...q.items, { id: crypto.randomUUID(), text, images: [], clarify: false }] })).catch(e => setError(String(e)));
+        }
+      }
       release?.();
       abortRef.current = null;
       setRunning(false);

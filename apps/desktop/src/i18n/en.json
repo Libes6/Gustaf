@@ -1513,5 +1513,20 @@
   "chatWidthHint": "How wide the conversation and the message box are on large screens",
   "chatWidthStandard": "Standard",
   "chatWidthWide": "Wide",
-  "chatWidthFull": "Full"
+  "chatWidthFull": "Full",
+  "goalCommandHint": "Keep working until a goal is met / Работать до достижения цели",
+  "goal": "Goal",
+  "goalTurns": "turn {turns} of {max}",
+  "goalTokens": "{tokens} tokens",
+  "goalPause": "Pause",
+  "goalResume": "Resume",
+  "goalClear": "Clear goal",
+  "goal_active": "Working",
+  "goal_paused": "Paused",
+  "goal_done": "Done",
+  "goal_blocked": "Needs you",
+  "goalNote_stopped": "stopped",
+  "goalNote_failed": "the request failed",
+  "goalNote_limit": "turn limit reached",
+  "goalNote_restart": "the app was restarted"
 }

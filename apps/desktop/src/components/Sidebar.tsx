@@ -10,11 +10,12 @@ import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProj
 import { useApp } from "../state";
 import { useApprovalChats, useChatFlags } from "../lib/attention";
 import { deriveStatus, type ChatStatus } from "../lib/chatStatus";
+import { getGoal, goalsVersion, subscribeGoals } from "../lib/goalStore";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
-import { Brain } from "lucide-react";
+import { Brain, Flag } from "lucide-react";
 import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
@@ -49,6 +50,14 @@ function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | nul
       }}
     />
   );
+}
+
+/** Marks a chat whose goal is being worked on (`/goal`, lib/goalStore.ts). */
+function GoalMark({ chatId }: { chatId: number }) {
+  const t = useT();
+  useSyncExternalStore(subscribeGoals, goalsVersion);
+  if (getGoal(chatId)?.status !== "active") return null;
+  return <span className="chat-goal-mark" role="img" aria-label={t("goal")} title={t("goal")}><Flag size={11} aria-hidden="true" /></span>;
 }
 
 /** One badge per chat, same size and slot for every state; each has an icon shape of its own and a text alternative. */
@@ -330,7 +339,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           <span className="ws-branch">
             <GitBranch size={13} aria-hidden="true" />
             <span className="label">{c.title}</span>
-            <ChatBadge status={statusOf(c)} />
+            <GoalMark chatId={c.id} /><ChatBadge status={statusOf(c)} />
           </span>
           <span className="ws-meta">
             <span className="branch" title={row.branch}>{row.branch}</span>
@@ -390,7 +399,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       >
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
-          <ChatBadge status={statusOf(c)} />
+          <GoalMark chatId={c.id} /><ChatBadge status={statusOf(c)} />
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
