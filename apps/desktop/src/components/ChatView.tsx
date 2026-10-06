@@ -8,7 +8,7 @@ import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
 import { getAdapter } from "../providers";
-import { textOf } from "../providers/types";
+import { levelsOf, textOf, type Reasoning } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { groupTurns } from "../lib/chatTurns";
 import { editableText, turnMessageIds } from "../lib/messageActions";
@@ -70,7 +70,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const contextTokens = estimateContext(effectiveHistory(messages), text);
   const lastInput = [...messages].reverse().find(m => m.meta?.provider === provider?.id && m.meta?.model === app.selection?.model && m.meta?.usage)?.meta?.usage?.input;
   const modelName = app.models.find((m) => m.providerId === provider?.id && m.id === app.selection?.model)?.name ?? app.selection?.model;
-  const [supports, setSupports] = useState({ computer: false, reasoning: false });
+  const [supports, setSupports] = useState<{ computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] }>({ computer: false, reasoning: false });
 
   const tasks = useBackgroundTasks(root);
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
@@ -114,7 +114,9 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     setSupports({ computer: false, reasoning: false });
     if (provider && model) {
       getAdapter(provider).then((a) => {
-        if (!cancelled) setSupports({ computer: a.supportsComputer, reasoning: a.supportsReasoning(model) });
+        if (cancelled) return;
+        const levels = levelsOf(a, model);
+        setSupports({ computer: a.supportsComputer, reasoning: levels.length > 0, levels });
       }).catch(() => {});
     }
     return () => { cancelled = true; };

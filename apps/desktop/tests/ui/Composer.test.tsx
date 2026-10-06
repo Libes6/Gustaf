@@ -15,7 +15,7 @@ type Over = {
   images?: string[];
   root?: string | null;
   running?: boolean;
-  supports?: { computer: boolean; reasoning: boolean };
+  supports?: { computer: boolean; reasoning: boolean; levels?: ("low" | "medium" | "high" | "xhigh" | "max")[] };
   selectedModel?: ModelInfo | undefined;
   canCompact?: boolean;
   onSend?: () => void;
@@ -258,6 +258,20 @@ describe("Composer", () => {
     await userEvent.click(within(screen.getByRole("dialog", { name: "Reasoning effort" })).getByRole("button", { name: /Model One/ }));
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
+  });
+
+  it("uses the model's own levels and shows a level from another model as the nearest one", async () => {
+    const all = ["low", "medium", "high", "xhigh", "max"] as const;
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model], reasoning: "max" });
+    const { unmount } = renderApp(<Harness supports={{ computer: false, reasoning: true, levels: [...all] }} />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Model One Max" }));
+    const slider = screen.getByRole("slider", { name: "Reasoning effort" });
+    expect(slider).toHaveAttribute("aria-valuemax", "4");
+    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+    expect(app.setReasoning).toHaveBeenCalledWith("xhigh");
+    unmount();
+    renderApp(<Harness supports={{ computer: false, reasoning: true, levels: ["low", "medium", "high"] }} />, makeApp({ providers: [provider()], reasoning: "xhigh" }));
+    expect(screen.getByRole("button", { name: "Model One High" })).toBeInTheDocument();
   });
 
   it("without effort levels the model chip opens the model list directly", async () => {

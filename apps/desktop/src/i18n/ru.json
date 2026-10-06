@@ -1522,5 +1522,7 @@
   "effortTitle": "Уровень рассуждений",
   "effortReset": "Сбросить к умолчанию",
   "effortHintLow": "Быстрее, дешевле",
-  "effortHintHigh": "Глубже, дольше"
+  "effortHintHigh": "Глубже, дольше",
+  "reasoning_xhigh": "Очень глубокое",
+  "reasoning_max": "Максимум"
 }

@@ -1486,5 +1486,7 @@
   "effortTitle": "Reasoning effort",
   "effortReset": "Reset to default",
   "effortHintLow": "Faster, cheaper",
-  "effortHintHigh": "Deeper, slower"
+  "effortHintHigh": "Deeper, slower",
+  "reasoning_xhigh": "Extra high",
+  "reasoning_max": "Max"
 }

@@ -10,7 +10,8 @@ import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
 import { useCursorPool } from "../../providers/cursorPoolStore";
-import { DEFAULT_REASONING, REASONING_LEVELS, type ModelInfo, type ProviderConfig } from "../../providers/types";
+import { DEFAULT_REASONING, REASONING_LEVELS, type ModelInfo, type ProviderConfig, type Reasoning } from "../../providers/types";
+import { defaultLevel, pickLevel } from "../../providers/reasoning";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
@@ -44,7 +45,8 @@ type Props = {
   provider: ProviderConfig | undefined;
   selectedModel: ModelInfo | undefined;
   modelName: string | undefined;
-  supports: { computer: boolean; reasoning: boolean };
+  /** `levels`: effort levels of the selected model, weakest first (absent: low/medium/high when `reasoning`). */
+  supports: { computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] };
   running: boolean;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
@@ -100,6 +102,9 @@ export function Composer(p: Props) {
   const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
   const [effort, setEffort] = useState(false);
+  // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
+  const levels = p.supports.levels?.length ? p.supports.levels : REASONING_LEVELS;
+  const level = pickLevel(app.reasoning, levels) ?? DEFAULT_REASONING;
   // MCP prompts: a user-invoked template picker, offered only when some MCP server is configured.
   const [promptDialog, setPromptDialog] = useState(false);
   const [hasMcp, setHasMcp] = useState(false);
@@ -355,13 +360,13 @@ export function Composer(p: Props) {
               >
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
                 <span className="chip-label">{p.modelName ?? t("chooseModel")}</span>
-                {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${app.reasoning}`)}</span></>}
+                {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${level}`)}</span></>}
                 <ChevronDown size={13} className="chev" />
               </button>
               {picker && <ModelPicker onClose={() => setPicker(false)} />}
               {effort && p.supports.reasoning && (
                 <EffortPicker
-                  levels={REASONING_LEVELS} value={app.reasoning} defaultValue={DEFAULT_REASONING} onChange={app.setReasoning}
+                  levels={levels} value={level} defaultValue={defaultLevel(levels) ?? DEFAULT_REASONING} onChange={app.setReasoning}
                   modelName={p.modelName ?? t("chooseModel")} onOpenModels={() => (setEffort(false), setPicker(true))} onClose={() => setEffort(false)}
                 />
               )}

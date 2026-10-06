@@ -3,7 +3,8 @@ import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
 import { request, sse } from "./http";
 import { makeError, streamError, withRetry } from "./retry";
-import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
+import { flattenMsg, REASONING_LEVELS, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
+import { pickLevel } from "./reasoning";
 
 function toAction(a: any): CuAction {
   switch (a.type) {
@@ -90,7 +91,9 @@ export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
       const tools: any[] = t.tools.map((d) => ({ type: "function", name: d.name, description: d.description, parameters: d.parameters, strict: false }));
       if (t.computer) tools.push({ type: "computer" });
       const body: any = { model: t.model, instructions: t.system, input, tools, stream: true, previous_response_id: previous };
-      if (t.reasoning && this.supportsReasoning(t.model)) body.reasoning = { effort: t.reasoning };
+      // Only low/medium/high are offered here; a level chosen for another model (xhigh, max) is sent as the nearest one.
+      const effort = this.supportsReasoning(t.model) ? pickLevel(t.reasoning, REASONING_LEVELS) : undefined;
+      if (effort) body.reasoning = { effort };
 
       const final = await withRetry(
         async (onText) => {
