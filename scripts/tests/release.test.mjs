@@ -20,12 +20,15 @@ test('bump writes exactly the app version entries and validates tag in isolated 
       fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true });
       fs.copyFileSync(path.join(root, f), path.join(tmp, f));
     }
+    // Relative to the version the checkout is at, so the test keeps passing after every release bump.
+    const bumped = nextVersion(versionFiles(tmp).version, 'minor');
+    const higher = nextVersion(bumped, 'minor');
     execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), 'minor']);
-    assert.equal(versionFiles(tmp).version, '0.2.0');
-    execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', 'v0.2.0']);
-    assert.throws(() => execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', 'v0.3.0'], { stdio: 'pipe' }));
+    assert.equal(versionFiles(tmp).version, bumped);
+    execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', `v${bumped}`]);
+    assert.throws(() => execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', `v${higher}`], { stdio: 'pipe' }));
     const cargo = fs.readFileSync(path.join(tmp, files[5]), 'utf8');
-    assert.match(cargo, /name = "gustaf"\nversion = "0.2.0"/);
+    assert.match(cargo, new RegExp(`name = "gustaf"\\nversion = "${bumped.replace(/\./g, '\\.')}"`));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 const assets = Object.fromEntries(targets.map(p => [p, { name: p + (p.startsWith('darwin') ? '.app.tar.gz' : p.endsWith('-msi') ? '.msi' : p.startsWith('windows') ? '.exe' : '.AppImage'), size: 10, signature: 'c2lnbmF0dXJl' }]));
