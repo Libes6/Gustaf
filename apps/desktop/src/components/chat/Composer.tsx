@@ -1,7 +1,7 @@
 import { freezeChat, shortenChat, splitChatReferences, joinChatReferences, CHAT_REFERENCE_LIMIT, type ChatReference } from "../../lib/chatContext";
 import { loadMessages, type Chat } from "../../lib/data";
 import { VoiceInput } from "../VoiceInput";
-import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
@@ -10,7 +10,8 @@ import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
 import { useCursorPool } from "../../providers/cursorPoolStore";
-import type { ModelInfo, ProviderConfig } from "../../providers/types";
+import { DEFAULT_REASONING, REASONING_LEVELS, type ModelInfo, type ProviderConfig, type Reasoning } from "../../providers/types";
+import { defaultLevel, pickLevel } from "../../providers/reasoning";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
@@ -18,6 +19,8 @@ import { ModelPicker } from "../ModelPicker";
 import { OPEN_MODEL_PICKER_EVENT } from "../../agent/verificationCore";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
+import { EffortPicker } from "./EffortPicker";
+import "../../styles/effort.css";
 import { ImageThumb } from "../ImageViewer";
 import "../../styles/workspaces.css";
 import { loadSkills, type Skill } from "../../agent/skills";
@@ -42,7 +45,8 @@ type Props = {
   provider: ProviderConfig | undefined;
   selectedModel: ModelInfo | undefined;
   modelName: string | undefined;
-  supports: { computer: boolean; reasoning: boolean };
+  /** `levels`: effort levels of the selected model, weakest first (absent: low/medium/high when `reasoning`). */
+  supports: { computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] };
   running: boolean;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
@@ -97,6 +101,10 @@ export function Composer(p: Props) {
   const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
   const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
+  const [effort, setEffort] = useState(false);
+  // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
+  const levels = p.supports.levels?.length ? p.supports.levels : REASONING_LEVELS;
+  const level = pickLevel(app.reasoning, levels) ?? DEFAULT_REASONING;
   // MCP prompts: a user-invoked template picker, offered only when some MCP server is configured.
   const [promptDialog, setPromptDialog] = useState(false);
   const [hasMcp, setHasMcp] = useState(false);
@@ -131,7 +139,7 @@ export function Composer(p: Props) {
     ta.style.height = "auto";
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
-  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
+  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setEffort(false); setMention(null); setSlash(null); } }, [p.visible]);
   // The "Try another model" button of a verification card (docs/features/verification-gates.md) opens the picker; it never re-runs anything.
   useEffect(() => {
     if (!p.visible) return;
@@ -345,23 +353,24 @@ export function Composer(p: Props) {
               onOpen={instructions.reload}
             />
             <div className="composer-model" style={{ position: "relative" }}>
-              <button className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
+              {/* A model with effort levels opens the effort slider first (the model name inside it opens the list). */}
+              <button
+                className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker || effort}
+                onClick={() => (!app.providers.length ? app.openSettings("providers") : p.supports.reasoning ? (setPicker(false), setEffort(!effort)) : setPicker(!picker))}
+              >
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span> <ChevronDown size={13} className="chev" />
+                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span>
+                {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${level}`)}</span></>}
+                <ChevronDown size={13} className="chev" />
               </button>
               {picker && <ModelPicker onClose={() => setPicker(false)} />}
+              {effort && p.supports.reasoning && (
+                <EffortPicker
+                  levels={levels} value={level} defaultValue={defaultLevel(levels) ?? DEFAULT_REASONING} onChange={app.setReasoning}
+                  modelName={p.modelName ?? t("chooseModel")} onOpenModels={() => (setEffort(false), setPicker(true))} onClose={() => setEffort(false)}
+                />
+              )}
             </div>
-            {p.supports.reasoning && (
-              <button
-                className="chip"
-                aria-haspopup="menu"
-                onClick={(e) =>
-                  menu.open(e.currentTarget.getBoundingClientRect(), (["low", "medium", "high"] as const).map((r) => ({ label: t(`reasoning_${r}`), kbd: app.reasoning === r ? "✓" : "", onClick: () => app.setReasoning(r) })))
-                }
-              >
-                <Brain size={14} /> {t(`reasoning_${app.reasoning}`)}
-              </button>
-            )}
             <div className="composer-actions">
             <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
             {p.running ? (

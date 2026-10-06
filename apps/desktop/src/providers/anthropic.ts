@@ -4,6 +4,7 @@ import { request, sse } from "./http";
 import { resolveKey, type KeySource } from "../lib/keys";
 import { makeError, streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
+import { anthropicLevels, pickLevel } from "./reasoning";
 
 type XY = [number, number] | undefined;
 
@@ -104,7 +105,8 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
   });
   return {
     supportsComputer: true,
-    supportsReasoning: () => false,
+    supportsReasoning: (model) => anthropicLevels(model).length > 0,
+    reasoningLevels: anthropicLevels,
 
     async listModels() {
       const res = await request(`${base}/v1/models?limit=100`, { headers: await authHeaders() });
@@ -115,7 +117,13 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
     async turn(t: TurnInput) {
       const tools: any[] = t.tools.map((d) => ({ name: d.name, description: d.description, input_schema: d.parameters }));
       if (t.computer) tools.push({ type: "computer_toolset_20260801" });
-      const body = { model: t.model, max_tokens: 16000, system: t.system, messages: toAnthropic(t.messages, cfg.id), tools, stream: true };
+      // Effort goes in output_config (GA); models without effort support get no field. The upper levels think longer, so
+      // they get more room before max_tokens cuts the reply (the request streams, so a large cap does not time out).
+      const effort = pickLevel(t.reasoning, anthropicLevels(t.model));
+      const body = {
+        model: t.model, max_tokens: effort === "xhigh" || effort === "max" ? 64000 : 16000, system: t.system, messages: toAnthropic(t.messages, cfg.id), tools, stream: true,
+        ...(effort ? { output_config: { effort } } : {}),
+      };
       const { blocks, usageRaw } = await withRetry(
         async (onText) => {
           const blocks: any[] = [];

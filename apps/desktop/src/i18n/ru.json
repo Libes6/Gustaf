@@ -610,9 +610,9 @@
   "projects": "Проекты",
   "providers": "Провайдеры моделей",
   "providersLead": "OpenAI, Anthropic, OpenRouter, Cursor, локальные модели или любой OpenAI-совместимый endpoint.",
-  "reasoning_high": "Высокий",
-  "reasoning_low": "Низкий",
-  "reasoning_medium": "Обычный",
+  "reasoning_high": "Глубокое",
+  "reasoning_low": "Лёгкое",
+  "reasoning_medium": "Среднее",
   "recent": "Недавние",
   "removeProject": "Убрать проект",
   "rename": "Переименовать",
@@ -1518,5 +1518,11 @@
   "provManage": "Управление провайдерами…",
   "provSignInCommand": "Войдите командой {command} в терминале и проверьте снова.",
   "provNoBaseUrl": "У этого провайдера нет base URL или путей для настройки.",
-  "provBrowserDone": "Аккаунты, в которые вы вошли, появятся в списке слева."
+  "provBrowserDone": "Аккаунты, в которые вы вошли, появятся в списке слева.",
+  "effortTitle": "Уровень рассуждений",
+  "effortReset": "Сбросить к умолчанию",
+  "effortHintLow": "Быстрее, дешевле",
+  "effortHintHigh": "Глубже, дольше",
+  "reasoning_xhigh": "Очень глубокое",
+  "reasoning_max": "Максимум"
 }

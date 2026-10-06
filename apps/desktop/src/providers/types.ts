@@ -75,7 +75,10 @@ export type CliId = "claude" | "cursor-agent" | "codex";
 export type ProviderConfig = { id: string; kind: ProviderKind; name: string; baseUrl: string; cli?: CliId; cliAuth?: "key"; /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string; /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string; disabled?: boolean };
 export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean };
 export type ToolDef = { name: string; description: string; parameters: Record<string, unknown> };
-export type Reasoning = "low" | "medium" | "high";
+export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max";
+/** Levels of an adapter that only says it supports reasoning (no `reasoningLevels`), weakest first. */
+export const REASONING_LEVELS: readonly Reasoning[] = ["low", "medium", "high"];
+export const DEFAULT_REASONING: Reasoning = "medium";
 
 export type TurnInput = {
   system: string;
@@ -107,7 +110,13 @@ export interface Adapter {
   turn(input: TurnInput): Promise<TurnOutput>;
   supportsComputer: boolean;
   supportsReasoning(model: string): boolean;
+  /** Effort levels this model offers, weakest first (empty: no control). Absent: `REASONING_LEVELS` when `supportsReasoning`. */
+  reasoningLevels?(model: string): readonly Reasoning[];
 }
+
+/** Levels to show for a model, whichever way the adapter reports them. */
+export const levelsOf = (a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">, model: string): readonly Reasoning[] =>
+  a.reasoningLevels ? a.reasoningLevels(model) : a.supportsReasoning(model) ? REASONING_LEVELS : [];
 
 export const textOf = (m: Msg) =>
   m.parts

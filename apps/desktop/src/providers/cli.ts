@@ -6,13 +6,14 @@ import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
+import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
 import { Command } from "@tauri-apps/plugin-shell";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
-import type { Adapter, CliId, ProviderConfig, TurnInput } from "./types";
+import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
 
 export { shq } from "./shell";
 
@@ -121,7 +122,9 @@ type Spec = {
   name: string;
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
   /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
-  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string }): string[];
+  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string; reasoning?: Reasoning }): string[];
+  /** Effort levels the CLI can pass for this model (providers/reasoning.ts). */
+  levels(model: string): readonly Reasoning[];
   /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
   imageFlag?: boolean;
   parse(e: any): Ev;
@@ -134,6 +137,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Claude Code",
     models: ["default", "opus", "sonnet", "haiku"],
     args: ({ attachDir, ...o }) => claudeArgs({ ...o, addDir: attachDir }),
+    levels: claudeCliLevels,
     parse: parseClaudeEvent,
     loginHint: "claude auth login",
   },
@@ -150,6 +154,7 @@ const SPECS: Record<CliId, Spec> = {
       return out;
     },
     args: cursorArgs,
+    levels: cursorLevels,
     parse: (e) => {
       // With --stream-partial-output the deltas carry timestamp_ms; the aggregate repeats without it.
       if (e.type === "assistant" && e.timestamp_ms) return { text: (e.message?.content ?? []).map((c: any) => c.text ?? "").join(""), session: e.session_id };
@@ -162,6 +167,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Codex",
     models: listCodexModels,
     args: codexArgs,
+    levels: codexLevels,
     imageFlag: true,
     parse: (e) => {
       if (e.type === "thread.started") return { session: e.thread_id };
@@ -195,7 +201,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
   const spec = SPECS[id];
   return {
     supportsComputer: false,
-    supportsReasoning: () => false,
+    supportsReasoning: (model) => spec.levels(model).length > 0,
+    reasoningLevels: (model) => spec.levels(model),
 
     async listModels() {
       if (id === 'cursor-agent') {
@@ -220,7 +227,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir });
+      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir, reasoning: pickLevel(t.reasoning, spec.levels(t.model)) });
       const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
       let text = "";
       const actions = new Map<string, Activity>();
