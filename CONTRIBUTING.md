@@ -45,11 +45,12 @@ Add or update tests with every behaviour change. If a change cannot be tested au
 
 ## Branches and releases
 
-Short version (full description in [docs/branching.md](docs/branching.md)):
+`dev` is the integration branch and the default target; `main` only receives releases and hotfixes. Details: [docs/branching.md](docs/branching.md) (branches, CI) and [docs/release.md](docs/release.md) (release flow, hotfixes, signing).
 
-1. Branch from `dev` (`feature/…`, `fix/…`) and open a pull request **into `dev`**. CI must pass.
+1. Branch from `dev` (`feature/<topic>`; agent branches use `gustaf/<topic>`) and open a pull request **into `dev`**. CI must pass.
 2. A release bumps the version on `dev` (`npm run version:bump -- patch|minor|major`), then a pull request from `dev` into `main`.
-3. A push to `main` builds all installers and creates a **draft** GitHub Release. Before it is published by hand, the [release checklist](docs/release-checklist.md) is run on the built artifacts. Signing and updater settings: [docs/release.md](docs/release.md).
+3. The push to `main` builds all installers, tags `vX.Y.Z` and creates a **draft** GitHub Release. Do not push version tags by hand. Before the draft is published by hand, the [release checklist](docs/release-checklist.md) is run on the built artifacts.
+4. Hotfixes branch from `main`, go back into `main` by pull request, and `main` is then merged back into `dev`.
 
 Do not push directly to `dev` or `main`.
 
