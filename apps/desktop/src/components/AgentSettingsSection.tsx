@@ -92,10 +92,10 @@ function CodexSessionsRow() {
   );
 }
 
-/** Codex over its app-server: native subagent lifecycle (providers/codexAppServer.ts). Off until verified; falls back to `exec`. */
+/** Codex over its app-server: native subagent lifecycle (providers/codexAppServer.ts). On by default; falls back to `exec`. */
 function CodexAppServerRow() {
   const t = useT();
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(true);
   useEffect(() => {
     let alive = true;
     void codexTransport().then((v) => { if (alive) setOn(v === "app-server"); });

@@ -1656,6 +1656,6 @@
   "cleanupNow": "Очистить сейчас",
   "cleanupDone": "Удалено папок workspace: {n}",
   "cleanupFailed": "Не удалось очистить",
-  "codexAppServer": "Codex app-server (экспериментально)",
+  "codexAppServer": "Codex app-server",
   "codexAppServerDesc": "Общаться с Codex по протоколу app-server вместо codex exec: субагенты показывают настоящий статус, модель и прогресс. Если app-server не запустился, используется codex exec. Выключите, если запуск Codex ведёт себя странно."
 }

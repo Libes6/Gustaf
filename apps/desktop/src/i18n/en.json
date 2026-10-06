@@ -1620,6 +1620,6 @@
   "cleanupNow": "Clean up now",
   "cleanupDone": "Removed {n} workspace folders",
   "cleanupFailed": "Cleanup failed",
-  "codexAppServer": "Codex app-server (experimental)",
+  "codexAppServer": "Codex app-server",
   "codexAppServerDesc": "Talk to Codex over its app-server protocol instead of codex exec: subagents report their real status, model and progress. Falls back to codex exec if the app-server cannot start. Turn off if a Codex run misbehaves."
 }

@@ -295,3 +295,11 @@ test('real Codex 0.160.1 run with two subagents: both appear, finish, and no bar
   assert.equal(done.status, 'completed');
   assert.match(text, /2\+2 = 4|2\+2 is 4|4/);
 });
+
+test('separate agent messages of one turn are separated by a blank line, a continuing message is not', async () => {
+  const { out, h } = handlers();
+  const d = (itemId, delta) => note('item/agentMessage/delta', { threadId: ROOT, turnId: 't1', itemId, delta });
+  const conn = fakeConn(base({ then: [d('m1', 'Starting '), d('m1', 'agents.'), d('m2', 'Done: '), d('m2', '4.'), turnDone(ROOT)] }));
+  await runAppServerTurn(conn, P, h);
+  assert.equal(out.text, 'Starting agents.\n\nDone: 4.');
+});
