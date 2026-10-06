@@ -781,3 +781,7 @@ button:disabled { cursor:default; opacity:.45; }
 .pr-watch.passing .goal-icon { color: var(--green); }
 .pr-watch.stopped .goal-icon { color: var(--text-3); }
 
+.tool-head .tool-time { margin-left: auto; color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; flex: none; }
+.tool-head .tool-time + .action-status { margin-left: 8px; }
+.file-row .viewed-box { flex: none; margin: 0 6px 0 2px; accent-color: var(--accent); }
+.file-row.viewed .path { color: var(--text-3); }

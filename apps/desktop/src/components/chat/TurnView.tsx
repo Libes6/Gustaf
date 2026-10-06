@@ -88,9 +88,9 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       ) : isVerificationPart(p) ? (
         <VerificationCard key={`verification-${i}`} part={p} />
       ) : p.type === "activity" ? (
-        <ToolCard key={p.id} call={p} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+        <ToolCard key={p.id} call={p} at={m.created_at} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : p.type === "tool_call" ? (
-        <ToolCard key={p.id} call={p} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+        <ToolCard key={p.id} call={p} at={m.created_at} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : null,
     );
 
