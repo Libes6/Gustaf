@@ -47,7 +47,7 @@ async function run(script, o = {}) {
     turn: async (input) => {
       assert.ok(input.tools.length === 0 || input.tools.some((t) => t.name === 'read_file'));
       const next = script[i++];
-      if (typeof next === 'function') return next({ ctl, root });
+      if (typeof next === 'function') return next({ ctl, root, input });
       return next ?? { parts: [{ type: 'text', text: 'done' }] };
     },
   };
@@ -70,6 +70,7 @@ async function run(script, o = {}) {
       approvals.push(req);
       return o.approve ? o.approve(req, ctl) : true;
     },
+    ...(o.requestSecret ? { requestSecret: o.requestSecret } : {}),
   });
   return { root, outputs, approvals, runs: [...state.runs], log: getActionLog().entries };
 }
@@ -359,3 +360,34 @@ test('web disabled or declined never executes a native request',async()=>{
  const domain=await run([step(call('web_fetch',{url:'https://blocked.example.com'}))],{access:'full',setup:()=>setSetting('webTools',{enabled:true,allow:[],deny:['example.com']})});assert.equal(domain.approvals.length,0);assert.equal(domain.outputs[0].isError,true);
 });
 test('terminal reading always asks, including full access',async()=>{const r=await run([step(call('read_terminal',{id:1,lines:30}))],{access:'full',approve:()=>false});assert.equal(r.approvals[0].kind,'terminal');assert.equal(r.outputs[0].isError,true);});
+
+test('request_secret: the value reaches one command as an env variable, is masked in its output and never in a message', async () => {
+  const asked = [];
+  let ref = '';
+  const r = await run([
+    step(call('request_secret', { name: 'GitHub token', reason: 'push the branch' })),
+    ({ input }) => { ref = /REF ([A-Z0-9]{8})/.exec(JSON.stringify(input.messages))[1]; return step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` })); },
+    () => step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` })),
+    step(),
+  ], {
+    requestSecret: async (req) => (asked.push(req), 'ghp_SECRETVALUE123'),
+    runResult: ({ command }) => ({ code: 0, output: command.includes('GUSTAF_SECRET_') ? 'token=ghp_SECRETVALUE123' : '', timed_out: false }),
+  });
+  assert.deepEqual(asked, [{ name: 'GitHub token', reason: 'push the branch' }]);
+  ref = /REF ([A-Z0-9]{8})/.exec(r.outputs[0].output)[1];
+  assert.match(r.outputs[0].output, /\$GUSTAF_SECRET_[A-Z0-9]{8}/);
+  assert.ok(!r.outputs[0].output.includes('ghp_'), 'the tool result carries only the reference');
+  assert.deepEqual(r.runs[0].env, { [`GUSTAF_SECRET_${ref}`]: 'ghp_SECRETVALUE123' });
+  assert.equal(r.outputs[1].output, `exit code: 0\ntoken=[secret ${ref}]`);
+  assert.equal(r.runs[1].env, undefined, 'one use: the second command gets no value');
+  assert.ok(!JSON.stringify(r.log).includes('ghp_SECRETVALUE123'), 'the action log never has the value');
+});
+
+test('request_secret: declined, and not offered without a secret prompt (scheduled runs, subagents)', async () => {
+  const declined = await run([step(call('request_secret', { name: 'key', reason: 'x' })), step()], { requestSecret: async () => null });
+  assert.equal(declined.outputs[0].isError, true);
+  assert.match(declined.outputs[0].output, /declined/);
+  const absent = await run([step(call('request_secret', { name: 'key', reason: 'x' })), step()]);
+  assert.match(absent.outputs[0].output, /only in an interactive chat/);
+});
+

@@ -142,7 +142,7 @@ pub async fn review_prepare(app: AppHandle, root: String, link_dirs: Option<Vec<
 pub async fn review_run(app: AppHandle, id: String, command: String, timeout_ms: Option<u64>) -> Result<crate::tools::CmdResult, String> {
     let work = review_dir(&app, &id)?.join("work");
     if !work.is_dir() { return Err("Review workspace not found".into()); }
-    crate::tools::run_command(work.to_string_lossy().into_owned(), command, Some(timeout_ms.unwrap_or(300_000).min(900_000))).await
+    crate::tools::run_command(work.to_string_lossy().into_owned(), command, Some(timeout_ms.unwrap_or(300_000).min(900_000)), None).await
 }
 
 fn changes(dir: &Path) -> Result<Vec<Change>, String> {

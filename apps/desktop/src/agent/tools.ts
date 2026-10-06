@@ -44,3 +44,12 @@ export const WRITE_TOOLS: ToolDef[] = [
     parameters: obj({ command: str("Command line"), timeout_ms: int("Timeout, default 120000") }, ["command"]),
   },
 ];
+
+/** Asks the user for a secret through a private card (T10); see agent/secretRefs.ts. Offered with run_command in interactive chats. */
+export const SECRET_TOOL: ToolDef = {
+  name: "request_secret",
+  description:
+    "Ask the user for a secret (API key, token, password) that a command needs. The user types it into a private field; you never see the value. You get a reference REF: use it in run_command as the environment variable $GUSTAF_SECRET_<REF> (PowerShell: $env:GUSTAF_SECRET_<REF>). It works for one command; the value is masked in the output. Never ask the user to paste a secret into the chat.",
+  parameters: obj({ name: str("What the secret is, e.g. 'GitHub token'"), reason: str("Why it is needed, one sentence") }, ["name", "reason"]),
+};
+

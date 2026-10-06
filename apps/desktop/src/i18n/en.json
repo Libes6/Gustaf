@@ -1558,5 +1558,10 @@
   "newScratchChat": "New scratch chat",
   "scratchTitle": "Scratch {date}",
   "scratchFolder": "Scratch folder",
-  "scratchHint": "A chat without a project, with its own folder for files"
+  "scratchHint": "A chat without a project, with its own folder for files",
+  "secretTitle": "The agent asks for {name}",
+  "secretValue": "Secret value",
+  "secretNote": "Goes to one command as an environment variable. It is not saved in the chat, and it is masked in the output.",
+  "secretGive": "Provide",
+  "secretDecline": "Decline"
 }

@@ -175,8 +175,8 @@ export const fsx = {
   /** Instruction files the test put in `state.instructionFiles` ({ name, text }). */
   instructions: async () => state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
   homeFile: async () => null,
-  run: async (root, command, timeoutMs) => {
-    state.runs.push({ root, command });
+  run: async (root, command, timeoutMs, env) => {
+    state.runs.push(env && Object.keys(env).length ? { root, command, env } : { root, command });
     state.runTimeouts.push(timeoutMs);
     return typeof state.runResult === 'function' ? state.runResult({ root, command, timeoutMs }) : state.runResult;
   },
