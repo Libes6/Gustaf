@@ -489,3 +489,16 @@ describe("Composer: large pastes", () => {
   });
 });
 
+it("⌘⌥↵ sends and opens a new chat; a plain Enter only sends", () => {
+  const onSend = vi.fn();
+  const app = makeApp({ sessions: { active: "s1", items: [{ key: "s1", chatId: 3, projectId: 7 }] } });
+  renderApp(<Harness text="ship it" onSend={onSend} />, app);
+  const field = screen.getByRole("textbox", { name: "Ask anything" });
+  fireEvent.keyDown(field, { key: "Enter" });
+  expect(onSend).toHaveBeenCalledTimes(1);
+  expect(app.newChat).not.toHaveBeenCalled();
+  fireEvent.keyDown(field, { key: "Enter", metaKey: true, altKey: true });
+  expect(onSend).toHaveBeenCalledTimes(2);
+  expect(app.newChat).toHaveBeenCalledWith(7);
+});
+

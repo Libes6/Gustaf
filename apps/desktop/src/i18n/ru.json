@@ -1635,5 +1635,8 @@
   "webhookOutcome_running": "пропущено: уже выполняется",
   "webhookOutcome_off": "пропущено: расписание выключено",
   "webhookOutcome_rejected": "отклонено: неверная подпись",
-  "copied": "Скопировано"
+  "copied": "Скопировано",
+  "chatBack": "Предыдущий чат",
+  "chatForward": "Следующий чат",
+  "sendNewChat": "Отправить и открыть новый чат"
 }

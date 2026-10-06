@@ -1599,5 +1599,8 @@
   "webhookOutcome_running": "skipped: already running",
   "webhookOutcome_off": "skipped: schedule off",
   "webhookOutcome_rejected": "rejected: bad signature",
-  "copied": "Copied"
+  "copied": "Copied",
+  "chatBack": "Previous chat",
+  "chatForward": "Next chat",
+  "sendNewChat": "Send and open a new chat"
 }
