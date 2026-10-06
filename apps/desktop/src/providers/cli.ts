@@ -6,6 +6,8 @@ import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
+import { AppServerUnavailable, runAppServerTurn, type Connection } from "./codexAppServer";
+import { codexTransport } from "./codexTransport";
 import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
@@ -100,6 +102,39 @@ export async function spawnLines(
   try { code = await done; } finally { o.signal?.removeEventListener("abort", kill); }
   line(buf);
   return { code, stderr };
+}
+
+/** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
+async function openAppServer(executable: string, o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void }): Promise<Connection> {
+  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
+  let listener: ((m: Record<string, unknown>) => void) | undefined;
+  const queued: Record<string, unknown>[] = [];
+  let buf = "";
+  let stderr = "";
+  const line = (raw: string) => {
+    raw = raw.trim();
+    if (!raw) return;
+    try { o.onRaw?.(raw); } catch { /* debugging aid only */ }
+    try {
+      const m = JSON.parse(raw);
+      if (m && typeof m === "object") (listener ? listener(m) : queued.push(m));
+    } catch { /* banners and warnings */ }
+  };
+  const closed = new Promise<number | null>((resolve) => cmd.on("close", (e) => { line(buf); buf = ""; resolve(e.code); }));
+  cmd.stdout.on("data", (chunk: string) => {
+    buf += chunk;
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); }
+  });
+  cmd.stderr.on("data", (s: string) => { stderr = (stderr + s).slice(-4000); });
+  const child = await cmd.spawn();
+  return {
+    write: (l) => child.write(l + "\n"),
+    onMessage(cb) { listener = cb; for (const m of queued.splice(0)) cb(m); },
+    closed,
+    kill: () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); },
+    stderr: () => stderr,
+  };
 }
 
 export { resumePoint } from "./cliArgs";
@@ -249,9 +284,27 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       const rollout = id === "codex" && (await rolloutEnabled())
         ? createRolloutTracker({ startedAt: Date.now(), onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onDebug: log.debug })
         : undefined;
-      let res: Awaited<ReturnType<typeof spawnLines>>;
+      let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
+      // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
+      let viaServer = false;
+      if (id === "codex" && (await codexTransport()) === "app-server") {
+        try {
+          const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
+          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)) }, {
+            signal: t.signal, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
+          });
+          viaServer = true;
+          session = r.session;
+          if (r.error) error = r.error;
+          res = { code: 0, stderr: "" };
+        } catch (e) {
+          if (t.signal.aborted) throw e;
+          if (!(e instanceof AppServerUnavailable)) throw e;
+          log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
+        }
+      }
       try {
-      res = await spawnLines(
+      if (!viaServer) res = await spawnLines(
         // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
         runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
         (e) => {
@@ -276,7 +329,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
         for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) t.onActivity?.(applyActivity(actions, action));
       }
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
+      if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
       if (error) {
         const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
         throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
