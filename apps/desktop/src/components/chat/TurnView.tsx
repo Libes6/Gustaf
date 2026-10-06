@@ -1,4 +1,4 @@
-import { splitChatReferences } from "../../lib/chatContext";
+import { pasteStats, splitComposerText } from "../../lib/chatContext";
 import { useApp } from "../../state";
 import { ChevronDown, ChevronRight, Copy, GitBranch, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
@@ -39,7 +39,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
   const t = useT();
   const rewindMenu = useMenu();
   const app = useApp();
-  const userContext = splitChatReferences(turn.user ? textOf(turn.user) : "");
+  const userContext = splitComposerText(turn.user ? textOf(turn.user) : "");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // Which delete button waits for its second click (the one under the user bubble or the one under the reply).
@@ -126,10 +126,17 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
                 {images.map((p, i) => <ImageThumb key={i} src={`data:image/png;base64,${p.data}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />)}
               </div>
             )}
-            {(contextText || userContext.references.length > 0 || turn.user.meta?.compacted) && (
+            {(contextText || userContext.references.length > 0 || userContext.pastes.length > 0 || turn.user.meta?.compacted) && (
               <div className="bubble">
                 {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
                 {contextText}
+                {userContext.pastes.map((paste, i) => {
+                  const { lines, chars } = pasteStats(paste);
+                  return <div className="chat-reference paste-card" key={`paste:${i}`}>
+                    <strong>{t("pastedText")}</strong> <span>{t("pastedTextStats", { lines: lines.toLocaleString(app.locale), chars: chars.toLocaleString(app.locale) })}</span>
+                    <details><summary>{t("pastedTextShow")}</summary><pre>{paste.text}</pre></details>
+                  </div>;
+                })}
                 {userContext.references.map((ref, i) => <div className="chat-reference" key={`${ref.sourceId}:${i}`}>
                   <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
                   <span>{ref.snapshot.length.toLocaleString()} {app.locale === "ru" ? "символов · справочный материал" : "characters · reference material"}</span>

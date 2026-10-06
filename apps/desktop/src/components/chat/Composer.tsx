@@ -1,4 +1,4 @@
-import { freezeChat, shortenChat, splitChatReferences, joinChatReferences, CHAT_REFERENCE_LIMIT, type ChatReference } from "../../lib/chatContext";
+import { freezeChat, shortenChat, splitComposerText, joinComposerText, isLargePaste, pasteStats, CHAT_REFERENCE_LIMIT, type ChatReference, type PastedText } from "../../lib/chatContext";
 import { loadMessages, type Chat } from "../../lib/data";
 import { VoiceInput } from "../VoiceInput";
 import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
@@ -72,7 +72,9 @@ export function Composer(p: Props) {
   const menu = useMenu();
   const addMenu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
-  const { body: composerBody, references } = splitChatReferences(text);
+  const { body: composerBody, pastes, references } = splitComposerText(text);
+  // Composer text = what is in the field, then pasted-text cards, then attached chats (lib/chatContext.ts).
+  const compose = (body: string, refs: ChatReference[] = references, ps: PastedText[] = pastes) => joinComposerText(body, ps, refs);
   const [pendingChat, setPendingChat] = useState<ChatReference | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const ru = app.locale === "ru";
@@ -87,8 +89,8 @@ export function Composer(p: Props) {
     finally { if (scope === currentScope.current) setChatLoading(false); }
   };
   const confirmChat = (ref: ChatReference) => {
-    const latest = splitChatReferences(text);
-    const next = joinChatReferences(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref]);
+    const latest = splitComposerText(text);
+    const next = compose(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref], latest.pastes);
     if (next.length > 200_000) { setAttachmentError(ru ? "Снимок превышает лимит черновика (200 000 символов). Выберите сокращённую версию или удалите другое вложение." : "Snapshot exceeds draft limit (200,000 characters). Choose shortened version or remove another attachment."); return; }
     setText(next);
     setPendingChat(null); taRef.current?.focus();
@@ -151,7 +153,7 @@ export function Composer(p: Props) {
     ...app.chats.filter(c => c.title.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(chat => ({ path: "", chat, label: `💬 ${chat.title}` }))
   ].slice(0, 12) : [];
   const insertMention = (path: string) => {
-    setText(joinChatReferences(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
+    setText(compose(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
     setMention(null);
     taRef.current?.focus();
   };
@@ -234,9 +236,21 @@ export function Composer(p: Props) {
           {references.map((ref, i) => <div key={`${ref.sourceId}:${i}`} className="chat-reference">
             <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
             <span>{ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}{ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}</span>
-            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(joinChatReferences(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
+            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
             <details><summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary><pre>{ref.snapshot}</pre></details>
           </div>)}
+          {pastes.map((paste, i) => {
+            const { lines, chars } = pasteStats(paste);
+            return (
+              <div key={`paste:${i}`} className="chat-reference paste-card" role="group" aria-label={t("pastedText")}>
+                <strong>{t("pastedText")}</strong>
+                <span>{t("pastedTextStats", { lines: lines.toLocaleString(app.locale), chars: chars.toLocaleString(app.locale) })}</span>
+                <button className="btn-ghost" onClick={() => setText(compose(composerBody + (composerBody && !composerBody.endsWith("\n") ? "\n" : "") + paste.text, references, pastes.filter((_, j) => j !== i)))}>{t("pastedTextInline")}</button>
+                <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references, pastes.filter((_, j) => j !== i)))}><X size={14} /></button>
+                <details><summary>{t("pastedTextShow")}</summary><pre>{paste.text}</pre></details>
+              </div>
+            );
+          })}
           {pendingChat && <div className="chat-reference" role="region" aria-label={ru ? "Прикрепить чат" : "Attach chat"}>
             <strong>{pendingChat.title}</strong> · {pendingChat.fullSize.toLocaleString()} {ru ? "символов" : "characters"}
             <p>{ru ? "Разговор будет отправлен как текстовый справочный материал (изображения не копируются). Снимок сохраняется независимо от последующих изменений исходника." : "Conversation is sent as text reference material (images are not copied). The snapshot is retained independently of later source edits."}</p>
@@ -267,7 +281,7 @@ export function Composer(p: Props) {
             value={composerBody}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
             onChange={(e) => {
-              setText(joinChatReferences(e.target.value, references));
+              setText(compose(e.target.value, references));
               const cmd = /^\/([a-zA-Z0-9_-]*)$/.exec(e.target.value);
               setSlash(cmd ? { q: cmd[1], hl: 0 } : null);
               const m = /@([^\s@]*)$/.exec(e.target.value.slice(0, e.target.selectionStart));
@@ -278,7 +292,17 @@ export function Composer(p: Props) {
             onPaste={e => {
               const files = Array.from(e.clipboardData.items ?? []).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => !!file);
               const images = files.length ? files : Array.from(e.clipboardData.files).filter(file => file.type.startsWith("image/"));
-              if (images.length) { e.preventDefault(); addImageFiles(images); }
+              if (images.length) { e.preventDefault(); addImageFiles(images); return; }
+              // A large text paste becomes a card instead of filling the field (the model still gets all of it).
+              const pasted = e.clipboardData.getData?.("text/plain") ?? "";
+              if (!pasted || !isLargePaste(pasted)) return;
+              e.preventDefault();
+              const field = e.currentTarget;
+              const body = composerBody.slice(0, field.selectionStart) + composerBody.slice(field.selectionEnd);
+              const next = compose(body, references, [...pastes, { text: pasted }]);
+              if (next.length > 200_000) { setAttachmentError(t("pasteTooLarge")); return; }
+              setAttachmentError("");
+              setText(next);
             }}
           />
           <div className="composer-bar">
@@ -294,8 +318,8 @@ export function Composer(p: Props) {
                   { heading: t("attach") },
                   ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
-                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
-                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
+                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(compose(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
+                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(compose(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
                   ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
                   { sep: true },

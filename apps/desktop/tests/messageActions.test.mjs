@@ -97,3 +97,9 @@ test('turnActions: compacted summaries offer no edit, regenerate, delete or bran
   const a = turnActions(turn([txt(2, 'assistant', 'a')], txt(1, 'user', 's', { compacted: true })), { busy: false, isLastTurn: true });
   assert.deepEqual(a.show, { edit: false, regenerate: false, remove: false, branch: false });
 });
+
+test('editableText keeps pasted texts and chat references that follow the file blocks', () => {
+  const paste = '\n\n<gustaf-pasted-text>\nText the user pasted into the message:\n{"text":"log"}\n</gustaf-pasted-text>';
+  assert.equal(editableText(txt(1, 'user', 'see @a.ts\n\n<file path="a.ts">\nx\n</file>' + paste)), 'see @a.ts' + paste);
+  assert.equal(editableText(txt(1, 'user', 'plain' + paste)), 'plain' + paste);
+});

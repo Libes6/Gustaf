@@ -1499,5 +1499,10 @@
   "rewindKeepFiles": "Return here, keep files",
   "rewindKeepFilesHint": "Removes this message and everything after it; your files stay as they are",
   "rewindWithFiles": "Return here and restore files",
-  "rewindWithFilesHint": "Also puts the project files back to how they were before this message"
+  "rewindWithFilesHint": "Also puts the project files back to how they were before this message",
+  "pastedText": "Pasted text",
+  "pastedTextStats": "{lines} lines · {chars} characters",
+  "pastedTextInline": "Put into message",
+  "pastedTextShow": "Show text",
+  "pasteTooLarge": "This paste is larger than the draft limit (200,000 characters)."
 }
