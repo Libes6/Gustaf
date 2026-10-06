@@ -35,6 +35,8 @@ import { branchCutoff, branchTitle, editableText, messageImages, messagesBefore 
 import type { useComposerDraft } from "./useComposerDraft";
 
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void };
+/** An open `request_secret` (T10): the private card resolves with the typed value or null. */
+export type SecretRequest = { name: string; reason: string; resolve: (value: string | null) => void };
 
 type Options = {
   session: ChatSession;
@@ -93,6 +95,7 @@ export function useChatRun(o: Options) {
   const [error, setError] = useState("");
   const [ownRunning, setRunning] = useState(false);
   const [ownApproval, setApproval] = useState<Approval | null>(null);
+  const [secretRequest, setSecretRequest] = useState<SecretRequest | null>(null);
   const [ownToolResults, setToolResults] = useState<Extract<Part, { type: "tool_result" }>[]>([]);
   const [ownActivities, setActivities] = useState<Extract<Part, { type: "activity" }>[]>([]);
   const [ownRetryNotice, setRetryNotice] = useState("");
@@ -140,6 +143,7 @@ export function useChatRun(o: Options) {
   const stop = () => {
     abortRef.current?.abort();
     approval?.resolve(false);
+    secretRequest?.resolve(null);
     external?.abort();
   };
 
@@ -344,6 +348,12 @@ export function useChatRun(o: Options) {
         signal: ctl.signal,
         stop: () => ctl.abort(),
         approve,
+        requestSecret: (req) => new Promise<string | null>((resolve) => {
+          let done = false;
+          const finish = (value: string | null) => { if (done) return; done = true; setSecretRequest(null); resolve(value); };
+          ctl.signal.addEventListener("abort", () => finish(null), { once: true });
+          setSecretRequest({ ...req, resolve: finish });
+        }),
         subagents: runRoot ? createSubagentHost({ projectRoot: runRoot, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app), providers: providerDirectory(app), onCliFailure: parkCliAccount }) : undefined,
       }, deps, {
         onReview: r => { reviewRef.current = r; },
@@ -538,5 +548,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
 }

@@ -139,8 +139,9 @@ export const fsx = {
   /** AGENTS.md, CLAUDE.md, .cursorrules and always-apply Cursor rules found inside the project root. */
   instructions: (root: string) => invoke<{ name: string; bytes: number; text: string }[]>("read_instructions", { root }),
   homeFile: (rel: string) => invoke<string | null>("read_home_file", { rel }),
-  run: (root: string, command: string, timeoutMs?: number) =>
-    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs }),
+  /** `env`: extra variables for this command only (secrets from `request_secret`, see agent/secretRefs.ts). */
+  run: (root: string, command: string, timeoutMs?: number, env?: Record<string, string>) =>
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs, ...(env && Object.keys(env).length ? { env } : {}) }),
 };
 
 /** Runs a hook command (src-tauri/src/hook_exec.rs): JSON on stdin, scrubbed environment plus `env` (GUSTAF_* only), hard timeout, process tree killed on timeout. */

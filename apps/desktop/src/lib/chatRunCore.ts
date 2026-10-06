@@ -79,6 +79,7 @@ export type ChatRunInput = {
   /** Stops this run; the agents panel offers it for the CLI-native subagents (they cannot be stopped one by one). */
   stop?: () => void;
   approve: RunOptions["approve"];
+  requestSecret?: RunOptions["requestSecret"];
   subagents?: RunOptions["subagents"];
   source?: RunOptions["source"];
 };
@@ -159,6 +160,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
         ui.onMessage?.(m, id);
       },
       approve: i.approve,
+      requestSecret: i.requestSecret,
     });
     if (!i.signal.aborted) deps.recordResult(tg.providerId);
     return { review: review ?? null, target: tg, ...(outcome && outcome.verification ? { verification: outcome.verification } : {}) };

@@ -1,5 +1,6 @@
 import { QueuePanel } from "./chat/QueuePanel";
 import { GoalBar } from "./chat/GoalBar";
+import { SecretCard } from "./chat/SecretCard";
 import { fanOut } from "../lib/fanOut";
 import { isScratch, loadScratch, scratchRoot, scratchVersion, subscribeScratch } from "../lib/scratch";
 import { ArrowDown } from "lucide-react";
@@ -211,6 +212,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
             ))}
             {blocked && <div className="error-box" role="alert">{blocked}</div>}
             <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} onRunCommand={turnHandlers.onRunCommand} projectRoot={root ?? undefined} />
+            {run.secretRequest && <SecretCard request={run.secretRequest} />}
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>
         </div>

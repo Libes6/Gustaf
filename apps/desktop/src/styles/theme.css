@@ -763,3 +763,11 @@ button:disabled { cursor:default; opacity:.45; }
 .picker-hint { color: var(--text-3); font-size: 11.5px; padding: 6px 10px 0; }
 
 .fan-notice { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 16px 6px; white-space: pre-line; }
+
+/* request_secret card (components/chat/SecretCard.tsx) */
+.secret-card { display: flex; flex-direction: column; gap: 8px; }
+.secret-head { display: flex; align-items: center; gap: 6px; }
+.secret-reason, .secret-note { margin: 0; font-size: 12.5px; color: var(--text-2); }
+.secret-note { color: var(--text-3); }
+.secret-card .btns { display: flex; justify-content: flex-end; gap: 6px; }
+
