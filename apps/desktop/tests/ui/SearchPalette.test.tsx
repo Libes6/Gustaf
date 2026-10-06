@@ -313,3 +313,15 @@ describe("SearchPalette jumps", () => {
     expect(app.openSettings).toHaveBeenCalledWith("providers");
   });
 });
+
+it("Restart agent session is offered for the open chat and asks it to restart", () => {
+  const onClose = vi.fn();
+  const heard = vi.fn();
+  addEventListener("gustaf-restart-session", heard);
+  renderApp(<SearchPalette onClose={onClose} />, makeApp({ activeChat: 3, view: "chat", chats: [], projects: [] }));
+  const input = document.querySelector<HTMLInputElement>(".search-input input")!;
+  fireEvent.change(input, { target: { value: "restart" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(heard).toHaveBeenCalledTimes(1);
+  removeEventListener("gustaf-restart-session", heard);
+});

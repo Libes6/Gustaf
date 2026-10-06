@@ -3,6 +3,8 @@ import { GoalBar } from "./chat/GoalBar";
 import { PrWatchBar } from "./chat/PrWatchBar";
 import { SecretCard } from "./chat/SecretCard";
 import { fanOut } from "../lib/fanOut";
+import { matches } from "../lib/shortcuts";
+import { RESTART_SESSION_EVENT } from "./SearchPalette";
 import { savedPosition, savePosition } from "../lib/readingPosition";
 import { isScratch, loadScratch, scratchRoot, scratchVersion, subscribeScratch } from "../lib/scratch";
 import { ArrowDown } from "lucide-react";
@@ -123,6 +125,14 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
     workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
   });
+  // "Restart agent session" from ⌘K is sent to the chat in front (SearchPalette dispatches RESTART_SESSION_EVENT).
+  const [sessionNotice, setSessionNotice] = useState("");
+  useEffect(() => {
+    if (!visible) return;
+    const restart = () => void run.restartSession().then((ok) => ok && setSessionNotice(t("sessionRestarted")));
+    addEventListener(RESTART_SESSION_EVENT, restart);
+    return () => removeEventListener(RESTART_SESSION_EVENT, restart);
+  }, [visible, run.restartSession]);
   const { stream, error, running, approval, toolResults, activities } = run;
   const autoMemory = useAutoMemorySuggest({ chatId: session.chatId, running: run.ownRunning, active: visible, projectRoot: projectRoot });
   // Stable handlers (TurnView is memoized, so a streaming reply must not re-render the whole history); they read the latest state through the ref.
@@ -198,6 +208,23 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       setAtBottom(false);
     });
   }, [loaded, session.chatId, messages.length]);
+  // ⌘⌥↑ / ⌘⌥↓ (Ctrl+Alt elsewhere): previous / next of your messages in the visible chat.
+  useEffect(() => {
+    if (!visible) return;
+    const key = (e: KeyboardEvent) => {
+      if (!matches(e, "turnPrev") && !matches(e, "turnNext")) return;
+      const feed = feedRef.current;
+      if (!feed) return;
+      const tops = [...feed.querySelectorAll<HTMLElement>(".msg-block[data-msg-id]")].map((el) => ({ el, top: el.offsetTop - feed.offsetTop }));
+      const now = feed.scrollTop + 8;
+      const target = e.key === "ArrowUp" ? [...tops].reverse().find((x) => x.top < now - 8) : tops.find((x) => x.top > now + 8);
+      if (!target) return;
+      e.preventDefault();
+      feed.scrollTo({ top: target.top - 8, behavior: "smooth" });
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [visible]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rememberScroll = (el: HTMLDivElement) => {
     const id = session.chatId;
@@ -248,6 +275,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         </button>
       )}
 
+      {sessionNotice && <div className="hint fan-notice" role="status">{sessionNotice}<button className="btn-ghost" onClick={() => setSessionNotice("")}>{t("cancel")}</button></div>}
       {fanNotice && <div className="hint fan-notice" role="status">{fanNotice}<button className="btn-ghost" onClick={() => setFanNotice("")}>{t("cancel")}</button></div>}
       <GoalBar chatId={session.chatId} running={running} />
       <PrWatchBar chatId={session.chatId} />

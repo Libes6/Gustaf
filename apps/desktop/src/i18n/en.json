@@ -1603,5 +1603,13 @@
   "chatBack": "Previous chat",
   "chatForward": "Next chat",
   "sendNewChat": "Send and open a new chat",
-  "fileViewed": "Viewed"
+  "fileViewed": "Viewed",
+  "restartSession": "Restart agent session",
+  "restartSessionHint": "Next message starts a fresh session (new skills, plugins, MCP)",
+  "sessionRestarted": "The next message starts a fresh agent session; the conversation is sent as history.",
+  "chatMute": "Mute notifications",
+  "chatUnmute": "Unmute notifications",
+  "chatMuted": "Notifications muted",
+  "turnPrev": "Previous message of yours",
+  "turnNext": "Next message of yours"
 }

@@ -449,6 +449,24 @@ export function useChatRun(o: Options) {
   /** Re-runs the last request after a failure (resuming from the completed steps when there are any). */
   const retryRequest = () => send(!!retryRef.current);
 
+  /**
+   * Restart the agent session (T13): forget the provider sessions this chat would resume (CLI session ids, API
+   * response ids), so the next request starts a fresh session (new skills, plugins, MCP servers, instructions) with
+   * the history sent as text. The messages stay.
+   */
+  async function restartSession() {
+    if (running || !session.chatId) return false;
+    try {
+      for (const m of messages.filter((x) => x.meta?.responseId)) {
+        const { role, parts, meta } = m;
+        await db.exec("update messages set content = ? where chat_id = ? and id = ?", [JSON.stringify({ role, parts, meta: { ...meta, responseId: undefined } }), session.chatId, m.id]);
+      }
+      setMessages(await loadMessages(session.chatId));
+      retryRef.current = null;
+      return true;
+    } catch (e) { setError(String(e)); return false; }
+  }
+
   async function restoreContext() {
     if (running || !session.chatId) return;
     try {
@@ -560,5 +578,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, restartSession, rewind };
 }

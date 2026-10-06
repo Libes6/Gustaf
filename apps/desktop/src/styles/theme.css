@@ -785,3 +785,4 @@ button:disabled { cursor:default; opacity:.45; }
 .tool-head .tool-time + .action-status { margin-left: 8px; }
 .file-row .viewed-box { flex: none; margin: 0 6px 0 2px; accent-color: var(--accent); }
 .file-row.viewed .path { color: var(--text-3); }
+.chat-muted-mark { flex: none; color: var(--text-3); margin-right: 2px; }
