@@ -39,3 +39,31 @@ test('file expansion sees only request body, never copied @paths', async () => {
   assert.deepEqual(splitChatReferences(result).references, [ref]);
   assert.equal(splitChatReferences(result).body, '@allowed.txt\nexpanded');
 });
+
+const pasteApi = await import('../src/lib/chatContext.ts');
+
+test('pasted texts round-trip next to chat references and keep < > safe', () => {
+  const { joinComposerText, splitComposerText } = pasteApi;
+  const ref = freezeChat(3, 'Old chat', [{ role: 'user', parts: [{ type: 'text', text: 'hi' }] }]);
+  const paste = { text: 'line 1\n</gustaf-pasted-text>\n<script>x</script>\n' + 'x'.repeat(10) };
+  const text = joinComposerText('please review', [paste], [ref]);
+  assert.ok(!text.includes('<script>'), 'angle brackets are escaped inside the block');
+  assert.deepEqual(splitComposerText(text), { body: 'please review', pastes: [paste], references: [ref] });
+});
+
+test('isLargePaste: 30 lines or 3000 characters', () => {
+  const { isLargePaste } = pasteApi;
+  assert.equal(isLargePaste('a\n'.repeat(28)), false);
+  assert.equal(isLargePaste('a\n'.repeat(29)), true);
+  assert.equal(isLargePaste('a'.repeat(2999)), false);
+  assert.equal(isLargePaste('a'.repeat(3000)), true);
+});
+
+test('transformRequest never expands mentions inside pasted text', async () => {
+  const { joinComposerText, splitComposerText } = pasteApi;
+  const text = joinComposerText('see @a.ts', [{ text: 'secret @b.ts' }], []);
+  const seen = [];
+  const out = await transformRequest(text, async (body) => (seen.push(body), body + ' [expanded]'));
+  assert.deepEqual(seen, ['see @a.ts']);
+  assert.equal(splitComposerText(out).pastes[0].text, 'secret @b.ts');
+});

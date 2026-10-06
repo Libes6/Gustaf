@@ -452,3 +452,40 @@ describe("chat reference attachments", () => {
     expect(screen.getByRole("option", { name: "💬 Source chat" })).toBeInTheDocument();
   });
 });
+
+describe("Composer: large pastes", () => {
+  const big = Array.from({ length: 40 }, (_, i) => `log line ${i}`).join("\n");
+  const paste = (el: HTMLElement, text: string) => fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : ""), items: [], files: [] } });
+
+  it("a large paste becomes a card; the field keeps only what was typed", () => {
+    renderApp(<Harness text="check this" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" }) as HTMLTextAreaElement;
+    field.setSelectionRange(field.value.length, field.value.length);
+    paste(field, big);
+    expect(field.value).toBe("check this");
+    const card = screen.getByRole("group", { name: "Pasted text" });
+    expect(card).toHaveTextContent("40 lines");
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  it("the card can be put back into the message or removed", async () => {
+    renderApp(<Harness text="" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" }) as HTMLTextAreaElement;
+    paste(field, big);
+    await userEvent.click(screen.getByRole("button", { name: "Put into message" }));
+    expect(field.value).toBe(big);
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+    await userEvent.clear(field);
+    paste(field, big);
+    await userEvent.click(within(screen.getByRole("group", { name: "Pasted text" })).getByRole("button", { name: "Remove attachment" }));
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+  });
+
+  it("a short paste goes into the field as usual", () => {
+    renderApp(<Harness text="" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" });
+    paste(field, "short");
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+  });
+});
+

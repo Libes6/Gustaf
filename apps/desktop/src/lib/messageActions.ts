@@ -5,11 +5,17 @@ type TurnLike = { user?: MsgLike; steps: MsgLike[] };
 
 /** Marker the composer appends before `<file>` blocks of expanded `@path` mentions; they are not part of what the user typed. */
 const FILE_BLOCKS = "\n\n<file ";
+const ATTACHED_PASTE = "\n\n<gustaf-pasted-text>\n";
+const ATTACHED_CHAT = "\n\n<gustaf-chat-reference>\n";
 
 /** What the user typed in a stored message: its text without the appended `<file>` blocks. */
 export function editableText(m: MsgLike): string {
   const text = m.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("");
-  return text.split(FILE_BLOCKS)[0];
+  // Pasted texts and chat references come after the file blocks (lib/chatContext.ts); they are part of what the user sent.
+  const attachments = [ATTACHED_PASTE, ATTACHED_CHAT].map((marker) => text.indexOf(marker)).filter((i) => i >= 0);
+  const tail = attachments.length ? Math.min(...attachments) : text.length;
+  const files = text.indexOf(FILE_BLOCKS);
+  return (files >= 0 && files < tail ? text.slice(0, files) : text.slice(0, tail)) + text.slice(tail);
 }
 
 /** Base64 data of the images attached to a stored message. */
