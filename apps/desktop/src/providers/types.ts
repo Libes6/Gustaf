@@ -16,8 +16,10 @@ export type SubagentInfo = {
   title: string;
   /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
   bgId?: string;
-  /** Claude `subagent_type`. */
+  /** Claude `subagent_type`, or the Codex agent role. */
   role?: string;
+  /** Model the agent runs on, when the provider reports it (Codex app-server). */
+  model?: string;
   action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";
   state: SubagentState;
   /** Short summary of the task given to the agent. */

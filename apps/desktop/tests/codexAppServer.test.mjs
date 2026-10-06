@@ -1,0 +1,219 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { AppServerUnavailable, createReducer, execItem, runAppServerTurn, sandboxFor, threadRequest, turnRequest } from '../src/providers/codexAppServer.ts';
+import { applyActivity } from '../src/providers/activities.ts';
+
+// Fixtures follow the app-server schema (T3 Code's generated `ServerNotification`): camelCase items, `threadId` on every notification.
+const ROOT = 'thr-root';
+const note = (method, params) => ({ jsonrpc: '2.0', method, params });
+const item = (method, threadId, it) => note(method, { threadId, turnId: 't1', item: it });
+const spawn = (id, ids, extra = {}) => ({ type: 'collabAgentToolCall', id, tool: 'spawnAgent', status: 'completed', senderThreadId: ROOT, receiverThreadIds: ids, prompt: 'Review the parser', model: 'gpt-5.1-codex', agentsStates: Object.fromEntries(ids.map((i) => [i, { status: 'running', message: null }])), ...extra });
+const turnDone = (threadId, status = 'completed', extra = {}) => note('turn/completed', { threadId, turn: { id: 't1', status, items: [], ...extra } });
+const usage = (threadId, total, last) => note('thread/tokenUsage/updated', { threadId, turnId: 't1', tokenUsage: { total: { inputTokens: total, outputTokens: total / 10, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: total * 1.1 }, last: { inputTokens: last, outputTokens: last / 10, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: last * 1.1 } } });
+
+/** A scripted connection: `script` gets every request and returns what the server does next (responses are added by the harness). */
+function fakeConn(script) {
+  let cb = () => {};
+  let close;
+  const closed = new Promise((r) => { close = r; });
+  const written = [];
+  let killed = 0;
+  const conn = {
+    written, get killed() { return killed; },
+    emit: (m) => cb(m),
+    async write(line) {
+      const m = JSON.parse(line);
+      written.push(m);
+      if (m.id !== undefined && m.method) {
+        const r = script(m, conn);
+        if (r?.error) queueMicrotask(() => cb({ jsonrpc: '2.0', id: m.id, error: { code: -1, message: r.error } }));
+        else if (r !== 'silent') queueMicrotask(() => { cb({ jsonrpc: '2.0', id: m.id, result: r?.result ?? {} }); for (const n of r?.then ?? []) cb(n); });
+      }
+    },
+    onMessage(f) { cb = f; },
+    closed, kill() { killed++; close(null); }, stderr: () => '', exit: (code) => close(code),
+  };
+  return conn;
+}
+const base = (extra = {}) => (m, conn) => {
+  if (m.method === 'initialize') return { result: { userAgent: 'codex' } };
+  if (m.method === 'thread/start' || m.method === 'thread/resume') return { result: { thread: { id: ROOT } } };
+  if (m.method === 'turn/start') return { result: { turn: { id: 't1' } }, then: extra.then ?? [] };
+};
+const handlers = () => {
+  const out = { text: '', acts: new Map(), usage: undefined, raw: [] };
+  return { out, h: { onText: (s) => { out.text += s; }, onActivity: (a) => { out.raw.push(a); applyActivity(out.acts, a); }, onUsage: (u) => { out.usage = u; } } };
+};
+const P = { prompt: 'hi', model: 'gpt-5.1-codex', access: 'auto', mode: 'agent', cwd: '/proj' };
+
+test('requests: thread start/resume and turn params carry sandbox, effort, images and never ask for approval', () => {
+  assert.deepEqual(threadRequest(P), { method: 'thread/start', params: { cwd: '/proj', model: 'gpt-5.1-codex', approvalPolicy: 'never', sandbox: 'workspace-write' } });
+  assert.equal(threadRequest({ ...P, session: 'abc' }).method, 'thread/resume');
+  assert.equal(threadRequest({ ...P, session: 'abc' }).params.threadId, 'abc');
+  const t = turnRequest('abc', { ...P, reasoning: 'high', images: ['/a.png'] });
+  assert.deepEqual(t.input, [{ type: 'text', text: 'hi' }, { type: 'localImage', path: '/a.png' }]);
+  assert.equal(t.effort, 'high');
+  assert.deepEqual(t.sandboxPolicy, { type: 'workspaceWrite' });
+  assert.equal(sandboxFor('full', 'plan').mode, 'read-only');
+  assert.equal(sandboxFor('full', 'agent').mode, 'danger-full-access');
+  assert.equal(sandboxFor('readonly', 'agent').mode, 'read-only');
+});
+
+test('a plain turn streams text, shows commands as activities and reports the usage of this turn only', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [
+    usage(ROOT, 1000, 1000), // first model call of the thread: nothing before it
+    item('item/started', ROOT, { type: 'commandExecution', id: 'c1', command: 'ls', commandActions: [], cwd: '/proj', status: 'inProgress' }),
+    item('item/completed', ROOT, { type: 'commandExecution', id: 'c1', command: 'ls', commandActions: [], cwd: '/proj', status: 'completed', exitCode: 0, aggregatedOutput: 'a\nb' }),
+    note('item/agentMessage/delta', { threadId: ROOT, turnId: 't1', itemId: 'm1', delta: 'Hello ' }),
+    note('item/agentMessage/delta', { threadId: ROOT, turnId: 't1', itemId: 'm1', delta: 'world' }),
+    item('item/completed', ROOT, { type: 'agentMessage', id: 'm1', text: 'Hello world' }),
+    usage(ROOT, 1500, 500),
+    turnDone(ROOT),
+  ] }));
+  const r = await runAppServerTurn(conn, P, h);
+  assert.equal(out.text, 'Hello world', 'streamed text is not repeated by the completed item');
+  assert.equal(r.session, ROOT);
+  assert.equal(r.error, '');
+  const cmd = out.acts.get('c1');
+  assert.equal(cmd.status, 'success');
+  assert.match(cmd.output, /a\nb/);
+  assert.deepEqual(out.usage, { input: 1500, output: 150, cached: 0, cacheWrite: 0, reasoning: 0 });
+  assert.ok(conn.killed >= 1, 'the process is stopped when the turn ends');
+});
+
+test('a message that never streamed arrives whole; an unstreamed one is not duplicated', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [item('item/completed', ROOT, { type: 'agentMessage', id: 'm9', text: 'Whole' }), turnDone(ROOT)] }));
+  await runAppServerTurn(conn, P, h);
+  assert.equal(out.text, 'Whole');
+});
+
+test('a spawn of two agents makes two entries with their model; child frames that came before registration are replayed', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [
+    note('thread/started', { thread: { id: 'ca', parentThreadId: ROOT, model: 'gpt-5.1-codex', agentRole: 'explorer', agentNickname: 'Ada' } }),
+    // The child starts working before the parent's spawn item is completed.
+    note('turn/started', { threadId: 'ca', turn: { id: 'x', status: 'inProgress', items: [] } }),
+    item('item/started', 'ca', { type: 'commandExecution', id: 'cc1', command: 'rg parser', commandActions: [], cwd: '/p', status: 'inProgress' }),
+    item('item/started', ROOT, spawn('s1', ['ca', 'cb'], { status: 'inProgress' })),
+    item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])),
+    turnDone(ROOT),
+  ] }));
+  const r = await runAppServerTurn(conn, P, h);
+  const subs = [...out.acts.values()].filter((a) => a.subagent);
+  assert.equal(subs.length, 2);
+  const ca = subs.find((a) => a.subagent.agentId === 'ca').subagent;
+  assert.equal(ca.model, 'gpt-5.1-codex');
+  assert.equal(ca.role, 'explorer');
+  assert.equal(ca.toolUses, 1, 'the held command of the child was replayed');
+  assert.match(ca.step, /rg parser/);
+  assert.deepEqual(r.running.sort(), ['ca', 'cb'], 'the parent turn ending does not complete a running child');
+});
+
+test('child status is monotone; only a new turn of that child reopens it', () => {
+  const rd = createReducer(ROOT);
+  const map = new Map();
+  const feed = (m) => { for (const e of rd.onMessage(m)) if (e.kind === 'activity') applyActivity(map, e.activity); };
+  feed(item('item/completed', ROOT, spawn('s1', ['ca'])));
+  const get = () => [...map.values()].find((a) => a.subagent?.agentId === 'ca').subagent;
+  feed(note('turn/started', { threadId: 'ca', turn: { id: 'x' } }));
+  feed(item('item/completed', 'ca', { type: 'agentMessage', id: 'cm', text: 'Found 3 bugs' }));
+  feed(turnDone('ca'));
+  assert.equal(get().state, 'completed');
+  assert.match(get().result, /Found 3 bugs/);
+  assert.deepEqual(rd.running(), []);
+  // A late tool frame and a late token update must not revive it.
+  feed(item('item/started', 'ca', { type: 'commandExecution', id: 'late', command: 'ls', commandActions: [], cwd: '/', status: 'inProgress' }));
+  feed(usage('ca', 10, 10));
+  assert.equal(get().state, 'completed');
+  // SendMessage to the finished agent starts a new turn of the same thread: running again, then finished again.
+  feed(note('turn/started', { threadId: 'ca', turn: { id: 'y' } }));
+  assert.equal(get().state, 'running');
+  assert.deepEqual(rd.running(), ['ca']);
+  feed(turnDone('ca', 'interrupted'));
+  assert.equal(get().state, 'stopped');
+});
+
+test('a child that errors or is interrupted ends in its own state without failing the parent', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [
+    item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])),
+    turnDone('ca', 'failed', { error: { message: 'boom' } }),
+    turnDone('cb', 'interrupted'),
+    note('item/agentMessage/delta', { threadId: ROOT, turnId: 't1', itemId: 'm1', delta: 'done' }),
+    turnDone(ROOT),
+  ] }));
+  const r = await runAppServerTurn(conn, P, h);
+  const by = (id) => [...out.acts.values()].find((a) => a.subagent?.agentId === id).subagent;
+  assert.equal(by('ca').state, 'failed');
+  assert.match(by('ca').result, /boom/);
+  assert.equal(by('cb').state, 'stopped');
+  assert.equal(r.error, '');
+  assert.deepEqual(r.running, []);
+});
+
+test('frames of unknown threads are bounded and never become entries', () => {
+  const rd = createReducer(ROOT);
+  for (let i = 0; i < 500; i++) rd.onMessage(note('turn/started', { threadId: `ghost${i}`, turn: { id: 'x' } }));
+  assert.ok(rd.held <= 50);
+  assert.deepEqual(rd.onMessage(note('turn/started', { threadId: 'ghost1', turn: { id: 'x' } })), []);
+});
+
+test('approval requests are declined, unknown server requests answered with an error', async () => {
+  const { h } = handlers();
+  const conn = fakeConn(base({ then: [
+    { jsonrpc: '2.0', id: 77, method: 'item/commandExecution/requestApproval', params: { threadId: ROOT, itemId: 'c', command: 'rm -rf x' } },
+    { jsonrpc: '2.0', id: 78, method: 'item/tool/requestUserInput', params: { threadId: ROOT } },
+    turnDone(ROOT),
+  ] }));
+  await runAppServerTurn(conn, P, h);
+  const reply = (id) => conn.written.find((m) => m.id === id && !m.method);
+  assert.deepEqual(reply(77).result, { decision: 'decline' });
+  assert.equal(reply(78).error.code, -32601);
+});
+
+test('a failed turn reports its message; an interrupted turn is not an error', async () => {
+  let c = fakeConn(base({ then: [turnDone(ROOT, 'failed', { error: { message: 'rate limited' } })] }));
+  assert.equal((await runAppServerTurn(c, P, handlers().h)).error, 'rate limited');
+  c = fakeConn(base({ then: [turnDone(ROOT, 'interrupted')] }));
+  assert.equal((await runAppServerTurn(c, P, handlers().h)).error, '');
+  c = fakeConn(base({ then: [note('error', { error: { message: 'retrying' }, willRetry: true }), note('error', { error: { message: 'fatal' }, willRetry: false })] }));
+  assert.equal((await runAppServerTurn(c, P, handlers().h)).error, 'fatal');
+});
+
+test('a crash mid-turn is an error and leaves running children running (the caller marks them unknown)', async () => {
+  const { out, h } = handlers();
+  const conn = fakeConn(base({ then: [item('item/completed', ROOT, spawn('s1', ['ca']))] }));
+  const p = runAppServerTurn(conn, P, h);
+  await new Promise((r) => setTimeout(r, 20));
+  conn.exit(139);
+  const r = await p;
+  assert.match(r.error, /exited with 139/);
+  assert.deepEqual(r.running, ['ca']);
+  assert.equal([...out.acts.values()][0].subagent.state, 'running');
+});
+
+test('stop: the signal kills the process and rejects with AbortError', async () => {
+  const ac = new AbortController();
+  const conn = fakeConn(base({ then: [] }));
+  const p = runAppServerTurn(conn, P, { ...handlers().h, signal: ac.signal });
+  await new Promise((r) => setTimeout(r, 20));
+  ac.abort();
+  await assert.rejects(p, (e) => e.name === 'AbortError');
+  assert.ok(conn.killed >= 1);
+});
+
+test('an app-server that cannot initialize is "unavailable" so the caller can fall back to exec', async () => {
+  const conn = fakeConn((m) => (m.method === 'initialize' ? { error: 'unknown variant' } : {}));
+  await assert.rejects(runAppServerTurn(conn, P, handlers().h), (e) => e instanceof AppServerUnavailable);
+  const dead = fakeConn(() => 'silent');
+  setTimeout(() => dead.exit(1), 10);
+  await assert.rejects(runAppServerTurn(dead, P, handlers().h), (e) => e instanceof AppServerUnavailable);
+});
+
+test('execItem: command, file change and MCP items take the exec shape the activity cards read', () => {
+  assert.equal(execItem({ type: 'commandExecution', id: 'a', command: 'x', status: 'declined', exitCode: null }).status, 'failed');
+  assert.deepEqual(execItem({ type: 'fileChange', id: 'f', status: 'completed', changes: [{ path: 'a.ts', kind: 'update', diff: 'x' }] }).changes, [{ path: 'a.ts', kind: 'update' }]);
+  assert.equal(execItem({ type: 'mcpToolCall', id: 'm', server: 's', tool: 't', arguments: {}, status: 'inProgress' }).status, 'in_progress');
+});
