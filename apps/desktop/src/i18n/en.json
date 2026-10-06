@@ -1495,5 +1495,9 @@
   "retry": "Retry",
   "contextWindowTokens": "Context window: {tokens} tokens",
   "modelsLoading": "Loading models…",
-  "modelsRefreshFailed": "Couldn't refresh this list. Showing the saved one."
+  "modelsRefreshFailed": "Couldn't refresh this list. Showing the saved one.",
+  "rewindKeepFiles": "Return here, keep files",
+  "rewindKeepFilesHint": "Removes this message and everything after it; your files stay as they are",
+  "rewindWithFiles": "Return here and restore files",
+  "rewindWithFilesHint": "Also puts the project files back to how they were before this message"
 }
