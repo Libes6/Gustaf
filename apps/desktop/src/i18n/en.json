@@ -1546,5 +1546,13 @@
   "triageSettledNotice": "“{title}” marked as done",
   "triageSnoozedNotice": "“{title}” snoozed until {time}",
   "triageReopenedNotice": "“{title}” is back in Recent",
-  "triageUndo": "Undo"
+  "triageUndo": "Undo",
+  "fanOutHint": "Shift-click to send one prompt to several models, each in its own workspace",
+  "fanOutPickedHint": "{count} of up to {max} models: each gets its own workspace when you send",
+  "fanOutPicked": "Picked for this prompt",
+  "fanOutModels": "{count} models",
+  "fanOutSend": "Send to {count} models",
+  "fanOutStarted": "Started in {count} workspaces. They run in the background; see Working in the sidebar.",
+  "fanOutFailed": "{name}: {error}",
+  "fanOutNoImages": "Pictures can't be sent to several models yet. Remove them or pick one model."
 }

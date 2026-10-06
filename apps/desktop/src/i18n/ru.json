@@ -1582,5 +1582,13 @@
   "triageSettledNotice": "«{title}» — разобрано",
   "triageSnoozedNotice": "«{title}» отложено до {time}",
   "triageReopenedNotice": "«{title}» снова в недавних",
-  "triageUndo": "Отменить"
+  "triageUndo": "Отменить",
+  "fanOutHint": "Shift+клик — отправить один промпт нескольким моделям, каждой в своём workspace",
+  "fanOutPickedHint": "Выбрано {count} из {max}: при отправке каждая модель получит свой workspace",
+  "fanOutPicked": "Выбрана для этого промпта",
+  "fanOutModels": "Моделей: {count}",
+  "fanOutSend": "Отправить {count} моделям",
+  "fanOutStarted": "Запущено в {count} workspace. Работают в фоне — смотрите «В работе» в сайдбаре.",
+  "fanOutFailed": "{name}: {error}",
+  "fanOutNoImages": "Картинки пока нельзя отправить нескольким моделям. Уберите их или выберите одну модель."
 }

@@ -29,7 +29,10 @@ export function newModelKeys(models: Model[], now = Date.now()): Set<string> {
 export const contextLabel = (tokens?: number) =>
   !tokens ? "" : tokens >= 1_000_000 ? `${+(tokens / 1_000_000).toFixed(1)}M` : `${Math.round(tokens / 1000)}K`;
 
-export function ModelPicker({ onClose }: { onClose: () => void }) {
+/** Several models for one prompt (T7): shift-click toggles a model in `keys` instead of choosing it. */
+export type MultiPick = { keys: string[]; toggle: (m: Model) => void; max: number };
+
+export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: MultiPick }) {
   const t = useT();
   const app = useApp();
   const selKey = app.selection ? favKey({ providerId: app.selection.providerId, id: app.selection.model }) : "";
@@ -167,7 +170,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
             const sel = favKey(m) === selKey;
             const ctx = contextLabel(m.contextWindow);
             return (
-              <div key={favKey(m)} id={`model-opt-${i}`} role="option" aria-selected={sel} className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`} onMouseMove={() => i !== hl && setHl(i)} onClick={() => pick(m)}>
+              <div key={favKey(m)} id={`model-opt-${i}`} role="option" aria-selected={sel} className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`} onMouseMove={() => i !== hl && setHl(i)} onClick={(e) => (multi && e.shiftKey ? multi.toggle(m) : pick(m))}>
                 <div className="info">
                   <div className="model-name" title={m.name !== m.id ? `${m.name} · ${m.id}` : m.name}>
                     <ModelIcon model={`${m.id} ${m.name}`} provider={app.providers.find(p => p.id === m.providerId)} size={18} /> <span className="model-label">{m.name}</span>
@@ -178,6 +181,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
                     {ctx && <span className="model-ctx" title={t("contextWindowTokens", { tokens: m.contextWindow!.toLocaleString(app.locale) })}>{ctx}</span>}
                   </div>
                 </div>
+                {multi?.keys.includes(favKey(m)) && <span className="multi-mark" role="img" aria-label={t("fanOutPicked")}>{multi.keys.indexOf(favKey(m)) + 1}</span>}
                 {sel && <Check size={15} className="sel-check" aria-hidden="true" />}
                 {i < 9 && <span className="kbd-chip">{displayKeys(`⌘${i + 1}`)}</span>}
                 <button
@@ -213,6 +217,7 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
             </button>
           )}
         </div>
+        {multi && <div className="picker-hint">{multi.keys.length ? t("fanOutPickedHint", { count: multi.keys.length, max: multi.max }) : t("fanOutHint")}</div>}
         <button className="picker-more picker-manage" onClick={() => (onClose(), app.openSettings("providers"))}>
           <Settings2 size={13} /> {t("provManage")}
         </button>

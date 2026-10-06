@@ -1,5 +1,6 @@
 import { QueuePanel } from "./chat/QueuePanel";
 import { GoalBar } from "./chat/GoalBar";
+import { fanOut } from "../lib/fanOut";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -9,7 +10,7 @@ import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
 import { getAdapter } from "../providers";
-import { levelsOf, textOf, type Reasoning } from "../providers/types";
+import { levelsOf, textOf, type ModelInfo, type Reasoning } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { groupTurns } from "../lib/chatTurns";
 import { editableText, turnMessageIds } from "../lib/messageActions";
@@ -74,6 +75,25 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const [supports, setSupports] = useState<{ computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] }>({ computer: false, reasoning: false });
 
   const tasks = useBackgroundTasks(root);
+  // One prompt to several models, each in its own workspace chat running in the background (lib/fanOut.ts).
+  const appRef = useRef(app);
+  appRef.current = app;
+  const [fanNotice, setFanNotice] = useState("");
+  const startFanOut = (models: ModelInfo[]) => {
+    const prompt = text.trim();
+    if (!project?.path || !prompt) return;
+    if (images.length) return setFanNotice(t("fanOutNoImages"));
+    setText("");
+    setFanNotice(t("fanOutStarted", { count: models.length }));
+    void fanOut(() => appRef.current, {
+      projectId: project.id, projectRoot: project.path, title: prompt.split("\n")[0].slice(0, 60), prompt,
+      targets: models.map((m) => ({ providerId: m.providerId, model: m.id, name: m.name })),
+      access: app.access === "readonly" ? "readonly" : "auto", signal: new AbortController().signal,
+    }).then((results) => {
+      const failed = results.filter((r) => r.status === "not-created" || r.status === "failed");
+      if (failed.length) setFanNotice(failed.map((r) => t("fanOutFailed", { name: r.target.name, error: r.error ?? r.status })).join("\n"));
+    });
+  };
   const continueAgent = (message: string) => { setText((old) => (old.trim() ? `${old}\n\n${message}` : message)); taRef.current?.focus(); };
   // A draft requested from outside (the merge queue's "Resolve with agent") lands in this chat's message box; it is never sent.
   useEffect(() => {
@@ -191,6 +211,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         </button>
       )}
 
+      {fanNotice && <div className="hint fan-notice" role="status">{fanNotice}<button className="btn-ghost" onClick={() => setFanNotice("")}>{t("cancel")}</button></div>}
       <GoalBar chatId={session.chatId} running={running} />
       {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
       <Composer
@@ -202,7 +223,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
         }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
-        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onStop={run.stop}
+        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onFanOut={startFanOut} onStop={run.stop}
         contextTokens={contextTokens} lastInput={lastInput}
         canCompact={!(running || !loaded || messages.length < 4 || !provider)}
         canRestore={messages.some(m => m.meta?.compacted)}
