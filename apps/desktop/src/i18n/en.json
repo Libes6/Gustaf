@@ -1482,5 +1482,9 @@
   "provManage": "Manage providers…",
   "provSignInCommand": "Sign in with {command} in a terminal, then check again.",
   "provNoBaseUrl": "This provider has no base URL or paths to configure.",
-  "provBrowserDone": "Accounts you sign in appear in the list on the left."
+  "provBrowserDone": "Accounts you sign in appear in the list on the left.",
+  "effortTitle": "Reasoning effort",
+  "effortReset": "Reset to default",
+  "effortHintLow": "Faster, cheaper",
+  "effortHintHigh": "Deeper, slower"
 }

@@ -238,13 +238,33 @@ describe("Composer", () => {
     });
   });
 
-  it("shows the reasoning chip only when the model supports it, and never a Computer Use chip", () => {
-    const { unmount } = renderApp(<Harness />);
-    expect(screen.queryByRole("button", { name: /Medium/ })).not.toBeInTheDocument();
+  it("shows the effort level on the model chip only when the model supports it, and never a Computer Use chip", () => {
+    const { unmount } = renderApp(<Harness />, makeApp({ providers: [provider()] }));
+    expect(screen.queryByText("Medium")).not.toBeInTheDocument();
     unmount();
-    renderApp(<Harness supports={{ computer: true, reasoning: true }} />);
-    expect(screen.getByRole("button", { name: /Medium/ })).toBeInTheDocument();
+    renderApp(<Harness supports={{ computer: true, reasoning: true }} />, makeApp({ providers: [provider()] }));
+    expect(screen.getByRole("button", { name: "Model One Medium" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
+  });
+
+  it("the model chip opens the effort slider when the model has levels; the model name inside opens the model list", async () => {
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] });
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Model One Medium" }));
+    const slider = screen.getByRole("slider", { name: "Reasoning effort" });
+    expect(slider).toHaveAttribute("aria-valuetext", "Medium");
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(app.setReasoning).toHaveBeenCalledWith("high");
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Reasoning effort" })).getByRole("button", { name: /Model One/ }));
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
+  });
+
+  it("without effort levels the model chip opens the model list directly", async () => {
+    renderApp(<Harness />, makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }));
+    await userEvent.click(screen.getByRole("button", { name: "Model One" }));
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
   });
 
   it("the bar holds only mode, access, context ring, model, mic and send: no Computer Use or Review copy chip", () => {

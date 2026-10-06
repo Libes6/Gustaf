@@ -76,6 +76,9 @@ export type ProviderConfig = { id: string; kind: ProviderKind; name: string; bas
 export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean };
 export type ToolDef = { name: string; description: string; parameters: Record<string, unknown> };
 export type Reasoning = "low" | "medium" | "high";
+/** Effort levels offered in the composer, weakest first. */
+export const REASONING_LEVELS: readonly Reasoning[] = ["low", "medium", "high"];
+export const DEFAULT_REASONING: Reasoning = "medium";
 
 export type TurnInput = {
   system: string;
