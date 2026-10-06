@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { fsx, git } from "../lib/api";
+import { stripLineNumbers } from "../lib/autoReview";
 import { worktrees, type WorktreeDiff } from "../lib/worktrees";
 import { relativeToProject, untrackedDiffText } from "../lib/workspaceDiff";
 import "../styles/workspaces.css";
@@ -33,7 +34,7 @@ export function WorkspaceChanges({ projectRoot, taskId, branch, root, prefix, ti
     try {
       if (status === "untracked") {
         const rel = relativeToProject(path, prefix);
-        onShowDiff(path, rel === null ? "" : untrackedDiffText(await fsx.read(root, rel)));
+        onShowDiff(path, rel === null ? "" : untrackedDiffText(stripLineNumbers(await fsx.read(root, rel))));
       } else {
         // `:(top)` makes the path relative to the repository, as the list reports it, whatever folder `root` is.
         onShowDiff(path, await git(root, ["diff", "--no-color", "--no-ext-diff", diff!.base, "--", `:(top)${path}`]));
