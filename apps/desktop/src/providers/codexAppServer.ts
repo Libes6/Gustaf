@@ -123,6 +123,9 @@ export function createReducer(rootThreadId: string) {
   const held = new Map<string, Json[]>();
   const hints = new Map<string, { model?: string; role?: string; nickname?: string }>();
   const streamed = new Set<string>();
+  let lastMessage = "";
+  /** Separate agent messages of one turn (before and after tool calls) read as paragraphs, not one run-on sentence. */
+  const gap = (id: string) => { const sep = lastMessage && lastMessage !== id ? "\n\n" : ""; lastMessage = id; return sep; };
   let baseline: TokenUsage | undefined;
   let latest: { total: TokenUsage; last: TokenUsage } | undefined;
   let usageSeen = 0;
@@ -243,15 +246,16 @@ export function createReducer(rootThreadId: string) {
     const p = rec(m.params);
     const out: Effect[] = [];
     if (method === "item/agentMessage/delta") {
+      const first = !streamed.has(str(p.itemId));
       streamed.add(str(p.itemId));
-      if (str(p.delta)) out.push({ kind: "text", text: str(p.delta) });
+      if (str(p.delta)) out.push({ kind: "text", text: (first ? gap(str(p.itemId)) : "") + str(p.delta) });
     } else if (method === "item/started" || method === "item/completed") {
       const item = rec(p.item);
       const type = str(item.type);
       const evType = method === "item/started" ? "item.started" : "item.completed";
       if (type === "agentMessage") {
         // A message that never streamed deltas (short or replayed) arrives whole.
-        if (evType === "item.completed" && str(item.text) && !streamed.has(str(item.id))) out.push({ kind: "text", text: str(item.text) });
+        if (evType === "item.completed" && str(item.text) && !streamed.has(str(item.id))) out.push({ kind: "text", text: gap(str(item.id)) + str(item.text) });
       } else if (type === "collabAgentToolCall" && str(item.tool) === "spawnAgent" && list(item.receiverThreadIds).length > 1) {
         // One entry per spawned agent (the shared mapping keys a spawn by its first receiver only).
         const ids = list(item.receiverThreadIds).map(str);
