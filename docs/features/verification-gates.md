@@ -9,7 +9,9 @@ Scope: **API-provider agent runs** (the loop in `src/agent/agent.ts`: main chat,
 | Source | Location | Trusted |
 | --- | --- | --- |
 | Project settings | app settings, key `verification:<project path>`, edited in Settings > Git and commands > Definition of done | always |
-| Project file | `<project>/.mcode/done.json`, read-only for the app | only after the user turns on "Also run the checks from this project's .mcode/done.json" for that project (default **off**, shown with a warning that the checks run shell commands) |
+| Project file | `<project>/.gustaf/done.json`, read-only for the app | only after the user turns on "Also run the checks from this project's .gustaf/done.json" for that project (default **off**, shown with a warning that the checks run shell commands) |
+
+A project set up before the rename to Gustaf may keep `.mcode/done.json`; it is read when `.gustaf/done.json` does not exist.
 
 The effective list is the settings checks first, then the project file's when its switch is on (at most 10 in total). The switch is stored in the project's settings entry (`useProjectFile`). Scheduled runs follow the same rule. For a workspace (git worktree) chat the settings belong to the project, not to the worktree folder: the chat passes its project root to the run (`RunOptions.project`).
 

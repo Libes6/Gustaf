@@ -31,9 +31,9 @@ In a pending file's diff each hunk can be accepted or rejected on its own, or ti
 
 **Review all with AI covers every kind of pending change.** The button is offered for review copies, for the checkpoint diff of direct-edit chats (the default) and for the net diff of a workspace chat; findings are keyed by file path, so they show inline in whichever diff view the file opens in.
 
-### Review rules: `.mcode/REVIEW.md`
+### Review rules: `.gustaf/REVIEW.md`
 
-A project can tell the reviewer what to look for. Put plain Markdown in `<project>/.mcode/REVIEW.md` (read-only, at most 16 KB: a longer file is cut at 16 KB and the panel says so). When the file exists the Changes panel shows "Rules: .mcode/REVIEW.md" and its text is appended to the review prompt as "Project review rules", in a fenced block that is marked untrusted, like project instructions (`agent/instructions.ts`). It is guidance only: the file is never executed, the review keeps its tool-less read-only request whatever the file says (the rules go into the system prompt after the base prompt; they cannot add tools, allow commands or file changes, or change the JSON reply format), and a closing tag inside the file cannot end the fence. The file is read again for every review. It applies to manual and automatic reviews alike.
+A project can tell the reviewer what to look for. Put plain Markdown in `<project>/.gustaf/REVIEW.md` (read-only, at most 16 KB: a longer file is cut at 16 KB and the panel says so). When the file exists the Changes panel shows "Rules: .gustaf/REVIEW.md" and its text is appended to the review prompt as "Project review rules", in a fenced block that is marked untrusted, like project instructions (`agent/instructions.ts`). It is guidance only: the file is never executed, the review keeps its tool-less read-only request whatever the file says (the rules go into the system prompt after the base prompt; they cannot add tools, allow commands or file changes, or change the JSON reply format), and a closing tag inside the file cannot end the fence. The file is read again for every review. It applies to manual and automatic reviews alike. Projects set up before the rename to Gustaf may keep the file in `.mcode/` instead; it is read from there when the `.gustaf/` file does not exist.
 
 Example:
 

@@ -7,7 +7,9 @@ Hooks are user-defined shell commands that run on agent lifecycle events, modell
 | Source | Location | Trusted |
 | --- | --- | --- |
 | Global | app settings (key `hooks`), edited in Settings > Git and commands > Hooks | always |
-| Project | `<project>/.mcode/hooks.json`, read-only for the app | only after the user turns on "Run hooks from this project's .mcode/hooks.json" for that project (default **off**, shown with a warning that hooks run shell commands) |
+| Project | `<project>/.gustaf/hooks.json`, read-only for the app | only after the user turns on "Run hooks from this project's .gustaf/hooks.json" for that project (default **off**, shown with a warning that hooks run shell commands) |
+
+A project set up before the rename to Gustaf may keep `.mcode/hooks.json`; it is read when `.gustaf/hooks.json` does not exist.
 
 The effective list is global hooks first, then the project's when enabled. The Settings viewer shows each effective hook with its source and timeout, and lists every skipped entry with the reason. Scheduled runs follow the same rule: project hooks need the per-project switch. The switch is stored per project in the `hooksProjects` setting.
 
@@ -17,7 +19,7 @@ The effective list is global hooks first, then the project's when enabled. The S
 {
   "hooks": [
     { "event": "post_edit", "matcher": "edit_file|write_file", "command": "npm test --silent", "timeoutMs": 30000 },
-    { "event": "pre_tool", "matcher": "run_command", "command": "./.mcode/block-rm.sh" }
+    { "event": "pre_tool", "matcher": "run_command", "command": "./.gustaf/block-rm.sh" }
   ]
 }
 ```
@@ -58,7 +60,7 @@ Every hook run is an entry in the action log (`src/agent/actionLog.ts`) with `so
 
 ## Example
 
-Run the tests after every edit and refuse `rm` through the agent. Save as `<project>/.mcode/hooks.json` and switch project hooks on in Settings:
+Run the tests after every edit and refuse `rm` through the agent. Save as `<project>/.gustaf/hooks.json` and switch project hooks on in Settings:
 
 ```json
 {

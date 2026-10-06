@@ -9,7 +9,8 @@ const dicts = { en: load('en'), ru: load('ru') };
 // Keys that are shown only on macOS (or name the macOS store on purpose) and may say Mac/macOS/Dock.
 const MAC_ONLY = new Set(['keyStoreMac']);
 
-const PATTERNS = [/\bMac\b/, /macOS/, /\bDock\b/i, /M Code/];
+// The old app name, its identifiers and the owner's account name never appear in the interface.
+const PATTERNS = [/\bMac\b/, /macOS/, /\bDock\b/i, /M Code/i, /\bmcode\b/i, /maksimkulakov/i];
 
 for (const [locale, dict] of Object.entries(dicts)) {
   test(`${locale}: no Mac-only wording or old app name outside the allow-list`, () => {
