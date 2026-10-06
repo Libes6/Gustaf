@@ -11,13 +11,14 @@ import { useApp } from "../state";
 import { useApprovalChats, useChatFlags } from "../lib/attention";
 import { chatStatusStore, deriveStatus, type ChatStatus } from "../lib/chatStatus";
 import { getGoal, goalsVersion, subscribeGoals } from "../lib/goalStore";
+import { isScratch, loadScratch, scratchRoot, startScratchChat } from "../lib/scratch";
 import { placeOf, settle, snooze, snoozePresets, wakeUps, without, type Place } from "../lib/triageCore";
 import { changeTriage, dismissUndo, getTriage, lastUndo, loadTriage, subscribeTriage, undoTriage } from "../lib/triageStore";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
-import { AlarmClock, Brain, CheckCheck, Flag } from "lucide-react";
+import { AlarmClock, Brain, CheckCheck, Flag, FolderPen } from "lucide-react";
 import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
@@ -179,6 +180,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [snoozedOpen, setSnoozedOpen] = useState(false);
   const [snoozeFor, setSnoozeFor] = useState<Chat | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { void loadScratch(); }, []);
   useEffect(() => { loadTriage(); const id = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(id); }, []);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [showAll, setShowAll] = useState<Record<number, boolean>>({});
@@ -255,6 +257,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
+      ...(c.project_id === null && isScratch(c.id) ? [{ label: t("scratchFolder"), icon: <FolderOpen size={15} />, onClick: () => void scratchRoot(c.id, c.title).then((d) => revealItemInDir(d)).catch(() => {}) }] : []),
       { sep: true },
       ...triageItems(c),
       { sep: true },
@@ -524,6 +527,10 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`} onClick={() => newChat(null)}>
           <SquarePen size={15} />
           <span className="label">{t("newChat")}</span>
+        </button>
+        <button className="row muted" title={t("scratchHint")} onClick={() => void startScratchChat(app)}>
+          <FolderPen size={15} />
+          <span className="label">{t("newScratchChat")}</span>
         </button>
 
         {app.sections.map((s) =>

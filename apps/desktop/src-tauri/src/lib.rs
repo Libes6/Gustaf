@@ -13,6 +13,7 @@ mod mcp;
 mod oauth;
 mod rawlog;
 mod review;
+mod scratch;
 mod secrets;
 mod skills;
 mod shell;
@@ -65,6 +66,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            scratch::scratch_dir,
             terminal::terminal_create,
             terminal::terminal_write,
             terminal::terminal_resize,
