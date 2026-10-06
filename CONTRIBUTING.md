@@ -62,7 +62,7 @@ Do not push directly to `dev` or `main`.
 - Update the docs that describe the behaviour (`README.md`, `docs/features/*.md`) and add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 - Never commit API keys, tokens, `.env` files, signing keys or logs containing them. Test fixtures use fake values.
 - UI strings go through the i18n dictionaries in `apps/desktop/src/i18n/` (both `en.json` and `ru.json`).
-- Do not rename the internal identifiers (`com.maksimkulakov.mcode`, crate and npm names, data paths): they keep existing installations working.
+- Internal names are `gustaf` everywhere: the bundle identifier and Keychain service `io.github.libes6.gustaf`, the crate `gustaf` (`gustaf_lib`), the npm packages `@gustaf/*`, the project folder `.gustaf/`, the `gustaf://` pairing scheme and the `gustaf-*` text protocols. Builds from before the rename used `mcode` names; they are only read as fallbacks (`src-tauri/src/legacy.rs` moves the old app data folders once at startup, `secrets.rs` moves old Keychain entries on first read, `src/lib/projectFolder.ts` falls back to `.gustaf/`). Do not add new `mcode` names.
 
 ## Where tasks live
 

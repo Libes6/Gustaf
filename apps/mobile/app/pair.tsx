@@ -1,4 +1,4 @@
-import type { PairingQrPayload } from "@mcode/protocol";
+import type { PairingQrPayload } from "@gustaf/protocol";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -96,7 +96,7 @@ export default function Pair() {
         autoCapitalize="none"
         autoCorrect={false}
         multiline
-        placeholder="mcode://pair?host=…"
+        placeholder="gustaf://pair?host=…"
         placeholderTextColor={theme.text3}
         style={{ backgroundColor: theme.bgInput, color: theme.text, borderRadius: radius, padding: 12, minHeight: 64 }}
       />

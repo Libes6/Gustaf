@@ -1,6 +1,6 @@
-import type { PairingQrPayload } from "@mcode/protocol";
+import type { PairingQrPayload } from "@gustaf/protocol";
 import { create } from "zustand";
-import { MCodeClient, pairWithDesktop, type ConnectionState, type DesktopApi } from "../api/client.ts";
+import { GustafClient, pairWithDesktop, type ConnectionState, type DesktopApi } from "../api/client.ts";
 import { MockServer } from "../api/mock.ts";
 import {
   deleteToken,
@@ -88,13 +88,13 @@ export const useStore = create<Store>((set, get) => {
       const desktops = [...get().desktops.filter((d) => d.id !== desktop.id), desktop];
       await saveDesktops(desktops);
       set({ desktops });
-      attach(new MCodeClient({ ...desktop, token: res.token }), "real", desktop);
+      attach(new GustafClient({ ...desktop, token: res.token }), "real", desktop);
     },
 
     async connectTo(desktop) {
       const token = await loadToken(desktop.id);
       if (!token) return;
-      attach(new MCodeClient({ ...desktop, token }), "real", desktop);
+      attach(new GustafClient({ ...desktop, token }), "real", desktop);
     },
 
     disconnect() {

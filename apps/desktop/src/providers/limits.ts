@@ -8,7 +8,7 @@ export async function readSubscriptionLimits(p: ProviderConfig) {
   const script = import.meta.env.DEV ? __SIDECAR__.replace(/cursor-agent\.mjs$/, 'codex-limits.mjs') : await resolveResource('sidecar/codex-limits.mjs');
   let result; let error = '';
   const executable = await codexExecutable();
-  await spawnLines(runScript({ executable: 'node', args: [script], env: { MCODE_CODEX_BINARY: executable } }), e => { if (e.type === 'limits') result = e.result; if (e.type === 'error') error = e.message; });
+  await spawnLines(runScript({ executable: 'node', args: [script], env: { GUSTAF_CODEX_BINARY: executable } }), e => { if (e.type === 'limits') result = e.result; if (e.type === 'error') error = e.message; });
   if (error) throw new Error(error);
   const windows = codexLimits(result);
   if (!windows.length) throw new Error('Account did not return subscription limits.');

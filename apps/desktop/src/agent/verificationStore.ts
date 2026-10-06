@@ -1,4 +1,5 @@
 import { fsx, getSetting, setSetting } from "../lib/api";
+import { readProjectFile } from "../lib/projectFolder";
 import { detectDiagnostics } from "./diagnostics";
 import { normalizeProjectPath } from "./rules";
 import { defaultSettings, effectiveConfig, normalizeSettings, parseDoneText, PROJECT_DONE_FILE, SETTING_PREFIX, type DoneFile, type VerificationConfig, type VerificationSettings } from "./verificationCore";
@@ -13,12 +14,12 @@ export async function loadVerificationSettings(project: string): Promise<Verific
 
 export const saveVerificationSettings = (project: string, value: VerificationSettings) => setSetting(verificationKey(project), normalizeSettings(value));
 
-/** `<project>/.mcode/done.json`, read-only. A missing file is not an error (`null`). */
+/** `<project>/.gustaf/done.json` (else the legacy `.mcode/done.json`), read-only. A missing file is not an error (`null`). */
 export async function loadDoneFile(project: string | null): Promise<(DoneFile & { exists: true }) | null> {
   if (!project) return null;
   let text: string;
   try {
-    text = await fsx.read(project, PROJECT_DONE_FILE, 1, 5000);
+    text = (await readProjectFile((path) => fsx.read(project, path, 1, 5000), PROJECT_DONE_FILE)).value;
   } catch {
     return null;
   }

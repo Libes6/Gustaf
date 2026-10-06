@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ChatMessage, ServerEvent } from "@mcode/protocol";
+import type { ChatMessage, ServerEvent } from "@gustaf/protocol";
 import { backoffDelay } from "./backoff.ts";
 import { initialChatState, reduceEvent, type ChatState } from "./streaming.ts";
 

@@ -164,10 +164,10 @@ async function run(script, o = {}) {
   saveRulesConfig(o.config ?? DEFAULT_RULES);
   clearActionLog();
   const root = mkdtempSync(join(tmpdir(), 'hooks-test-'));
-  mkdirSync(join(root, '.mcode'));
+  mkdirSync(join(root, '.gustaf'));
   writeFileSync(join(root, 'a.txt'), 'hello');
   if (o.global) state.settings.set('hooks', JSON.stringify({ hooks: o.global }));
-  if (o.project !== undefined) writeFileSync(join(root, '.mcode/hooks.json'), typeof o.project === 'string' ? o.project : JSON.stringify({ hooks: o.project }));
+  if (o.project !== undefined) writeFileSync(join(root, '.gustaf/hooks.json'), typeof o.project === 'string' ? o.project : JSON.stringify({ hooks: o.project }));
   if (o.enabled) await setProjectHooksEnabled(root, true);
   if (o.hookResult) state.hookResult = o.hookResult;
   const all = [...(o.global ?? []), ...(Array.isArray(o.project) ? o.project : [])].map((x) => x.command);

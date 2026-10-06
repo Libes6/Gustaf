@@ -185,7 +185,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
   );
 });
 
-/** An assistant text; a valid `mcode-plan` block in it becomes a plan card, anything unparsable stays Markdown. */
+/** An assistant text; a valid `gustaf-plan` block in it becomes a plan card, anything unparsable stays Markdown. */
 function PlanOrMarkdown({ text, actionable, handlers }: { text: string; actionable: boolean; handlers: TurnHandlers }) {
   const found = extractPlan(text);
   if (!found) return <div className="msg-assistant"><Markdown text={text} /></div>;

@@ -143,11 +143,11 @@ test('canvas document: no inline code, nonce on the only script, hardened own CS
 const RUNTIME_MARK = 'Export a React component with export default';
 let dist;
 let built = false;
-const SKIP_BUILD = process.env.MCODE_CSP_SKIP_BUILD === '1';
+const SKIP_BUILD = process.env.GUSTAF_CSP_SKIP_BUILD === '1';
 
 before(() => {
   if (SKIP_BUILD) return;
-  dist = mkdtempSync(join(tmpdir(), 'mcode-dist-'));
+  dist = mkdtempSync(join(tmpdir(), 'gustaf-dist-'));
   execFileSync(process.execPath, ['scripts/build-canvas.mjs'], { cwd: root, stdio: 'pipe' });
   execFileSync(process.execPath, [viteBin, 'build', '--outDir', dist, '--emptyOutDir'], { cwd: root, stdio: 'pipe' });
   built = true;
@@ -307,7 +307,7 @@ test('browser: canvas srcdoc iframe still runs under the parent CSP and stays is
     assert.equal(probe.fetchBlocked, true, 'canvas can reach the network');
     assert.equal(probe.parentBlocked, true, 'canvas can read the parent document');
     assert.equal(msgs.find((m) => m?.type === 'icons')?.svg, true, 'the lucide-react canvas (runtime-icons.js) did not render');
-    assert.ok(!msgs.some((m) => m?.type === 'mcode-canvas-error'), 'canvas runtime reported an error: ' + JSON.stringify(msgs));
+    assert.ok(!msgs.some((m) => m?.type === 'gustaf-canvas-error'), 'canvas runtime reported an error: ' + JSON.stringify(msgs));
     assert.ok(!msgs.some((m) => m?.type === 'inline-ran'), 'an inline script ran under the app CSP (inheritance assumption is wrong)');
     assert.deepEqual([...new Set(probe.violated)], ['connect-src'], 'the only refusal inside the canvas may be its own fetch: ' + JSON.stringify(probe.violated));
     // Control: without the app CSP the legacy inline bootstrap does run, so its absence above is caused by the inherited policy.

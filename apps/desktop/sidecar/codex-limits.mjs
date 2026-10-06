@@ -1,7 +1,7 @@
 // Read-only Codex app-server protocol. No login, resets or credential extraction.
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-const child = spawn(process.env.MCODE_CODEX_BINARY || 'codex', ['app-server'], { stdio: ['pipe', 'pipe', 'pipe'] });
+const child = spawn(process.env.GUSTAF_CODEX_BINARY || 'codex', ['app-server'], { stdio: ['pipe', 'pipe', 'pipe'] });
 const modelsMode = process.argv.includes('--models');
 const models = [];
 let requestId = 2;
@@ -32,4 +32,4 @@ createInterface({ input: child.stdout }).on('line', line => {
     finish({ type: 'limits', result: { rateLimits: pick(ev.result?.rateLimits), rateLimitsByLimitId: ev.result?.rateLimitsByLimitId ? Object.fromEntries(Object.entries(ev.result.rateLimitsByLimitId).map(([k,v]) => [k,pick(v)])) : undefined } });
   }
 });
-send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'mcode', title: 'Gustaf', version: '0.1.0' } } });
+send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'gustaf', title: 'Gustaf', version: '0.1.0' } } });

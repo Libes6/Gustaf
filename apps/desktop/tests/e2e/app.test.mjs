@@ -42,8 +42,8 @@ test('export all chats as JSON, then import the file into an emptied app', { ski
     await openSettings(page);
     await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Import', exact: true }).click();
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
-    await shown(page.getByRole('status').filter({ hasText: 'Saved: /exports/mcode-export.json' }));
-    const exported = backend.files.get('/exports/mcode-export.json');
+    await shown(page.getByRole('status').filter({ hasText: 'Saved: /exports/gustaf-export.json' }));
+    const exported = backend.files.get('/exports/gustaf-export.json');
     assert.ok(exported, 'the export was written through fs_write');
     assert.match(exported, /Nine minutes\./);
     assert.match(exported, /After the last frost\./);
@@ -54,14 +54,14 @@ test('export all chats as JSON, then import the file into an emptied app', { ski
     await page.locator('.app').waitFor();
     await openSettings(page);
     await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Import', exact: true }).click();
-    await page.locator('input[type=file][accept*="json"]').setInputFiles({ name: 'mcode-export.json', mimeType: 'application/json', buffer: Buffer.from(exported) });
+    await page.locator('input[type=file][accept*="json"]').setInputFiles({ name: 'gustaf-export.json', mimeType: 'application/json', buffer: Buffer.from(exported) });
     await shown(page.getByRole('status').filter({ hasText: 'Chats imported: 2, already present: 0.' }));
     const titles = backend.rows('select title from chats order by title').map((r) => r.title);
     assert.deepEqual(titles, ['Garden plans', 'Pasta recipes']);
     assert.equal(backend.rows('select count(*) as n from messages')[0].n, 4);
 
     // Importing the same file again skips what is already there.
-    await page.locator('input[type=file][accept*="json"]').setInputFiles({ name: 'mcode-export.json', mimeType: 'application/json', buffer: Buffer.from(exported) });
+    await page.locator('input[type=file][accept*="json"]').setInputFiles({ name: 'gustaf-export.json', mimeType: 'application/json', buffer: Buffer.from(exported) });
     await shown(page.getByRole('status').filter({ hasText: 'Chats imported: 0, already present: 2.' }));
   });
 });

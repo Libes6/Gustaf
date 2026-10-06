@@ -6,7 +6,7 @@ import { renderApp } from "./render";
 import { callsOf, mockInvoke, mockSettings } from "./tauri";
 import { previewUrlError } from "../../src/lib/projectPreview";
 
-const info={id:7,root:"/project",command:"npm run dev",url:"http://127.0.0.1:5173/",previewUrl:"http://127.0.0.1:45678/__mcode_preview/token/",state:"running",logs:"server output",console:[{kind:"error",message:"fixture failure"}],instrumented:true,error:null};
+const info={id:7,root:"/project",command:"npm run dev",url:"http://127.0.0.1:5173/",previewUrl:"http://127.0.0.1:45678/__gustaf_preview/token/",state:"running",logs:"server output",console:[{kind:"error",message:"fixture failure"}],instrumented:true,error:null};
 it("never starts a dev server automatically; explicit Start shows isolated iframe and Stop removes it",async()=>{
  mockSettings({"preview:/project":{command:"npm run dev",url:"http://127.0.0.1:5173/"}});
  mockInvoke({preview_list:[],preview_start:info,preview_status:info,preview_stop:undefined});

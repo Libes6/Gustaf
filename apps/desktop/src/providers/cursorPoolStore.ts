@@ -5,7 +5,7 @@ import { EMPTY_POOL, migrateBackups, normalizePool, type CursorPool } from "./cu
 import type { ProviderConfig } from "./types";
 
 const KEY = "cursorPool";
-const CHANGED = "mcode-cursor-pool";
+const CHANGED = "gustaf-cursor-pool";
 
 /** Reads the pool, migrating the legacy `backupProviderId` into it on first sight (providers are rewritten
  *  without the field) and dropping accounts that no longer exist. */

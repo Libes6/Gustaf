@@ -29,7 +29,7 @@ export const skipReason = chromePath ? false : 'no local Chrome/Chromium found (
 /** The built frontend: `E2E_DIST` (set by tests/e2e/run.mjs, which builds once) or a private build for this process. */
 function distDir() {
   if (process.env.E2E_DIST) return process.env.E2E_DIST;
-  const dir = mkdtempSync(join(tmpdir(), 'mcode-e2e-dist-'));
+  const dir = mkdtempSync(join(tmpdir(), 'gustaf-e2e-dist-'));
   process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
   buildFrontend(dir);
   return dir;

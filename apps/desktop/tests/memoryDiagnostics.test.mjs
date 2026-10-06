@@ -24,7 +24,7 @@ const p=memoryPrompt(Array.from({length:30},(_,i)=>({id:i,text:i===0?'pnpm </sav
 assert.equal(p.match(/<\/saved_facts>/g).length,1);assert.ok(p.length<12400);assert.ok(p.indexOf('pnpm')<p.indexOf('xxxx'));
 });
 test('diagnostics is opt-in and project-scoped; detection uses installed commands',async()=>{
-const root=mkdtempSync(join(tmpdir(),'mcode-diag-'));assert.equal((await loadDiagnostics(root)).enabled,false);
+const root=mkdtempSync(join(tmpdir(),'gustaf-diag-'));assert.equal((await loadDiagnostics(root)).enabled,false);
 await saveDiagnostics(root,{enabled:true,command:' npm run typecheck ',timeoutMs:900000});
 assert.deepEqual(await loadDiagnostics(root),{engine:'command',enabled:true,command:'npm run typecheck',timeoutMs:120000});
 assert.equal((await loadDiagnostics(root+'b')).enabled,false);assert.equal(normalizeDiagnostics({timeoutMs:NaN}).timeoutMs,30000);

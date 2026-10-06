@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PROTOCOL_VERSION } from "@mcode/protocol";
+import { PROTOCOL_VERSION } from "@gustaf/protocol";
 import { normalizeFingerprint, normalizeHost, parsePairingPayload, shortFingerprint } from "./pairing.ts";
 
 const FP = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
@@ -14,9 +14,9 @@ test("parses a JSON payload", () => {
   });
 });
 
-test("parses an mcode:// URL, with fp alias, colons and uppercase in the fingerprint", () => {
+test("parses a gustaf:// URL, with fp alias, colons and uppercase in the fingerprint", () => {
   const colon = FP.toUpperCase().match(/../g)!.join(":");
-  const r = parsePairingPayload(`mcode://pair?host=my-mac.local&port=9000&code=abcd1234&fp=${encodeURIComponent(colon)}&v=1`);
+  const r = parsePairingPayload(`gustaf://pair?host=my-mac.local&port=9000&code=abcd1234&fp=${encodeURIComponent(colon)}&v=1`);
   assert.equal(r.ok, true);
   if (r.ok) {
     assert.equal(r.payload.host, "my-mac.local");
@@ -53,7 +53,9 @@ test("rejects bad input with a specific code", () => {
   assert.equal(code(JSON.stringify({ ...good, fingerprint: "abc" })), "invalid_fingerprint");
   assert.equal(code(JSON.stringify({ ...good, v: PROTOCOL_VERSION + 1 })), "unsupported_version");
   assert.equal(code(JSON.stringify({ ...good, v: undefined })), "missing_field");
-  assert.equal(code("mcode://pair?host=a&port=1"), "missing_field");
+  assert.equal(code("gustaf://pair?host=a&port=1"), "missing_field");
+  // The scheme of desktop builds from before the rename.
+  assert.equal(parsePairingPayload(`mcode://pair?host=a&port=1&code=abcd1234&fp=${FP}&v=${PROTOCOL_VERSION}`).ok, true);
 });
 
 test("reports the offending field", () => {

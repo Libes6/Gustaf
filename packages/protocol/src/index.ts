@@ -1,5 +1,5 @@
 /**
- * @mcode/protocol: the wire contract between the Gustaf desktop app (server side, `apps/desktop/src-tauri`) and its
+ * @gustaf/protocol: the wire contract between the Gustaf desktop app (server side, `apps/desktop/src-tauri`) and its
  * companion apps (`apps/mobile`).
  *
  * Rules: pure TypeScript only. No React, Tauri or React Native imports, no runtime dependencies (Expo pins its own React

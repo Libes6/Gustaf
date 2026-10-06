@@ -109,7 +109,7 @@ async function listCodexModels() {
   const executable = await codexExecutable();
   let models: { id: string; name: string }[] = [];
   let error = '';
-  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { MCODE_CODEX_BINARY: executable } }), e => {
+  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { GUSTAF_CODEX_BINARY: executable } }), e => {
     if (e.type === 'models') models = e.result;
     if (e.type === 'error') error = e.message;
   });

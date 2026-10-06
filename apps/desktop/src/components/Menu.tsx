@@ -7,7 +7,7 @@ export type MenuEntry =
   | { sep: true }
   | { heading: string };
 type Anchor = { x: number; y: number; top?: number };
-const OPEN_EVENT = "mcode-menu-open";
+const OPEN_EVENT = "gustaf-menu-open";
 
 /** Portalled menu: measured before paint, flips above its trigger and never clips inside the composer. */
 export function Menu({ at, items, onClose, trigger, wide = false, keyboard = false }: { at: Anchor; items: MenuEntry[]; onClose: () => void; trigger?: HTMLElement | null; wide?: boolean; keyboard?: boolean }) {

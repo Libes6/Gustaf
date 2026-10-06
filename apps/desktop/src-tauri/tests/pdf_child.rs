@@ -28,18 +28,18 @@ fn tiny_pdf(text: &str) -> Vec<u8> {
 
 #[test]
 fn child_process_extracts_pdf_text_and_reports_bad_files() {
-    let exe = Path::new(env!("CARGO_BIN_EXE_mcode"));
+    let exe = Path::new(env!("CARGO_BIN_EXE_gustaf"));
     let dir = std::env::temp_dir().join(format!("gustaf-pdf-child-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let good = dir.join("good.pdf");
     std::fs::write(&good, tiny_pdf("hello from the child process")).unwrap();
-    let pages = mcode_lib::extract_pdf_with_exe(exe, &good).unwrap();
+    let pages = gustaf_lib::extract_pdf_with_exe(exe, &good).unwrap();
     assert_eq!(pages.len(), 1);
     assert!(pages[0].contains("hello from the child process"), "{pages:?}");
 
     let bad = dir.join("bad.pdf");
     std::fs::write(&bad, b"%PDF-1.4 not really").unwrap();
-    assert!(mcode_lib::extract_pdf_with_exe(exe, &bad).is_err());
-    assert!(mcode_lib::extract_pdf_with_exe(exe, &dir.join("missing.pdf")).is_err());
+    assert!(gustaf_lib::extract_pdf_with_exe(exe, &bad).is_err());
+    assert!(gustaf_lib::extract_pdf_with_exe(exe, &dir.join("missing.pdf")).is_err());
     std::fs::remove_dir_all(&dir).unwrap();
 }

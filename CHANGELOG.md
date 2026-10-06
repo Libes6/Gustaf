@@ -1,8 +1,13 @@
 # Changelog
 
-All notable user-visible changes to Gustaf are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Gustaf was previously developed as M Code.
+All notable user-visible changes to Gustaf are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- Every internal name now uses Gustaf: bundle identifier and Keychain service `io.github.libes6.gustaf`, project folder `.gustaf/` (review rules, hooks, checks, skills; also `~/.gustaf/skills`), pairing links `gustaf://pair`, chat export format `gustaf-chats`, plan and desktop-control blocks `gustaf-plan` / `gustaf-computer`.
+- Upgrading from a build made before the rename: the data folders are moved to the new identifier on first start and stored API keys move to the new Keychain service the first time they are read (macOS may ask once per key for access to the old entry). `.mcode/` project files, `mcode://` pairing links, `mcode-chats` exports and old plan and desktop-control blocks are still read.
 
 ## [0.1.0] - 2026-10-04
 

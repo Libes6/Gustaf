@@ -28,7 +28,7 @@ it("lists effective hooks with their source and the skipped entries; project hoo
   expect(await screen.findByText("guard.sh")).toBeInTheDocument();
   expect(screen.getByText(/global · timeout 10000 ms/)).toBeInTheDocument();
   expect(screen.queryByText("npm test")).not.toBeInTheDocument();
-  expect(screen.getByRole("checkbox", { name: /\.mcode\/hooks\.json/ })).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: /\.gustaf\/hooks\.json/ })).not.toBeChecked();
   expect(screen.getByRole("note")).toHaveTextContent(/run shell commands/);
   expect(screen.getByText("The project file exists but its hooks are off and will not run.")).toBeInTheDocument();
   const skipped = screen.getByRole("alert");
@@ -40,7 +40,7 @@ it("enabling project hooks stores the switch and shows the project's hooks marke
   const settings = settingsDb({});
   mockInvoke({ fs_read: file });
   renderApp(<HooksSettings />, makeApp({ projects: [project({ path: "/work/alpha" })] }));
-  await userEvent.click(await screen.findByRole("checkbox", { name: /\.mcode\/hooks\.json/ }));
+  await userEvent.click(await screen.findByRole("checkbox", { name: /\.gustaf\/hooks\.json/ }));
   expect(await screen.findByText("npm test")).toBeInTheDocument();
   expect(screen.getByText(/project file · timeout 10000 ms/)).toBeInTheDocument();
   expect(JSON.parse(settings.hooksProjects)).toEqual(["/work/alpha"]);

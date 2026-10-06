@@ -53,7 +53,7 @@ Windows and Linux builds have not yet been launched by hand, so the first run on
 | W1 | Windows: run the NSIS `.exe`; on another clean machine or after uninstalling, the `.msi`. | SmartScreen warning appears (not Authenticode signed): More info → Run anyway; install completes; the app starts from the Start menu. | | |
 | W2 | Windows: save an API key, restart the app. | Key is stored in Credential Manager and survives the restart. | | |
 | W3 | Windows: CLI provider and `run_command` (PowerShell). | The CLI on `PATH` or in the npm global folder is found; commands run; note any `.cmd` shim problems. | | |
-| W4 | Windows: uninstall from Settings → Apps. | App is removed; data in `%APPDATA%\com.maksimkulakov.mcode` remains (expected). | | |
+| W4 | Windows: uninstall from Settings → Apps. | App is removed; data in `%APPDATA%\io.github.libes6.gustaf` remains (expected). | | |
 | L1 | Linux: AppImage (`chmod +x`, run); DEB (`sudo apt install ./<file>.deb`); RPM on a Fedora-like system. | Each starts; note the distribution, glibc version, desktop and X11/Wayland. | | |
 | L2 | Linux: save an API key with GNOME Keyring or KWallet running; then try without a keyring daemon. | With a keyring the key is saved and survives a restart; without one, saving shows an error (expected). | | |
 | L3 | Linux: Settings → General update check in the AppImage and in the DEB/RPM install. | AppImage offers update checks; DEB/RPM show updates as disabled. | | |

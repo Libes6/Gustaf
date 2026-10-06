@@ -75,8 +75,8 @@ test('PowerShell invocation: exe gets escaped args, shim gets the prompt on stdi
   assert.ok(!shim.includes('calc'), 'prompt must not appear as text');
   const b64 = /FromBase64String\('([^']+)'\)/.exec(shim)[1];
   assert.equal(Buffer.from(b64, 'base64').toString('utf8'), '& calc | "x" %PATH%');
-  const env = invocationScript('powershell', { executable: 'node', args: ["it's.mjs"], env: { MCODE_CODEX_BINARY: 'C:\\a b\\codex.cmd' } });
-  assert.equal(env, `$env:MCODE_CODEX_BINARY = 'C:\\a b\\codex.cmd'; & 'node' 'it''s.mjs'; exit $LASTEXITCODE`);
+  const env = invocationScript('powershell', { executable: 'node', args: ["it's.mjs"], env: { GUSTAF_CODEX_BINARY: 'C:\\a b\\codex.cmd' } });
+  assert.equal(env, `$env:GUSTAF_CODEX_BINARY = 'C:\\a b\\codex.cmd'; & 'node' 'it''s.mjs'; exit $LASTEXITCODE`);
 });
 
 test('CLI candidates differ per OS and drop the ChatGPT bundle outside macOS', () => {

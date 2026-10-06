@@ -15,7 +15,7 @@ import { modeAllowsTool, modeBlockedMessage, modePrompt, type ChatMode } from ".
 import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
-import { computerApproval, endsWithTyping, formatComputerResult } from "./computerCore";
+import { computerApproval, endsWithTyping, formatComputerResult, isBridgeComputerTool } from "./computerCore";
 import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
 import { getRulesConfig, projectRootFor } from "./rulesStore";
@@ -470,7 +470,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
           const shot = await computer.execute(actions);
           const failed = typeof shot.failedStep === "number" || !!shot.error;
           afterTyping = endsWithTyping(failed ? actions.slice(0, shot.failedStep ?? 0) : actions, afterTyping);
-          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer" || call.name === "mcode_computer";
+          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer" || isBridgeComputerTool(call.name);
           const output = formatComputerResult(actions, shot);
           if (failed) throw new ComputerFailed(output, shot.png || undefined);
           results.push({ ...res, output, image: wantsImage ? shot.png : undefined });

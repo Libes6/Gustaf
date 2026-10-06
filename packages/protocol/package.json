@@ -1,5 +1,5 @@
 {
-  "name": "@mcode/protocol",
+  "name": "@gustaf/protocol",
   "version": "0.1.0",
   "private": true,
   "description": "Wire protocol between the Gustaf desktop server and its companion apps (pure TypeScript, no React/Tauri/React Native imports).",

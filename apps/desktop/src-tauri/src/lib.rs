@@ -20,6 +20,7 @@ mod tools;
 mod preview;
 mod semantic;
 mod knowledge;
+mod legacy;
 mod lsp;
 mod web_tools;
 mod updater;
@@ -36,6 +37,8 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before any window or the database: move the data of builds from before the rename (see legacy.rs).
+    legacy::migrate_app_dirs();
     tauri::Builder::default()
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())

@@ -1,6 +1,6 @@
 // Integration: the three API adapters (anthropic, openaiCompatible, openaiResponses) with their retry wiring, run
 // against a scripted fetch. The adapters import Tauri's HTTP plugin, so they are bundled with esbuild and that
-// import is replaced by a stub that delegates to `globalThis.__mcodeFetch`. Retry-After headers keep the real waits to a few ms.
+// import is replaced by a stub that delegates to `globalThis.__gustafFetch`. Retry-After headers keep the real waits to a few ms.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +19,7 @@ const bundle = await build({
       b.onResolve({ filter: /^@tauri-apps\// }, (a) => ({ path: a.path, namespace: 'stub' }));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
         loader: 'js',
-        contents: 'export const fetch = (...a) => globalThis.__mcodeFetch(...a); export const invoke = () => { throw new Error("no tauri"); };',
+        contents: 'export const fetch = (...a) => globalThis.__gustafFetch(...a); export const invoke = () => { throw new Error("no tauri"); };',
       }));
     },
   }],
@@ -43,7 +43,7 @@ const http = (status, message, headers = { 'retry-after-ms': '1' }) => () => new
 /** Installs a fetch that plays `steps` (the last repeats) and returns its call log. */
 function mockFetch(...steps) {
   const calls = [];
-  globalThis.__mcodeFetch = async (url, init) => {
+  globalThis.__gustafFetch = async (url, init) => {
     calls.push({ url, init });
     const step = steps[Math.min(calls.length - 1, steps.length - 1)];
     const v = await step(init);
