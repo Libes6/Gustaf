@@ -3,6 +3,7 @@ import { useT } from "../i18n";
 import { answerScheduledApproval, useScheduledApprovals } from "../lib/scheduledApprovals";
 import { loadScheduled } from "../lib/scheduledPromptsStore";
 import { startScheduledRuntime } from "../lib/scheduledRuntime";
+import { startWebhooks } from "../lib/webhooks";
 import { useApp } from "../state";
 import "../styles/scheduled.css";
 
@@ -23,11 +24,15 @@ export function ScheduledPromptsRuntime() {
     if (!ready) return;
     let stop: (() => void) | undefined;
     let cancelled = false;
+    let stopHooks: (() => void) | undefined;
     void loadScheduled().then(() => {
-      if (!cancelled) stop = startScheduledRuntime(() => appRef.current);
+      if (cancelled) return;
+      stop = startScheduledRuntime(() => appRef.current);
+      stopHooks = startWebhooks();
     });
     return () => {
       cancelled = true;
+      stopHooks?.();
       stop?.();
     };
   }, [ready]);

@@ -22,6 +22,7 @@ import {
 import { updateScheduled, useScheduled } from "../lib/scheduledPromptsStore";
 import { modelKey, useApp } from "../state";
 import "../styles/scheduled.css";
+import { WebhooksSection } from "./WebhooksSection";
 
 // Settings: scheduled prompts. The list, a toggle that confirms a schedule (nothing runs before it is switched on),
 // "Run now", and the creation/edit form. The scheduling logic is in lib/scheduledPrompts.ts, runs in lib/scheduledRun.ts.
@@ -290,6 +291,7 @@ export function ScheduledPage() {
           </ul>
         </div>
       )}
+      <WebhooksSection list={list} />
       {menu.node}
     </>
   );

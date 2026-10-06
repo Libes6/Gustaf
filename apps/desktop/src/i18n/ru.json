@@ -1619,5 +1619,21 @@
   "prWatchStopped_unreadable": "остановлено: GitHub недоступен 15 минут",
   "prWatchStopped_user": "остановлено",
   "prWatchCommandHint": "Watch a pull request: /watch <url or number> / Следить за PR",
-  "prWatchStart": "Следить в этом чате"
+  "prWatchStart": "Следить в этом чате",
+  "webhooksTitle": "Запуск по вебхуку",
+  "webhooksLead": "Подписанный POST на адрес запускает расписание сразу, тело запроса передаётся как недоверенные данные. Сервер слушает только этот компьютер (127.0.0.1); чтобы принимать вебхуки GitHub, откройте его своим туннелем, выберите тип application/json и вставьте секрет в поле Secret вебхука.",
+  "webhooksPort": "Порт",
+  "webhooksListening": "Слушает 127.0.0.1:{port}",
+  "webhooksIdle": "Выключен: нет включённых вебхуков",
+  "webhooksCopyUrl": "Скопировать адрес",
+  "webhooksCopySecret": "Скопировать секрет",
+  "webhooksRotate": "Сменить",
+  "webhooksEnable": "Вебхук для «{title}»",
+  "webhooksScheduleOff": "Расписание выключено: доставки записываются, но не запускают его.",
+  "webhooksDeliveries": "Последние доставки",
+  "webhookOutcome_started": "запущен прогон",
+  "webhookOutcome_running": "пропущено: уже выполняется",
+  "webhookOutcome_off": "пропущено: расписание выключено",
+  "webhookOutcome_rejected": "отклонено: неверная подпись",
+  "copied": "Скопировано"
 }

@@ -1583,5 +1583,21 @@
   "prWatchStopped_unreadable": "stopped: GitHub could not be read for 15 minutes",
   "prWatchStopped_user": "stopped",
   "prWatchCommandHint": "Watch a pull request: /watch <url or number> / Следить за PR",
-  "prWatchStart": "Watch in this chat"
+  "prWatchStart": "Watch in this chat",
+  "webhooksTitle": "Webhook triggers",
+  "webhooksLead": "A signed POST to the URL runs the schedule now, with the payload attached as untrusted data. The server listens on this computer only (127.0.0.1); to receive GitHub webhooks, expose it with a tunnel you run, set the content type to application/json and paste the secret into the webhook's Secret field.",
+  "webhooksPort": "Port",
+  "webhooksListening": "Listening on 127.0.0.1:{port}",
+  "webhooksIdle": "Off: no webhook is switched on",
+  "webhooksCopyUrl": "Copy URL",
+  "webhooksCopySecret": "Copy secret",
+  "webhooksRotate": "Rotate",
+  "webhooksEnable": "Webhook for {title}",
+  "webhooksScheduleOff": "The schedule is off: deliveries are recorded but do not run it.",
+  "webhooksDeliveries": "Recent deliveries",
+  "webhookOutcome_started": "started a run",
+  "webhookOutcome_running": "skipped: already running",
+  "webhookOutcome_off": "skipped: schedule off",
+  "webhookOutcome_rejected": "rejected: bad signature",
+  "copied": "Copied"
 }
