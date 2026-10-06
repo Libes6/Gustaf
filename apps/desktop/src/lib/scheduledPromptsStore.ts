@@ -35,6 +35,8 @@ export function loadScheduled(): Promise<ScheduledPrompt[]> {
 }
 
 export const getScheduled = () => current;
+/** Called after every change of the list (runner patches included). */
+export const subscribeScheduled = subscribe;
 export const isScheduledLoaded = () => loaded;
 
 /** Replaces the list through `fn` (given the latest list, so concurrent patches do not overwrite each other) and saves it. */

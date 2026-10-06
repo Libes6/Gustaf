@@ -1,4 +1,4 @@
-// In-memory stand-in for the Rust side of M Code, living in the test process. The browser's fake
+// In-memory stand-in for the Rust side of Gustaf, living in the test process. The browser's fake
 // `window.__TAURI_INTERNALS__.invoke` (tests/e2e/tauriInit.js) forwards every command here.
 //
 // Database: the real SQLite engine through Node's built-in `node:sqlite`, with the schema read out of
@@ -99,7 +99,7 @@ export class FakeBackend {
   /** Workspaces made through `worktree_create` (src-tauri/src/worktree.rs); `worktree_list` answers with them. */
   worktrees = [];
   /** What the native "save" dialog answers (`null` = cancelled). */
-  savePath = '/exports/mcode-export.json';
+  savePath = '/exports/gustaf-export.json';
   #overrides = new Map();
   #fetches = new Map();
   #nextRid = 1;

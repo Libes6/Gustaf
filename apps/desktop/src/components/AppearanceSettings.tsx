@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useT, type Key } from "../i18n";
 import { getThemePrefs, setThemePrefs, subscribeTheme } from "../lib/theme";
-import { ACCENT_PRESETS, normalizeHex, THEME_MODES, type ThemeMode } from "../lib/themeUtil";
+import { ACCENT_PRESETS, CHAT_WIDTHS, normalizeHex, THEME_MODES, type ChatWidth, type ThemeMode } from "../lib/themeUtil";
 
 const MODE_LABEL: Record<ThemeMode, Key> = { system: "themeSystem", light: "themeLight", dark: "themeDark" };
+const WIDTH_LABEL: Record<ChatWidth, Key> = { standard: "chatWidthStandard", wide: "chatWidthWide", full: "chatWidthFull" };
 
 /** Theme (light / dark / system) and accent color; stored in app settings through lib/theme.ts. */
 export function AppearanceSettings() {
@@ -22,6 +23,14 @@ export function AppearanceSettings() {
           <div className="seg" role="group" aria-label={t("themeLabel")} style={{ margin: 0 }}>
             {THEME_MODES.map((m) => (
               <button key={m} className={prefs.mode === m ? "active" : ""} aria-pressed={prefs.mode === m} onClick={() => setThemePrefs({ mode: m })}>{t(MODE_LABEL[m])}</button>
+            ))}
+          </div>
+        </div>
+        <div className="card-row">
+          <div className="grow"><div className="t">{t("chatWidth")}</div><div className="d">{t("chatWidthHint")}</div></div>
+          <div className="seg" role="group" aria-label={t("chatWidth")} style={{ margin: 0 }}>
+            {CHAT_WIDTHS.map((w) => (
+              <button key={w} className={prefs.width === w ? "active" : ""} aria-pressed={prefs.width === w} onClick={() => setThemePrefs({ width: w })}>{t(WIDTH_LABEL[w])}</button>
             ))}
           </div>
         </div>

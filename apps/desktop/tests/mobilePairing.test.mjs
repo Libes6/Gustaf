@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { PROTOCOL_VERSION } from "@mcode/protocol";
+import { PROTOCOL_VERSION } from "@gustaf/protocol";
 import { parsePairingPayload } from "../../mobile/src/lib/pairing.ts";
 import { buildPairingUri, countdown, formatCode, groupFingerprint, qrMatrix, qrPath } from "../src/lib/mobilePairing.ts";
 
@@ -11,7 +11,7 @@ const FP = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 test("the pairing URI the QR carries is accepted by the phone's parser", () => {
   const uri = buildPairingUri({ host: "192.168.1.20", port: 51234, code: "K7Q2X9PM", fingerprint: FP, protocol: PROTOCOL_VERSION });
-  assert.equal(uri, `mcode://pair?host=192.168.1.20&port=51234&code=K7Q2X9PM&fp=${FP}&v=${PROTOCOL_VERSION}`);
+  assert.equal(uri, `gustaf://pair?host=192.168.1.20&port=51234&code=K7Q2X9PM&fp=${FP}&v=${PROTOCOL_VERSION}`);
   assert.deepEqual(parsePairingPayload(uri), {
     ok: true,
     payload: { protocol: PROTOCOL_VERSION, host: "192.168.1.20", port: 51234, code: "K7Q2X9PM", fingerprint: FP },

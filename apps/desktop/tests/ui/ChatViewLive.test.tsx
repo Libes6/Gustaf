@@ -60,7 +60,8 @@ describe("ChatView with a live scheduled run", () => {
     // Sending is refused with a clear message (Enter in the composer), nothing is stored or run.
     const box = screen.getByRole("textbox");
     await userEvent.type(box, "hello{Enter}");
-    expect(await screen.findByRole("textbox", { name: "Edit queued message" })).toHaveValue("hello");
+    expect(await screen.findByText("hello")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Edit queued message" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Pause queue" }));
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(callsOf("db_execute").filter((a) => /insert into messages/i.test(a.sql))).toEqual([]);
@@ -92,11 +93,12 @@ describe("Queued chat context integration", () => {
     const reference = { sourceId: 9, title: "Reference chat", snapshot: "user: Original snapshot", fullSize: 23, shortened: false };
     await updateQueue(5, () => ({ paused: true, items: [{ id: "with-context", text: joinChatReferences("Question", [reference]), images: [], clarify: false }] }));
     setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit queued message" }));
     const editor = await screen.findByRole("textbox", { name: "Edit queued message" });
     expect(editor).toHaveValue("Question");
     expect(screen.getByText("Reference chat")).toBeInTheDocument();
     await userEvent.clear(editor);
-    await userEvent.type(editor, "Updated question");
+    await userEvent.type(editor, "Updated question{Enter}");
     const saved = splitChatReferences(getQueue(5)!.items[0].text);
     expect(saved.body).toBe("Updated question");
     expect(saved.references).toEqual([reference]);
@@ -148,8 +150,8 @@ describe('pending interactive messages', () => {
    await userEvent.type(screen.getByRole('textbox'), 'first{Enter}');
    await waitFor(() => expect(calls).toBe(1));
    await userEvent.type(screen.getByRole('textbox'), 'second');
-   await userEvent.click(screen.getByRole('button', { name: 'Send next' }));
-   expect(await screen.findByRole('textbox', { name: 'Edit queued message' })).toHaveValue('second');
+   await userEvent.keyboard('{Enter}');
+   expect(await screen.findByText('second')).toBeInTheDocument();
    expect(calls).toBe(1);
    act(() => finish());
    await screen.findByText('Second completed');
@@ -158,7 +160,7 @@ describe('pending interactive messages', () => {
  });
 });
 
-it('delivers clarification during an active API run without pausing its queue', async () => {
+it('queues Enter during an active API run and keeps Stop available', async () => {
  let finish!: () => void;
  let turns = 0;
  let received = '';
@@ -172,8 +174,10 @@ it('delivers clarification during an active API run without pausing its queue', 
  await userEvent.type(screen.getByRole('textbox'), 'do this{Enter}');
  await waitFor(() => expect(turns).toBe(1));
  await userEvent.type(screen.getByRole('textbox'), 'use this detail');
- await userEvent.click(screen.getByRole('button', { name: 'Clarify current task' }));
- expect(await screen.findByRole('textbox', { name: 'Edit queued message' })).toHaveValue('use this detail');
+ expect(screen.queryByRole('button', { name: 'Clarify current task' })).not.toBeInTheDocument();
+ expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+ await userEvent.keyboard('{Enter}');
+ expect(await screen.findByText('use this detail')).toBeInTheDocument();
  act(() => finish());
  await screen.findByText('Clarified response');
  expect(received).toBe('use this detail');

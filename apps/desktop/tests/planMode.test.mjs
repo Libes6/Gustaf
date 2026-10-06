@@ -41,11 +41,11 @@ test('a plan block round-trips and the last block wins', () => {
 });
 
 test('unparsable or empty plan blocks give null; string steps and missing ids are accepted', () => {
-  assert.equal(core.extractPlan('```mcode-plan\n{oops\n```'), null);
-  assert.equal(core.extractPlan('```mcode-plan\n{"title":"t","steps":[]}\n```'), null);
-  assert.equal(core.extractPlan('```mcode-plan\n{"steps":[{"text":"  "}]}\n```'), null);
+  assert.equal(core.extractPlan('```gustaf-plan\n{oops\n```'), null);
+  assert.equal(core.extractPlan('```gustaf-plan\n{"title":"t","steps":[]}\n```'), null);
+  assert.equal(core.extractPlan('```gustaf-plan\n{"steps":[{"text":"  "}]}\n```'), null);
   assert.equal(core.extractPlan('```json\n{"steps":["a"]}\n```'), null);
-  const p = core.extractPlan('```mcode-plan\n{"steps":["a",{"text":"b","files":["x",3]},7]}\n```').plan;
+  const p = core.extractPlan('```gustaf-plan\n{"steps":["a",{"text":"b","files":["x",3]},7]}\n```').plan;
   assert.equal(p.title, 'Plan');
   assert.deepEqual(p.steps, [{ id: '1', text: 'a' }, { id: '2', text: 'b', files: ['x'] }]);
 });
@@ -133,7 +133,7 @@ test('Plan mode offers only read tools and blocks writes, commands, MCP and spaw
   ]);
   assert.deepEqual(r.offered[0].sort(), ['list_dir', 'read_file', 'search', 'use_skill']);
   assert.match(r.systems[0], /Plan mode/);
-  assert.match(r.systems[0], /mcode-plan/);
+  assert.match(r.systems[0], /gustaf-plan/);
   const byName = Object.fromEntries(r.outputs.map((o) => [o.name, o]));
   assert.equal(byName.read_file.isError, false);
   for (const name of ['run_command', 'write_file', 'edit_file', 'spawn_agent', 'mcp__srv__tool']) {

@@ -11,14 +11,14 @@ import {
   type ProjectSummary,
   type SendMessageRequest,
   type ServerEvent,
-} from "@mcode/protocol";
+} from "@gustaf/protocol";
 import { backoffDelay } from "../lib/backoff.ts";
 
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
 
 /**
- * What every screen talks to. `MCodeClient` (real desktop over HTTPS + WebSocket) and `MockServer` (in memory) implement it.
- * The REST paths used by `MCodeClient` are an assumption until the desktop server exists (TASKS.md, "Desktop server").
+ * What every screen talks to. `GustafClient` (real desktop over HTTPS + WebSocket) and `MockServer` (in memory) implement it.
+ * The REST paths used by `GustafClient` are an assumption until the desktop server exists (TASKS.md, "Desktop server").
  */
 export interface DesktopApi {
   listProjects(): Promise<ProjectSummary[]>;
@@ -110,7 +110,7 @@ export function pairWithDesktop(
   });
 }
 
-export class MCodeClient implements DesktopApi {
+export class GustafClient implements DesktopApi {
   private readonly transport: PinnedTransport;
   private readonly base: string;
   private readonly listeners = new Set<(e: ServerEvent) => void>();

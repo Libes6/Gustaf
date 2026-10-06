@@ -1,4 +1,5 @@
-import { flattenMsg, textOf, type TurnInput } from "./types.ts";
+import { flattenMsg, textOf, type Reasoning, type TurnInput } from "./types.ts";
+import { cursorModel } from "./reasoning.ts";
 
 export type ChatMode = 'ask' | 'plan' | 'agent';
 /** Plan and Ask must not change anything. */
@@ -8,9 +9,9 @@ export const isPlanning = (mode?: ChatMode) => mode === 'plan' || mode === 'ask'
  * Cursor Agent: `--plan` (shorthand for `--mode=plan`) and `--mode ask` exist in `cursor-agent --help`. The older read-only
  * access mode keeps `--mode plan`; "full" access adds `--force` unless the chat mode is read-only.
  */
-export function cursorArgs({ model, session, access, mode, attachDir }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; attachDir?: string }): string[] {
+export function cursorArgs({ model, session, access, mode, attachDir, reasoning }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; attachDir?: string; reasoning?: Reasoning }): string[] {
   const modeFlags = mode === 'plan' ? ['--plan'] : mode === 'ask' ? ['--mode', 'ask'] : access === 'readonly' ? ['--mode', 'plan'] : access === 'full' ? ['--force'] : [];
-  return ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--trust', ...modeFlags, ...(model ? ['--model', model] : []), ...(session ? ['--resume', session] : []), ...(attachDir ? ['--add-dir', attachDir] : [])];
+  return ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--trust', ...modeFlags, ...(model ? ['--model', cursorModel(model, reasoning)] : []), ...(session ? ['--resume', session] : []), ...(attachDir ? ['--add-dir', attachDir] : [])];
 }
 
 /**
@@ -18,7 +19,7 @@ export function cursorArgs({ model, session, access, mode, attachDir }: { model?
  * instead of `-i <path>` because `codex exec -i` takes a variadic list and would swallow the positional prompt/session id.
  * Each flag is followed by another `--` option, never by a positional.
  */
-export function codexArgs({ model, session, access, mode, images = [] }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; images?: string[] }): string[] {
+export function codexArgs({ model, session, access, mode, images = [], reasoning }: { model?: string; session?: string; access?: 'readonly' | 'auto' | 'full'; mode?: ChatMode; images?: string[]; reasoning?: Reasoning }): string[] {
   // Plan and Ask have no native Codex mode: the read-only sandbox is the equivalent, and it wins over "full" access.
   const readonly = access === 'readonly' || isPlanning(mode);
   const permissions = access === 'full' && !readonly
@@ -26,7 +27,7 @@ export function codexArgs({ model, session, access, mode, images = [] }: { model
     : session
       ? ['-c', `sandbox_mode="${readonly ? 'read-only' : 'workspace-write'}"`]
       : ['--sandbox', readonly ? 'read-only' : 'workspace-write'];
-  return ['exec', ...(session ? ['resume'] : []), '--json', '--skip-git-repo-check', ...images.map((p) => `--image=${p}`), ...permissions, ...(model ? ['-m', model] : []), ...(session ? [session] : [])];
+  return ['exec', ...(session ? ['resume'] : []), '--json', '--skip-git-repo-check', ...images.map((p) => `--image=${p}`), ...permissions, ...(model ? ['-m', model] : []), ...(reasoning ? ['-c', `model_reasoning_effort="${reasoning}"`] : []), ...(session ? [session] : [])];
 }
 
 /**

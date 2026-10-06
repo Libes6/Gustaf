@@ -1,4 +1,7 @@
 import { transformRequest } from "./chatContext";
+import { afterTurn, fromNativeStatus, goalPrompt, isContinuation, newGoal, newNativeGoal, parseGoalCommand } from "./goalCore";
+import { getGoal, loadGoal, setGoal, subscribeGoals } from "./goalStore";
+import { parseWatchCommand, startPrWatch } from "./prWatch";
 import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
 import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
@@ -16,7 +19,7 @@ import { getAdapter } from "../providers";
 import { classifyQuota, exhaustedUntil, markExhausted, pickAccount, resolveAccount, setActive, type Quota } from "../providers/cursorAccounts";
 import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
-import { type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
+import { textOf, type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
 import { db, fsx, review } from "./api";
 import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ChatRunDeps, type ReviewCopy } from "./chatRunCore";
@@ -33,6 +36,8 @@ import { branchCutoff, branchTitle, editableText, messageImages, messagesBefore 
 import type { useComposerDraft } from "./useComposerDraft";
 
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void };
+/** An open `request_secret` (T10): the private card resolves with the typed value or null. */
+export type SecretRequest = { name: string; reason: string; resolve: (value: string | null) => void };
 
 type Options = {
   session: ChatSession;
@@ -91,6 +96,7 @@ export function useChatRun(o: Options) {
   const [error, setError] = useState("");
   const [ownRunning, setRunning] = useState(false);
   const [ownApproval, setApproval] = useState<Approval | null>(null);
+  const [secretRequest, setSecretRequest] = useState<SecretRequest | null>(null);
   const [ownToolResults, setToolResults] = useState<Extract<Part, { type: "tool_result" }>[]>([]);
   const [ownActivities, setActivities] = useState<Extract<Part, { type: "activity" }>[]>([]);
   const [ownRetryNotice, setRetryNotice] = useState("");
@@ -138,6 +144,7 @@ export function useChatRun(o: Options) {
   const stop = () => {
     abortRef.current?.abort();
     approval?.resolve(false);
+    secretRequest?.resolve(null);
     external?.abort();
   };
 
@@ -168,9 +175,9 @@ export function useChatRun(o: Options) {
   useEffect(() => {
     const stopKey = (e: KeyboardEvent) => { if (o.visible && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Escape") { e.preventDefault(); stop(); } };
     const stopGlobal = () => { if (o.visible) stop(); };
-    addEventListener("mcode-stop", stopGlobal);
+    addEventListener("gustaf-stop", stopGlobal);
     addEventListener("keydown", stopKey);
-    return () => { removeEventListener("keydown", stopKey); removeEventListener("mcode-stop", stopGlobal); };
+    return () => { removeEventListener("keydown", stopKey); removeEventListener("gustaf-stop", stopGlobal); };
   }, [o.visible, approval, external]);
 
   async function send(retry = false, edit?: Edit) {
@@ -182,10 +189,37 @@ export function useChatRun(o: Options) {
     if (external) return setError(busyError.current = t("scheduledChatBusy", { title: external.title }));
     if (!provider || !app.selection) return app.openSettings("providers");
     if (o.blocked) return setError(o.blocked);
+    // `/watch <PR url or number>`: watch that pull request for this chat (lib/prWatch.ts); nothing goes to the model.
+    const watched = !edit && !retry ? parseWatchCommand(body) : null;
+    if (watched) {
+      if (!session.chatId || !root) return setError(t("prWatchNeedsChat"));
+      try {
+        await startPrWatch(session.chatId, root, watched);
+        o.setText("");
+        o.draft.clearSent(session.chatId);
+      } catch (e) { setError(t("prWatchFailed", { error: String(e instanceof Error ? e.message : e) })); }
+      return;
+    }
     let activeProvider: ProviderConfig = provider;
     let allBlocked = false;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));
     let activeModel = app.selection.model;
+    // `/goal <objective>` starts a goal: the agent then keeps going turn after turn (lib/goalCore.ts).
+    const goalObjective = retry ? null : parseGoalCommand(body);
+    // Codex (app-server) has goals of its own: it keeps working turn after turn by itself, so the app's loop and its
+    // `GOAL: done` protocol are not used for it. A continuation of such a goal (Resume) re-activates it.
+    if (session.chatId) await loadGoal(session.chatId).catch(() => {});
+    const existing = session.chatId ? getGoal(session.chatId) : null;
+    const nativeAdapter = !retry && (goalObjective || (existing?.native && existing.status === "active" && isContinuation(body)))
+      ? await getAdapter(provider).then((a) => a.nativeGoal?.() ?? false).catch(() => false)
+      : false;
+    const nativeResume = !!nativeAdapter && !goalObjective && !!existing;
+    const nativeObjective = nativeAdapter ? (goalObjective ?? existing!.objective) : null;
+    const sentBody = goalObjective ? (nativeAdapter ? goalObjective : goalPrompt(goalObjective)) : body;
+    let goalRun = false;
+    let stopGoalWatch = () => {};
+    let runTokens = 0;
+    let lastAssistant = "";
     setError("");
     setActivities([]);
     setToolResults([]);
@@ -206,7 +240,10 @@ export function useChatRun(o: Options) {
         return { review: made.review, error };
       },
       finishReview: id => review.finish(id),
-      recordUsage: app.recordTokens,
+      recordUsage: (providerId, model, usage) => {
+        if (usage) runTokens += (usage.input ?? 0) + (usage.output ?? 0);
+        app.recordTokens(providerId, model, usage);
+      },
       bumpUsage: app.bumpUsage,
       recordResult: app.recordProviderResult,
       onLimits: app.recordLimits,
@@ -221,7 +258,7 @@ export function useChatRun(o: Options) {
     if (chatId) chatStatusStore.runStarted(chatId);
     try {
       if (!chatId) {
-        const title = body.split("\n")[0].slice(0, 60) || t("newChat");
+        const title = (goalObjective ?? body).split("\n")[0].slice(0, 60) || t("newChat");
         if (o.newWorkspace && !retry && o.projectId && o.projectRoot) {
           setRetryNotice(t("workspaceCreating"));
           const r = await createWorkspace({ projectId: o.projectId, root: o.projectRoot, title, slugSource: body, provider: activeProvider.id, model: activeModel });
@@ -242,15 +279,20 @@ export function useChatRun(o: Options) {
       if (!release) { outcome = "stopped"; return setError("Chat is busy. Try again when the current request ends."); }
       await loadQueue(cid);
       await updateQueue(cid, q => ({ ...q, active: true }));
+      await loadGoal(cid).catch(() => {});
+      if (goalObjective) await setGoal(cid, nativeAdapter ? newNativeGoal(goalObjective, Date.now()) : newGoal(goalObjective, Date.now()));
+      goalRun = getGoal(cid)?.status === "active";
+      // Pausing or clearing a native goal stops its running turn at once (the provider would otherwise carry on).
+      if (nativeObjective && goalRun) stopGoalWatch = subscribeGoals(() => { const g = getGoal(cid); if (!g || g.status === "paused" || g.status === "blocked") ctl.abort(); });
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
         if (history[history.length - 1]?.role !== "user") history.push({ role: "user", parts: [{ type: "text", text: "Continue the interrupted request from the completed steps. Do not repeat completed actions." }] });
       } else {
-        const expanded = await expandMentions(runRoot, o.files, body);
+        const expanded = await expandMentions(runRoot, o.files, sentBody);
         const added = await appendUserMessage(deps, { chatId: cid, root: runRoot, prior, parts: [{ type: "text", text: expanded }, ...imgs.map((data) => ({ type: "image" as const, data }))] });
         if (edit?.queuedId) await updateQueue(cid, q => ({ ...q, active: true, items: q.items.filter(i => i.id !== edit.queuedId) }));
-        const shown: Msg = { ...added.msg, parts: [{ type: "text", text: body }, ...added.msg.parts.slice(1)] };
+        const shown: Msg = { ...added.msg, parts: [{ type: "text", text: sentBody }, ...added.msg.parts.slice(1)] };
         history = added.history;
         setMessages([...prior, { ...shown, id: added.stored.id, chat_id: cid, created_at: added.stored.created_at } as StoredMsg]);
         if (!edit) {
@@ -329,7 +371,25 @@ export function useChatRun(o: Options) {
         allowlist: app.allowlist,
         signal: ctl.signal,
         stop: () => ctl.abort(),
+        ...(nativeObjective ? { goal: {
+          objective: nativeObjective,
+          resume: nativeResume,
+          onUpdate: (g: import("../providers/types").NativeGoal) => {
+            const cur = getGoal(cid);
+            if (!cur?.native) return;
+            const mapped = fromNativeStatus(g.status);
+            // The user paused or cleared it meanwhile: that wins, and the running turn is stopped.
+            if (cur.status === "paused" || cur.status === "blocked") { ctl.abort(); return; }
+            void setGoal(cid, { ...cur, status: mapped.status, note: mapped.note, tokens: g.tokensUsed || cur.tokens }).catch(() => {});
+          },
+        } } : {}),
         approve,
+        requestSecret: (req) => new Promise<string | null>((resolve) => {
+          let done = false;
+          const finish = (value: string | null) => { if (done) return; done = true; setSecretRequest(null); resolve(value); };
+          ctl.signal.addEventListener("abort", () => finish(null), { once: true });
+          setSecretRequest({ ...req, resolve: finish });
+        }),
         subagents: runRoot ? createSubagentHost({ projectRoot: runRoot, recordTokens: app.recordTokens, resolveModel: subagentModelResolver(app), providers: providerDirectory(app), onCliFailure: parkCliAccount }) : undefined,
       }, deps, {
         onReview: r => { reviewRef.current = r; },
@@ -346,6 +406,7 @@ export function useChatRun(o: Options) {
         onAccepted: m => { retryRef.current?.history.push(m); },
         onMessage: (m, mid) => {
           if (m.role === "user" && steeringIds.length) { const id = steeringIds.shift()!; void updateQueue(cid, q => ({ ...q, items: q.items.filter(i => i.id !== id) })).catch(e => setError(String(e))); }
+          if (m.role === "assistant" && textOf(m).trim()) lastAssistant = textOf(m);
           setMessages((ms) => [...ms, { ...m, id: mid, chat_id: cid, created_at: Date.now() }]);
           setStream("");
           setActivities([]);
@@ -373,6 +434,23 @@ export function useChatRun(o: Options) {
         reviewRef.current = null;
       }
       if (chatId && getQueue(chatId)) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: outcome !== "ok", paused: outcome !== "ok" ? true : q.paused })).catch(e => setError(String(e)));
+      // A goal turn ended: count it, and queue the next turn unless the agent reported done/blocked, the user stopped
+      // or paused it, the run failed or the turn limit is reached.
+      const goalNow = chatId ? getGoal(chatId) : null;
+      stopGoalWatch();
+      if (chatId && goalRun && goalNow?.native) {
+        // The provider drives a native goal: no continuation turns here. A run that ended while the goal is still active was
+        // stopped, failed or went quiet; it waits for Resume.
+        const done = goalNow.status !== "active";
+        await setGoal(chatId, { ...goalNow, turns: goalNow.turns + 1, ...(done ? {} : { status: "paused" as const, note: outcome === "ok" ? "idle" : outcome }) }).catch(() => {});
+      } else if (chatId && goalRun && goalNow) {
+        const next = afterTurn(goalNow, { outcome, lastText: lastAssistant, tokens: runTokens });
+        await setGoal(chatId, next.goal).catch(() => {});
+        if (next.continueWith) {
+          const text = next.continueWith;
+          await updateQueue(chatId, q => ({ ...q, paused: false, interrupted: false, items: [...q.items, { id: crypto.randomUUID(), text, images: [], clarify: false }] })).catch(e => setError(String(e)));
+        }
+      }
       release?.();
       abortRef.current = null;
       setRunning(false);
@@ -400,6 +478,24 @@ export function useChatRun(o: Options) {
 
   /** Re-runs the last request after a failure (resuming from the completed steps when there are any). */
   const retryRequest = () => send(!!retryRef.current);
+
+  /**
+   * Restart the agent session (T13): forget the provider sessions this chat would resume (CLI session ids, API
+   * response ids), so the next request starts a fresh session (new skills, plugins, MCP servers, instructions) with
+   * the history sent as text. The messages stay.
+   */
+  async function restartSession() {
+    if (running || !session.chatId) return false;
+    try {
+      for (const m of messages.filter((x) => x.meta?.responseId)) {
+        const { role, parts, meta } = m;
+        await db.exec("update messages set content = ? where chat_id = ? and id = ?", [JSON.stringify({ role, parts, meta: { ...meta, responseId: undefined } }), session.chatId, m.id]);
+      }
+      setMessages(await loadMessages(session.chatId));
+      retryRef.current = null;
+      return true;
+    } catch (e) { setError(String(e)); return false; }
+  }
 
   async function restoreContext() {
     if (running || !session.chatId) return;
@@ -454,9 +550,17 @@ export function useChatRun(o: Options) {
     finally { release(); abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
   }
 
-  const rewind = useCallback(async (m: StoredMsg) => {
-    if (!root || !m.meta?.checkpoint || running) return;
-    await restoreAll(root, m.meta.checkpoint);
+  /**
+   * Returns the chat to the point before message `m`: drops `m` and everything after it and puts its text back into
+   * the composer. `files` also restores the project from the checkpoint taken before `m`; without it the files keep
+   * every change made since ("revert and keep changes").
+   */
+  const rewind = useCallback(async (m: StoredMsg, o2: { files: boolean } = { files: true }) => {
+    if (running) return;
+    if (o2.files) {
+      if (!root || !m.meta?.checkpoint) return;
+      await restoreAll(root, m.meta.checkpoint);
+    }
     await deleteMessagesFrom(m.chat_id, m.id);
     setMessages(await loadMessages(m.chat_id));
     o.setText(editableText(m));
@@ -504,5 +608,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, restartSession, rewind };
 }

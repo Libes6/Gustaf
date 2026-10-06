@@ -18,9 +18,9 @@ export interface Prefs {
   locale: Locale | "system";
 }
 
-const DESKTOPS_KEY = "mcode.desktops";
-const PREFS_KEY = "mcode.prefs";
-const tokenKey = (deviceId: string) => `mcode.token.${deviceId.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const DESKTOPS_KEY = "gustaf.desktops";
+const PREFS_KEY = "gustaf.prefs";
+const tokenKey = (deviceId: string) => `gustaf.token.${deviceId.replace(/[^A-Za-z0-9._-]/g, "_")}`;
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {

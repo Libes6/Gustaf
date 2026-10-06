@@ -1,4 +1,5 @@
 import { fsx, getSetting, setSetting } from "../lib/api";
+import { readProjectFile } from "../lib/projectFolder";
 import { normalizeProjectPath, sameProject } from "./rules";
 import { effectiveHooks, GLOBAL_HOOKS_SETTING, parseHooksText, PROJECT_HOOKS_FILE, PROJECT_HOOKS_SETTING, validateHooks, type Hook, type HooksConfig } from "./hooksCore";
 
@@ -26,12 +27,12 @@ export async function saveGlobalHooksText(text: string): Promise<HooksConfig> {
   return parsed;
 }
 
-/** `<project>/.mcode/hooks.json`, read-only. A missing file is not an error. */
+/** `<project>/.gustaf/hooks.json` (else the legacy `.mcode/hooks.json`), read-only. A missing file is not an error. */
 export async function loadProjectHooks(project: string | null): Promise<HooksConfig & { exists: boolean }> {
   if (!project) return { hooks: [], issues: [], exists: false };
   let text: string;
   try {
-    text = await fsx.read(project, PROJECT_HOOKS_FILE, 1, 5000);
+    text = (await readProjectFile((path) => fsx.read(project, path, 1, 5000), PROJECT_HOOKS_FILE)).value;
   } catch {
     return { hooks: [], issues: [], exists: false };
   }

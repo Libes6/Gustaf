@@ -1,6 +1,6 @@
 # Mobile companion server (slice 1: read-only)
 
-A local HTTPS + WebSocket server inside the Tauri backend (`src-tauri/src/mobile_server.rs` and `src-tauri/src/mobile_server/`) that the phone app (`apps/mobile`) talks to over the LAN. **Off by default**; Settings > Mobile (`src/components/MobileSettings.tsx`) turns it on. The wire types are `@mcode/protocol` (`PROTOCOL_VERSION` 1, routes under `/v1`).
+A local HTTPS + WebSocket server inside the Tauri backend (`src-tauri/src/mobile_server.rs` and `src-tauri/src/mobile_server/`) that the phone app (`apps/mobile`) talks to over the LAN. **Off by default**; Settings > Mobile (`src/components/MobileSettings.tsx`) turns it on. The wire types are `@gustaf/protocol` (`PROTOCOL_VERSION` 1, routes under `/v1`).
 
 This slice is **read-only**: no endpoint changes anything except pairing (which creates a device row).
 
@@ -19,7 +19,7 @@ This slice is **read-only**: no endpoint changes anything except pairing (which 
 
 ## Pairing
 
-- The page shows a QR with `mcode://pair?host=…&port=…&code=…&fp=<sha256 hex>&v=<protocol>` (built in `src/lib/mobilePairing.ts`, encoded locally by `qrcode-generator`, drawn as inline SVG; a node test parses it with `apps/mobile/src/lib/pairing.ts`) and the code as text.
+- The page shows a QR with `gustaf://pair?host=…&port=…&code=…&fp=<sha256 hex>&v=<protocol>` (built in `src/lib/mobilePairing.ts`, encoded locally by `qrcode-generator`, drawn as inline SVG; a node test parses it with `apps/mobile/src/lib/pairing.ts`) and the code as text. The phone also accepts the `mcode://pair?…` form of desktop builds from before the rename.
 - Code: 8 symbols from a 32-symbol alphabet without look-alikes (40 bits), valid 2 minutes, single use, a new code invalidates the previous one.
 - `POST /v1/pair {code, deviceName, publicInfo?, protocol?}` returns `{protocol, deviceId, token, desktopName}`. The token is 32 random bytes (base64url), shown once; only its SHA-256 is stored in `paired_devices(id, name, token_hash, created_at, last_seen_at, revoked_at)`. `publicInfo` is validated and bounded, not stored.
 - Wrong, expired, reused and never-issued codes give the same 401. Rate limit: 5 failed attempts per minute per address lock that address out for 5 minutes (429 + `Retry-After`, even for the right code). In addition a code is burned after 5 wrong submissions from any addresses, so an attacker gets at most 5 guesses per code (5 / 2^40) however many addresses they have. At most 16 active devices.

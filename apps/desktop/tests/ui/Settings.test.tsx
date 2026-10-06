@@ -46,7 +46,7 @@ describe("Settings", () => {
   it("the providers page lists configured providers", async () => {
     mockSettings({});
     renderApp(<Settings />, makeApp({ settingsPage: "providers", providers: [provider({ name: "My Anthropic" })] }));
-    expect(await screen.findByText("My Anthropic")).toBeInTheDocument();
+    expect((await screen.findAllByText("My Anthropic")).length).toBeGreaterThan(0);
   });
 
   it("lists every section in the navigation and marks the current one", () => {

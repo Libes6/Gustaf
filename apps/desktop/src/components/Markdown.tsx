@@ -2,6 +2,8 @@ import { Check, Copy, WrapText } from "lucide-react";
 import { isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import { parseArtifacts } from "../canvas/artifacts";
 import { CanvasCard } from "./CanvasWorkspace";
+import { MermaidBlock } from "./MermaidBlock";
+import { HtmlPageCard } from "./HtmlPageCard";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -49,6 +51,7 @@ const components: Components = {
     const code: ReactNode = Array.isArray(children) ? children[0] : children;
     const className = isValidElement<{ className?: string }>(code) ? code.props.className : undefined;
     const lang = /language-(\S+)/.exec(className ?? "")?.[1] ?? "";
+    if (lang === "mermaid") return <MermaidBlock code={textOfNode(children).replace(/\n$/, "")} />;
     return <CodeBlock lang={lang}>{children}</CodeBlock>;
   },
   a: ({ href, children }) => (
@@ -60,7 +63,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
   const segments = useMemo(() => parseArtifacts(text), [text]);
   return (
     <div className="md">
-      {segments.map((segment, i) => segment.type === "canvas" ? <CanvasCard key={i} artifact={segment.artifact} /> : (
+      {segments.map((segment, i) => segment.type === "canvas" ? <CanvasCard key={i} artifact={segment.artifact} /> : segment.type === "page" ? <HtmlPageCard key={i} page={segment.page} /> : (
       <ReactMarkdown
         key={i}
         remarkPlugins={[remarkGfm]}

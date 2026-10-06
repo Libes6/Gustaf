@@ -38,7 +38,7 @@ export type CommitGate = {
   dismiss: (id: string, reason: string) => void;
 };
 
-export function GitCommitDialog({ root, accepted, gate, onClose, onCommitted }: { root: string; accepted: string[]; /** Present when automatic review is on: a confirm step lists high-severity findings (never a block). */ gate?: CommitGate; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
+export function GitCommitDialog({ root, chatId, accepted, gate, onClose, onCommitted }: { root: string; chatId?: number | null; accepted: string[]; /** Present when automatic review is on: a confirm step lists high-severity findings (never a block). */ gate?: CommitGate; onClose: () => void; onCommitted: (result: CommitResult) => void }) {
   const t = useT();
   const app = useApp();
   const dialogRef = useRef<HTMLElement>(null);
@@ -189,7 +189,7 @@ export function GitCommitDialog({ root, accepted, gate, onClose, onCommitted }: 
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose} disabled={committing}><X size={17} /></button>
         </header>
         <div className="git-body">
-          {done && <GitPublishPanel root={root} message={message} />}
+          {done && <GitPublishPanel root={root} message={message} chatId={chatId} />}
           {!done && !status && !loadError && <div className="git-state"><Loader2 size={14} className="spin" /> {t("gitLoading")}</div>}
           {!done && loadError && <div className="error-box git-error" role="alert">{loadError}</div>}
           {!done && status && !status.repo && <div className="git-state">{t("gitNotRepo")}</div>}

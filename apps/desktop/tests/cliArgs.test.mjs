@@ -68,3 +68,20 @@ test('sidecarFailure: a crashed Cursor sidecar is an error, not an empty answer 
   assert.equal(sidecarFailure({ ...ok, code: 1, stderr: 'x', reported: true }), '');
   assert.equal(sidecarFailure({ ...ok, code: null, aborted: true }), '');
 });
+
+test('effort flags: Codex config override, Claude --effort, Cursor model bracket', async () => {
+  const { cursorArgs } = await import('../src/providers/cliArgs.ts');
+  const codex = codexArgs({ model: 'gpt-5.5-codex', access: 'auto', reasoning: 'high' });
+  assert.deepEqual(codex.slice(codex.indexOf('-c'), codex.indexOf('-c') + 2), ['-c', 'model_reasoning_effort="high"']);
+  const resumed = codexArgs({ session: 's1', access: 'auto', reasoning: 'low' });
+  assert.ok(resumed.includes('model_reasoning_effort="low"'));
+  assert.equal(resumed.at(-1), 's1', 'the session id stays the last positional');
+  assert.ok(!codexArgs({ access: 'auto' }).some((a) => a.startsWith('model_reasoning_effort')));
+  const claude = claudeArgs({ model: 'opus', access: 'auto', reasoning: 'xhigh' });
+  assert.deepEqual(claude.slice(claude.indexOf('--effort'), claude.indexOf('--effort') + 2), ['--effort', 'xhigh']);
+  assert.ok(!claudeArgs({ access: 'auto' }).includes('--effort'));
+  const cursor = cursorArgs({ model: 'claude-opus-4-8', access: 'auto', reasoning: 'high' });
+  assert.equal(cursor[cursor.indexOf('--model') + 1], 'claude-opus-4-8[effort=high]');
+  const plain = cursorArgs({ model: 'claude-opus-4-8', access: 'auto', reasoning: 'medium' });
+  assert.equal(plain[plain.indexOf('--model') + 1], 'claude-opus-4-8');
+});

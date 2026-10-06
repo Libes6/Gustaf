@@ -26,7 +26,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Starts headless Chrome and returns `{ open(url), close() }`; `open` resolves to a page with `messages`, `eval`, `waitFor`. */
 export async function launchChrome(bin = findChrome()) {
   if (!bin || typeof WebSocket === 'undefined') return null;
-  const profile = mkdtempSync(join(tmpdir(), 'mcode-chrome-'));
+  const profile = mkdtempSync(join(tmpdir(), 'gustaf-chrome-'));
   const child = spawn(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run',
     '--no-default-browser-check', '--disable-extensions', '--disable-gpu', '--disable-background-networking',

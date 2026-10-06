@@ -11,7 +11,7 @@ const edit = (id, path, over = {}) => entry(id, { tool: 'edit_file', summary: pa
 
 test('calls are summarised on one line without secrets', () => {
   assert.equal(summarizeCall('run_command', { command: 'npm test' }), 'npm test');
-  assert.equal(summarizeCall('mcode_computer', {}, { actions: [{ type: 'open_app', name: 'Telegram' }, { type: 'click', x: 1, y: 2 }] }), 'open_app "Telegram" · click 1,2');
+  assert.equal(summarizeCall('gustaf_computer', {}, { actions: [{ type: 'open_app', name: 'Telegram' }, { type: 'click', x: 1, y: 2 }] }), 'open_app "Telegram" · click 1,2');
   assert.equal(summarizeCall('run_command', { command: 'echo a\n  echo b' }), 'echo a ⏎ echo b');
   assert.equal(summarizeCall('read_file', { path: 'src/a.ts', offset: 1 }), 'src/a.ts');
   assert.equal(summarizeCall('edit_file', { path: 'src/a.ts', old_string: 'SECRET_BODY', new_string: 'x' }), 'src/a.ts', 'file contents are not logged');

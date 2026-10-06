@@ -1,5 +1,5 @@
 // Metro for an app that is NOT in the root npm workspaces: it has its own node_modules (own React and React Native), and
-// consumes @mcode/protocol (pure TypeScript source, no build step) through the symlink that `file:../../packages/protocol`
+// consumes @gustaf/protocol (pure TypeScript source, no build step) through the symlink that `file:../../packages/protocol`
 // creates in node_modules.
 const path = require("node:path");
 const { getDefaultConfig } = require("expo/metro-config");

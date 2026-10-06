@@ -78,6 +78,10 @@ export function createStatusStore() {
       }
       emit();
     },
+    /** The user dealt with the chat without opening it (settled or snoozed it in the sidebar). */
+    markSeen(chatId: number) {
+      this.forget(chatId);
+    },
     /** The chat was deleted. */
     forget(chatId: number) {
       if (!unread.includes(chatId) && !failed.has(chatId)) return;

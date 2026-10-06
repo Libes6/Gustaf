@@ -55,6 +55,7 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
     const info: SubagentInfo = {
       provider: "codex",
       agentId: threadId || text(a.id) || key,
+      ...(text(a.agentPath) || task.startsWith("/") ? { agentPath: text(a.agentPath) || task } : {}),
       title: brief(readable || nickname || (threadId ? threadId.slice(0, 8) : ""), 60),
       action: "scan",
       state,
@@ -64,6 +65,7 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
       toolUses: num(a.toolUses) ?? 0,
       ...(text(a.step) && state === "running" ? { step: brief(text(a.step), 120) } : {}),
       ...(tokens ? { tokens } : {}),
+      ...(num(a.turnStartedAtMs) ? { turnStartedAt: num(a.turnStartedAtMs) } : {}),
       ...(num(a.startedAtMs) ? { startedAt: num(a.startedAtMs) } : {}),
       ...(num(a.endedAtMs) && state !== "running" ? { endedAt: num(a.endedAtMs) } : {}),
       ...(num(a.durationMs) && state !== "running" ? { durationMs: num(a.durationMs) } : {}),

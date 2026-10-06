@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 import { useApp } from "../state";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { ImportPanel } from "./ImportPanel";
-import { ProviderForm } from "./ProviderForm";
+import { AddProviderWizard } from "./AddProviderDialog";
 
 /** First run: import projects from Cursor (or create one), then connect a model provider. */
 export function Onboarding() {
@@ -46,7 +46,7 @@ export function Onboarding() {
             <>
               <h1>{t("onbProviderTitle")}</h1>
               <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbProviderLead", { store: t(keyStoreKey()) })}</p>
-              <ProviderForm
+              <AddProviderWizard
                 onSaved={async (cfg, models) => {
                   await app.refreshModels({ only: [cfg.id] });
                   if (models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });

@@ -6,7 +6,7 @@ Built-in commands: `/review`, `/test`, `/explain`, `/commit`. The last one prepa
 
 Project and home directories are scanned at:
 
-- `.agents/skills/<name>/SKILL.md`, `.mcode/skills/<name>/SKILL.md`, `.claude/skills/<name>/SKILL.md`, `.cursor/skills/<name>/SKILL.md`, `.codex/skills/<name>/SKILL.md`.
+- `.agents/skills/<name>/SKILL.md`, `.gustaf/skills/<name>/SKILL.md`, `.claude/skills/<name>/SKILL.md`, `.cursor/skills/<name>/SKILL.md`, `.codex/skills/<name>/SKILL.md`. `.mcode/skills/<name>/SKILL.md` (the folder name from before the rename to Gustaf) is still scanned.
 - Compatibility command files: `.cursor/commands/*.md`, `.claude/commands/*.md` (nested directories up to four levels).
 
 A SKILL.md can start with frontmatter `name:` and `description:`. Without those fields, its containing directory becomes the name. A command Markdown file uses its filename stem. Names may contain ASCII letters, digits, `-`, and `_`; invocation is case insensitive. Project definitions override global definitions, which override built-ins. Names are resolved deterministically within a scope. Symlinked files/folders are excluded, read paths cannot escape the containing root, and bodies over 128 KiB are rejected. Discovery is capped at 200 files per scope.

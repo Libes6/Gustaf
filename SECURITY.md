@@ -21,13 +21,13 @@ Gustaf is a local desktop app with no account and no server of its own. It does 
 
 | Data | Where |
 | --- | --- |
-| API keys of model providers, secret MCP env values and headers, MCP OAuth tokens, the Brave search key | The OS credential store, never the database: macOS Keychain, Windows Credential Manager, Secret Service on Linux (GNOME Keyring or KWallet), under the service name `com.maksimkulakov.mcode` |
+| API keys of model providers, secret MCP env values and headers, MCP OAuth tokens, the Brave search key | The OS credential store, never the database: macOS Keychain, Windows Credential Manager, Secret Service on Linux (GNOME Keyring or KWallet), under the service name `io.github.libes6.gustaf` |
 | Chats, messages, drafts, settings, projects, agent runs, action log | Local SQLite database `app.db` in the app data folder |
 | Review (shadow) copies of projects, checkpoints, semantic-search cache, Cursor login profiles | Subfolders of the app data folder |
 | Image attachments for CLI providers | `<app data>/attachments/<chat id>/`, removed when the reply ends |
 | Raw CLI event logs | `<app data>/raw-cli/`, **only** when Settings → General → Developer → "Record raw CLI events" is switched on (off by default); secrets are scrubbed best effort, at most 5 MB in total |
 
-The app data folder is `~/Library/Application Support/com.maksimkulakov.mcode` on macOS, `%APPDATA%\com.maksimkulakov.mcode` on Windows and `~/.local/share/com.maksimkulakov.mcode` on Linux. The identifier keeps the project's earlier name (M Code) so upgrades keep existing data.
+The app data folder is `~/Library/Application Support/io.github.libes6.gustaf` on macOS, `%APPDATA%\io.github.libes6.gustaf` on Windows and `~/.local/share/io.github.libes6.gustaf` on Linux.
 
 Data on disk is not encrypted by Gustaf beyond what the OS credential store provides. Anyone with access to your user account can read the database.
 

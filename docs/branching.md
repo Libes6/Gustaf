@@ -18,7 +18,8 @@ Two long-lived branches:
 3. Merge. The push to `main` starts `.github/workflows/release-build.yml`:
    - job `plan` (`scripts/release-plan.mjs`) reads the version from the desktop version files (`tauri.conf.json` and friends) and checks whether tag `vX.Y.Z` exists on origin;
    - tag missing: all four platform bundles are built; only if every one succeeds, job `draft` creates tag `vX.Y.Z` on the merged commit and a **draft** GitHub Release `vX.Y.Z` (target `main`) with installers, signatures and `latest.json`;
-   - tag already exists (a docs-only change on `main`, or a merge without a bump): the build is skipped with a `::notice::` and the run succeeds. Nothing is tagged or released.
+   - tag already exists and has a release (draft or published) — a docs-only change on `main`, or a merge without a bump: the build is skipped with a `::notice::` and the run succeeds. Nothing is tagged or released.
+   - tag exists but has no release (a stray tag pushed by hand or left over): `plan` fails with an `::error::` naming the tag's commit; delete the tag (`git push origin :refs/tags/vX.Y.Z`) or bump the version (see `docs/release.md`).
 4. Review the draft (artifacts, notes, the manifest's `notes`) and **publish it manually** in the GitHub UI. The workflow never publishes and refuses to touch a release that is already public.
 
 If the build fails after the tag was created (e.g. the upload step), use "Re-run failed jobs" on that run: the draft job accepts an existing tag only when it points at the same commit, and preserves an existing draft's notes. A new push to `main` will not retry it, because the tag now exists.
@@ -57,7 +58,7 @@ Not configured by any workflow; set these in Settings → Branches (or Rules →
 
 Verified locally (macOS):
 
-- `npm run test:release` passes, including `scripts/tests/release-plan.test.mjs`: new version → build and draft; tag exists → skip and succeed; manual run → artifacts only; other branch, tag ref, fork, commit not on `main`, other events and invalid versions → refused. The CLI is exercised against a throwaway git repository with a bare `origin` (tag absent/present, commit on/off `main`, `GITHUB_OUTPUT` contents).
+- `npm run test:release` passes, including `scripts/tests/release-plan.test.mjs`: new version → build and draft; tag with a release → skip and succeed; tag without a release → fail; manual run → artifacts only; other branch, tag ref, fork, commit not on `main`, other events and invalid versions → refused. The CLI is exercised against a throwaway git repository with a bare `origin` (tag absent/present, with and without a release via a fake `gh` in `RELEASE_PLAN_GH`, commit on/off `main`, `GITHUB_OUTPUT` contents).
 - Both workflow files parse as YAML.
 - From a clean worktree, `npm ci` and `npm run tauri build -- --debug --bundles app` ran the new `beforeBuildCommand` (sidecar `npm ci`, then the frontend build) and produced `apps/desktop/src-tauri/target/debug/bundle/macos/Gustaf.app` (arm64, ad-hoc signed, hardened runtime; `codesign --verify --deep --strict` passes; bundles `sidecar/node_modules`). The app was not launched.
 - When `sidecar/node_modules` is a symlink, `install-sidecar.mjs` skips the reinstall and leaves the link target untouched.

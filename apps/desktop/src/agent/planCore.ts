@@ -17,7 +17,9 @@ export const modeAllowsTool = (mode: ChatMode | undefined, name: string) => {
 export const modeBlockedMessage = (mode: ChatMode | undefined) =>
   mode === "ask" ? "Blocked: Ask mode has no tools. Answer from the conversation only." : "Blocked: Plan mode is read-only. Use read_file, list_dir or search, then finish with the plan.";
 
-export const PLAN_FENCE = "mcode-plan";
+export const PLAN_FENCE = "gustaf-plan";
+/** Fence name written by builds from before the rename; still parsed in old chats. */
+export const LEGACY_PLAN_FENCE = "mcode-plan";
 
 export const ASK_PROMPT = "Ask mode: you have no tools. Answer the question from the conversation and your knowledge; do not claim to have read files or run anything. If the answer needs the project's files, say so.";
 export const PLAN_PROMPT = [
@@ -54,7 +56,7 @@ export function normalizePlan(raw: unknown): Plan | null {
   return { title: typeof r.title === "string" && r.title.trim() ? r.title.trim() : "Plan", steps, ...(risks.length ? { risks } : {}), ...(questions.length ? { questions } : {}) };
 }
 
-const FENCE = new RegExp("```" + PLAN_FENCE + "[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n?```", "g");
+const FENCE = new RegExp("```(?:" + PLAN_FENCE + "|" + LEGACY_PLAN_FENCE + ")[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n?```", "g");
 
 /** The LAST plan block of a reply: the text before it, the plan and the text after. Null when absent or unparsable. */
 export function extractPlan(text: string): { before: string; plan: Plan; after: string } | null {

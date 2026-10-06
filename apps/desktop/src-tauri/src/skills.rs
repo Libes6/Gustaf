@@ -45,7 +45,8 @@ fn discovered(project: Option<&str>) -> Vec<(String, PathBuf, String)> {
     let mut out = Vec::new();
     for (source, root) in roots(project) {
         let mut names = Vec::new();
-        for rel in [".agents/skills", ".mcode/skills", ".claude/skills", ".cursor/skills", ".codex/skills"] { files(&root, rel, 0, false, &mut names); }
+        // `.mcode/skills` is the folder of projects (and `~/.mcode`) set up before the rename.
+        for rel in [".agents/skills", ".gustaf/skills", ".mcode/skills", ".claude/skills", ".cursor/skills", ".codex/skills"] { files(&root, rel, 0, false, &mut names); }
         for rel in [".cursor/commands", ".claude/commands"] { files(&root, rel, 0, true, &mut names); }
         names.sort(); names.dedup();
         out.extend(names.into_iter().map(|rel| (source.clone(), root.clone(), rel)));

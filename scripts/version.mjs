@@ -19,7 +19,7 @@ export function versionFiles(base = root) {
   const files = ['package.json', 'apps/desktop/package.json', 'apps/desktop/src-tauri/tauri.conf.json', 'package-lock.json', 'apps/desktop/src-tauri/Cargo.toml', 'apps/desktop/src-tauri/Cargo.lock'];
   const values = files.map(read);
   const cargo = values[4].match(/\[package\][\s\S]*?\nversion = "([^"]+)"/)[1];
-  const locked = values[5].match(/\[\[package\]\]\nname = "mcode"\nversion = "([^"]+)"/)[1];
+  const locked = values[5].match(/\[\[package\]\]\nname = "gustaf"\nversion = "([^"]+)"/)[1];
   const lock = JSON.parse(values[3]);
   const versions = [JSON.parse(values[0]).version, JSON.parse(values[1]).version, JSON.parse(values[2]).version, lock.version, lock.packages[''].version, lock.packages['apps/desktop'].version, cargo, locked];
   if (!semver.test(versions[0]) || versions.some(v => v !== versions[0])) throw Error('Desktop versions are inconsistent: ' + versions.join(', '));
@@ -39,7 +39,7 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(file
         if (i === 3) { json.packages[''].version = next; json.packages['apps/desktop'].version = next; }
         return JSON.stringify(json, null, 2) + '\n';
       }
-      return i === 4 ? value.replace(/(\[package\][\s\S]*?\nversion = ")[^"]+/, `$1${next}`) : value.replace(/(\[\[package\]\]\nname = "mcode"\nversion = ")[^"]+/, `$1${next}`);
+      return i === 4 ? value.replace(/(\[package\][\s\S]*?\nversion = ")[^"]+/, `$1${next}`) : value.replace(/(\[\[package\]\]\nname = "gustaf"\nversion = ")[^"]+/, `$1${next}`);
     });
     output.forEach((value, i) => fs.writeFileSync(path.join(root, files[i]), value));
     console.log(`${version} → ${next}. Review and commit before tagging v${next}.`);

@@ -1,12 +1,25 @@
-import { Bot, Search, User } from "lucide-react";
+import { Bot, Keyboard, MessageSquare, Search, Settings as Gear, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { chatSearch, type SearchHit } from "../lib/api";
 import { arrowDown, isSearchShortcut, mergeHits, moveHighlight, PAGE_SIZE, parseSnippet, searchableQuery } from "../lib/searchUtil";
-import { useApp } from "../state";
+import { useApp, type SettingsPage } from "../state";
+import { SHORTCUTS, shortcutDisplay } from "../lib/shortcuts";
+import type { Key } from "../i18n";
 import "../styles/search.css";
 
 const DEBOUNCE_MS = 180;
+
+/** Settings pages offered as jumps (same ids and labels as the settings navigation). */
+const SETTINGS_PAGES: { id: SettingsPage; label: Key }[] = [
+  { id: "general", label: "general" }, { id: "import", label: "import" }, { id: "providers", label: "providers" }, { id: "usage", label: "usage" },
+  { id: "memory", label: "memoryTitle" }, { id: "computer", label: "computerUse" }, { id: "mcp", label: "mcp" }, { id: "scheduled", label: "scheduledNav" },
+  { id: "knowledge", label: "knowledgeNav" }, { id: "mobile", label: "mobileTitle" }, { id: "git", label: "gitAndCommands" }, { id: "rules", label: "rules" },
+  { id: "archive", label: "archivedChats" },
+];
+/** Asks the chat in front to forget its provider sessions (ChatView listens). */
+export const RESTART_SESSION_EVENT = "gustaf-restart-session";
+type Jump = { key: string; kind: "settings" | "chat" | "shortcut"; label: string; detail: string; go: () => void };
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -106,7 +119,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
         setLoadingMore(false);
         setHits((prev) => mergeHits(prev, result.hits));
         setMore({ hasMore: result.hasMore && result.hits.length > 0, total: result.total, capped: result.totalCapped, byRecency: result.byRecency });
-        if (advanceRef.current !== null) setActive(advanceRef.current);
+        if (advanceRef.current !== null) setActive(advanceRef.current + jumpsRef.current);
         advanceRef.current = null;
       })
       .catch((e) => {
@@ -131,6 +144,27 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   };
 
   const shown = live ? hits : [];
+  // Jumps above the message hits: chats by title or #id, settings pages and keyboard shortcuts by name.
+  const q = query.trim().toLowerCase();
+  const jumps: Jump[] = !q ? [] : [
+    ...app.chats.filter((c) => q === `#${c.id}` || (q.length >= 2 && c.title.toLowerCase().includes(q))).slice(0, 5).map((c): Jump => ({
+      key: `c${c.id}`, kind: "chat", label: c.title, detail: `#${c.id} · ${app.projects.find((p) => p.id === c.project_id)?.name ?? t("searchNoProject")}`,
+      go: () => app.openChat(c.id, c.project_id),
+    })),
+    ...(q.length >= 2 ? SETTINGS_PAGES.filter((p) => t(p.label).toLowerCase().includes(q) || p.id.includes(q)) : []).slice(0, 3).map((p): Jump => ({
+      key: `s${p.id}`, kind: "settings", label: t(p.label), detail: t("settings"), go: () => app.openSettings(p.id),
+    })),
+    ...(q.length >= 2 && app.activeChat !== null && app.view === "chat" && t("restartSession").toLowerCase().includes(q) ? [{
+      key: "restart", kind: "shortcut" as const, label: t("restartSession"), detail: t("restartSessionHint"), go: () => dispatchEvent(new Event(RESTART_SESSION_EVENT)),
+    }] : []),
+    ...(q.length >= 2 ? SHORTCUTS.filter((s) => t(s.label).toLowerCase().includes(q)).slice(0, 3).map((s): Jump => ({
+      key: `k${s.id}`, kind: "shortcut", label: t(s.label), detail: shortcutDisplay(s), go: () => app.openSettings("general"),
+    })) : []),
+  ];
+  const J = jumps.length;
+  const rows = J + shown.length;
+  const jumpsRef = useRef(0);
+  jumpsRef.current = J;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const inSelect = (e.target as HTMLElement).tagName === "SELECT";
@@ -139,15 +173,15 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
       dismiss();
     } else if (e.key === "ArrowDown" && !inSelect) {
       e.preventDefault();
-      const step = arrowDown(active, shown.length, more.hasMore);
-      if (step.loadMore) loadMore(shown.length);
-      else setActive(step.next);
+      if (active >= J && arrowDown(active - J, shown.length, more.hasMore).loadMore) loadMore(shown.length);
+      else setActive(moveHighlight(active, 1, rows));
     } else if (e.key === "ArrowUp" && !inSelect) {
       e.preventDefault();
-      setActive(moveHighlight(active, -1, shown.length));
+      setActive(moveHighlight(active, -1, rows));
     } else if (e.key === "Enter" && !inSelect && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      open(shown[active]);
+      if (active < J) (onClose(), jumps[active].go());
+      else open(shown[active - J]);
     } else if (e.key === "Tab") {
       // Keep focus inside the dialog.
       const items = [...(dialogRef.current?.querySelectorAll<HTMLElement>("input, select, button") ?? [])];
@@ -180,9 +214,9 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
             autoFocus
             aria-label={t("searchPlaceholder")}
             role="combobox"
-            aria-expanded={shown.length > 0}
+            aria-expanded={rows > 0}
             aria-controls="search-hits"
-            aria-activedescendant={shown.length ? `search-hit-${active}` : undefined}
+            aria-activedescendant={rows ? `search-hit-${active}` : undefined}
             aria-autocomplete="list"
             spellCheck={false}
             placeholder={t("searchPlaceholder")}
@@ -221,8 +255,18 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
               {t("searchFailed", { error })}
             </div>
           )}
-          {live && status === "done" && !shown.length && <div className="search-empty">{t("searchNoResults", { query: query.trim() })}</div>}
-          {shown.map((hit, i) => (
+          {live && status === "done" && !shown.length && !J && <div className="search-empty">{t("searchNoResults", { query: query.trim() })}</div>}
+          {jumps.map((j, i) => (
+            <div key={j.key} id={`search-hit-${i}`} role="option" aria-selected={i === active} className={`search-hit search-jump${i === active ? " hl" : ""}`}
+              onMouseMove={() => i !== active && setActive(i)} onClick={() => (onClose(), j.go())}>
+              <div className="search-hit-head">
+                <span className="search-role">{j.kind === "chat" ? <MessageSquare size={13} /> : j.kind === "settings" ? <Gear size={13} /> : <Keyboard size={13} />}</span>
+                <span className="search-title">{j.label}</span>
+                <span className="search-date">{j.detail}</span>
+              </div>
+            </div>
+          ))}
+          {shown.map((hit, n) => { const i = n + J; return (
             <div
               key={hit.messageId}
               id={`search-hit-${i}`}
@@ -249,7 +293,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
                 {hit.archived && <span className="search-badge">{t("searchArchived")}</span>}
               </div>
             </div>
-          ))}
+          ); })}
         </div>
         {live && status !== "error" && shown.length > 0 && more.hasMore && (
           <button type="button" className="search-more" disabled={loadingMore} onClick={() => loadMore()}>

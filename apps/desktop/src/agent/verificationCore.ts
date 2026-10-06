@@ -11,13 +11,13 @@ export type CheckIssue = { source: CheckSource; index: number | null; message: s
 
 /** What is stored per project in the settings table (key `verification:<project>`). */
 export type VerificationSettings = { checks: { name: string; command: string; timeoutMs: number }[]; maxFixAttempts: number; useProjectFile: boolean };
-/** The file `<project>/.mcode/done.json`, validated. */
+/** The file `<project>/.gustaf/done.json` (or the legacy `.mcode/done.json`), validated. */
 export type DoneFile = { checks: Check[]; maxFixAttempts?: number; issues: CheckIssue[] };
 /** What one run uses. */
 export type VerificationConfig = { checks: Check[]; maxFixAttempts: number; issues: CheckIssue[] };
 
 export const SETTING_PREFIX = "verification:";
-export const PROJECT_DONE_FILE = ".mcode/done.json";
+export const PROJECT_DONE_FILE = ".gustaf/done.json";
 export const MAX_CHECKS = 10;
 export const MAX_CHECK_COMMAND = 2_000;
 export const MAX_CHECK_NAME = 60;
@@ -74,7 +74,7 @@ export function validateChecks(raw: unknown, source: CheckSource): { checks: Che
   return { checks, issues };
 }
 
-/** Validates the parsed content of `.mcode/done.json`: `{ "checks": [...], "maxFixAttempts": 2 }`. */
+/** Validates the parsed content of `.gustaf/done.json`: `{ "checks": [...], "maxFixAttempts": 2 }`. */
 export function validateDoneFile(raw: unknown): DoneFile {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { checks: [], issues: [{ source: "project", index: null, message: 'The file must be a JSON object with a "checks" array.' }] };
   const f = raw as { checks?: unknown; maxFixAttempts?: unknown };
@@ -143,7 +143,7 @@ export type GateReport = {
 
 export const GATE_ACTIVITY = "verification";
 /** Sent by the "Try another model" button of a verification card; the composer opens its model picker on it. */
-export const OPEN_MODEL_PICKER_EVENT = "mcode-open-model-picker";
+export const OPEN_MODEL_PICKER_EVENT = "gustaf-open-model-picker";
 export const isFailure = (s: CheckStatus) => s === "failed" || s === "timeout";
 
 /** Reads the report back from a stored activity part (`args.report`); null when it is not a valid one. */

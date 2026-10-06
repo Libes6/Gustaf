@@ -56,11 +56,11 @@ test('a pending spawn and the thread that follows it are one entry; later scans 
   assert.equal(map.size, 1);
   let [e] = [...map.values()];
   assert.deepEqual([e.subagent.title, e.subagent.toolUses, e.subagent.step, e.subagent.agentId, e.subagent.prompt], ['task k', 4, 'wc', 'thread-k', 'Do k']);
-  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'completed', lastMessage: 'ok', toolUses: 4 })))[0]);
+  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'completed', lastMessage: 'ok', toolUses: 4, endedAtMs: 7000 })))[0]);
   [e] = [...map.values()];
   assert.deepEqual([e.status, e.subagent.state, e.output], ['success', 'completed', 'ok']);
-  // A woken agent runs again (rollout state is authoritative).
-  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'running' })))[0]);
+  // A genuine newer task_started proves that the same thread was woken.
+  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'running', turnStartedAtMs: 8000 })))[0]);
   assert.equal([...map.values()][0].status, 'running');
 });
 
@@ -253,7 +253,7 @@ test('a stopped scan state is a neutral stopped entry: not running, not failed, 
 test('a stopped agent that a later scan lists as running again (a follow-up) is live again', () => {
   const map = new Map();
   applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'stopped', endedAtMs: 5 })))[0]);
-  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'running' })))[0]);
+  applyActivity(map, rolloutActivities(scanOf(agent('k', { state: 'running', turnStartedAtMs: 8000 })))[0]);
   assert.equal([...map.values()][0].subagent.state, 'running');
 });
 
@@ -277,4 +277,21 @@ test('Codex agent states from the JSON stream: interrupted is stopped, errored s
   const ev = (status) => ({ type: 'item.completed', item: { id: 'i1', type: 'collab_tool_call', tool: 'wait', receiver_thread_ids: ['th-1'], agents_states: { 'th-1': { status, message: null } }, status: 'completed' } });
   assert.equal(nativeActivities('codex', ev('interrupted'))[0].subagent.state, 'stopped');
   assert.equal(nativeActivities('codex', ev('errored'))[0].subagent.state, 'failed');
+});
+
+test('pending scan, stream interruption, and matching child collapse into one stopped panel card', () => {
+  resetCliAgents();
+  const map = new Map();
+  const ctx = { chatId: 91, root: '/p' };
+  const publish = (a) => { applyActivity(map, a); trackCliAgents(ctx, [...map.values()], 9000); };
+  publish(rolloutActivities(scanOf(agent('context', { id: 'pending:p:context', threadId: null, state: 'starting' })))[0]);
+  for (const a of nativeActivities('codex', { type: 'item.completed', item: { id: 'interrupt', type: 'collab_tool_call', tool: 'interrupt_agent', receiver_thread_ids: ['thread-context'], agents_states: { 'thread-context': { status: 'interrupted' } } } })) publish(a);
+  assert.equal(map.size, 2); // The stream knows the thread before the scan resolves the pending task.
+  publish(rolloutActivities(scanOf(agent('context', { state: 'running', turnStartedAtMs: 1000, toolUses: 3, tokens: { total: 500 } })))[0]);
+  assert.equal(map.size, 1);
+  assert.equal([...map.values()][0].subagent.state, 'stopped');
+  assert.equal(getCliAgents().length, 1);
+  assert.equal(getCliAgents()[0].state, 'stopped');
+  assert.equal(getCliAgents()[0].tokens, 500);
+  resetCliAgents();
 });

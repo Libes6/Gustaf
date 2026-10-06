@@ -20,7 +20,7 @@ fn validate_url(value:&str)->Result<reqwest::Url,String>{
 }
 fn bounded_append(logs:&mut String,text:&str){logs.push_str(text);if logs.len()>100_000{let mut cut=logs.len()-100_000;while !logs.is_char_boundary(cut){cut+=1;}logs.drain(..cut);}}
 fn monitor(token:&str)->String{format!(r#"<script>(function(){{
- const endpoint='/__mcode_console/{token}';const send=(kind,message)=>{{try{{fetch(endpoint,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{kind,message:String(message).slice(0,4000)}})}}).catch(()=>{{}})}}catch(_){{}}}};
+ const endpoint='/__gustaf_console/{token}';const send=(kind,message)=>{{try{{fetch(endpoint,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{kind,message:String(message).slice(0,4000)}})}}).catch(()=>{{}})}}catch(_){{}}}};
  const repr=v=>{{try{{return v instanceof Error?v.stack||v.message:typeof v==='string'?v:JSON.stringify(v)}}catch(_){{return String(v)}}}};
  for(const kind of ['error','warn']){{const original=console[kind].bind(console);console[kind]=(...args)=>{{original(...args);send(kind,args.map(repr).join(' '))}}}}
  addEventListener('error',e=>send('error',(e.message||'Resource failed')+' '+(e.filename||e.target?.src||e.target?.href||'')+(e.lineno?':'+e.lineno:'')),true);
@@ -34,11 +34,11 @@ fn proxy_response(mut request:tiny_http::Request,target:&reqwest::Url,token:&str
  let same_origin=origin.as_deref()==Some(proxy_origin);
  let same_referer=referer.as_deref().and_then(|r|reqwest::Url::parse(r).ok()).is_some_and(|u|u.origin().ascii_serialization()==proxy_origin);
  let safe=matches!(request.method().as_str(),"GET"|"HEAD");
- let prefix=format!("/__mcode_preview/{token}");
+ let prefix=format!("/__gustaf_preview/{token}");
  let bootstrap=path.starts_with(&format!("{prefix}/"));
- if (!safe&&!same_origin)||(!bootstrap&&!same_origin&&!same_referer)|| (path.starts_with("/__mcode_preview/")&&!bootstrap){return request.respond(tiny_http::Response::from_string("Unauthorized preview request").with_status_code(403)).map_err(|e|e.to_string());}
+ if (!safe&&!same_origin)||(!bootstrap&&!same_origin&&!same_referer)|| (path.starts_with("/__gustaf_preview/")&&!bootstrap){return request.respond(tiny_http::Response::from_string("Unauthorized preview request").with_status_code(403)).map_err(|e|e.to_string());}
 
- if path==format!("/__mcode_console/{token}"){
+ if path==format!("/__gustaf_console/{token}"){
   if request.method().as_str()!="POST"||request.body_length().unwrap_or(0)>16_000{return request.respond(tiny_http::Response::from_string("Invalid console event").with_status_code(400)).map_err(|e|e.to_string());}
   let mut data=String::new();request.as_reader().take(16_001).read_to_string(&mut data).map_err(|e|e.to_string())?;
   if data.len()>16_000{return request.respond(tiny_http::Response::empty(413)).map_err(|e|e.to_string());}
@@ -46,7 +46,7 @@ fn proxy_response(mut request:tiny_http::Request,target:&reqwest::Url,token:&str
   if let Ok(mut state)=info.lock(){if event.kind=="ready"{state.instrumented=true;}else if matches!(event.kind.as_str(),"error"|"warn"){state.console.push(Console{kind:event.kind,message:event.message.chars().take(4000).collect()});if state.console.len()>100{state.console.remove(0);}}}
   return request.respond(tiny_http::Response::empty(204)).map_err(|e|e.to_string());
  }
- if path.starts_with("/__mcode_console/"){return request.respond(tiny_http::Response::empty(403)).map_err(|e|e.to_string());}
+ if path.starts_with("/__gustaf_console/"){return request.respond(tiny_http::Response::empty(403)).map_err(|e|e.to_string());}
  let path=path.strip_prefix(&prefix).unwrap_or(&path);
  if !path.starts_with('/')||path.starts_with("//"){return request.respond(tiny_http::Response::empty(400)).map_err(|e|e.to_string());}
  let destination=target.join(path).map_err(|e|e.to_string())?;
@@ -90,7 +90,7 @@ fn start_checked(state:&Previews,root:String,command:String,url:String,check_por
  let mut cmd=CommandBuilder::new(crate::shell::Shell::current().program());cmd.args(crate::shell::Shell::current().flags());cmd.arg(&command);cmd.cwd(&root);cmd.env("TERM","dumb");cmd.env("NO_COLOR","1");
  let mut child=pair.slave.spawn_command(cmd).map_err(|e|e.to_string())?;drop(pair.slave);
  let id=NEXT.fetch_add(1,Ordering::SeqCst);let path=format!("{}{}",target.path(),target.query().map(|q|format!("?{q}")).unwrap_or_default());
- let initial=Info{id,root:root.to_string_lossy().into_owned(),command,url:target.to_string(),preview_url:format!("http://127.0.0.1:{port}/__mcode_preview/{token}{path}"),state:"starting".into(),error:None,logs:String::new(),console:vec![],instrumented:false};
+ let initial=Info{id,root:root.to_string_lossy().into_owned(),command,url:target.to_string(),preview_url:format!("http://127.0.0.1:{port}/__gustaf_preview/{token}{path}"),state:"starting".into(),error:None,logs:String::new(),console:vec![],instrumented:false};
  let info=Arc::new(Mutex::new(initial.clone()));let stopped=Arc::new(AtomicBool::new(false));
  sessions.insert(id,Session{info:info.clone(),stopped:stopped.clone(),killer:child.clone_killer(),master:pair.master,#[cfg(unix)]pid:child.process_id()});drop(sessions);
  let loginfo=info.clone();let stop=stopped.clone();std::thread::spawn(move||{
@@ -114,22 +114,22 @@ pub fn shutdown(app:&AppHandle){if let Some(state)=app.try_state::<Previews>(){i
 #[cfg(test)]mod tests{use super::*;
  #[test]fn only_loopback_dev_ports(){for ok in["http://127.0.0.1:3000/","http://localhost:5173/a","http://[::1]:8080/"]{assert!(validate_url(ok).is_ok(),"{ok}");}for bad in["https://example.com","http://localhost.evil:3000","http://127.0.0.1:80","file:///a","http://user:pass@localhost:3000/"]{assert!(validate_url(bad).is_err(),"{bad}");}}
  #[test]fn rejects_existing_server_instead_of_showing_another_project(){let server=tiny_http::Server::http("127.0.0.1:0").unwrap();let port=server.server_addr().to_ip().unwrap().port();let dir=tempfile::tempdir().unwrap();let result=start(&Previews::default(),dir.path().to_string_lossy().into_owned(),"sleep 30".into(),format!("http://127.0.0.1:{port}/"));assert!(result.err().unwrap().contains("already in use"));}
- #[test]fn monitor_is_before_project_scripts(){let html=inject("<!doctype html><html><head><script src='/app.js'></script></head></html>","token");assert!(html.find("__mcode_console/token").unwrap()<html.find("src='/app.js'").unwrap());assert!(html.contains("unhandledrejection"));}
+ #[test]fn monitor_is_before_project_scripts(){let html=inject("<!doctype html><html><head><script src='/app.js'></script></head></html>","token");assert!(html.find("__gustaf_console/token").unwrap()<html.find("src='/app.js'").unwrap());assert!(html.contains("unhandledrejection"));}
  #[test]fn real_proxy_instruments_console_and_blocks_external_redirect(){
   let target=tiny_http::Server::http("127.0.0.1:0").unwrap();let port=target.server_addr().to_ip().unwrap().port();
   let origin=std::thread::spawn(move||{for _ in 0..3{let request=target.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();if request.url()=="/redirect"{request.respond(tiny_http::Response::empty(302).with_header(tiny_http::Header::from_bytes("Location","https://example.com/").unwrap())).unwrap();}else{request.respond(tiny_http::Response::from_string("<html><head></head><body>fixture</body></html>").with_header(tiny_http::Header::from_bytes("Content-Type","text/html").unwrap()).with_header(tiny_http::Header::from_bytes("X-Frame-Options","DENY").unwrap())).unwrap();}}});
   let dir=tempfile::tempdir().unwrap();let state=Previews::default();let info=start_checked(&state,dir.path().to_string_lossy().into_owned(),"sleep 30".into(),format!("http://127.0.0.1:{port}/"),false).unwrap();
   let client=reqwest::blocking::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(5)).build().unwrap();
-  let response=client.get(&info.preview_url).send().unwrap();assert!(response.headers().get("x-frame-options").is_none());let html=response.text().unwrap();assert!(html.contains("__mcode_console/"));assert!(html.contains("fixture"));
-  let url=reqwest::Url::parse(&info.preview_url).unwrap();let token=url.path().split('/').nth(2).unwrap();let endpoint=url.join(&format!("/__mcode_console/{token}")).unwrap();
+  let response=client.get(&info.preview_url).send().unwrap();assert!(response.headers().get("x-frame-options").is_none());let html=response.text().unwrap();assert!(html.contains("__gustaf_console/"));assert!(html.contains("fixture"));
+  let url=reqwest::Url::parse(&info.preview_url).unwrap();let token=url.path().split('/').nth(2).unwrap();let endpoint=url.join(&format!("/__gustaf_console/{token}")).unwrap();
   assert_eq!(client.post(endpoint.clone()).header("Origin",url.origin().ascii_serialization()).json(&serde_json::json!({"kind":"ready","message":"connected"})).send().unwrap().status().as_u16(),204);
   assert_eq!(client.post(endpoint).header("Origin",url.origin().ascii_serialization()).json(&serde_json::json!({"kind":"error","message":"actual fixture error"})).send().unwrap().status().as_u16(),204);
   let snapshot=state.0.lock().unwrap().get(&info.id).unwrap().info.lock().unwrap().clone();assert!(snapshot.instrumented);assert_eq!(snapshot.console[0].message,"actual fixture error");
-  assert_eq!(client.post(url.join("/__mcode_console/wrong").unwrap()).header("Origin",url.origin().ascii_serialization()).json(&serde_json::json!({"kind":"error","message":"forged"})).send().unwrap().status().as_u16(),403);
+  assert_eq!(client.post(url.join("/__gustaf_console/wrong").unwrap()).header("Origin",url.origin().ascii_serialization()).json(&serde_json::json!({"kind":"error","message":"forged"})).send().unwrap().status().as_u16(),403);
   assert_eq!(client.get(url.join("/redirect").unwrap()).header("Referer",info.preview_url.clone()).send().unwrap().status().as_u16(),403);
   let asset=client.get(url.join("/asset.js").unwrap()).header("Referer",&info.preview_url).send().unwrap();assert_eq!(asset.status().as_u16(),200);assert!(asset.text().unwrap().contains("fixture"));
   assert_eq!(client.get(url.join("/private").unwrap()).send().unwrap().status().as_u16(),403);
-  assert_eq!(client.get(url.join("/__mcode_preview/wrong/").unwrap()).header("Referer",&info.preview_url).send().unwrap().status().as_u16(),403);
+  assert_eq!(client.get(url.join("/__gustaf_preview/wrong/").unwrap()).header("Referer",&info.preview_url).send().unwrap().status().as_u16(),403);
   assert_eq!(client.post(&info.preview_url).header("Origin","https://evil.example").body("request").send().unwrap().status().as_u16(),403);
   state.0.lock().unwrap().remove(&info.id);origin.join().unwrap();
  }

@@ -6,6 +6,7 @@ import { saveAgentSettings, useAgentSettings } from "../agent/agentSettingsStore
 import { AGENT_TYPES, DEFAULT_BUDGETS, type AgentType, type Budget } from "../agent/subagentCore";
 import { parseTokenLimit } from "../lib/budgets";
 import { rolloutEnabled, setRolloutEnabled } from "../providers/codexRollout";
+import { codexTransport, setCodexTransport } from "../providers/codexTransport";
 import { runsOwnTools } from "../lib/modelRouting";
 import { useApp } from "../state";
 import { AgentRolesSection } from "./AgentRolesSection";
@@ -87,6 +88,30 @@ function CodexSessionsRow() {
         <div className="d">{t("codexSessionsDesc")}</div>
       </div>
       <Toggle on={on} label={t("codexSessions")} onChange={change} />
+    </div>
+  );
+}
+
+/** Codex over its app-server: native subagent lifecycle (providers/codexAppServer.ts). On by default; falls back to `exec`. */
+function CodexAppServerRow() {
+  const t = useT();
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    void codexTransport().then((v) => { if (alive) setOn(v === "app-server"); });
+    return () => { alive = false; };
+  }, []);
+  const change = (v: boolean) => {
+    setOn(v);
+    setCodexTransport(v ? "app-server" : "exec").catch(() => setOn(!v));
+  };
+  return (
+    <div className="card-row">
+      <div className="grow">
+        <div className="t">{t("codexAppServer")}</div>
+        <div className="d">{t("codexAppServerDesc")}</div>
+      </div>
+      <Toggle on={on} label={t("codexAppServer")} onChange={change} />
     </div>
   );
 }
@@ -216,6 +241,7 @@ export function AgentSettingsSection() {
           </div>
           <Toggle on={s.notifications} label={t("agentNotifications")} onChange={(v) => saveAgentSettings({ ...s, notifications: v })} />
         </div>
+        <CodexAppServerRow />
         <CodexSessionsRow />
       </div>
       <AgentRolesSection />

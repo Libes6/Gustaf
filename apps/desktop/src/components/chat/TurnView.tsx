@@ -1,7 +1,8 @@
-import { splitChatReferences } from "../../lib/chatContext";
+import { pasteStats, splitComposerText } from "../../lib/chatContext";
 import { useApp } from "../../state";
 import { ChevronDown, ChevronRight, Copy, GitBranch, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { useMenu } from "../Menu";
 import { useT } from "../../i18n";
 import { userText, type Turn } from "../../lib/chatTurns";
 import { editableText, turnActions } from "../../lib/messageActions";
@@ -34,10 +35,11 @@ export type TurnHandlers = {
   onRejectPlan: () => void;
 };
 
-export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
+export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg, o: { files: boolean }) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
   const t = useT();
+  const rewindMenu = useMenu();
   const app = useApp();
-  const userContext = splitChatReferences(turn.user ? textOf(turn.user) : "");
+  const userContext = splitComposerText(turn.user ? textOf(turn.user) : "");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // Which delete button waits for its second click (the one under the user bubble or the one under the reply).
@@ -86,9 +88,9 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       ) : isVerificationPart(p) ? (
         <VerificationCard key={`verification-${i}`} part={p} />
       ) : p.type === "activity" ? (
-        <ToolCard key={p.id} call={p} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+        <ToolCard key={p.id} call={p} at={m.created_at} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : p.type === "tool_call" ? (
-        <ToolCard key={p.id} call={p} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+        <ToolCard key={p.id} call={p} at={m.created_at} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : null,
     );
 
@@ -124,10 +126,17 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
                 {images.map((p, i) => <ImageThumb key={i} src={`data:image/png;base64,${p.data}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />)}
               </div>
             )}
-            {(contextText || userContext.references.length > 0 || turn.user.meta?.compacted) && (
+            {(contextText || userContext.references.length > 0 || userContext.pastes.length > 0 || turn.user.meta?.compacted) && (
               <div className="bubble">
                 {turn.user.meta?.compacted && <strong className="summary-label">{t("contextSummary")}</strong>}
                 {contextText}
+                {userContext.pastes.map((paste, i) => {
+                  const { lines, chars } = pasteStats(paste);
+                  return <div className="chat-reference paste-card" key={`paste:${i}`}>
+                    <strong>{t("pastedText")}</strong> <span>{t("pastedTextStats", { lines: lines.toLocaleString(app.locale), chars: chars.toLocaleString(app.locale) })}</span>
+                    <details><summary>{t("pastedTextShow")}</summary><pre>{paste.text}</pre></details>
+                  </div>;
+                })}
                 {userContext.references.map((ref, i) => <div className="chat-reference" key={`${ref.sourceId}:${i}`}>
                   <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
                   <span>{ref.snapshot.length.toLocaleString()} {app.locale === "ru" ? "символов · справочный материал" : "characters · reference material"}</span>
@@ -141,8 +150,14 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             <button className="icon-btn" title={t("copy")} onClick={() => navigator.clipboard.writeText(textOf(turn.user!))}>
               <Copy size={13} />
             </button>
-            {onRewind && turn.user.meta?.checkpoint && (
-              <button className="icon-btn" title={t("rewind")} onClick={() => onRewind(turn.user!)}>
+            {onRewind && (
+              <button
+                className="icon-btn" title={t("rewind")} aria-label={t("rewind")} aria-haspopup="menu" disabled={busy}
+                onClick={(e) => rewindMenu.open(e.currentTarget.getBoundingClientRect(), [
+                  { label: t("rewindKeepFiles"), description: t("rewindKeepFilesHint"), onClick: () => onRewind(turn.user!, { files: false }) },
+                  ...(turn.user!.meta?.checkpoint ? [{ label: t("rewindWithFiles"), description: t("rewindWithFilesHint"), onClick: () => onRewind(turn.user!, { files: true }) }] : []),
+                ])}
+              >
                 <RotateCcw size={13} />
               </button>
             )}
@@ -181,11 +196,12 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
           </div>
         </div>
       )}
+      {rewindMenu.node}
     </>
   );
 });
 
-/** An assistant text; a valid `mcode-plan` block in it becomes a plan card, anything unparsable stays Markdown. */
+/** An assistant text; a valid `gustaf-plan` block in it becomes a plan card, anything unparsable stays Markdown. */
 function PlanOrMarkdown({ text, actionable, handlers }: { text: string; actionable: boolean; handlers: TurnHandlers }) {
   const found = extractPlan(text);
   if (!found) return <div className="msg-assistant"><Markdown text={text} /></div>;

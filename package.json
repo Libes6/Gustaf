@@ -1,5 +1,5 @@
 {
-  "name": "mcode-monorepo",
+  "name": "gustaf-monorepo",
   "private": true,
   "workspaces": [
     "apps/desktop",
@@ -9,7 +9,7 @@
     "dev": "npm run dev -w apps/desktop",
     "build": "npm run build -w apps/desktop",
     "preview": "npm run preview -w apps/desktop",
-    "tauri": "npm run tauri -w apps/desktop --",
+    "tauri": "node scripts/tauri.mjs",
     "check": "npm run check -w apps/desktop && npm run check -w packages/protocol",
     "test": "npm test -w apps/desktop",
     "test:ui": "npm run test:ui -w apps/desktop",
@@ -18,5 +18,5 @@
     "version:check": "node scripts/version.mjs --check",
     "test:release": "node --test scripts/tests/*.test.mjs"
   },
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

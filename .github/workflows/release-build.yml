@@ -1,7 +1,8 @@
 name: Gustaf desktop releases
 
 # Push to main: if tag v<version from tauri.conf.json> does not exist yet, build every platform, then tag the
-# commit and create a DRAFT release (never published here). If the tag exists (docs-only push, no bump), skip.
+# commit and create a DRAFT release (never published here). If the tag and its release (draft or published)
+# exist (docs-only push, no bump), skip. If the tag exists without any release (stray tag), fail.
 # Manual run (any branch): build artifacts only, no tag, no draft. Decision logic: scripts/release-plan.mjs.
 on:
   push:
@@ -24,6 +25,10 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    # write: `gh release view` only sees DRAFT releases with push access; with read it would report a draft
+    # as missing and fail the run as a stray tag. This job only reads (git ls-remote/fetch, gh release view).
+    permissions:
+      contents: write
     outputs:
       build: ${{ steps.plan.outputs.build }}
       release: ${{ steps.plan.outputs.release }}
@@ -34,8 +39,11 @@ jobs:
         with:
           node-version-file: .nvmrc
       # Refuses (fails) unless the push is to main in Libes6/Gustaf and the commit is on origin/main;
-      # emits a ::notice:: and build=false when the version tag already exists.
+      # emits a ::notice:: and build=false when the version tag and its release already exist;
+      # fails when the tag exists without a release (stray tag), or when gh cannot tell.
       - id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/release-plan.mjs
 
   bundle:
@@ -107,22 +115,22 @@ jobs:
           test -n "$APPLE_CERTIFICATE" && test -n "$APPLE_CERTIFICATE_PASSWORD" && test -n "$KEYCHAIN_PASSWORD"
           test -n "$APPLE_SIGNING_IDENTITY" && test -n "$APPLE_ID" && test -n "$APPLE_PASSWORD" && test -n "$APPLE_TEAM_ID"
           case "$APPLE_SIGNING_IDENTITY" in "Developer ID Application:"*) ;; *) echo "Expected a Developer ID Application identity" >&2; exit 1;; esac
-          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/mcode-cert.p12", Buffer.from(process.env.APPLE_CERTIFICATE, "base64"))'
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
-          security set-keychain-settings -t 3600 -u "$RUNNER_TEMP/mcode-build.keychain-db"
-          security list-keychains -d user -s "$RUNNER_TEMP/mcode-build.keychain-db" login.keychain-db
-          security import "$RUNNER_TEMP/mcode-cert.p12" -k "$RUNNER_TEMP/mcode-build.keychain-db" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/mcode-build.keychain-db"
-          rm -f "$RUNNER_TEMP/mcode-cert.p12"
+          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/gustaf-cert.p12", Buffer.from(process.env.APPLE_CERTIFICATE, "base64"))'
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/gustaf-build.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/gustaf-build.keychain-db"
+          security set-keychain-settings -t 3600 -u "$RUNNER_TEMP/gustaf-build.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/gustaf-build.keychain-db" login.keychain-db
+          security import "$RUNNER_TEMP/gustaf-cert.p12" -k "$RUNNER_TEMP/gustaf-build.keychain-db" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/gustaf-build.keychain-db"
+          rm -f "$RUNNER_TEMP/gustaf-cert.p12"
       - name: Build distribution bundles
         env:
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && (inputs.signed_macos || vars.GUSTAF_SIGNED_MACOS == 'true') && secrets.APPLE_SIGNING_IDENTITY || '' }}
           APPLE_ID: ${{ runner.os == 'macOS' && (inputs.signed_macos || vars.GUSTAF_SIGNED_MACOS == 'true') && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ runner.os == 'macOS' && (inputs.signed_macos || vars.GUSTAF_SIGNED_MACOS == 'true') && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && (inputs.signed_macos || vars.GUSTAF_SIGNED_MACOS == 'true') && secrets.APPLE_TEAM_ID || '' }}
-          M_CODE_UPDATER_PUBLIC_KEY: ${{ vars.M_CODE_UPDATER_PUBLIC_KEY }}
-          M_CODE_UPDATER_ENDPOINT: https://github.com/Libes6/Gustaf/releases/latest/download/latest.json
+          GUSTAF_UPDATER_PUBLIC_KEY: ${{ vars.GUSTAF_UPDATER_PUBLIC_KEY || vars.M_CODE_UPDATER_PUBLIC_KEY }}
+          GUSTAF_UPDATER_ENDPOINT: https://github.com/Libes6/Gustaf/releases/latest/download/latest.json
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           RELEASE: ${{ needs.plan.outputs.release }}
@@ -131,10 +139,10 @@ jobs:
           if [ -z "$APPLE_SIGNING_IDENTITY" ]; then
             unset APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
           fi
-          if [ "$RELEASE" = true ] || [ -n "$M_CODE_UPDATER_PUBLIC_KEY" ]; then
-            test -n "$M_CODE_UPDATER_PUBLIC_KEY" && test -n "$M_CODE_UPDATER_ENDPOINT" && test -n "$TAURI_SIGNING_PRIVATE_KEY"
-            node -e 'const fs=require("fs");const u=process.env.M_CODE_UPDATER_ENDPOINT;if(!u.startsWith("https://"))throw Error("Updater endpoint must use HTTPS");fs.writeFileSync(process.env.RUNNER_TEMP+"/mcode-updater.json",JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:process.env.M_CODE_UPDATER_PUBLIC_KEY,endpoints:[u]}}}))'
-            npm run tauri -- build --config "$RUNNER_TEMP/mcode-updater.json"
+          if [ "$RELEASE" = true ] || [ -n "$GUSTAF_UPDATER_PUBLIC_KEY" ]; then
+            test -n "$GUSTAF_UPDATER_PUBLIC_KEY" && test -n "$GUSTAF_UPDATER_ENDPOINT" && test -n "$TAURI_SIGNING_PRIVATE_KEY"
+            node -e 'const fs=require("fs");const u=process.env.GUSTAF_UPDATER_ENDPOINT;if(!u.startsWith("https://"))throw Error("Updater endpoint must use HTTPS");fs.writeFileSync(process.env.RUNNER_TEMP+"/gustaf-updater.json",JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:process.env.GUSTAF_UPDATER_PUBLIC_KEY,endpoints:[u]}}}))'
+            npm run tauri -- build --config "$RUNNER_TEMP/gustaf-updater.json"
           else
             npm run tauri -- build
           fi
@@ -147,8 +155,8 @@ jobs:
       - name: Remove temporary signing keychain
         if: always() && runner.os == 'macOS' && (inputs.signed_macos || vars.GUSTAF_SIGNED_MACOS == 'true')
         run: |
-          security delete-keychain "$RUNNER_TEMP/mcode-build.keychain-db" || true
-          rm -f "$RUNNER_TEMP/mcode-cert.p12"
+          security delete-keychain "$RUNNER_TEMP/gustaf-build.keychain-db" || true
+          rm -f "$RUNNER_TEMP/gustaf-cert.p12"
       - name: Stage architecture-specific assets
         env:
           PLATFORM: ${{ matrix.platform }}

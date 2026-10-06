@@ -249,13 +249,16 @@ pub struct CmdResult {
 
 // ponytail: output is returned when the command ends, not streamed; switch to Channel events if long builds need live logs.
 #[tauri::command]
-pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>) -> Result<CmdResult, String> {
+/// `env`: extra variables for this command only (the secrets an agent was given through `request_secret`; their values
+/// never appear in the command text).
+pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>, env: Option<std::collections::HashMap<String, String>>) -> Result<CmdResult, String> {
     let shell = Shell::current();
     let merged = shell.merges_stderr_itself();
     let mut child = Command::new(shell.program())
         .args(shell.flags())
         .arg(shell.script(&command))
         .current_dir(&root)
+        .envs(env.unwrap_or_default())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(if merged { Stdio::inherit() } else { Stdio::piped() })

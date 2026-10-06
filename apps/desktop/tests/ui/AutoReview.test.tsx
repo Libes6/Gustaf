@@ -212,16 +212,16 @@ describe("automatic review: other change sources", () => {
 });
 
 describe("review rules label and prompt", () => {
-  const rulesFile = ({ path }: { path: string }) => (path === ".mcode/REVIEW.md" ? "     1|Flag any SQL built by string concatenation.\n" : Promise.reject(new Error("no such file")));
+  const rulesFile = ({ path }: { path: string }) => (path === ".gustaf/REVIEW.md" ? "     1|Flag any SQL built by string concatenation.\n" : Promise.reject(new Error("no such file")));
 
-  it("shows 'Rules: .mcode/REVIEW.md' when the file exists, and appends it to the system prompt, still without tools", async () => {
+  it("shows 'Rules: .gustaf/REVIEW.md' when the file exists, and appends it to the system prompt, still without tools", async () => {
     const view = await setup(undefined, { fs_read: rulesFile });
     finishRun(view);
     await userEvent.click(await chip());
-    expect(await screen.findByText("Rules: .mcode/REVIEW.md")).toBeInTheDocument();
+    expect(await screen.findByText("Rules: .gustaf/REVIEW.md")).toBeInTheDocument();
     await waitFor(() => expect(model.requests).toHaveLength(1));
     const req = model.requests[0];
-    expect(req.system).toMatch(/<project_review_rules path="\.mcode\/REVIEW\.md">\nFlag any SQL built by string concatenation\.\n<\/project_review_rules>/);
+    expect(req.system).toMatch(/<project_review_rules path="\.gustaf\/REVIEW\.md">\nFlag any SQL built by string concatenation\.\n<\/project_review_rules>/);
     expect(req.system).toMatch(/untrusted project content/);
     expect(req.tools).toEqual([]);
     expect(req.access).toBe("readonly");

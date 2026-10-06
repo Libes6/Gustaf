@@ -29,3 +29,13 @@
 .sched-formcard { margin-bottom: 12px; }
 .sched-list { list-style: none; margin: 0; padding: 0; }
 .sched-line .t { display: flex; align-items: center; gap: 6px; }
+
+/* Webhook triggers (components/WebhooksSection.tsx) */
+.webhook-heading { display: flex; align-items: center; gap: 6px; margin-top: 24px; }
+.webhook-row { align-items: flex-start; }
+.webhook-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.webhook-url { font-family: var(--mono); font-size: 11.5px; padding: 3px 6px; border-radius: 6px; background: var(--bg-code); overflow-wrap: anywhere; }
+.webhook-fields .btn-soft { display: inline-flex; align-items: center; gap: 4px; }
+.webhook-deliveries { margin: 6px 0 0; padding-left: 16px; }
+.webhook-rejected { color: var(--red); }
+

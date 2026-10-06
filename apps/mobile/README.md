@@ -1,6 +1,6 @@
-# @mcode/mobile
+# @gustaf/mobile
 
-Companion app for M Code: control the desktop app from a phone on the local network (see [TASKS.md](../../TASKS.md),
+Companion app for Gustaf: control the desktop app from a phone on the local network (see [TASKS.md](../../TASKS.md),
 "Mobile companion app"). **Status: skeleton.** Everything works against an in-memory mock desktop; the desktop server,
 real pairing and TLS pinning are not built yet.
 
@@ -34,7 +34,7 @@ Metro's upward `node_modules` lookup) could bundle two copies of React. So:
 - the root `workspaces` list is `["apps/desktop", "packages/*"]`; root `npm ci` / `npm run check` never install or check
   this app;
 - `apps/mobile` has its own `package-lock.json` and `node_modules`;
-- `@mcode/protocol` is consumed as `"file:../../packages/protocol"` (a symlink) and read as TypeScript source: no build
+- `@gustaf/protocol` is consumed as `"file:../../packages/protocol"` (a symlink) and read as TypeScript source: no build
   step. `metro.config.js` adds it to `watchFolders`; `tsc` and the Node test runner follow the symlink.
   The protocol package must stay free of React / React Native imports.
 
@@ -46,9 +46,9 @@ CI: the `mobile` job in `.github/workflows/ci.yml` (ubuntu only, separate from t
 ```
 app/                  expo-router: (tabs)/index (connection / pair prompt), (tabs)/projects, (tabs)/settings,
                       pair (QR scanner, expo-camera CameraView), chat/[id] (messages, composer, streaming, approvals)
-src/lib/pairing.ts    pure parser/validator for mcode://pair?... and JSON payloads (tests next to it)
+src/lib/pairing.ts    pure parser/validator for gustaf://pair?... and JSON payloads (tests next to it)
 src/lib/streaming.ts  pure reducer: ServerEvent -> chat state (tests next to it); backoff.ts reconnect delays
-src/api/client.ts     DesktopApi interface, MCodeClient (REST + WebSocket, reconnect, bearer token),
+src/api/client.ts     DesktopApi interface, GustafClient (REST + WebSocket, reconnect, bearer token),
                       PinnedTransport = certificate-pinning interface only
 src/api/mock.ts       MockServer (in-memory desktop with fake streaming)
 src/storage/secure.ts expo-secure-store: device token, paired desktops, preferences
@@ -59,10 +59,10 @@ src/i18n, src/theme   en/ru strings (ru typed against en keys), light/dark token
 ## Verified vs not
 
 Verified without a device: `tsc --noEmit`, 15 unit tests (pairing parser, streaming reducer, backoff), `expo-doctor`
-(21/21), `expo export --platform ios` (Metro bundles the app incl. `@mcode/protocol`), config resolves (`expo config`).
+(21/21), `expo export --platform ios` (Metro bundles the app incl. `@gustaf/protocol`), config resolves (`expo config`).
 
 Not verified: nothing was run in a simulator or on a device, so no screen has been looked at; the camera scan, secure
 storage, tab/stack navigation and keyboard handling are untested; the Android build was never attempted; `eas.json`
 profiles were not built; app icon and splash are the Expo template placeholders. No certificate pinning: `PinnedTransport`
 is an interface and `unpinnedTransport` does plain TLS, so a real connection would not be protected from interception.
-The REST paths in `MCodeClient` are assumptions until the desktop server exists.
+The REST paths in `GustafClient` are assumptions until the desktop server exists.

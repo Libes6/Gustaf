@@ -3,6 +3,7 @@ import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { getAdapter } from "../providers";
 import { useApp } from "../state";
 import { fsx, git, review } from "./api";
+import { readProjectFile } from "./projectFolder";
 import { assembleReviewRules, NO_RULES, planAutoReview, recordDismissal, stripLineNumbers, withReviewRules, REVIEW_RULES_PATH, AUTO_REVIEW_MAX_CHARS, AUTO_REVIEW_MAX_FILES, type AutoInput, type Dismissal, type ReviewRules } from "./autoReview";
 import { buildReviewPrompt, reviewBudget, reviewFromParts, type Finding, type ReviewFile } from "./diffReview";
 import { reviewTarget, runsOwnTools } from "./modelRouting";
@@ -21,12 +22,13 @@ export type RunOutcome = "done" | "skipped" | "error" | "busy";
 
 let seq = 0;
 
-/** The project's `.mcode/REVIEW.md` (read through the project-root-confined file reader; missing or unreadable means no rules). */
+/** The project's `.gustaf/REVIEW.md` (else the legacy `.mcode/REVIEW.md`; read through the project-root-confined file reader; missing or unreadable means no rules). */
 export async function loadReviewRules(root: string): Promise<ReviewRules> {
   try {
-    const read = stripLineNumbers(await fsx.read(root, REVIEW_RULES_PATH));
+    const file = await readProjectFile((path) => fsx.read(root, path), REVIEW_RULES_PATH);
+    const read = stripLineNumbers(file.value);
     const cutByReader = /\n…\[truncated\]$/.test(read);
-    const rules = assembleReviewRules(read.replace(/\n…\[truncated\]$/, ""));
+    const rules = assembleReviewRules(read.replace(/\n…\[truncated\]$/, ""), undefined, file.path);
     return cutByReader && rules.status === "loaded" ? { ...rules, status: "truncated" } : rules;
   } catch { return NO_RULES; }
 }
@@ -39,7 +41,7 @@ async function ignoredPaths(root: string, paths: string[]): Promise<Set<string>>
 
 /**
  * Runs the read-only AI review over the pending files: one model turn without tools, the diff as bounded JSON data
- * (lib/diffReview.ts) plus the project's `.mcode/REVIEW.md` rules in the system prompt. Uses the `review` model or the cheap
+ * (lib/diffReview.ts) plus the project's `.gustaf/REVIEW.md` rules in the system prompt. Uses the `review` model or the cheap
  * model from the agent settings when configured, else the chat's selected model; usage goes through the app's counters so
  * budgets see it. Nothing is applied: the result is findings to look at. An automatic run (`auto`) additionally never
  * sends binary, ignored or secret-looking files, redacts the diff and skips above a size cap; every failure is a status, never a throw.

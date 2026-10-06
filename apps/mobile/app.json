@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "M Code",
-    "slug": "mcode-mobile",
+    "name": "Gustaf",
+    "slug": "gustaf-mobile",
     "version": "0.1.0",
-    "scheme": "mcode",
+    "scheme": "gustaf",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.mcode.mobile",
+      "bundleIdentifier": "io.github.libes6.gustaf.mobile",
       "infoPlist": {
-        "NSCameraUsageDescription": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
-        "NSLocalNetworkUsageDescription": "M Code connects to the M Code desktop app on your local network.",
-        "NSBonjourServices": ["_mcode._tcp"]
+        "NSCameraUsageDescription": "Gustaf uses the camera to scan the pairing QR code shown by the desktop app.",
+        "NSLocalNetworkUsageDescription": "Gustaf connects to the Gustaf desktop app on your local network.",
+        "NSBonjourServices": ["_gustaf._tcp"]
       }
     },
     "android": {
-      "package": "app.mcode.mobile",
+      "package": "io.github.libes6.gustaf.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#181818",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -34,7 +34,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
+          "cameraPermission": "Gustaf uses the camera to scan the pairing QR code shown by the desktop app.",
           "recordAudioAndroid": false
         }
       ]

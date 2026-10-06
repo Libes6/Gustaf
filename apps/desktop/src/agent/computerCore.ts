@@ -93,6 +93,11 @@ export function formatComputerResult(actions: readonly CuAction[], f: ShotFacts)
   return out.join(" ");
 }
 
+/** Tool name of the desktop calls parsed from a provider's text reply (providers without a native computer tool). */
+export const BRIDGE_COMPUTER_TOOL = "gustaf_computer";
+/** The bridge tool, also under the name stored in chats from before the rename. */
+export const isBridgeComputerTool = (name: string | undefined) => name === BRIDGE_COMPUTER_TOOL || name === "mcode_computer";
+
 /**
  * The newest screenshot in a desktop history, as [message index, part index], or null. CLI replays attach only this one:
  * older screenshots would grow every prompt and resumed sessions already saw them.

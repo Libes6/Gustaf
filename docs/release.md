@@ -2,7 +2,7 @@
 
 ## Implemented pipeline
 
-The existing `.github/workflows/release-build.yml` builds macOS Apple Silicon and Intel, Windows x64, and Linux x64. `workflow_dispatch` produces CI artifacts without publishing. Pushing a stable `vX.Y.Z` tag builds all platforms and creates/updates a **draft** GitHub Release in [Libes6/Gustaf](https://github.com/Libes6/Gustaf). The tag must match the source version and point to a commit reachable from `dev`. Every matrix job must succeed before the draft is assembled. A retry refuses to modify an already public release.
+The existing `.github/workflows/release-build.yml` builds macOS Apple Silicon and Intel, Windows x64, and Linux x64. `workflow_dispatch` produces CI artifacts without publishing. A push to `main` whose source version has no `vX.Y.Z` tag yet builds all platforms, then tags that commit and creates/updates a **draft** GitHub Release in [Libes6/Gustaf](https://github.com/Libes6/Gustaf). Every matrix job must succeed before the tag and draft are created. A retry refuses to modify an already public release. Branch model and CI: [branching.md](branching.md).
 
 The draft contains installers, updater payloads, `.sig` files, and one complete `latest.json`. Architecture prefixes prevent macOS archive collisions. Manifest URLs point to the immutable version tag; the application checks `https://github.com/Libes6/Gustaf/releases/latest/download/latest.json`. Drafts are unavailable through this public endpoint. Public publication requires separate human authorization; the workflow never publishes a draft automatically. No release has been published or signature/certificate secret configured by this change.
 
@@ -18,14 +18,33 @@ npm run version:bump -- patch # also minor, major, or an explicit higher stable 
 npm run test:release
 ```
 
-The bump command synchronizes root/desktop package.json, root package-lock.json (including workspace entries), Cargo.toml, the app's Cargo.lock entry, and tauri.conf.json. It does not create commits or tags. Mobile, sidecar and protocol packages have independent versions and are not desktop release versions. Stable SemVer only: prereleases and non-increasing versions are rejected. Review and commit these files on `dev`; after separate release approval, create and push the corresponding tag:
+The bump command synchronizes root/desktop package.json, root package-lock.json (including workspace entries), Cargo.toml, the app's Cargo.lock entry, and tauri.conf.json. It does not create commits or tags. Mobile, sidecar and protocol packages have independent versions and are not desktop release versions. Stable SemVer only: prereleases and non-increasing versions are rejected.
 
-```sh
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
+## Release flow
+
+`dev` is the integration branch, `main` the release branch ([branching.md](branching.md)).
+
+1. On `dev`, through a normal pull request, run `npm run version:bump -- <level>` and commit the changed version files.
+2. After release approval, open a pull request from `dev` into `main`; CI runs on it. Merge.
+3. The push to `main` starts the release workflow. Its `plan` job (`scripts/release-plan.mjs`) reads the version from the desktop version files and checks whether tag `vX.Y.Z` exists on origin:
+   - tag missing: all four platforms are built; only if every job succeeds, job `draft` creates tag `vX.Y.Z` on the merged `main` commit and a **draft** release `vX.Y.Z` with installers, signatures and `latest.json`;
+   - tag exists and a release (draft or published) exists for it (docs-only push, merge without a bump): the build is skipped with a `::notice::` ("Tag vX.Y.Z already exists: nothing to release") and the run succeeds. Nothing is tagged or released;
+   - tag exists but **no** release exists for it (a stray tag): `plan` fails with an `::error::` naming the tag and the commit it points at. Nothing is built. See below.
+4. Review the draft and publish it by hand (see the checklist below). The workflow never publishes.
+
+`plan` fails the run for a push to any other branch, from a fork, or of a commit that is not on `origin/main`. These refusals come first: GitHub is asked about releases only for an eligible push whose tag exists. `plan` looks the release up with `gh release view vX.Y.Z`; any `gh` error other than "release not found" (authentication, network) also fails the run rather than counting as "no release". Seeing draft releases needs `contents: write`, so the `plan` job has it; it only reads.
+
+**Do not create or push `vX.Y.Z` tags by hand.** The workflow has no tag trigger, so a pushed tag starts nothing. Worse, the merge to `main` with that version then finds the tag without a release, and `plan` fails the run ("Tag vX.Y.Z exists on <sha> but has no release"); nothing is built. The same happens with a tag left over from an abandoned attempt. Fix it by deleting the stray tag on origin (`git push origin :refs/tags/vX.Y.Z`) and re-running the workflow (or pushing to `main` again), or by bumping to a higher version. Earlier versions of `plan` skipped silently in this case, so a version could go unreleased unnoticed.
+
+If the run fails after the tag was pushed (for example during upload), use "Re-run failed jobs" on that run: it re-runs only the failed `draft` job and reuses the successful `plan` job's outputs, so the tag that now exists does not stop it. The draft job accepts an existing tag only when it points at the same commit, and keeps an existing draft's notes. Do not use "Re-run all jobs" or a new push to `main` for this: both run `plan` again, which then skips (if the incomplete draft exists) or fails as a stray tag (if the draft was never created). A failure before the tag (a bundle job) is retried by re-running, or by the next push to `main`.
 
 Do not retag a released version. Build a higher version for corrections. Review generated release notes and the manifest's `notes` together before publication: edit both if wording changes, otherwise installed clients see the original generated notes.
+
+## Hotfix
+
+1. Branch from `main` (`git switch -c hotfix/<topic> main`), fix, and bump the patch version (`npm run version:bump -- patch`).
+2. Open a pull request into `main`. Merging it produces the draft release as above; review and publish it.
+3. After the release, merge `main` back into `dev` (pull request `main` → `dev`) so the fix and the version bump reach `dev`. On a version conflict keep the higher version, then run `npm run version:check`.
 
 ## Required settings before the first real release
 
@@ -33,7 +52,7 @@ Generate a Tauri updater key pair outside the repository using `npm run tauri --
 
 Repository **variable**:
 
-- `M_CODE_UPDATER_PUBLIC_KEY`: public key contents generated by the Tauri signer, not a path. The historical variable name is retained. The endpoint is fixed to this repository; the old endpoint variable is no longer used.
+- `GUSTAF_UPDATER_PUBLIC_KEY`: public key contents generated by the Tauri signer, not a path. Until the repository variable is renamed, the workflow falls back to the variable's earlier name `M_CODE_UPDATER_PUBLIC_KEY`. The endpoint is fixed to this repository; the old endpoint variable is no longer used.
 
 Repository **secrets**:
 
@@ -47,11 +66,11 @@ Optional Apple Developer ID/notarization secrets (not needed for the initial rel
 - `APPLE_SIGNING_IDENTITY`: full `Developer ID Application: …` identity.
 - `APPLE_ID`, `APPLE_PASSWORD` (app-specific password), `APPLE_TEAM_ID`: notarization credentials.
 
-Tag builds always require the free Tauri updater signing key; missing updater credentials fail the pipeline. Paid Apple Developer Program membership is **not required** for this initial distribution. By default, macOS bundles use the existing ad-hoc signature (`signingIdentity: "-"`) without Developer ID or notarization, including builds triggered by tags. Users may need to allow the first launch in System Settings → Privacy & Security → Open Anyway after attempting to open the downloaded app; see [Apple's instructions](https://support.apple.com/en-me/102445). This first-launch exception and subsequent update/relaunch behavior must be tested on a real Mac.
+Release builds (push to `main` with a new version) always require the free Tauri updater signing key; missing updater credentials fail the pipeline. Paid Apple Developer Program membership is **not required** for this initial distribution. By default, macOS bundles use the existing ad-hoc signature (`signingIdentity: "-"`) without Developer ID or notarization, including release builds. Users may need to allow the first launch in System Settings → Privacy & Security → Open Anyway after attempting to open the downloaded app; see [Apple's instructions](https://support.apple.com/en-me/102445). This first-launch exception and subsequent update/relaunch behavior must be tested on a real Mac.
 
-If Apple membership is obtained later, set the optional repository variable `GUSTAF_SIGNED_MACOS=true` to enable Developer ID signing and notarization for tag and manual builds, or use `signed_macos=true` for one manual run. When either option is enabled, all Apple secrets above are required and missing credentials fail the job. Leave the variable unset or `false` for the current free distribution. Updater signing is independent of Apple notarization and Windows Authenticode signing. The Windows installer is **not Authenticode signed** by this workflow; SmartScreen warnings may remain. No Windows certificate has been provisioned. Temporary Apple certificates/keychains are removed after every job.
+If Apple membership is obtained later, set the optional repository variable `GUSTAF_SIGNED_MACOS=true` to enable Developer ID signing and notarization for release and manual builds, or use `signed_macos=true` for one manual run. When either option is enabled, all Apple secrets above are required and missing credentials fail the job. Leave the variable unset or `false` for the current free distribution. Updater signing is independent of Apple notarization and Windows Authenticode signing. The Windows installer is **not Authenticode signed** by this workflow; SmartScreen warnings may remain. No Windows certificate has been provisioned. Temporary Apple certificates/keychains are removed after every job.
 
-The automatically supplied `GITHUB_TOKEN` needs Actions `contents: write` for the draft job. Enable Actions for the repository and permit this scoped token. The base jobs retain read-only permissions. The repository and release assets must be publicly accessible for this unauthenticated updater endpoint. Private repositories need a different authenticated distribution design; do not embed a GitHub personal token in the application.
+The automatically supplied `GITHUB_TOKEN` needs Actions `contents: write` for the draft job, and for the `plan` job, which only reads but must see draft releases. Enable Actions for the repository and permit this scoped token. The other jobs retain read-only permissions. The repository and release assets must be publicly accessible for this unauthenticated updater endpoint. Private repositories need a different authenticated distribution design; do not embed a GitHub personal token in the application.
 
 ## Application behavior
 

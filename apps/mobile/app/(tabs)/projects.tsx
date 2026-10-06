@@ -1,4 +1,4 @@
-import type { ChatSummary, ProjectSummary } from "@mcode/protocol";
+import type { ChatSummary, ProjectSummary } from "@gustaf/protocol";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, SectionList, Text, View } from "react-native";

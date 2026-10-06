@@ -45,11 +45,12 @@ Add or update tests with every behaviour change. If a change cannot be tested au
 
 ## Branches and releases
 
-Short version (full description in [docs/branching.md](docs/branching.md)):
+`dev` is the integration branch and the default target; `main` only receives releases and hotfixes. Details: [docs/branching.md](docs/branching.md) (branches, CI) and [docs/release.md](docs/release.md) (release flow, hotfixes, signing).
 
-1. Branch from `dev` (`feature/…`, `fix/…`) and open a pull request **into `dev`**. CI must pass.
+1. Branch from `dev` (`feature/<topic>`; agent branches use `gustaf/<topic>`) and open a pull request **into `dev`**. CI must pass.
 2. A release bumps the version on `dev` (`npm run version:bump -- patch|minor|major`), then a pull request from `dev` into `main`.
-3. A push to `main` builds all installers and creates a **draft** GitHub Release. Before it is published by hand, the [release checklist](docs/release-checklist.md) is run on the built artifacts. Signing and updater settings: [docs/release.md](docs/release.md).
+3. The push to `main` builds all installers, tags `vX.Y.Z` and creates a **draft** GitHub Release. Do not push version tags by hand. Before the draft is published by hand, the [release checklist](docs/release-checklist.md) is run on the built artifacts.
+4. Hotfixes branch from `main`, go back into `main` by pull request, and `main` is then merged back into `dev`.
 
 Do not push directly to `dev` or `main`.
 
@@ -61,7 +62,7 @@ Do not push directly to `dev` or `main`.
 - Update the docs that describe the behaviour (`README.md`, `docs/features/*.md`) and add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 - Never commit API keys, tokens, `.env` files, signing keys or logs containing them. Test fixtures use fake values.
 - UI strings go through the i18n dictionaries in `apps/desktop/src/i18n/` (both `en.json` and `ru.json`).
-- Do not rename the internal identifiers (`com.maksimkulakov.mcode`, crate and npm names, data paths): they keep existing installations working.
+- Internal names are `gustaf` everywhere: the bundle identifier and Keychain service `io.github.libes6.gustaf`, the crate `gustaf` (`gustaf_lib`), the npm packages `@gustaf/*`, the project folder `.gustaf/`, the `gustaf://` pairing scheme and the `gustaf-*` text protocols. Builds from before the rename used `mcode` names; they are only read as fallbacks (`src-tauri/src/legacy.rs` moves the old app data folders once at startup, `secrets.rs` moves old Keychain entries on first read, `src/lib/projectFolder.ts` falls back to `.gustaf/`). Do not add new `mcode` names.
 
 ## Where tasks live
 

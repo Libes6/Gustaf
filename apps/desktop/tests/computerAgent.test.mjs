@@ -10,7 +10,7 @@ const { runAgent } = await import('../src/agent/agent.ts');
 const { clearActionLog, getActionLog } = await import('../src/agent/actionLogStore.ts');
 
 let n = 0;
-const batch = (...actions) => ({ parts: [{ type: 'tool_call', id: `k${n++}`, name: 'mcode_computer', args: { actions }, computer: { actions } }] });
+const batch = (...actions) => ({ parts: [{ type: 'tool_call', id: `k${n++}`, name: 'gustaf_computer', args: { actions }, computer: { actions } }] });
 const type = (text) => ({ type: 'type', text });
 const key = (...keys) => ({ type: 'keypress', keys });
 const click = { type: 'click', x: 1, y: 2 };

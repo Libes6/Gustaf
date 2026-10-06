@@ -33,10 +33,10 @@ fn shadow_dir(app: &AppHandle, root: &str) -> Result<PathBuf, String> {
 
 fn run(cmd: &mut Command) -> Result<String, String> {
     let out = cmd
-        .env("GIT_AUTHOR_NAME", "mcode")
-        .env("GIT_AUTHOR_EMAIL", "mcode@local")
-        .env("GIT_COMMITTER_NAME", "mcode")
-        .env("GIT_COMMITTER_EMAIL", "mcode@local")
+        .env("GIT_AUTHOR_NAME", "gustaf")
+        .env("GIT_AUTHOR_EMAIL", "gustaf@local")
+        .env("GIT_COMMITTER_NAME", "gustaf")
+        .env("GIT_COMMITTER_EMAIL", "gustaf@local")
         .output()
         .map_err(|e| format!("git: {e}"))?;
     if out.status.success() {

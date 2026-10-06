@@ -1,5 +1,5 @@
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UpdatesProvider } from "./components/UpdaterPanel";
 import { WindowHeader } from "./components/WindowHeader";
 import { ChatView } from "./components/ChatView";
@@ -17,6 +17,10 @@ import { isSearchShortcut } from "./lib/searchUtil";
 import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
+import { startScratchChat } from "./lib/scratch";
+import { startPrWatchPoller } from "./lib/prWatch";
+import { startCleanupScheduler } from "./lib/storageCleanup";
+import { emptyNav, move, visit } from "./lib/navHistory";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -26,22 +30,42 @@ function Shell({ app }: { app: AppState }) {
   useAttentionNotifications();
   useChatStatusSync(app.activeChat, app.view);
   useQuickAskHost(app);
+  useEffect(() => startPrWatchPoller(), []);
+  useEffect(() => startCleanupScheduler(), []);
+  // Back / forward between chats (lib/navHistory.ts): every chat the user opens is recorded, except moves made by ⌘[ / ⌘].
+  const nav = useRef(emptyNav);
+  const navigating = useRef(false);
+  useEffect(() => {
+    if (app.activeChat === null) return;
+    if (navigating.current) { navigating.current = false; return; }
+    nav.current = visit(nav.current, { chatId: app.activeChat, projectId: app.chats.find((c) => c.id === app.activeChat)?.project_id ?? null });
+  }, [app.activeChat]);
+  const go = (step: -1 | 1) => {
+    const r = move(nav.current, step, (id) => app.chats.some((c) => c.id === id));
+    if (!r) return;
+    nav.current = r.nav;
+    navigating.current = true;
+    app.openChat(r.entry.chatId, r.entry.projectId);
+  };
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (matches(e, "settings")) (e.preventDefault(), app.openSettings());
       if (matches(e, "newChat")) (e.preventDefault(), app.newChat());
+      if (matches(e, "newScratchChat")) (e.preventDefault(), void startScratchChat(app));
+      if (matches(e, "chatBack")) (e.preventDefault(), go(-1));
+      if (matches(e, "chatForward")) (e.preventDefault(), go(1));
       if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching(open => !open));
       if (matches(e, "closeSettings") && app.view === "settings") app.setView("chat");
     };
     addEventListener("keydown", k);
     return () => removeEventListener("keydown", k);
-  }, [app.view, app.ready, app.onboarded]);
+  }, [app.view, app.ready, app.onboarded, app.chats]);
 
   useEffect(() => {
     const accelerator = acceleratorOf("stopAgent");
     let disposed = false;
-    register(accelerator, () => dispatchEvent(new Event("mcode-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
+    register(accelerator, () => dispatchEvent(new Event("gustaf-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
     return () => { disposed = true; unregister(accelerator).catch(() => {}); };
   }, []);
   if (!app.ready) return null;

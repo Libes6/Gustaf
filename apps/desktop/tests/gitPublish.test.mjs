@@ -6,8 +6,8 @@ import {
 } from '../src/lib/gitPublish.ts';
 
 const info = (over = {}) => ({
-  repo: true, branch: 'mcode/x', hasCommits: true, remotes: [{ name: 'origin', url: 'https://github.com/o/r.git' }], upstream: null,
-  ahead: null, behind: null, remoteBranches: ['origin/main', 'origin/dev', 'origin/mcode/x'], defaultBase: 'main', protected: false, ...over,
+  repo: true, branch: 'gustaf/x', hasCommits: true, remotes: [{ name: 'origin', url: 'https://github.com/o/r.git' }], upstream: null,
+  ahead: null, behind: null, remoteBranches: ['origin/main', 'origin/dev', 'origin/gustaf/x'], defaultBase: 'main', protected: false, ...over,
 });
 
 test('remote URLs are parsed in every common form', () => {
@@ -22,7 +22,7 @@ test('remote URLs are parsed in every common form', () => {
 
 test('protected branches', () => {
   for (const b of ['main', 'master', 'develop']) assert.ok(isProtectedBranch(b));
-  for (const b of ['mcode/main', 'feature', '', null]) assert.ok(!isProtectedBranch(b));
+  for (const b of ['gustaf/main', 'feature', '', null]) assert.ok(!isProtectedBranch(b));
 });
 
 test('the push plan picks the remote, upstream and confirmation', () => {
@@ -33,11 +33,11 @@ test('the push plan picks the remote, upstream and confirmation', () => {
   assert.equal(planPush(info({ remotes: [{ name: 'a', url: '' }, { name: 'b', url: '' }] })).problem, 'noRemote');
   const fresh = planPush(info());
   assert.deepEqual([fresh.problem, fresh.remote, fresh.setUpstream, fresh.needsConfirm, fresh.upToDate], [null, 'origin', true, false, false]);
-  const tracked = planPush(info({ upstream: 'origin/mcode/x', ahead: 2, behind: 0 }));
+  const tracked = planPush(info({ upstream: 'origin/gustaf/x', ahead: 2, behind: 0 }));
   assert.deepEqual([tracked.setUpstream, tracked.upToDate], [false, false]);
-  assert.ok(planPush(info({ upstream: 'origin/mcode/x', ahead: 0 })).upToDate);
+  assert.ok(planPush(info({ upstream: 'origin/gustaf/x', ahead: 0 })).upToDate);
   assert.ok(planPush(info({ branch: 'main' })).needsConfirm);
-  const two = info({ remotes: [{ name: 'origin', url: '' }, { name: 'fork', url: '' }], upstream: 'fork/mcode/x', ahead: 1 });
+  const two = info({ remotes: [{ name: 'origin', url: '' }, { name: 'fork', url: '' }], upstream: 'fork/gustaf/x', ahead: 1 });
   assert.equal(chooseRemote(two), 'fork');
   assert.equal(planPush(two, 'origin').remote, 'origin');
   assert.equal(planPush(two, 'nope').remote, 'fork');
@@ -55,7 +55,7 @@ test('push arguments carry no force and the protected confirmation only when nee
 });
 
 test('base branches come from the remote, without the head branch', () => {
-  assert.deepEqual(baseOptions(info().remoteBranches, 'origin', 'mcode/x'), ['main', 'dev']);
+  assert.deepEqual(baseOptions(info().remoteBranches, 'origin', 'gustaf/x'), ['main', 'dev']);
   assert.deepEqual(baseOptions(info().remoteBranches, null, null), []);
   assert.equal(defaultBase(['dev', 'main'], 'dev'), 'dev');
   assert.equal(defaultBase(['dev', 'master'], 'gone'), 'master');

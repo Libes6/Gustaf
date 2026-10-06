@@ -6,7 +6,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Plus, RefreshCw, Settings as Gear, Star, Trash2, Undo2, Boxes,
+  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -16,25 +16,23 @@ import { shortcut, shortcutDisplay } from "../lib/shortcuts";
 import { computer, getSetting } from "../lib/api";
 import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/data";
 import { SOURCE_LABELS } from "../lib/importers/common";
-import { deleteProvider, PRESETS, saveProvider } from "../providers";
-import { cliName, detectClis } from "../providers/cli";
-import type { CliId, ProviderConfig } from "../providers/types";
-import { modelKey, useApp, type SettingsPage } from "../state";
+import type { ProviderConfig } from "../providers/types";
+import { useApp, type SettingsPage } from "../state";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
+import { CleanupSettings } from "./CleanupSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
 import { HooksSettings } from "./HooksSettings";
 import { VerificationSettings } from "./VerificationSettings";
-import { CursorAccounts } from "./CursorAccounts";
 import { ChatTransfer, ImportPanel } from "./ImportPanel";
 import { McpServers } from "./McpServers";
 import { MobileSettings } from "./MobileSettings";
-import { ProviderForm } from "./ProviderForm";
+import { ProvidersPage } from "./ProvidersPage";
 import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
 import { ScheduledPage } from "./ScheduledPromptsSection";
@@ -87,6 +85,7 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
+      <CleanupSettings />
       <DeveloperSettings />
     <VoiceSettings /><WebSettings /><UpdaterPanel /></>
   );
@@ -133,209 +132,6 @@ function ImportPage() {
             <span className="d"><span className="status-dot" style={{ background: "var(--green)" }} />{t("chatsCount", { count: h.chats })}</span>
           </div>
         ))}
-      </div>
-    </>
-  );
-}
-
-function Providers() {
-  const t = useT();
-  const app = useApp();
-  const [clis, setClis] = useState<{ id: CliId; version: string }[]>([]);
-  const [sel, setSel] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => void detectClis().then(setClis, () => {}), []);
-
-  const pending = clis.filter((c) => !app.providers.some((p) => p.cli === c.id));
-  const current = sel ?? app.providers[0]?.id ?? (pending[0] ? `cli:${pending[0].id}` : "new");
-  const prov = app.providers.find((p) => p.id === current);
-  const pendingCli = pending.find((c) => `cli:${c.id}` === current);
-  const short = (v: string) => /\d+(?:\.\d+)+/.exec(v)?.[0] ?? v.split(/[\s-]/)[0];
-  const version = (p: ProviderConfig) => {
-    const v = clis.find((c) => c.id === p.cli)?.version;
-    return v && short(v);
-  };
-
-  const refresh = async () => (setBusy(true), await app.refreshModels().finally(() => setBusy(false)));
-  // Only a new key, base URL or re-enabling refetches that provider's models; a rename keeps the cached list (no Keychain read).
-  const update = async (p: ProviderConfig, key: string | null = null) => {
-    const old = app.providers.find((x) => x.id === p.id);
-    await saveProvider(p, key);
-    const refetch = key !== null || !old || old.baseUrl !== p.baseUrl || (!!old.disabled && !p.disabled);
-    setBusy(true);
-    await app.refreshModels(refetch ? { only: [p.id] } : { refresh: "startup" }).finally(() => setBusy(false));
-  };
-  const connect = async (id: CliId) => {
-    const c: ProviderConfig = { id: `cli-${id}-${Date.now().toString(36)}`, kind: "cli", name: cliName(id), baseUrl: "", cli: id };
-    await update(c);
-    setSel(c.id);
-  };
-
-  const status = (p: ProviderConfig) => {
-    if (p.disabled) return <span className="d">{t("providerOff")}</span>;
-    const health = app.providerHealth[p.id];
-    if (health?.status === "auth") return <span className="err" title={health.message}>{t("providerAuth")}</span>;
-    const err = health?.status === "error" ? health.message : app.modelErrors[p.id];
-    if (err) return <span className="err" title={err}><span className="status-dot" style={{ background: "var(--red)" }} />{err.slice(0, 60)}</span>;
-    return <span className="d"><span className="status-dot" style={{ background: health?.status === "ok" ? "var(--green)" : "var(--text-3)" }} />{t(health?.status === "ok" ? "providerOn" : "providerAvailable")} · {t("modelsCount", { count: app.models.filter((m) => m.providerId === p.id).length })}</span>;
-  };
-
-  return (
-    <>
-      <div className="page-head">
-        <div className="grow">
-          <h1>{t("providers")}</h1>
-          <p className="lead">{t("providersLead")}</p>
-        </div>
-        <button className="btn-ghost small" onClick={refresh} disabled={busy}>
-          <RefreshCw size={13} className={busy ? "spin" : ""} /> {app.checkedAt ? t("checkedAt", { time: new Date(app.checkedAt).toLocaleTimeString(app.locale, { hour: "2-digit", minute: "2-digit" }) }) : t("checkNow")}
-        </button>
-      </div>
-      <div className="split card">
-        <div className="split-list">
-          {app.providers.map((p) => (
-            <div key={p.id} className={`split-item${current === p.id ? " active" : ""}`}>
-              <button className="split-main" aria-current={current === p.id ? "true" : undefined} onClick={() => setSel(p.id)}>
-                <ProviderIcon kind={p.kind} cli={p.cli} />
-                <div className="grow">
-                  <div className="t">{p.name} {version(p) && <span className="mono d">v{version(p)}</span>}</div>
-                  <div className="sub">{status(p)}</div>
-                </div>
-              </button>
-              <Toggle on={!p.disabled} label={p.name} onChange={(on) => update({ ...p, disabled: !on })} />
-            </div>
-          ))}
-          {pending.map((c) => (
-            <div key={c.id} className={`split-item${current === `cli:${c.id}` ? " active" : ""}`}>
-              <button className="split-main" aria-current={current === `cli:${c.id}` ? "true" : undefined} onClick={() => setSel(`cli:${c.id}`)}>
-                <ProviderIcon kind="cli" cli={c.id} />
-                <div className="grow">
-                  <div className="t">{cliName(c.id)} <span className="mono d">v{short(c.version)}</span></div>
-                  <div className="sub d">{t("notConnected")}</div>
-                </div>
-              </button>
-              <Toggle on={false} label={cliName(c.id)} onChange={() => connect(c.id)} />
-            </div>
-          ))}
-          <button className={`split-item add${current === "new" ? " active" : ""}`} aria-current={current === "new" ? "true" : undefined} onClick={() => setSel("new")}>
-            <Plus size={15} /> <span className="grow">{t("addProvider")}</span>
-          </button>
-        </div>
-        <div className="split-detail">
-          {current === "new" && (
-            <ProviderForm
-              onCancel={app.providers[0] ? () => setSel(null) : undefined}
-              onSaved={async (cfg, models) => {
-                await app.refreshModels({ only: [cfg.id] });
-                setSel(cfg.id);
-                if (!app.selection && models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });
-              }}
-            />
-          )}
-          {pendingCli && (
-            <div className="card">
-              <div className="card-row">
-                <div className="grow">
-                  <div className="t">{cliName(pendingCli.id)}</div>
-                  <div className="d">{t("cliFound")}</div>
-                </div>
-                <button className="btn-soft" disabled={busy} onClick={() => connect(pendingCli.id)}>{t("cliConnect")}</button>
-              </div>
-            </div>
-          )}
-          {prov && <ProviderDetail key={prov.id} p={prov} update={update} />}
-        </div>
-      </div>
-    </>
-  );
-}
-
-function ProviderDetail({ p, update }: { p: ProviderConfig; update: (p: ProviderConfig, key?: string | null) => Promise<unknown> }) {
-  const t = useT();
-  const app = useApp();
-  const [name, setName] = useState(p.name);
-  const [baseUrl, setBaseUrl] = useState(p.baseUrl);
-  const [key, setKey] = useState("");
-  const [q, setQ] = useState("");
-  const models = app.models.filter((m) => m.providerId === p.id);
-  const shown = models.filter((m) => `${m.id} ${m.name}`.toLowerCase().includes(q.trim().toLowerCase()));
-  const keys = models.map(modelKey);
-  const allHidden = keys.length > 0 && keys.every((k) => app.hiddenModels.includes(k));
-  const toggle = (list: string[], k: string, on: boolean) => (on ? [...list, k] : list.filter((x) => x !== k));
-
-  return (
-    <>
-      <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("displayName")}</div>
-            <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
-          </div>
-          <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-          <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), app.refreshModels({ refresh: "startup" }))}><Trash2 size={14} /></button>
-        </div>
-      </div>
-      <div className="card"><div className="card-row"><div className="grow"><div className="t">{t(app.providerHealth[p.id]?.status === "auth" ? "providerAuth" : app.providerHealth[p.id]?.status === "ok" ? "providerOn" : "providerAvailable")}</div><div className="d">{t("providerCheckHint")}</div>
-      {app.providerHealth[p.id]?.message && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{app.providerHealth[p.id].message}</div>}
-      {app.providerHealth[p.id]?.status === "auth" && p.kind === "cli" && <code>{p.cli === "claude" ? "claude auth login" : p.cli === "cursor-agent" ? "cursor-agent login" : "codex login"}</code>}
-      </div><button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button></div></div>
-      <h4 aria-level={2}>{t("runtime")}</h4>
-      <div className="card">
-        {p.kind === "cli" ? (
-          <div className="card-row">
-            <div className="grow">
-              <div className="t">{t("command")}</div>
-              <div className="d">{t("cliCommandHint")}</div>
-            </div>
-            <code className="mono">{p.cli}</code>
-          </div>
-        ) : (
-          <>
-            {p.kind !== "cursor" && (
-              <div className="card-row">
-                <div className="grow t">Base URL</div>
-                <input aria-label="Base URL" className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
-              </div>
-            )}
-            <div className="card-row">
-              <div className="grow">
-                <div className="t">{t("apiKey")}</div>
-                <div className="d">{t("keyUnchanged")}</div>
-              </div>
-              <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
-            </div>
-          </>
-        )}
-      </div>
-      {p.cli === "cursor-agent" && <>
-        {p.cliAuth === "key" && <div className="card"><div className="card-row"><div className="grow"><div className="t">{t("apiKey")}</div><div className="d">{t("cursorCliAccountHint")}</div></div><input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={e => setKey(e.target.value)} /><button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button></div></div>}
-        <CursorAccounts />
-      </>}
-      <h4 aria-level={2}>{t("models")}</h4>
-      <div className="card">
-        <div className="card-row" style={{ minHeight: 44 }}>
-          <input aria-label={t("searchModels")} className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
-          <button className="btn-ghost small" onClick={() => app.setHiddenModels(allHidden ? app.hiddenModels.filter((k) => !keys.includes(k)) : [...new Set([...app.hiddenModels, ...keys])])}>
-            {t(allHidden ? "showAll" : "hideAll")}
-          </button>
-          <span className="grow d">{t("modelsCount", { count: models.length })}</span>
-        </div>
-        <div className="model-table">
-          {shown.map((m) => {
-            const k = modelKey(m);
-            const fav = app.favorites.includes(k);
-            return (
-              <div key={m.id} className="model-line">
-                <button className={`star${fav ? " on" : ""}`} title={t("favorite")} aria-label={`${t("favorite")}: ${m.name}`} aria-pressed={fav} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
-                  <Star size={13} fill={fav ? "currentColor" : "none"} />
-                </button>
-                <span className="grow">{m.name} {m.name !== m.id && <span className="mono d">{m.id}</span>}</span>
-                <Toggle on={!app.hiddenModels.includes(k)} label={m.name} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
-              </div>
-            );
-          })}
-          {!shown.length && <div className="card-row d">{app.modelErrors[p.id] ?? t("noModels")}</div>}
-        </div>
       </div>
     </>
   );
@@ -496,7 +292,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: Providers, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
+  memory: MemorySettings, general: General, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {

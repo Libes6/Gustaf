@@ -6,9 +6,9 @@
 import { redactSecrets } from "./exportChats.ts";
 import type { Finding, ReviewFile } from "./diffReview.ts";
 
-// --- Review rules (.mcode/REVIEW.md) --------------------------------------------------------------------------------
+// --- Review rules (.gustaf/REVIEW.md)--------------------------------------------------------------------------------
 
-export const REVIEW_RULES_PATH = ".mcode/REVIEW.md";
+export const REVIEW_RULES_PATH = ".gustaf/REVIEW.md";
 export const REVIEW_RULES_CAP = 16 * 1024;
 export const RULES_TAG = "project_review_rules";
 
@@ -36,18 +36,21 @@ const utf8Length = (s: string) => new TextEncoder().encode(s).length;
 /** Closing delimiters inside the file must not end the block early. */
 const defang = (s: string) => s.replace(new RegExp(`<(/?)(${RULES_TAG})`, "gi"), "<\\$1$2");
 
-/** The rules for the prompt from the file's text (`null`: it does not exist). Oversize files are cut at the cap, not refused. */
-export function assembleReviewRules(raw: string | null | undefined, cap = REVIEW_RULES_CAP): ReviewRules {
+/**
+ * The rules for the prompt from the file's text (`null`: it does not exist). Oversize files are cut at the cap, not refused.
+ * `path` is where the text was read (the legacy `.mcode/REVIEW.md` for projects set up before the rename).
+ */
+export function assembleReviewRules(raw: string | null | undefined, cap = REVIEW_RULES_CAP, path = REVIEW_RULES_PATH): ReviewRules {
   if (raw === null || raw === undefined) return NO_RULES;
   const body = String(raw).replace(/\r\n?/g, "\n").replace(/\u0000/g, "").trim();
-  if (!body) return { ...NO_RULES, status: "empty" };
+  if (!body) return { ...NO_RULES, status: "empty", path };
   const cut = utf8Length(body) > cap;
   let text = body;
   if (cut) { const enc = new TextEncoder().encode(body).slice(0, cap); text = new TextDecoder("utf-8", { fatal: false }).decode(enc).replace(/�+$/, ""); }
-  const note = cut ? `\n…[truncated: only the first ${cap} bytes of ${REVIEW_RULES_PATH} are used]` : "";
+  const note = cut ? `\n…[truncated: only the first ${cap} bytes of ${path} are used]` : "";
   return {
-    status: cut ? "truncated" : "loaded", path: REVIEW_RULES_PATH, used: text.length,
-    text: `${REVIEW_RULES_WARNING}\n<${RULES_TAG} path="${REVIEW_RULES_PATH}">\n${defang(text)}${note}\n</${RULES_TAG}>`,
+    status: cut ? "truncated" : "loaded", path, used: text.length,
+    text: `${REVIEW_RULES_WARNING}\n<${RULES_TAG} path="${path}">\n${defang(text)}${note}\n</${RULES_TAG}>`,
   };
 }
 

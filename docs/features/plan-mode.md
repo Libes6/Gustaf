@@ -15,10 +15,12 @@ Enforcement is in `src/agent/agent.ts`, not only in the offered tool list: `runT
 Pure logic lives in `src/agent/planCore.ts` (tests: `tests/planMode.test.mjs`). The agent ends its reply with one fenced block:
 
 ````
-```mcode-plan
+```gustaf-plan
 {"title":"Short title","steps":[{"id":"1","text":"What to do","files":["src/a.ts"]}],"risks":["optional"],"questions":["optional"]}
 ```
 ````
+
+Chats from before the rename to Gustaf contain `mcode-plan` blocks; they are still shown as plan cards.
 
 The last valid block of a reply wins. Steps may also be plain strings; ids are renumbered. A block that is not valid JSON or has no usable step is left as ordinary Markdown.
 

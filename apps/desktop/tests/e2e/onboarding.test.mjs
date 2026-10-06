@@ -16,8 +16,9 @@ test('first run: onboarding adds a provider and the first message streams in', {
     await shown(page.getByRole('heading', { level: 1 }));
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Step 2: provider form. "Custom" = any OpenAI-compatible endpoint.
+    // Step 2: the "Add provider" wizard (Driver, Identity, Config). "Custom" = any OpenAI-compatible endpoint.
     await page.getByRole('button', { name: 'Custom' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
     await page.getByPlaceholder('https://example.com/v1').fill(FAKE_BASE_URL);
     await page.getByRole('button', { name: 'Test connection' }).click();
     await shown(page.getByText('Connected: 1 model'));

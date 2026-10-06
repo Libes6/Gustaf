@@ -1,5 +1,5 @@
-import type { ApprovalDecision, ChatMessage, ChatSummary, ProjectSummary, SendMessageRequest, ServerEvent } from "@mcode/protocol";
-import { PROTOCOL_VERSION } from "@mcode/protocol";
+import type { ApprovalDecision, ChatMessage, ChatSummary, ProjectSummary, SendMessageRequest, ServerEvent } from "@gustaf/protocol";
+import { PROTOCOL_VERSION } from "@gustaf/protocol";
 import type { ConnectionState, DesktopApi } from "./client.ts";
 
 const DEMO_REPLY =
@@ -15,7 +15,7 @@ export class MockServer implements DesktopApi {
   private state: ConnectionState = "closed";
 
   private projects: ProjectSummary[] = [
-    { id: 1, name: "m-code", pinned: true },
+    { id: 1, name: "gustaf", pinned: true },
     { id: 2, name: "website", pinned: false },
   ];
   private chats: ChatSummary[] = [

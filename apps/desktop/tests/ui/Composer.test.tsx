@@ -15,7 +15,7 @@ type Over = {
   images?: string[];
   root?: string | null;
   running?: boolean;
-  supports?: { computer: boolean; reasoning: boolean };
+  supports?: { computer: boolean; reasoning: boolean; levels?: ("low" | "medium" | "high" | "xhigh" | "max")[] };
   selectedModel?: ModelInfo | undefined;
   canCompact?: boolean;
   onSend?: () => void;
@@ -238,13 +238,76 @@ describe("Composer", () => {
     });
   });
 
-  it("shows the reasoning chip only when the model supports it, and never a Computer Use chip", () => {
-    const { unmount } = renderApp(<Harness />);
-    expect(screen.queryByRole("button", { name: /Medium/ })).not.toBeInTheDocument();
+  it("shows the effort level on the model chip only when the model supports it, and never a Computer Use chip", () => {
+    const { unmount } = renderApp(<Harness />, makeApp({ providers: [provider()] }));
+    expect(screen.queryByText("Medium")).not.toBeInTheDocument();
     unmount();
-    renderApp(<Harness supports={{ computer: true, reasoning: true }} />);
-    expect(screen.getByRole("button", { name: /Medium/ })).toBeInTheDocument();
+    renderApp(<Harness supports={{ computer: true, reasoning: true }} />, makeApp({ providers: [provider()] }));
+    expect(screen.getByRole("button", { name: "Model One Medium" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
+  });
+
+  it("the model chip opens a menu listing the model's effort levels with the current one checked", async () => {
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] });
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Model One Medium" }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByText("Reasoning effort")).toBeInTheDocument();
+    const levels = within(menu).getAllByRole("menuitemradio");
+    expect(levels.map((el) => el.querySelector(".grow > span")?.textContent)).toEqual(["Low", "Medium", "High"]);
+    expect(within(menu).getByRole("menuitemradio", { name: /^Medium/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getByRole("menuitemradio", { name: /^Low/ })).toHaveAttribute("aria-checked", "false");
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole("menuitemradio", { name: /^High/ }));
+    expect(app.setReasoning).toHaveBeenCalledWith("high");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("the effort menu works from the keyboard and leads to the model list", async () => {
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] });
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, app);
+    const chip = screen.getByRole("button", { name: "Model One Medium" });
+    chip.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("menuitemradio", { name: /^Medium/ })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(app.setReasoning).toHaveBeenCalledWith("high");
+    await userEvent.click(chip);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Choose model/ }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
+  });
+
+  it("uses the model's own levels and shows a level from another model as the nearest one", async () => {
+    const all = ["low", "medium", "high", "xhigh", "max"] as const;
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model], reasoning: "max" });
+    const { unmount } = renderApp(<Harness supports={{ computer: false, reasoning: true, levels: [...all] }} />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Model One Max" }));
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(5);
+    expect(screen.getByRole("menuitemradio", { name: /^Max/ })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: /^Extra high/ }));
+    expect(app.setReasoning).toHaveBeenCalledWith("xhigh");
+    unmount();
+    renderApp(<Harness supports={{ computer: false, reasoning: true, levels: ["low", "medium", "high"] }} />, makeApp({ providers: [provider()], reasoning: "xhigh" }));
+    await userEvent.click(screen.getByRole("button", { name: "Model One High" }));
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(3);
+    expect(screen.getByRole("menuitemradio", { name: /^High/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("uses Russian level names in the effort menu", async () => {
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, makeApp({ providers: [provider()], reasoning: "low" }), "ru");
+    await userEvent.click(screen.getByRole("button", { name: /Лёгкое/ }));
+    expect(screen.getByText("Вдумчивость")).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /^Лёгкое/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: /^Глубокое/ })).toBeInTheDocument();
+  });
+
+  it("without effort levels the model chip opens the model list directly, with no effort section", async () => {
+    renderApp(<Harness />, makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }));
+    await userEvent.click(screen.getByRole("button", { name: "Model One" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reasoning effort")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
   });
 
   it("the bar holds only mode, access, context ring, model, mic and send: no Computer Use or Review copy chip", () => {
@@ -389,3 +452,53 @@ describe("chat reference attachments", () => {
     expect(screen.getByRole("option", { name: "💬 Source chat" })).toBeInTheDocument();
   });
 });
+
+describe("Composer: large pastes", () => {
+  const big = Array.from({ length: 40 }, (_, i) => `log line ${i}`).join("\n");
+  const paste = (el: HTMLElement, text: string) => fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : ""), items: [], files: [] } });
+
+  it("a large paste becomes a card; the field keeps only what was typed", () => {
+    renderApp(<Harness text="check this" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" }) as HTMLTextAreaElement;
+    field.setSelectionRange(field.value.length, field.value.length);
+    paste(field, big);
+    expect(field.value).toBe("check this");
+    const card = screen.getByRole("group", { name: "Pasted text" });
+    expect(card).toHaveTextContent("40 lines");
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  it("the card can be put back into the message or removed", async () => {
+    renderApp(<Harness text="" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" }) as HTMLTextAreaElement;
+    paste(field, big);
+    await userEvent.click(screen.getByRole("button", { name: "Put into message" }));
+    expect(field.value).toBe(big);
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+    await userEvent.clear(field);
+    paste(field, big);
+    await userEvent.click(within(screen.getByRole("group", { name: "Pasted text" })).getByRole("button", { name: "Remove attachment" }));
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+  });
+
+  it("a short paste goes into the field as usual", () => {
+    renderApp(<Harness text="" />);
+    const field = screen.getByRole("textbox", { name: "Ask anything" });
+    paste(field, "short");
+    expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
+  });
+});
+
+it("⌘⌥↵ sends and opens a new chat; a plain Enter only sends", () => {
+  const onSend = vi.fn();
+  const app = makeApp({ sessions: { active: "s1", items: [{ key: "s1", chatId: 3, projectId: 7 }] } });
+  renderApp(<Harness text="ship it" onSend={onSend} />, app);
+  const field = screen.getByRole("textbox", { name: "Ask anything" });
+  fireEvent.keyDown(field, { key: "Enter" });
+  expect(onSend).toHaveBeenCalledTimes(1);
+  expect(app.newChat).not.toHaveBeenCalled();
+  fireEvent.keyDown(field, { key: "Enter", metaKey: true, altKey: true });
+  expect(onSend).toHaveBeenCalledTimes(2);
+  expect(app.newChat).toHaveBeenCalledWith(7);
+});
+

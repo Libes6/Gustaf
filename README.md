@@ -2,8 +2,6 @@
 
 Desktop AI chat and coding assistant built with Tauri 2, React and TypeScript. It talks to hosted model APIs, local models and the Codex, Claude Code and Cursor command-line agents from one window, and can edit your projects in a reviewable copy.
 
-Gustaf was previously developed as M Code. Internal identifiers keep the old name so existing data and upgrades keep working: the application identifier `com.maksimkulakov.mcode`, the Rust crate and npm package names, and the data folders listed below.
-
 ## Install
 
 > **Status:** no Gustaf release has been published yet. Installers are built by CI ([release notes](docs/release.md)), but the first public release is still waiting for the manual checks in the [release checklist](docs/release-checklist.md). Until then, build from source (see [Development](#development)). The instructions below describe the published release once it exists.
@@ -50,10 +48,12 @@ Release builds check GitHub Releases for a newer version once at startup. An upd
 
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
-| Chats, settings, review copies, attachments | `~/Library/Application Support/com.maksimkulakov.mcode` | `%APPDATA%\com.maksimkulakov.mcode` | `~/.local/share/com.maksimkulakov.mcode` |
-| API keys and MCP secrets | Keychain (service `com.maksimkulakov.mcode`) | Credential Manager | Secret Service (GNOME Keyring / KWallet) |
+| Chats, settings, review copies, attachments | `~/Library/Application Support/io.github.libes6.gustaf` | `%APPDATA%\io.github.libes6.gustaf` | `~/.local/share/io.github.libes6.gustaf` |
+| API keys and MCP secrets | Keychain (service `io.github.libes6.gustaf`) | Credential Manager | Secret Service (GNOME Keyring / KWallet) |
 
 Chats live in a local SQLite database (`app.db`) in that folder. More in [SECURITY.md](SECURITY.md).
+
+Builds made before the app was renamed to Gustaf stored their data under an earlier identifier. On its first start Gustaf moves those folders to the names above (only when the new folder is still empty; nothing is deleted if the move fails, and the outcome is written to `migration.log` in the data folder), and moves each stored API key to the new Keychain service the first time it is read. Project files in `.mcode/` (review rules, hooks, checks, skills) keep working; rename the folder to `.gustaf/` when convenient.
 
 ### Uninstall
 
@@ -61,14 +61,14 @@ Chats live in a local SQLite database (`app.db`) in that folder. More in [SECURI
 - **Windows:** Settings → Apps → Installed apps → Gustaf → Uninstall.
 - **Linux:** delete the AppImage, or remove the package with `apt remove` / `dnf remove`.
 
-Uninstalling keeps your data. To remove it too, delete the data folder above (and the app's cache folders named `com.maksimkulakov.mcode`, if present), and delete the stored keys: on macOS in Keychain Access (search for `com.maksimkulakov.mcode`), on Windows in Credential Manager, on Linux in your keyring app (Seahorse, KWalletManager).
+Uninstalling keeps your data. To remove it too, delete the data folder above (and the app's cache folders named `io.github.libes6.gustaf`, if present), and delete the stored keys: on macOS in Keychain Access (search for `io.github.libes6.gustaf`), on Windows in Credential Manager, on Linux in your keyring app (Seahorse, KWalletManager).
 
 ## Features
 
 - **Chat with many providers**: switch models per chat, compare 2-4 models side by side, retry and resume interrupted requests ([chat](docs/features/chat.md)).
 - **Full-text search** across every message, Cmd+K ([search](docs/features/search.md)).
 - **Interactive canvas**: assistant-written React/TSX previews in a sandbox, with revisions ([canvas](docs/features/canvas.md)).
-- **Safe project edits**: by default the agent edits the project folder directly and every run starts from a checkpoint you can revert or use git; switch on "Review copy for chats" (globally or per chat) and it works in a shadow copy instead, where you review per file or per hunk, run tests there, then commit only what you accepted, optionally push and open a pull request with `gh`. A read-only AI review of the changes can run on demand or automatically after each run (optional, off by default; project rules in `.mcode/REVIEW.md`; high-severity findings ask for confirmation before accept or commit) ([files and git](docs/features/files-and-git.md)).
+- **Safe project edits**: by default the agent edits the project folder directly and every run starts from a checkpoint you can revert or use git; switch on "Review copy for chats" (globally or per chat) and it works in a shadow copy instead, where you review per file or per hunk, run tests there, then commit only what you accepted, optionally push and open a pull request with `gh`. A read-only AI review of the changes can run on demand or automatically after each run (optional, off by default; project rules in `.gustaf/REVIEW.md`; high-severity findings ask for confirmation before accept or commit) ([files and git](docs/features/files-and-git.md)).
 - **Command rules and action log**: allow/ask/deny rules for shell commands, project instruction files (`AGENTS.md`, `CLAUDE.md`, ...) ([rules](docs/features/rules-and-instructions.md)).
 - **Memory**: saved global and per-project facts injected into prompts (editable in Settings and from the project menu), opt-in "suggest memories" from a chat (one extra model request that sends the chat text, redacted, to your provider; nothing saved without confirmation), and export to a managed section of `AGENTS.md` after a preview ([memory](docs/features/memory.md)).
 - **Subagents and MCP servers** for API providers (stdio, streamable HTTP and legacy SSE, OAuth with discovery fallbacks and token revocation, resources, resource templates, prompts), with budgets and background runs ([agents](docs/features/agents.md), [MCP](docs/features/mcp.md)), plus [scheduled prompts](docs/features/scheduled-prompts.md).
@@ -145,7 +145,7 @@ What is **not** verified outside macOS:
 ## Project structure
 
 ```text
-apps/desktop/             the desktop app (package `mcode`)
+apps/desktop/             the desktop app (package `@gustaf/desktop`)
   src/                    React UI: components/, lib/ (data, api, chat logic), providers/ (model backends),
                           agent/ (tool loop, rules, subagents, MCP), canvas/, i18n/
   src-tauri/src/          Rust backend: SQLite, files and shell, review copy, git, secrets, computer use, MCP
@@ -153,7 +153,7 @@ apps/desktop/             the desktop app (package `mcode`)
   scripts/, public/, design/, index.html, vite.config.ts, vitest.config.ts, tsconfig*.json
   tests/                  node:test suites (*.test.mjs), tests/ui (Vitest component tests), tests/e2e
 apps/mobile/              companion app skeleton (Expo SDK 57 dev build, expo-router); NOT an npm workspace, own lockfile
-packages/protocol/        @mcode/protocol: protocol version and API/WebSocket event types (pure TypeScript)
+packages/protocol/        @gustaf/protocol: protocol version and API/WebSocket event types (pure TypeScript)
 docs/                     Architecture and per-feature documentation
 ```
 
@@ -181,13 +181,13 @@ Release builds run under a strict Content Security Policy and a narrowed capabil
 
 ## Providers and models
 
-Add providers in Settings, Model providers. API keys are stored by the Rust backend (`secrets.rs`), not in the database.
+Add providers in Settings, Model providers: Claude, GPT / Codex, Cursor and Grok are pinned at the top, every instance has its own row with its status, and "+" opens a three-step wizard ([providers](docs/features/providers.md)). API keys are stored by the Rust backend (`secrets.rs`), not in the database.
 
 | Provider | Kind | Notes |
 | --- | --- | --- |
 | Anthropic | API | Messages API with tool use |
 | OpenAI | API | Responses API |
-| Gemini, OpenRouter | API | OpenAI-compatible endpoints |
+| Gemini, OpenRouter, Grok (xAI) | API | OpenAI-compatible endpoints |
 | Ollama, LM Studio | local API | No key; detected on their default ports |
 | Custom | API | Any OpenAI-compatible base URL |
 | Cursor | SDK | Cursor API key; runs through the sidecar |

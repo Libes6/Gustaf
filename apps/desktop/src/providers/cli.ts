@@ -6,13 +6,16 @@ import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
+import { AppServerUnavailable, runAppServerTurn, type Connection } from "./codexAppServer";
+import { codexTransport } from "./codexTransport";
+import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
 import { Command } from "@tauri-apps/plugin-shell";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
-import type { Adapter, CliId, ProviderConfig, TurnInput } from "./types";
+import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
 
 export { shq } from "./shell";
 
@@ -101,6 +104,39 @@ export async function spawnLines(
   return { code, stderr };
 }
 
+/** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
+async function openAppServer(executable: string, o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void }): Promise<Connection> {
+  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
+  let listener: ((m: Record<string, unknown>) => void) | undefined;
+  const queued: Record<string, unknown>[] = [];
+  let buf = "";
+  let stderr = "";
+  const line = (raw: string) => {
+    raw = raw.trim();
+    if (!raw) return;
+    try { o.onRaw?.(raw); } catch { /* debugging aid only */ }
+    try {
+      const m = JSON.parse(raw);
+      if (m && typeof m === "object") (listener ? listener(m) : queued.push(m));
+    } catch { /* banners and warnings */ }
+  };
+  const closed = new Promise<number | null>((resolve) => cmd.on("close", (e) => { line(buf); buf = ""; resolve(e.code); }));
+  cmd.stdout.on("data", (chunk: string) => {
+    buf += chunk;
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); }
+  });
+  cmd.stderr.on("data", (s: string) => { stderr = (stderr + s).slice(-4000); });
+  const child = await cmd.spawn();
+  return {
+    write: (l) => child.write(l + "\n"),
+    onMessage(cb) { listener = cb; for (const m of queued.splice(0)) cb(m); },
+    closed,
+    kill: () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); },
+    stderr: () => stderr,
+  };
+}
+
 export { resumePoint } from "./cliArgs";
 
 async function listCodexModels() {
@@ -108,12 +144,12 @@ async function listCodexModels() {
   const executable = await codexExecutable();
   let models: { id: string; name: string }[] = [];
   let error = '';
-  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { MCODE_CODEX_BINARY: executable } }), e => {
+  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { GUSTAF_CODEX_BINARY: executable } }), e => {
     if (e.type === 'models') models = e.result;
     if (e.type === 'error') error = e.message;
   });
   if (error || result.code || !models.length) throw new Error(error || 'Codex did not return available models.');
-  return [{ id: 'default', name: 'По умолчанию' }, ...models.filter(m => m.id !== 'default')];
+  return [{ id: 'default', name: 'Default' }, ...models.filter(m => m.id !== 'default')];
 }
 
 type Ev = { text?: string; session?: string; final?: string; error?: string };
@@ -121,7 +157,9 @@ type Spec = {
   name: string;
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
   /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
-  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string }): string[];
+  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string; reasoning?: Reasoning }): string[];
+  /** Effort levels the CLI can pass for this model (providers/reasoning.ts); `listed`: ids of the provider's model list. */
+  levels(model: string, listed?: readonly string[]): readonly Reasoning[];
   /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
   imageFlag?: boolean;
   parse(e: any): Ev;
@@ -134,6 +172,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Claude Code",
     models: ["default", "opus", "sonnet", "haiku"],
     args: ({ attachDir, ...o }) => claudeArgs({ ...o, addDir: attachDir }),
+    levels: claudeCliLevels,
     parse: parseClaudeEvent,
     loginHint: "claude auth login",
   },
@@ -150,6 +189,7 @@ const SPECS: Record<CliId, Spec> = {
       return out;
     },
     args: cursorArgs,
+    levels: cursorLevels,
     parse: (e) => {
       // With --stream-partial-output the deltas carry timestamp_ms; the aggregate repeats without it.
       if (e.type === "assistant" && e.timestamp_ms) return { text: (e.message?.content ?? []).map((c: any) => c.text ?? "").join(""), session: e.session_id };
@@ -162,6 +202,7 @@ const SPECS: Record<CliId, Spec> = {
     name: "Codex",
     models: listCodexModels,
     args: codexArgs,
+    levels: codexLevels,
     imageFlag: true,
     parse: (e) => {
       if (e.type === "thread.started") return { session: e.thread_id };
@@ -193,9 +234,17 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
   const accountKey = async () => (cfg.cliAuth === "key" ? resolveKey(key) : "");
   const id = cfg.cli!;
   const spec = SPECS[id];
+  // The provider's model ids (from the last listing or from the UI): Cursor decides effort support by its siblings.
+  let listed: string[] | undefined;
   return {
     supportsComputer: false,
-    supportsReasoning: () => false,
+    supportsReasoning: (model) => spec.levels(model, listed).length > 0,
+    reasoningLevels: (model, ids) => {
+      if (ids) listed = [...ids];
+      return spec.levels(model, listed);
+    },
+
+    nativeGoal: async () => id === "codex" && (await codexTransport()) === "app-server",
 
     async listModels() {
       if (id === 'cursor-agent') {
@@ -207,6 +256,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
         });
         if (cmd.code || !models.length) throw new Error(cmd.stderr || 'Cursor did not return models.');
+        listed = models.map((m) => m.id);
         return models;
       }
       const list = typeof spec.models === "function" ? await spec.models() : spec.models.map((id) => ({ id, name: id }));
@@ -220,7 +270,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir });
+      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)) });
       const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
       let text = "";
       const actions = new Map<string, Activity>();
@@ -236,9 +286,27 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       const rollout = id === "codex" && (await rolloutEnabled())
         ? createRolloutTracker({ startedAt: Date.now(), onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onDebug: log.debug })
         : undefined;
-      let res: Awaited<ReturnType<typeof spawnLines>>;
+      let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
+      // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
+      let viaServer = false;
+      if (id === "codex" && (await codexTransport()) === "app-server") {
+        try {
+          const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
+          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)), approvals: !!t.approve, goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined }, {
+            signal: t.signal, onApproval: t.approve, onGoal: t.goal?.onUpdate, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
+          });
+          viaServer = true;
+          session = r.session;
+          if (r.error) error = r.error;
+          res = { code: 0, stderr: "" };
+        } catch (e) {
+          if (t.signal.aborted) throw e;
+          if (!(e instanceof AppServerUnavailable)) throw e;
+          log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
+        }
+      }
       try {
-      res = await spawnLines(
+      if (!viaServer) res = await spawnLines(
         // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
         runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
         (e) => {
@@ -263,7 +331,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
         for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) t.onActivity?.(applyActivity(actions, action));
       }
       if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (!error && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
+      if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
       if (error) {
         const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
         throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);

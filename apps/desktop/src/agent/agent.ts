@@ -9,13 +9,14 @@ import type { Adapter, Msg, Part, Reasoning } from "../providers/types";
 import { loadDiagnostics, diagnosticResult, detectLanguageServers, runLspDiagnostics, languageForPath, formatLspReport } from "./diagnostics";
 import { loadSkills, skillCatalogPrompt, requestedSkillPrompt, SKILL_TOOL, executeSkill } from "./skills";
 import { MEMORY_TOOLS, remember, forget, loadMemoryPrompt, memoryText } from "./memory";
-import { READ_TOOLS, WRITE_TOOLS } from "./tools";
+import { READ_TOOLS, SECRET_TOOL, WRITE_TOOLS } from "./tools";
+import { issueSecret, redactSecrets, secretEnv, spendSecrets } from "./secretRefs";
 import { serializeCalls } from "./subagentCore";
 import { modeAllowsTool, modeBlockedMessage, modePrompt, type ChatMode } from "./planCore";
 import type { SubagentHost } from "./subagents";
 import { CANVAS_INSTRUCTIONS } from "../canvas/artifacts";
 import { summarizeCall } from "./actionLog";
-import { computerApproval, endsWithTyping, formatComputerResult } from "./computerCore";
+import { computerApproval, endsWithTyping, formatComputerResult, isBridgeComputerTool } from "./computerCore";
 import { beginRun, endRun, logFinish, logPatch, logStart } from "./actionLogStore";
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, evaluateCommand, legacyAllowRules, type Access } from "./rules";
 import { getRulesConfig, projectRootFor } from "./rulesStore";
@@ -41,6 +42,8 @@ export type ApprovalRequest =
 export type ApprovalAnswer = boolean | "task";
 
 export type RunOptions = {
+  /** Run this message as a native provider goal (`TurnInput.goal`); first step only. */
+  goal?: import("../providers/types").TurnInput["goal"];
   takeClarifications?: () => Promise<Msg[]>;
   root: string | null;
   reviewMode?: boolean;
@@ -66,6 +69,8 @@ export type RunOptions = {
   onToolResult?: (result: Extract<Part, { type: "tool_result" }>) => void;
   onMessage: (msg: Msg) => Promise<void>;
   approve: (req: ApprovalRequest) => Promise<ApprovalAnswer>;
+  /** Interactive chats: shows the private secret card; resolves with the typed value, or null when the user declines. */
+  requestSecret?: (req: { name: string; reason: string }) => Promise<string | null>;
   /** Present in the main loop: offers `spawn_agent`. Subagent runs never get it. */
   subagents?: SubagentHost;
   /** Subagents: only these tools may be used (others are not offered and are blocked if called). */
@@ -218,6 +223,14 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
       }
       return call.name === "remember" ? `Saved fact #${await remember(scope,text,o.chatId)}.` : `Removed ${await forget(a.id,scope)} fact(s).`;
     }
+    case "request_secret": {
+      if (!o.requestSecret || o.source || o.subagent || o.toolNames) throw new ActionBlocked("Secrets can be requested only in an interactive chat.");
+      const name = typeof a.name === "string" && a.name.trim() ? a.name.trim().slice(0, 80) : "secret";
+      const value = await o.requestSecret({ name, reason: typeof a.reason === "string" ? a.reason.slice(0, 300) : "" });
+      if (value === null) throw new ActionDeclined("User declined to provide the secret.");
+      const ref = issueSecret(name, value);
+      return `Secret "${name}" stored as REF ${ref}. Use it in exactly one run_command as $GUSTAF_SECRET_${ref} (PowerShell: $env:GUSTAF_SECRET_${ref}); it is removed after that command and masked in its output.`;
+    }
     case "read_file":
       return fsx.read(root, a.path, a.offset, a.limit);
     case "list_dir":
@@ -251,9 +264,16 @@ async function runTool(call: Extract<Part, { type: "tool_call" }>, o: RunOptions
         if (!(await o.approve({ kind: "command", command: a.command, reason: askReason(evaluation) }))) throw new ActionDeclined("User declined to run this command.");
         logPatch(ctx.act, { approval: "user", ...(rule ? { rule } : {}) });
       } else logPatch(ctx.act, evaluation.decision === "allow" ? { approval: "rule", ...(rule ? { rule } : {}) } : { approval: "mode" });
-      const r = await fsx.run(root, a.command, a.timeout_ms);
-      if (r.timed_out || r.code !== 0) throw new Error(`${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${r.output}`);
-      return `${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${r.output}`;
+      // Secrets from request_secret go in as environment variables of this one command and are masked in its output.
+      const secrets = secretEnv(a.command);
+      let r;
+      try { r = await fsx.run(root, a.command, a.timeout_ms, secrets.env); }
+      catch (e) { spendSecrets(secrets.used); throw e; }
+      // Mask first, then drop the values (one use).
+      const output = redactSecrets(r.output, secrets.used);
+      spendSecrets(secrets.used);
+      if (r.timed_out || r.code !== 0) throw new Error(`${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${output}`);
+      return `${r.timed_out ? "[timed out]\n" : ""}exit code: ${r.code ?? "killed"}\n${output}`;
     }
     default:
       throw new Error(`Unknown tool: ${call.name}`);
@@ -319,6 +339,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
   let tools = !o.root || o.supportsTools === false ? [] : o.access === "readonly" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS];
   if (o.supportsTools !== false && o.access !== "readonly" && !planning && !o.source && !o.subagent && !o.toolNames && await getSetting("memoryEnabled",true)) tools = [...tools,...MEMORY_TOOLS];
   if (o.supportsTools !== false && !o.source && !o.subagent && !o.toolNames && skills.length && o.mode !== "ask") tools = [...tools,SKILL_TOOL];
+  if (o.requestSecret && !o.source && !o.subagent && !o.toolNames && tools.some((d) => d.name === "run_command")) tools = [...tools, SECRET_TOOL];
   if (o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames && (await webConfig()).enabled) tools = [...tools,...WEB_TOOLS];
   if (o.root && o.supportsTools !== false && !planning && !o.source && !o.subagent && !o.toolNames) {
     if((await loadSemantic(skillRoot??o.root)).enabled)tools=[...tools,SEMANTIC_TOOL];
@@ -377,6 +398,8 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
       onActivity: o.onActivity,
       onLimits: o.onLimits,
       onRetry: o.onRetry,
+      approve: async (req) => (await o.approve(req)) !== false,
+      ...(step === 0 && o.goal ? { goal: o.goal } : {}),
     });
     if (o.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const calls = out.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
@@ -470,7 +493,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
           const shot = await computer.execute(actions);
           const failed = typeof shot.failedStep === "number" || !!shot.error;
           afterTyping = endsWithTyping(failed ? actions.slice(0, shot.failedStep ?? 0) : actions, afterTyping);
-          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer" || call.name === "mcode_computer";
+          const wantsImage = call === lastComputer || /screenshot|zoom/.test(call.name) || call.name === "computer" || isBridgeComputerTool(call.name);
           const output = formatComputerResult(actions, shot);
           if (failed) throw new ComputerFailed(output, shot.png || undefined);
           results.push({ ...res, output, image: wantsImage ? shot.png : undefined });

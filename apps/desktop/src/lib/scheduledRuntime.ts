@@ -34,7 +34,7 @@ export const getRunner = () => runner;
 /** Re-renders when a scheduled run starts or ends. */
 export const useRunnerVersion = () => useSyncExternalStore(subscribe, () => version);
 
-function depsFor(getApp: () => AppState): ScheduledRunDeps {
+export function depsFor(getApp: () => AppState): ScheduledRunDeps {
   const t = (key: Key, vars?: Record<string, string | number>) => translate(getApp().locale, key, vars);
   return {
     now: Date.now,

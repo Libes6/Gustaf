@@ -1,4 +1,4 @@
-//! Reads the app database for the phone and shapes rows into the `@mcode/protocol` types.
+//! Reads the app database for the phone and shapes rows into the `@gustaf/protocol` types.
 //!
 //! Two SQLite connections of the server's own, both on the same `app.db` file the webview writes (WAL mode, so the
 //! webview's writes never block these reads and these reads never block the webview):
@@ -51,7 +51,7 @@ fn err(e: rusqlite::Error) -> String {
     format!("database: {e}")
 }
 
-// ---- Protocol shapes (camelCase JSON, `@mcode/protocol`) --------------------------------------------------------------
+// ---- Protocol shapes (camelCase JSON, `@gustaf/protocol`) --------------------------------------------------------------
 
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]

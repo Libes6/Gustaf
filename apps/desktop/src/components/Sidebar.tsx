@@ -9,12 +9,17 @@ import { displayKeys, isMac, isWindows } from "../lib/platform";
 import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
 import { useApp } from "../state";
 import { useApprovalChats, useChatFlags } from "../lib/attention";
-import { deriveStatus, type ChatStatus } from "../lib/chatStatus";
+import { chatStatusStore, deriveStatus, type ChatStatus } from "../lib/chatStatus";
+import { getGoal, goalsVersion, subscribeGoals } from "../lib/goalStore";
+import { isScratch, loadScratch, scratchRoot, startScratchChat } from "../lib/scratch";
+import { isMuted, loadMuted, mutedVersion, setMuted, subscribeMuted } from "../lib/mutedChats";
+import { placeOf, settle, snooze, snoozePresets, wakeUps, without, type Place } from "../lib/triageCore";
+import { changeTriage, dismissUndo, getTriage, lastUndo, loadTriage, subscribeTriage, undoTriage } from "../lib/triageStore";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
-import { Brain } from "lucide-react";
+import { AlarmClock, BellOff, Brain, CheckCheck, Flag, FolderPen } from "lucide-react";
 import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
@@ -49,6 +54,36 @@ function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | nul
       }}
     />
   );
+}
+
+/** "Pick a time…" for snoozing a chat: a local date-time in the future. */
+function SnoozeDialog({ chat, onClose, onSnooze }: { chat: Chat; onClose: () => void; onSnooze: (at: number) => void }) {
+  const t = useT();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const local = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const [value, setValue] = useState(() => local(Date.now() + 3 * 3600_000));
+  const at = Date.parse(value);
+  const ok = Number.isFinite(at) && at > Date.now();
+  return (
+    <div className="snooze-dialog" role="dialog" aria-label={t("snoozeCustom")}>
+      <div className="t">{t("snoozeCustomFor", { title: chat.title })}</div>
+      <input className="input" type="datetime-local" aria-label={t("snoozeCustom")} value={value} min={local(Date.now())} onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") onClose(); if (e.key === "Enter" && ok) onSnooze(at); }} autoFocus />
+      {!ok && <div className="field-error">{t("snoozeInPast")}</div>}
+      <div className="btns">
+        <button className="btn btn-ghost" onClick={onClose}>{t("cancel")}</button>
+        <button className="btn btn-primary" disabled={!ok} onClick={() => onSnooze(at)}>{t("triageSnooze")}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Marks a chat whose goal is being worked on (`/goal`, lib/goalStore.ts). */
+function GoalMark({ chatId }: { chatId: number }) {
+  const t = useT();
+  useSyncExternalStore(subscribeGoals, goalsVersion);
+  if (getGoal(chatId)?.status !== "active") return null;
+  return <span className="chat-goal-mark" role="img" aria-label={t("goal")} title={t("goal")}><Flag size={11} aria-hidden="true" /></span>;
 }
 
 /** One badge per chat, same size and slot for every state; each has an icon shape of its own and a text alternative. */
@@ -139,6 +174,16 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [recentLimit, setRecentLimit] = useState(8);
   const [recentOpen, setRecentOpen] = useState(true);
+  // Settle / snooze (lib/triageCore.ts): the Working and Snoozed groups start folded.
+  const triage = useSyncExternalStore(subscribeTriage, getTriage);
+  const undo = useSyncExternalStore(subscribeTriage, lastUndo);
+  const [workingOpen, setWorkingOpen] = useState(false);
+  const [snoozedOpen, setSnoozedOpen] = useState(false);
+  const [snoozeFor, setSnoozeFor] = useState<Chat | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { void loadScratch(); loadMuted(); }, []);
+  useSyncExternalStore(subscribeMuted, mutedVersion);
+  useEffect(() => { loadTriage(); const id = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(id); }, []);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [showAll, setShowAll] = useState<Record<number, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -214,9 +259,30 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
+      { label: isMuted(c.id) ? t("chatUnmute") : t("chatMute"), icon: isMuted(c.id) ? <Bell size={15} /> : <BellOff size={15} />, onClick: () => setMuted(c.id, !isMuted(c.id)) },
+      ...(c.project_id === null && isScratch(c.id) ? [{ label: t("scratchFolder"), icon: <FolderOpen size={15} />, onClick: () => void scratchRoot(c.id, c.title).then((d) => revealItemInDir(d)).catch(() => {}) }] : []),
+      { sep: true },
+      ...triageItems(c),
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
+  };
+
+  // ---- settle / snooze ----
+  // Settling or snoozing also clears "unread" / "failed": otherwise the chat would need attention and come straight back.
+  const settleChat = (c: Chat) => (chatStatusStore.markSeen(c.id), changeTriage((m) => settle(m, c.id, Date.now()), t("triageSettledNotice", { title: c.title })));
+  const snoozeChat = (c: Chat, until: number) => (chatStatusStore.markSeen(c.id), changeTriage((m) => snooze(m, c.id, until), t("triageSnoozedNotice", { title: c.title, time: t.date(until) })));
+  const reopenChat = (c: Chat) => changeTriage((m) => without(m, c.id), t("triageReopenedNotice", { title: c.title }));
+  const triageItems = (c: Chat) => {
+    const e = triage[c.id];
+    if (e?.snoozedUntil && e.snoozedUntil > Date.now()) return [{ label: t("triageUnsnooze"), icon: <AlarmClock size={15} />, onClick: () => reopenChat(c) }];
+    if (e?.settledAt) return [{ label: t("triageReopen"), icon: <CheckCheck size={15} />, onClick: () => reopenChat(c) }];
+    return [
+      { label: t("triageSettle"), icon: <CheckCheck size={15} />, onClick: () => settleChat(c) },
+      { heading: t("triageSnooze") },
+      ...snoozePresets(Date.now()).map((p) => ({ label: t(`snooze_${p.key}`), description: t.date(p.at), icon: <AlarmClock size={15} />, onClick: () => snoozeChat(c, p.at) })),
+      { label: t("snoozeCustom"), icon: <AlarmClock size={15} />, onClick: () => setSnoozeFor(c) },
+    ];
   };
 
   const projectMenu = (anchor: DOMRect | React.MouseEvent, p: Project) =>
@@ -247,6 +313,27 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       failed: flags.failed.has(c.id),
       unread: flags.unread.has(c.id),
     });
+
+  // Wake settled/snoozed chats that need attention, got newer activity, or whose snooze ran out (not undoable).
+  const attentionIds = app.chats.filter((c) => { const s = statusOf(c); return s === "waiting" || s === "failed" || s === "unread"; }).map((c) => c.id);
+  const attentionKey = attentionIds.join(",");
+  useEffect(() => {
+    const ids = wakeUps(triage, now, new Set(attentionIds), new Map(app.chats.map((c) => [c.id, c.updated_at])));
+    if (ids.length) changeTriage((m) => ids.reduce(without, m));
+  }, [attentionKey, now, triage, app.chats]);
+  // ⌘Z / Ctrl+Z outside text fields undoes the last settle / snooze.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z" || el?.closest("input, textarea, [contenteditable=true]")) return;
+      if (undoTriage()) e.preventDefault();
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, []);
+  useEffect(() => { if (!undo) return; const id = setTimeout(dismissUndo, 10_000); return () => clearTimeout(id); }, [undo]);
+  const recent: Record<Place, Chat[]> = { attention: [], working: [], open: [], snoozed: [], settled: [] };
+  for (const c of app.chats) recent[placeOf(c.id, triage, statusOf(c), now)].push(c);
 
   // ---- workspaces ----
   const startWorkspace = async (p: Project, title: string) => {
@@ -330,7 +417,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
           <span className="ws-branch">
             <GitBranch size={13} aria-hidden="true" />
             <span className="label">{c.title}</span>
-            <ChatBadge status={statusOf(c)} />
+            <GoalMark chatId={c.id} /><ChatBadge status={statusOf(c)} />
           </span>
           <span className="ws-meta">
             <span className="branch" title={row.branch}>{row.branch}</span>
@@ -390,7 +477,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       >
         <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
           <span className="label">{c.title}</span>
-          <ChatBadge status={statusOf(c)} />
+          <GoalMark chatId={c.id} />{isMuted(c.id) && <BellOff size={11} className="chat-muted-mark" aria-label={t("chatMuted")} />}<ChatBadge status={statusOf(c)} />
         </button>
         <span className="actions">
           <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
@@ -443,6 +530,10 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`} onClick={() => newChat(null)}>
           <SquarePen size={15} />
           <span className="label">{t("newChat")}</span>
+        </button>
+        <button className="row muted" title={t("scratchHint")} onClick={() => void startScratchChat(app)}>
+          <FolderPen size={15} />
+          <span className="label">{t("newScratchChat")}</span>
         </button>
 
         {app.sections.map((s) =>
@@ -541,8 +632,31 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className="section-title" aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}>
           {t("recent")} {recentOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
-        {(recentOpen || q) && app.chats.filter(c => !q || c.title.toLowerCase().includes(q.toLowerCase())).slice(0, q ? undefined : recentLimit).map((c) => chatRow(c, false))}
-        {recentOpen && !q && app.chats.length > recentLimit && <button className="hint" onClick={() => setRecentLimit(n => n + 8)}>{t("showMore")}</button>}
+        {q && app.chats.filter(c => c.title.toLowerCase().includes(q.toLowerCase())).map((c) => chatRow(c, false))}
+        {recentOpen && !q && <>
+          {recent.attention.map((c) => chatRow(c, false))}
+          {recent.working.length > 0 && <>
+            <button className="row muted triage-group" aria-expanded={workingOpen} onClick={() => setWorkingOpen(!workingOpen)}>
+              {workingOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<span className="label">{t("triageWorking")}</span><Loader2 size={12} className="spin" aria-hidden="true" /><span className="count">{recent.working.length}</span>
+            </button>
+            {workingOpen && recent.working.map((c) => chatRow(c, true))}
+          </>}
+          {recent.open.slice(0, recentLimit).map((c) => chatRow(c, false))}
+          {recent.open.length > recentLimit && <button className="hint" onClick={() => setRecentLimit(n => n + 8)}>{t("showMore")}</button>}
+          {recent.snoozed.length > 0 && <>
+            <button className="row muted triage-group" aria-expanded={snoozedOpen} onClick={() => setSnoozedOpen(!snoozedOpen)}>
+              {snoozedOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<span className="label">{t("triageSnoozed")}</span><span className="count">{recent.snoozed.length}</span>
+            </button>
+            {snoozedOpen && recent.snoozed.map((c) => <div key={`z${c.id}`} title={t("triageSnoozedUntil", { time: t.date(triage[c.id]!.snoozedUntil!) })}>{chatRow(c, true)}</div>)}
+          </>}
+        </>}
+        {undo && (
+          <div className="hint triage-undo" role="status">
+            <span>{undo.label}</span>
+            <button className="btn-ghost" onClick={() => undoTriage()}>{t("triageUndo")}</button>
+          </div>
+        )}
+        {snoozeFor && <SnoozeDialog chat={snoozeFor} onClose={() => setSnoozeFor(null)} onSnooze={(at) => (snoozeChat(snoozeFor, at), setSnoozeFor(null))} />}
 
 
       </div>

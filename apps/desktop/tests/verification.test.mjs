@@ -163,8 +163,8 @@ test('the action log keeps gate entries and drops malformed gate metadata', () =
 test('settings are stored per project; the file is read only when its switch is on (or the editor asks)', async () => {
   state.reset();
   const root = mkdtempSync(join(tmpdir(), 'verify-store-'));
-  mkdirSync(join(root, '.mcode'));
-  writeFileSync(join(root, '.mcode/done.json'), JSON.stringify({ checks: [chk('from-file')] }));
+  mkdirSync(join(root, '.gustaf'));
+  writeFileSync(join(root, '.gustaf/done.json'), JSON.stringify({ checks: [chk('from-file')] }));
   const other = mkdtempSync(join(tmpdir(), 'verify-store-'));
   await saveVerificationSettings(root, { checks: [chk('own', { timeoutMs: 3000 })], maxFixAttempts: 1, useProjectFile: false });
   assert.deepEqual((await loadVerificationConfig(root)).checks.map((c) => c.command), ['own']);
@@ -206,11 +206,11 @@ async function run(script, o = {}) {
   saveRulesConfig(o.config ?? DEFAULT_RULES);
   clearActionLog();
   const root = mkdtempSync(join(tmpdir(), 'verify-test-'));
-  mkdirSync(join(root, '.mcode'));
+  mkdirSync(join(root, '.gustaf'));
   writeFileSync(join(root, 'a.txt'), 'hello');
   const checks = (o.checks ?? ['npm test']).map((c) => (typeof c === 'string' ? chk(c) : c));
   await saveVerificationSettings(root, { checks, maxFixAttempts: o.max ?? 2, useProjectFile: !!o.enabled });
-  if (o.file !== undefined) writeFileSync(join(root, '.mcode/done.json'), JSON.stringify(o.file));
+  if (o.file !== undefined) writeFileSync(join(root, '.gustaf/done.json'), JSON.stringify(o.file));
   if (o.global) state.settings.set('hooks', JSON.stringify({ hooks: o.global }));
   if (o.result) state.runResult = o.result;
   if (o.hookResult) state.hookResult = o.hookResult;
@@ -500,8 +500,8 @@ test('project file: ignored with the switch off (also for scheduled runs), used 
 test('a broken project file never breaks a run; settings checks still run', async () => {
   state.reset();
   const root = mkdtempSync(join(tmpdir(), 'verify-broken-'));
-  mkdirSync(join(root, '.mcode'));
-  writeFileSync(join(root, '.mcode/done.json'), '{ nope');
+  mkdirSync(join(root, '.gustaf'));
+  writeFileSync(join(root, '.gustaf/done.json'), '{ nope');
   await saveVerificationSettings(root, { checks: [chk('npm test')], maxFixAttempts: 2, useProjectFile: true });
   const view = await loadVerificationView(root);
   assert.deepEqual(view.config.checks.map((c) => c.command), ['npm test']);

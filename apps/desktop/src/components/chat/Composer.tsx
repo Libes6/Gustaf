@@ -1,20 +1,24 @@
-import { freezeChat, shortenChat, splitChatReferences, joinChatReferences, CHAT_REFERENCE_LIMIT, type ChatReference } from "../../lib/chatContext";
+import { freezeChat, shortenChat, splitComposerText, joinComposerText, isLargePaste, pasteStats, CHAT_REFERENCE_LIMIT, type ChatReference, type PastedText } from "../../lib/chatContext";
 import { loadMessages, type Chat } from "../../lib/data";
 import { VoiceInput } from "../VoiceInput";
-import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, Brain, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
 import { useT } from "../../i18n";
+import { cmdKey } from "../../lib/shortcuts";
 import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
 import { useCursorPool } from "../../providers/cursorPoolStore";
-import type { ModelInfo, ProviderConfig } from "../../providers/types";
+import { DEFAULT_REASONING, REASONING_LEVELS, type ModelInfo, type ProviderConfig, type Reasoning } from "../../providers/types";
+import { pickLevel } from "../../providers/reasoning";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
+import { FAN_OUT_MAX } from "../../lib/fanOut";
+import { modelKey } from "../../state";
 import { OPEN_MODEL_PICKER_EVENT } from "../../agent/verificationCore";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
@@ -42,12 +46,14 @@ type Props = {
   provider: ProviderConfig | undefined;
   selectedModel: ModelInfo | undefined;
   modelName: string | undefined;
-  supports: { computer: boolean; reasoning: boolean };
+  /** `levels`: effort levels of the selected model, weakest first (absent: low/medium/high when `reasoning`). */
+  supports: { computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] };
   running: boolean;
-  onClarify?: () => void;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
   onSend: () => void;
+  /** One prompt to several models, each in its own workspace (shift-click in the model list; new chats of git projects). */
+  onFanOut?: (models: ModelInfo[]) => void;
   onStop: () => void;
   contextTokens: number;
   lastInput: number | undefined;
@@ -71,7 +77,9 @@ export function Composer(p: Props) {
   const menu = useMenu();
   const addMenu = useMenu();
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
-  const { body: composerBody, references } = splitChatReferences(text);
+  const { body: composerBody, pastes, references } = splitComposerText(text);
+  // Composer text = what is in the field, then pasted-text cards, then attached chats (lib/chatContext.ts).
+  const compose = (body: string, refs: ChatReference[] = references, ps: PastedText[] = pastes) => joinComposerText(body, ps, refs);
   const [pendingChat, setPendingChat] = useState<ChatReference | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const ru = app.locale === "ru";
@@ -86,8 +94,8 @@ export function Composer(p: Props) {
     finally { if (scope === currentScope.current) setChatLoading(false); }
   };
   const confirmChat = (ref: ChatReference) => {
-    const latest = splitChatReferences(text);
-    const next = joinChatReferences(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref]);
+    const latest = splitComposerText(text);
+    const next = compose(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref], latest.pastes);
     if (next.length > 200_000) { setAttachmentError(ru ? "Снимок превышает лимит черновика (200 000 символов). Выберите сокращённую версию или удалите другое вложение." : "Snapshot exceeds draft limit (200,000 characters). Choose shortened version or remove another attachment."); return; }
     setText(next);
     setPendingChat(null); taRef.current?.focus();
@@ -98,6 +106,21 @@ export function Composer(p: Props) {
   const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
   const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
+  // Models picked with shift-click for a fan-out; offered only where a workspace can be created for each of them.
+  const [fanKeys, setFanKeys] = useState<string[]>([]);
+  const fanAllowed = !!p.onFanOut && !!p.workspace?.available;
+  const fanModels = fanAllowed ? fanKeys.map((k) => app.models.find((m) => modelKey(m) === k)).filter((m): m is NonNullable<typeof m> => !!m) : [];
+  useEffect(() => { if (!fanAllowed && fanKeys.length) setFanKeys([]); }, [fanAllowed]);
+  const toggleFan = (m: ModelInfo) => setFanKeys((ks) => {
+    const base = ks.length ? ks : app.selection ? [modelKey({ providerId: app.selection.providerId, id: app.selection.model })] : [];
+    const k = modelKey(m);
+    return base.includes(k) ? base.filter((x) => x !== k) : base.length >= FAN_OUT_MAX ? base : [...base, k];
+  });
+  const send = () => (fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend());
+  const effortMenu = useMenu();
+  // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
+  const levels = p.supports.levels?.length ? p.supports.levels : REASONING_LEVELS;
+  const level = pickLevel(app.reasoning, levels) ?? DEFAULT_REASONING;
   // MCP prompts: a user-invoked template picker, offered only when some MCP server is configured.
   const [promptDialog, setPromptDialog] = useState(false);
   const [hasMcp, setHasMcp] = useState(false);
@@ -120,7 +143,10 @@ export function Composer(p: Props) {
     loadSkills(root, true).then(xs => { if (!stale) { setSkills(xs); setSkillError(false); } }, () => { if (!stale) { setSkills(mergeSkills([])); setSkillError(true); } });
     return () => { stale = true; };
   }, [root, !!slash]);
-  const slashList = slash ? skills.filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
+  // `/goal` is a built-in command of the chat run (lib/goalCore.ts), listed first next to the skills.
+  const goalCommand: Skill = { id: "command:goal", name: "goal", source: "builtin", description: t("goalCommandHint") };
+  const watchCommand: Skill = { id: "command:watch", name: "watch", source: "builtin", description: t("prWatchCommandHint") };
+  const slashList = slash ? [goalCommand, watchCommand, ...skills].filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
   const insertSkill = (skill: Skill) => {
     setText(`/${skill.name} `);
     setSlash(null);
@@ -132,7 +158,7 @@ export function Composer(p: Props) {
     ta.style.height = "auto";
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
-  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); setMention(null); setSlash(null); } }, [p.visible]);
+  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); effortMenu.close(); setMention(null); setSlash(null); } }, [p.visible]);
   // The "Try another model" button of a verification card (docs/features/verification-gates.md) opens the picker; it never re-runs anything.
   useEffect(() => {
     if (!p.visible) return;
@@ -146,7 +172,7 @@ export function Composer(p: Props) {
     ...app.chats.filter(c => c.title.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(chat => ({ path: "", chat, label: `💬 ${chat.title}` }))
   ].slice(0, 12) : [];
   const insertMention = (path: string) => {
-    setText(joinChatReferences(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
+    setText(compose(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
     setMention(null);
     taRef.current?.focus();
   };
@@ -167,7 +193,9 @@ export function Composer(p: Props) {
     }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      p.onSend();
+      send();
+      // ⌘⌥↵: the message goes out here and a fresh chat opens next to it (the run continues in the background).
+      if (e.altKey && cmdKey(e.nativeEvent) && (text.trim() || images.length)) app.newChat(app.sessions.items.find((s) => s.key === app.sessions.active)?.projectId ?? null);
     }
   };
 
@@ -229,9 +257,21 @@ export function Composer(p: Props) {
           {references.map((ref, i) => <div key={`${ref.sourceId}:${i}`} className="chat-reference">
             <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
             <span>{ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}{ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}</span>
-            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(joinChatReferences(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
+            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
             <details><summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary><pre>{ref.snapshot}</pre></details>
           </div>)}
+          {pastes.map((paste, i) => {
+            const { lines, chars } = pasteStats(paste);
+            return (
+              <div key={`paste:${i}`} className="chat-reference paste-card" role="group" aria-label={t("pastedText")}>
+                <strong>{t("pastedText")}</strong>
+                <span>{t("pastedTextStats", { lines: lines.toLocaleString(app.locale), chars: chars.toLocaleString(app.locale) })}</span>
+                <button className="btn-ghost" onClick={() => setText(compose(composerBody + (composerBody && !composerBody.endsWith("\n") ? "\n" : "") + paste.text, references, pastes.filter((_, j) => j !== i)))}>{t("pastedTextInline")}</button>
+                <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references, pastes.filter((_, j) => j !== i)))}><X size={14} /></button>
+                <details><summary>{t("pastedTextShow")}</summary><pre>{paste.text}</pre></details>
+              </div>
+            );
+          })}
           {pendingChat && <div className="chat-reference" role="region" aria-label={ru ? "Прикрепить чат" : "Attach chat"}>
             <strong>{pendingChat.title}</strong> · {pendingChat.fullSize.toLocaleString()} {ru ? "символов" : "characters"}
             <p>{ru ? "Разговор будет отправлен как текстовый справочный материал (изображения не копируются). Снимок сохраняется независимо от последующих изменений исходника." : "Conversation is sent as text reference material (images are not copied). The snapshot is retained independently of later source edits."}</p>
@@ -262,7 +302,7 @@ export function Composer(p: Props) {
             value={composerBody}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
             onChange={(e) => {
-              setText(joinChatReferences(e.target.value, references));
+              setText(compose(e.target.value, references));
               const cmd = /^\/([a-zA-Z0-9_-]*)$/.exec(e.target.value);
               setSlash(cmd ? { q: cmd[1], hl: 0 } : null);
               const m = /@([^\s@]*)$/.exec(e.target.value.slice(0, e.target.selectionStart));
@@ -273,7 +313,17 @@ export function Composer(p: Props) {
             onPaste={e => {
               const files = Array.from(e.clipboardData.items ?? []).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => !!file);
               const images = files.length ? files : Array.from(e.clipboardData.files).filter(file => file.type.startsWith("image/"));
-              if (images.length) { e.preventDefault(); addImageFiles(images); }
+              if (images.length) { e.preventDefault(); addImageFiles(images); return; }
+              // A large text paste becomes a card instead of filling the field (the model still gets all of it).
+              const pasted = e.clipboardData.getData?.("text/plain") ?? "";
+              if (!pasted || !isLargePaste(pasted)) return;
+              e.preventDefault();
+              const field = e.currentTarget;
+              const body = composerBody.slice(0, field.selectionStart) + composerBody.slice(field.selectionEnd);
+              const next = compose(body, references, [...pastes, { text: pasted }]);
+              if (next.length > 200_000) { setAttachmentError(t("pasteTooLarge")); return; }
+              setAttachmentError("");
+              setText(next);
             }}
           />
           <div className="composer-bar">
@@ -289,8 +339,8 @@ export function Composer(p: Props) {
                   { heading: t("attach") },
                   ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
                   ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
-                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(joinChatReferences(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
-                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(joinChatReferences(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
+                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(compose(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
+                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(compose(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
                   ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
                   ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
                   { sep: true },
@@ -346,32 +396,33 @@ export function Composer(p: Props) {
               onOpen={instructions.reload}
             />
             <div className="composer-model" style={{ position: "relative" }}>
-              <button className="chip" title={accountTitle} aria-haspopup="dialog" aria-expanded={picker} onClick={() => (app.providers.length ? setPicker(!picker) : app.openSettings("providers"))}>
-                {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span> <ChevronDown size={13} className="chev" />
-              </button>
-              {picker && <ModelPicker onClose={() => setPicker(false)} />}
-            </div>
-            {p.supports.reasoning && (
+              {/* A model with effort levels opens a menu of its levels (weakest first) plus a way to the model list. */}
               <button
-                className="chip"
-                aria-haspopup="menu"
-                onClick={(e) =>
-                  menu.open(e.currentTarget.getBoundingClientRect(), (["low", "medium", "high"] as const).map((r) => ({ label: t(`reasoning_${r}`), kbd: app.reasoning === r ? "✓" : "", onClick: () => app.setReasoning(r) })))
-                }
+                className="chip" title={accountTitle} aria-haspopup={p.supports.reasoning ? "menu" : "dialog"} aria-expanded={picker || effortMenu.isOpen}
+                onKeyDown={p.supports.reasoning ? effortMenu.onTriggerKeyDown : undefined}
+                onClick={(e) => (!app.providers.length ? app.openSettings("providers") : p.supports.reasoning ? (setPicker(false), effortMenu.open(e.currentTarget.getBoundingClientRect(), [
+                  { heading: t("effortTitle") },
+                  ...levels.map((r) => ({ label: t(`reasoning_${r}`), description: t(`effortHint_${r}`), checked: r === level, onClick: () => app.setReasoning(r) })),
+                  { sep: true },
+                  { label: t("chooseModel"), description: p.modelName, onClick: () => setPicker(true) },
+                ])) : setPicker(!picker))}
               >
-                <Brain size={14} /> {t(`reasoning_${app.reasoning}`)}
+                {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
+                <span className="chip-label" title={fanModels.length > 1 ? fanModels.map((m) => m.name).join(", ") : undefined}>{fanModels.length > 1 ? t("fanOutModels", { count: fanModels.length }) : p.modelName ?? t("chooseModel")}</span>
+                {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${level}`)}</span></>}
+                <ChevronDown size={13} className="chev" />
               </button>
-            )}
+              {picker && <ModelPicker onClose={() => setPicker(false)} multi={fanAllowed ? { keys: fanKeys, toggle: toggleFan, max: FAN_OUT_MAX } : undefined} />}
+              {effortMenu.node}
+            </div>
             <div className="composer-actions">
             <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
-            {p.running && <><button className="chip" disabled={!text.trim() && !images.length} onClick={p.onSend}>{t("sendNext")}</button>{p.onClarify && <button className="chip" disabled={!text.trim() || !!images.length} onClick={p.onClarify}>{t("clarifyTask")}</button>}</>}
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />
               </button>
             ) : (
-              <button className="send" disabled={!text.trim() && !images.length} onClick={p.onSend} title={t("send")} aria-label={t("send")}>
+              <button className="send" disabled={!text.trim() && !images.length} onClick={send} title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")} aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}>
                 <ArrowUp size={16} />
               </button>
             )}

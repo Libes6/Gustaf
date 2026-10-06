@@ -3,7 +3,9 @@
 // (tests/exportChats.test.mjs). Only `import type` is allowed because Node runs this file directly.
 import type { Msg, Part, TokenUsage } from "../providers/types";
 
-export const EXPORT_FORMAT = "mcode-chats";
+export const EXPORT_FORMAT = "gustaf-chats";
+/** `format` of files exported before the rename; import accepts it. */
+export const LEGACY_EXPORT_FORMAT = "mcode-chats";
 /** Bump when the JSON shape changes incompatibly; `parseBundle` rejects newer versions. */
 export const EXPORT_VERSION = 1;
 export const REDACTED = "[REDACTED]";
@@ -23,8 +25,8 @@ export type ExportedChat = {
   project: { name: string; path: string | null } | null;
   messages: ExportedMessage[];
 };
-// `app` stays "M Code": it is part of the file format, not a display name.
-export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: "M Code"; exportedAt: string; chats: ExportedChat[] };
+// `app` names the exporting app; import does not check it (older files carry the previous app name).
+export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: string; exportedAt: string; chats: ExportedChat[] };
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
 export type ExportSource = {
@@ -195,7 +197,7 @@ export function buildBundle(sources: ExportSource[], options: { includeImages?: 
     const updatedAt = ts(chat.updated_at);
     return { ...exported, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {}) };
   });
-  return { format: EXPORT_FORMAT, version: EXPORT_VERSION, app: "M Code", exportedAt: new Date(options.now ?? Date.now()).toISOString(), chats };
+  return { format: EXPORT_FORMAT, version: EXPORT_VERSION, app: "Gustaf", exportedAt: new Date(options.now ?? Date.now()).toISOString(), chats };
 }
 
 export const toJson = (bundle: ChatBundle) => `${JSON.stringify(bundle, null, 2)}\n`;
@@ -241,14 +243,14 @@ export function parseBundle(text: string): ChatBundle {
   } catch {
     throw new ImportError("invalid_json");
   }
-  if (!rec(raw) || raw.format !== EXPORT_FORMAT || !Number.isInteger(raw.version) || raw.version < 1) throw new ImportError("not_export");
+  if (!rec(raw) || (raw.format !== EXPORT_FORMAT && raw.format !== LEGACY_EXPORT_FORMAT) || !Number.isInteger(raw.version) || raw.version < 1) throw new ImportError("not_export");
   if (raw.version > EXPORT_VERSION) throw new ImportError("unsupported_version");
   const chats = (Array.isArray(raw.chats) ? raw.chats : []).map(cleanChat).filter((c: ExportedChat | null): c is ExportedChat => c !== null);
   if (!chats.length) throw new ImportError("empty");
   return {
     format: EXPORT_FORMAT,
     version: raw.version,
-    app: "M Code",
+    app: str(raw.app) ? raw.app : "Gustaf",
     exportedAt: str(raw.exportedAt) ? raw.exportedAt : "",
     chats,
   };
@@ -515,6 +517,6 @@ export function exportFileName(format: ExportFormat, titles: string[], now = Dat
       .slice(0, 60)
       .join("")
       .replace(/-+$/, "");
-  const base = titles.length === 1 ? clean(titles[0]) || "chat" : `mcode-chats-${new Date(now).toISOString().slice(0, 10)}`;
+  const base = titles.length === 1 ? clean(titles[0]) || "chat" : `gustaf-chats-${new Date(now).toISOString().slice(0, 10)}`;
   return `${base}.${ext}`;
 }

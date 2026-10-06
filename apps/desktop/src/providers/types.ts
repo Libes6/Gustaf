@@ -5,17 +5,21 @@ import type { RetryInfo } from "./retry";
 
 /** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. `stopped`: interrupted or cut off (the turn or the whole run ended first); neutral, not a failure. */
 export type SubagentState = "running" | "waiting" | "completed" | "failed" | "stopped";
-/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose values replace the old ones. */
+/** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose cumulative counters supplement stream lifecycle updates. */
 export type SubagentInfo = {
   provider: "codex" | "claude";
   /** Codex thread id or Claude `tool_use` id; empty while a Codex spawn is still in flight. */
   agentId: string;
+  /** Canonical Codex task path, also accepted by collaboration tools. */
+  agentPath?: string;
   /** Empty when the CLI gave the agent no name (the UI then shows a short id). */
   title: string;
   /** Claude background `Task`: the id the CLI gave the launched agent; its later completion notice names this id (or the `tool_use` id). */
   bgId?: string;
-  /** Claude `subagent_type`. */
+  /** Claude `subagent_type`, or the Codex agent role. */
   role?: string;
+  /** Model the agent runs on, when the provider reports it (Codex app-server). */
+  model?: string;
   action: "spawn" | "wait" | "send" | "close" | "task" | "progress" | "scan";
   state: SubagentState;
   /** Short summary of the task given to the agent. */
@@ -31,6 +35,8 @@ export type SubagentInfo = {
   /** Codex rollout scan only (providers/codexRollout.ts): total tokens, start and end (Unix ms) and run time. */
   tokens?: number;
   startedAt?: number;
+  /** Latest genuine Codex task_started, distinct from the thread creation time. */
+  turnStartedAt?: number;
   endedAt?: number;
   durationMs?: number;
 };
@@ -65,12 +71,16 @@ export type Msg = {
   };
 };
 
-export type ProviderKind = "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli";
+/** `xai` (Grok) is an OpenAI-compatible preset served by the generic OpenAI-compatible adapter. */
+export type ProviderKind = "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
 export type CliId = "claude" | "cursor-agent" | "codex";
 export type ProviderConfig = { id: string; kind: ProviderKind; name: string; baseUrl: string; cli?: CliId; cliAuth?: "key"; /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string; /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string; disabled?: boolean };
 export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean };
 export type ToolDef = { name: string; description: string; parameters: Record<string, unknown> };
-export type Reasoning = "low" | "medium" | "high";
+export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max";
+/** Levels of an adapter that only says it supports reasoning (no `reasoningLevels`), weakest first. */
+export const REASONING_LEVELS: readonly Reasoning[] = ["low", "medium", "high"];
+export const DEFAULT_REASONING: Reasoning = "medium";
 
 export type TurnInput = {
   system: string;
@@ -91,18 +101,34 @@ export type TurnInput = {
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;
   onLimits?: (windows: LimitWindow[]) => void;
+  /** Codex app-server native goal: the server keeps working turn after turn until the goal leaves `active`; the turn lasts that long. */
+  goal?: { objective: string; /** Re-activate the thread's existing goal instead of setting a new one. */ resume?: boolean; onUpdate: (g: NativeGoal) => void };
+  /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
+  approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
   onRetry?: (info: RetryInfo) => void;
 };
+
+/** A Codex thread goal (`thread/goal/*`). */
+export type NativeGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
+export type NativeGoal = { status: NativeGoalStatus; objective: string; tokensUsed: number; timeUsedSeconds: number };
 
 export type TurnOutput = { parts: Part[]; responseId?: string; usage?: TokenUsage };
 
 export interface Adapter {
   listModels(): Promise<ModelInfo[]>;
+  /** True when `/goal` can run on the provider's own goal feature (`TurnInput.goal`) instead of the app's turn loop. */
+  nativeGoal?(): Promise<boolean>;
   turn(input: TurnInput): Promise<TurnOutput>;
   supportsComputer: boolean;
   supportsReasoning(model: string): boolean;
+  /** Effort levels this model offers, weakest first (empty: no control). Absent: `REASONING_LEVELS` when `supportsReasoning`. */
+  reasoningLevels?(model: string, listed?: readonly string[]): readonly Reasoning[];
 }
+
+/** Levels to show for a model, whichever way the adapter reports them. */
+export const levelsOf = (a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">, model: string, listed?: readonly string[]): readonly Reasoning[] =>
+  a.reasoningLevels ? a.reasoningLevels(model, listed) : a.supportsReasoning(model) ? REASONING_LEVELS : [];
 
 export const textOf = (m: Msg) =>
   m.parts

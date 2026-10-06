@@ -11,8 +11,10 @@ mod hunks;
 mod import_sources;
 mod mcp;
 mod oauth;
+mod pr_watch;
 mod rawlog;
 mod review;
+mod scratch;
 mod secrets;
 mod skills;
 mod shell;
@@ -20,9 +22,11 @@ mod tools;
 mod preview;
 mod semantic;
 mod knowledge;
+mod legacy;
 mod lsp;
 mod web_tools;
 mod updater;
+mod webhooks;
 mod worktree;
 mod merge_queue;
 mod terminal;
@@ -36,11 +40,14 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before any window or the database: move the data of builds from before the rename (see legacy.rs).
+    legacy::migrate_app_dirs();
     tauri::Builder::default()
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
         .manage(mobile_server::MobileServer::default())
         .manage(quick_ask::QuickAsk::default())
+        .manage(webhooks::Webhooks::default())
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 quick_ask::on_main_destroyed(window.app_handle());
@@ -62,6 +69,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            scratch::scratch_dir,
             terminal::terminal_create,
             terminal::terminal_write,
             terminal::terminal_resize,
@@ -132,6 +140,9 @@ pub fn run() {
             git_publish::git_pr_context,
             git_publish::gh_status,
             git_publish::git_create_pr,
+            pr_watch::gh_pr_view,
+            webhooks::webhook_serve,
+            webhooks::webhook_stop,
             worktree::worktree_create,
             worktree::worktree_list,
             worktree::worktree_remove,

@@ -2,7 +2,7 @@
 
 Desktop code lives in `apps/desktop`.
 
-Skills are Markdown workflows in `~/.mcode/skills/<name>/SKILL.md` or `<project>/.mcode/skills/<name>/SKILL.md`. Compatible Claude skills and Cursor commands are discovered too. A project workflow wins over a global name. Type `/` in the composer to choose a workflow and append arguments. Skills supply instructions; they never grant additional access. Built-ins: `/review`, `/test`, `/explain`, `/commit` (commit preparation requires explicit authorization before committing).
+Skills are Markdown workflows in `~/.gustaf/skills/<name>/SKILL.md` or `<project>/.gustaf/skills/<name>/SKILL.md`. Compatible Claude skills and Cursor commands are discovered too. A project workflow wins over a global name. Type `/` in the composer to choose a workflow and append arguments. Skills supply instructions; they never grant additional access. Built-ins: `/review`, `/test`, `/explain`, `/commit` (commit preparation requires explicit authorization before committing).
 
 Settings → Memory stores selected facts globally or per project, also reachable from a project's menu ("Memory…"). Relevant facts are inserted into subsequent model prompts with a size limit; this sends them to the selected provider. Facts can be added by hand, by the model (`remember` / `forget`, with confirmation by default) or from a chat's "Suggest memories" action (one extra model request, confirmation required), and exported to a managed section of the project's `AGENTS.md`. Details: [memory](features/memory.md). Do not put credentials into facts.
 

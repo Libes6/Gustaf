@@ -1,8 +1,33 @@
 # Changelog
 
-All notable user-visible changes to Gustaf are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Gustaf was previously developed as M Code.
+All notable user-visible changes to Gustaf are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-06
+
+### Added
+
+- **Codex over its app-server** (default; Settings → Usage → Agents switches back to `codex exec`): subagents report their real status, model and progress, children that outlive the parent turn are followed, approvals use the usual approval card, and `/goal` runs on Codex's own thread goals. Falls back to `codex exec` when the app-server cannot start.
+- `/goal <objective>`: the agent keeps working turn after turn until it reports done or blocked (a goal bar with Pause / Resume / Clear; other providers use the app's own loop).
+- `/watch <PR>`: a chat watches a pull request and wakes up when a check fails, a review or comment arrives, or a conflict appears.
+- Webhook triggers for scheduled prompts (local HTTP endpoint with a GitHub-style signature).
+- Several models on one prompt (Shift-click in the model picker), each in its own workspace.
+- Scratch chats with their own folder (Cmd+Alt+N); chat triage in the sidebar (settle, snooze, a "Working" group, undo).
+- Rewind can keep or restore files; large pastes become a text card; Mermaid diagrams and sandboxed HTML pages in messages; a private card for secrets the agent asks for; chat width setting.
+- Navigation: Cmd+[ / Cmd+] between chats, Cmd+Alt+Enter send and open a new chat, reading positions across restarts, Cmd+K jumps to chats, settings pages and shortcuts, Cmd+Alt+Up/Down between your messages, per-chat notification mute, "Viewed" marks on changed files, times on tool rows.
+- Reasoning effort for Claude, Cursor and GPT; git branch switcher.
+- Optional automatic cleanup of idle workspace checkouts (Settings → General → Storage; off by default, branches are kept).
+
+### Changed
+
+- The model picker is more reliable and states clearer.
+- Every internal name now uses Gustaf: bundle identifier and Keychain service `io.github.libes6.gustaf`, project folder `.gustaf/` (review rules, hooks, checks, skills; also `~/.gustaf/skills`), pairing links `gustaf://pair`, chat export format `gustaf-chats`, plan and desktop-control blocks `gustaf-plan` / `gustaf-computer`.
+- Upgrading from a build made before the rename: the data folders are moved to the new identifier on first start and stored API keys move to the new Keychain service the first time they are read (macOS may ask once per key for access to the old entry). `.mcode/` project files, `mcode://` pairing links, `mcode-chats` exports and old plan and desktop-control blocks are still read.
+
+### Security
+
+- Added the `mermaid` dependency; a low-severity KaTeX advisory in its dependencies is noted in `docs/features/security.md`.
 
 ## [0.1.0] - 2026-10-04
 
