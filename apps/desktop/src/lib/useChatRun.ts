@@ -454,9 +454,17 @@ export function useChatRun(o: Options) {
     finally { release(); abortRef.current = null; setRunning(false); app.setSessionBusy(session.key, false); setStream(null); }
   }
 
-  const rewind = useCallback(async (m: StoredMsg) => {
-    if (!root || !m.meta?.checkpoint || running) return;
-    await restoreAll(root, m.meta.checkpoint);
+  /**
+   * Returns the chat to the point before message `m`: drops `m` and everything after it and puts its text back into
+   * the composer. `files` also restores the project from the checkpoint taken before `m`; without it the files keep
+   * every change made since ("revert and keep changes").
+   */
+  const rewind = useCallback(async (m: StoredMsg, o2: { files: boolean } = { files: true }) => {
+    if (running) return;
+    if (o2.files) {
+      if (!root || !m.meta?.checkpoint) return;
+      await restoreAll(root, m.meta.checkpoint);
+    }
     await deleteMessagesFrom(m.chat_id, m.id);
     setMessages(await loadMessages(m.chat_id));
     o.setText(editableText(m));

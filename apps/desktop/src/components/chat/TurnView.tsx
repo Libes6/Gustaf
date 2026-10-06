@@ -2,6 +2,7 @@ import { splitChatReferences } from "../../lib/chatContext";
 import { useApp } from "../../state";
 import { ChevronDown, ChevronRight, Copy, GitBranch, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { useMenu } from "../Menu";
 import { useT } from "../../i18n";
 import { userText, type Turn } from "../../lib/chatTurns";
 import { editableText, turnActions } from "../../lib/messageActions";
@@ -34,8 +35,9 @@ export type TurnHandlers = {
   onRejectPlan: () => void;
 };
 
-export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
+export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg, o: { files: boolean }) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
   const t = useT();
+  const rewindMenu = useMenu();
   const app = useApp();
   const userContext = splitChatReferences(turn.user ? textOf(turn.user) : "");
   const [open, setOpen] = useState(false);
@@ -141,8 +143,14 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
             <button className="icon-btn" title={t("copy")} onClick={() => navigator.clipboard.writeText(textOf(turn.user!))}>
               <Copy size={13} />
             </button>
-            {onRewind && turn.user.meta?.checkpoint && (
-              <button className="icon-btn" title={t("rewind")} onClick={() => onRewind(turn.user!)}>
+            {onRewind && (
+              <button
+                className="icon-btn" title={t("rewind")} aria-label={t("rewind")} aria-haspopup="menu" disabled={busy}
+                onClick={(e) => rewindMenu.open(e.currentTarget.getBoundingClientRect(), [
+                  { label: t("rewindKeepFiles"), description: t("rewindKeepFilesHint"), onClick: () => onRewind(turn.user!, { files: false }) },
+                  ...(turn.user!.meta?.checkpoint ? [{ label: t("rewindWithFiles"), description: t("rewindWithFilesHint"), onClick: () => onRewind(turn.user!, { files: true }) }] : []),
+                ])}
+              >
                 <RotateCcw size={13} />
               </button>
             )}
@@ -181,6 +189,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
           </div>
         </div>
       )}
+      {rewindMenu.node}
     </>
   );
 });
