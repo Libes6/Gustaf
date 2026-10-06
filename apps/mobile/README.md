@@ -1,6 +1,6 @@
 # @mcode/mobile
 
-Companion app for M Code: control the desktop app from a phone on the local network (see [TASKS.md](../../TASKS.md),
+Companion app for Gustaf: control the desktop app from a phone on the local network (see [TASKS.md](../../TASKS.md),
 "Mobile companion app"). **Status: skeleton.** Everything works against an in-memory mock desktop; the desktop server,
 real pairing and TLS pinning are not built yet.
 

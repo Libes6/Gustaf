@@ -1,4 +1,4 @@
-// In-memory stand-in for the Rust side of M Code, living in the test process. The browser's fake
+// In-memory stand-in for the Rust side of Gustaf, living in the test process. The browser's fake
 // `window.__TAURI_INTERNALS__.invoke` (tests/e2e/tauriInit.js) forwards every command here.
 //
 // Database: the real SQLite engine through Node's built-in `node:sqlite`, with the schema read out of
