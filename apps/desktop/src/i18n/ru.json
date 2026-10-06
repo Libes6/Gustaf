@@ -1599,5 +1599,10 @@
   "secretValue": "Значение секрета",
   "secretNote": "Уйдёт в одну команду как переменная окружения. В чате не сохраняется и маскируется в выводе.",
   "secretGive": "Передать",
-  "secretDecline": "Отказать"
+  "secretDecline": "Отказать",
+  "htmlPageShowCode": "Показать HTML",
+  "htmlPageShowPage": "Показать страницу",
+  "htmlPageLarger": "Выше",
+  "htmlPageSmaller": "Ниже",
+  "htmlPageWriting": "Пишу страницу…"
 }
