@@ -1,6 +1,7 @@
 import { transformRequest } from "./chatContext";
 import { afterTurn, goalPrompt, newGoal, parseGoalCommand } from "./goalCore";
 import { getGoal, loadGoal, setGoal } from "./goalStore";
+import { parseWatchCommand, startPrWatch } from "./prWatch";
 import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
 import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
@@ -188,6 +189,17 @@ export function useChatRun(o: Options) {
     if (external) return setError(busyError.current = t("scheduledChatBusy", { title: external.title }));
     if (!provider || !app.selection) return app.openSettings("providers");
     if (o.blocked) return setError(o.blocked);
+    // `/watch <PR url or number>`: watch that pull request for this chat (lib/prWatch.ts); nothing goes to the model.
+    const watched = !edit && !retry ? parseWatchCommand(body) : null;
+    if (watched) {
+      if (!session.chatId || !root) return setError(t("prWatchNeedsChat"));
+      try {
+        await startPrWatch(session.chatId, root, watched);
+        o.setText("");
+        o.draft.clearSent(session.chatId);
+      } catch (e) { setError(t("prWatchFailed", { error: String(e instanceof Error ? e.message : e) })); }
+      return;
+    }
     let activeProvider: ProviderConfig = provider;
     let allBlocked = false;
     if (!retry && imgs.length && selectedModel?.images === false) return setError(t("imagesUnsupported"));

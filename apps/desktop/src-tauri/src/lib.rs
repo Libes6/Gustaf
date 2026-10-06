@@ -11,6 +11,7 @@ mod hunks;
 mod import_sources;
 mod mcp;
 mod oauth;
+mod pr_watch;
 mod rawlog;
 mod review;
 mod scratch;
@@ -137,6 +138,7 @@ pub fn run() {
             git_publish::git_pr_context,
             git_publish::gh_status,
             git_publish::git_create_pr,
+            pr_watch::gh_pr_view,
             worktree::worktree_create,
             worktree::worktree_list,
             worktree::worktree_remove,

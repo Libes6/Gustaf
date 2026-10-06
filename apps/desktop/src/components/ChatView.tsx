@@ -1,5 +1,6 @@
 import { QueuePanel } from "./chat/QueuePanel";
 import { GoalBar } from "./chat/GoalBar";
+import { PrWatchBar } from "./chat/PrWatchBar";
 import { SecretCard } from "./chat/SecretCard";
 import { fanOut } from "../lib/fanOut";
 import { isScratch, loadScratch, scratchRoot, scratchVersion, subscribeScratch } from "../lib/scratch";
@@ -191,7 +192,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     <main className="main">
 
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
-      {root && project && <ChangesPanel reviewOn={workspace ? undefined : reviewOn} name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} />}
+      {root && project && <ChangesPanel reviewOn={workspace ? undefined : reviewOn} name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} chatId={session.chatId} />}
 
       {messages.length === 0 && stream === null && !error ? (
         <div className="empty">
@@ -226,6 +227,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
       {fanNotice && <div className="hint fan-notice" role="status">{fanNotice}<button className="btn-ghost" onClick={() => setFanNotice("")}>{t("cancel")}</button></div>}
       <GoalBar chatId={session.chatId} running={running} />
+      <PrWatchBar chatId={session.chatId} />
       {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}

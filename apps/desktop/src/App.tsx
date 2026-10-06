@@ -18,6 +18,7 @@ import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
 import { startScratchChat } from "./lib/scratch";
+import { startPrWatchPoller } from "./lib/prWatch";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -27,6 +28,7 @@ function Shell({ app }: { app: AppState }) {
   useAttentionNotifications();
   useChatStatusSync(app.activeChat, app.view);
   useQuickAskHost(app);
+  useEffect(() => startPrWatchPoller(), []);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
