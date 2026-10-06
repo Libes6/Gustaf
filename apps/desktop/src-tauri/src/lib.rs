@@ -26,6 +26,7 @@ mod legacy;
 mod lsp;
 mod web_tools;
 mod updater;
+mod webhooks;
 mod worktree;
 mod merge_queue;
 mod terminal;
@@ -46,6 +47,7 @@ pub fn run() {
         .manage(preview::Previews::default())
         .manage(mobile_server::MobileServer::default())
         .manage(quick_ask::QuickAsk::default())
+        .manage(webhooks::Webhooks::default())
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 quick_ask::on_main_destroyed(window.app_handle());
@@ -139,6 +141,8 @@ pub fn run() {
             git_publish::gh_status,
             git_publish::git_create_pr,
             pr_watch::gh_pr_view,
+            webhooks::webhook_serve,
+            webhooks::webhook_stop,
             worktree::worktree_create,
             worktree::worktree_list,
             worktree::worktree_remove,

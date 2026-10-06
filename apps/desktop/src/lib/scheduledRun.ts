@@ -171,8 +171,8 @@ export type RunnerStore = { get(): ScheduledPrompt[]; update(fn: (list: Schedule
 export type Runner = {
   /** Applies the periodic check: starts due schedules, records missed ones. */
   tick(): void;
-  /** Starts a schedule now (the user asked for it). False while it is already running. */
-  runNow(id: string): boolean;
+  /** Starts a schedule now (the user asked for it, or a webhook arrived: `prompt` replaces its prompt for this run). False while it is already running. */
+  runNow(id: string, prompt?: string): boolean;
   stop(id: string): void;
   isRunning(id: string): boolean;
   running(): ReadonlySet<string>;
@@ -203,9 +203,10 @@ export function createRunner(store: RunnerStore, execute: (sc: ScheduledPrompt, 
         if (sc && !active.has(id)) start(sc);
       }
     },
-    runNow(id) {
-      const sc = store.get().find((s) => s.id === id);
-      if (!sc || active.has(id)) return false;
+    runNow(id, prompt) {
+      const stored = store.get().find((s) => s.id === id);
+      if (!stored || active.has(id)) return false;
+      const sc = prompt ? { ...stored, prompt } : stored;
       store.update((list) => applyPatches(list, [{ id, patch: { lastRunAt: now(), lastStatus: "running" satisfies RunStatus, lastError: undefined } }]));
       start(sc);
       return true;
