@@ -17,6 +17,7 @@ import { isSearchShortcut } from "./lib/searchUtil";
 import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
+import { startScratchChat } from "./lib/scratch";
 import { AppProvider, type AppState } from "./state";
 
 function Shell({ app }: { app: AppState }) {
@@ -31,6 +32,7 @@ function Shell({ app }: { app: AppState }) {
     const k = (e: KeyboardEvent) => {
       if (matches(e, "settings")) (e.preventDefault(), app.openSettings());
       if (matches(e, "newChat")) (e.preventDefault(), app.newChat());
+      if (matches(e, "newScratchChat")) (e.preventDefault(), void startScratchChat(app));
       if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching(open => !open));
       if (matches(e, "closeSettings") && app.view === "settings") app.setView("chat");
     };

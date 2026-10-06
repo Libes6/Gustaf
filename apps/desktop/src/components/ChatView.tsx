@@ -1,8 +1,9 @@
 import { QueuePanel } from "./chat/QueuePanel";
 import { GoalBar } from "./chat/GoalBar";
 import { fanOut } from "../lib/fanOut";
+import { isScratch, loadScratch, scratchRoot, scratchVersion, subscribeScratch } from "../lib/scratch";
 import { ArrowDown } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
 import { requestTerminalCommand } from "../lib/terminalBridge";
 import { onComposerDraft, takeComposerDraft } from "../lib/composerBridge";
@@ -62,7 +63,17 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const workspaces = useWorkspaces(projectRoot, !!workspace);
   const prefix = usePrefix(projectRoot, !!workspace);
   const resolved = resolveChatRoot({ projectPath: projectRoot, workspace, known: prefix === null ? undefined : workspaces.list, prefix });
-  const root = resolved.root;
+  // A scratch chat (no project, lib/scratch.ts) works in its own folder under the app data.
+  const scratchV = useSyncExternalStore(subscribeScratch, scratchVersion);
+  const [scratchDir, setScratchDir] = useState<string | null>(null);
+  useEffect(() => { void loadScratch(); }, []);
+  useEffect(() => {
+    let live = true;
+    setScratchDir(null);
+    if (chat && chat.project_id === null && isScratch(chat.id)) scratchRoot(chat.id, chat.title).then((d) => live && setScratchDir(d), () => {});
+    return () => { live = false; };
+  }, [chat?.id, scratchV]);
+  const root = resolved.root ?? scratchDir;
   const blocked = resolved.state === "pending" ? t("workspacePending") : resolved.state === "missing" ? t("workspaceMissing") : undefined;
   const [newWorkspace, setNewWorkspace] = useState(false);
   const reviewOn = resolveReviewCopy(app.reviewCopy);

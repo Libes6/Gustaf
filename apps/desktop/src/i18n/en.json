@@ -1554,5 +1554,9 @@
   "fanOutSend": "Send to {count} models",
   "fanOutStarted": "Started in {count} workspaces. They run in the background; see Working in the sidebar.",
   "fanOutFailed": "{name}: {error}",
-  "fanOutNoImages": "Pictures can't be sent to several models yet. Remove them or pick one model."
+  "fanOutNoImages": "Pictures can't be sent to several models yet. Remove them or pick one model.",
+  "newScratchChat": "New scratch chat",
+  "scratchTitle": "Scratch {date}",
+  "scratchFolder": "Scratch folder",
+  "scratchHint": "A chat without a project, with its own folder for files"
 }
