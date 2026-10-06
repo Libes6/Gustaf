@@ -16,6 +16,8 @@ import { useApp } from "../../state";
 import { useMenu } from "../Menu";
 import { ModelIcon } from "../ModelIcon";
 import { ModelPicker } from "../ModelPicker";
+import { FAN_OUT_MAX } from "../../lib/fanOut";
+import { modelKey } from "../../state";
 import { OPEN_MODEL_PICKER_EVENT } from "../../agent/verificationCore";
 import { useInstructionReport } from "../../lib/useInstructionReport";
 import { ContextChip } from "./ContextChip";
@@ -49,6 +51,8 @@ type Props = {
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
   onSend: () => void;
+  /** One prompt to several models, each in its own workspace (shift-click in the model list; new chats of git projects). */
+  onFanOut?: (models: ModelInfo[]) => void;
   onStop: () => void;
   contextTokens: number;
   lastInput: number | undefined;
@@ -101,6 +105,17 @@ export function Composer(p: Props) {
   const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
   const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
   const [picker, setPicker] = useState(false);
+  // Models picked with shift-click for a fan-out; offered only where a workspace can be created for each of them.
+  const [fanKeys, setFanKeys] = useState<string[]>([]);
+  const fanAllowed = !!p.onFanOut && !!p.workspace?.available;
+  const fanModels = fanAllowed ? fanKeys.map((k) => app.models.find((m) => modelKey(m) === k)).filter((m): m is NonNullable<typeof m> => !!m) : [];
+  useEffect(() => { if (!fanAllowed && fanKeys.length) setFanKeys([]); }, [fanAllowed]);
+  const toggleFan = (m: ModelInfo) => setFanKeys((ks) => {
+    const base = ks.length ? ks : app.selection ? [modelKey({ providerId: app.selection.providerId, id: app.selection.model })] : [];
+    const k = modelKey(m);
+    return base.includes(k) ? base.filter((x) => x !== k) : base.length >= FAN_OUT_MAX ? base : [...base, k];
+  });
+  const send = () => (fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend());
   const effortMenu = useMenu();
   // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
   const levels = p.supports.levels?.length ? p.supports.levels : REASONING_LEVELS;
@@ -176,7 +191,7 @@ export function Composer(p: Props) {
     }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      p.onSend();
+      send();
     }
   };
 
@@ -389,11 +404,11 @@ export function Composer(p: Props) {
                 ])) : setPicker(!picker))}
               >
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                <span className="chip-label">{p.modelName ?? t("chooseModel")}</span>
+                <span className="chip-label" title={fanModels.length > 1 ? fanModels.map((m) => m.name).join(", ") : undefined}>{fanModels.length > 1 ? t("fanOutModels", { count: fanModels.length }) : p.modelName ?? t("chooseModel")}</span>
                 {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${level}`)}</span></>}
                 <ChevronDown size={13} className="chev" />
               </button>
-              {picker && <ModelPicker onClose={() => setPicker(false)} />}
+              {picker && <ModelPicker onClose={() => setPicker(false)} multi={fanAllowed ? { keys: fanKeys, toggle: toggleFan, max: FAN_OUT_MAX } : undefined} />}
               {effortMenu.node}
             </div>
             <div className="composer-actions">
@@ -403,7 +418,7 @@ export function Composer(p: Props) {
                 <Square size={12} fill="currentColor" />
               </button>
             ) : (
-              <button className="send" disabled={!text.trim() && !images.length} onClick={p.onSend} title={t("send")} aria-label={t("send")}>
+              <button className="send" disabled={!text.trim() && !images.length} onClick={send} title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")} aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}>
                 <ArrowUp size={16} />
               </button>
             )}
