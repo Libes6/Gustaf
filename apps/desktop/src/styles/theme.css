@@ -748,3 +748,12 @@ button:disabled { cursor:default; opacity:.45; }
 .goal-bar .chip { display: inline-flex; align-items: center; gap: 4px; flex: none; }
 
 .chat-goal-mark { display: inline-grid; place-items: center; color: var(--accent-soft); flex: none; margin-right: 2px; }
+
+/* Settle / snooze in Recent (components/Sidebar.tsx, lib/triageCore.ts) */
+.triage-group { gap: 4px; }
+.triage-group .count { margin-left: auto; color: var(--text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.triage-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 8px; }
+.snooze-dialog { margin: 6px 8px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-elev); display: flex; flex-direction: column; gap: 8px; }
+.snooze-dialog .btns { display: flex; justify-content: flex-end; gap: 6px; }
+
+.snooze-dialog .field-error { color: var(--red); font-size: 12px; }
