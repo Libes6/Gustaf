@@ -22,7 +22,7 @@ const valid = (v: unknown): Goal | null => {
   const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : 0);
   // A goal restored after a restart never continues by itself: it waits for Resume.
   const status = g.status === "active" ? "paused" : g.status!;
-  return { objective: g.objective, status, turns: n(g.turns), maxTurns: n(g.maxTurns) || 20, tokens: n(g.tokens), startedAt: n(g.startedAt), note: g.status === "active" ? "restart" : typeof g.note === "string" ? g.note : undefined };
+  return { objective: g.objective, status, turns: n(g.turns), maxTurns: n(g.maxTurns) || 20, tokens: n(g.tokens), startedAt: n(g.startedAt), note: g.status === "active" ? "restart" : typeof g.note === "string" ? g.note : undefined, ...(g.native === true ? { native: true } : {}) };
 };
 
 export function loadGoal(id: number) {

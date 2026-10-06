@@ -12,7 +12,7 @@
 //  - liveness is never guessed: nothing here treats silence as a heartbeat. When the connection or the turn ends with children
 //    still running, they are left "running" and the caller marks them unknown (cli.ts), not completed.
 import { isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
-import type { Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
+import type { NativeGoal, Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
 
 type Json = Record<string, unknown>;
 const rec = (v: unknown): Json => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {});
@@ -48,6 +48,8 @@ export type TurnParams = {
   reasoning?: Reasoning;
   /** The caller can ask the user: workspace-write turns use `on-request` and forward approval requests; otherwise nothing is requested. */
   approvals?: boolean;
+  /** Run the prompt as a native thread goal: `thread/goal/set` starts the work and the server continues until the goal leaves `active`. */
+  goal?: { objective: string; resume?: boolean };
 };
 
 const policyFor = (p: TurnParams) => (p.approvals && sandboxFor(p.access, p.mode).mode === "workspace-write" ? "on-request" : "never");
@@ -55,7 +57,9 @@ const policyFor = (p: TurnParams) => (p.approvals && sandboxFor(p.access, p.mode
 /** `thread/start` or `thread/resume`. Without an approval handler nothing is asked (`exec` never asked either). */
 export function threadRequest(p: TurnParams): { method: string; params: Json } {
   const sb = sandboxFor(p.access, p.mode);
-  const common = { ...(p.cwd ? { cwd: p.cwd } : {}), ...(p.model ? { model: p.model } : {}), approvalPolicy: policyFor(p), sandbox: sb.mode };
+  // A goal's turns are started by the server, so the effort (a turn/start parameter) has to travel as thread config.
+  const config = p.goal && p.reasoning ? { config: { model_reasoning_effort: p.reasoning } } : {};
+  const common = { ...(p.cwd ? { cwd: p.cwd } : {}), ...(p.model ? { model: p.model } : {}), approvalPolicy: policyFor(p), sandbox: sb.mode, ...config };
   return p.session ? { method: "thread/resume", params: { threadId: p.session, ...common } } : { method: "thread/start", params: common };
 }
 
@@ -102,6 +106,10 @@ export type Effect =
   | { kind: "text"; text: string }
   | { kind: "activity"; activity: Activity }
   | { kind: "usage"; usage: TokenUsage }
+  | { kind: "goal"; goal: NativeGoal }
+  /** Goal mode: a root turn ended but the goal is still active (more turns may follow) / the next root turn began. */
+  | { kind: "idle" }
+  | { kind: "busy" }
   | { kind: "reply"; reply: Reply }
   | { kind: "approval"; id: string | number; ask: { kind: "command"; command: string; reason?: string } }
   | { kind: "done"; status: "completed" | "interrupted" | "failed"; error?: string };
@@ -118,7 +126,9 @@ const humanTask = (path: string) => (path.split("/").filter(Boolean).pop() ?? ""
 const childState = (s: unknown): SubagentState => (s === "completed" ? "completed" : s === "interrupted" ? "stopped" : "failed");
 
 /** Per-turn state machine. Feed it every JSON-RPC message of the connection; apply the returned effects in order. */
-export function createReducer(rootThreadId: string) {
+export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) {
+  let goalStatus = "";
+  let turnEnded = false;
   const children = new Map<string, Child>();
   const held = new Map<string, Json[]>();
   const hints = new Map<string, { model?: string; role?: string; nickname?: string }>();
@@ -280,11 +290,23 @@ export function createReducer(rootThreadId: string) {
         if (!baseline) baseline = sub(total, last);
         usageSeen++;
       }
+    } else if (method === "turn/started") {
+      turnEnded = false;
+      if (o.goal) out.push({ kind: "busy" });
+    } else if (method === "thread/goal/updated") {
+      const g = rec(p.goal);
+      goalStatus = str(g.status);
+      out.push({ kind: "goal", goal: { status: (goalStatus || "active") as NativeGoal["status"], objective: str(g.objective), tokensUsed: num(g.tokensUsed) ?? 0, timeUsedSeconds: num(g.timeUsedSeconds) ?? 0 } });
+      // The goal finished after the last turn already ended: nothing more will come.
+      if (o.goal && goalStatus !== "active" && turnEnded) out.push({ kind: "done", status: "completed" });
     } else if (method === "turn/completed") {
       const turn = rec(p.turn);
       const s = str(turn.status);
       const e = rec(turn.error);
-      out.push({ kind: "done", status: s === "interrupted" ? "interrupted" : s === "failed" ? "failed" : "completed", ...(str(e.message) ? { error: str(e.message) } : {}) });
+      turnEnded = true;
+      // A goal run continues in further server-started turns while the goal is active.
+      if (o.goal && s === "completed" && (goalStatus === "active" || goalStatus === "")) out.push({ kind: "idle" });
+      else out.push({ kind: "done", status: s === "interrupted" ? "interrupted" : s === "failed" ? "failed" : "completed", ...(str(e.message) ? { error: str(e.message) } : {}) });
     } else if (method === "error") {
       const e = rec(p.error);
       if (p.willRetry !== true && str(e.message)) out.push({ kind: "done", status: "failed", error: str(e.message) });
@@ -360,6 +382,10 @@ export type TurnHandlers = {
   onDebug?(note: string): void;
   /** Answers an approval request (true: allow once). Absent: declined. */
   onApproval?(ask: { kind: "command"; command: string; reason?: string }): Promise<boolean>;
+  /** Goal updates (`thread/goal/updated`), in order. */
+  onGoal?(g: NativeGoal): void;
+  /** Goal run: how long an idle thread with a still-active goal is waited on before the turn ends (default `GOAL_IDLE_MS`). */
+  goalIdleMs?: number;
   /** How long to keep the connection for children still running after the parent turn completed (default `CHILD_WAIT_MS`). */
   childWaitMs?: number;
 };
@@ -376,6 +402,8 @@ const REQUEST_TIMEOUT_MS = 20_000;
  * verdict about the children: they stay "running" and the caller shows them as unknown.
  */
 export const CHILD_WAIT_MS = 15 * 60_000;
+/** An active goal whose thread went idle and stayed idle: the server is not continuing (waiting for the user, or stuck). */
+export const GOAL_IDLE_MS = 30_000;
 
 /**
  * initialize, thread/start|resume, turn/start, then reduce notifications until the root turn ends. Never reports an error
@@ -390,11 +418,15 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
   const early: Json[] = [];
 
   let childrenSettled: (() => void) | undefined;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
   const apply = (effects: Effect[]) => {
     for (const e of effects) {
       if (e.kind === "text") h.onText(e.text);
       else if (e.kind === "activity") h.onActivity(e.activity);
       else if (e.kind === "usage") h.onUsage?.(e.usage);
+      else if (e.kind === "goal") h.onGoal?.(e.goal);
+      else if (e.kind === "busy") { clearTimeout(idleTimer); idleTimer = undefined; }
+      else if (e.kind === "idle") { clearTimeout(idleTimer); idleTimer = setTimeout(() => finish({ status: "completed" }), h.goalIdleMs ?? GOAL_IDLE_MS); }
       else if (e.kind === "approval") {
         const answer = (ok: boolean) => void conn.write(JSON.stringify({ jsonrpc: "2.0", id: e.id, result: { decision: ok ? "accept" : "decline" } })).catch(() => {});
         if (!h.onApproval) answer(false);
@@ -453,10 +485,11 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     }
     const session = str(thread.id);
     if (!session) throw new Error("app-server returned no thread id");
-    reducer = createReducer(session);
+    reducer = createReducer(session, { goal: !!p.goal });
     for (const m of early.splice(0)) apply(reducer.onMessage(m));
     try {
-      await request("turn/start", turnRequest(session, p));
+      if (p.goal) await request("thread/goal/set", { threadId: session, ...(p.goal.resume ? { status: "active" } : { objective: p.goal.objective }) });
+      else await request("turn/start", turnRequest(session, p));
     } catch (e) {
       if (h.signal?.aborted) throw aborted();
       throw e;
@@ -475,6 +508,7 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     const error = end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";
     return { session, error, running: reducer.running(), usage };
   } finally {
+    clearTimeout(idleTimer);
     h.signal?.removeEventListener("abort", onAbort);
     conn.kill();
   }

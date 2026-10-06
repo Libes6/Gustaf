@@ -42,6 +42,8 @@ export type ApprovalRequest =
 export type ApprovalAnswer = boolean | "task";
 
 export type RunOptions = {
+  /** Run this message as a native provider goal (`TurnInput.goal`); first step only. */
+  goal?: import("../providers/types").TurnInput["goal"];
   takeClarifications?: () => Promise<Msg[]>;
   root: string | null;
   reviewMode?: boolean;
@@ -397,6 +399,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
       onLimits: o.onLimits,
       onRetry: o.onRetry,
       approve: async (req) => (await o.approve(req)) !== false,
+      ...(step === 0 && o.goal ? { goal: o.goal } : {}),
     });
     if (o.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const calls = out.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");

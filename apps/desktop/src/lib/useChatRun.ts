@@ -1,6 +1,6 @@
 import { transformRequest } from "./chatContext";
-import { afterTurn, goalPrompt, newGoal, parseGoalCommand } from "./goalCore";
-import { getGoal, loadGoal, setGoal } from "./goalStore";
+import { afterTurn, fromNativeStatus, goalPrompt, isContinuation, newGoal, newNativeGoal, parseGoalCommand } from "./goalCore";
+import { getGoal, loadGoal, setGoal, subscribeGoals } from "./goalStore";
 import { parseWatchCommand, startPrWatch } from "./prWatch";
 import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
 import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
@@ -206,8 +206,18 @@ export function useChatRun(o: Options) {
     let activeModel = app.selection.model;
     // `/goal <objective>` starts a goal: the agent then keeps going turn after turn (lib/goalCore.ts).
     const goalObjective = retry ? null : parseGoalCommand(body);
-    const sentBody = goalObjective ? goalPrompt(goalObjective) : body;
+    // Codex (app-server) has goals of its own: it keeps working turn after turn by itself, so the app's loop and its
+    // `GOAL: done` protocol are not used for it. A continuation of such a goal (Resume) re-activates it.
+    if (session.chatId) await loadGoal(session.chatId).catch(() => {});
+    const existing = session.chatId ? getGoal(session.chatId) : null;
+    const nativeAdapter = !retry && (goalObjective || (existing?.native && existing.status === "active" && isContinuation(body)))
+      ? await getAdapter(provider).then((a) => a.nativeGoal?.() ?? false).catch(() => false)
+      : false;
+    const nativeResume = !!nativeAdapter && !goalObjective && !!existing;
+    const nativeObjective = nativeAdapter ? (goalObjective ?? existing!.objective) : null;
+    const sentBody = goalObjective ? (nativeAdapter ? goalObjective : goalPrompt(goalObjective)) : body;
     let goalRun = false;
+    let stopGoalWatch = () => {};
     let runTokens = 0;
     let lastAssistant = "";
     setError("");
@@ -270,8 +280,10 @@ export function useChatRun(o: Options) {
       await loadQueue(cid);
       await updateQueue(cid, q => ({ ...q, active: true }));
       await loadGoal(cid).catch(() => {});
-      if (goalObjective) await setGoal(cid, newGoal(goalObjective, Date.now()));
+      if (goalObjective) await setGoal(cid, nativeAdapter ? newNativeGoal(goalObjective, Date.now()) : newGoal(goalObjective, Date.now()));
       goalRun = getGoal(cid)?.status === "active";
+      // Pausing or clearing a native goal stops its running turn at once (the provider would otherwise carry on).
+      if (nativeObjective && goalRun) stopGoalWatch = subscribeGoals(() => { const g = getGoal(cid); if (!g || g.status === "paused" || g.status === "blocked") ctl.abort(); });
       let history: Msg[];
       if (retry && retryRef.current) {
         history = [...retryRef.current.history];
@@ -359,6 +371,18 @@ export function useChatRun(o: Options) {
         allowlist: app.allowlist,
         signal: ctl.signal,
         stop: () => ctl.abort(),
+        ...(nativeObjective ? { goal: {
+          objective: nativeObjective,
+          resume: nativeResume,
+          onUpdate: (g: import("../providers/types").NativeGoal) => {
+            const cur = getGoal(cid);
+            if (!cur?.native) return;
+            const mapped = fromNativeStatus(g.status);
+            // The user paused or cleared it meanwhile: that wins, and the running turn is stopped.
+            if (cur.status === "paused" || cur.status === "blocked") { ctl.abort(); return; }
+            void setGoal(cid, { ...cur, status: mapped.status, note: mapped.note, tokens: g.tokensUsed || cur.tokens }).catch(() => {});
+          },
+        } } : {}),
         approve,
         requestSecret: (req) => new Promise<string | null>((resolve) => {
           let done = false;
@@ -413,7 +437,13 @@ export function useChatRun(o: Options) {
       // A goal turn ended: count it, and queue the next turn unless the agent reported done/blocked, the user stopped
       // or paused it, the run failed or the turn limit is reached.
       const goalNow = chatId ? getGoal(chatId) : null;
-      if (chatId && goalRun && goalNow) {
+      stopGoalWatch();
+      if (chatId && goalRun && goalNow?.native) {
+        // The provider drives a native goal: no continuation turns here. A run that ended while the goal is still active was
+        // stopped, failed or went quiet; it waits for Resume.
+        const done = goalNow.status !== "active";
+        await setGoal(chatId, { ...goalNow, turns: goalNow.turns + 1, ...(done ? {} : { status: "paused" as const, note: outcome === "ok" ? "idle" : outcome }) }).catch(() => {});
+      } else if (chatId && goalRun && goalNow) {
         const next = afterTurn(goalNow, { outcome, lastText: lastAssistant, tokens: runTokens });
         await setGoal(chatId, next.goal).catch(() => {});
         if (next.continueWith) {

@@ -63,6 +63,8 @@ export type ChatRunInput = {
   root: string | null;
   /** The project folder when `root` is a workspace checkout (settings such as the verification checks belong to the project). */
   project?: string | null;
+  /** Run the message as a native provider goal (Codex `thread/goal/*`); see `TurnInput.goal`. */
+  goal?: RunOptions["goal"];
   /** Final history for the model (already includes the new user message). */
   history: Msg[];
   /** A retry: the history comes from the interrupted run, response ids are kept. */
@@ -138,6 +140,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       signal: i.signal,
       source: i.source,
       takeClarifications: i.takeClarifications,
+      ...(i.goal ? { goal: i.goal } : {}),
       subagents: i.subagents,
       onLimits: (windows) => deps.onLimits?.(tg.providerId, windows),
       onRetry: ui.onRetry,
