@@ -1611,5 +1611,13 @@
   "chatUnmute": "Unmute notifications",
   "chatMuted": "Notifications muted",
   "turnPrev": "Previous message of yours",
-  "turnNext": "Next message of yours"
+  "turnNext": "Next message of yours",
+  "cleanupTitle": "Storage",
+  "cleanupAuto": "Clean up idle workspaces",
+  "cleanupDesc": "Once a day, remove the folder of a workspace chat that has been idle for a while and has no uncommitted changes. The branch and the chat stay; open the chat to see it archived.",
+  "cleanupAfter": "Idle for",
+  "cleanupDays": "{n} days",
+  "cleanupNow": "Clean up now",
+  "cleanupDone": "Removed {n} workspace folders",
+  "cleanupFailed": "Cleanup failed"
 }

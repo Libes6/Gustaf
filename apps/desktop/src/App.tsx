@@ -19,6 +19,7 @@ import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
 import { startScratchChat } from "./lib/scratch";
 import { startPrWatchPoller } from "./lib/prWatch";
+import { startCleanupScheduler } from "./lib/storageCleanup";
 import { emptyNav, move, visit } from "./lib/navHistory";
 import { AppProvider, type AppState } from "./state";
 
@@ -30,6 +31,7 @@ function Shell({ app }: { app: AppState }) {
   useChatStatusSync(app.activeChat, app.view);
   useQuickAskHost(app);
   useEffect(() => startPrWatchPoller(), []);
+  useEffect(() => startCleanupScheduler(), []);
   // Back / forward between chats (lib/navHistory.ts): every chat the user opens is recorded, except moves made by ⌘[ / ⌘].
   const nav = useRef(emptyNav);
   const navigating = useRef(false);

@@ -23,6 +23,7 @@ import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DeveloperSettings } from "./DeveloperSettings";
+import { CleanupSettings } from "./CleanupSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommandRules } from "./CommandRules";
@@ -84,6 +85,7 @@ function General() {
       </div>
       <AppearanceSettings />
       <ShortcutsSettings />
+      <CleanupSettings />
       <DeveloperSettings />
     <VoiceSettings /><WebSettings /><UpdaterPanel /></>
   );
