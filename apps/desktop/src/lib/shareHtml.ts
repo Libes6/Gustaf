@@ -74,7 +74,10 @@ function textHtml(text: string, L: ShareLabels): string {
     .map((seg) =>
       seg.type === "text"
         ? seg.text.trim() ? `<div class="md">${markdownToHtml(seg.text)}</div>` : ""
-        : `<div class="card canvas"><div class="card-head">${escapeHtml(L.canvas)}: ${escapeHtml(seg.artifact.title)}</div><pre>${escapeHtml(seg.artifact.code)}</pre></div>`,
+        : seg.type === "page"
+          // An agent's HTML page is shared as its source: embedding it would run its markup inside the shared page.
+          ? `<div class="card canvas"><div class="card-head">HTML: ${escapeHtml(seg.page.title)}</div><pre>${escapeHtml(seg.page.html)}</pre></div>`
+          : `<div class="card canvas"><div class="card-head">${escapeHtml(L.canvas)}: ${escapeHtml(seg.artifact.title)}</div><pre>${escapeHtml(seg.artifact.code)}</pre></div>`,
     )
     .join("");
 }

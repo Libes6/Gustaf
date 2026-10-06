@@ -1563,5 +1563,10 @@
   "secretValue": "Secret value",
   "secretNote": "Goes to one command as an environment variable. It is not saved in the chat, and it is masked in the output.",
   "secretGive": "Provide",
-  "secretDecline": "Decline"
+  "secretDecline": "Decline",
+  "htmlPageShowCode": "Show HTML",
+  "htmlPageShowPage": "Show page",
+  "htmlPageLarger": "Taller",
+  "htmlPageSmaller": "Shorter",
+  "htmlPageWriting": "Writing the page…"
 }

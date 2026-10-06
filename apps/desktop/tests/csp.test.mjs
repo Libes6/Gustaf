@@ -124,7 +124,8 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
   // sanitised by Mermaid's DOMPurify before it is returned.
   assert.match(readFileSync(join(root, 'src/components/MermaidBlock.tsx'), 'utf8'), /securityLevel:\s*"strict"/, 'Mermaid must render with securityLevel "strict"');
   const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length).split(sep).join("/"));
-  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, isolated local project preview and HTML sharing may create an iframe');
+  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/HtmlPageCard.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, agent HTML pages, isolated local project preview and HTML sharing may create an iframe');
+  assert.match(readFileSync(join(root, 'src/components/HtmlPageCard.tsx'), 'utf8'), /sandbox=""/, 'agent HTML pages must be fully sandboxed (no scripts)');
   const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
   assert.match(share, /sandbox=""/, 'the share preview frame must be fully sandboxed (no scripts)');
   const panel = readFileSync(join(root, 'src/components/CanvasPanel.tsx'), 'utf8');

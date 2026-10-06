@@ -3,6 +3,7 @@ import { isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import { parseArtifacts } from "../canvas/artifacts";
 import { CanvasCard } from "./CanvasWorkspace";
 import { MermaidBlock } from "./MermaidBlock";
+import { HtmlPageCard } from "./HtmlPageCard";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -62,7 +63,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
   const segments = useMemo(() => parseArtifacts(text), [text]);
   return (
     <div className="md">
-      {segments.map((segment, i) => segment.type === "canvas" ? <CanvasCard key={i} artifact={segment.artifact} /> : (
+      {segments.map((segment, i) => segment.type === "canvas" ? <CanvasCard key={i} artifact={segment.artifact} /> : segment.type === "page" ? <HtmlPageCard key={i} page={segment.page} /> : (
       <ReactMarkdown
         key={i}
         remarkPlugins={[remarkGfm]}

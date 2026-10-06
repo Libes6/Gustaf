@@ -172,3 +172,12 @@ test('externals other than react are only reachable when provided by the runtime
   assert.equal(loadModules(files, compile, { react: React, 'lucide-react': icons }).default(), 'heart-icon');
   assert.throws(() => loadModules(files, compile, { react: React }), /Unsupported import "lucide-react"/);
 });
+
+test('html-page fences become page segments; incomplete ones are marked; instructions mention them', () => {
+  const s = parseArtifacts('Intro\n```html-page title="Weekly report"\n<h1>Hi</h1>\n```\nOutro');
+  assert.deepEqual(s.map((x) => x.type), ['text', 'page', 'text']);
+  assert.deepEqual(s[1].page, { title: 'Weekly report', html: '<h1>Hi</h1>', complete: true });
+  assert.equal(parseArtifacts('```html-page\n<p>x')[0].page.complete, false);
+  assert.equal(parseArtifacts('```html\n<p>x</p>\n```')[0].type, 'text', 'plain html code blocks stay code');
+  assert.match(CANVAS_INSTRUCTIONS, /html-page title=/);
+});
