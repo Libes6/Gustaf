@@ -1519,10 +1519,12 @@
   "provSignInCommand": "Войдите командой {command} в терминале и проверьте снова.",
   "provNoBaseUrl": "У этого провайдера нет base URL или путей для настройки.",
   "provBrowserDone": "Аккаунты, в которые вы вошли, появятся в списке слева.",
-  "effortTitle": "Уровень рассуждений",
-  "effortReset": "Сбросить к умолчанию",
-  "effortHintLow": "Быстрее, дешевле",
-  "effortHintHigh": "Глубже, дольше",
+  "effortTitle": "Вдумчивость",
+  "effortHint_low": "Быстрее и дешевле",
+  "effortHint_medium": "Сбалансированно",
+  "effortHint_high": "Думает дольше",
+  "effortHint_xhigh": "Думает намного дольше",
+  "effortHint_max": "Глубже всего, медленнее всего",
   "reasoning_xhigh": "Очень глубокое",
   "reasoning_max": "Максимум"
 }

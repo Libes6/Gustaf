@@ -1484,9 +1484,11 @@
   "provNoBaseUrl": "This provider has no base URL or paths to configure.",
   "provBrowserDone": "Accounts you sign in appear in the list on the left.",
   "effortTitle": "Reasoning effort",
-  "effortReset": "Reset to default",
-  "effortHintLow": "Faster, cheaper",
-  "effortHintHigh": "Deeper, slower",
+  "effortHint_low": "Fastest, cheapest",
+  "effortHint_medium": "Balanced",
+  "effortHint_high": "Thinks longer",
+  "effortHint_xhigh": "Thinks much longer",
+  "effortHint_max": "Deepest, slowest",
   "reasoning_xhigh": "Extra high",
   "reasoning_max": "Max"
 }
