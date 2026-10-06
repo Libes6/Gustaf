@@ -1504,5 +1504,9 @@
   "pastedTextStats": "{lines} lines · {chars} characters",
   "pastedTextInline": "Put into message",
   "pastedTextShow": "Show text",
-  "pasteTooLarge": "This paste is larger than the draft limit (200,000 characters)."
+  "pasteTooLarge": "This paste is larger than the draft limit (200,000 characters).",
+  "mermaidInvalid": "Can't draw this diagram; showing the code",
+  "mermaidShowCode": "Show code",
+  "mermaidShowDiagram": "Show diagram",
+  "mermaidDiagram": "Diagram"
 }

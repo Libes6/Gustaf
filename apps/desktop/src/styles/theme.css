@@ -730,3 +730,8 @@ button:disabled { cursor:default; opacity:.45; }
 .method-list .card-row { cursor: pointer; }
 .picker-manage { border-top: 1px solid var(--border); padding: 8px 10px; flex: none; }
 .picker-manage:hover { color: var(--text); }
+
+/* Mermaid diagrams in messages (components/MermaidBlock.tsx) */
+.mermaid-diagram { padding: 14px; overflow-x: auto; display: flex; justify-content: center; }
+.mermaid-diagram svg { max-width: 100%; height: auto; }
+.mermaid-note { color: var(--text-3); font-size: 11.5px; margin-left: 8px; }
