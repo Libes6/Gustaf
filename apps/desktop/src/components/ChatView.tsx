@@ -3,6 +3,7 @@ import { GoalBar } from "./chat/GoalBar";
 import { PrWatchBar } from "./chat/PrWatchBar";
 import { SecretCard } from "./chat/SecretCard";
 import { fanOut } from "../lib/fanOut";
+import { savedPosition, savePosition } from "../lib/readingPosition";
 import { isScratch, loadScratch, scratchRoot, scratchVersion, subscribeScratch } from "../lib/scratch";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -183,6 +184,28 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     if (el && atBottom) el.scrollTop = el.scrollHeight;
   }, [messages, stream, approval, activities, toolResults]);
 
+  // Reading position across restarts (lib/readingPosition.ts): restored once when the chat's messages first load,
+  // unless a search result is being opened; saved while scrolling.
+  const restored = useRef<number | null>(null);
+  useEffect(() => {
+    const el = feedRef.current;
+    if (!el || !loaded || !session.chatId || restored.current === session.chatId || !messages.length) return;
+    restored.current = session.chatId;
+    const from = app.jump?.chatId === session.chatId ? null : savedPosition(session.chatId);
+    if (from === null) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight - from);
+      setAtBottom(false);
+    });
+  }, [loaded, session.chatId, messages.length]);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rememberScroll = (el: HTMLDivElement) => {
+    const id = session.chatId;
+    if (!id || restored.current !== id) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => savePosition(id, el.scrollHeight - el.scrollTop - el.clientHeight), 400);
+  };
+
   const turns = useMemo(() => groupTurns(messages), [messages]);
   const canvasSources = useMemo(() => messages.filter((m) => m.role === "assistant").map(textOf), [messages]);
 
@@ -206,7 +229,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           await latest.current.run.branchFrom(branchPoint, latest.current.title, latest.current.branchLabel, selection);
           setBranchPoint(null);
         }} />}
-        <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
+        <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => { setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40); rememberScroll(e.currentTarget); }}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
               <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />

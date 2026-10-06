@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
 import { useT } from "../../i18n";
+import { cmdKey } from "../../lib/shortcuts";
 import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
@@ -193,6 +194,8 @@ export function Composer(p: Props) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       send();
+      // ⌘⌥↵: the message goes out here and a fresh chat opens next to it (the run continues in the background).
+      if (e.altKey && cmdKey(e.nativeEvent) && (text.trim() || images.length)) app.newChat(app.sessions.items.find((s) => s.key === app.sessions.active)?.projectId ?? null);
     }
   };
 
