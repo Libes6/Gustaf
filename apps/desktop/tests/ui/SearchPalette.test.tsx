@@ -2,7 +2,7 @@ import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SearchPalette } from "../../src/components/SearchPalette";
 import type { SearchHit, SearchPage } from "../../src/lib/api";
-import { makeApp, project, renderApp } from "./render";
+import { chat, makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 const hit = (id: number, over: Partial<SearchHit> = {}): SearchHit => ({
@@ -293,5 +293,23 @@ describe("SearchPalette", () => {
       renderApp(<SearchPalette onClose={() => {}} />);
       expect(screen.queryByRole("checkbox", { name: "Only this project" })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("SearchPalette jumps", () => {
+  it("offers chats by title or #id and settings pages above the message hits", () => {
+    const onClose = vi.fn();
+    const app = makeApp({ chats: [chat({ id: 12, project_id: null, title: "Release notes draft" })], projects: [] });
+    renderApp(<SearchPalette onClose={onClose} />, app);
+    const input = document.querySelector<HTMLInputElement>(".search-input input")!;
+    fireEvent.change(input, { target: { value: "#12" } });
+    expect(screen.getByRole("option", { name: /Release notes draft/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(app.openChat).toHaveBeenCalledWith(12, null);
+    expect(onClose).toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "provid" } });
+    expect(screen.getByRole("option", { name: /Model providers/ })).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(app.openSettings).toHaveBeenCalledWith("providers");
   });
 });

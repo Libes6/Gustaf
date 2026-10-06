@@ -1602,5 +1602,6 @@
   "copied": "Copied",
   "chatBack": "Previous chat",
   "chatForward": "Next chat",
-  "sendNewChat": "Send and open a new chat"
+  "sendNewChat": "Send and open a new chat",
+  "fileViewed": "Viewed"
 }

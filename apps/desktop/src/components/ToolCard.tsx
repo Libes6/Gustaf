@@ -23,7 +23,7 @@ export function summarize(call: Call) {
   return a.command ?? a.file_path ?? a.path ?? a.pattern ?? (a.tool ? `${a.server ?? ""} · ${a.tool}` : undefined) ?? JSON.stringify(a).slice(0, 80);
 }
 
-export function ToolCard({ call, result, onRunCommand, projectRoot }: { call: Call; result?: Result; onRunCommand?: (command: string) => void; projectRoot?: string }) {
+export function ToolCard({ call, result, onRunCommand, projectRoot, at }: { call: Call; result?: Result; onRunCommand?: (command: string) => void; projectRoot?: string; /** When the step that made this call was stored (shown as a time on the row). */ at?: number }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [commandError, setCommandError] = useState("");
@@ -41,6 +41,7 @@ export function ToolCard({ call, result, onRunCommand, projectRoot }: { call: Ca
         <Icon size={14} />
         <span className="name">{label}</span>
         <span className="arg">{summarize(call)}</span>
+        {at && <time className="tool-time" dateTime={new Date(at).toISOString()} title={t.date(at)}>{new Date(at).toLocaleTimeString(t.locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>}
         <span className={`action-status ${status}`}>{t(`action_${status}`)}</span>
         {status === "running" ? <Loader2 size={13} className="spin" /> : status === "error" ? <X size={13} className="err" /> : status === "success" ? <Check size={13} color="var(--green)" /> : null}
       </button>

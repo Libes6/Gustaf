@@ -29,6 +29,7 @@ const TerminalPanel = lazy(() => import("./TerminalPanel").then(module => ({ def
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
 import { WorkspaceChanges } from "./WorkspaceChanges";
 import { usePrefix } from "../lib/workspaceStore";
+import { isViewed, setViewed } from "../lib/viewedFiles";
 
 function DiffView({ text }: { text: string }) {
   return (
@@ -53,6 +54,8 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
   const [comments, setComments] = useState<FeedbackComment[]>([]);
   const [focusHunk, setFocusHunk] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [, setViewedTick] = useState(0);
+  const bumpViewed = () => setViewedTick((n) => n + 1);
   const [terminalOpened, setTerminalOpened] = useState(false);
   const [previewOpened, setPreviewOpened] = useState(false);
   const [tab, setTab] = useState<"changes" | "terminal" | "preview">("changes");
@@ -345,7 +348,8 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
                 {reviews.map(([r, list]) => <div key={r.id} className="review-group">
                   {reviews.length > 1 && <button className="btn-soft review-ai" disabled={!canReview} onClick={() => reviewFiles(r.id)}><Sparkles size={13} /> {t("aiReviewGroup", { count: list.length })}</button>}
                   {setupCfg.testCommand && <ReviewTestRun reviewId={r.id} command={setupCfg.testCommand} tick={tick} busy={busy || acting} />}
-                  {list.map(f => <div key={f.path} className="file-row review-row">
+                  {list.map(f => <div key={f.path} className={`file-row review-row${isViewed(root, f.path, `review:${r.id}`) ? " viewed" : ""}`}>
+                  <ViewedBox root={root} path={f.path} signature={`review:${r.id}`} onChange={bumpViewed} />
                   <button className="path review-path" onClick={() => showDiff(f.path, r.id)}>{f.path}<span className="hint">{t(f.binary ? "reviewBinary" : "reviewChanged")}</span></button>
                   <button className="icon-btn" disabled={busy || acting} title={t("reviewAccept")} aria-label={`${t("reviewAccept")}: ${f.path}`} onClick={guarded([f.path], t("gateAcceptAnyway"), act(accept(r.id, f.path)))}><Check size={15} /></button>
                   <button className="icon-btn" disabled={busy || acting} title={t("reviewReject")} aria-label={`${t("reviewReject")}: ${f.path}`} onClick={act(() => review.decide(r.id, f.path, false))}><X size={15} /></button>
@@ -353,7 +357,8 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
                 {files.length > 0 && <div className="review-intro"><strong>{t("changes")}</strong></div>}
                 {!files.length && <div className="hint" style={{ padding: 12 }}>{t("noChanges")}</div>}
                 {files.map((f) => (
-                  <div key={f.path} className="file-row">
+                  <div key={f.path} className={`file-row${isViewed(root, f.path, `${f.added}/${f.removed}`) ? " viewed" : ""}`}>
+                    <ViewedBox root={root} path={f.path} signature={`${f.added}/${f.removed}`} onChange={bumpViewed} />
                     <button className="path" onClick={() => showDiff(f.path)}>{f.path}</button>
                     <span className="plus">+{f.added}</span>
                     <span className="minus">−{f.removed}</span>
@@ -393,3 +398,11 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
     </aside>
   );
 }
+
+/** "Viewed" checkbox of a changed file (lib/viewedFiles.ts); unchecks itself when the change is different. */
+function ViewedBox({ root, path, signature, onChange }: { root: string; path: string; signature: string; onChange: () => void }) {
+  const t = useT();
+  const on = isViewed(root, path, signature);
+  return <input type="checkbox" className="viewed-box" checked={on} title={t("fileViewed")} aria-label={`${t("fileViewed")}: ${path}`} onChange={(e) => { setViewed(root, path, signature, e.target.checked); onChange(); }} />;
+}
+
