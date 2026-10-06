@@ -45,7 +45,7 @@ function DiffView({ text }: { text: string }) {
   );
 }
 
-export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, tick, onChanged, onReplyToAgent }: { /** False: this chat edits the project directly (no review copy), so the copy hint is not shown while nothing is pending. */ reviewOn?: boolean; name: string; root: string; /** The chat runs in a git workspace: its net diff against the base is listed. */ workspace?: { taskId: string; branch: string; projectRoot: string }; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
+export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, tick, onChanged, onReplyToAgent, chatId }: { /** The chat this panel belongs to: a created PR can be watched in it. */ chatId?: number | null; /** False: this chat edits the project directly (no review copy), so the copy hint is not shown while nothing is pending. */ reviewOn?: boolean; name: string; root: string; /** The chat runs in a git workspace: its net diff against the base is listed. */ workspace?: { taskId: string; branch: string; projectRoot: string }; busy: boolean; messages: StoredMsg[]; tick: number; onChanged: () => void; onReplyToAgent?: (text: string) => void }) {
   const t = useT();
   const app = useApp();
   const aiReview = useDiffReview(root);
@@ -275,7 +275,7 @@ export function ChangesPanel({ reviewOn, name, root, workspace, busy, messages, 
         <button className="icon-btn" title={t("gitOfferDismiss")} aria-label={t("gitOfferDismiss")} onClick={() => { acceptedFiles.forget(root, offer.map(f => f.path)); refresh().catch(e => setErr(String(e))); }}><X size={13} /></button>
       </div>}
       {notice && <div className="commit-notice" role="status"><Check size={13} /><span className="grow">{notice}</span></div>}
-      {commitOpen && <GitCommitDialog root={root} accepted={acceptedFiles.list(root)} onClose={() => setCommitOpen(false)}
+      {commitOpen && <GitCommitDialog root={root} chatId={chatId} accepted={acceptedFiles.list(root)} onClose={() => setCommitOpen(false)}
         gate={auto.enabled ? { ensure: () => trigger.ensureReviewed().then(() => undefined), high: highFor, dismiss: aiReview.dismiss } : undefined}
         onCommitted={(r) => {
         acceptedFiles.forget(root, r.files);

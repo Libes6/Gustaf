@@ -263,7 +263,7 @@ pub fn push(root: &Path, remote: &str, branch: &str, set_upstream: bool, confirm
 // gh
 
 /// `gh` from PATH plus the usual install directories (a GUI app on macOS has a minimal PATH).
-fn find_gh() -> Option<PathBuf> {
+pub(crate) fn find_gh() -> Option<PathBuf> {
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
     for extra in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/home/linuxbrew/.linuxbrew/bin"] {
         dirs.push(PathBuf::from(extra));
@@ -271,7 +271,7 @@ fn find_gh() -> Option<PathBuf> {
     dirs.into_iter().map(|d| d.join("gh")).find(|p| p.is_file())
 }
 
-fn gh_command(gh: &Path, root: &Path) -> Command {
+pub(crate) fn gh_command(gh: &Path, root: &Path) -> Command {
     let mut cmd = Command::new(gh);
     cmd.current_dir(root).env("GH_PROMPT_DISABLED", "1").env("GH_NO_UPDATE_NOTIFIER", "1").env("NO_COLOR", "1").env("GIT_TERMINAL_PROMPT", "0");
     cmd

@@ -1568,5 +1568,20 @@
   "htmlPageShowPage": "Show page",
   "htmlPageLarger": "Taller",
   "htmlPageSmaller": "Shorter",
-  "htmlPageWriting": "Writing the page…"
+  "htmlPageWriting": "Writing the page…",
+  "prWatchNeedsChat": "Start watching from a chat that has a project and at least one message.",
+  "prWatchFailed": "Couldn't read the pull request: {error}",
+  "prWatchTitle": "Watching pull request",
+  "prWatchChecks": "checks {passed}/{total} passed",
+  "prWatchFailing": "{count} failing",
+  "prWatchConflict": "conflicts with the base",
+  "prWatchStop": "Stop watching",
+  "prWatchDismiss": "Dismiss",
+  "prWatchStopped_merged": "merged",
+  "prWatchStopped_closed": "closed",
+  "prWatchStopped_comments": "stopped after 10 comment updates",
+  "prWatchStopped_unreadable": "stopped: GitHub could not be read for 15 minutes",
+  "prWatchStopped_user": "stopped",
+  "prWatchCommandHint": "Watch a pull request: /watch <url or number> / Следить за PR",
+  "prWatchStart": "Watch in this chat"
 }

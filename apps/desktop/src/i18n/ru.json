@@ -1604,5 +1604,20 @@
   "htmlPageShowPage": "Показать страницу",
   "htmlPageLarger": "Выше",
   "htmlPageSmaller": "Ниже",
-  "htmlPageWriting": "Пишу страницу…"
+  "htmlPageWriting": "Пишу страницу…",
+  "prWatchNeedsChat": "Начните слежение из чата с проектом и хотя бы одним сообщением.",
+  "prWatchFailed": "Не удалось прочитать PR: {error}",
+  "prWatchTitle": "Слежу за PR",
+  "prWatchChecks": "проверок {passed}/{total} пройдено",
+  "prWatchFailing": "падает: {count}",
+  "prWatchConflict": "конфликт с базовой веткой",
+  "prWatchStop": "Перестать следить",
+  "prWatchDismiss": "Убрать",
+  "prWatchStopped_merged": "влит",
+  "prWatchStopped_closed": "закрыт",
+  "prWatchStopped_comments": "остановлено после 10 обновлений с комментариями",
+  "prWatchStopped_unreadable": "остановлено: GitHub недоступен 15 минут",
+  "prWatchStopped_user": "остановлено",
+  "prWatchCommandHint": "Watch a pull request: /watch <url or number> / Следить за PR",
+  "prWatchStart": "Следить в этом чате"
 }

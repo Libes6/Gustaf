@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Loader2, Sparkles, Upload } from "lucide-react";
+import { Check, ExternalLink, Loader2, Sparkles, Upload, Eye } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { gitRepo, type GhStatus, type PublishInfo } from "../lib/api";
@@ -11,6 +11,7 @@ import { getAdapter } from "../providers";
 import { loadAgentSettings } from "../agent/agentSettingsStore";
 import { cheapTarget } from "../lib/modelRouting";
 import { useApp } from "../state";
+import { startPrWatch } from "../lib/prWatch";
 
 const errText = (e: any) => String(e?.message ?? e);
 
@@ -19,7 +20,7 @@ const errText = (e: any) => String(e?.message ?? e);
  * and Create pull request. Pushing never forces; pushing a protected branch (main, master, develop) asks first and
  * offers a new branch. Pull requests need `gh` (installed and signed in); without it the manual command is shown.
  */
-export function GitPublishPanel({ root, message }: { root: string; message: string }) {
+export function GitPublishPanel({ root, message, chatId }: { root: string; message: string; /** Offers watching the created PR in this chat (T9). */ chatId?: number | null }) {
   const t = useT();
   const app = useApp();
   const [info, setInfo] = useState<PublishInfo | null>(null);
@@ -40,6 +41,7 @@ export function GitPublishPanel({ root, message }: { root: string; message: stri
   const [creating, setCreating] = useState(false);
   const [prError, setPrError] = useState("");
   const [prUrl, setPrUrl] = useState("");
+  const [watching, setWatching] = useState(false);
   const generation = useRef<AbortController | null>(null);
 
   const selection = app.selection;
@@ -245,6 +247,7 @@ export function GitPublishPanel({ root, message }: { root: string; message: stri
             <div className="git-pr-link">
               <Check size={14} /> <span className="grow git-path">{prUrl}</span>
               <button className="btn-soft" onClick={openPr}><ExternalLink size={13} /> {t("gitPrOpenLink")}</button>
+              {chatId && <button className="btn-soft" disabled={watching} onClick={() => { setWatching(true); startPrWatch(chatId, root, prUrl).catch((e) => (setWatching(false), setPrError(errText(e)))); }}><Eye size={13} /> {t("prWatchStart")}</button>}
             </div>
           )}
           {prUrl && prError && <div className="error-box git-error" role="alert">{prError}</div>}

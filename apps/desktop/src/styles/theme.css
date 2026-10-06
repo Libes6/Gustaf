@@ -776,4 +776,8 @@ button:disabled { cursor:default; opacity:.45; }
 .html-page-frame.tall { height: min(80vh, 900px); }
 .html-page-title { font-weight: 500; color: var(--text-2); }
 .html-page-pending { padding: 18px; color: var(--text-3); font-size: 12.5px; }
+.pr-watch.failing { border-color: color-mix(in srgb, var(--red) 55%, var(--border)); }
+.pr-watch.failing .goal-icon { color: var(--red); }
+.pr-watch.passing .goal-icon { color: var(--green); }
+.pr-watch.stopped .goal-icon { color: var(--text-3); }
 
