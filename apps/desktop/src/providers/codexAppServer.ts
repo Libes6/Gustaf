@@ -46,12 +46,16 @@ export type TurnParams = {
   access?: Access;
   mode?: Mode;
   reasoning?: Reasoning;
+  /** The caller can ask the user: workspace-write turns use `on-request` and forward approval requests; otherwise nothing is requested. */
+  approvals?: boolean;
 };
 
-/** `thread/start` or `thread/resume`. Approvals are never requested: the app has no approval card for Codex yet (`exec` never asked either). */
+const policyFor = (p: TurnParams) => (p.approvals && sandboxFor(p.access, p.mode).mode === "workspace-write" ? "on-request" : "never");
+
+/** `thread/start` or `thread/resume`. Without an approval handler nothing is asked (`exec` never asked either). */
 export function threadRequest(p: TurnParams): { method: string; params: Json } {
   const sb = sandboxFor(p.access, p.mode);
-  const common = { ...(p.cwd ? { cwd: p.cwd } : {}), ...(p.model ? { model: p.model } : {}), approvalPolicy: "never", sandbox: sb.mode };
+  const common = { ...(p.cwd ? { cwd: p.cwd } : {}), ...(p.model ? { model: p.model } : {}), approvalPolicy: policyFor(p), sandbox: sb.mode };
   return p.session ? { method: "thread/resume", params: { threadId: p.session, ...common } } : { method: "thread/start", params: common };
 }
 
@@ -62,7 +66,7 @@ export function turnRequest(threadId: string, p: TurnParams): Json {
     input: [{ type: "text", text: p.prompt }, ...(p.images ?? []).map((path) => ({ type: "localImage", path }))],
     ...(p.model ? { model: p.model } : {}),
     ...(p.reasoning ? { effort: p.reasoning } : {}),
-    approvalPolicy: "never",
+    approvalPolicy: policyFor(p),
     sandboxPolicy: sb.policy,
   };
 }
@@ -99,6 +103,7 @@ export type Effect =
   | { kind: "activity"; activity: Activity }
   | { kind: "usage"; usage: TokenUsage }
   | { kind: "reply"; reply: Reply }
+  | { kind: "approval"; id: string | number; ask: { kind: "command"; command: string; reason?: string } }
   | { kind: "done"; status: "completed" | "interrupted" | "failed"; error?: string };
 
 const MAX_HELD_PER_THREAD = 100;
@@ -286,8 +291,10 @@ export function createReducer(rootThreadId: string) {
   const serverRequest = (m: Json): Effect[] => {
     const method = str(m.method);
     const id = m.id as string | number;
-    // No approval UI yet: refuse (the sandbox/never policy should keep these from arriving at all).
-    if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") return [{ kind: "reply", reply: { id, result: { decision: "decline" } } }];
+    const p = rec(m.params);
+    // The runner asks the user (or declines when it has no handler); the reply is one of the decisions below.
+    if (method === "item/commandExecution/requestApproval") return [{ kind: "approval", id, ask: { kind: "command", command: str(p.command) || "(command)", ...(str(p.reason) ? { reason: str(p.reason) } : {}) } }];
+    if (method === "item/fileChange/requestApproval") return [{ kind: "approval", id, ask: { kind: "command", command: "Apply file changes outside the workspace", reason: str(p.reason) || (str(p.grantRoot) ? `Write access to ${str(p.grantRoot)}` : "Codex asks to change files") } }];
     if (method === "mcpServer/elicitation/request") return [{ kind: "reply", reply: { id, result: { action: "decline" } } }];
     return [{ kind: "reply", reply: { id, error: { code: -32601, message: `Not supported by this client: ${method}` } } }];
   };
@@ -347,6 +354,10 @@ export type TurnHandlers = {
   onActivity(a: Activity): void;
   onUsage?(u: TokenUsage): void;
   onDebug?(note: string): void;
+  /** Answers an approval request (true: allow once). Absent: declined. */
+  onApproval?(ask: { kind: "command"; command: string; reason?: string }): Promise<boolean>;
+  /** How long to keep the connection for children still running after the parent turn completed (default `CHILD_WAIT_MS`). */
+  childWaitMs?: number;
 };
 
 export type TurnResult = { session: string; error: string; running: string[]; usage?: TokenUsage };
@@ -355,6 +366,12 @@ export type TurnResult = { session: string; error: string; running: string[]; us
 export class AppServerUnavailable extends Error {}
 
 const REQUEST_TIMEOUT_MS = 20_000;
+/**
+ * A parent turn can complete while its background children still work. The connection is kept (and the turn stays open, so the
+ * stop button works) until they all report an end, the process exits, or this long passes. Hitting the limit is not a
+ * verdict about the children: they stay "running" and the caller shows them as unknown.
+ */
+export const CHILD_WAIT_MS = 15 * 60_000;
 
 /**
  * initialize, thread/start|resume, turn/start, then reduce notifications until the root turn ends. Never reports an error
@@ -368,14 +385,21 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
   const finished = new Promise<{ status: string; error?: string }>((resolve) => { finish = resolve; });
   const early: Json[] = [];
 
+  let childrenSettled: (() => void) | undefined;
   const apply = (effects: Effect[]) => {
     for (const e of effects) {
       if (e.kind === "text") h.onText(e.text);
       else if (e.kind === "activity") h.onActivity(e.activity);
       else if (e.kind === "usage") h.onUsage?.(e.usage);
+      else if (e.kind === "approval") {
+        const answer = (ok: boolean) => void conn.write(JSON.stringify({ jsonrpc: "2.0", id: e.id, result: { decision: ok ? "accept" : "decline" } })).catch(() => {});
+        if (!h.onApproval) answer(false);
+        else h.onApproval(e.ask).then(answer, () => answer(false));
+      }
       else if (e.kind === "reply") void conn.write(JSON.stringify({ jsonrpc: "2.0", ...e.reply })).catch(() => {});
       else if (e.kind === "done") finish({ status: e.status, error: e.error });
     }
+    if (childrenSettled && reducer && reducer.running().length === 0) childrenSettled();
   };
 
   conn.onMessage((m) => {
@@ -435,6 +459,13 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     }
     const end = await Promise.race([finished, exit.then((x) => ({ status: "lost", error: conn.stderr().trim().slice(-600) || `codex app-server exited${x.code == null ? "" : ` with ${x.code}`}` }))]);
     if (h.signal?.aborted) throw aborted();
+    if (end.status === "completed" && reducer.running().length) {
+      const wait = new Promise<void>((resolve) => { childrenSettled = resolve; });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const limit = new Promise<void>((resolve) => { timer = setTimeout(resolve, h.childWaitMs ?? CHILD_WAIT_MS); });
+      try { await Promise.race([wait, limit, exit]); } finally { clearTimeout(timer); childrenSettled = undefined; }
+      if (h.signal?.aborted) throw aborted();
+    }
     const usage = reducer.usage();
     if (usage) h.onUsage?.(usage);
     const error = end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";

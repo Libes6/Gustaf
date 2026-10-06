@@ -101,6 +101,8 @@ export type TurnInput = {
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;
   onLimits?: (windows: LimitWindow[]) => void;
+  /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
+  approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
   onRetry?: (info: RetryInfo) => void;
 };
