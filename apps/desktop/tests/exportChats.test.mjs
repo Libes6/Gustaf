@@ -297,7 +297,7 @@ test('file names are safe for the save dialog', () => {
   assert.equal(exportFileName('markdown', ['Fix login/bug: now?'], NOW), 'Fix-login-bug-now.md');
   assert.equal(exportFileName('json', ['Заметки про код'], NOW), 'Заметки-про-код.json');
   assert.equal(exportFileName('json', ['...'], NOW), 'chat.json');
-  assert.equal(exportFileName('markdown', ['a', 'b'], NOW), 'mcode-chats-2026-10-02.md');
+  assert.equal(exportFileName('markdown', ['a', 'b'], NOW), 'gustaf-chats-2026-10-02.md');
   assert.equal(Array.from(exportFileName('json', ['\u{1F600}'.repeat(100)], NOW)).length, 60 + '.json'.length);
   assert.equal(formatDate('not a date'), '');
 });

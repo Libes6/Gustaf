@@ -75,7 +75,7 @@ export function branchNameProblem(raw: string): "empty" | "invalid" | null {
   return null;
 }
 
-/** A starting point for the branch-name field: `mcode/` plus an ASCII slug of the commit subject. */
+/** A starting point for the branch-name field: `gustaf/` plus an ASCII slug of the commit subject. */
 export function suggestBranchName(message: string): string {
   const subject = message.trim().split("\n")[0] ?? "";
   const slug = subject
@@ -86,7 +86,7 @@ export function suggestBranchName(message: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
     .replace(/-+$/, "");
-  return `mcode/${slug || "changes"}`;
+  return `gustaf/${slug || "changes"}`;
 }
 
 export type CommitProblem = "notRepo" | "inProgress" | "noFiles" | "noMessage" | "badBranch" | null;

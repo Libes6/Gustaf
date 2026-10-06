@@ -13,7 +13,7 @@ async (page) => {
     };
     const projects = [
       { id: 1, name: "grill", path: "/Users/me/pet/grill", pinned: 1, created_at: now },
-      { id: 2, name: "m code", path: "/Users/me/pet/m code", pinned: 0, created_at: now },
+      { id: 2, name: "gustaf", path: "/Users/me/pet/gustaf", pinned: 0, created_at: now },
     ];
     const chats = [
       { id: 1, project_id: 1, title: "Карта заказов: кластеры", archived: 0, created_at: now, updated_at: now },

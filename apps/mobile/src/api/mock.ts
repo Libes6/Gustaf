@@ -15,7 +15,7 @@ export class MockServer implements DesktopApi {
   private state: ConnectionState = "closed";
 
   private projects: ProjectSummary[] = [
-    { id: 1, name: "m-code", pinned: true },
+    { id: 1, name: "gustaf", pinned: true },
     { id: 2, name: "website", pinned: false },
   ];
   private chats: ChatSummary[] = [
