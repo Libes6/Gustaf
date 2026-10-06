@@ -217,3 +217,27 @@ test('execItem: command, file change and MCP items take the exec shape the activ
   assert.deepEqual(execItem({ type: 'fileChange', id: 'f', status: 'completed', changes: [{ path: 'a.ts', kind: 'update', diff: 'x' }] }).changes, [{ path: 'a.ts', kind: 'update' }]);
   assert.equal(execItem({ type: 'mcpToolCall', id: 'm', server: 's', tool: 't', arguments: {}, status: 'inProgress' }).status, 'in_progress');
 });
+
+// Recorded from a real run: codex-cli 0.160.1, "spawn two subagents in parallel, wait for both" (noise methods dropped, paths anonymized).
+import { readFileSync } from 'node:fs';
+test('real Codex 0.160.1 run with two subagents: both appear, finish, and no bare wait cards or running leftovers', () => {
+  const lines = readFileSync(new URL('./fixtures/codex-app-server-two-agents.jsonl', import.meta.url), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const root = lines.find((m) => m.method === 'thread/started').params.thread.id;
+  const rd = createReducer(root);
+  const map = new Map();
+  let text = '';
+  let done;
+  for (const m of lines) for (const e of rd.onMessage(m)) {
+    if (e.kind === 'activity') applyActivity(map, e.activity);
+    else if (e.kind === 'text') text += e.text;
+    else if (e.kind === 'done') done = e;
+  }
+  const agents = [...map.values()].filter((a) => a.subagent);
+  assert.deepEqual(agents.map((a) => a.subagent.title).sort(), ['arithmetic', 'list files']);
+  for (const a of agents) { assert.equal(a.subagent.state, 'completed'); assert.equal(a.status, 'success'); assert.equal(a.subagent.provider, 'codex'); }
+  assert.match(agents.find((a) => a.subagent.title === 'list files').subagent.step ?? '', /ls -A/);
+  assert.equal(map.size, agents.length, 'no generic cards for the empty wait calls');
+  assert.deepEqual(rd.running(), []);
+  assert.equal(done.status, 'completed');
+  assert.match(text, /2\+2 = 4|2\+2 is 4|4/);
+});

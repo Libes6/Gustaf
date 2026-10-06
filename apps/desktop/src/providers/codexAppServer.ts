@@ -11,7 +11,7 @@
 //    a late progress frame; the parent turn ending never completes a child that is still running;
 //  - liveness is never guessed: nothing here treats silence as a heartbeat. When the connection or the turn ends with children
 //    still running, they are left "running" and the caller marks them unknown (cli.ts), not completed.
-import { nativeActivities, type Activity } from "./activities.ts";
+import { isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
 import type { Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
 
 type Json = Record<string, unknown>;
@@ -107,6 +107,9 @@ const HELD = new Set(["turn/started", "turn/completed", "item/started", "item/co
 
 type Child = { activityId: string; state: SubagentState; lastText: string; tokens?: number };
 
+/** "/root/list_files" to "list files": the last segment of an agent path, readable. */
+const humanTask = (path: string) => (path.split("/").filter(Boolean).pop() ?? "").replace(/[_-]+/g, " ").trim();
+
 const childState = (s: unknown): SubagentState => (s === "completed" ? "completed" : s === "interrupted" ? "stopped" : "failed");
 
 /** Per-turn state machine. Feed it every JSON-RPC message of the connection; apply the returned effects in order. */
@@ -199,6 +202,36 @@ export function createReducer(rootThreadId: string) {
     return out;
   }
 
+  /**
+   * Codex 0.160 announces a spawned agent with `subAgentActivity` (kind started + agentThreadId + agentPath), not with a
+   * `collabAgentToolCall`; the child's own frames follow under that thread id. The item arrives twice (started, completed).
+   */
+  function subAgentActivity(item: Json, first: boolean, out: Effect[]) {
+    const threadId = str(item.agentThreadId);
+    if (!threadId) return;
+    const kind = str(item.kind);
+    const known = children.get(threadId);
+    if (kind === "started") {
+      if (known || !first) return;
+      const h = hints.get(threadId);
+      const path = str(item.agentPath);
+      publish([{ type: "activity", id: str(item.id) || `agent:${threadId}`, name: "subagent", args: { tool: "spawnAgent", agent: threadId }, status: "running", subagent: { provider: "codex", agentId: threadId, ...(path ? { agentPath: path } : {}), title: humanTask(path) || h?.nickname || "", action: "spawn", state: "running", startedAt: Date.now(), ...(h?.model ? { model: h.model } : {}), ...(h?.role ? { role: h.role } : {}) } }], out);
+      return;
+    }
+    if (!known) return;
+    if (kind === "interacted") {
+      if (first) return;
+      const reopen = known.state !== "running" && known.state !== "waiting";
+      known.state = "running";
+      out.push({ kind: "activity", activity: info(threadId, known, { action: reopen ? "send" : "progress", state: "running" }) });
+    } else if ((kind === "completed" || kind === "interrupted") && !first) {
+      const state: SubagentState = kind === "completed" ? "completed" : "stopped";
+      if (known.state === "completed" || known.state === "failed") return;
+      known.state = state;
+      out.push({ kind: "activity", activity: { ...info(threadId, known, { action: "close", state, ...(known.lastText ? { result: brief(known.lastText, 300) } : {}) }), status: state === "completed" ? "success" : "unknown" } });
+    }
+  }
+
   /** The turn's own text and tool items. */
   function root(m: Json): Effect[] {
     const method = str(m.method);
@@ -219,6 +252,10 @@ export function createReducer(rootThreadId: string) {
         const ids = list(item.receiverThreadIds).map(str);
         const states = rec(item.agentsStates);
         for (const id of ids) publish(nativeActivities("codex", { type: evType, item: { ...item, id: `${str(item.id)}:${id}`, receiverThreadIds: [id], agentsStates: id in states ? { [id]: states[id] } : {} } }), out);
+      } else if (type === "subAgentActivity") {
+        subAgentActivity(item, evType === "item.started", out);
+      } else if (type === "collabAgentToolCall" && isBareCollabWait({ type: evType, item })) {
+        // A `wait` that names no agent says nothing the agents' own entries do not (Codex 0.160 emits only these).
       } else if (type !== "reasoning" && type !== "userMessage" && type !== "plan" && type !== "hookPrompt") {
         const model = type === "collabAgentToolCall" ? str(item.model) : "";
         const acts = nativeActivities("codex", { type: evType, item: execItem(item) });
