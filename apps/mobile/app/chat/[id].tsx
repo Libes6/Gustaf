@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@mcode/protocol";
+import type { ChatMessage } from "@gustaf/protocol";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";

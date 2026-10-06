@@ -1,5 +1,5 @@
 {
-  "name": "mcode-monorepo",
+  "name": "gustaf-monorepo",
   "private": true,
   "workspaces": [
     "apps/desktop",

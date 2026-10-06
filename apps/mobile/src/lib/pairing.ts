@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type PairingQrPayload } from "@mcode/protocol";
+import { PROTOCOL_VERSION, type PairingQrPayload } from "@gustaf/protocol";
 
 /** Why a scanned or pasted pairing payload was rejected; each code maps to a translated message (`pairError.<code>`). */
 export type PairingErrorCode =

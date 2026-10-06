@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { PROTOCOL_VERSION } from "@mcode/protocol";
+import { PROTOCOL_VERSION } from "@gustaf/protocol";
 import { parsePairingPayload } from "../../mobile/src/lib/pairing.ts";
 import { buildPairingUri, countdown, formatCode, groupFingerprint, qrMatrix, qrPath } from "../src/lib/mobilePairing.ts";
 

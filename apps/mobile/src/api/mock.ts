@@ -1,5 +1,5 @@
-import type { ApprovalDecision, ChatMessage, ChatSummary, ProjectSummary, SendMessageRequest, ServerEvent } from "@mcode/protocol";
-import { PROTOCOL_VERSION } from "@mcode/protocol";
+import type { ApprovalDecision, ChatMessage, ChatSummary, ProjectSummary, SendMessageRequest, ServerEvent } from "@gustaf/protocol";
+import { PROTOCOL_VERSION } from "@gustaf/protocol";
 import type { ConnectionState, DesktopApi } from "./client.ts";
 
 const DEMO_REPLY =

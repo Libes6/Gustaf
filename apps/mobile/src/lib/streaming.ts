@@ -1,4 +1,4 @@
-import type { ApprovalRequest, ChatMessage, ServerEvent, ToolActivity } from "@mcode/protocol";
+import type { ApprovalRequest, ChatMessage, ServerEvent, ToolActivity } from "@gustaf/protocol";
 
 /** Everything the chat screen shows for one chat, built only from `ServerEvent`s and the initial message list. */
 export interface ChatState {

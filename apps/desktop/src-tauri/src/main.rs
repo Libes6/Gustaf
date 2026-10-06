@@ -3,8 +3,8 @@
 
 fn main() {
     // Child mode for PDF text extraction (isolates parser crashes from the app); see knowledge.rs.
-    if mcode_lib::pdf_child_main() {
+    if gustaf_lib::pdf_child_main() {
         return;
     }
-    mcode_lib::run()
+    gustaf_lib::run()
 }

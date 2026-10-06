@@ -25,7 +25,7 @@ test('bump writes exactly the app version entries and validates tag in isolated 
     execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', 'v0.2.0']);
     assert.throws(() => execFileSync(process.execPath, [path.join(tmp, 'scripts/version.mjs'), '--check', 'v0.3.0'], { stdio: 'pipe' }));
     const cargo = fs.readFileSync(path.join(tmp, files[5]), 'utf8');
-    assert.match(cargo, /name = "mcode"\nversion = "0.2.0"/);
+    assert.match(cargo, /name = "gustaf"\nversion = "0.2.0"/);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 const assets = Object.fromEntries(targets.map(p => [p, { name: p + (p.startsWith('darwin') ? '.app.tar.gz' : p.endsWith('-msi') ? '.msi' : p.startsWith('windows') ? '.exe' : '.AppImage'), size: 10, signature: 'c2lnbmF0dXJl' }]));

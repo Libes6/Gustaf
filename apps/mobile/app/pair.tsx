@@ -1,4 +1,4 @@
-import type { PairingQrPayload } from "@mcode/protocol";
+import type { PairingQrPayload } from "@gustaf/protocol";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
