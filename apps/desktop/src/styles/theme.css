@@ -316,6 +316,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .composer-model .chip { max-width: 100%; min-width: 0; }
 .composer-model .chip .chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .composer-model .chip svg { flex: none; }
+.composer-model .chip .effort-chip-level { color: var(--accent-soft); flex: none; }
 .composer-bar .send { flex-shrink: 0; margin-left: 2px; }
 .composer-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; padding-left: 2px; }
 .chip {

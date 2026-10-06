@@ -247,16 +247,34 @@ describe("Composer", () => {
     expect(screen.queryByRole("button", { name: /Computer use/i })).not.toBeInTheDocument();
   });
 
-  it("the model chip opens the effort slider when the model has levels; the model name inside opens the model list", async () => {
+  it("the model chip opens a menu listing the model's effort levels with the current one checked", async () => {
     const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] });
     renderApp(<Harness supports={{ computer: false, reasoning: true }} />, app);
     await userEvent.click(screen.getByRole("button", { name: "Model One Medium" }));
-    const slider = screen.getByRole("slider", { name: "Reasoning effort" });
-    expect(slider).toHaveAttribute("aria-valuetext", "Medium");
-    fireEvent.keyDown(slider, { key: "ArrowRight" });
-    expect(app.setReasoning).toHaveBeenCalledWith("high");
-    await userEvent.click(within(screen.getByRole("dialog", { name: "Reasoning effort" })).getByRole("button", { name: /Model One/ }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByText("Reasoning effort")).toBeInTheDocument();
+    const levels = within(menu).getAllByRole("menuitemradio");
+    expect(levels.map((el) => el.querySelector(".grow > span")?.textContent)).toEqual(["Low", "Medium", "High"]);
+    expect(within(menu).getByRole("menuitemradio", { name: /^Medium/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getByRole("menuitemradio", { name: /^Low/ })).toHaveAttribute("aria-checked", "false");
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole("menuitemradio", { name: /^High/ }));
+    expect(app.setReasoning).toHaveBeenCalledWith("high");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("the effort menu works from the keyboard and leads to the model list", async () => {
+    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] });
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, app);
+    const chip = screen.getByRole("button", { name: "Model One Medium" });
+    chip.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("menuitemradio", { name: /^Medium/ })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(app.setReasoning).toHaveBeenCalledWith("high");
+    await userEvent.click(chip);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Choose model/ }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
   });
 
@@ -265,19 +283,30 @@ describe("Composer", () => {
     const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model], reasoning: "max" });
     const { unmount } = renderApp(<Harness supports={{ computer: false, reasoning: true, levels: [...all] }} />, app);
     await userEvent.click(screen.getByRole("button", { name: "Model One Max" }));
-    const slider = screen.getByRole("slider", { name: "Reasoning effort" });
-    expect(slider).toHaveAttribute("aria-valuemax", "4");
-    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(5);
+    expect(screen.getByRole("menuitemradio", { name: /^Max/ })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: /^Extra high/ }));
     expect(app.setReasoning).toHaveBeenCalledWith("xhigh");
     unmount();
     renderApp(<Harness supports={{ computer: false, reasoning: true, levels: ["low", "medium", "high"] }} />, makeApp({ providers: [provider()], reasoning: "xhigh" }));
-    expect(screen.getByRole("button", { name: "Model One High" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Model One High" }));
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(3);
+    expect(screen.getByRole("menuitemradio", { name: /^High/ })).toHaveAttribute("aria-checked", "true");
   });
 
-  it("without effort levels the model chip opens the model list directly", async () => {
+  it("uses Russian level names in the effort menu", async () => {
+    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, makeApp({ providers: [provider()], reasoning: "low" }), "ru");
+    await userEvent.click(screen.getByRole("button", { name: /Лёгкое/ }));
+    expect(screen.getByText("Вдумчивость")).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /^Лёгкое/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: /^Глубокое/ })).toBeInTheDocument();
+  });
+
+  it("without effort levels the model chip opens the model list directly, with no effort section", async () => {
     renderApp(<Harness />, makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }));
     await userEvent.click(screen.getByRole("button", { name: "Model One" }));
-    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reasoning effort")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeInTheDocument();
   });
 
