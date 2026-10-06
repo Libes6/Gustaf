@@ -1540,5 +1540,9 @@
   "pastedTextStats": "{lines} строк · {chars} символов",
   "pastedTextInline": "Вставить в сообщение",
   "pastedTextShow": "Показать текст",
-  "pasteTooLarge": "Вставка больше лимита черновика (200 000 символов)."
+  "pasteTooLarge": "Вставка больше лимита черновика (200 000 символов).",
+  "mermaidInvalid": "Не удалось нарисовать диаграмму, показан код",
+  "mermaidShowCode": "Показать код",
+  "mermaidShowDiagram": "Показать диаграмму",
+  "mermaidDiagram": "Диаграмма"
 }

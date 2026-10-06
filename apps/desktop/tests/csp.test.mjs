@@ -99,6 +99,9 @@ function walk(dir, out = []) {
   return out;
 }
 
+/** Files allowed to inject HTML (see the assertion below the scan). */
+const RAW_HTML_ALLOWED = ['src/components/MermaidBlock.tsx'];
+
 test('source: no new network/frame/script surfaces that the CSP was not designed for', () => {
   const files = walk(join(root, 'src')).filter((f) => /\.(tsx?|css)$/.test(f) && !f.includes(`${sep}generated${sep}`));
   const rules = [
@@ -106,7 +109,7 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
     [/new\s+EventSource\s*\(/, 'EventSource'],
     [/sendBeacon\s*\(/, 'sendBeacon'],
     [/new\s+(Shared)?Worker\s*\(/, 'Worker (no worker-src)'],
-    [/dangerouslySetInnerHTML|\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(/, 'raw HTML injection'],
+    [/dangerouslySetInnerHTML|\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(/, 'raw HTML injection', RAW_HTML_ALLOWED],
     [/createElement\(\s*["'`]script/, 'dynamic script element'],
     [/@import|url\(\s*["']?https?:/, 'CSS remote import'],
     [/\beval\s*\(/, 'eval'],
@@ -114,8 +117,12 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
   ];
   for (const f of files) {
     const text = readFileSync(f, 'utf8');
-    for (const [re, what] of rules) assert.ok(!re.test(text), `${f.slice(root.length)}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
+    const rel = f.slice(root.length).split(sep).join('/');
+    for (const [re, what, allowed] of rules) assert.ok(!re.test(text) || allowed?.includes(rel), `${rel}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
   }
+  // The one HTML injection: Mermaid's SVG, produced with securityLevel "strict" (no HTML labels, no click handlers) and
+  // sanitised by Mermaid's DOMPurify before it is returned.
+  assert.match(readFileSync(join(root, 'src/components/MermaidBlock.tsx'), 'utf8'), /securityLevel:\s*"strict"/, 'Mermaid must render with securityLevel "strict"');
   const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length).split(sep).join("/"));
   assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, isolated local project preview and HTML sharing may create an iframe');
   const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
@@ -159,6 +166,9 @@ const KNOWN_HOSTS = new Set([
   // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
   'api.search.brave.com', 'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
   'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com', 'api.x.ai', 'console.x.ai',
+  // Mermaid's lazy chunks: links in parser error messages (chevrotain, langium, Wikipedia), ELK's XML namespace URIs and
+  // a bundler message (rolldown); strings only, never fetched.
+  'chevrotain.io', 'langium.org', 'en.wikipedia.org', 'www.eclipse.org', 'rolldown.rs',
 ]);
 
 /** The two HTML entries: the app and the quick-ask window (src-tauri/src/quick_ask.rs loads `quick-ask.html`). */
@@ -187,7 +197,10 @@ test('build: the main bundle needs no eval, so script-src unsafe-eval is only fo
     if (js.includes(RUNTIME_MARK)) continue;
     appChunks++;
     assert.ok(!/\beval\s*\(/.test(js), `${f.slice(dist.length)} uses eval(`);
-    assert.ok(!/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(js), `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/features/security.md and this test.`);
+    // `self || Function("return this")()` is the global-object fallback of lodash-style code (Mermaid's dependencies):
+    // in a webview `self` exists, so the Function call never runs. Any other Function(...) still fails.
+    const code = js.replace(/\|\|\s*Function\(\s*["'`]return this["'`]\s*\)\(\)/g, '');
+    assert.ok(!/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(code), `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/features/security.md and this test.`);
     assert.ok(!/(setTimeout|setInterval)\(\s*["'`]/.test(js), `${f.slice(dist.length)} passes a string to a timer`);
   }
   assert.ok(appChunks >= 2, 'expected the main chunk and the lazy CanvasPanel chunk to be scanned');
