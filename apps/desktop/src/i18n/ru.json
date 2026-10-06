@@ -1549,5 +1549,20 @@
   "chatWidthHint": "Насколько широкими будут переписка и поле ввода на больших экранах",
   "chatWidthStandard": "Обычная",
   "chatWidthWide": "Широкая",
-  "chatWidthFull": "Во всё окно"
+  "chatWidthFull": "Во всё окно",
+  "goalCommandHint": "Keep working until a goal is met / Работать до достижения цели",
+  "goal": "Цель",
+  "goalTurns": "ход {turns} из {max}",
+  "goalTokens": "{tokens} токенов",
+  "goalPause": "Пауза",
+  "goalResume": "Продолжить",
+  "goalClear": "Убрать цель",
+  "goal_active": "В работе",
+  "goal_paused": "На паузе",
+  "goal_done": "Готово",
+  "goal_blocked": "Нужны вы",
+  "goalNote_stopped": "остановлено",
+  "goalNote_failed": "запрос не удался",
+  "goalNote_limit": "достигнут лимит ходов",
+  "goalNote_restart": "приложение перезапускалось"
 }

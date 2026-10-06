@@ -1,4 +1,5 @@
 import { QueuePanel } from "./chat/QueuePanel";
+import { GoalBar } from "./chat/GoalBar";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
@@ -190,6 +191,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         </button>
       )}
 
+      <GoalBar chatId={session.chatId} running={running} />
       {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
       <Composer
         scopeKey={session.key} text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible={visible}

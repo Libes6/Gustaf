@@ -127,7 +127,9 @@ export function Composer(p: Props) {
     loadSkills(root, true).then(xs => { if (!stale) { setSkills(xs); setSkillError(false); } }, () => { if (!stale) { setSkills(mergeSkills([])); setSkillError(true); } });
     return () => { stale = true; };
   }, [root, !!slash]);
-  const slashList = slash ? skills.filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
+  // `/goal` is a built-in command of the chat run (lib/goalCore.ts), listed first next to the skills.
+  const goalCommand: Skill = { id: "command:goal", name: "goal", source: "builtin", description: t("goalCommandHint") };
+  const slashList = slash ? [goalCommand, ...skills].filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
   const insertSkill = (skill: Skill) => {
     setText(`/${skill.name} `);
     setSlash(null);

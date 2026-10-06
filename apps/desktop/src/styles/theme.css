@@ -735,3 +735,16 @@ button:disabled { cursor:default; opacity:.45; }
 .mermaid-diagram { padding: 14px; overflow-x: auto; display: flex; justify-content: center; }
 .mermaid-diagram svg { max-width: 100%; height: auto; }
 .mermaid-note { color: var(--text-3); font-size: 11.5px; margin-left: 8px; }
+
+/* Chat goal above the composer (components/chat/GoalBar.tsx) */
+.goal-bar { display: flex; align-items: center; gap: 10px; margin: 0 16px 6px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 12.5px; min-width: 0; }
+.goal-bar .goal-icon { flex: none; color: var(--accent-soft); }
+.goal-bar.goal-done .goal-icon { color: var(--green); }
+.goal-bar.goal-blocked { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.goal-bar.goal-blocked .goal-icon { color: var(--warn); }
+.goal-main { flex: 1; min-width: 0; }
+.goal-objective { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.goal-meta { color: var(--text-3); font-size: 11.5px; }
+.goal-bar .chip { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+
+.chat-goal-mark { display: inline-grid; place-items: center; color: var(--accent-soft); flex: none; margin-right: 2px; }
