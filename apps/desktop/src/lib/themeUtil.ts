@@ -6,6 +6,14 @@ export type ResolvedTheme = "light" | "dark";
 export const THEME_MODES: readonly ThemeMode[] = ["system", "light", "dark"];
 export const DEFAULT_THEME: ThemeMode = "dark";
 export const DEFAULT_ACCENT = "#a884ee";
+
+/** Width of the conversation column and the composer. */
+export type ChatWidth = "standard" | "wide" | "full";
+export const CHAT_WIDTHS: readonly ChatWidth[] = ["standard", "wide", "full"];
+export const DEFAULT_CHAT_WIDTH: ChatWidth = "standard";
+export const parseChatWidth = (v: unknown): ChatWidth => (CHAT_WIDTHS.includes(v as ChatWidth) ? (v as ChatWidth) : DEFAULT_CHAT_WIDTH);
+/** CSS value of `--chat-width` for a setting. */
+export const chatWidthCss = (w: ChatWidth) => (w === "wide" ? "960px" : w === "full" ? "100%" : "720px");
 /** Offered in Settings; any other valid hex is accepted through the custom field. */
 export const ACCENT_PRESETS: readonly string[] = ["#a884ee", "#6ea8fe", "#4ec27a", "#f0a53a", "#f07178", "#e879b9"];
 /** WCAG AA for normal text. */

@@ -1544,5 +1544,10 @@
   "mermaidInvalid": "Не удалось нарисовать диаграмму, показан код",
   "mermaidShowCode": "Показать код",
   "mermaidShowDiagram": "Показать диаграмму",
-  "mermaidDiagram": "Диаграмма"
+  "mermaidDiagram": "Диаграмма",
+  "chatWidth": "Ширина чата",
+  "chatWidthHint": "Насколько широкими будут переписка и поле ввода на больших экранах",
+  "chatWidthStandard": "Обычная",
+  "chatWidthWide": "Широкая",
+  "chatWidthFull": "Во всё окно"
 }

@@ -214,7 +214,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .topbar .center { flex: 1; text-align: center; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .feed { flex: 1; min-height: 0; overflow-y: auto; user-select: text; }
-.feed-inner { max-width: 720px; margin: 0 auto; padding: 16px 24px 32px; }
+.feed-inner { max-width: var(--chat-width, 720px); margin: 0 auto; padding: 16px 24px 32px; }
 .msg-user { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: 20px 0; }
 .msg-user .bubble {
   background: var(--bubble); color: var(--bubble-fg); padding: 8px 14px; border-radius: 18px;
@@ -299,7 +299,7 @@ button.row, button.section-title { width: 100%; text-align: left; }
 /* composer */
 .composer-wrap { padding: 0 24px 18px; }
 .composer {
-  max-width: 720px; margin: 0 auto; background: var(--bg-input); border: 1px solid var(--border);
+  max-width: var(--chat-width, 720px); margin: 0 auto; background: var(--bg-input); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 10px 10px 8px 14px; position: relative;
 }
 .composer textarea {
