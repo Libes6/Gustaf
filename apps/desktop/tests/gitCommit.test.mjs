@@ -65,13 +65,13 @@ test('branch names follow git check-ref-format', () => {
 });
 
 test('suggested branch names are always valid', () => {
-  assert.equal(suggestBranchName('Fix: login redirect loop'), 'mcode/fix-login-redirect-loop');
-  assert.equal(suggestBranchName('feat(ui): Add "Commit…" dialog\n\nBody text'), 'mcode/feat-ui-add-commit-dialog');
-  assert.equal(suggestBranchName('Café résumé'), 'mcode/cafe-resume');
-  assert.equal(suggestBranchName('Исправить ошибку входа'), 'mcode/changes');
-  assert.equal(suggestBranchName(''), 'mcode/changes');
-  assert.equal(suggestBranchName('x'.repeat(100)), `mcode/${'x'.repeat(40)}`);
-  assert.equal(suggestBranchName(`${'a'.repeat(39)} b`), `mcode/${'a'.repeat(39)}`);
+  assert.equal(suggestBranchName('Fix: login redirect loop'), 'gustaf/fix-login-redirect-loop');
+  assert.equal(suggestBranchName('feat(ui): Add "Commit…" dialog\n\nBody text'), 'gustaf/feat-ui-add-commit-dialog');
+  assert.equal(suggestBranchName('Café résumé'), 'gustaf/cafe-resume');
+  assert.equal(suggestBranchName('Исправить ошибку входа'), 'gustaf/changes');
+  assert.equal(suggestBranchName(''), 'gustaf/changes');
+  assert.equal(suggestBranchName('x'.repeat(100)), `gustaf/${'x'.repeat(40)}`);
+  assert.equal(suggestBranchName(`${'a'.repeat(39)} b`), `gustaf/${'a'.repeat(39)}`);
   for (const m of ['Fix: login', '', '...', '---', 'Исправить', 'a/b', '@{u}', 'HEAD', 'x.lock']) assert.equal(branchNameProblem(suggestBranchName(m)), null, m);
 });
 

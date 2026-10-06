@@ -1,7 +1,7 @@
 import type { StringKey } from "./en.ts";
 
 export const ru: Record<StringKey, string> = {
-  appName: "M Code",
+  appName: "Gustaf",
   tabHome: "Главная",
   tabProjects: "Проекты",
   tabSettings: "Настройки",
@@ -32,12 +32,12 @@ export const ru: Record<StringKey, string> = {
   connClosed: "Отключено",
   demoBanner: "Демо-режим: данные берутся из встроенной заглушки, а не с компьютера.",
   pairPrompt: "Подключитесь к компьютеру",
-  pairPromptDesc: "Включите сервер для телефона в M Code на компьютере и отсканируйте показанный QR-код. Оба устройства должны быть в одной сети.",
+  pairPromptDesc: "Включите сервер для телефона в Gustaf на компьютере и отсканируйте показанный QR-код. Оба устройства должны быть в одной сети.",
   pairButton: "Сканировать QR-код",
   demoButton: "Попробовать демо",
   reconnect: "Подключиться",
   pairTitle: "Сканирование QR-кода",
-  cameraPermission: "M Code нужна камера, чтобы отсканировать QR-код.",
+  cameraPermission: "Gustaf нужен доступ к камере, чтобы отсканировать QR-код.",
   cameraDenied: "Доступ к камере запрещён. Разрешите его в настройках системы.",
   grantCamera: "Разрешить камеру",
   openSettings: "Открыть настройки",
@@ -50,7 +50,7 @@ export const ru: Record<StringKey, string> = {
   pairFailed: "Не удалось подключиться: {error}",
   scanAgain: "Сканировать снова",
   "pairError.empty": "Нечего читать.",
-  "pairError.unrecognized": "Это не код подключения M Code.",
+  "pairError.unrecognized": "Это не код подключения Gustaf.",
   "pairError.invalid_json": "Данные подключения — некорректный JSON.",
   "pairError.missing_field": "В данных подключения нет поля «{field}».",
   "pairError.invalid_host": "Адрес в данных подключения некорректен.",

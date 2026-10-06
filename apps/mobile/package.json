@@ -2,7 +2,7 @@
   "name": "@mcode/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "M Code companion app (Expo development build + expo-router). Not an npm workspace: see README.md.",
+  "description": "Gustaf companion app (Expo development build + expo-router). Not an npm workspace: see README.md.",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start --dev-client",

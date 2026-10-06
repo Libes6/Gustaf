@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "M Code",
+    "name": "Gustaf",
     "slug": "mcode-mobile",
     "version": "0.1.0",
     "scheme": "mcode",
@@ -11,8 +11,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.mcode.mobile",
       "infoPlist": {
-        "NSCameraUsageDescription": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
-        "NSLocalNetworkUsageDescription": "M Code connects to the M Code desktop app on your local network.",
+        "NSCameraUsageDescription": "Gustaf uses the camera to scan the pairing QR code shown by the desktop app.",
+        "NSLocalNetworkUsageDescription": "Gustaf connects to the Gustaf desktop app on your local network.",
         "NSBonjourServices": ["_mcode._tcp"]
       }
     },
@@ -34,7 +34,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "M Code uses the camera to scan the pairing QR code shown by the desktop app.",
+          "cameraPermission": "Gustaf uses the camera to scan the pairing QR code shown by the desktop app.",
           "recordAudioAndroid": false
         }
       ]

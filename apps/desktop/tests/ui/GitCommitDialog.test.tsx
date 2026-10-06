@@ -141,11 +141,11 @@ describe("GitCommitDialog", () => {
     await userEvent.type(messageBox(), "Add parser");
     await userEvent.click(screen.getByLabelText("Create a new branch first"));
     const name = screen.getByLabelText("Branch name") as HTMLInputElement;
-    expect(name.placeholder).toBe("mcode/add-parser");
+    expect(name.placeholder).toBe("gustaf/add-parser");
     mockInvoke({ git_commit: { ...result, createdBranch: true } });
     await userEvent.click(commitButton());
     await waitFor(() => expect(callsOf("git_commit")).toHaveLength(1));
-    expect(callsOf("git_commit")[0].newBranch).toBe("mcode/add-parser");
+    expect(callsOf("git_commit")[0].newBranch).toBe("gustaf/add-parser");
   });
 
   it("rejects an invalid branch name", async () => {
@@ -227,10 +227,10 @@ describe("GitCommitDialog", () => {
       await userEvent.click(screen.getByRole("button", { name: "Push main" }));
       expect(callsOf("git_push")).toEqual([]);
       expect(screen.getByRole("alertdialog")).toHaveTextContent("protected branch");
-      mockInvoke({ git_create_branch: "mcode/add-parser", git_publish_info: pub({ branch: "mcode/add-parser" }) });
+      mockInvoke({ git_create_branch: "gustaf/add-parser", git_publish_info: pub({ branch: "gustaf/add-parser" }) });
       await userEvent.click(screen.getByRole("button", { name: "Create branch and switch" }));
-      expect(await screen.findByText(/Switched to mcode\/add-parser/)).toBeInTheDocument();
-      expect(callsOf("git_create_branch")).toEqual([{ root: "/work/alpha", name: "mcode/add-parser" }]);
+      expect(await screen.findByText(/Switched to gustaf\/add-parser/)).toBeInTheDocument();
+      expect(callsOf("git_create_branch")).toEqual([{ root: "/work/alpha", name: "gustaf/add-parser" }]);
       expect(callsOf("git_push")).toEqual([]);
     });
 

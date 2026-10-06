@@ -23,8 +23,8 @@ export type ExportedChat = {
   project: { name: string; path: string | null } | null;
   messages: ExportedMessage[];
 };
-// `app` stays "M Code": it is part of the file format, not a display name.
-export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: "M Code"; exportedAt: string; chats: ExportedChat[] };
+// `app` names the exporting app. Files written before the rename say "M Code"; import does not check it.
+export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: string; exportedAt: string; chats: ExportedChat[] };
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
 export type ExportSource = {
@@ -195,7 +195,7 @@ export function buildBundle(sources: ExportSource[], options: { includeImages?: 
     const updatedAt = ts(chat.updated_at);
     return { ...exported, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {}) };
   });
-  return { format: EXPORT_FORMAT, version: EXPORT_VERSION, app: "M Code", exportedAt: new Date(options.now ?? Date.now()).toISOString(), chats };
+  return { format: EXPORT_FORMAT, version: EXPORT_VERSION, app: "Gustaf", exportedAt: new Date(options.now ?? Date.now()).toISOString(), chats };
 }
 
 export const toJson = (bundle: ChatBundle) => `${JSON.stringify(bundle, null, 2)}\n`;
@@ -248,7 +248,7 @@ export function parseBundle(text: string): ChatBundle {
   return {
     format: EXPORT_FORMAT,
     version: raw.version,
-    app: "M Code",
+    app: str(raw.app) ? raw.app : "Gustaf",
     exportedAt: str(raw.exportedAt) ? raw.exportedAt : "",
     chats,
   };
@@ -515,6 +515,6 @@ export function exportFileName(format: ExportFormat, titles: string[], now = Dat
       .slice(0, 60)
       .join("")
       .replace(/-+$/, "");
-  const base = titles.length === 1 ? clean(titles[0]) || "chat" : `mcode-chats-${new Date(now).toISOString().slice(0, 10)}`;
+  const base = titles.length === 1 ? clean(titles[0]) || "chat" : `gustaf-chats-${new Date(now).toISOString().slice(0, 10)}`;
   return `${base}.${ext}`;
 }

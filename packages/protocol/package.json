@@ -2,7 +2,7 @@
   "name": "@mcode/protocol",
   "version": "0.1.0",
   "private": true,
-  "description": "Wire protocol between the M Code desktop server and its companion apps (pure TypeScript, no React/Tauri/React Native imports).",
+  "description": "Wire protocol between the Gustaf desktop server and its companion apps (pure TypeScript, no React/Tauri/React Native imports).",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
