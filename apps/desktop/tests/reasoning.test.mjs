@@ -21,8 +21,11 @@ test('Claude Code aliases get every level except haiku', () => {
 test('Codex offers low/medium/high; Cursor only for Claude and GPT-5+ ids', () => {
   assert.deepEqual(codexLevels('gpt-5.5-codex'), ['low', 'medium', 'high']);
   assert.deepEqual(cursorLevels('claude-opus-4-8'), ['low', 'medium', 'high']);
+  assert.deepEqual(cursorLevels('claude-opus-5-5', ['claude-opus-5-5', 'gpt-5.2']), ['low', 'medium', 'high']);
+  assert.deepEqual(cursorLevels('gpt-5.2', ['gpt-5.2', 'gpt-5.2-high', 'gpt-5.2-low-fast']), [], 'old scheme: plain id beside its variants');
+  assert.deepEqual(cursorLevels('claude-4-sonnet'), [], 'old-style Claude ids');
   assert.deepEqual(cursorLevels('gpt-5'), ['low', 'medium', 'high']);
-  for (const m of ['auto', 'composer-2', 'grok-4', 'claude-haiku-4-5', 'claude-opus-4-8[effort=high]']) assert.deepEqual(cursorLevels(m), [], m);
+  for (const m of ['auto', 'composer-2', 'grok-4', 'claude-haiku-4-5', 'claude-opus-4-8[effort=high]', 'claude-opus-4-8-high', 'claude-opus-4-8-thinking-max-fast', 'gpt-5.5-extra-high', 'gpt-5.6-sol-none-fast', 'claude-4.6-sonnet-medium']) assert.deepEqual(cursorLevels(m), [], m);
 });
 
 test('Cursor model id carries the effort override except for medium', () => {
@@ -30,6 +33,7 @@ test('Cursor model id carries the effort override except for medium', () => {
   assert.equal(cursorModel('claude-opus-4-8', 'medium'), 'claude-opus-4-8');
   assert.equal(cursorModel('claude-opus-4-8', undefined), 'claude-opus-4-8');
   assert.equal(cursorModel('auto', 'high'), 'auto');
+  assert.equal(cursorModel('claude-opus-4-8-high', 'low'), 'claude-opus-4-8-high', 'an id that names its level is sent unchanged');
   assert.equal(cursorModel('gpt-5', 'max'), 'gpt-5', 'callers snap first; an unknown level is not sent');
 });
 

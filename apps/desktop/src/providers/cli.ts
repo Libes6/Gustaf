@@ -114,7 +114,7 @@ async function listCodexModels() {
     if (e.type === 'error') error = e.message;
   });
   if (error || result.code || !models.length) throw new Error(error || 'Codex did not return available models.');
-  return [{ id: 'default', name: 'По умолчанию' }, ...models.filter(m => m.id !== 'default')];
+  return [{ id: 'default', name: 'Default' }, ...models.filter(m => m.id !== 'default')];
 }
 
 type Ev = { text?: string; session?: string; final?: string; error?: string };
@@ -123,8 +123,8 @@ type Spec = {
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
   /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
   args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string; reasoning?: Reasoning }): string[];
-  /** Effort levels the CLI can pass for this model (providers/reasoning.ts). */
-  levels(model: string): readonly Reasoning[];
+  /** Effort levels the CLI can pass for this model (providers/reasoning.ts); `listed`: ids of the provider's model list. */
+  levels(model: string, listed?: readonly string[]): readonly Reasoning[];
   /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
   imageFlag?: boolean;
   parse(e: any): Ev;
@@ -199,10 +199,15 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
   const accountKey = async () => (cfg.cliAuth === "key" ? resolveKey(key) : "");
   const id = cfg.cli!;
   const spec = SPECS[id];
+  // The provider's model ids (from the last listing or from the UI): Cursor decides effort support by its siblings.
+  let listed: string[] | undefined;
   return {
     supportsComputer: false,
-    supportsReasoning: (model) => spec.levels(model).length > 0,
-    reasoningLevels: (model) => spec.levels(model),
+    supportsReasoning: (model) => spec.levels(model, listed).length > 0,
+    reasoningLevels: (model, ids) => {
+      if (ids) listed = [...ids];
+      return spec.levels(model, listed);
+    },
 
     async listModels() {
       if (id === 'cursor-agent') {
@@ -214,6 +219,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
         });
         if (cmd.code || !models.length) throw new Error(cmd.stderr || 'Cursor did not return models.');
+        listed = models.map((m) => m.id);
         return models;
       }
       const list = typeof spec.models === "function" ? await spec.models() : spec.models.map((id) => ({ id, name: id }));
@@ -227,7 +233,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir, reasoning: pickLevel(t.reasoning, spec.levels(t.model)) });
+      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)) });
       const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
       let text = "";
       const actions = new Map<string, Activity>();

@@ -111,12 +111,12 @@ export interface Adapter {
   supportsComputer: boolean;
   supportsReasoning(model: string): boolean;
   /** Effort levels this model offers, weakest first (empty: no control). Absent: `REASONING_LEVELS` when `supportsReasoning`. */
-  reasoningLevels?(model: string): readonly Reasoning[];
+  reasoningLevels?(model: string, listed?: readonly string[]): readonly Reasoning[];
 }
 
 /** Levels to show for a model, whichever way the adapter reports them. */
-export const levelsOf = (a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">, model: string): readonly Reasoning[] =>
-  a.reasoningLevels ? a.reasoningLevels(model) : a.supportsReasoning(model) ? REASONING_LEVELS : [];
+export const levelsOf = (a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">, model: string, listed?: readonly string[]): readonly Reasoning[] =>
+  a.reasoningLevels ? a.reasoningLevels(model, listed) : a.supportsReasoning(model) ? REASONING_LEVELS : [];
 
 export const textOf = (m: Msg) =>
   m.parts

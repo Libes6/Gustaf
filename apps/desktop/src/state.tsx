@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { openSession, promoteSession, isAuthError, type Sessions } from "./lib/chatSessions";
 import type { Jump } from "./lib/searchUtil";
 import type { Access } from "./agent/agent";
-import { detectLocale, type Locale } from "./i18n";
+import { detectLocale, translate, type Locale } from "./i18n";
 import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
@@ -149,6 +149,9 @@ function useAppState() {
     setView("settings");
   };
 
+  // CLIs list a synthetic `default` model; its name follows the UI language instead of whatever the adapter wrote.
+  const shownModels = useMemo(() => models.map((m) => (m.id === "default" ? { ...m, name: translate(locale, "modelDefault") } : m)), [models, locale]);
+
   const bumpUsage = (providerId: string) => setUsage((u) => ({ ...u, [providerId]: (u[providerId] ?? 0) + 1 }));
 
   return {
@@ -156,7 +159,7 @@ function useAppState() {
     locale, setLocale, onboarded, setOnboarded,
     selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
-    projects, chats, reload, providers, models, modelErrors, refreshModels, ensureModels,
+    projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
     view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
   };

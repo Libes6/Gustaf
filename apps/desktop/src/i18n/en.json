@@ -1490,5 +1490,10 @@
   "effortHint_xhigh": "Thinks much longer",
   "effortHint_max": "Deepest, slowest",
   "reasoning_xhigh": "Extra high",
-  "reasoning_max": "Max"
+  "reasoning_max": "Max",
+  "modelDefault": "Default",
+  "retry": "Retry",
+  "contextWindowTokens": "Context window: {tokens} tokens",
+  "modelsLoading": "Loading models…",
+  "modelsRefreshFailed": "Couldn't refresh this list. Showing the saved one."
 }
