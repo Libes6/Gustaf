@@ -25,7 +25,7 @@ export function GoalBar({ chatId, running }: { chatId: number | null; running: b
     void setGoal(chatId, next);
     if (!running) void updateQueue(chatId, (q) => ({ ...q, paused: false, interrupted: false, items: [...q.items.filter((i) => !isContinuation(i.text)), { id: crypto.randomUUID(), text: continuePrompt(next), images: [], clarify: false }] }));
   };
-  const note = goal.note && (["stopped", "failed", "limit", "restart"].includes(goal.note) ? t(`goalNote_${goal.note}` as Key) : goal.note);
+  const note = goal.note && (["stopped", "failed", "limit", "restart", "idle", "usage", "budget"].includes(goal.note) ? t(`goalNote_${goal.note}` as Key) : goal.note);
   return (
     <section className={`goal-bar goal-${goal.status}`} aria-label={t("goal")}>
       <Flag size={14} aria-hidden="true" className="goal-icon" />
@@ -34,7 +34,7 @@ export function GoalBar({ chatId, running }: { chatId: number | null; running: b
         <div className="goal-meta" role="status">
           <span className="goal-status">{t(`goal_${goal.status}` as Key)}</span>
           {note && <span> · {note}</span>}
-          <span> · {t("goalTurns", { turns: goal.turns, max: goal.maxTurns })}</span>
+          {!goal.native && <span> · {t("goalTurns", { turns: goal.turns, max: goal.maxTurns })}</span>}
           {goal.tokens > 0 && <span> · {t("goalTokens", { tokens: goal.tokens.toLocaleString(app.locale) })}</span>}
         </div>
       </div>

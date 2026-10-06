@@ -13,7 +13,23 @@ export type Goal = {
   startedAt: number;
   /** Why it is paused or blocked (the agent's reason, "stopped", "failed", "limit"). */
   note?: string;
+  /** Driven by the provider (Codex `thread/goal/*`): no app-side turn loop, turns and limits do not apply. */
+  native?: boolean;
 };
+
+/** A Codex thread goal status as ours. Usage and budget limits are pauses the user can resume. */
+export function fromNativeStatus(s: string): { status: GoalStatus; note?: string } {
+  switch (s) {
+    case "complete": return { status: "done" };
+    case "blocked": return { status: "blocked" };
+    case "paused": return { status: "paused" };
+    case "usageLimited": return { status: "paused", note: "usage" };
+    case "budgetLimited": return { status: "paused", note: "budget" };
+    default: return { status: "active" };
+  }
+}
+
+export const newNativeGoal = (objective: string, now: number): Goal => ({ ...newGoal(objective, now), native: true });
 
 export const DEFAULT_MAX_TURNS = 20;
 export const MAX_OBJECTIVE = 2000;

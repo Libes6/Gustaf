@@ -244,6 +244,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       return spec.levels(model, listed);
     },
 
+    nativeGoal: async () => id === "codex" && (await codexTransport()) === "app-server",
+
     async listModels() {
       if (id === 'cursor-agent') {
         const executable = await cursorExecutable();
@@ -290,8 +292,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       if (id === "codex" && (await codexTransport()) === "app-server") {
         try {
           const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
-          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)), approvals: !!t.approve }, {
-            signal: t.signal, onApproval: t.approve, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
+          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)), approvals: !!t.approve, goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined }, {
+            signal: t.signal, onApproval: t.approve, onGoal: t.goal?.onUpdate, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
           });
           viaServer = true;
           session = r.session;

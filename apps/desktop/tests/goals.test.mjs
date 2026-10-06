@@ -49,3 +49,13 @@ test('resumeGoal reactivates with room for more turns', () => {
   assert.deepEqual([r.status, r.note, r.maxTurns], ['active', undefined, 8]);
   assert.match(goalPrompt('x'), /GOAL: done/);
 });
+
+import { fromNativeStatus, newNativeGoal } from '../src/lib/goalCore.ts';
+test('native goal statuses map to ours; limits are resumable pauses', () => {
+  assert.deepEqual(fromNativeStatus('complete'), { status: 'done' });
+  assert.deepEqual(fromNativeStatus('blocked'), { status: 'blocked' });
+  assert.deepEqual(fromNativeStatus('usageLimited'), { status: 'paused', note: 'usage' });
+  assert.deepEqual(fromNativeStatus('budgetLimited'), { status: 'paused', note: 'budget' });
+  assert.deepEqual(fromNativeStatus('active'), { status: 'active' });
+  assert.equal(newNativeGoal('x', 1).native, true);
+});

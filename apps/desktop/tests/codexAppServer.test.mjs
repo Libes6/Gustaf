@@ -303,3 +303,60 @@ test('separate agent messages of one turn are separated by a blank line, a conti
   await runAppServerTurn(conn, P, h);
   assert.equal(out.text, 'Starting agents.\n\nDone: 4.');
 });
+
+const goalNote = (status, objective = 'Make hello.txt', tokensUsed = 5) => note('thread/goal/updated', { threadId: ROOT, turnId: 't1', goal: { threadId: ROOT, objective, status, tokensUsed, timeUsedSeconds: 3 } });
+const goalConn = (then) => fakeConn((m) => {
+  if (m.method === 'initialize') return { result: {} };
+  if (m.method === 'thread/start' || m.method === 'thread/resume') return { result: { thread: { id: ROOT } } };
+  if (m.method === 'thread/goal/set') return { result: { goal: {} }, then };
+});
+const turnStarted = () => note('turn/started', { threadId: ROOT, turn: { id: 't2', status: 'inProgress', items: [] } });
+
+test('native goal: sets the goal (no turn/start), follows the server\'s own turns, ends when the goal completes', async () => {
+  const { out, h } = handlers();
+  const goals = [];
+  const conn = goalConn([turnStarted(), goalNote('active'), turnDone(ROOT), turnStarted(), goalNote('active', undefined, 9), goalNote('complete', undefined, 12), turnDone(ROOT)]);
+  const r = await runAppServerTurn(conn, { ...P, reasoning: 'high', goal: { objective: 'Make hello.txt' } }, { ...h, onGoal: (g) => goals.push(g.status + ':' + g.tokensUsed) });
+  assert.deepEqual(goals, ['active:5', 'active:9', 'complete:12']);
+  assert.equal(r.error, '');
+  const methods = conn.written.filter((m) => m.method).map((m) => m.method);
+  assert.ok(methods.includes('thread/goal/set'));
+  assert.ok(!methods.includes('turn/start'));
+  const set = conn.written.find((m) => m.method === 'thread/goal/set');
+  assert.deepEqual(set.params, { threadId: ROOT, objective: 'Make hello.txt' });
+  assert.equal(conn.written.find((m) => m.method === 'thread/start').params.config.model_reasoning_effort, 'high', 'the effort travels as thread config');
+});
+
+test('native goal: a goal that completes after the last turn ended still ends the run; resume re-activates without a new objective', async () => {
+  let conn = goalConn([turnStarted(), turnDone(ROOT), goalNote('blocked')]);
+  await runAppServerTurn(conn, { ...P, goal: { objective: 'x', resume: true } }, { ...handlers().h, goalIdleMs: 5000 });
+  assert.deepEqual(conn.written.find((m) => m.method === 'thread/goal/set').params, { threadId: ROOT, status: 'active' });
+});
+
+test('native goal: an active goal on an idle thread ends the run after the idle wait; a new turn cancels the wait', async () => {
+  const goals = [];
+  let conn = goalConn([turnStarted(), goalNote('active'), turnDone(ROOT)]);
+  const t0 = Date.now();
+  await runAppServerTurn(conn, { ...P, goal: { objective: 'x' } }, { ...handlers().h, onGoal: (g) => goals.push(g.status), goalIdleMs: 40 });
+  assert.ok(Date.now() - t0 >= 35);
+  assert.deepEqual(goals, ['active']);
+  // The server continues after a pause shorter than the wait: the run goes on to the next turn's end.
+  conn = goalConn([turnStarted(), goalNote('active'), turnDone(ROOT)]);
+  const p = runAppServerTurn(conn, { ...P, goal: { objective: 'x' } }, { ...handlers().h, goalIdleMs: 60 });
+  await new Promise((r) => setTimeout(r, 20));
+  conn.emit(turnStarted());
+  await new Promise((r) => setTimeout(r, 80));
+  let ended = false;
+  p.then(() => { ended = true; });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(ended, false, 'the running turn cancelled the idle wait');
+  conn.emit(goalNote('complete'));
+  conn.emit(turnDone(ROOT));
+  await p;
+});
+
+test('native goal: a failed turn ends the run with its error even while the goal is active', async () => {
+  const conn = goalConn([turnStarted(), goalNote('active'), turnDone(ROOT, 'failed', { error: { message: 'rate limited' } })]);
+  const r = await runAppServerTurn(conn, { ...P, goal: { objective: 'x' } }, handlers().h);
+  assert.equal(r.error, 'rate limited');
+});

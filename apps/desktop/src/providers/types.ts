@@ -101,16 +101,24 @@ export type TurnInput = {
   onText: (delta: string) => void;
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;
   onLimits?: (windows: LimitWindow[]) => void;
+  /** Codex app-server native goal: the server keeps working turn after turn until the goal leaves `active`; the turn lasts that long. */
+  goal?: { objective: string; /** Re-activate the thread's existing goal instead of setting a new one. */ resume?: boolean; onUpdate: (g: NativeGoal) => void };
   /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
   approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
   onRetry?: (info: RetryInfo) => void;
 };
 
+/** A Codex thread goal (`thread/goal/*`). */
+export type NativeGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
+export type NativeGoal = { status: NativeGoalStatus; objective: string; tokensUsed: number; timeUsedSeconds: number };
+
 export type TurnOutput = { parts: Part[]; responseId?: string; usage?: TokenUsage };
 
 export interface Adapter {
   listModels(): Promise<ModelInfo[]>;
+  /** True when `/goal` can run on the provider's own goal feature (`TurnInput.goal`) instead of the app's turn loop. */
+  nativeGoal?(): Promise<boolean>;
   turn(input: TurnInput): Promise<TurnOutput>;
   supportsComputer: boolean;
   supportsReasoning(model: string): boolean;
