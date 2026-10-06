@@ -123,12 +123,15 @@ describe("Sidebar", () => {
     expect(screen.queryByRole("status", { name: "Waiting for your approval" })).not.toBeInTheDocument();
   });
 
-  it("shows the running state of a chat a scheduled run writes to, even when it is not open", () => {
+  it("shows the running state of a chat a scheduled run writes to, even when it is not open", async () => {
     setup();
     const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
     expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
     let handle: ReturnType<typeof beginLiveRun> | undefined;
     act(() => { handle = beginLiveRun(3, "Nightly", noop); });
+    // A running chat folds into the Working group of Recent (T6); opening the group shows it with its badge.
+    expect(screen.queryByText("Loose question")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Working/ }));
     expect(within(row()).getByRole("img", { name: "Thinking…" })).toBeInTheDocument();
     expect(within(screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
     act(() => handle?.end());
