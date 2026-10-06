@@ -1526,5 +1526,10 @@
   "effortHint_xhigh": "Думает намного дольше",
   "effortHint_max": "Глубже всего, медленнее всего",
   "reasoning_xhigh": "Очень глубокое",
-  "reasoning_max": "Максимум"
+  "reasoning_max": "Максимум",
+  "modelDefault": "По умолчанию",
+  "retry": "Повторить",
+  "contextWindowTokens": "Окно контекста: {tokens} токенов",
+  "modelsLoading": "Загружаем модели…",
+  "modelsRefreshFailed": "Не удалось обновить список. Показан сохранённый."
 }

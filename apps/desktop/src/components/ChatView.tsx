@@ -108,6 +108,8 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     onRejectPlan: () => taRef.current?.focus(),
   }), [root]);
 
+  // Ids of the selected provider's models: Cursor decides effort support by an id's siblings (providers/reasoning.ts).
+  const providerModelIds = useMemo(() => app.models.filter((m) => m.providerId === provider?.id).map((m) => m.id), [app.models, provider?.id]);
   useEffect(() => {
     let cancelled = false;
     const model = app.selection?.model;
@@ -115,12 +117,12 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
     if (provider && model) {
       getAdapter(provider).then((a) => {
         if (cancelled) return;
-        const levels = levelsOf(a, model);
+        const levels = levelsOf(a, model, providerModelIds);
         setSupports({ computer: a.supportsComputer, reasoning: levels.length > 0, levels });
       }).catch(() => {});
     }
     return () => { cancelled = true; };
-  }, [provider, app.selection?.model]);
+  }, [provider, app.selection?.model, providerModelIds]);
 
   useEffect(() => {
     // Not while this view runs a send itself (a new chat is promoted to its id then); a scheduled run is only displayed.

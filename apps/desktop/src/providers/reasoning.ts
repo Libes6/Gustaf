@@ -43,19 +43,28 @@ export function claudeCliLevels(model: string): readonly Reasoning[] {
 
 export const codexLevels = (_model: string): readonly Reasoning[] => BASIC;
 
-/** Cursor model ids from `--list-models`; `auto` and Cursor's own models get no override. */
-export function cursorLevels(model: string): readonly Reasoning[] {
+/** A Cursor id that already names its effort, e.g. `claude-opus-4-8-high`, `gpt-5.5-extra-high-fast`, `claude-fable-5-thinking-max`. */
+const CURSOR_LEVEL_SUFFIX = /-(none|minimal|low|medium|high|xhigh|extra-high|max)(-fast)?$/;
+
+/**
+ * Cursor model ids from `--list-models`. Accounts list either one id per effort variant (`claude-opus-4-8-high`; the
+ * level is chosen by picking the id, so no slider) or plain ids (`claude-opus-5-5`) that take a bracket override.
+ * `auto` and Cursor's own models get no override.
+ */
+export function cursorLevels(model: string, listed?: Iterable<string>): readonly Reasoning[] {
   const m = model.toLowerCase();
-  if (m.includes("[")) return NONE;
-  return /^(claude-|opus|sonnet|gpt-5|gpt-6)/.test(m) && !m.includes("haiku") ? BASIC : NONE;
+  if (m.includes("[") || CURSOR_LEVEL_SUFFIX.test(m)) return NONE;
+  // A plain id listed next to its own level variants (`gpt-5.2` beside `gpt-5.2-high`) belongs to the old scheme too.
+  if (listed) for (const id of listed) if (id.toLowerCase().startsWith(`${m}-`) && CURSOR_LEVEL_SUFFIX.test(id.toLowerCase())) return NONE;
+  return /^(claude-(opus|sonnet|fable|mythos)-|gpt-5|gpt-6)/.test(m) ? BASIC : NONE;
 }
 
 /**
  * Cursor model id with the effort override. `medium` sends the plain id (the model's own default), so a chat that
  * never touched the slider keeps exactly the request it made before.
  */
-export function cursorModel(model: string, level: Reasoning | undefined): string {
-  if (!level || level === "medium" || !cursorLevels(model).includes(level)) return model;
+export function cursorModel(model: string, level: Reasoning | undefined, listed?: Iterable<string>): string {
+  if (!level || level === "medium" || !cursorLevels(model, listed).includes(level)) return model;
   return `${model}[effort=${level}]`;
 }
 
