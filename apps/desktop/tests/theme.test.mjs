@@ -87,3 +87,12 @@ test('shortcuts: no conflicts, no text-editing keys taken, global one has an acc
   assert.equal(isTextEditingSafe({ ...shortcut('settings'), combo: 'Enter' }), false);
   assert.equal(new Set(SHORTCUTS.map((s) => s.id)).size, SHORTCUTS.length);
 });
+
+test('chat width: parse falls back to standard, CSS values per setting', async () => {
+  const { parseChatWidth, chatWidthCss, CHAT_WIDTHS } = await import('../src/lib/themeUtil.ts');
+  assert.deepEqual(CHAT_WIDTHS, ['standard', 'wide', 'full']);
+  assert.equal(parseChatWidth('wide'), 'wide');
+  assert.equal(parseChatWidth('huge'), 'standard');
+  assert.equal(parseChatWidth(undefined), 'standard');
+  assert.deepEqual(CHAT_WIDTHS.map(chatWidthCss), ['720px', '960px', '100%']);
+});

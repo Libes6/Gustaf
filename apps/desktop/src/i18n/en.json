@@ -1508,5 +1508,10 @@
   "mermaidInvalid": "Can't draw this diagram; showing the code",
   "mermaidShowCode": "Show code",
   "mermaidShowDiagram": "Show diagram",
-  "mermaidDiagram": "Diagram"
+  "mermaidDiagram": "Diagram",
+  "chatWidth": "Chat width",
+  "chatWidthHint": "How wide the conversation and the message box are on large screens",
+  "chatWidthStandard": "Standard",
+  "chatWidthWide": "Wide",
+  "chatWidthFull": "Full"
 }
