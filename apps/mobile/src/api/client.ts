@@ -27,6 +27,8 @@ export interface DesktopApi {
   listChats(projectId: number): Promise<ChatSummary[]>;
   listMessages(chatId: number): Promise<ChatMessage[]>;
   sendMessage(chatId: number, req: SendMessageRequest): Promise<void>;
+  /** Starts a chat in a project with its first message; resolves with the new chat's id once the desktop accepted it. */
+  createChat(projectId: number, text: string, title?: string): Promise<{ chatId: number }>;
   stop(chatId: number): Promise<void>;
   resolveApproval(approvalId: string, decision: ApprovalDecision): Promise<void>;
   /** Opens the event stream (idempotent). Events and connection changes are delivered to the subscribers below. */
@@ -143,6 +145,8 @@ export class GustafClient implements DesktopApi {
   listChats = (projectId: number) => this.call<ChatSummary[]>("GET", `${API_BASE_PATH}/chats?project=${projectId}`);
   listMessages = (chatId: number) => this.call<ChatMessage[]>("GET", `${API_BASE_PATH}/chats/${chatId}/messages`);
   sendMessage = (chatId: number, req: SendMessageRequest) => this.call<void>("POST", `${API_BASE_PATH}/chats/${chatId}/messages`, req);
+  createChat = (projectId: number, text: string, title?: string) =>
+    this.call<{ chatId: number }>("POST", `${API_BASE_PATH}/chats`, { projectId, text, ...(title ? { title } : {}) });
   stop = (chatId: number) => this.call<void>("POST", `${API_BASE_PATH}/chats/${chatId}/stop`);
   resolveApproval = (approvalId: string, decision: ApprovalDecision) =>
     this.call<void>("POST", `${API_BASE_PATH}/approvals/${encodeURIComponent(approvalId)}`, { decision } satisfies ApprovalResponse);

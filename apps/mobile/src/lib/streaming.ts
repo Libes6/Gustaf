@@ -1,4 +1,4 @@
-import type { ApprovalRequest, ChatMessage, ServerEvent, ToolActivity } from "@gustaf/protocol";
+import type { ApprovalRequest, ChatMessage, ChatRunStatus, ServerEvent, ToolActivity } from "@gustaf/protocol";
 
 /** Everything the chat screen shows for one chat, built only from `ServerEvent`s and the initial message list. */
 export interface ChatState {
@@ -7,6 +7,8 @@ export interface ChatState {
   /** Approvals waiting for the user's decision. */
   approvals: ApprovalRequest[];
   running: boolean;
+  /** The desktop's finer status: `waiting` means an approval is open on the desktop. */
+  status?: ChatRunStatus;
   /** Id of the assistant message currently receiving text (drives the streaming placeholder). */
   streamingMessageId: number | null;
   error?: string;
@@ -40,8 +42,8 @@ export function reduceEvent(state: ChatState, event: ServerEvent): ChatState {
     case "hello":
       return state;
     case "chat.updated":
-      if (event.chat.id !== state.chatId || event.chat.running === state.running) return state;
-      return { ...state, running: event.chat.running };
+      if (event.chat.id !== state.chatId || (event.chat.running === state.running && event.chat.status === state.status)) return state;
+      return { ...state, running: event.chat.running, status: event.chat.status };
     case "message.created": {
       if (event.message.chatId !== state.chatId) return state;
       const messages = upsertMessage(state.messages, event.message);
@@ -81,6 +83,7 @@ export function reduceEvent(state: ChatState, event: ServerEvent): ChatState {
       return {
         ...state,
         running: false,
+        status: undefined,
         streamingMessageId: null,
         approvals: [],
         error: event.outcome === "error" ? (event.error ?? "error") : undefined,

@@ -1,9 +1,9 @@
 import Constants from "expo-constants";
 import { Alert, ScrollView, View } from "react-native";
-import { Body, Button, Card } from "../../src/components/ui.tsx";
-import { useT } from "../../src/i18n/index.ts";
-import type { Locale, ThemeMode } from "../../src/storage/secure.ts";
-import { useStore } from "../../src/state/store.ts";
+import { Body, Button, Card } from "../src/components/ui.tsx";
+import { useT } from "../src/i18n/index.ts";
+import type { Locale, ThemeMode } from "../src/storage/secure.ts";
+import { useStore } from "../src/state/store.ts";
 
 export default function Settings() {
   const t = useT();
