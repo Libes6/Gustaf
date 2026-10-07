@@ -2,6 +2,7 @@ import type { PairingQrPayload } from "@gustaf/protocol";
 import { create } from "zustand";
 import { GustafClient, pairWithDesktop, type ConnectionState, type DesktopApi } from "../api/client.ts";
 import { MockServer } from "../api/mock.ts";
+import { isPinningAvailable, pinnedTransport } from "../../modules/gustaf-pinned";
 import {
   deleteToken,
   loadDesktops,
@@ -39,6 +40,8 @@ interface Store {
 }
 
 let unsubConn: (() => void) | null = null;
+/** The certificate-pinning transport where the native module exists; otherwise the default one (which rejects the desktop's self-signed certificate). */
+const transport = isPinningAvailable ? pinnedTransport : undefined;
 
 export const useStore = create<Store>((set, get) => {
   const attach = (api: DesktopApi, mode: "demo" | "real", desktop: PairedDesktop | null) => {
@@ -75,7 +78,7 @@ export const useStore = create<Store>((set, get) => {
     },
 
     async pair(payload, deviceName) {
-      const res = await pairWithDesktop(payload, deviceName);
+      const res = await pairWithDesktop(payload, deviceName, transport);
       const desktop: PairedDesktop = {
         id: res.deviceId,
         name: res.desktopName,
@@ -88,13 +91,13 @@ export const useStore = create<Store>((set, get) => {
       const desktops = [...get().desktops.filter((d) => d.id !== desktop.id), desktop];
       await saveDesktops(desktops);
       set({ desktops });
-      attach(new GustafClient({ ...desktop, token: res.token }), "real", desktop);
+      attach(new GustafClient({ ...desktop, token: res.token, transport }), "real", desktop);
     },
 
     async connectTo(desktop) {
       const token = await loadToken(desktop.id);
       if (!token) return;
-      attach(new GustafClient({ ...desktop, token }), "real", desktop);
+      attach(new GustafClient({ ...desktop, token, transport }), "real", desktop);
     },
 
     disconnect() {
