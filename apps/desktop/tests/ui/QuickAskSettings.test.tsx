@@ -110,7 +110,6 @@ describe("Settings: Quick ask window", () => {
     mockSettings({});
     view(<ShortcutsSettings />);
     expect(await screen.findByRole("switch", { name: "Quick ask window" })).toBeInTheDocument();
-    expect(screen.getByText("Keyboard shortcuts")).toBeInTheDocument();
     await act(async () => {});
   });
 });

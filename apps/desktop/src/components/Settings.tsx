@@ -6,7 +6,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes,
+  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -43,6 +43,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
     group: "personal",
     items: [
       { id: "general", label: "general", icon: Gear },
+      { id: "shortcuts", label: "shortcuts", icon: Keyboard },
       { id: "import", label: "import", icon: Download },
       { id: "providers", label: "providers", icon: Boxes },
       { id: "usage", label: "usage", icon: BarChart3 },
@@ -84,10 +85,20 @@ function General() {
         </div>
       </div>
       <AppearanceSettings />
-      <ShortcutsSettings />
       <CleanupSettings />
       <DeveloperSettings />
     <VoiceSettings /><WebSettings /><UpdaterPanel /></>
+  );
+}
+
+function ShortcutsPage() {
+  const t = useT();
+  return (
+    <>
+      <h1>{t("shortcuts")}</h1>
+      <p className="lead">{t("shortcutsLead")}</p>
+      <ShortcutsSettings />
+    </>
   );
 }
 
@@ -292,7 +303,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
+  memory: MemorySettings, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {
