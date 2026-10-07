@@ -5,6 +5,7 @@ mod cursor_accounts;
 mod cursor_import;
 mod db;
 mod git;
+mod git_branches;
 mod git_publish;
 mod hook_exec;
 mod hunks;
@@ -134,6 +135,8 @@ pub fn run() {
             git::git_status,
             git::git_commit_context,
             git::git_commit,
+            git_branches::git_branches,
+            git_branches::git_switch_branch,
             git_publish::git_publish_info,
             git_publish::git_push,
             git_publish::git_create_branch,
