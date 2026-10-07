@@ -1,8 +1,8 @@
 .project-preview { display: flex; flex-direction: column; min-height: 360px; }
 .preview-config { padding: 10px; }
-.preview-config label { display: block; font-size: 11px; color: var(--text-2); margin: 5px 0; }
+.preview-config label { display: block; font-size: calc(11px * var(--ui-scale, 1)); color: var(--text-2); margin: 5px 0; }
 .preview-config .input { width: 100%; box-sizing: border-box; }
-.preview-hint, .preview-state, .preview-empty { color: var(--text-2); font-size: 11px; line-height: 1.5; }
+.preview-hint, .preview-state, .preview-empty { color: var(--text-2); font-size: calc(11px * var(--ui-scale, 1)); line-height: 1.5; }
 .preview-actions, .preview-tabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .preview-tabs { padding: 6px 10px; border-block: 1px solid var(--border); }
 .preview-tabs button { padding: 4px 8px; border-radius: 6px; }

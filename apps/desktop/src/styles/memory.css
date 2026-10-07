@@ -1,9 +1,9 @@
 /* Memory: the project dialog, the export preview and the suggestions dialog (shared dialog chrome is in gitCommit.css). */
-.memory-body label { color: var(--text-2); font-size: 12.5px; }
+.memory-body label { color: var(--text-2); font-size: calc(12.5px * var(--ui-scale, 1)); }
 .memory-body .card { margin-top: 4px; }
 .memory-actions { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 .memory-actions .memory-export { margin-left: auto; }
-.memory-preview { margin: 0; max-height: 280px; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-hover); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.memory-preview { margin: 0; max-height: 280px; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-hover); font: calc(12px * var(--code-scale, 1))/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .memory-suggestions { display: flex; flex-direction: column; gap: 10px; }
 .memory-suggestion { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 8px; }
 .memory-suggestion .check { margin-top: 9px; }

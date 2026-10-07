@@ -1,6 +1,7 @@
 // DOM side of theming: sets data-theme + accent variables on <html>, follows the OS scheme in "system" mode.
 // Preferences live in app settings ("theme", "accent", "chatWidth"); a localStorage copy lets the first paint use them synchronously.
 import { getSetting, setSetting } from "./api";
+import { applyCustomTheme } from "./customTheme";
 import { accentVars, chatWidthCss, parseChatWidth, parsePrefs, resolveTheme, type ChatWidth, type ThemeMode } from "./themeUtil";
 
 const CACHE_KEY = "gustaf-theme";
@@ -19,6 +20,7 @@ export function applyTheme(p: Prefs = prefs) {
   root.style.colorScheme = resolved;
   for (const [k, v] of Object.entries(accentVars(p.accent, resolved))) root.style.setProperty(k, v);
   root.style.setProperty("--chat-width", chatWidthCss(p.width));
+  applyCustomTheme(resolved);
 }
 
 const publish = () => listeners.forEach((l) => l(prefs));
