@@ -120,7 +120,8 @@ function CliDetail({ agent, onClose }: { agent: CliAgent; onClose: () => void })
         </header>
         <div className="agent-transcript">
           <div className="agent-meta">{t(PROVIDER_KEY[agent.provider])} · {t(CLI_STATE_KEY[agent.state])}{agent.role ? ` · ${agent.role}` : ""}{agent.toolUses ? ` · ${t("agentsToolUses", { count: agent.toolUses })}` : ""}</div>
-          <div className="hint">{t("agentsCliReadOnly", { provider: t(PROVIDER_KEY[agent.provider]) })}</div>
+          <div className="hint">{agent.command !== undefined ? t("agentsCommandNote", { provider: t(PROVIDER_KEY[agent.provider]) }) : t("agentsCliReadOnly", { provider: t(PROVIDER_KEY[agent.provider]) })}</div>
+          {agent.command !== undefined && <div className="agent-step"><div className="agent-step-head">{t("agentsCommand")}</div><pre>{agent.command}</pre></div>}
           {agent.prompt && <div className="agent-step"><div className="agent-step-head">{t("subagentTask")}</div><pre>{agent.prompt}</pre></div>}
           {agent.step && isCliAgentActive(agent) && <div className="agent-step"><div className="agent-step-head">{agent.step}</div></div>}
           {agent.output || agent.result ? <div className="agent-step"><div className="agent-step-head">{t("agentsReport")}</div><pre>{agent.output ?? agent.result}</pre></div> : <div className="hint">{t("subagentNoResult")}</div>}
@@ -207,11 +208,11 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
   const provider = t(PROVIDER_KEY[agent.provider]);
   const title = cliTitle(agent, (id) => t("subagentUnnamed", { id }));
   const time = elapsed({ status: active ? "running" : "completed", startedAt: agent.startedAt, endedAt: agent.endedAt }, now, t);
-  const step = active ? agent.step || (agent.state === "waiting" ? t("subagentWaiting") : t("agentsThinking")) : agent.result;
+  const step = agent.command !== undefined ? (active ? agent.command : agent.result) : active ? agent.step || (agent.state === "waiting" ? t("subagentWaiting") : t("agentsThinking")) : agent.result;
   return (
     <Card
       title={title}
-      kind={t("agentsKind", { type: provider })}
+      kind={t(agent.command !== undefined ? "agentsKindCommand" : "agentsKind", { type: provider })}
       status={active ? undefined : { label: t(CLI_STATE_KEY[agent.state]), tone: agent.state === "completed" ? "completed" : agent.state === "failed" ? "failed" : "cancelled" }}
       time={time || undefined}
       meta={[...(agent.role ? [agent.role] : []), ...(agent.tokens ? [t("agentsTokens", { tokens: formatTokens(agent.tokens) })] : []), ...(agent.toolUses > 0 ? [t("agentsToolUses", { count: agent.toolUses })] : [])]}

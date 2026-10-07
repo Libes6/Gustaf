@@ -1,5 +1,5 @@
 import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions, type RunOutcome } from "../agent/agent";
-import { finishCliAgents, trackCliAgents } from "../agent/cliAgents";
+import { finishCliAgents, isBackgroundShell, trackCliAgents } from "../agent/cliAgents";
 import type { Adapter, LimitWindow, Msg, Part, Reasoning, TokenUsage } from "../providers/types";
 
 // The part of "run the agent in a chat" that interactive sends (lib/useChatRun.ts) and scheduled runs
@@ -150,7 +150,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
         // An update keeps the position of its card (a subagent's rows must not jump around while it works).
         const at = activities.findIndex((p) => p.id === a.id);
         activities = at < 0 ? [...activities, a] : activities.map((p, k) => (k === at ? a : p));
-        if (a.subagent) trackCliAgents({ chatId: i.chatId, root: i.root, stop: i.stop }, activities);
+        if (a.subagent || isBackgroundShell(a)) trackCliAgents({ chatId: i.chatId, root: i.root, stop: i.stop }, activities);
         ui.onActivity?.(activities);
       },
       onMessage: async (m) => {
