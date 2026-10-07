@@ -22,6 +22,10 @@ import { groupTurns } from "../lib/chatTurns";
 import { editableText, turnMessageIds } from "../lib/messageActions";
 import { useChatRun } from "../lib/useChatRun";
 import { useBackgroundTasks } from "../lib/useBackgroundTasks";
+import { useInterruptedWork } from "../lib/useInterruptedWork";
+import { useStopGuard } from "../lib/stopGuard";
+import { getRuns, stopRun } from "../agent/agentRuns";
+import { isActiveStatus } from "../agent/agentRunsModel";
 import { useComposerDraft } from "../lib/useComposerDraft";
 import { useMessageJump } from "../lib/useMessageJump";
 import { turnHasMessage } from "../lib/searchUtil";
@@ -90,7 +94,12 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const modelName = app.models.find((m) => m.providerId === provider?.id && m.id === app.selection?.model)?.name ?? app.selection?.model;
   const [supports, setSupports] = useState<{ computer: boolean; reasoning: boolean; levels?: readonly Reasoning[] }>({ computer: false, reasoning: false });
 
-  const tasks = useBackgroundTasks(root);
+  const interrupted = useInterruptedWork(projectRoot);
+  const tasks = useBackgroundTasks(root, interrupted.length);
+  // Stopping the run also stops its background agents: ask first when some are mid-run.
+  const stopGuard = useStopGuard(tasks.running, () => {
+    for (const r of getRuns()) if (r.projectRoot === root && isActiveStatus(r.status)) stopRun(r.id);
+  });
   // One prompt to several models, each in its own workspace chat running in the background (lib/fanOut.ts).
   const appRef = useRef(app);
   appRef.current = app;
@@ -123,7 +132,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   const run = useChatRun({
     session, visible, messages, setMessages, loaded, text, setText, images, setImages, draft,
     projectId: project?.id ?? null, root, files, provider, selectedModel, setAtBottom, mode,
-    workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false),
+    workspace, projectRoot, blocked, newWorkspace, onWorkspaceUsed: () => setNewWorkspace(false), confirmStop: stopGuard.confirmStop,
   });
   // "Restart agent session" from ⌘K is sent to the chat in front (SearchPalette dispatches RESTART_SESSION_EVENT).
   const [sessionNotice, setSessionNotice] = useState("");
@@ -245,9 +254,10 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
 
   return (
     <CanvasWorkspace sources={canvasSources} scope={session.key} onRepair={(prompt) => { setText(prompt); taRef.current?.focus(); }}
-      aside={root && tasks.open ? <AgentsColumn root={root} tasks={tasks} onContinue={continueAgent} toggleRef={toggleRef} /> : undefined}>
+      aside={root && tasks.open ? <AgentsColumn root={root} projectRoot={projectRoot} interrupted={interrupted} tasks={tasks} onContinue={continueAgent} toggleRef={toggleRef} /> : undefined}>
     <main className="main">
 
+      {stopGuard.node}
       {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
       {root && project && <ChangesPanel reviewOn={workspace ? undefined : reviewOn} name={project.name} root={root} workspace={resolved.state === "workspace" && workspace && projectRoot ? { taskId: workspace.taskId, branch: resolved.info.branch, projectRoot } : undefined} busy={running} messages={messages} tick={run.tick} onChanged={run.bumpTick} onReplyToAgent={continueAgent} chatId={session.chatId} />}
 
@@ -296,7 +306,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
         }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
-        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onFanOut={startFanOut} onStop={run.stop}
+        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onFanOut={startFanOut} onStop={run.requestStop}
         contextTokens={contextTokens} lastInput={lastInput}
         canCompact={!(running || !loaded || messages.length < 4 || !provider)}
         canRestore={messages.some(m => m.meta?.compacted)}

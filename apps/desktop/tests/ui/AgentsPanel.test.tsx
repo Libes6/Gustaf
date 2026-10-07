@@ -195,6 +195,14 @@ describe("AgentsPanel", () => {
     expect(callsOf("db_select").filter((a: any) => /from agent_messages/.test(a.sql) && a.params[0] === "r3").length).toBeGreaterThan(0);
   });
 
+  it("a stopped run's card points at the work it may have left behind; a finished one does not", async () => {
+    setup();
+    await openColumn();
+    const stopped = await screen.findByRole("article", { name: "Stopped one" });
+    expect(within(stopped).getByText(/Stopped before it finished/)).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Done one" })).queryByText(/Stopped before it finished/)).toBeNull();
+  });
+
   it("continues a finished run: the follow-up becomes a request for the main agent; cancelled runs cannot be continued", async () => {
     const onContinue = setup();
     await openColumn();

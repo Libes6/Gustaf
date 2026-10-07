@@ -1664,5 +1664,20 @@
   "goalNote_usage": "usage limit reached",
   "goalNote_budget": "token budget reached",
   "importFrom": "Import from",
-  "importCursorSub": "Pick Cursor projects to bring their chats."
+  "importCursorSub": "Pick Cursor projects to bring their chats.",
+  "interruptedTitle": "Interrupted agent work",
+  "interruptedHint": "Worktrees with uncommitted changes or unmerged commits that no chat owns.",
+  "interruptedCommits": "{count} unmerged commits",
+  "interruptedCommitsSome": "has unmerged commits",
+  "interruptedFiles": "{count} uncommitted files",
+  "interruptedOpen": "Open",
+  "interruptedDiscard": "Discard",
+  "interruptedDiscardTitle": "Discard {branch}?",
+  "interruptedDiscardBody": "This deletes the checkout and the branch {branch}, including {files} uncommitted files and: {commits}. It cannot be undone.",
+  "interruptedDiscardConfirm": "Discard work",
+  "agentsInterruptedNote": "Stopped before it finished. Check Interrupted agent work for changes it left behind.",
+  "stopAgentsTitle": "{count} agents are running, stop them?",
+  "stopAgentsBody": "Stopping the run also stops its background agents. Their unfinished work stays in their worktrees.",
+  "stopAgentsConfirm": "Stop agents",
+  "stopAgentsKeep": "Keep running"
 }
