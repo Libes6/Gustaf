@@ -8,12 +8,12 @@ import "../styles/agents.css";
 export type SubagentActivity = Extract<Part, { type: "activity" }> & { subagent: SubagentInfo };
 export const isSubagentActivity = (p: Part): p is SubagentActivity => p.type === "activity" && !!p.subagent;
 
-/** Display state: an agent that was still running when the turn ended is "ended" (the CLI never reported its result). */
-export type ShownState = SubagentInfo["state"] | "ended";
-export const shownState = (a: SubagentActivity): ShownState => (a.status !== "running" && (a.subagent.state === "running" || a.subagent.state === "waiting") ? "ended" : a.subagent.state);
+/** Display state: an agent that was still running when the turn ended is "unknown" (the CLI never reported its result). */
+export type ShownState = SubagentInfo["state"] | "unknown";
+export const shownState = (a: SubagentActivity): ShownState => (a.status !== "running" && (a.subagent.state === "running" || a.subagent.state === "waiting") ? "unknown" : a.subagent.state);
 export const agentTitle = (a: SubagentActivity, unnamed: (id: string) => string) => a.subagent.title || unnamed(a.subagent.agentId.slice(-6) || "…");
 
-const STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", stopped: "subagentStopped", ended: "subagentEnded" } as const;
+const STATE_KEY = { running: "subagentRunning", waiting: "subagentWaiting", completed: "subagentDone", failed: "subagentFailed", stopped: "subagentStopped", unknown: "subagentUnknown" } as const;
 export const stateKey = (s: ShownState) => STATE_KEY[s];
 
 function Row({ agent }: { agent: SubagentActivity }) {
@@ -62,7 +62,7 @@ export function SubagentsCard({ agents }: { agents: SubagentActivity[] }) {
   const running = states.filter((s) => s === "running" || s === "waiting").length;
   const done = states.filter((s) => s === "completed").length;
   const failed = states.filter((s) => s === "failed").length;
-  const stopped = states.filter((s) => s === "stopped" || s === "ended").length;
+  const stopped = states.filter((s) => s === "stopped" || s === "unknown").length;
   return (
     <section className="tool-card subagents-card" aria-label={t("subagentsTitle")}>
       <button className="tool-head" style={{ width: "100%" }} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>

@@ -10,7 +10,9 @@
 //  - child status is monotone: a terminal child is only reopened by a new turn of that child (SendMessage / resume), never by
 //    a late progress frame; the parent turn ending never completes a child that is still running;
 //  - liveness is never guessed: nothing here treats silence as a heartbeat. When the connection or the turn ends with children
-//    still running, they are left "running" and the caller marks them unknown (cli.ts), not completed.
+//    that never reported an end, `settle` closes them: `stopped` when the owning process is confirmed gone (exit, crash, our own
+//    kill after a failed/interrupted/aborted turn), `unknown` when observation merely ran out (the wait limit). Never `completed`,
+//    never left `running`.
 import { isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
 import type { NativeGoal, Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
 
@@ -116,7 +118,7 @@ export type Effect =
 
 const MAX_HELD_PER_THREAD = 100;
 const MAX_HELD_THREADS = 50;
-const HELD = new Set(["turn/started", "turn/completed", "item/started", "item/completed", "thread/tokenUsage/updated", "thread/status/changed"]);
+const HELD = new Set(["turn/started", "turn/completed", "item/started", "item/completed", "thread/tokenUsage/updated", "thread/status/changed", "thread/closed"]);
 
 type Child = { activityId: string; state: SubagentState; lastText: string; tokens?: number };
 
@@ -210,6 +212,13 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
         if (total !== undefined) { c.tokens = total; push(info(threadId, c, { action: "progress", state: c.state, tokens: total })); }
         break;
       }
+      case "thread/closed":
+        // The server unloaded the thread: a child that never reported an end is not running any more.
+        if (c.state === "running" || c.state === "waiting") {
+          c.state = "stopped";
+          push({ ...info(threadId, c, { action: "close", state: "stopped", result: "Agent thread closed" }), status: "unknown" });
+        }
+        break;
       case "thread/status/changed":
         if (rec(p.status).type === "systemError" && c.state === "running") {
           c.state = "failed";
@@ -346,7 +355,21 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
     usage(): TokenUsage | undefined {
       return latest && baseline && usageSeen ? sub(latest.total, baseline) : undefined;
     },
-    /** Children still running (the caller marks them unknown when the turn or the connection ends). */
+    /**
+     * The connection or turn is over and these children never reported an end: closes each with `state` (see the header) and
+     * returns the entries to publish. `stopped`: the process that owned them is confirmed gone. `unknown`: we only stopped
+     * observing. Terminal children are untouched.
+     */
+    settle(state: "stopped" | "unknown", note: string): Effect[] {
+      const out: Effect[] = [];
+      for (const [threadId, c] of children) {
+        if (c.state !== "running" && c.state !== "waiting") continue;
+        c.state = state;
+        out.push({ kind: "activity", activity: { ...info(threadId, c, { action: "close", state, result: c.lastText ? brief(c.lastText, 300) : note, ...(c.tokens ? { tokens: c.tokens } : {}) }), status: "unknown" } });
+      }
+      return out;
+    },
+    /** Children still running (those the caller has not settled yet). */
     running(): string[] { return [...children].filter(([, c]) => c.state === "running" || c.state === "waiting").map(([id]) => id); },
     /** Test hook. */
     get held() { return held.size; },
@@ -390,7 +413,8 @@ export type TurnHandlers = {
   childWaitMs?: number;
 };
 
-export type TurnResult = { session: string; error: string; running: string[]; usage?: TokenUsage };
+/** `unreported`: children that never reported an end and were settled (`stopped` or `unknown`) when the connection or turn ended. */
+export type TurnResult = { session: string; error: string; unreported: string[]; usage?: TokenUsage };
 
 /** Thrown when the app-server could not be started or spoken to before any output: the caller may fall back to `exec`. */
 export class AppServerUnavailable extends Error {}
@@ -496,17 +520,28 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     }
     const end = await Promise.race([finished, exit.then((x) => ({ status: "lost", error: conn.stderr().trim().slice(-600) || `codex app-server exited${x.code == null ? "" : ` with ${x.code}`}` }))]);
     if (h.signal?.aborted) throw aborted();
+    let verdict: { state: "stopped" | "unknown"; note: string } = { state: "stopped", note: "Agent did not report a result before the Codex run ended" };
+    if (end.status === "lost") verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
     if (end.status === "completed" && reducer.running().length) {
       const wait = new Promise<void>((resolve) => { childrenSettled = resolve; });
       let timer: ReturnType<typeof setTimeout> | undefined;
       const limit = new Promise<void>((resolve) => { timer = setTimeout(resolve, h.childWaitMs ?? CHILD_WAIT_MS); });
-      try { await Promise.race([wait, limit, exit]); } finally { clearTimeout(timer); childrenSettled = undefined; }
+      const how = await Promise.race([wait.then(() => "settled"), limit.then(() => "limit"), exit.then(() => "exit")]).finally(() => { clearTimeout(timer); childrenSettled = undefined; });
       if (h.signal?.aborted) throw aborted();
+      if (how === "limit") verdict = { state: "unknown", note: "Lost track of this agent: no report within the wait limit" };
+      else if (how === "exit") verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
     }
+    // Whatever never reported an end is closed now, never left `running` and never called completed.
+    const unreported = reducer.running();
+    apply(reducer.settle(verdict.state, verdict.note));
     const usage = reducer.usage();
     if (usage) h.onUsage?.(usage);
     const error = end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";
-    return { session, error, running: reducer.running(), usage };
+    return { session, error, unreported, usage };
+  } catch (e) {
+    // The user stopped the run: we killed the process, so its children are confirmed gone (they are "stopped", not running).
+    if (reducer && h.signal?.aborted) apply(reducer.settle("stopped", "Stopped with the Codex run"));
+    throw e;
   } finally {
     clearTimeout(idleTimer);
     h.signal?.removeEventListener("abort", onAbort);

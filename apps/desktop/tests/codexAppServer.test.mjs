@@ -108,7 +108,7 @@ test('a spawn of two agents makes two entries with their model; child frames tha
   assert.equal(ca.role, 'explorer');
   assert.equal(ca.toolUses, 1, 'the held command of the child was replayed');
   assert.match(ca.step, /rg parser/);
-  assert.deepEqual(r.running.sort(), ['ca', 'cb'], 'the parent turn ending does not complete a running child');
+  assert.deepEqual(r.unreported.sort(), ['ca', 'cb'], 'the parent turn ending does not complete a running child');
 });
 
 test('child status is monotone; only a new turn of that child reopens it', () => {
@@ -149,7 +149,7 @@ test('children that outlive the parent turn are waited for until they report an 
   conn.emit(item('item/completed', 'cb', { type: 'agentMessage', id: 'x', text: 'late result' }));
   conn.emit(turnDone('cb'));
   const r = await p;
-  assert.deepEqual(r.running, []);
+  assert.deepEqual(r.unreported, []);
   const by = (id) => [...out.acts.values()].find((a) => a.subagent?.agentId === id).subagent;
   assert.equal(by('ca').state, 'completed');
   assert.match(by('cb').result, /late result/);
@@ -158,7 +158,7 @@ test('children that outlive the parent turn are waited for until they report an 
 test('waiting for children is bounded and stoppable, and does not decide their fate', async () => {
   const mk = () => fakeConn(base({ then: [item('item/completed', ROOT, spawn('s1', ['ca'])), turnDone(ROOT)] }));
   const r = await runAppServerTurn(mk(), P, { ...handlers().h, childWaitMs: 40 });
-  assert.deepEqual(r.running, ['ca'], 'still running, left for the caller to show as unknown');
+  assert.deepEqual(r.unreported, ['ca'], 'never reported an end');
   const ac = new AbortController();
   const p = runAppServerTurn(mk(), P, { ...handlers().h, signal: ac.signal });
   await new Promise((r2) => setTimeout(r2, 30));
@@ -168,7 +168,7 @@ test('waiting for children is bounded and stoppable, and does not decide their f
   const q = runAppServerTurn(c3, P, handlers().h);
   await new Promise((r2) => setTimeout(r2, 30));
   c3.exit(1);
-  assert.deepEqual((await q).running, ['ca'], 'a process that exits ends the wait');
+  assert.deepEqual((await q).unreported, ['ca'], 'a process that exits ends the wait');
 });
 
 test('a child that errors or is interrupted ends in its own state without failing the parent', async () => {
@@ -186,7 +186,7 @@ test('a child that errors or is interrupted ends in its own state without failin
   assert.match(by('ca').result, /boom/);
   assert.equal(by('cb').state, 'stopped');
   assert.equal(r.error, '');
-  assert.deepEqual(r.running, []);
+  assert.deepEqual(r.unreported, []);
 });
 
 test('frames of unknown threads are bounded and never become entries', () => {
@@ -236,7 +236,7 @@ test('a failed turn reports its message; an interrupted turn is not an error', a
   assert.equal((await runAppServerTurn(c, P, handlers().h)).error, 'fatal');
 });
 
-test('a crash mid-turn is an error and leaves running children running (the caller marks them unknown)', async () => {
+test('a crash mid-turn is an error and settles unreported children as stopped, never running or completed', async () => {
   const { out, h } = handlers();
   const conn = fakeConn(base({ then: [item('item/completed', ROOT, spawn('s1', ['ca']))] }));
   const p = runAppServerTurn(conn, P, h);
@@ -244,8 +244,7 @@ test('a crash mid-turn is an error and leaves running children running (the call
   conn.exit(139);
   const r = await p;
   assert.match(r.error, /exited with 139/);
-  assert.deepEqual(r.running, ['ca']);
-  assert.equal([...out.acts.values()][0].subagent.state, 'running');
+  assert.deepEqual(r.unreported, ['ca']);
 });
 
 test('stop: the signal kills the process and rejects with AbortError', async () => {

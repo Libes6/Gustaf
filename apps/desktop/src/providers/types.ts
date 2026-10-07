@@ -3,8 +3,8 @@ export type LimitWindow = { id: string; label: string; usedPercent: number; rese
 import type { CuAction } from "../lib/api";
 import type { RetryInfo } from "./retry";
 
-/** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. `stopped`: interrupted or cut off (the turn or the whole run ended first); neutral, not a failure. */
-export type SubagentState = "running" | "waiting" | "completed" | "failed" | "stopped";
+/** Lifecycle of a CLI-native subagent (Codex `collab_tool_call`, Claude Code `Task`/`Agent`), see providers/activities.ts. `stopped`: interrupted or cut off (the turn or the whole run ended first); neutral, not a failure. `unknown`: lifecycle observation was lost (connection or time limit) so the real outcome is not known; never a guess of completion, and a later provider report may still replace it. */
+export type SubagentState = "running" | "waiting" | "completed" | "failed" | "stopped" | "unknown";
 /** One CLI-native subagent as shown in the "Subagents" card and the agents panel. Action `progress` is only used for patches from the subagent's own events; `scan` marks entries read from Codex's rollout files, whose cumulative counters supplement stream lifecycle updates. */
 export type SubagentInfo = {
   provider: "codex" | "claude";

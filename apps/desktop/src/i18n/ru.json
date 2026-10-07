@@ -107,7 +107,7 @@
   "subagentWaiting": "Ожидание",
   "subagentDone": "Готово",
   "subagentFailed": "Ошибка",
-  "subagentEnded": "Завершён",
+  "subagentUnknown": "Статус неизвестен",
   "subagentTask": "Задача",
   "subagentWaits": "ожиданий: {count}",
   "subagentNoResult": "Результат пока не получен.",
