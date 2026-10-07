@@ -39,7 +39,7 @@ WKWebView behavior (CSP, canvas in the real window), code signing, notarization,
 
 - Work on a branch `gustaf/<topic>` and merge into `dev` via PR; never commit straight to `main`.
 - Several sessions may run in parallel in the same checkout. Never revert, reset or `git checkout --` files or directories you did not change; do not stage other people's edits (`git add` specific paths).
-- Subagents in a worktree must commit on `gustaf/<topic>` before reporting; uncommitted work is lost.
+- Subagents in a worktree must commit on `gustaf/<topic>` before reporting; uncommitted work is lost. Commit early and often: a WIP commit after every green `check:quick` and at least every ~10 minutes (squash later if needed). If the parent session is interrupted, background agents die without reporting, and only committed work survives.
 - `TASKS.md` is gitignored and exists only in the main checkout. Only the main agent edits it, and only after a branch is merged into `dev`; subagents never touch it and instead report status, bugs and manual-check steps in their final message (and in the commit message).
 - A reported bug is recorded in `TASKS.md` (by the main agent) unless the request says to fix it.
 - Do not push, publish releases or delete worktrees/branches without being asked.
