@@ -4,19 +4,15 @@ import { useT } from "../i18n";
 import { chatSearch, type SearchHit } from "../lib/api";
 import { arrowDown, isSearchShortcut, mergeHits, moveHighlight, PAGE_SIZE, parseSnippet, searchableQuery } from "../lib/searchUtil";
 import { useApp, type SettingsPage } from "../state";
-import { SHORTCUTS, shortcutDisplay } from "../lib/shortcuts";
+import { PAGE_LABEL } from "../lib/settingsIndex";
+import { useSettingsHits } from "./SettingsSearch";
 import type { Key } from "../i18n";
 import "../styles/search.css";
 
 const DEBOUNCE_MS = 180;
 
 /** Settings pages offered as jumps (same ids and labels as the settings navigation). */
-const SETTINGS_PAGES: { id: SettingsPage; label: Key }[] = [
-  { id: "general", label: "general" }, { id: "import", label: "import" }, { id: "providers", label: "providers" }, { id: "usage", label: "usage" },
-  { id: "memory", label: "memoryTitle" }, { id: "computer", label: "computerUse" }, { id: "mcp", label: "mcp" }, { id: "scheduled", label: "scheduledNav" },
-  { id: "knowledge", label: "knowledgeNav" }, { id: "mobile", label: "mobileTitle" }, { id: "git", label: "gitAndCommands" }, { id: "rules", label: "rules" },
-  { id: "archive", label: "archivedChats" },
-];
+const SETTINGS_PAGES = (Object.entries(PAGE_LABEL) as [SettingsPage, Key][]).map(([id, label]) => ({ id, label }));
 /** Asks the chat in front to forget its provider sessions (ChatView listens). */
 export const RESTART_SESSION_EVENT = "gustaf-restart-session";
 type Jump = { key: string; kind: "settings" | "chat" | "shortcut"; label: string; detail: string; go: () => void };
@@ -146,6 +142,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   const shown = live ? hits : [];
   // Jumps above the message hits: chats by title or #id, settings pages and keyboard shortcuts by name.
   const q = query.trim().toLowerCase();
+  const settingHits = useSettingsHits(query);
   const jumps: Jump[] = !q ? [] : [
     ...app.chats.filter((c) => q === `#${c.id}` || (q.length >= 2 && c.title.toLowerCase().includes(q))).slice(0, 5).map((c): Jump => ({
       key: `c${c.id}`, kind: "chat", label: c.title, detail: `#${c.id} · ${app.projects.find((p) => p.id === c.project_id)?.name ?? t("searchNoProject")}`,
@@ -157,9 +154,9 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
     ...(q.length >= 2 && app.activeChat !== null && app.view === "chat" && t("restartSession").toLowerCase().includes(q) ? [{
       key: "restart", kind: "shortcut" as const, label: t("restartSession"), detail: t("restartSessionHint"), go: () => dispatchEvent(new Event(RESTART_SESSION_EVENT)),
     }] : []),
-    ...(q.length >= 2 ? SHORTCUTS.filter((s) => t(s.label).toLowerCase().includes(q)).slice(0, 3).map((s): Jump => ({
-      key: `k${s.id}`, kind: "shortcut", label: t(s.label), detail: shortcutDisplay(s), go: () => app.openSettings("general"),
-    })) : []),
+    ...settingHits.slice(0, 6).map((h): Jump => ({
+      key: `h${h.id}`, kind: h.keys ? "shortcut" : "settings", label: h.title, detail: h.keys ? `${h.keys} · ${h.detail}` : `${t("settings")} · ${h.detail}`, go: () => app.openSettings(h.page, h.id),
+    })),
   ];
   const J = jumps.length;
   const rows = J + shown.length;

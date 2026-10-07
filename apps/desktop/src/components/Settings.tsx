@@ -7,7 +7,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Archive, BarChart3, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
 import { useT, type Key } from "../i18n";
 import { displayKeys, isMac } from "../lib/platform";
@@ -36,6 +36,7 @@ import { ProviderIcon } from "./ProviderIcon";
 import { ScheduledPage } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
 import { SettingRow } from "./SettingRow";
+import { SettingsSearch } from "./SettingsSearch";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
   {
@@ -291,6 +292,34 @@ function ArchivePage() {
   );
 }
 
+/** Scrolls to the row a settings search result points at (`data-setting`) and flashes it; waits briefly for pages that load their rows later. */
+function useSettingTarget() {
+  const app = useApp();
+  const target = app.settingTarget;
+  const clear = useRef(app.clearSettingTarget);
+  clear.current = app.clearSettingTarget;
+  useEffect(() => {
+    if (!target) return;
+    let tries = 0;
+    let flash: ReturnType<typeof setTimeout> | undefined;
+    const find = () => {
+      const el = document.querySelector<HTMLElement>(`[data-setting="${target}"]`);
+      if (!el) return false;
+      el.scrollIntoView?.({ block: "center" });
+      el.classList.add("setting-hit");
+      flash = setTimeout(() => el.classList.remove("setting-hit"), 2600);
+      clear.current();
+      return true;
+    };
+    if (find()) return () => clearTimeout(flash);
+    const timer = setInterval(() => {
+      if (find()) clearInterval(timer);
+      else if (++tries > 20) { clearInterval(timer); clear.current(); }
+    }, 100);
+    return () => { clearInterval(timer); clearTimeout(flash); };
+  }, [target, app.settingsPage]);
+}
+
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
   memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
@@ -299,11 +328,14 @@ export function Settings() {
   const t = useT();
   const app = useApp();
   const Page = PAGES[app.settingsPage];
+  const [searching, setSearching] = useState(false);
+  useSettingTarget();
   return (
     <div className="settings">
       <nav className="settings-nav drag" aria-label={t("settings")}>
         <div className="settings-nav-title">{t("settings")}</div>
-        {NAV.map((g) => (
+        <SettingsSearch onActive={setSearching} />
+        {!searching && NAV.map((g) => (
           <div key={g.group} role="group" aria-label={t(g.group)}>
             <div className="section-title" aria-hidden="true" style={{ paddingTop: 10 }}>{t(g.group)}</div>
             {g.items.map((it) => (
@@ -314,9 +346,9 @@ export function Settings() {
             ))}
           </div>
         ))}
-        <button className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
+        {!searching && <button className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
           <span className="label">{t("docs")}</span>
-        </button>
+        </button>}
       </nav>
       <main className="settings-main" aria-label={t(NAV.flatMap((g) => g.items).find((it) => it.id === app.settingsPage)?.label ?? "settings")}>
         <div className="drag" style={{ height: 0 }} />

@@ -1676,5 +1676,8 @@
   "webDeny": "Denied domains",
   "webSave": "Save",
   "webSaved": "Saved",
-  "webRemoveKey": "Remove key"
+  "webRemoveKey": "Remove key",
+  "settingsSearch": "Search settings",
+  "settingsSearchEmpty": "No settings match “{query}”.",
+  "settingsSearchMin": "Type at least two characters."
 }

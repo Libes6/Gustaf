@@ -20,7 +20,7 @@ export function makeApp(over: Record<string, unknown> = {}): AppState {
     favorites: [], hiddenModels: [], checkedAt: 0, allowlist: [], sections: [], usage: {}, tokenStats: {}, limits: {}, loadingLimits: null, limitErrors: {},
     projects: [], chats: [], providers: [], models: [], modelErrors: {}, activeChat: null, draftProject: null,
     sessions: { active: "initial", items: [{ key: "initial", chatId: null, projectId: null }] },
-    jump: null, providerHealth: {}, checkingProvider: null, view: "chat", settingsPage: "general", sideHidden: false,
+    jump: null, providerHealth: {}, checkingProvider: null, view: "chat", settingsPage: "general", settingTarget: null, sideHidden: false,
     ...over,
   };
   return new Proxy(base, {

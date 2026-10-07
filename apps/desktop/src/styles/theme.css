@@ -489,6 +489,14 @@ label.field > span { display: block; color: var(--text-2); margin-bottom: 5px; f
 /* ---------- settings ---------- */
 .settings { display: grid; grid-template-columns: 240px 1fr; height: 100%; grid-column: 2 / 4; }
 .settings-nav { background: var(--bg-side); border-right: 1px solid var(--border); padding: calc(var(--titlebar) - 6px) 8px 12px; overflow-y: auto; }
+.settings-search { margin: 0 4px 8px; }
+.settings-search-field { display: flex; align-items: center; gap: 6px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 0 8px; color: var(--text-3); }
+.settings-search-field:focus-within { border-color: var(--text-3); }
+.settings-search-field input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; padding: 6px 0; color: var(--text); user-select: text; }
+.settings-search-hits { margin-top: 6px; display: flex; flex-direction: column; gap: 1px; }
+.settings-search-hits .row .label { display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 0; }
+.settings-hit-where { font-size: 11.5px; }
+.settings-search-empty { padding: 8px; }
 .settings-nav h3, .settings-nav-title { font-size: 15px; font-weight: 600; margin: 0 8px 10px; }
 .settings-main { overflow-y: auto; }
 .settings-inner { max-width: 600px; margin: 0 auto; padding: calc(var(--titlebar) + 24px) 24px 60px; }

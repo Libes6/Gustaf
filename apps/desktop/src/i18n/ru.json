@@ -1724,5 +1724,8 @@
   "webDeny": "Запрещённые домены",
   "webSave": "Сохранить",
   "webSaved": "Сохранено",
-  "webRemoveKey": "Удалить ключ"
+  "webRemoveKey": "Удалить ключ",
+  "settingsSearch": "Поиск по настройкам",
+  "settingsSearchEmpty": "Нет настроек по запросу «{query}».",
+  "settingsSearchMin": "Введите хотя бы два символа."
 }

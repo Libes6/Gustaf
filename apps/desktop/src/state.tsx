@@ -109,6 +109,8 @@ function useAppState() {
   };
   const [view, setView] = useState<"chat" | "settings">("chat");
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
+  /** The setting to scroll to and highlight once its page is shown (settings search); cleared by the settings view. */
+  const [settingTarget, setSettingTarget] = useState<string | null>(null);
   const [sideHidden, setSideHidden] = useState(false);
 
   const reload = useCallback(async () => {
@@ -144,7 +146,8 @@ function useAppState() {
     }).catch(() => {});
   }, []);
 
-  const openSettings = (page: SettingsPage = "general") => {
+  const openSettings = (page: SettingsPage = "general", target: string | null = null) => {
+    setSettingTarget(target);
     setSettingsPage(page);
     setView("settings");
   };
@@ -161,7 +164,7 @@ function useAppState() {
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
-    view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
+    view, setView, settingsPage, openSettings, settingTarget, clearSettingTarget: () => setSettingTarget(null), sideHidden, setSideHidden,
   };
 }
 
