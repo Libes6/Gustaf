@@ -247,6 +247,32 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .tool-body img { max-width: 100%; border-radius: 6px; display: block; }
 .err { color: var(--red); }
 
+/* Compact tool-call rows (components/ToolCard.tsx) and the collapsed group of consecutive calls (components/ToolGroup.tsx). */
+.tool-card.tool-row { border-color: transparent; background: transparent; margin: 0; border-radius: 6px; overflow: visible; }
+.tool-row:hover { background: var(--bg-tool); }
+.tool-row .tool-line { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
+.tool-row .tool-head { flex: 1; min-width: 0; gap: 7px; padding: 3px 8px; }
+.tool-row .tool-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.tool-row .tool-text .name { font-family: inherit; color: var(--text-2); }
+.tool-row .tool-text .arg { display: inline; font-family: var(--mono); color: var(--text); }
+.tool-row .tool-duration { flex: none; color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .12s; }
+.tool-row:hover .tool-duration, .tool-row:focus-within .tool-duration { opacity: 1; }
+.tool-row .tool-terminal { flex: none; opacity: 0; transition: opacity .12s; }
+.tool-row:hover .tool-terminal, .tool-row:focus-within .tool-terminal, .tool-row .tool-terminal:focus-visible { opacity: 1; }
+.tool-row .action-status { margin-left: 0; }
+.tool-row .action-status.awaiting { color: var(--accent); }
+.tool-row .action-status.unknown { color: var(--text-3); }
+.tool-row .tool-body, .tool-row .action-error, .tool-row .error-box { margin: 2px 8px 6px 28px; }
+.tool-row .tool-body { border: 1px solid var(--border); border-radius: 6px; }
+.tool-row .tool-args { margin-bottom: 6px; }
+.tool-group { margin: 4px 0; }
+.tool-group-head { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 3px 8px; border-radius: 6px; color: var(--text-3); font-size: 12.5px; text-align: left; }
+.tool-group-head:hover { background: var(--bg-tool); color: var(--text-2); }
+.tool-group-summary { flex: none; }
+.tool-group-failed { flex: none; color: var(--red); }
+.tool-group-now { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.tool-group-body { margin: 2px 0 4px 10px; padding-left: 6px; border-left: 1px solid var(--border); }
+
 .approval {
   border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-elev);
   padding: 12px; margin: 10px 0;
@@ -789,8 +815,6 @@ button:disabled { cursor:default; opacity:.45; }
 .pr-watch.passing .goal-icon { color: var(--green); }
 .pr-watch.stopped .goal-icon { color: var(--text-3); }
 
-.tool-head .tool-time { margin-left: auto; color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; flex: none; }
-.tool-head .tool-time + .action-status { margin-left: 8px; }
 .file-row .viewed-box { flex: none; margin: 0 6px 0 2px; accent-color: var(--accent); }
 .file-row.viewed .path { color: var(--text-3); }
 .chat-muted-mark { flex: none; color: var(--text-3); margin-right: 2px; }
