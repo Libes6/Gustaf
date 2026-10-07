@@ -827,7 +827,7 @@ mod tests {
         let s = chat_summary(&row, Some("waiting"));
         assert_eq!((s.status, s.running), ("waiting", true));
         assert_eq!(s.title, "A [REDACTED]");
-        assert_eq!(chat_summary(&row, Some("running")).running, true);
+        assert!(chat_summary(&row, Some("running")).running);
         assert_eq!(
             (
                 chat_summary(&row, Some("done")).status,

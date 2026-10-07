@@ -539,7 +539,7 @@ fn restore_without_focus(window: &tauri::WebviewWindow) {
                     std::mem::transmute(objc_msgSend as *const ());
                 send(
                     native,
-                    sel_registerName(b"orderFront:\0".as_ptr().cast()),
+                    sel_registerName(c"orderFront:".as_ptr()),
                     std::ptr::null(),
                 );
             }
@@ -683,224 +683,6 @@ pub fn cu_permissions(_request: bool) -> Permissions {
     other_os_permissions(std::env::consts::OS, set("WAYLAND_DISPLAY"), set("DISPLAY"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::cell::Cell;
-
-    #[test]
-    fn coords_roundtrip_through_downscale() {
-        // 1728x1117 points (MacBook Pro 16") downscaled to fit 1440.
-        let display = (1728, 1117);
-        let shot = fit(display.0, display.1);
-        assert_eq!(shot, (1440, 931));
-        assert_eq!(map_coords(720, 465, shot, display), (864, 558));
-        assert_eq!(map_coords(0, 0, shot, display), (0, 0));
-        assert_eq!(map_coords(1440, 931, shot, display), (1728, 1117));
-        assert_eq!(unmap_coords(864, 558, shot, display), (720, 465));
-        assert_eq!(fit(1280, 800), (1280, 800));
-    }
-
-    #[test]
-    fn scroll_lines_converts_pixels_to_signed_clamped_lines() {
-        assert_eq!(scroll_lines(0), 0);
-        assert_eq!(scroll_lines(10), 1);
-        assert_eq!(scroll_lines(-10), -1);
-        assert_eq!(scroll_lines(120), 3);
-        assert_eq!(scroll_lines(-120), -3);
-        assert_eq!(scroll_lines(1_000_000), 50);
-        assert_eq!(scroll_lines(-1_000_000), -50);
-    }
-
-    fn solid(w: usize, h: usize, v: u8) -> Vec<u8> {
-        let mut px = Vec::with_capacity(w * h * 4);
-        for _ in 0..w * h {
-            px.extend_from_slice(&[v, v, v, 255]);
-        }
-        px
-    }
-
-    #[test]
-    fn thumbnails_detect_visible_changes_only() {
-        let (w, h) = (640, 400);
-        let white = solid(w, h, 255);
-        let a = thumb(w, h, &white);
-        assert_eq!(a.len(), THUMB_W * THUMB_H);
-        assert!(a.iter().all(|v| *v == 255));
-        assert!(!differs(&a, &thumb(w, h, &white)));
-        // A dark 40x40 block (a dialog, a new message) changes the cells it covers.
-        let mut block = white.clone();
-        for y in 100..140 {
-            for x in 200..240 {
-                let i = (y * w + x) * 4;
-                block[i..i + 3].copy_from_slice(&[0, 0, 0]);
-            }
-        }
-        assert!(differs(&a, &thumb(w, h, &block)));
-        // A slight brightness shift everywhere (noise, compression) does not count.
-        assert!(!differs(&a, &thumb(w, h, &solid(w, h, 250))));
-        // Short or empty buffers do not panic.
-        assert_eq!(thumb(0, 0, &[]).len(), THUMB_W * THUMB_H);
-        assert_eq!(thumb(10, 10, &[0; 4]).len(), THUMB_W * THUMB_H);
-        assert!(differs(&a, &a[..10]));
-    }
-
-    /// Runs `settle` against scripted thumbnails with a fake clock: each sample takes 20 ms, each wait advances time.
-    fn run_settle(frames: &[u8], cfg: Settle) -> (usize, bool, u64) {
-        let clock = Cell::new(0u64);
-        let i = Cell::new(0usize);
-        let (idx, _, ok) = settle(
-            &cfg,
-            || {
-                let n = i.get();
-                i.set(n + 1);
-                clock.set(clock.get() + 20);
-                Ok((vec![frames[n.min(frames.len() - 1)]; 4], n))
-            },
-            || clock.get(),
-            |ms| clock.set(clock.get() + ms),
-        )
-        .unwrap();
-        (idx, ok, clock.get())
-    }
-
-    #[test]
-    fn settle_waits_until_the_screen_is_stable() {
-        let cfg = || Settle {
-            poll_ms: 60,
-            stable_ms: 250,
-            max_ms: 2000,
-        };
-        // Already still: settles after ~250 ms with a handful of captures.
-        let (n, ok, t) = run_settle(&[100], cfg());
-        assert!(ok);
-        assert!(t >= 250 && t < 400, "took {t}");
-        assert!(n <= 5);
-        // Changing for 4 frames, then still: the stable window restarts after the last change.
-        let (n, ok, _) = run_settle(&[0, 50, 100, 150, 200], cfg());
-        assert!(ok);
-        assert!(n >= 7, "stopped at frame {n}");
-        // Never still: gives up at max_ms and reports it.
-        let frames: Vec<u8> = (0..200).map(|k| if k % 2 == 0 { 0 } else { 200 }).collect();
-        let (_, ok, t) = run_settle(&frames, cfg());
-        assert!(!ok);
-        assert!(t >= 2000 && t < 2200, "took {t}");
-    }
-
-    #[test]
-    fn settle_propagates_capture_errors() {
-        let cfg = Settle {
-            poll_ms: 10,
-            stable_ms: 50,
-            max_ms: 100,
-        };
-        let r = settle(
-            &cfg,
-            || Err::<(Vec<u8>, ()), _>("no permission".to_string()),
-            || 0,
-            |_| {},
-        );
-        assert_eq!(r.unwrap_err(), "no permission");
-    }
-
-    #[test]
-    fn permissions_off_macos() {
-        let p = other_os_permissions("windows", false, false);
-        assert!(p.accessibility && p.screen && p.supported);
-        assert!(other_os_permissions("linux", false, true).supported);
-        assert!(
-            other_os_permissions("linux", true, true).supported,
-            "XWayland session"
-        );
-        let w = other_os_permissions("linux", true, false);
-        assert!(!w.supported && !w.screen && !w.accessibility);
-    }
-
-    #[test]
-    fn app_names_reject_paths_and_options() {
-        assert_eq!(valid_app_name(" Telegram "), Ok("Telegram"));
-        assert_eq!(valid_app_name("System Settings"), Ok("System Settings"));
-        assert_eq!(valid_app_name("Safari.app"), Ok("Safari.app"));
-        assert_eq!(valid_app_name("Почта"), Ok("Почта"));
-        for bad in [
-            "",
-            "  ",
-            "-a",
-            "--args",
-            "/Applications/Safari.app",
-            "../x",
-            "~/Apps/x",
-            ".hidden",
-            "a\\b",
-            "x:y",
-            "a\nb",
-            &"x".repeat(81),
-        ] {
-            assert!(valid_app_name(bad).is_err(), "{bad:?} accepted");
-        }
-    }
-
-    #[test]
-    fn actions_parse_from_the_frontend_json() {
-        let a: Vec<Action> = serde_json::from_str(
-            r#"[{"type":"open_app","name":"Telegram"},{"type":"click","x":1,"y":2},{"type":"keypress","keys":["cmd","f"]},
-                {"type":"type","text":"hi"},{"type":"wait"},{"type":"scroll","x":3,"y":4,"scroll_y":-120},{"type":"screenshot"}]"#,
-        )
-        .unwrap();
-        assert_eq!(
-            a[0],
-            Action::OpenApp {
-                name: "Telegram".into()
-            }
-        );
-        assert_eq!(
-            a[1],
-            Action::Click {
-                x: 1,
-                y: 2,
-                button: None
-            }
-        );
-        assert_eq!(
-            a[2],
-            Action::Keypress {
-                keys: vec!["cmd".into(), "f".into()]
-            }
-        );
-        assert_eq!(a[4], Action::Wait { ms: None });
-        assert_eq!(
-            a[5],
-            Action::Scroll {
-                x: 3,
-                y: 4,
-                scroll_x: 0,
-                scroll_y: -120
-            }
-        );
-        assert_eq!(a[6], Action::Screenshot);
-        assert!(serde_json::from_str::<Action>(r#"{"type":"open_app"}"#).is_err());
-        assert!(serde_json::from_str::<Action>(r#"{"type":"shell","command":"rm"}"#).is_err());
-    }
-
-    #[test]
-    fn shot_serializes_camel_case_facts() {
-        let s = Shot {
-            png: "x".into(),
-            width: 2,
-            height: 1,
-            front_app: Some("Telegram".into()),
-            cursor: Some((3, 4)),
-            failed_step: Some(1),
-            ..Default::default()
-        };
-        let v = serde_json::to_value(&s).unwrap();
-        assert_eq!(v["frontApp"], "Telegram");
-        assert_eq!(v["cursor"], serde_json::json!([3, 4]));
-        assert_eq!(v["failedStep"], 1);
-        assert!(v["windowTitle"].is_null());
-    }
-}
-
 #[cfg(not(target_os = "macos"))]
 fn accessible_elements() -> Vec<AccessibleElement> {
     Vec::new()
@@ -1020,5 +802,223 @@ fn accessible_elements() -> Vec<AccessibleElement> {
         }
         CFRelease(system);
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn coords_roundtrip_through_downscale() {
+        // 1728x1117 points (MacBook Pro 16") downscaled to fit 1440.
+        let display = (1728, 1117);
+        let shot = fit(display.0, display.1);
+        assert_eq!(shot, (1440, 931));
+        assert_eq!(map_coords(720, 465, shot, display), (864, 558));
+        assert_eq!(map_coords(0, 0, shot, display), (0, 0));
+        assert_eq!(map_coords(1440, 931, shot, display), (1728, 1117));
+        assert_eq!(unmap_coords(864, 558, shot, display), (720, 465));
+        assert_eq!(fit(1280, 800), (1280, 800));
+    }
+
+    #[test]
+    fn scroll_lines_converts_pixels_to_signed_clamped_lines() {
+        assert_eq!(scroll_lines(0), 0);
+        assert_eq!(scroll_lines(10), 1);
+        assert_eq!(scroll_lines(-10), -1);
+        assert_eq!(scroll_lines(120), 3);
+        assert_eq!(scroll_lines(-120), -3);
+        assert_eq!(scroll_lines(1_000_000), 50);
+        assert_eq!(scroll_lines(-1_000_000), -50);
+    }
+
+    fn solid(w: usize, h: usize, v: u8) -> Vec<u8> {
+        let mut px = Vec::with_capacity(w * h * 4);
+        for _ in 0..w * h {
+            px.extend_from_slice(&[v, v, v, 255]);
+        }
+        px
+    }
+
+    #[test]
+    fn thumbnails_detect_visible_changes_only() {
+        let (w, h) = (640, 400);
+        let white = solid(w, h, 255);
+        let a = thumb(w, h, &white);
+        assert_eq!(a.len(), THUMB_W * THUMB_H);
+        assert!(a.iter().all(|v| *v == 255));
+        assert!(!differs(&a, &thumb(w, h, &white)));
+        // A dark 40x40 block (a dialog, a new message) changes the cells it covers.
+        let mut block = white.clone();
+        for y in 100..140 {
+            for x in 200..240 {
+                let i = (y * w + x) * 4;
+                block[i..i + 3].copy_from_slice(&[0, 0, 0]);
+            }
+        }
+        assert!(differs(&a, &thumb(w, h, &block)));
+        // A slight brightness shift everywhere (noise, compression) does not count.
+        assert!(!differs(&a, &thumb(w, h, &solid(w, h, 250))));
+        // Short or empty buffers do not panic.
+        assert_eq!(thumb(0, 0, &[]).len(), THUMB_W * THUMB_H);
+        assert_eq!(thumb(10, 10, &[0; 4]).len(), THUMB_W * THUMB_H);
+        assert!(differs(&a, &a[..10]));
+    }
+
+    /// Runs `settle` against scripted thumbnails with a fake clock: each sample takes 20 ms, each wait advances time.
+    fn run_settle(frames: &[u8], cfg: Settle) -> (usize, bool, u64) {
+        let clock = Cell::new(0u64);
+        let i = Cell::new(0usize);
+        let (idx, _, ok) = settle(
+            &cfg,
+            || {
+                let n = i.get();
+                i.set(n + 1);
+                clock.set(clock.get() + 20);
+                Ok((vec![frames[n.min(frames.len() - 1)]; 4], n))
+            },
+            || clock.get(),
+            |ms| clock.set(clock.get() + ms),
+        )
+        .unwrap();
+        (idx, ok, clock.get())
+    }
+
+    #[test]
+    fn settle_waits_until_the_screen_is_stable() {
+        let cfg = || Settle {
+            poll_ms: 60,
+            stable_ms: 250,
+            max_ms: 2000,
+        };
+        // Already still: settles after ~250 ms with a handful of captures.
+        let (n, ok, t) = run_settle(&[100], cfg());
+        assert!(ok);
+        assert!((250..400).contains(&t), "took {t}");
+        assert!(n <= 5);
+        // Changing for 4 frames, then still: the stable window restarts after the last change.
+        let (n, ok, _) = run_settle(&[0, 50, 100, 150, 200], cfg());
+        assert!(ok);
+        assert!(n >= 7, "stopped at frame {n}");
+        // Never still: gives up at max_ms and reports it.
+        let frames: Vec<u8> = (0..200).map(|k| if k % 2 == 0 { 0 } else { 200 }).collect();
+        let (_, ok, t) = run_settle(&frames, cfg());
+        assert!(!ok);
+        assert!((2000..2200).contains(&t), "took {t}");
+    }
+
+    #[test]
+    fn settle_propagates_capture_errors() {
+        let cfg = Settle {
+            poll_ms: 10,
+            stable_ms: 50,
+            max_ms: 100,
+        };
+        let r = settle(
+            &cfg,
+            || Err::<(Vec<u8>, ()), _>("no permission".to_string()),
+            || 0,
+            |_| {},
+        );
+        assert_eq!(r.unwrap_err(), "no permission");
+    }
+
+    #[test]
+    fn permissions_off_macos() {
+        let p = other_os_permissions("windows", false, false);
+        assert!(p.accessibility && p.screen && p.supported);
+        assert!(other_os_permissions("linux", false, true).supported);
+        assert!(
+            other_os_permissions("linux", true, true).supported,
+            "XWayland session"
+        );
+        let w = other_os_permissions("linux", true, false);
+        assert!(!w.supported && !w.screen && !w.accessibility);
+    }
+
+    #[test]
+    fn app_names_reject_paths_and_options() {
+        assert_eq!(valid_app_name(" Telegram "), Ok("Telegram"));
+        assert_eq!(valid_app_name("System Settings"), Ok("System Settings"));
+        assert_eq!(valid_app_name("Safari.app"), Ok("Safari.app"));
+        assert_eq!(valid_app_name("Почта"), Ok("Почта"));
+        for bad in [
+            "",
+            "  ",
+            "-a",
+            "--args",
+            "/Applications/Safari.app",
+            "../x",
+            "~/Apps/x",
+            ".hidden",
+            "a\\b",
+            "x:y",
+            "a\nb",
+            &"x".repeat(81),
+        ] {
+            assert!(valid_app_name(bad).is_err(), "{bad:?} accepted");
+        }
+    }
+
+    #[test]
+    fn actions_parse_from_the_frontend_json() {
+        let a: Vec<Action> = serde_json::from_str(
+            r#"[{"type":"open_app","name":"Telegram"},{"type":"click","x":1,"y":2},{"type":"keypress","keys":["cmd","f"]},
+                {"type":"type","text":"hi"},{"type":"wait"},{"type":"scroll","x":3,"y":4,"scroll_y":-120},{"type":"screenshot"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            a[0],
+            Action::OpenApp {
+                name: "Telegram".into()
+            }
+        );
+        assert_eq!(
+            a[1],
+            Action::Click {
+                x: 1,
+                y: 2,
+                button: None
+            }
+        );
+        assert_eq!(
+            a[2],
+            Action::Keypress {
+                keys: vec!["cmd".into(), "f".into()]
+            }
+        );
+        assert_eq!(a[4], Action::Wait { ms: None });
+        assert_eq!(
+            a[5],
+            Action::Scroll {
+                x: 3,
+                y: 4,
+                scroll_x: 0,
+                scroll_y: -120
+            }
+        );
+        assert_eq!(a[6], Action::Screenshot);
+        assert!(serde_json::from_str::<Action>(r#"{"type":"open_app"}"#).is_err());
+        assert!(serde_json::from_str::<Action>(r#"{"type":"shell","command":"rm"}"#).is_err());
+    }
+
+    #[test]
+    fn shot_serializes_camel_case_facts() {
+        let s = Shot {
+            png: "x".into(),
+            width: 2,
+            height: 1,
+            front_app: Some("Telegram".into()),
+            cursor: Some((3, 4)),
+            failed_step: Some(1),
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["frontApp"], "Telegram");
+        assert_eq!(v["cursor"], serde_json::json!([3, 4]));
+        assert_eq!(v["failedStep"], 1);
+        assert!(v["windowTitle"].is_null());
     }
 }

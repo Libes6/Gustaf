@@ -13,6 +13,9 @@
 //! gets the same 401 body, and authentication is checked BEFORE the route is looked up, so an unauthenticated client cannot
 //! learn which paths exist.
 
+// The Err side of these helpers is the ready-made HTTP response (`Resp`); boxing it would touch every handler.
+#![allow(clippy::result_large_err)]
+
 use super::{
     commands::{BusError, CommandBus},
     data::{

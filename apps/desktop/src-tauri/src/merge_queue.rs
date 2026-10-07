@@ -1413,7 +1413,7 @@ mod tests {
 
     #[test]
     fn conflict_records_are_parsed() {
-        let text = "tree\0100644 aaa 1\ta\0100644 bbb 2\ta\0100644 ccc 3\ta\0100644 ddd 1\td\0100644 eee 2\td\0100644 fff 2\tn\0100644 ggg 3\tn\0\0ignored message\0";
+        let text = "tree\x00100644 aaa 1\ta\x00100644 bbb 2\ta\x00100644 ccc 3\ta\x00100644 ddd 1\td\x00100644 eee 2\td\x00100644 fff 2\tn\x00100644 ggg 3\tn\0\0ignored message\0";
         let (list, cut) = parse_conflicts(text);
         assert!(!cut);
         let kinds: Vec<(&str, &str)> = list

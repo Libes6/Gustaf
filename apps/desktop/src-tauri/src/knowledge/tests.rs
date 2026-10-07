@@ -350,7 +350,7 @@ fn symlinks_pointing_outside_the_picked_folder_are_not_indexed() {
         .issues
         .iter()
         .any(|i| i.path.ends_with("link.md") && i.reason.contains("Symbolic link")));
-    let hits = search(env.store.path(), &[env.id.clone()], "apple", 10).unwrap();
+    let hits = search(env.store.path(), std::slice::from_ref(&env.id), "apple", 10).unwrap();
     assert!(hits
         .iter()
         .all(|h| !h.text.contains("outside") && !h.text.contains("more")));
@@ -429,7 +429,7 @@ fn search_orders_by_similarity_across_collections_and_honours_limit() {
     .unwrap();
     index(env.store.path(), &other.id).unwrap();
 
-    let hits = search(env.store.path(), &[env.id.clone()], "banana", 3).unwrap();
+    let hits = search(env.store.path(), std::slice::from_ref(&env.id), "banana", 3).unwrap();
     assert_eq!(hits.len(), 3);
     assert!(hits[0].source.ends_with("f2.md"));
     assert!(hits[0].score >= hits[1].score && hits[1].score >= hits[2].score);
@@ -447,9 +447,9 @@ fn search_orders_by_similarity_across_collections_and_honours_limit() {
     assert_eq!(both.len(), 5);
     assert!(both[0].source.ends_with("f1.md") || both[0].source.ends_with("g1.md"));
     assert!(both.iter().any(|h| h.collection == "Other"));
-    assert!(search(env.store.path(), &[env.id.clone()], "  ", 5).is_err());
+    assert!(search(env.store.path(), std::slice::from_ref(&env.id), "  ", 5).is_err());
     assert_eq!(
-        search(env.store.path(), &[env.id.clone()], "apple", 0)
+        search(env.store.path(), std::slice::from_ref(&env.id), "apple", 0)
             .unwrap()
             .len(),
         1,
@@ -472,14 +472,22 @@ fn deleting_a_collection_or_source_removes_its_vectors() {
     remove_source(env.store.path(), &env.id, extra.path().to_str().unwrap()).unwrap();
     assert_eq!(env.files(), vec!["a.md".to_string()]);
     assert_eq!(env.manifest().status.files, 1);
-    let hits = search(env.store.path(), &[env.id.clone()], "banana", 10).unwrap();
+    let hits = search(
+        env.store.path(),
+        std::slice::from_ref(&env.id),
+        "banana",
+        10,
+    )
+    .unwrap();
     assert!(hits.iter().all(|h| !h.text.contains("banana")));
 
     delete(env.store.path(), &env.id).unwrap();
     assert!(!env.store.path().join(&env.id).join("index.json").exists());
-    assert!(search(env.store.path(), &[env.id.clone()], "apple", 5)
-        .unwrap_err()
-        .contains("no longer exists"));
+    assert!(
+        search(env.store.path(), std::slice::from_ref(&env.id), "apple", 5)
+            .unwrap_err()
+            .contains("no longer exists")
+    );
 }
 
 #[test]
@@ -502,7 +510,7 @@ fn cancel_keeps_embedded_vectors_and_resume_only_embeds_the_rest() {
     assert_eq!(env.fake.embedded(), BATCH);
     // The partial index is searchable and a later run does not pay for the 16 chunks again.
     assert_eq!(
-        search(env.store.path(), &[env.id.clone()], "apple", 20)
+        search(env.store.path(), std::slice::from_ref(&env.id), "apple", 20)
             .unwrap()
             .len(),
         20.min(BATCH)
@@ -715,7 +723,7 @@ fn pdf_text_is_extracted_per_page_and_cited_by_page() {
     )
     .unwrap();
     assert_eq!((stats.files, stats.chunks), (1, 2));
-    let hits = search(env.store.path(), &[env.id.clone()], "banana", 2).unwrap();
+    let hits = search(env.store.path(), std::slice::from_ref(&env.id), "banana", 2).unwrap();
     assert_eq!(hits[0].heading.as_deref(), Some("page 2"));
     assert!(hits[0].source.ends_with("paper.pdf"));
     // Unchanged PDFs are not extracted or embedded again.

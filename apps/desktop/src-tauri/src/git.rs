@@ -1629,7 +1629,7 @@ mod tests {
         assert_eq!((st.files.len(), st.total), (MAX_FILES, MAX_FILES + 5));
         let last = format!("many/f{:05}.txt", MAX_FILES + 4);
         assert!(!st.files.iter().any(|f| f.path == last));
-        commit(r, "Add the last one", &[last.clone()], None).unwrap();
+        commit(r, "Add the last one", std::slice::from_ref(&last), None).unwrap();
         assert_eq!(head_files(r), [last]);
     }
 

@@ -141,13 +141,12 @@ fn create(app: &AppHandle) -> Result<WebviewWindow, String> {
         let state = handle.state::<QuickAsk>();
         match event {
             WindowEvent::Focused(true) => state.was_focused.store(true, Ordering::SeqCst),
-            WindowEvent::Focused(false) => {
+            WindowEvent::Focused(false)
                 if state.was_focused.swap(false, Ordering::SeqCst)
-                    && state.hide_on_blur.load(Ordering::SeqCst)
-                {
-                    if let Some(w) = handle.get_webview_window(LABEL) {
-                        let _ = w.hide();
-                    }
+                    && state.hide_on_blur.load(Ordering::SeqCst) =>
+            {
+                if let Some(w) = handle.get_webview_window(LABEL) {
+                    let _ = w.hide();
                 }
             }
             _ => {}

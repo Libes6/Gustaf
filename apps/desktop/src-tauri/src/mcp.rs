@@ -19,6 +19,10 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
+/// Pulls the JSON-RPC id out of the prefix of an oversized message (compiled once, not per dropped message).
+static ID_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r#""id"\s*:\s*(\d+)"#).expect("a valid regex"));
+
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 const MAX_MESSAGE: usize = 16 * 1024 * 1024;
 const MAX_OUTGOING: usize = 4 * 1024 * 1024;
@@ -587,11 +591,7 @@ impl Server {
 
     fn read_loop(self: Arc<Self>, stdout: std::process::ChildStdout, gen: u64) {
         let mut r = BufReader::new(stdout);
-        loop {
-            let line = match read_line_bounded(&mut r, MAX_MESSAGE) {
-                Ok(Some(l)) => l,
-                _ => break,
-            };
+        while let Ok(Some(line)) = read_line_bounded(&mut r, MAX_MESSAGE) {
             if lock(&self.inner).gen != gen {
                 return;
             }
@@ -599,10 +599,7 @@ impl Server {
                 Ok(bytes) => self.handle_line(&bytes),
                 Err(prefix) => {
                     let head = String::from_utf8_lossy(&prefix).into_owned();
-                    let id = regex::Regex::new(r#""id"\s*:\s*(\d+)"#)
-                        .ok()
-                        .and_then(|re| re.captures(&head))
-                        .and_then(|c| c[1].parse::<u64>().ok());
+                    let id = ID_RE.captures(&head).and_then(|c| c[1].parse::<u64>().ok());
                     let mut i = lock(&self.inner);
                     i.push_log(&format!(
                         "[dropped a message over {} MB]",
@@ -740,7 +737,7 @@ impl Server {
                 if i.gen != gen {
                     return;
                 }
-                if i.started_at.map_or(false, |t| t.elapsed() > STABLE_AFTER) {
+                if i.started_at.is_some_and(|t| t.elapsed() > STABLE_AFTER) {
                     i.crashes = 0;
                 }
                 i.crashes += 1;

@@ -878,7 +878,7 @@ mod tests {
     #[test]
     fn bounded_lines_skip_huge_ones() {
         let mut data = b"short\n".to_vec();
-        data.extend(std::iter::repeat(b'x').take(100));
+        data.extend(std::iter::repeat_n(b'x', 100));
         data.extend(b"\nlast");
         let mut r = BufReader::with_capacity(8, &data[..]);
         let (mut buf, mut over) = (Vec::new(), false);
