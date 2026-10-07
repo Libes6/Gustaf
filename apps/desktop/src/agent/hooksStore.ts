@@ -1,7 +1,16 @@
 import { fsx, getSetting, setSetting } from "../lib/api";
 import { readProjectFile } from "../lib/projectFolder";
 import { normalizeProjectPath, sameProject } from "./rules";
-import { effectiveHooks, GLOBAL_HOOKS_SETTING, parseHooksText, PROJECT_HOOKS_FILE, PROJECT_HOOKS_SETTING, validateHooks, type Hook, type HooksConfig } from "./hooksCore";
+import {
+  effectiveHooks,
+  GLOBAL_HOOKS_SETTING,
+  parseHooksText,
+  PROJECT_HOOKS_FILE,
+  PROJECT_HOOKS_SETTING,
+  validateHooks,
+  type Hook,
+  type HooksConfig,
+} from "./hooksCore";
 
 /** Hooks defined in the app settings (apply to every project). Never throws: unreadable settings mean no hooks. */
 export async function loadGlobalHooks(): Promise<HooksConfig> {
@@ -54,10 +63,19 @@ export async function setProjectHooksEnabled(project: string, enabled: boolean) 
   await setSetting(PROJECT_HOOKS_SETTING, enabled ? [...rest, normalizeProjectPath(project)] : rest);
 }
 
-export type HooksView = { global: HooksConfig; project: HooksConfig & { exists: boolean }; enabled: boolean; effective: Hook[] };
+export type HooksView = {
+  global: HooksConfig;
+  project: HooksConfig & { exists: boolean };
+  enabled: boolean;
+  effective: Hook[];
+};
 
 /** Everything the settings viewer and the agent need for one project (`project` null: global hooks only). */
 export async function loadHooksView(project: string | null): Promise<HooksView> {
-  const [global, proj, enabled] = await Promise.all([loadGlobalHooks(), loadProjectHooks(project), projectHooksEnabled(project)]);
+  const [global, proj, enabled] = await Promise.all([
+    loadGlobalHooks(),
+    loadProjectHooks(project),
+    projectHooksEnabled(project),
+  ]);
   return { global, project: proj, enabled, effective: effectiveHooks(global, proj, enabled) };
 }

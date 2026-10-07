@@ -13,12 +13,24 @@ describe("Settings: read Codex session files to show subagents", () => {
     expect(screen.getByText(/reads only the session files of that run/)).toBeInTheDocument();
     fireEvent.click(sw);
     await waitFor(() => expect(sw).toHaveAttribute("aria-checked", "false"));
-    await waitFor(() => expect(callsOf("db_execute").some((a: any) => /insert into settings/.test(a.sql) && a.params[0] === "readCodexSessions" && a.params[1] === "false")).toBe(true));
+    await waitFor(() =>
+      expect(
+        callsOf("db_execute").some(
+          (a: any) =>
+            /insert into settings/.test(a.sql) && a.params[0] === "readCodexSessions" && a.params[1] === "false",
+        ),
+      ).toBe(true),
+    );
   });
 
   it("reads a stored off value", async () => {
     mockSettings({ readCodexSessions: false });
     renderApp(<AgentSettingsSection />);
-    await waitFor(() => expect(screen.getByRole("switch", { name: "Read Codex session files to show subagents" })).toHaveAttribute("aria-checked", "false"));
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Read Codex session files to show subagents" })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      ),
+    );
   });
 });

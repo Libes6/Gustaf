@@ -17,7 +17,9 @@ export async function matchOrCreateProject(name: string, path: string | null): P
 export const importStore: ImportStore = {
   async existing() {
     const chats = [...(await listChats()), ...(await listArchived())];
-    const rows = await db.select<{ id: number; source_id: string | null }>("select id, source_id from chats where source_id is not null");
+    const rows = await db.select<{ id: number; source_id: string | null }>(
+      "select id, source_id from chats where source_id is not null",
+    );
     const sourceOf = new Map(rows.map((r) => [r.id, r.source_id]));
     return chats.map((c) => ({ title: c.title, created_at: c.created_at, source_id: sourceOf.get(c.id) ?? null }));
   },
@@ -39,7 +41,12 @@ export const importStore: ImportStore = {
     ]);
   },
   async finish(chatId, { createdAt, updatedAt }) {
-    if (createdAt) await db.exec("update chats set created_at = ?, updated_at = ? where id = ?", [createdAt, updatedAt ?? createdAt, chatId]);
+    if (createdAt)
+      await db.exec("update chats set created_at = ?, updated_at = ? where id = ?", [
+        createdAt,
+        updatedAt ?? createdAt,
+        chatId,
+      ]);
   },
   async discard(chatId) {
     await db.exec("delete from chats where id = ?", [chatId]);

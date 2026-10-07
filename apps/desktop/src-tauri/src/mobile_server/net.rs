@@ -44,8 +44,15 @@ pub fn peer_allowed(ip: IpAddr, allow_loopback: bool) -> bool {
 /// route (no packet is sent), so this needs no interface-enumeration dependency and works on every desktop platform.
 /// Targets in the private ranges are tried first so that a VPN default route does not hide the LAN interface.
 pub fn detect_lan_ip() -> Option<Ipv4Addr> {
-    for target in ["192.168.255.254:9", "10.255.255.254:9", "172.31.255.254:9", "8.8.8.8:80"] {
-        let Ok(socket) = UdpSocket::bind("0.0.0.0:0") else { continue };
+    for target in [
+        "192.168.255.254:9",
+        "10.255.255.254:9",
+        "172.31.255.254:9",
+        "8.8.8.8:80",
+    ] {
+        let Ok(socket) = UdpSocket::bind("0.0.0.0:0") else {
+            continue;
+        };
         if socket.connect(target).is_err() {
             continue;
         }
@@ -70,7 +77,13 @@ mod tests {
 
     #[test]
     fn private_ranges_are_accepted() {
-        for ip in [v4(10, 0, 0, 5), v4(10, 255, 255, 255), v4(172, 16, 0, 1), v4(172, 31, 255, 254), v4(192, 168, 1, 20)] {
+        for ip in [
+            v4(10, 0, 0, 5),
+            v4(10, 255, 255, 255),
+            v4(172, 16, 0, 1),
+            v4(172, 31, 255, 254),
+            v4(192, 168, 1, 20),
+        ] {
             assert!(validate_bind(ip, false).is_ok(), "{ip}");
             assert!(peer_allowed(ip, false), "{ip}");
         }
@@ -95,7 +108,10 @@ mod tests {
             assert!(validate_bind(ip, false).is_err(), "{ip} must be refused");
             assert!(!peer_allowed(ip, false), "{ip} must not be a peer");
         }
-        assert!(validate_bind(v4(0, 0, 0, 0), true).is_err(), "0.0.0.0 is refused even where loopback is allowed");
+        assert!(
+            validate_bind(v4(0, 0, 0, 0), true).is_err(),
+            "0.0.0.0 is refused even where loopback is allowed"
+        );
         assert!(validate_bind(v4(8, 8, 8, 8), true).is_err());
     }
 
@@ -109,7 +125,10 @@ mod tests {
     fn mapped_ipv4_is_judged_by_its_ipv4_address() {
         assert!(validate_bind(IpAddr::V6("::ffff:192.168.1.5".parse().unwrap()), false).is_ok());
         assert!(validate_bind(IpAddr::V6("::ffff:8.8.8.8".parse().unwrap()), false).is_err());
-        assert!(!peer_allowed(IpAddr::V6("::ffff:8.8.8.8".parse().unwrap()), false));
+        assert!(!peer_allowed(
+            IpAddr::V6("::ffff:8.8.8.8".parse().unwrap()),
+            false
+        ));
     }
 
     #[test]

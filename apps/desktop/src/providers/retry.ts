@@ -26,7 +26,13 @@ export type RetryPolicy = {
   jitter: number;
 };
 
-export const DEFAULT_POLICY: RetryPolicy = { maxAttempts: 4, baseDelayMs: 1000, maxDelayMs: 16_000, maxTotalWaitMs: 30_000, jitter: 0.5 };
+export const DEFAULT_POLICY: RetryPolicy = {
+  maxAttempts: 4,
+  baseDelayMs: 1000,
+  maxDelayMs: 16_000,
+  maxTotalWaitMs: 30_000,
+  jitter: 0.5,
+};
 
 /** Reported before each wait so the UI can show "Retrying in 5s…". */
 export type RetryInfo = {
@@ -40,7 +46,11 @@ export type RetryInfo = {
 };
 
 /** Variables for the `retryingIn` i18n string: `t("retryingIn", retryNoticeVars(info))`. */
-export const retryNoticeVars = (i: RetryInfo) => ({ seconds: Math.max(1, Math.ceil(i.delayMs / 1000)), attempt: i.attempt + 1, max: i.maxAttempts });
+export const retryNoticeVars = (i: RetryInfo) => ({
+  seconds: Math.max(1, Math.ceil(i.delayMs / 1000)),
+  attempt: i.attempt + 1,
+  max: i.maxAttempts,
+});
 
 export type RetryDeps = {
   sleep: (ms: number, signal: AbortSignal) => Promise<void>;
@@ -58,7 +68,11 @@ export class ProviderError extends Error {
   /** Attempts made when this error was finally surfaced (set by `withRetry`). */
   attempts: number;
   cause?: unknown;
-  constructor(kind: ErrorKind, message: string, o: { status?: number; retryable?: boolean; retryAfterMs?: number; cause?: unknown } = {}) {
+  constructor(
+    kind: ErrorKind,
+    message: string,
+    o: { status?: number; retryable?: boolean; retryAfterMs?: number; cause?: unknown } = {},
+  ) {
     super(message);
     this.name = "ProviderError";
     this.kind = kind;
@@ -73,7 +87,9 @@ export class ProviderError extends Error {
 // ---- Errors -----------------------------------------------------------------------------------------------------
 
 export const abortError = (signal?: AbortSignal) =>
-  signal?.reason instanceof Error && signal.reason.name === "AbortError" ? signal.reason : new DOMException("Aborted", "AbortError");
+  signal?.reason instanceof Error && signal.reason.name === "AbortError"
+    ? signal.reason
+    : new DOMException("Aborted", "AbortError");
 
 export const isAbortError = (e: unknown) => (e as { name?: string } | null)?.name === "AbortError";
 
@@ -86,25 +102,44 @@ function waitText(ms: number) {
 
 type Spec = { head: string; hint?: string; retryable: boolean };
 
-function specFor(kind: ErrorKind, status: number | undefined, retryAfterMs: number | undefined, retryable: boolean): Spec {
+function specFor(
+  kind: ErrorKind,
+  status: number | undefined,
+  retryAfterMs: number | undefined,
+  retryable: boolean,
+): Spec {
   switch (kind) {
     case "rate_limit":
       return {
         head: "Rate limit reached",
-        hint: retryAfterMs !== undefined ? `Try again in about ${waitText(retryAfterMs)}.` : "Wait a moment and try again.",
+        hint:
+          retryAfterMs !== undefined ? `Try again in about ${waitText(retryAfterMs)}.` : "Wait a moment and try again.",
         retryable,
       };
     case "quota":
-      return { head: "Quota or credits exhausted", hint: "Check the plan, billing and credit balance with the provider.", retryable: false };
+      return {
+        head: "Quota or credits exhausted",
+        hint: "Check the plan, billing and credit balance with the provider.",
+        retryable: false,
+      };
     case "auth":
       return status === 403
-        ? { head: "Access denied", hint: "Check the API key permissions and that the model is available for this account or region.", retryable: false }
-        : { head: "Authentication failed", hint: "Invalid API key or sign-in expired; check it in Settings.", retryable: false };
+        ? {
+            head: "Access denied",
+            hint: "Check the API key permissions and that the model is available for this account or region.",
+            retryable: false,
+          }
+        : {
+            head: "Authentication failed",
+            hint: "Invalid API key or sign-in expired; check it in Settings.",
+            retryable: false,
+          };
     case "network":
       return { head: "Network error", hint: "Check your internet connection.", retryable };
     case "server":
       return {
-        head: status === 529 ? "Provider is overloaded" : status === 408 ? "Request timed out" : "Provider server error",
+        head:
+          status === 529 ? "Provider is overloaded" : status === 408 ? "Request timed out" : "Provider server error",
         hint: retryable ? "This is usually temporary; try again shortly." : undefined,
         retryable,
       };
@@ -114,8 +149,16 @@ function specFor(kind: ErrorKind, status: number | undefined, retryAfterMs: numb
 }
 
 /** Builds the user-facing error. `HTTP <status>` stays in the message so existing status checks (e.g. 401 sign-in detection) keep working. */
-export function makeError(kind: ErrorKind, o: { status?: number; detail?: string; retryAfterMs?: number; retryable?: boolean; cause?: unknown } = {}) {
-  const spec = specFor(kind, o.status, o.retryAfterMs, o.retryable ?? (kind === "rate_limit" || kind === "network" || kind === "server"));
+export function makeError(
+  kind: ErrorKind,
+  o: { status?: number; detail?: string; retryAfterMs?: number; retryable?: boolean; cause?: unknown } = {},
+) {
+  const spec = specFor(
+    kind,
+    o.status,
+    o.retryAfterMs,
+    o.retryable ?? (kind === "rate_limit" || kind === "network" || kind === "server"),
+  );
   const detail = (o.detail ?? "").trim();
   const status = o.status !== undefined ? ` (HTTP ${o.status})` : "";
   const message = `${spec.head}${status}${detail ? `: ${detail}` : ""}`;
@@ -127,15 +170,18 @@ export function makeError(kind: ErrorKind, o: { status?: number; detail?: string
   });
 }
 
-const QUOTA = /insufficient_quota|exceeded your current quota|credit balance is too low|insufficient (?:credits|funds)|out of credits/i;
+const QUOTA =
+  /insufficient_quota|exceeded your current quota|credit balance is too low|insufficient (?:credits|funds)|out of credits/i;
 
 /** Maps an HTTP status (plus the provider's message) to a classified error. */
 export function errorForStatus(status: number, detail = "", retryAfterMs?: number): ProviderError {
-  if ([400, 402, 429].includes(status) && (status === 402 || QUOTA.test(detail))) return makeError("quota", { status, detail });
+  if ([400, 402, 429].includes(status) && (status === 402 || QUOTA.test(detail)))
+    return makeError("quota", { status, detail });
   if (status === 401 || status === 403) return makeError("auth", { status, detail });
   if (status === 429) return makeError("rate_limit", { status, detail, retryAfterMs });
   if (status === 408) return makeError("server", { status, detail, retryAfterMs, retryable: true });
-  if (status >= 500) return makeError("server", { status, detail, retryAfterMs, retryable: status !== 501 && status !== 505 });
+  if (status >= 500)
+    return makeError("server", { status, detail, retryAfterMs, retryable: status !== 501 && status !== 505 });
   return makeError("request", { status, detail });
 }
 
@@ -146,21 +192,32 @@ export function networkError(e: unknown): ProviderError {
   const refused = /refused|ECONNREFUSED/i.test(raw);
   const err = makeError("network", { detail, retryable: !refused, cause: e });
   // A refused connection means nothing is listening (e.g. Ollama is not running): waiting will not help.
-  if (refused) err.message = `${sentence(`Network error: ${detail}`)} Check that the server is running and the base URL is correct.`;
+  if (refused)
+    err.message = `${sentence(`Network error: ${detail}`)} Check that the server is running and the base URL is correct.`;
   return err;
 }
 
 /** Error events delivered inside a 200 stream (`event: error`, `response.failed`, OpenRouter mid-stream errors). */
 export function streamError(info: unknown): ProviderError {
-  const o = (info && typeof info === "object" ? info : {}) as { type?: unknown; code?: unknown; status?: unknown; message?: unknown };
-  const detail = typeof info === "string" && info ? info : typeof o.message === "string" && o.message ? o.message : "stream error";
-  const num = [o.status, o.code].map((v) => (typeof v === "string" && /^\d{3}$/.test(v) ? Number(v) : v)).find((v) => typeof v === "number" && v >= 400 && v < 600);
+  const o = (info && typeof info === "object" ? info : {}) as {
+    type?: unknown;
+    code?: unknown;
+    status?: unknown;
+    message?: unknown;
+  };
+  const detail =
+    typeof info === "string" && info ? info : typeof o.message === "string" && o.message ? o.message : "stream error";
+  const num = [o.status, o.code]
+    .map((v) => (typeof v === "string" && /^\d{3}$/.test(v) ? Number(v) : v))
+    .find((v) => typeof v === "number" && v >= 400 && v < 600);
   if (typeof num === "number") return errorForStatus(num, detail);
   const tag = [o.type, o.code].filter((v): v is string => typeof v === "string").join(" ");
   if (QUOTA.test(tag) || QUOTA.test(detail)) return makeError("quota", { detail });
   if (/rate_?limit|too_many_requests|resource_exhausted/i.test(tag)) return makeError("rate_limit", { detail });
-  if (/overloaded|server_error|api_error|internal|unavailable|timeout|bad_gateway|upstream/i.test(tag)) return makeError("server", { detail, retryable: true });
-  if (/authentication|permission|invalid_api_key|unauthorized|forbidden/i.test(tag)) return makeError("auth", { detail });
+  if (/overloaded|server_error|api_error|internal|unavailable|timeout|bad_gateway|upstream/i.test(tag))
+    return makeError("server", { detail, retryable: true });
+  if (/authentication|permission|invalid_api_key|unauthorized|forbidden/i.test(tag))
+    return makeError("auth", { detail });
   return makeError("request", { detail });
 }
 
@@ -180,7 +237,10 @@ export function errorDetail(body: string): string {
 }
 
 /** Retry-After in milliseconds from `retry-after-ms`, or `retry-after` as delta-seconds or an HTTP date. */
-export function parseRetryAfter(headers: { get(name: string): string | null } | undefined, now: number): number | undefined {
+export function parseRetryAfter(
+  headers: { get(name: string): string | null } | undefined,
+  now: number,
+): number | undefined {
   if (!headers) return undefined;
   const ms = headers.get("retry-after-ms");
   if (ms !== null && /^\s*\d+(\.\d+)?\s*$/.test(ms)) return Math.round(Number(ms));
@@ -279,7 +339,14 @@ export async function withRetry<T>(run: (onText: (delta: string) => void) => Pro
       if (left <= 0 || delay > left) throw gaveUp(e, attempt);
       waited += delay;
       try {
-        o.onRetry?.({ attempt, maxAttempts: policy.maxAttempts, delayMs: delay, kind: e.kind, status: e.status, message: e.message });
+        o.onRetry?.({
+          attempt,
+          maxAttempts: policy.maxAttempts,
+          delayMs: delay,
+          kind: e.kind,
+          status: e.status,
+          message: e.message,
+        });
       } catch {}
       await sleep(delay, o.signal);
     }

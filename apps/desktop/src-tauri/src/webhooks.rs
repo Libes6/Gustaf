@@ -52,35 +52,69 @@ pub fn hmac_sha256(key: &[u8], msg: &[u8]) -> [u8; 32] {
         ipad[i] ^= k[i];
         opad[i] ^= k[i];
     }
-    let inner = Sha256::new().chain_update(ipad).chain_update(msg).finalize();
-    Sha256::new().chain_update(opad).chain_update(inner).finalize().into()
+    let inner = Sha256::new()
+        .chain_update(ipad)
+        .chain_update(msg)
+        .finalize();
+    Sha256::new()
+        .chain_update(opad)
+        .chain_update(inner)
+        .finalize()
+        .into()
 }
 
 /// `sha256=<64 hex>` made with `secret` over `body`, compared in constant time.
 pub fn signature_ok(secret: &str, body: &[u8], header: Option<&str>) -> bool {
-    let Some(hex) = header.and_then(|h| h.trim().strip_prefix("sha256=")) else { return false };
+    let Some(hex) = header.and_then(|h| h.trim().strip_prefix("sha256=")) else {
+        return false;
+    };
     if hex.len() != 64 || secret.is_empty() {
         return false;
     }
-    let expected: String = hmac_sha256(secret.as_bytes(), body).iter().map(|b| format!("{b:02x}")).collect();
-    expected.as_bytes().ct_eq(hex.to_ascii_lowercase().as_bytes()).into()
+    let expected: String = hmac_sha256(secret.as_bytes(), body)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    expected
+        .as_bytes()
+        .ct_eq(hex.to_ascii_lowercase().as_bytes())
+        .into()
 }
 
 fn now_ms() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn header(req: &tiny_http::Request, name: &str) -> Option<String> {
-    req.headers().iter().find(|h| h.field.as_str().as_str().eq_ignore_ascii_case(name)).map(|h| h.value.as_str().chars().take(200).collect())
+    req.headers()
+        .iter()
+        .find(|h| h.field.as_str().as_str().eq_ignore_ascii_case(name))
+        .map(|h| h.value.as_str().chars().take(200).collect())
 }
 
-fn handle(mut req: tiny_http::Request, hooks: &Mutex<HashMap<String, String>>, emit: &dyn Fn(Delivery)) {
-    let respond = |req: tiny_http::Request, code: u16, text: &str| { let _ = req.respond(tiny_http::Response::from_string(text).with_status_code(code)); };
+fn handle(
+    mut req: tiny_http::Request,
+    hooks: &Mutex<HashMap<String, String>>,
+    emit: &dyn Fn(Delivery),
+) {
+    let respond = |req: tiny_http::Request, code: u16, text: &str| {
+        let _ = req.respond(tiny_http::Response::from_string(text).with_status_code(code));
+    };
     let path = req.url().split('?').next().unwrap_or("").to_string();
-    let Some(id) = path.strip_prefix("/hooks/").filter(|id| !id.is_empty() && id.len() <= 100 && !id.contains('/')) else { return respond(req, 404, "not found") };
+    let Some(id) = path
+        .strip_prefix("/hooks/")
+        .filter(|id| !id.is_empty() && id.len() <= 100 && !id.contains('/'))
+    else {
+        return respond(req, 404, "not found");
+    };
     let id = id.to_string();
     let secret = hooks.lock().ok().and_then(|h| h.get(&id).cloned());
-    let Some(secret) = secret else { return respond(req, 404, "not found") };
+    let Some(secret) = secret else {
+        return respond(req, 404, "not found");
+    };
     if req.method() != &tiny_http::Method::Post {
         return respond(req, 405, "POST only");
     }
@@ -88,26 +122,56 @@ fn handle(mut req: tiny_http::Request, hooks: &Mutex<HashMap<String, String>>, e
         return respond(req, 413, "too large");
     }
     let mut body = Vec::new();
-    if req.as_reader().take(MAX_BODY as u64 + 1).read_to_end(&mut body).is_err() || body.len() > MAX_BODY {
+    if req
+        .as_reader()
+        .take(MAX_BODY as u64 + 1)
+        .read_to_end(&mut body)
+        .is_err()
+        || body.len() > MAX_BODY
+    {
         return respond(req, 413, "too large");
     }
-    let ok = signature_ok(&secret, &body, header(&req, "X-Hub-Signature-256").as_deref());
+    let ok = signature_ok(
+        &secret,
+        &body,
+        header(&req, "X-Hub-Signature-256").as_deref(),
+    );
     let delivery = Delivery {
         id: id.clone(),
         at: now_ms(),
         status: if ok { 202 } else { 401 },
         event: header(&req, "X-GitHub-Event").unwrap_or_default(),
         delivery: header(&req, "X-GitHub-Delivery").unwrap_or_default(),
-        preview: if ok { String::from_utf8_lossy(&body).chars().take(PREVIEW).collect() } else { String::new() },
+        preview: if ok {
+            String::from_utf8_lossy(&body)
+                .chars()
+                .take(PREVIEW)
+                .collect()
+        } else {
+            String::new()
+        },
     };
     emit(delivery);
-    respond(req, if ok { 202 } else { 401 }, if ok { "accepted" } else { "bad signature" });
+    respond(
+        req,
+        if ok { 202 } else { 401 },
+        if ok { "accepted" } else { "bad signature" },
+    );
 }
 
 /// Starts the server (or updates its hooks when it already runs on the same port); returns the port.
 #[tauri::command]
-pub fn webhook_serve(app: AppHandle, state: State<'_, Webhooks>, port: u16, hooks: Vec<Hook>) -> Result<u16, String> {
-    let map: HashMap<String, String> = hooks.into_iter().filter(|h| h.secret.len() >= 16).map(|h| (h.id, h.secret)).collect();
+pub fn webhook_serve(
+    app: AppHandle,
+    state: State<'_, Webhooks>,
+    port: u16,
+    hooks: Vec<Hook>,
+) -> Result<u16, String> {
+    let map: HashMap<String, String> = hooks
+        .into_iter()
+        .filter(|h| h.secret.len() >= 16)
+        .map(|h| (h.id, h.secret))
+        .collect();
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(r) = guard.as_ref() {
         if r.port == port || port == 0 {
@@ -117,13 +181,21 @@ pub fn webhook_serve(app: AppHandle, state: State<'_, Webhooks>, port: u16, hook
         r.server.unblock();
         *guard = None;
     }
-    let server = Arc::new(tiny_http::Server::http(("127.0.0.1", port)).map_err(|e| format!("Port {port}: {e}"))?);
-    let port = server.server_addr().to_ip().map(|a| a.port()).ok_or("no port")?;
+    let server = Arc::new(
+        tiny_http::Server::http(("127.0.0.1", port)).map_err(|e| format!("Port {port}: {e}"))?,
+    );
+    let port = server
+        .server_addr()
+        .to_ip()
+        .map(|a| a.port())
+        .ok_or("no port")?;
     let hooks = Arc::new(Mutex::new(map));
     let (s, h) = (server.clone(), hooks.clone());
     std::thread::spawn(move || loop {
         match s.recv_timeout(Duration::from_millis(500)) {
-            Ok(Some(req)) => handle(req, &h, &|d| { let _ = app.emit("webhook-delivery", d); }),
+            Ok(Some(req)) => handle(req, &h, &|d| {
+                let _ = app.emit("webhook-delivery", d);
+            }),
             Ok(None) => {}
             Err(_) => break,
         }
@@ -131,7 +203,11 @@ pub fn webhook_serve(app: AppHandle, state: State<'_, Webhooks>, port: u16, hook
             break;
         }
     });
-    *guard = Some(Running { port, server, hooks });
+    *guard = Some(Running {
+        port,
+        server,
+        hooks,
+    });
     Ok(port)
 }
 
@@ -150,12 +226,28 @@ mod tests {
 
     #[test]
     fn hmac_matches_rfc4231_and_github_signatures_are_checked() {
-        let mac: String = hmac_sha256(b"key", b"The quick brown fox jumps over the lazy dog").iter().map(|b| format!("{b:02x}")).collect();
-        assert_eq!(mac, "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
+        let mac: String = hmac_sha256(b"key", b"The quick brown fox jumps over the lazy dog")
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(
+            mac,
+            "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+        );
         let body = b"{\"zen\":\"x\"}";
-        let sig = format!("sha256={}", hmac_sha256(b"s3cret-0123456789", body).iter().map(|b| format!("{b:02x}")).collect::<String>());
+        let sig = format!(
+            "sha256={}",
+            hmac_sha256(b"s3cret-0123456789", body)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
         assert!(signature_ok("s3cret-0123456789", body, Some(&sig)));
-        assert!(signature_ok("s3cret-0123456789", body, Some(&sig.to_uppercase().replace("SHA256=", "sha256="))));
+        assert!(signature_ok(
+            "s3cret-0123456789",
+            body,
+            Some(&sig.to_uppercase().replace("SHA256=", "sha256="))
+        ));
         assert!(!signature_ok("other-secret-0000", body, Some(&sig)));
         assert!(!signature_ok("s3cret-0123456789", b"{}", Some(&sig)));
         assert!(!signature_ok("s3cret-0123456789", body, None));
@@ -168,14 +260,23 @@ mod tests {
         use std::io::Write;
         let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
         let port = server.server_addr().to_ip().unwrap().port();
-        let hooks = Mutex::new(HashMap::from([("abc".to_string(), "s3cret-0123456789".to_string())]));
+        let hooks = Mutex::new(HashMap::from([(
+            "abc".to_string(),
+            "s3cret-0123456789".to_string(),
+        )]));
         let send = |raw: String| {
             let mut c = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
             c.write_all(raw.as_bytes()).unwrap();
             c
         };
         let body = "{\"action\":\"opened\"}";
-        let sig = format!("sha256={}", hmac_sha256(b"s3cret-0123456789", body.as_bytes()).iter().map(|b| format!("{b:02x}")).collect::<String>());
+        let sig = format!(
+            "sha256={}",
+            hmac_sha256(b"s3cret-0123456789", body.as_bytes())
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
         let cases = [
             (format!("POST /hooks/abc HTTP/1.1\r\nHost: x\r\nConnection: close\r\nX-Hub-Signature-256: {sig}\r\nX-GitHub-Event: pull_request\r\nContent-Length: {}\r\n\r\n{body}", body.len()), 202),
             (format!("POST /hooks/abc HTTP/1.1\r\nHost: x\r\nConnection: close\r\nX-Hub-Signature-256: sha256={}\r\nContent-Length: {}\r\n\r\n{body}", "0".repeat(64), body.len()), 401),
@@ -185,17 +286,29 @@ mod tests {
         let delivered = Mutex::new(Vec::new());
         for (raw, want) in cases {
             let mut c = send(raw);
-            let req = server.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+            let req = server
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .unwrap();
             handle(req, &hooks, &|d| delivered.lock().unwrap().push(d));
             let mut resp = String::new();
             c.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
             c.read_to_string(&mut resp).ok();
-            assert!(resp.starts_with(&format!("HTTP/1.1 {want}")), "{want}: {resp}");
+            assert!(
+                resp.starts_with(&format!("HTTP/1.1 {want}")),
+                "{want}: {resp}"
+            );
         }
         let d = delivered.lock().unwrap();
-        assert_eq!(d.iter().map(|d| d.status).collect::<Vec<_>>(), vec![202, 401], "unknown ids and wrong methods are not reported");
-        assert_eq!((d[0].event.as_str(), d[0].preview.as_str()), ("pull_request", body));
+        assert_eq!(
+            d.iter().map(|d| d.status).collect::<Vec<_>>(),
+            vec![202, 401],
+            "unknown ids and wrong methods are not reported"
+        );
+        assert_eq!(
+            (d[0].event.as_str(), d[0].preview.as_str()),
+            ("pull_request", body)
+        );
         assert_eq!(d[1].preview, "", "a rejected body is never passed on");
     }
 }
-

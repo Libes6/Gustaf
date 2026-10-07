@@ -6,10 +6,30 @@ import * as w from '../src/lib/workspaces.ts';
 import { relativeToProject, untrackedDiffText } from '../src/lib/workspaceDiff.ts';
 
 const info = (over = {}) => ({
-  taskId: 't1', path: '/store/abc/t1', branch: 'gustaf/fix-login', baseCommit: 'deadbeef', baseBranch: 'main', createdAt: 1,
-  provider: null, model: null, headSha: 'cafe', changedFiles: 0, ahead: 0, behind: 0, dirty: false, existsOnDisk: true, ...over,
+  taskId: 't1',
+  path: '/store/abc/t1',
+  branch: 'gustaf/fix-login',
+  baseCommit: 'deadbeef',
+  baseBranch: 'main',
+  createdAt: 1,
+  provider: null,
+  model: null,
+  headSha: 'cafe',
+  changedFiles: 0,
+  ahead: 0,
+  behind: 0,
+  dirty: false,
+  existsOnDisk: true,
+  ...over,
 });
-const linked = (over = {}) => ({ id: 7, title: 'Fix login', workspace_task_id: 't1', workspace_branch: 'gustaf/fix-login', workspace_base: 'deadbeef', ...over });
+const linked = (over = {}) => ({
+  id: 7,
+  title: 'Fix login',
+  workspace_task_id: 't1',
+  workspace_branch: 'gustaf/fix-login',
+  workspace_base: 'deadbeef',
+  ...over,
+});
 
 test('slugFromText takes the first words, ascii only, and falls back to "task"', () => {
   assert.equal(w.slugFromText('Fix the login bug in the auth module please'), 'fix-the-login-bug-in');
@@ -34,7 +54,11 @@ test('newTaskId is valid for the backend and unique among the existing ids', () 
   assert.match(next, valid);
   // Many ids drawn from a constant random source still end up unique.
   const seen = new Set();
-  for (let i = 0; i < 50; i++) { const n = w.newTaskId(seen, 5, () => 0); assert.ok(!seen.has(n)); seen.add(n); }
+  for (let i = 0; i < 50; i++) {
+    const n = w.newTaskId(seen, 5, () => 0);
+    assert.ok(!seen.has(n));
+    seen.add(n);
+  }
   assert.equal(seen.size, 50);
   for (const n of seen) assert.match(n, valid);
 });
@@ -49,30 +73,59 @@ test('chatWorkspace reads the link and treats missing or empty ids as an ordinar
 });
 
 test('an unlinked chat uses the project folder exactly as before', () => {
-  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: null, known: undefined }), { state: 'project', root: '/work/alpha' });
-  assert.deepEqual(w.resolveChatRoot({ projectPath: null, workspace: null, known: [info()] }), { state: 'project', root: null });
+  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: null, known: undefined }), {
+    state: 'project',
+    root: '/work/alpha',
+  });
+  assert.deepEqual(w.resolveChatRoot({ projectPath: null, workspace: null, known: [info()] }), {
+    state: 'project',
+    root: null,
+  });
   // The list of workspaces is irrelevant to it.
-  assert.equal(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: null, known: [info()], prefix: 'sub/' }).root, '/work/alpha');
+  assert.equal(
+    w.resolveChatRoot({ projectPath: '/work/alpha', workspace: null, known: [info()], prefix: 'sub/' }).root,
+    '/work/alpha',
+  );
 });
 
 test('a linked chat uses its checkout and never the project folder', () => {
   const ws = w.chatWorkspace(linked());
-  const r = w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [info(), info({ taskId: 't2', path: '/store/abc/t2' })], prefix: '' });
+  const r = w.resolveChatRoot({
+    projectPath: '/work/alpha',
+    workspace: ws,
+    known: [info(), info({ taskId: 't2', path: '/store/abc/t2' })],
+    prefix: '',
+  });
   assert.equal(r.state, 'workspace');
   assert.equal(r.root, '/store/abc/t1');
   assert.equal(r.info.branch, 'gustaf/fix-login');
   // A project in a repository subfolder works in the same subfolder of the checkout.
-  assert.equal(w.resolveChatRoot({ projectPath: '/work/alpha/app', workspace: ws, known: [info()], prefix: 'app/' }).root, '/store/abc/t1/app');
+  assert.equal(
+    w.resolveChatRoot({ projectPath: '/work/alpha/app', workspace: ws, known: [info()], prefix: 'app/' }).root,
+    '/store/abc/t1/app',
+  );
   assert.equal(w.joinCheckout('/store/abc/t1/', '/a/b/'), '/store/abc/t1/a/b');
   assert.equal(w.joinCheckout('/store/abc/t1', null), '/store/abc/t1');
 });
 
 test('a linked chat without a resolvable checkout has no root (no fallback to the main checkout)', () => {
   const ws = w.chatWorkspace(linked());
-  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: undefined }), { state: 'pending', root: null });
-  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [] }), { state: 'missing', root: null });
-  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [info({ taskId: 'other' })] }), { state: 'missing', root: null });
-  assert.equal(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [info({ existsOnDisk: false })] }).state, 'missing');
+  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: undefined }), {
+    state: 'pending',
+    root: null,
+  });
+  assert.deepEqual(w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [] }), {
+    state: 'missing',
+    root: null,
+  });
+  assert.deepEqual(
+    w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [info({ taskId: 'other' })] }),
+    { state: 'missing', root: null },
+  );
+  assert.equal(
+    w.resolveChatRoot({ projectPath: '/work/alpha', workspace: ws, known: [info({ existsOnDisk: false })] }).state,
+    'missing',
+  );
 });
 
 test('workspaceRow builds the sidebar row from the chat and the live info', () => {
@@ -107,10 +160,21 @@ test('workspaceRow: archived, still loading, and ordinary chats', () => {
 });
 
 test('splitWorkspaceChats separates workspace chats and keeps the order', () => {
-  const chats = [{ id: 1 }, linked({ id: 2 }), { id: 3, workspace_task_id: null }, linked({ id: 4, workspace_task_id: 't4' })];
+  const chats = [
+    { id: 1 },
+    linked({ id: 2 }),
+    { id: 3, workspace_task_id: null },
+    linked({ id: 4, workspace_task_id: 't4' }),
+  ];
   const { plain, workspaces } = w.splitWorkspaceChats(chats);
-  assert.deepEqual(plain.map((c) => c.id), [1, 3]);
-  assert.deepEqual(workspaces.map((c) => c.id), [2, 4]);
+  assert.deepEqual(
+    plain.map((c) => c.id),
+    [1, 3],
+  );
+  assert.deepEqual(
+    workspaces.map((c) => c.id),
+    [2, 4],
+  );
 });
 
 test('archiveChoices offers deleting the branch only when nothing would be lost', () => {

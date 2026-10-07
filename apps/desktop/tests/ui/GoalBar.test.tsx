@@ -2,7 +2,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/lib/api", async (orig) => ({ ...(await orig<typeof import("../../src/lib/api")>()), setSetting: vi.fn(async () => {}), getSetting: vi.fn(async (_k: string, d: unknown) => d) }));
+vi.mock("../../src/lib/api", async (orig) => ({
+  ...(await orig<typeof import("../../src/lib/api")>()),
+  setSetting: vi.fn(async () => {}),
+  getSetting: vi.fn(async (_k: string, d: unknown) => d),
+}));
 const { GoalBar } = await import("../../src/components/chat/GoalBar");
 const { getGoal, setGoal } = await import("../../src/lib/goalStore");
 const { getQueue, updateQueue } = await import("../../src/lib/chatQueue");
@@ -12,7 +16,13 @@ const { renderApp } = await import("./render");
 describe("GoalBar", () => {
   beforeEach(async () => {
     await setGoal(5, { ...newGoal("make CI green", 1, 20), turns: 2, tokens: 1500 });
-    await updateQueue(5, () => ({ items: [{ id: "c", text: continuePrompt({ ...newGoal("make CI green", 1), turns: 2 }), images: [], clarify: false }, { id: "u", text: "user note", images: [], clarify: false }], paused: false }));
+    await updateQueue(5, () => ({
+      items: [
+        { id: "c", text: continuePrompt({ ...newGoal("make CI green", 1), turns: 2 }), images: [], clarify: false },
+        { id: "u", text: "user note", images: [], clarify: false },
+      ],
+      paused: false,
+    }));
   });
 
   it("shows the objective, status, turns and tokens; Pause drops the queued continuation only", async () => {

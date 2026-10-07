@@ -23,9 +23,9 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: theme.bg },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="pair" options={{ title: t("pairTitle"), presentation: "modal" }} />
-        <Stack.Screen name="chat/[id]" options={{ title: "" }} />
+        <Stack.Screen name="settings" options={{ title: t("settings") }} />
       </Stack>
     </>
   );

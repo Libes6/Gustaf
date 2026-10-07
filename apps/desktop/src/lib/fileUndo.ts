@@ -22,9 +22,17 @@ export type UndoDeps = {
   reviewDiff?(reviewId: string, path: string): Promise<string>;
 };
 
-export type UndoRecord = { root: string; path: string; before: FileState; after: string; reviewId?: string; undone?: number };
+export type UndoRecord = {
+  root: string;
+  path: string;
+  before: FileState;
+  after: string;
+  reviewId?: string;
+  undone?: number;
+};
 export type FileSnapshot = { path: string; before: FileState };
-export type UndoResult = { ok: true } | { ok: false; reason: "changed" | "closed" | "unsupported" | "failed"; message?: string };
+export type UndoResult =
+  { ok: true } | { ok: false; reason: "changed" | "closed" | "unsupported" | "failed"; message?: string };
 
 export const MAX_UNDO_BYTES = 1_000_000;
 const BLOB_ID = /^[0-9a-f]{40,64}$/;
@@ -102,7 +110,12 @@ export async function captureBefore(d: UndoDeps, pathIn: unknown): Promise<FileS
 }
 
 /** Call after a successful edit. Returns undefined when nothing changed or the result cannot be recorded; never throws. */
-export async function captureAfter(d: UndoDeps, snap: FileSnapshot, root: string, reviewId?: string): Promise<UndoRecord | undefined> {
+export async function captureAfter(
+  d: UndoDeps,
+  snap: FileSnapshot,
+  root: string,
+  reviewId?: string,
+): Promise<UndoRecord | undefined> {
   try {
     const after = await fileState(d.git, snap.path);
     if (after === snap.before) return undefined;
@@ -115,7 +128,8 @@ export async function captureAfter(d: UndoDeps, snap: FileSnapshot, root: string
 /** Restores the file to its state before the edit, if and only if it is still exactly as the edit left it. */
 export async function undoEdit(d: UndoDeps, rec: UndoRecord): Promise<UndoResult> {
   const path = cleanRelPath(rec.path);
-  if (!path || path !== rec.path || !isBlobId(rec.after) || (rec.before !== null && !isBlobId(rec.before))) return { ok: false, reason: "unsupported" };
+  if (!path || path !== rec.path || !isBlobId(rec.after) || (rec.before !== null && !isBlobId(rec.before)))
+    return { ok: false, reason: "unsupported" };
   if (rec.reviewId) {
     if (!d.reviewDiff || !/^\d+-\d+$/.test(rec.reviewId)) return { ok: false, reason: "unsupported" };
     let diff = "";
@@ -149,7 +163,9 @@ export async function undoEdit(d: UndoDeps, rec: UndoRecord): Promise<UndoResult
     const text = await d.git(["cat-file", "blob", rec.before]);
     if ((await gitBlobId(text)) !== rec.before) return { ok: false, reason: "unsupported" };
     await d.write(path, text);
-    return (await fileState(d.git, path)) === rec.before ? { ok: true } : { ok: false, reason: "failed", message: "the restored file does not match" };
+    return (await fileState(d.git, path)) === rec.before
+      ? { ok: true }
+      : { ok: false, reason: "failed", message: "the restored file does not match" };
   } catch (e) {
     return { ok: false, reason: "failed", message: String((e as Error)?.message ?? e).slice(0, 200) };
   }

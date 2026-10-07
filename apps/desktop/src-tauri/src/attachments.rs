@@ -51,11 +51,14 @@ fn save_images(root: &Path, chat_id: u64, images: &[String]) -> Result<Saved, St
         if b64.len() > MAX_IMAGE_BYTES / 3 * 4 + 8 {
             return Err("image is larger than 10 MB".into());
         }
-        let bytes = STANDARD.decode(b64.trim()).map_err(|_| "image is not valid base64".to_string())?;
+        let bytes = STANDARD
+            .decode(b64.trim())
+            .map_err(|_| "image is not valid base64".to_string())?;
         if bytes.len() > MAX_IMAGE_BYTES {
             return Err("image is larger than 10 MB".into());
         }
-        let ext = sniff(&bytes).ok_or("unsupported image type (png, jpeg, gif and webp are accepted)")?;
+        let ext =
+            sniff(&bytes).ok_or("unsupported image type (png, jpeg, gif and webp are accepted)")?;
         decoded.push((bytes, ext));
     }
     let dir = chat_dir(root, chat_id)?;
@@ -89,7 +92,10 @@ fn save_images(root: &Path, chat_id: u64, images: &[String]) -> Result<Saved, St
     }
     Ok(Saved {
         dir: dir.to_string_lossy().into_owned(),
-        files: written.iter().map(|p| p.to_string_lossy().into_owned()).collect(),
+        files: written
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect(),
     })
 }
 
@@ -102,7 +108,11 @@ fn clear(root: &Path, chat_id: u64) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn attachments_save(app: tauri::AppHandle, chat_id: u64, images: Vec<String>) -> Result<Saved, String> {
+pub fn attachments_save(
+    app: tauri::AppHandle,
+    chat_id: u64,
+    images: Vec<String>,
+) -> Result<Saved, String> {
     let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
     save_images(&root, chat_id, &images)
 }
@@ -128,12 +138,18 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let first = save_images(root.path(), 7, &[b64(PNG), b64(JPG)]).unwrap();
         assert_eq!(first.files.len(), 2);
-        assert!(Path::new(&first.files[0]).ends_with(Path::new("attachments").join("7").join("1.png")));
-        assert!(Path::new(&first.files[1]).ends_with(Path::new("attachments").join("7").join("2.jpg")));
+        assert!(
+            Path::new(&first.files[0]).ends_with(Path::new("attachments").join("7").join("1.png"))
+        );
+        assert!(
+            Path::new(&first.files[1]).ends_with(Path::new("attachments").join("7").join("2.jpg"))
+        );
         assert!(Path::new(&first.dir).starts_with(root.path()));
         // A second call never overwrites existing files.
         let second = save_images(root.path(), 7, &[b64(PNG)]).unwrap();
-        assert!(Path::new(&second.files[0]).ends_with(Path::new("attachments").join("7").join("3.png")));
+        assert!(
+            Path::new(&second.files[0]).ends_with(Path::new("attachments").join("7").join("3.png"))
+        );
         assert_eq!(std::fs::read(&first.files[0]).unwrap(), PNG);
     }
 

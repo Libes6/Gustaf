@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { formatDuration, formatDurationMs } from '../src/lib/formatDuration.ts';
 
-const dict = Object.fromEntries(['en', 'ru'].map((l) => [l, JSON.parse(readFileSync(new URL(`../src/i18n/${l}.json`, import.meta.url), 'utf8'))]));
+const dict = Object.fromEntries(
+  ['en', 'ru'].map((l) => [l, JSON.parse(readFileSync(new URL(`../src/i18n/${l}.json`, import.meta.url), 'utf8'))]),
+);
 const tFor = (l) => (key, vars) => dict[l][key].replace('{n}', vars.n);
 
 const CASES = [

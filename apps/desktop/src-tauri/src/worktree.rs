@@ -116,11 +116,20 @@ pub fn valid_task_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= MAX_TASK_ID_CHARS
         && id.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 fn check_task_id(id: &str) -> Result<(), String> {
-    if valid_task_id(id) { Ok(()) } else { Err(err("invalid_task_id", "a task id is 1-64 letters, digits, '-' or '_'")) }
+    if valid_task_id(id) {
+        Ok(())
+    } else {
+        Err(err(
+            "invalid_task_id",
+            "a task id is 1-64 letters, digits, '-' or '_'",
+        ))
+    }
 }
 
 /// Lowercase ascii words joined by `-`, at most `MAX_SLUG_CHARS`; `task` when nothing is left.
@@ -135,7 +144,11 @@ pub fn sanitize_slug(slug: &str) -> String {
     }
     out.truncate(MAX_SLUG_CHARS);
     let out = out.trim_matches('-').to_string();
-    if out.is_empty() { "task".into() } else { out }
+    if out.is_empty() {
+        "task".into()
+    } else {
+        out
+    }
 }
 
 fn fnv(text: &str) -> String {
@@ -156,24 +169,46 @@ pub(crate) struct Repo {
 pub(crate) fn open_repo(store: &Path, root: &str) -> Result<Repo, String> {
     let base = canonical_root(root).map_err(|e| err("invalid_root", e))?;
     match run_git(&base, ["rev-parse", "--is-bare-repository"]) {
-        Err(_) => return Err(err("not_a_git_repo", "the project folder is not inside a git repository")),
-        Ok(out) if out.trim() == "true" => return Err(err("bare_repo", "bare repositories have no working tree to branch from")),
+        Err(_) => {
+            return Err(err(
+                "not_a_git_repo",
+                "the project folder is not inside a git repository",
+            ))
+        }
+        Ok(out) if out.trim() == "true" => {
+            return Err(err(
+                "bare_repo",
+                "bare repositories have no working tree to branch from",
+            ))
+        }
         Ok(_) => {}
     }
     let top = PathBuf::from(git(&base, ["rev-parse", "--show-toplevel"])?.trim());
-    let common = PathBuf::from(git(&base, ["rev-parse", "--path-format=absolute", "--git-common-dir"])?.trim());
+    let common = PathBuf::from(
+        git(
+            &base,
+            ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        )?
+        .trim(),
+    );
     let common = common.canonicalize().unwrap_or(common);
     let top = top.canonicalize().unwrap_or(top);
     fs::create_dir_all(store).map_err(|e| err("git_error", format!("worktree directory: {e}")))?;
     if let Ok(real_store) = store.canonicalize() {
         if real_store.starts_with(&top) {
-            return Err(err("unsafe_path", "the worktree directory would be inside the project folder"));
+            return Err(err(
+                "unsafe_path",
+                "the worktree directory would be inside the project folder",
+            ));
         }
     }
     // Git for Windows cannot create worktrees from ordinary paths carrying
     // Rust's canonicalize-produced verbatim prefix. Keep filesystem safety
     // checks canonical, but use the equivalent normal path for the store.
-    Ok(Repo { top, managed: dunce::simplified(store).join(fnv(&common.to_string_lossy())) })
+    Ok(Repo {
+        top,
+        managed: dunce::simplified(store).join(fnv(&common.to_string_lossy())),
+    })
 }
 
 fn meta_path(repo: &Repo, id: &str) -> PathBuf {
@@ -188,24 +223,37 @@ fn write_meta(repo: &Repo, meta: &Meta) -> Result<(), String> {
     let path = meta_path(repo, &meta.task_id);
     let tmp = repo.managed.join(format!("{}.json.tmp", meta.task_id));
     let text = serde_json::to_string_pretty(meta).map_err(|e| err("git_error", e))?;
-    fs::write(&tmp, text).and_then(|_| fs::rename(&tmp, &path)).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        err("git_error", format!("worktree metadata: {e}"))
-    })
+    fs::write(&tmp, text)
+        .and_then(|_| fs::rename(&tmp, &path))
+        .map_err(|e| {
+            let _ = fs::remove_file(&tmp);
+            err("git_error", format!("worktree metadata: {e}"))
+        })
 }
 
 pub(crate) fn read_meta(repo: &Repo, id: &str) -> Result<Meta, String> {
     check_task_id(id)?;
-    let text = fs::read_to_string(meta_path(repo, id)).map_err(|_| err("not_found", format!("no workspace for task {id}")))?;
-    let meta: Meta = serde_json::from_str(&text).map_err(|e| err("not_found", format!("unreadable metadata for task {id}: {e}")))?;
+    let text = fs::read_to_string(meta_path(repo, id))
+        .map_err(|_| err("not_found", format!("no workspace for task {id}")))?;
+    let meta: Meta = serde_json::from_str(&text).map_err(|e| {
+        err(
+            "not_found",
+            format!("unreadable metadata for task {id}: {e}"),
+        )
+    })?;
     if meta.task_id != id {
-        return Err(err("not_found", format!("metadata does not belong to task {id}")));
+        return Err(err(
+            "not_found",
+            format!("metadata does not belong to task {id}"),
+        ));
     }
     Ok(meta)
 }
 
 fn all_meta(repo: &Repo) -> Vec<Meta> {
-    let Ok(entries) = fs::read_dir(&repo.managed) else { return Vec::new() };
+    let Ok(entries) = fs::read_dir(&repo.managed) else {
+        return Vec::new();
+    };
     let mut out: Vec<Meta> = entries
         .flatten()
         .filter_map(|e| {
@@ -221,30 +269,59 @@ fn all_meta(repo: &Repo) -> Vec<Meta> {
 /// The checkout directory when it is a real (non-symlink) direct child of the managed dir; `None` when absent.
 pub(crate) fn safe_existing_dir(repo: &Repo, id: &str) -> Result<Option<PathBuf>, String> {
     let path = work_path(repo, id);
-    let Ok(md) = fs::symlink_metadata(&path) else { return Ok(None) };
+    let Ok(md) = fs::symlink_metadata(&path) else {
+        return Ok(None);
+    };
     if md.file_type().is_symlink() || !md.is_dir() {
-        return Err(err("unsafe_path", format!("{} is not a plain directory", path.display())));
+        return Err(err(
+            "unsafe_path",
+            format!("{} is not a plain directory", path.display()),
+        ));
     }
     let real = path.canonicalize().map_err(|e| err("unsafe_path", e))?;
-    let parent = repo.managed.canonicalize().map_err(|e| err("unsafe_path", e))?;
-    if real.parent() != Some(parent.as_path()) || real.file_name() != Some(std::ffi::OsStr::new(id)) {
-        return Err(err("unsafe_path", format!("{} is outside the managed directory", path.display())));
+    let parent = repo
+        .managed
+        .canonicalize()
+        .map_err(|e| err("unsafe_path", e))?;
+    if real.parent() != Some(parent.as_path()) || real.file_name() != Some(std::ffi::OsStr::new(id))
+    {
+        return Err(err(
+            "unsafe_path",
+            format!("{} is outside the managed directory", path.display()),
+        ));
     }
     Ok(Some(path))
 }
 
 pub(crate) fn ref_exists(dir: &Path, name: &str) -> bool {
-    run_git(dir, ["rev-parse", "--verify", "-q", &format!("{name}^{{commit}}")]).is_ok()
+    run_git(
+        dir,
+        ["rev-parse", "--verify", "-q", &format!("{name}^{{commit}}")],
+    )
+    .is_ok()
 }
 
 pub(crate) fn local_branch_exists(dir: &Path, branch: &str) -> bool {
-    run_git(dir, ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")]).is_ok()
+    run_git(
+        dir,
+        [
+            "show-ref",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{branch}"),
+        ],
+    )
+    .is_ok()
 }
 
 fn unique_branch(top: &Path, slug: &str) -> Result<String, String> {
     let stem = sanitize_slug(slug);
     for n in 1..1000 {
-        let name = if n == 1 { format!("{BRANCH_PREFIX}{stem}") } else { format!("{BRANCH_PREFIX}{stem}-{n}") };
+        let name = if n == 1 {
+            format!("{BRANCH_PREFIX}{stem}")
+        } else {
+            format!("{BRANCH_PREFIX}{stem}-{n}")
+        };
         if !local_branch_exists(top, &name) {
             return Ok(name);
         }
@@ -253,7 +330,10 @@ fn unique_branch(top: &Path, slug: &str) -> Result<String, String> {
 }
 
 pub(crate) fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -281,7 +361,10 @@ fn info_for(repo: &Repo, meta: &Meta) -> WorktreeInfo {
     if !exists {
         return info;
     }
-    info.head_sha = run_git(&path, ["rev-parse", "HEAD"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    info.head_sha = run_git(&path, ["rev-parse", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     if let Ok(branch) = run_git(&path, ["symbolic-ref", "--short", "-q", "HEAD"]) {
         if !branch.trim().is_empty() {
             info.branch = branch.trim().to_string();
@@ -291,8 +374,20 @@ fn info_for(repo: &Repo, meta: &Meta) -> WorktreeInfo {
         info.changed_files = status.lines().filter(|l| !l.is_empty()).count();
         info.dirty = info.changed_files > 0;
     }
-    let target = meta.base_branch.as_deref().filter(|b| ref_exists(&path, b)).unwrap_or(&meta.base_commit);
-    if let Ok(counts) = run_git(&path, ["rev-list", "--left-right", "--count", &format!("{target}...HEAD")]) {
+    let target = meta
+        .base_branch
+        .as_deref()
+        .filter(|b| ref_exists(&path, b))
+        .unwrap_or(&meta.base_commit);
+    if let Ok(counts) = run_git(
+        &path,
+        [
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("{target}...HEAD"),
+        ],
+    ) {
         let mut parts = counts.split_whitespace().map(|n| n.parse::<u32>().ok());
         if let (Some(behind), Some(ahead)) = (parts.next().flatten(), parts.next().flatten()) {
             info.behind = Some(behind);
@@ -302,39 +397,103 @@ fn info_for(repo: &Repo, meta: &Meta) -> WorktreeInfo {
     info
 }
 
-pub fn create(store: &Path, root: &str, base: Option<&str>, slug: &str, task_id: &str, provider: Option<String>, model: Option<String>) -> Result<WorktreeInfo, String> {
+pub fn create(
+    store: &Path,
+    root: &str,
+    base: Option<&str>,
+    slug: &str,
+    task_id: &str,
+    provider: Option<String>,
+    model: Option<String>,
+) -> Result<WorktreeInfo, String> {
     check_task_id(task_id)?;
     let repo = open_repo(store, root)?;
     let _guard = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let base_ref = base.map(str::trim).filter(|b| !b.is_empty()).unwrap_or("HEAD");
+    let base_ref = base
+        .map(str::trim)
+        .filter(|b| !b.is_empty())
+        .unwrap_or("HEAD");
     if base_ref.starts_with('-') || base_ref.contains(['\0', '\n']) {
         return Err(err("invalid_base", "not a valid revision"));
     }
     if run_git(&repo.top, ["rev-parse", "--verify", "-q", "HEAD"]).is_err() {
         return Err(err("no_commits", "the repository has no commits yet"));
     }
-    let base_commit = run_git(&repo.top, ["rev-parse", "--verify", "-q", &format!("{base_ref}^{{commit}}")])
-        .map_err(|_| err("invalid_base", format!("'{base_ref}' is not a commit")))?
-        .trim()
-        .to_string();
+    let base_commit = run_git(
+        &repo.top,
+        [
+            "rev-parse",
+            "--verify",
+            "-q",
+            &format!("{base_ref}^{{commit}}"),
+        ],
+    )
+    .map_err(|_| err("invalid_base", format!("'{base_ref}' is not a commit")))?
+    .trim()
+    .to_string();
     // The branch the base names (for ahead/behind later); none for a raw sha or a detached HEAD.
     let base_branch = if base_ref == "HEAD" {
-        run_git(&repo.top, ["symbolic-ref", "--short", "-q", "HEAD"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-    } else if local_branch_exists(&repo.top, base_ref) || run_git(&repo.top, ["show-ref", "--verify", "--quiet", &format!("refs/remotes/{base_ref}")]).is_ok() {
+        run_git(&repo.top, ["symbolic-ref", "--short", "-q", "HEAD"])
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    } else if local_branch_exists(&repo.top, base_ref)
+        || run_git(
+            &repo.top,
+            [
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/remotes/{base_ref}"),
+            ],
+        )
+        .is_ok()
+    {
         Some(base_ref.to_string())
     } else {
         None
     };
     let path = work_path(&repo, task_id);
     if fs::symlink_metadata(&path).is_ok() || meta_path(&repo, task_id).exists() {
-        return Err(err("task_exists", format!("task {task_id} already has a workspace")));
+        return Err(err(
+            "task_exists",
+            format!("task {task_id} already has a workspace"),
+        ));
     }
     fs::create_dir_all(&repo.managed).map_err(|e| err("git_error", e))?;
     let branch = unique_branch(&repo.top, slug)?;
-    git(&repo.top, ["worktree".as_ref(), "add".as_ref(), "-q".as_ref(), path.as_os_str(), "-b".as_ref(), branch.as_ref(), base_commit.as_ref()])?;
-    let meta = Meta { task_id: task_id.into(), root: repo.top.to_string_lossy().into_owned(), branch, base_commit, base_branch, created_at: now(), provider, model };
+    git(
+        &repo.top,
+        [
+            "worktree".as_ref(),
+            "add".as_ref(),
+            "-q".as_ref(),
+            path.as_os_str(),
+            "-b".as_ref(),
+            branch.as_ref(),
+            base_commit.as_ref(),
+        ],
+    )?;
+    let meta = Meta {
+        task_id: task_id.into(),
+        root: repo.top.to_string_lossy().into_owned(),
+        branch,
+        base_commit,
+        base_branch,
+        created_at: now(),
+        provider,
+        model,
+    };
     if let Err(e) = write_meta(&repo, &meta) {
-        let _ = run_git(&repo.top, ["worktree".as_ref(), "remove".as_ref(), "--force".as_ref(), path.as_os_str()]);
+        let _ = run_git(
+            &repo.top,
+            [
+                "worktree".as_ref(),
+                "remove".as_ref(),
+                "--force".as_ref(),
+                path.as_os_str(),
+            ],
+        );
         let _ = run_git(&repo.top, ["branch", "-D", &meta.branch]);
         return Err(e);
     }
@@ -347,11 +506,22 @@ pub fn list(store: &Path, root: &str) -> Result<Vec<WorktreeInfo>, String> {
 }
 
 fn is_merged(top: &Path, meta: &Meta) -> bool {
-    let merged_into = |target: &str| run_git(top, ["merge-base", "--is-ancestor", &meta.branch, target]).is_ok();
-    merged_into("HEAD") || meta.base_branch.as_deref().is_some_and(|b| ref_exists(top, b) && merged_into(b))
+    let merged_into =
+        |target: &str| run_git(top, ["merge-base", "--is-ancestor", &meta.branch, target]).is_ok();
+    merged_into("HEAD")
+        || meta
+            .base_branch
+            .as_deref()
+            .is_some_and(|b| ref_exists(top, b) && merged_into(b))
 }
 
-pub fn remove(store: &Path, root: &str, task_id: &str, force: bool, delete_branch: bool) -> Result<RemoveResult, String> {
+pub fn remove(
+    store: &Path,
+    root: &str,
+    task_id: &str,
+    force: bool,
+    delete_branch: bool,
+) -> Result<RemoveResult, String> {
     let repo = open_repo(store, root)?;
     let _guard = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let meta = read_meta(&repo, task_id)?;
@@ -360,7 +530,10 @@ pub fn remove(store: &Path, root: &str, task_id: &str, force: bool, delete_branc
             let status = git(&dir, ["status", "--porcelain"])?;
             let n = status.lines().filter(|l| !l.is_empty()).count();
             if n > 0 {
-                return Err(err("dirty", format!("{n} uncommitted change(s) in the workspace")));
+                return Err(err(
+                    "dirty",
+                    format!("{n} uncommitted change(s) in the workspace"),
+                ));
             }
         }
         let mut args: Vec<&std::ffi::OsStr> = vec!["worktree".as_ref(), "remove".as_ref()];
@@ -372,9 +545,14 @@ pub fn remove(store: &Path, root: &str, task_id: &str, force: bool, delete_branc
     }
     let _ = run_git(&repo.top, ["worktree", "prune"]);
     let _ = fs::remove_file(meta_path(&repo, task_id));
-    let mut result = RemoveResult { removed: true, branch_deleted: false, branch_kept_reason: None };
+    let mut result = RemoveResult {
+        removed: true,
+        branch_deleted: false,
+        branch_kept_reason: None,
+    };
     if delete_branch {
-        if !meta.branch.starts_with(BRANCH_PREFIX) || !local_branch_exists(&repo.top, &meta.branch) {
+        if !meta.branch.starts_with(BRANCH_PREFIX) || !local_branch_exists(&repo.top, &meta.branch)
+        {
             result.branch_kept_reason = Some("branch not found".into());
         } else if !force && !is_merged(&repo.top, &meta) {
             result.branch_kept_reason = Some("branch has commits that are not merged".into());
@@ -408,7 +586,10 @@ pub fn prune(store: &Path, root: &str) -> Result<PruneResult, String> {
     for meta in all_meta(&repo) {
         let id = &meta.task_id;
         let keep = match safe_existing_dir(&repo, id) {
-            Ok(Some(dir)) => dir.canonicalize().map(|p| registered.contains(&p)).unwrap_or(true),
+            Ok(Some(dir)) => dir
+                .canonicalize()
+                .map(|p| registered.contains(&p))
+                .unwrap_or(true),
             Ok(None) => false,
             Err(_) => true, // not a plain managed directory: never touch it
         };
@@ -430,9 +611,14 @@ fn parse_numstat(text: &str) -> BTreeMap<String, (u32, u32, bool)> {
     let mut out = BTreeMap::new();
     for rec in text.split('\0').filter(|r| !r.is_empty()) {
         let mut parts = rec.splitn(3, '\t');
-        let (Some(a), Some(d), Some(path)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let (Some(a), Some(d), Some(path)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
         let binary = a == "-" || d == "-";
-        out.insert(path.to_string(), (a.parse().unwrap_or(0), d.parse().unwrap_or(0), binary));
+        out.insert(
+            path.to_string(),
+            (a.parse().unwrap_or(0), d.parse().unwrap_or(0), binary),
+        );
     }
     out
 }
@@ -455,15 +641,27 @@ pub fn diff(store: &Path, root: &str, task_id: &str) -> Result<WorktreeDiff, Str
     let repo = open_repo(store, root)?;
     let meta = read_meta(&repo, task_id)?;
     let Some(dir) = safe_existing_dir(&repo, task_id)? else {
-        return Err(err("not_found", "the workspace directory is gone (prune it)"));
+        return Err(err(
+            "not_found",
+            "the workspace directory is gone (prune it)",
+        ));
     };
-    let capped = |args: &[&str]| run_git_capped(&dir, args.iter().copied(), DIFF_CAP_BYTES, &[0]).map_err(|e| err("git_error", e));
+    let capped = |args: &[&str]| {
+        run_git_capped(&dir, args.iter().copied(), DIFF_CAP_BYTES, &[0])
+            .map_err(|e| err("git_error", e))
+    };
     // Committed work (base...HEAD) plus staged and unstaged changes: the net difference from the base commit.
     let range = format!("{}...HEAD", meta.base_commit);
     let (committed, cut1) = capped(&["diff", "--numstat", "-z", "--no-renames", &range])?;
     let (committed_status, _) = capped(&["diff", "--name-status", "-z", "--no-renames", &range])?;
     let (tree, cut2) = capped(&["diff", "--numstat", "-z", "--no-renames", &meta.base_commit])?;
-    let (tree_status, _) = capped(&["diff", "--name-status", "-z", "--no-renames", &meta.base_commit])?;
+    let (tree_status, _) = capped(&[
+        "diff",
+        "--name-status",
+        "-z",
+        "--no-renames",
+        &meta.base_commit,
+    ])?;
     let (untracked, cut3) = capped(&["ls-files", "--others", "--exclude-standard", "-z"])?;
     let mut truncated = cut1 || cut2 || cut3;
     // `base...HEAD` first, then the working tree view (which already includes the committed part) wins.
@@ -473,26 +671,47 @@ pub fn diff(store: &Path, root: &str, task_id: &str) -> Result<WorktreeDiff, Str
     statuses.extend(parse_name_status(&tree_status));
     let mut files: Vec<DiffFile> = stats
         .into_iter()
-        .map(|(path, (additions, deletions, binary))| DiffFile { status: statuses.get(&path).cloned().unwrap_or_else(|| "modified".into()), path, additions, deletions, binary })
+        .map(|(path, (additions, deletions, binary))| DiffFile {
+            status: statuses
+                .get(&path)
+                .cloned()
+                .unwrap_or_else(|| "modified".into()),
+            path,
+            additions,
+            deletions,
+            binary,
+        })
         .collect();
     for path in untracked.split('\0').filter(|p| !p.is_empty()) {
         if files.iter().any(|f| f.path == path) {
             continue;
         }
         let (additions, binary) = count_untracked(&dir.join(path));
-        files.push(DiffFile { path: path.to_string(), status: "untracked".into(), additions, deletions: 0, binary });
+        files.push(DiffFile {
+            path: path.to_string(),
+            status: "untracked".into(),
+            additions,
+            deletions: 0,
+            binary,
+        });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     if files.len() > MAX_DIFF_FILES {
         files.truncate(MAX_DIFF_FILES);
         truncated = true;
     }
-    Ok(WorktreeDiff { base: meta.base_commit, files, truncated })
+    Ok(WorktreeDiff {
+        base: meta.base_commit,
+        files,
+        truncated,
+    })
 }
 
 /// Line count of a new file; `(0, true)` for binary or oversized files, `(0, false)` for unreadable or symlinks.
 fn count_untracked(path: &Path) -> (u32, bool) {
-    let Ok(md) = fs::symlink_metadata(path) else { return (0, false) };
+    let Ok(md) = fs::symlink_metadata(path) else {
+        return (0, false);
+    };
     if !md.is_file() {
         return (0, false);
     }
@@ -501,7 +720,11 @@ fn count_untracked(path: &Path) -> (u32, bool) {
     }
     match fs::read(path) {
         Ok(bytes) if bytes.contains(&0) => (0, true),
-        Ok(bytes) => (bytes.iter().filter(|b| **b == b'\n').count() as u32 + u32::from(!bytes.is_empty() && !bytes.ends_with(b"\n")), false),
+        Ok(bytes) => (
+            bytes.iter().filter(|b| **b == b'\n').count() as u32
+                + u32::from(!bytes.is_empty() && !bytes.ends_with(b"\n")),
+            false,
+        ),
         Err(_) => (0, false),
     }
 }
@@ -509,14 +732,26 @@ fn count_untracked(path: &Path) -> (u32, bool) {
 /// Symlinks dependency directories (project-relative, e.g. `node_modules`) of the original project into the task's
 /// checkout so its setup and tools find them; same validation as the shadow copy (`review::resolve_links`).
 /// Directories missing in the project or already present in the checkout are skipped. Returns what was linked.
-pub fn link_dirs(store: &Path, root: &str, task_id: &str, dirs: &[String]) -> Result<Vec<String>, String> {
+pub fn link_dirs(
+    store: &Path,
+    root: &str,
+    task_id: &str,
+    dirs: &[String],
+) -> Result<Vec<String>, String> {
     check_task_id(task_id)?;
     let repo = open_repo(store, root)?;
-    let checkout = safe_existing_dir(&repo, task_id)?.ok_or_else(|| err("not_found", format!("no workspace for task {task_id}")))?;
+    let checkout = safe_existing_dir(&repo, task_id)?
+        .ok_or_else(|| err("not_found", format!("no workspace for task {task_id}")))?;
     let base = canonical_root(root).map_err(|e| err("invalid_root", e))?;
-    let top = repo.top.canonicalize().map_err(|e| err("invalid_root", e))?;
+    let top = repo
+        .top
+        .canonicalize()
+        .map_err(|e| err("invalid_root", e))?;
     // A project in a subfolder of the repository lives at the same subfolder of the checkout.
-    let prefix = base.strip_prefix(&top).map_err(|_| err("invalid_root", "the project is outside its repository"))?.to_path_buf();
+    let prefix = base
+        .strip_prefix(&top)
+        .map_err(|_| err("invalid_root", "the project is outside its repository"))?
+        .to_path_buf();
     let target_root = checkout.join(prefix);
     let linked = crate::review::resolve_links(&base, dirs).map_err(|e| err("unsafe_path", e))?;
     let mut done = Vec::new();
@@ -525,7 +760,9 @@ pub fn link_dirs(store: &Path, root: &str, task_id: &str, dirs: &[String]) -> Re
         if fs::symlink_metadata(&dest).is_ok() {
             continue;
         }
-        let Some(parent) = dest.parent() else { continue };
+        let Some(parent) = dest.parent() else {
+            continue;
+        };
         fs::create_dir_all(parent).map_err(|e| err("git_error", e))?;
         crate::review::link_dir(&base.join(&rel), &dest).map_err(|e| err("git_error", e))?;
         done.push(rel);
@@ -537,14 +774,37 @@ pub fn link_dirs(store: &Path, root: &str, task_id: &str, dirs: &[String]) -> Re
 // Commands
 
 pub(crate) fn store(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|e| err("git_error", e))?.join("worktrees"))
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| err("git_error", e))?
+        .join("worktrees"))
 }
 
 /// New worktree + branch `gustaf/<slug>` at `base` (default HEAD) for a task.
 #[tauri::command]
-pub async fn worktree_create(app: AppHandle, root: String, base: Option<String>, slug: String, task_id: String, provider: Option<String>, model: Option<String>) -> Result<WorktreeInfo, String> {
+pub async fn worktree_create(
+    app: AppHandle,
+    root: String,
+    base: Option<String>,
+    slug: String,
+    task_id: String,
+    provider: Option<String>,
+    model: Option<String>,
+) -> Result<WorktreeInfo, String> {
     let store = store(&app)?;
-    blocking(move || create(&store, &root, base.as_deref(), &slug, &task_id, provider, model)).await
+    blocking(move || {
+        create(
+            &store,
+            &root,
+            base.as_deref(),
+            &slug,
+            &task_id,
+            provider,
+            model,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
@@ -554,7 +814,13 @@ pub async fn worktree_list(app: AppHandle, root: String) -> Result<Vec<WorktreeI
 }
 
 #[tauri::command]
-pub async fn worktree_remove(app: AppHandle, root: String, task_id: String, force: bool, delete_branch: bool) -> Result<RemoveResult, String> {
+pub async fn worktree_remove(
+    app: AppHandle,
+    root: String,
+    task_id: String,
+    force: bool,
+    delete_branch: bool,
+) -> Result<RemoveResult, String> {
     let store = store(&app)?;
     blocking(move || remove(&store, &root, &task_id, force, delete_branch)).await
 }
@@ -566,13 +832,22 @@ pub async fn worktree_prune(app: AppHandle, root: String) -> Result<PruneResult,
 }
 
 #[tauri::command]
-pub async fn worktree_diff(app: AppHandle, root: String, task_id: String) -> Result<WorktreeDiff, String> {
+pub async fn worktree_diff(
+    app: AppHandle,
+    root: String,
+    task_id: String,
+) -> Result<WorktreeDiff, String> {
     let store = store(&app)?;
     blocking(move || diff(&store, &root, &task_id)).await
 }
 
 #[tauri::command]
-pub async fn worktree_link_dirs(app: AppHandle, root: String, task_id: String, link_dirs: Vec<String>) -> Result<Vec<String>, String> {
+pub async fn worktree_link_dirs(
+    app: AppHandle,
+    root: String,
+    task_id: String,
+    link_dirs: Vec<String>,
+) -> Result<Vec<String>, String> {
     let store = store(&app)?;
     blocking(move || self::link_dirs(&store, &root, &task_id, &link_dirs)).await
 }
@@ -589,8 +864,16 @@ mod tests {
     }
 
     fn g(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git").current_dir(dir).args(args).output().unwrap();
-        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8_lossy(&out.stdout).into_owned()
     }
 
@@ -601,17 +884,35 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         g(&root, &["init", "-q", "-b", "main"]);
         g(&root, &["config", "core.autocrlf", "false"]);
-        for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false"), ("core.hooksPath", base.join("nohooks").to_str().unwrap())] {
+        for (k, v) in [
+            ("user.name", "T"),
+            ("user.email", "t@e.com"),
+            ("commit.gpgsign", "false"),
+            ("core.hooksPath", base.join("nohooks").to_str().unwrap()),
+        ] {
             g(&root, &["config", k, v]);
         }
         fs::write(root.join("a.txt"), "1\n").unwrap();
         g(&root, &["add", "."]);
         g(&root, &["commit", "-q", "-m", "init"]);
-        Fx { _tmp: tmp, root, store }
+        Fx {
+            _tmp: tmp,
+            root,
+            store,
+        }
     }
 
     fn mk(f: &Fx, slug: &str, id: &str) -> WorktreeInfo {
-        create(&f.store, f.root.to_str().unwrap(), None, slug, id, None, None).unwrap()
+        create(
+            &f.store,
+            f.root.to_str().unwrap(),
+            None,
+            slug,
+            id,
+            None,
+            None,
+        )
+        .unwrap()
     }
 
     fn root(f: &Fx) -> &str {
@@ -636,15 +937,32 @@ mod tests {
         for ok in ["abc", "a-b_c", "T1", "0123"] {
             assert!(valid_task_id(ok), "{ok}");
         }
-        for bad in ["", "..", "../x", "a/b", "a\\b", ".hidden", "-x", "a b", "a.b", &"x".repeat(65)] {
+        for bad in [
+            "",
+            "..",
+            "../x",
+            "a/b",
+            "a\\b",
+            ".hidden",
+            "-x",
+            "a b",
+            "a.b",
+            &"x".repeat(65),
+        ] {
             assert!(!valid_task_id(bad), "{bad:?}");
         }
         let f = fx();
         for bad in ["..", "a/b", "../escape"] {
             let e = create(&f.store, root(&f), None, "s", bad, None, None).unwrap_err();
             assert_eq!(code(&e), "invalid_task_id", "{e}");
-            assert_eq!(code(&remove(&f.store, root(&f), bad, true, true).unwrap_err()), "invalid_task_id");
-            assert_eq!(code(&diff(&f.store, root(&f), bad).unwrap_err()), "invalid_task_id");
+            assert_eq!(
+                code(&remove(&f.store, root(&f), bad, true, true).unwrap_err()),
+                "invalid_task_id"
+            );
+            assert_eq!(
+                code(&diff(&f.store, root(&f), bad).unwrap_err()),
+                "invalid_task_id"
+            );
         }
         assert!(!f.store.join("..").join("escape").exists());
     }
@@ -659,12 +977,24 @@ mod tests {
         assert_eq!(w.base_branch.as_deref(), Some("main"));
         let path = PathBuf::from(&w.path);
         assert!(path.join("a.txt").is_file());
-        assert!(!path.canonicalize().unwrap().starts_with(&f.root), "never inside the project");
+        assert!(
+            !path.canonicalize().unwrap().starts_with(&f.root),
+            "never inside the project"
+        );
         assert!(!path.join("t1.json").exists());
 
         let l = list(&f.store, root(&f)).unwrap();
         assert_eq!(l.len(), 1);
-        assert_eq!((l[0].changed_files, l[0].dirty, l[0].exists_on_disk, l[0].ahead, l[0].behind), (0, false, true, Some(0), Some(0)));
+        assert_eq!(
+            (
+                l[0].changed_files,
+                l[0].dirty,
+                l[0].exists_on_disk,
+                l[0].ahead,
+                l[0].behind
+            ),
+            (0, false, true, Some(0), Some(0))
+        );
         assert_eq!(l[0].head_sha.as_deref(), Some(head.as_str()));
 
         fs::write(path.join("a.txt"), "1\n2\n").unwrap();
@@ -681,9 +1011,21 @@ mod tests {
         fs::write(path.join("a.txt"), "1\n2\n3\n").unwrap();
         let d = diff(&f.store, root(&f), "t1").unwrap();
         assert_eq!(d.base, head);
-        let by = |p: &str| d.files.iter().find(|x| x.path == p).unwrap_or_else(|| panic!("{p} in {:?}", d.files)).clone();
-        assert_eq!((by("a.txt").status.as_str(), by("a.txt").additions), ("modified", 2));
-        assert_eq!((by("new.txt").status.as_str(), by("new.txt").additions), ("untracked", 2));
+        let by = |p: &str| {
+            d.files
+                .iter()
+                .find(|x| x.path == p)
+                .unwrap_or_else(|| panic!("{p} in {:?}", d.files))
+                .clone()
+        };
+        assert_eq!(
+            (by("a.txt").status.as_str(), by("a.txt").additions),
+            ("modified", 2)
+        );
+        assert_eq!(
+            (by("new.txt").status.as_str(), by("new.txt").additions),
+            ("untracked", 2)
+        );
         assert!(by("b.bin").binary && by("b.bin").status == "added");
         let l = list(&f.store, root(&f)).unwrap();
         assert_eq!((l[0].ahead, l[0].behind), (Some(2), Some(0)));
@@ -695,8 +1037,14 @@ mod tests {
         assert!(r.removed && !r.branch_deleted);
         assert!(!path.exists());
         assert!(list(&f.store, root(&f)).unwrap().is_empty());
-        assert!(local_branch_exists(&f.root, "gustaf/add-feature"), "branch kept without delete_branch");
-        assert_eq!(code(&remove(&f.store, root(&f), "t1", true, false).unwrap_err()), "not_found");
+        assert!(
+            local_branch_exists(&f.root, "gustaf/add-feature"),
+            "branch kept without delete_branch"
+        );
+        assert_eq!(
+            code(&remove(&f.store, root(&f), "t1", true, false).unwrap_err()),
+            "not_found"
+        );
     }
 
     #[test]
@@ -706,7 +1054,10 @@ mod tests {
         let a = mk(&f, "Same", "a");
         let b = mk(&f, "same", "b");
         let c = mk(&f, "SAME!", "c");
-        assert_eq!((a.branch.as_str(), b.branch.as_str(), c.branch.as_str()), ("gustaf/same", "gustaf/same-2", "gustaf/same-4"));
+        assert_eq!(
+            (a.branch.as_str(), b.branch.as_str(), c.branch.as_str()),
+            ("gustaf/same", "gustaf/same-2", "gustaf/same-4")
+        );
         assert_eq!(list(&f.store, root(&f)).unwrap().len(), 3);
         let e = create(&f.store, root(&f), None, "x", "a", None, None).unwrap_err();
         assert_eq!(code(&e), "task_exists");
@@ -723,10 +1074,22 @@ mod tests {
         let store = tmp.path().join("store");
         let e = create(&store, plain.to_str().unwrap(), None, "s", "t", None, None).unwrap_err();
         assert_eq!(code(&e), "not_a_git_repo", "{e}");
-        assert_eq!(code(&list(&store, plain.to_str().unwrap()).unwrap_err()), "not_a_git_repo");
+        assert_eq!(
+            code(&list(&store, plain.to_str().unwrap()).unwrap_err()),
+            "not_a_git_repo"
+        );
         let e = create(&store, bare.to_str().unwrap(), None, "s", "t", None, None).unwrap_err();
         assert_eq!(code(&e), "bare_repo", "{e}");
-        let e = create(&store, tmp.path().join("missing").to_str().unwrap(), None, "s", "t", None, None).unwrap_err();
+        let e = create(
+            &store,
+            tmp.path().join("missing").to_str().unwrap(),
+            None,
+            "s",
+            "t",
+            None,
+            None,
+        )
+        .unwrap_err();
         assert_eq!(code(&e), "invalid_root");
     }
 
@@ -737,7 +1100,10 @@ mod tests {
         fs::create_dir_all(&repo).unwrap();
         g(&repo, &["init", "-q", "-b", "main"]);
         let store = tmp.path().join("store");
-        assert_eq!(code(&create(&store, repo.to_str().unwrap(), None, "s", "t", None, None).unwrap_err()), "no_commits");
+        assert_eq!(
+            code(&create(&store, repo.to_str().unwrap(), None, "s", "t", None, None).unwrap_err()),
+            "no_commits"
+        );
         let f = fx();
         for bad in ["--orphan", "nope", "-x"] {
             let e = create(&f.store, root(&f), Some(bad), "s", "t", None, None).unwrap_err();
@@ -756,10 +1122,28 @@ mod tests {
         assert_eq!(w.base_branch, None);
         assert_eq!(w.base_commit, g(&f.root, &["rev-parse", "HEAD"]).trim());
         let w = create(&f.store, root(&f), Some(&first), "old", "d2", None, None).unwrap();
-        assert_eq!((w.base_commit.as_str(), w.base_branch), (first.as_str(), None));
-        assert_eq!(fs::read_to_string(PathBuf::from(&w.path).join("a.txt")).unwrap(), "1\n");
-        let w = create(&f.store, root(&f), Some("main"), "m", "d3", None, Some("gpt".into())).unwrap();
-        assert_eq!((w.base_branch.as_deref(), w.model.as_deref()), (Some("main"), Some("gpt")));
+        assert_eq!(
+            (w.base_commit.as_str(), w.base_branch),
+            (first.as_str(), None)
+        );
+        assert_eq!(
+            fs::read_to_string(PathBuf::from(&w.path).join("a.txt")).unwrap(),
+            "1\n"
+        );
+        let w = create(
+            &f.store,
+            root(&f),
+            Some("main"),
+            "m",
+            "d3",
+            None,
+            Some("gpt".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            (w.base_branch.as_deref(), w.model.as_deref()),
+            (Some("main"), Some("gpt"))
+        );
     }
 
     #[test]
@@ -771,7 +1155,10 @@ mod tests {
         g(&path, &["add", "."]);
         g(&path, &["commit", "-q", "-m", "n"]);
         let r = remove(&f.store, root(&f), "t1", false, true).unwrap();
-        assert!(r.removed && !r.branch_deleted && r.branch_kept_reason.is_some(), "{r:?}");
+        assert!(
+            r.removed && !r.branch_deleted && r.branch_kept_reason.is_some(),
+            "{r:?}"
+        );
         assert!(local_branch_exists(&f.root, "gustaf/feat"));
 
         let w = mk(&f, "feat", "t2");
@@ -809,7 +1196,10 @@ mod tests {
         g(&f.root, &["worktree", "remove", "--force", &b.path]);
         fs::create_dir_all(&b.path).unwrap();
         fs::write(PathBuf::from(&b.path).join("leftover"), "x").unwrap();
-        assert_eq!(prune(&f.store, root(&f)).unwrap().removed, vec!["tb".to_string()]);
+        assert_eq!(
+            prune(&f.store, root(&f)).unwrap().removed,
+            vec!["tb".to_string()]
+        );
         assert!(!PathBuf::from(&b.path).exists());
         assert!(prune(&f.store, root(&f)).unwrap().removed.is_empty());
     }
@@ -821,7 +1211,11 @@ mod tests {
         let other = f.root.parent().unwrap().join("other");
         fs::create_dir_all(&other).unwrap();
         g(&other, &["init", "-q", "-b", "main"]);
-        for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false")] {
+        for (k, v) in [
+            ("user.name", "T"),
+            ("user.email", "t@e.com"),
+            ("commit.gpgsign", "false"),
+        ] {
             g(&other, &["config", k, v]);
         }
         fs::write(other.join("f"), "1").unwrap();
@@ -829,7 +1223,12 @@ mod tests {
         g(&other, &["commit", "-q", "-m", "i"]);
         assert!(list(&f.store, other.to_str().unwrap()).unwrap().is_empty());
         fs::create_dir_all(f.root.join("sub")).unwrap();
-        assert_eq!(list(&f.store, f.root.join("sub").to_str().unwrap()).unwrap().len(), 1);
+        assert_eq!(
+            list(&f.store, f.root.join("sub").to_str().unwrap())
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[cfg(unix)]
@@ -839,21 +1238,62 @@ mod tests {
         fs::create_dir_all(f.root.join("node_modules/x")).unwrap();
         fs::create_dir_all(f.root.join("sub/node_modules")).unwrap();
         let w = mk(&f, "deps", "t1");
-        let done = link_dirs(&f.store, root(&f), "t1", &["node_modules".into(), "missing".into(), "node_modules/x".into()]).unwrap();
-        assert_eq!(done, vec!["node_modules".to_string()], "missing dirs are skipped, nested ones collapse");
+        let done = link_dirs(
+            &f.store,
+            root(&f),
+            "t1",
+            &[
+                "node_modules".into(),
+                "missing".into(),
+                "node_modules/x".into(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            done,
+            vec!["node_modules".to_string()],
+            "missing dirs are skipped, nested ones collapse"
+        );
         let link = PathBuf::from(&w.path).join("node_modules");
         assert_eq!(fs::read_link(&link).unwrap(), f.root.join("node_modules"));
         // Idempotent, and the original project is untouched.
-        assert!(link_dirs(&f.store, root(&f), "t1", &["node_modules".into()]).unwrap().is_empty());
-        assert!(f.root.join("node_modules").is_dir() && !fs::symlink_metadata(f.root.join("node_modules")).unwrap().file_type().is_symlink());
+        assert!(
+            link_dirs(&f.store, root(&f), "t1", &["node_modules".into()])
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            f.root.join("node_modules").is_dir()
+                && !fs::symlink_metadata(f.root.join("node_modules"))
+                    .unwrap()
+                    .file_type()
+                    .is_symlink()
+        );
         // Unsafe requests are refused; unknown tasks are not_found.
-        assert_eq!(code(&link_dirs(&f.store, root(&f), "t1", &["../x".into()]).unwrap_err()), "unsafe_path");
-        assert_eq!(code(&link_dirs(&f.store, root(&f), "nope", &[]).unwrap_err()), "not_found");
+        assert_eq!(
+            code(&link_dirs(&f.store, root(&f), "t1", &["../x".into()]).unwrap_err()),
+            "unsafe_path"
+        );
+        assert_eq!(
+            code(&link_dirs(&f.store, root(&f), "nope", &[]).unwrap_err()),
+            "not_found"
+        );
         // A project in a subfolder links into the same subfolder of the checkout.
         let sub = f.root.join("sub");
-        let done = link_dirs(&f.store, sub.to_str().unwrap(), "t1", &["node_modules".into()]).unwrap();
+        let done = link_dirs(
+            &f.store,
+            sub.to_str().unwrap(),
+            "t1",
+            &["node_modules".into()],
+        )
+        .unwrap();
         assert_eq!(done, vec!["node_modules".to_string()]);
-        assert!(fs::symlink_metadata(PathBuf::from(&w.path).join("sub/node_modules")).unwrap().file_type().is_symlink());
+        assert!(
+            fs::symlink_metadata(PathBuf::from(&w.path).join("sub/node_modules"))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
     }
 
     #[test]

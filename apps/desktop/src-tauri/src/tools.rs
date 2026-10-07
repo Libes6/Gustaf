@@ -26,7 +26,9 @@ fn truncate(mut s: String) -> String {
 
 /// Resolves `rel` inside `root`, rejecting anything (`..`, absolute paths, symlinks) that escapes it.
 pub fn resolve_in_root(root: &Path, rel: &str) -> Result<PathBuf, String> {
-    let root = root.canonicalize().map_err(|e| format!("project root: {e}"))?;
+    let root = root
+        .canonicalize()
+        .map_err(|e| format!("project root: {e}"))?;
     let joined = root.join(rel);
     // Canonicalize the deepest existing ancestor so new files can still be created.
     let mut existing = joined.as_path();
@@ -37,7 +39,10 @@ pub fn resolve_in_root(root: &Path, rel: &str) -> Result<PathBuf, String> {
     }
     let mut resolved = existing.canonicalize().map_err(|e| e.to_string())?;
     for part in tail.iter().rev() {
-        if Path::new(part).components().any(|c| matches!(c, Component::ParentDir)) {
+        if Path::new(part)
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+        {
             return Err("path escapes project".into());
         }
         resolved.push(part);
@@ -56,12 +61,19 @@ pub fn edit(path: &Path, old: &str, new: &str) -> Result<String, String> {
             fs::write(path, text.replacen(old, new, 1)).map_err(|e| e.to_string())?;
             Ok("ok".into())
         }
-        n => Err(format!("old_string is not unique ({n} matches); include more context")),
+        n => Err(format!(
+            "old_string is not unique ({n} matches); include more context"
+        )),
     }
 }
 
 #[tauri::command]
-pub fn fs_read(root: String, path: String, offset: Option<usize>, limit: Option<usize>) -> Result<String, String> {
+pub fn fs_read(
+    root: String,
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<String, String> {
     let p = resolve_in_root(Path::new(&root), &path)?;
     let text = fs::read_to_string(&p).map_err(|e| e.to_string())?;
     let start = offset.unwrap_or(1).max(1);
@@ -83,7 +95,11 @@ pub fn fs_list(root: String, path: String) -> Result<String, String> {
         .filter_map(Result::ok)
         .map(|e| {
             let n = e.file_name().to_string_lossy().into_owned();
-            if e.path().is_dir() { format!("{n}/") } else { n }
+            if e.path().is_dir() {
+                format!("{n}/")
+            } else {
+                n
+            }
         })
         .collect();
     names.sort();
@@ -92,7 +108,9 @@ pub fn fs_list(root: String, path: String) -> Result<String, String> {
 
 /// Canonicalizes `root` and requires it to be an existing directory, like `resolve_in_root` does for single paths.
 fn canonical_root(root: &str) -> Result<PathBuf, String> {
-    let base = Path::new(root).canonicalize().map_err(|e| format!("project root: {e}"))?;
+    let base = Path::new(root)
+        .canonicalize()
+        .map_err(|e| format!("project root: {e}"))?;
     if !base.is_dir() {
         return Err(format!("project root is not a directory: {root}"));
     }
@@ -101,12 +119,17 @@ fn canonical_root(root: &str) -> Result<PathBuf, String> {
 
 /// Returns the canonical form of `path` only if it still lies inside the canonical `base`.
 fn contained(base: &Path, path: &Path) -> Option<PathBuf> {
-    path.canonicalize().ok().filter(|real| real.starts_with(base))
+    path.canonicalize()
+        .ok()
+        .filter(|real| real.starts_with(base))
 }
 
 /// Walks regular files under the canonical `base` without following symlinks.
 /// Yields `(canonical path, path relative to base)`; anything resolving outside `base` is skipped.
-fn walk_files(base: &Path, glob: Option<&str>) -> Result<impl Iterator<Item = (PathBuf, String)>, String> {
+fn walk_files(
+    base: &Path,
+    glob: Option<&str>,
+) -> Result<impl Iterator<Item = (PathBuf, String)>, String> {
     let mut walk = WalkBuilder::new(base);
     walk.follow_links(false);
     if let Some(g) = glob.filter(|g| !g.is_empty()) {
@@ -121,7 +144,12 @@ fn walk_files(base: &Path, glob: Option<&str>) -> Result<impl Iterator<Item = (P
         .filter(|e| e.file_type().is_some_and(|t| t.is_file()))
         .filter_map(move |e| {
             let real = contained(&base, e.path())?;
-            let rel = e.path().strip_prefix(&base).ok()?.to_string_lossy().replace('\\', "/");
+            let rel = e
+                .path()
+                .strip_prefix(&base)
+                .ok()?
+                .to_string_lossy()
+                .replace('\\', "/");
             Some((real, rel))
         }))
 }
@@ -129,7 +157,10 @@ fn walk_files(base: &Path, glob: Option<&str>) -> Result<impl Iterator<Item = (P
 #[tauri::command]
 pub fn fs_files(root: String) -> Result<Vec<String>, String> {
     let base = canonical_root(&root)?;
-    Ok(walk_files(&base, None)?.map(|(_, rel)| rel).take(20_000).collect())
+    Ok(walk_files(&base, None)?
+        .map(|(_, rel)| rel)
+        .take(20_000)
+        .collect())
 }
 
 fn search_in(root: &str, pattern: &str, glob: Option<&str>) -> Result<String, String> {
@@ -138,7 +169,9 @@ fn search_in(root: &str, pattern: &str, glob: Option<&str>) -> Result<String, St
     let mut out = String::new();
     let mut hits = 0;
     'files: for (real, rel) in walk_files(&base, glob)? {
-        let Ok(text) = fs::read_to_string(&real) else { continue };
+        let Ok(text) = fs::read_to_string(&real) else {
+            continue;
+        };
         for (i, line) in text.lines().enumerate() {
             if re.is_match(line) {
                 out.push_str(&format!("{rel}:{}:{}\n", i + 1, line.trim_end()));
@@ -150,17 +183,34 @@ fn search_in(root: &str, pattern: &str, glob: Option<&str>) -> Result<String, St
             }
         }
     }
-    Ok(if out.is_empty() { "no matches".into() } else { truncate(out) })
+    Ok(if out.is_empty() {
+        "no matches".into()
+    } else {
+        truncate(out)
+    })
 }
 
 #[tauri::command]
-pub async fn fs_search(root: String, pattern: String, glob: Option<String>) -> Result<String, String> {
+pub async fn fs_search(
+    root: String,
+    pattern: String,
+    glob: Option<String>,
+) -> Result<String, String> {
     search_in(&root, &pattern, glob.as_deref())
 }
 
 #[tauri::command]
-pub fn fs_edit(root: String, path: String, old_string: String, new_string: String) -> Result<String, String> {
-    edit(&resolve_in_root(Path::new(&root), &path)?, &old_string, &new_string)
+pub fn fs_edit(
+    root: String,
+    path: String,
+    old_string: String,
+    new_string: String,
+) -> Result<String, String> {
+    edit(
+        &resolve_in_root(Path::new(&root), &path)?,
+        &old_string,
+        &new_string,
+    )
 }
 
 #[tauri::command]
@@ -188,27 +238,44 @@ pub struct InstructionFile {
 
 /// True when the YAML front matter of a Cursor rule file says `alwaysApply: true`.
 fn always_apply(text: &str) -> bool {
-    let Some(rest) = text.strip_prefix("---") else { return false };
-    let Some(end) = rest.find("\n---") else { return false };
+    let Some(rest) = text.strip_prefix("---") else {
+        return false;
+    };
+    let Some(end) = rest.find("\n---") else {
+        return false;
+    };
     rest[..end].lines().any(|l| l.trim() == "alwaysApply: true")
 }
 
 /// Reads one candidate instruction file. Anything that resolves outside the project root (a symlink pointing out),
 /// is not a regular file, or is already seen under another name is skipped.
-fn read_instruction(root: &Path, rel: &str, seen: &mut Vec<PathBuf>, filter: impl Fn(&str) -> bool) -> Option<InstructionFile> {
+fn read_instruction(
+    root: &Path,
+    rel: &str,
+    seen: &mut Vec<PathBuf>,
+    filter: impl Fn(&str) -> bool,
+) -> Option<InstructionFile> {
     let path = resolve_in_root(root, rel).ok()?;
     let meta = fs::metadata(&path).ok()?;
     if !meta.is_file() || seen.contains(&path) {
         return None;
     }
     let mut buf = Vec::new();
-    fs::File::open(&path).ok()?.take(INSTRUCTION_READ_CAP).read_to_end(&mut buf).ok()?;
+    fs::File::open(&path)
+        .ok()?
+        .take(INSTRUCTION_READ_CAP)
+        .read_to_end(&mut buf)
+        .ok()?;
     let text = String::from_utf8_lossy(&buf).into_owned();
     if !filter(&text) {
         return None;
     }
     seen.push(path);
-    Some(InstructionFile { name: rel.to_string(), bytes: meta.len(), text })
+    Some(InstructionFile {
+        name: rel.to_string(),
+        bytes: meta.len(),
+        text,
+    })
 }
 
 /// Project instruction files, in priority order: AGENTS.md, CLAUDE.md, .cursorrules and the `.cursor/rules/*.mdc|md`
@@ -221,15 +288,27 @@ pub fn read_instructions(root: String) -> Vec<InstructionFile> {
     for name in ["AGENTS.md", "CLAUDE.md", ".cursorrules"] {
         out.extend(read_instruction(base, name, &mut seen, |_| true));
     }
-    if let Ok(dir) = resolve_in_root(base, ".cursor/rules").and_then(|d| fs::read_dir(d).map_err(|e| e.to_string())) {
+    if let Ok(dir) = resolve_in_root(base, ".cursor/rules")
+        .and_then(|d| fs::read_dir(d).map_err(|e| e.to_string()))
+    {
         let mut names: Vec<String> = dir
             .filter_map(Result::ok)
-            .filter(|e| matches!(e.path().extension().and_then(|x| x.to_str()), Some("mdc" | "md")))
+            .filter(|e| {
+                matches!(
+                    e.path().extension().and_then(|x| x.to_str()),
+                    Some("mdc" | "md")
+                )
+            })
             .filter_map(|e| e.file_name().into_string().ok())
             .collect();
         names.sort();
         for name in names.into_iter().take(MAX_CURSOR_RULES) {
-            out.extend(read_instruction(base, &format!(".cursor/rules/{name}"), &mut seen, always_apply));
+            out.extend(read_instruction(
+                base,
+                &format!(".cursor/rules/{name}"),
+                &mut seen,
+                always_apply,
+            ));
         }
     }
     out
@@ -251,7 +330,12 @@ pub struct CmdResult {
 #[tauri::command]
 /// `env`: extra variables for this command only (the secrets an agent was given through `request_secret`; their values
 /// never appear in the command text).
-pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>, env: Option<std::collections::HashMap<String, String>>) -> Result<CmdResult, String> {
+pub async fn run_command(
+    root: String,
+    command: String,
+    timeout_ms: Option<u64>,
+    env: Option<std::collections::HashMap<String, String>>,
+) -> Result<CmdResult, String> {
     let shell = Shell::current();
     let merged = shell.merges_stderr_itself();
     let mut child = Command::new(shell.program())
@@ -261,7 +345,11 @@ pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>,
         .envs(env.unwrap_or_default())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(if merged { Stdio::inherit() } else { Stdio::piped() })
+        .stderr(if merged {
+            Stdio::inherit()
+        } else {
+            Stdio::piped()
+        })
         .spawn()
         .map_err(|e| e.to_string())?;
     let Some(mut stdout) = child.stdout.take() else {
@@ -299,7 +387,11 @@ pub async fn run_command(root: String, command: String, timeout_ms: Option<u64>,
         bytes.extend(r.join().unwrap_or_default());
     }
     let output = truncate(String::from_utf8_lossy(&bytes).into_owned());
-    Ok(CmdResult { code, output, timed_out })
+    Ok(CmdResult {
+        code,
+        output,
+        timed_out,
+    })
 }
 
 #[cfg(test)]
@@ -356,11 +448,17 @@ mod tests {
 
         for bad in ["", missing.to_str().unwrap(), file.to_str().unwrap()] {
             assert!(fs_files(bad.into()).is_err(), "fs_files accepted {bad:?}");
-            assert!(search_in(bad, "needle", None).is_err(), "fs_search accepted {bad:?}");
+            assert!(
+                search_in(bad, "needle", None).is_err(),
+                "fs_search accepted {bad:?}"
+            );
         }
         assert!(search_in(dir.path().to_str().unwrap(), "(", None).is_err());
         assert!(search_in(dir.path().to_str().unwrap(), "needle", Some("[")).is_err());
-        assert_eq!(fs_files(dir.path().to_str().unwrap().into()).unwrap(), ["plain.txt"]);
+        assert_eq!(
+            fs_files(dir.path().to_str().unwrap().into()).unwrap(),
+            ["plain.txt"]
+        );
     }
 
     #[cfg(unix)]
@@ -370,7 +468,11 @@ mod tests {
         let root_str = root.to_str().unwrap();
 
         let files = fs_files(root_str.into()).unwrap();
-        assert_eq!(files, ["src/a.txt"], "symlinked files and directories must not be listed");
+        assert_eq!(
+            files,
+            ["src/a.txt"],
+            "symlinked files and directories must not be listed"
+        );
 
         let hits = search_in(root_str, "needle", None).unwrap();
         assert!(hits.contains("src/a.txt:1:needle inside"), "{hits}");
@@ -380,8 +482,17 @@ mod tests {
         assert!(!hits.contains("src_alias"), "{hits}");
 
         // A glob cannot be used to pull the symlink targets in either.
-        assert_eq!(search_in(root_str, "needle", Some("*.txt")).unwrap().lines().count(), 1);
-        assert_eq!(search_in(root_str, "needle outside", Some("**/secret.txt")).unwrap(), "no matches");
+        assert_eq!(
+            search_in(root_str, "needle", Some("*.txt"))
+                .unwrap()
+                .lines()
+                .count(),
+            1
+        );
+        assert_eq!(
+            search_in(root_str, "needle outside", Some("**/secret.txt")).unwrap(),
+            "no matches"
+        );
     }
 
     #[cfg(unix)]
@@ -391,7 +502,10 @@ mod tests {
         let base = root.canonicalize().unwrap();
 
         assert!(contained(&base, &root.join("src/a.txt")).is_some());
-        assert!(contained(&base, &root.join("src_alias/a.txt")).is_some(), "in-root symlink resolves inside");
+        assert!(
+            contained(&base, &root.join("src_alias/a.txt")).is_some(),
+            "in-root symlink resolves inside"
+        );
         assert!(contained(&base, &root.join("filelink.txt")).is_none());
         assert!(contained(&base, &root.join("dirlink/secret.txt")).is_none());
         assert!(contained(&base, &outside.join("secret.txt")).is_none());
@@ -408,7 +522,9 @@ mod tests {
         let alias_str = alias.to_str().unwrap();
 
         assert_eq!(fs_files(alias_str.into()).unwrap(), ["src/a.txt"]);
-        assert!(search_in(alias_str, "needle", None).unwrap().starts_with("src/a.txt:1:"));
+        assert!(search_in(alias_str, "needle", None)
+            .unwrap()
+            .starts_with("src/a.txt:1:"));
     }
 
     #[test]
@@ -418,7 +534,10 @@ mod tests {
         let root = dir.path().to_str().unwrap();
 
         let out = search_in(root, "hit", None).unwrap();
-        assert_eq!(out.lines().filter(|l| l.starts_with("many.txt:")).count(), 300);
+        assert_eq!(
+            out.lines().filter(|l| l.starts_with("many.txt:")).count(),
+            300
+        );
         assert!(out.ends_with("…[more matches omitted]"));
         assert_eq!(search_in(root, "absent", None).unwrap(), "no matches");
     }
@@ -433,12 +552,24 @@ mod tests {
         fs::write(dir.path().join(".cursorrules"), "legacy").unwrap();
         fs::write(rules.join("on.mdc"), "---\nalwaysApply: true\n---\nbody").unwrap();
         fs::write(rules.join("off.mdc"), "---\nalwaysApply: false\n---\n").unwrap();
-        fs::write(rules.join("body-only.mdc"), "no front matter\nalwaysApply: true").unwrap();
+        fs::write(
+            rules.join("body-only.mdc"),
+            "no front matter\nalwaysApply: true",
+        )
+        .unwrap();
         fs::write(rules.join("note.txt"), "---\nalwaysApply: true\n---\n").unwrap();
 
         let out = read_instructions(dir.path().to_str().unwrap().into());
         let names: Vec<&str> = out.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(names, ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".cursor/rules/on.mdc"]);
+        assert_eq!(
+            names,
+            [
+                "AGENTS.md",
+                "CLAUDE.md",
+                ".cursorrules",
+                ".cursor/rules/on.mdc"
+            ]
+        );
         assert_eq!(out[0].text, "agents text");
         assert_eq!(out[0].bytes, 11);
     }
@@ -450,11 +581,23 @@ mod tests {
         fs::write(outside.path().join("secret.md"), "outside").unwrap();
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("CLAUDE.md"), "claude").unwrap();
-        std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("AGENTS.md")).unwrap();
-        std::os::unix::fs::symlink(dir.path().join("CLAUDE.md"), dir.path().join(".cursorrules")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("secret.md"),
+            dir.path().join("AGENTS.md"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(
+            dir.path().join("CLAUDE.md"),
+            dir.path().join(".cursorrules"),
+        )
+        .unwrap();
         let out = read_instructions(dir.path().to_str().unwrap().into());
         let names: Vec<&str> = out.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(names, ["CLAUDE.md"], "escaping symlink skipped, in-project symlink to the same file deduped");
+        assert_eq!(
+            names,
+            ["CLAUDE.md"],
+            "escaping symlink skipped, in-project symlink to the same file deduped"
+        );
     }
 
     #[test]

@@ -39,7 +39,9 @@ Run before every pull request:
 npm run check
 ```
 
-It runs, in `apps/desktop`: the i18n key check (`en` and `ru` must match), `tsc --noEmit`, the Node unit tests (`node --test tests/*.test.mjs`), the Vitest UI tests, the end-to-end tests (production build in Chrome against a fake backend) and `cargo test`; then `packages/protocol` typecheck and tests. CI runs the same on macOS, Windows and Linux. Focused suites: `npm run test:chat -w apps/desktop` (also `test:canvas`, `test:usage`, `test:cli`, `test:csp`). Release scripts: `npm run version:check` and `npm run test:release`.
+It runs, in `apps/desktop`: the i18n key check (`en` and `ru` must match), ESLint (`npm run lint`), the Prettier check (`npm run format:check`; `npm run format` rewrites the files), `tsc --noEmit`, the Node unit tests (`node --test tests/*.test.mjs`), the Vitest UI tests, the end-to-end tests (production build in Chrome against a fake backend) and `cargo test`; then `packages/protocol` typecheck and tests. CI runs the same on macOS, Windows and Linux. Focused suites: `npm run test:chat -w apps/desktop` (also `test:canvas`, `test:usage`, `test:cli`, `test:csp`). Release scripts: `npm run version:check` and `npm run test:release`.
+
+Formatting and lint: Rust is checked with `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` (both are part of `npm run check`; run `cargo fmt` in `apps/desktop/src-tauri` to fix formatting). TypeScript uses Prettier (config in `apps/desktop/.prettierrc.json`) and ESLint (`apps/desktop/eslint.config.mjs`). Violations that existed when ESLint was introduced are recorded in `apps/desktop/eslint-suppressions.json`, so only new code is held to the rules; after fixing a suppressed one run `npx eslint . --prune-suppressions` in `apps/desktop` to shrink the baseline. Rust and TypeScript formatting commits must not change behaviour.
 
 Add or update tests with every behaviour change. If a change cannot be tested automatically, say in the pull request how you checked it, and what you did not check.
 

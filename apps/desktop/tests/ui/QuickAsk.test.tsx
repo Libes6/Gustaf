@@ -23,15 +23,32 @@ vi.mock("../../src/lib/budgetUsage", () => ({ currentBudgetStop: async () => h.b
 vi.mock("../../src/lib/data", () => ({ createChat: vi.fn(async () => 42), addMessage: vi.fn(async () => 1) }));
 vi.mock("../../src/lib/quickAskApi", () => ({
   quickAskApi: {
-    hide: vi.fn(async () => {}), resize: vi.fn(async () => {}), openMain: vi.fn(async () => {}), ready: vi.fn(async () => {}),
-    emitUsage: vi.fn(async () => {}), emitOpenChat: vi.fn(async () => {}), onShown: vi.fn(async () => () => {}),
+    hide: vi.fn(async () => {}),
+    resize: vi.fn(async () => {}),
+    openMain: vi.fn(async () => {}),
+    ready: vi.fn(async () => {}),
+    emitUsage: vi.fn(async () => {}),
+    emitOpenChat: vi.fn(async () => {}),
+    onShown: vi.fn(async () => () => {}),
   },
 }));
 import { quickAskApi } from "../../src/lib/quickAskApi";
 import { addMessage, createChat } from "../../src/lib/data";
 
-const provider = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({ id: "p1", kind: "anthropic", name: "Anthropic", baseUrl: "", ...over });
-const model = (over: Partial<ModelInfo> = {}): ModelInfo => ({ id: "m1", name: "Model One", providerId: "p1", created: 1, ...over });
+const provider = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
+  id: "p1",
+  kind: "anthropic",
+  name: "Anthropic",
+  baseUrl: "",
+  ...over,
+});
+const model = (over: Partial<ModelInfo> = {}): ModelInfo => ({
+  id: "m1",
+  name: "Model One",
+  providerId: "p1",
+  created: 1,
+  ...over,
+});
 const usage = { input: 7, output: 3, cached: 0, cacheWrite: 0, reasoning: 0 };
 
 /** A turn that streams the given chunks, then waits for `release` (or the abort signal) before it ends. */
@@ -40,16 +57,25 @@ function gatedTurn(chunks: string[]) {
   const gate = new Promise<void>((r) => (release = r));
   h.turn = async (req) => {
     for (const c of chunks) req.onText(c);
-    await Promise.race([gate, new Promise((_, rej) => req.signal.addEventListener("abort", () => rej(new Error("aborted"))))]);
+    await Promise.race([
+      gate,
+      new Promise((_, rej) => req.signal.addEventListener("abort", () => rej(new Error("aborted")))),
+    ]);
     return { parts: [{ type: "text", text: chunks.join("") }], usage };
   };
   return release;
 }
-const instantTurn = (...chunks: string[]) => { h.turn = async (req) => (chunks.forEach((c) => req.onText(c)), { parts: [], usage }); };
+const instantTurn = (...chunks: string[]) => {
+  h.turn = async (req) => (chunks.forEach((c) => req.onText(c)), { parts: [], usage });
+};
 
 function open(settings: Record<string, unknown> = { selection: { providerId: "p1", model: "m1" } }) {
   mockSettings(settings);
-  const ui = (session: number) => <I18nProvider locale="en"><QuickAskView session={session} /></I18nProvider>;
+  const ui = (session: number) => (
+    <I18nProvider locale="en">
+      <QuickAskView session={session} />
+    </I18nProvider>
+  );
   const view = render(ui(0));
   return { ...view, reshow: (session: number) => view.rerender(ui(session)) };
 }
@@ -126,13 +152,19 @@ describe("QuickAskView", () => {
 
   it("shows a failure and offers no Open in Gustaf", async () => {
     const user = userEvent.setup();
-    h.turn = async () => { throw new Error("HTTP 401 invalid key"); };
+    h.turn = async () => {
+      throw new Error("HTTP 401 invalid key");
+    };
     open();
     await ready();
     await ask(user, "q");
     expect(await screen.findByRole("alert")).toHaveTextContent("HTTP 401 invalid key");
     expect(screen.queryByRole("button", { name: "Open in Gustaf" })).not.toBeInTheDocument();
-    expect(quickAskApi.emitUsage).toHaveBeenCalledWith({ providerId: "p1", model: "m1", error: "HTTP 401 invalid key" });
+    expect(quickAskApi.emitUsage).toHaveBeenCalledWith({
+      providerId: "p1",
+      model: "m1",
+      error: "HTTP 401 invalid key",
+    });
   });
 
   it("refuses to ask when the daily token budget is used up", async () => {
@@ -171,7 +203,9 @@ describe("QuickAskView", () => {
     ]);
     expect(vi.mocked(addMessage).mock.calls[1][1].meta).toEqual({ provider: "p1", model: "m1", usage });
     expect(quickAskApi.emitOpenChat).toHaveBeenCalledWith({ chatId: 42 });
-    expect(vi.mocked(quickAskApi.emitOpenChat).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(quickAskApi.openMain).mock.invocationCallOrder[0]);
+    expect(vi.mocked(quickAskApi.emitOpenChat).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(quickAskApi.openMain).mock.invocationCallOrder[0],
+    );
     // the window is clean afterwards
     await waitFor(() => expect(input()).toHaveValue(""));
     expect(screen.queryByRole("button", { name: "Open in Gustaf" })).not.toBeInTheDocument();

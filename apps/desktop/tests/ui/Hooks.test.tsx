@@ -8,9 +8,12 @@ import { callsOf, mockInvoke } from "./tauri";
 
 /** A settings table in memory behind the db_select / db_execute commands. */
 function settingsDb(initial: Record<string, unknown>) {
-  const settings: Record<string, string> = Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, JSON.stringify(v)]));
+  const settings: Record<string, string> = Object.fromEntries(
+    Object.entries(initial).map(([k, v]) => [k, JSON.stringify(v)]),
+  );
   mockInvoke({
-    db_select: ({ sql, params }: any) => (/from settings where key/.test(sql) && settings[params[0]] !== undefined ? [{ value: settings[params[0]] }] : []),
+    db_select: ({ sql, params }: any) =>
+      /from settings where key/.test(sql) && settings[params[0]] !== undefined ? [{ value: settings[params[0]] }] : [],
     db_execute: ({ params }: any) => {
       settings[params[0]] = params[1];
       return [1, 1];
@@ -19,7 +22,13 @@ function settingsDb(initial: Record<string, unknown>) {
   return settings;
 }
 
-const file = JSON.stringify({ hooks: [{ event: "post_edit", matcher: "edit_file|write_file", command: "npm test" }, { event: "bogus", command: "x" }, { event: "stop", command: "echo done", timeoutMs: 999999 }] });
+const file = JSON.stringify({
+  hooks: [
+    { event: "post_edit", matcher: "edit_file|write_file", command: "npm test" },
+    { event: "bogus", command: "x" },
+    { event: "stop", command: "echo done", timeoutMs: 999999 },
+  ],
+});
 
 it("lists effective hooks with their source and the skipped entries; project hooks are off by default with a warning", async () => {
   settingsDb({ hooks: { hooks: [{ event: "pre_tool", matcher: "run_command", command: "guard.sh" }] } });
@@ -48,7 +57,11 @@ it("enabling project hooks stores the switch and shows the project's hooks marke
 
 it("saving the global hooks editor validates the JSON", async () => {
   const settings = settingsDb({});
-  mockInvoke({ fs_read: () => { throw new Error("no such file"); } });
+  mockInvoke({
+    fs_read: () => {
+      throw new Error("no such file");
+    },
+  });
   renderApp(<HooksSettings />, makeApp({ projects: [project({ path: "/work/alpha" })] }));
   const box = await screen.findByLabelText("Global hooks (JSON)");
   await userEvent.click(box);
@@ -66,7 +79,20 @@ it("saving the global hooks editor validates the JSON", async () => {
 });
 
 it("the action log shows hook runs with event, exit code and output", async () => {
-  settingsDb({ actionLog: [{ id: "h1", at: 1_700_000_000_000, tool: "hook", summary: "pre_tool: guard.sh", status: "success", source: "hook", hook: { event: "pre_tool", command: "guard.sh", exitCode: 2, scope: "project" }, detail: "no rm here" }] });
+  settingsDb({
+    actionLog: [
+      {
+        id: "h1",
+        at: 1_700_000_000_000,
+        tool: "hook",
+        summary: "pre_tool: guard.sh",
+        status: "success",
+        source: "hook",
+        hook: { event: "pre_tool", command: "guard.sh", exitCode: 2, scope: "project" },
+        detail: "no rm here",
+      },
+    ],
+  });
   renderApp(<ActionLog />);
   expect(await screen.findByText("pre_tool: guard.sh")).toBeInTheDocument();
   await waitFor(() => expect(screen.getByText(/pre_tool · project · exit 2/)).toBeInTheDocument());

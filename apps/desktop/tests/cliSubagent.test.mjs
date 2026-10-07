@@ -15,7 +15,8 @@ const { createSubagentHost } = await import('../src/agent/subagents.ts');
 const { Scheduler } = await import('../src/agent/scheduler.ts');
 const { getRuns, resetAgentRuns, stopRun } = await import('../src/agent/agentRuns.ts');
 const { normalizeRuns } = await import('../src/agent/agentRunsModel.ts');
-const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings, selectProviderRoute, allowedProviderIds } = await import('../src/agent/agentSettings.ts');
+const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings, selectProviderRoute, allowedProviderIds } =
+  await import('../src/agent/agentSettings.ts');
 const core = await import('../src/agent/subagentCore.ts');
 const cli = await import('../src/agent/cliSubagentCore.ts');
 const { parsePlanArgs } = await import('../src/agent/orchestrator.ts');
@@ -25,7 +26,14 @@ const { DEFAULT_RULES } = await import('../src/agent/rules.ts');
 before(() => saveRulesConfig(DEFAULT_RULES));
 
 const usage = { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 };
-const act = (id, name, args, status = 'running', output) => ({ type: 'activity', id, name, args, status, ...(output ? { output } : {}) });
+const act = (id, name, args, status = 'running', output) => ({
+  type: 'activity',
+  id,
+  name,
+  args,
+  status,
+  ...(output ? { output } : {}),
+});
 
 const settingsWith = (extra = {}) => normalizeAgentSettings({ ...extra });
 
@@ -41,12 +49,14 @@ function fakeCli(name, script, calls) {
     },
   };
 }
-const finishWith = (text, extra = {}) => async (input) => {
-  input.onActivity?.(act('t1', 'Read', { file_path: 'a.txt' }));
-  input.onActivity?.(act('t1', 'Read', { file_path: 'a.txt' }, 'success', 'one'));
-  input.onText(text);
-  return { parts: [], usage, ...extra };
-};
+const finishWith =
+  (text, extra = {}) =>
+  async (input) => {
+    input.onActivity?.(act('t1', 'Read', { file_path: 'a.txt' }));
+    input.onActivity?.(act('t1', 'Read', { file_path: 'a.txt' }, 'success', 'one'));
+    input.onText(text);
+    return { parts: [], usage, ...extra };
+  };
 /** Resolves only when the signal aborts, like a CLI process that is killed. */
 const hang = (seen) => (input) =>
   new Promise((_, reject) => {
@@ -65,7 +75,13 @@ function fakeWorktrees({ touched = false, files = [], none = false, inspectFails
       log.created.push(a);
       if (none) return null;
       const n = log.created.length;
-      return { taskId: `w${n}`, branch: `gustaf/${a.title.toLowerCase().replace(/\W+/g, '-')}`, cwd: `/wt/w${n}`, path: `/wt/w${n}`, baseCommit: 'abc' };
+      return {
+        taskId: `w${n}`,
+        branch: `gustaf/${a.title.toLowerCase().replace(/\W+/g, '-')}`,
+        cwd: `/wt/w${n}`,
+        path: `/wt/w${n}`,
+        baseCommit: 'abc',
+      };
     },
     inspect: async (root, taskId) => {
       log.inspected.push(taskId);
@@ -79,12 +95,15 @@ function fakeWorktrees({ touched = false, files = [], none = false, inspectFails
 /** Provider directory over fake adapters. `defs`: id -> { name, kind: 'cli'|'api'|'bad', script, reason }. */
 function directory(defs, calls) {
   return {
-    list: () => Object.entries(defs).map(([id, d]) => ({ id, name: d.name, ...(d.kind !== 'api' ? { cli: true } : {}) })),
+    list: () =>
+      Object.entries(defs).map(([id, d]) => ({ id, name: d.name, ...(d.kind !== 'api' ? { cli: true } : {}) })),
     resolve: async (id, model) => {
       const d = defs[id];
       if (d.kind === 'bad') return { ok: false, reason: d.reason };
       const adapter = fakeCli(id, d.script, calls);
-      return d.kind === 'cli' ? { ok: true, kind: 'cli', adapter, cli: 'codex', model: model ?? 'default', name: d.name } : { ok: true, kind: 'api', adapter, supportsTools: true, model: model ?? 'm1', name: d.name };
+      return d.kind === 'cli'
+        ? { ok: true, kind: 'cli', adapter, cli: 'codex', model: model ?? 'default', name: d.name }
+        : { ok: true, kind: 'api', adapter, supportsTools: true, model: model ?? 'm1', name: d.name };
     },
   };
 }
@@ -115,7 +134,18 @@ function setup({ defs = {}, settings = {}, wt = fakeWorktrees(), hostCfg = {}, p
   });
   review.list = async () => [];
   review.finish = async () => {};
-  const parent = { root, providerId: 'p', model: 'm', access: parentAccess, allowlist: [], signal: ctl.signal, approve: async () => true, adapter: null, chatId: 7, supportsTools: true };
+  const parent = {
+    root,
+    providerId: 'p',
+    model: 'm',
+    access: parentAccess,
+    allowlist: [],
+    signal: ctl.signal,
+    approve: async () => true,
+    adapter: null,
+    chatId: 7,
+    supportsTools: true,
+  };
   return { host, parent, calls, prepared, failures, wt, root, ctl };
 }
 
@@ -181,42 +211,108 @@ test('activities become transcript steps', () => {
 });
 
 test('provider and role arguments are validated before anything runs', () => {
-  const ok = core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', provider: ' codex1 ', fallbackProviders: ['a', 'a', 'b'] });
+  const ok = core.parseSpawnArgs({
+    title: 't',
+    prompt: 'p',
+    type: 'general',
+    provider: ' codex1 ',
+    fallbackProviders: ['a', 'a', 'b'],
+  });
   assert.equal(ok.value.provider, 'codex1');
   assert.deepEqual(ok.value.fallbackProviders, ['a', 'b']);
-  assert.match(core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', role: 'boss' }).error, /planner, implementer, reviewer, tester/);
-  assert.match(core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', role: 'tester', model: 'x' }).error, /either `role` or/);
-  assert.match(core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', fallbackProviders: 'a' }).error, /list of provider ids/);
-  const plan = parsePlanArgs({ tasks: [{ id: 'a', title: 'A', prompt: 'p', type: 'plan', role: 'wizard' }] }, { cancelDependents: true });
+  assert.match(
+    core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', role: 'boss' }).error,
+    /planner, implementer, reviewer, tester/,
+  );
+  assert.match(
+    core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', role: 'tester', model: 'x' }).error,
+    /either `role` or/,
+  );
+  assert.match(
+    core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'general', fallbackProviders: 'a' }).error,
+    /list of provider ids/,
+  );
+  const plan = parsePlanArgs(
+    { tasks: [{ id: 'a', title: 'A', prompt: 'p', type: 'plan', role: 'wizard' }] },
+    { cancelDependents: true },
+  );
   assert.equal(plan.ok, false);
   assert.match(plan.error, /Task "a": `role` must be one of/);
-  assert.equal(core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'plan' }).value.provider, undefined, 'default behaviour: nothing set');
+  assert.equal(
+    core.parseSpawnArgs({ title: 't', prompt: 'p', type: 'plan' }).value.provider,
+    undefined,
+    'default behaviour: nothing set',
+  );
 });
 
 test('settings: roles, allowed providers and cleanup are normalized; roles need an allowed provider', () => {
-  const s = normalizeAgentSettings({ roles: { planner: { providerId: 'a', model: 'm' }, boss: { providerId: 'x', model: 'y' }, tester: { providerId: '' } }, allowedProviders: ['a', 'a', '', 5, 'b'], cleanupUntouchedWorktrees: 1 });
+  const s = normalizeAgentSettings({
+    roles: {
+      planner: { providerId: 'a', model: 'm' },
+      boss: { providerId: 'x', model: 'y' },
+      tester: { providerId: '' },
+    },
+    allowedProviders: ['a', 'a', '', 5, 'b'],
+    cleanupUntouchedWorktrees: 1,
+  });
   assert.deepEqual(s.roles, { planner: { providerId: 'a', model: 'm' } });
   assert.deepEqual(s.allowedProviders, ['a', 'b']);
   assert.equal(s.cleanupUntouchedWorktrees, false, 'only a real true switches it on');
   assert.deepEqual(normalizeAgentSettings(undefined), DEFAULT_AGENT_SETTINGS);
-  const known = [{ id: 'a', name: 'Alpha', cli: true }, { id: 'b', name: 'Beta' }, { id: 'c', name: 'Gamma' }];
+  const known = [
+    { id: 'a', name: 'Alpha', cli: true },
+    { id: 'b', name: 'Beta' },
+    { id: 'c', name: 'Gamma' },
+  ];
   assert.equal(selectProviderRoute({}, s, 'p', known), null);
   assert.equal(selectProviderRoute({ role: 'planner' }, s, 'p', known).ok, true);
   assert.match(selectProviderRoute({ role: 'tester' }, s, 'p', known).error, /no provider configured/);
   assert.match(selectProviderRoute({ provider: 'c' }, s, 'p', known).error, /not allowed/);
-  assert.equal(selectProviderRoute({ provider: 'gamma' }, { ...s, allowedProviders: ['c'] }, 'p', known).route.providerId, 'c', 'a unique name matches');
+  assert.equal(
+    selectProviderRoute({ provider: 'gamma' }, { ...s, allowedProviders: ['c'] }, 'p', known).route.providerId,
+    'c',
+    'a unique name matches',
+  );
   const notAllowedRole = { ...s, allowedProviders: [] };
-  assert.match(selectProviderRoute({ role: 'planner' }, notAllowedRole, 'p', known).error, /Provider of role "planner" "a" is not allowed/);
-  assert.deepEqual(allowedProviderIds({ ...s, models: { explore: { providerId: 'q', model: 'm' } } }, 'p'), ['p', 'q', 'a', 'b']);
+  assert.match(
+    selectProviderRoute({ role: 'planner' }, notAllowedRole, 'p', known).error,
+    /Provider of role "planner" "a" is not allowed/,
+  );
+  assert.deepEqual(allowedProviderIds({ ...s, models: { explore: { providerId: 'q', model: 'm' } } }, 'p'), [
+    'p',
+    'q',
+    'a',
+    'b',
+  ]);
 });
 
 // ---- runtime ----
 
 test('provider validation and allow-list: nothing starts for a provider that is not allowed', async () => {
-  const { host, parent, calls } = setup({ defs: cliDefs(finishWith('x'), { other: { name: 'Other', kind: 'cli', script: finishWith('y') } }), settings: { allowedProviders: ['codex1'] } });
-  await assert.rejects(host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'other' }, parent), /not allowed for subagents/);
-  await assert.rejects(host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'nope' }, parent), /not a known, enabled provider/);
-  await assert.rejects(host.delegate({ tasks: [{ id: 'a', title: 'A', prompt: 'p', type: 'explore' }, { id: 'b', title: 'B', prompt: 'p', type: 'explore', provider: 'other' }] }, parent), /Task "b": .*not allowed/);
+  const { host, parent, calls } = setup({
+    defs: cliDefs(finishWith('x'), { other: { name: 'Other', kind: 'cli', script: finishWith('y') } }),
+    settings: { allowedProviders: ['codex1'] },
+  });
+  await assert.rejects(
+    host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'other' }, parent),
+    /not allowed for subagents/,
+  );
+  await assert.rejects(
+    host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'nope' }, parent),
+    /not a known, enabled provider/,
+  );
+  await assert.rejects(
+    host.delegate(
+      {
+        tasks: [
+          { id: 'a', title: 'A', prompt: 'p', type: 'explore' },
+          { id: 'b', title: 'B', prompt: 'p', type: 'explore', provider: 'other' },
+        ],
+      },
+      parent,
+    ),
+    /Task "b": .*not allowed/,
+  );
   assert.equal(calls.length, 0);
   assert.equal(getRuns().length, 0, 'the whole plan is refused: task a did not start either');
   const out = await host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'Codex' }, parent);
@@ -224,14 +320,25 @@ test('provider validation and allow-list: nothing starts for a provider that is 
   assert.equal(calls.length, 1);
 });
 
-test('without a provider directory a provider or role is refused; no argument keeps today\'s behaviour', async () => {
+test("without a provider directory a provider or role is refused; no argument keeps today's behaviour", async () => {
   const { host, parent } = setup({ hostCfg: { providers: undefined } });
-  await assert.rejects(host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'x' }, parent), /not available here/);
-  await assert.rejects(host.delegate({ tasks: [{ id: 'a', title: 'T', prompt: 'p', type: 'explore', fallbackProviders: ['x'] }] }, parent), /needs a `provider` or a `role`/);
+  await assert.rejects(
+    host.spawn({ title: 'T', prompt: 'p', type: 'explore', provider: 'x' }, parent),
+    /not available here/,
+  );
+  await assert.rejects(
+    host.delegate({ tasks: [{ id: 'a', title: 'T', prompt: 'p', type: 'explore', fallbackProviders: ['x'] }] }, parent),
+    /needs a `provider` or a `role`/,
+  );
 });
 
 test('tools name the allowed providers and the usable roles', async () => {
-  const { host } = setup({ defs: cliDefs(finishWith('x')), settings: { roles: { implementer: { providerId: 'codex1', model: 'gpt' }, tester: { providerId: 'ghost', model: 'm' } } } });
+  const { host } = setup({
+    defs: cliDefs(finishWith('x')),
+    settings: {
+      roles: { implementer: { providerId: 'codex1', model: 'gpt' }, tester: { providerId: 'ghost', model: 'm' } },
+    },
+  });
   const [spawn, delegate] = await host.tools({ providerId: 'p', model: 'm' });
   assert.match(spawn.description, /Providers you may pass in `provider`: codex1 \(Codex, CLI agent\)/);
   assert.match(spawn.description, /Roles you may pass in `role`: implementer\./);
@@ -241,8 +348,22 @@ test('tools name the allowed providers and the usable roles', async () => {
 });
 
 test('roles resolve to their provider and model; an unconfigured role is refused before anything starts', async () => {
-  const { host, parent, calls } = setup({ defs: cliDefs(finishWith('done')), settings: { roles: { implementer: { providerId: 'codex1', model: 'gpt-5' } } } });
-  await assert.rejects(host.delegate({ tasks: [{ id: 'a', title: 'A', prompt: 'p', type: 'explore', role: 'implementer' }, { id: 'b', title: 'B', prompt: 'p', type: 'explore', role: 'reviewer' }] }, parent), /Role "reviewer" has no provider configured/);
+  const { host, parent, calls } = setup({
+    defs: cliDefs(finishWith('done')),
+    settings: { roles: { implementer: { providerId: 'codex1', model: 'gpt-5' } } },
+  });
+  await assert.rejects(
+    host.delegate(
+      {
+        tasks: [
+          { id: 'a', title: 'A', prompt: 'p', type: 'explore', role: 'implementer' },
+          { id: 'b', title: 'B', prompt: 'p', type: 'explore', role: 'reviewer' },
+        ],
+      },
+      parent,
+    ),
+    /Role "reviewer" has no provider configured/,
+  );
   assert.equal(calls.length, 0);
   assert.equal(getRuns().length, 0);
   await host.spawn({ title: 'Impl', prompt: 'p', type: 'explore', role: 'implementer' }, parent);
@@ -253,18 +374,35 @@ test('roles resolve to their provider and model; an unconfigured role is refused
 });
 
 test('a role whose provider is not allowed is refused (the allow-list applies to roles)', async () => {
-  const { host, parent } = setup({ defs: cliDefs(finishWith('x')), settings: { allowedProviders: [], roles: { planner: { providerId: 'codex1', model: 'm' } } } });
-  await assert.rejects(host.spawn({ title: 'T', prompt: 'p', type: 'plan', role: 'planner' }, parent), /Provider of role "planner" "codex1" is not allowed/);
+  const { host, parent } = setup({
+    defs: cliDefs(finishWith('x')),
+    settings: { allowedProviders: [], roles: { planner: { providerId: 'codex1', model: 'm' } } },
+  });
+  await assert.rejects(
+    host.spawn({ title: 'T', prompt: 'p', type: 'plan', role: 'planner' }, parent),
+    /Provider of role "planner" "codex1" is not allowed/,
+  );
 });
 
 test('an unusable provider is refused with its reason', async () => {
-  const { host, parent } = setup({ defs: { sdk: { name: 'Cursor', kind: 'bad', reason: 'the Cursor SDK cannot run non-interactively.' } } });
-  await assert.rejects(host.spawn({ title: 'T', prompt: 'p', type: 'general', provider: 'sdk' }, parent), /Provider "sdk" cannot run this subagent: the Cursor SDK cannot run non-interactively/);
+  const { host, parent } = setup({
+    defs: { sdk: { name: 'Cursor', kind: 'bad', reason: 'the Cursor SDK cannot run non-interactively.' } },
+  });
+  await assert.rejects(
+    host.spawn({ title: 'T', prompt: 'p', type: 'general', provider: 'sdk' }, parent),
+    /Provider "sdk" cannot run this subagent: the Cursor SDK cannot run non-interactively/,
+  );
 });
 
 test('a read-only CLI subagent runs read-only in the parent folder, without tools, computer use or a worktree', async () => {
-  const { host, parent, calls, wt } = setup({ defs: cliDefs(finishWith('Found: a.txt line 1.')), parentAccess: 'full' });
-  const out = await host.spawn({ title: 'Look', prompt: 'find it', type: 'review', provider: 'codex1', files: ['a.txt'] }, parent);
+  const { host, parent, calls, wt } = setup({
+    defs: cliDefs(finishWith('Found: a.txt line 1.')),
+    parentAccess: 'full',
+  });
+  const out = await host.spawn(
+    { title: 'Look', prompt: 'find it', type: 'review', provider: 'codex1', files: ['a.txt'] },
+    parent,
+  );
   const { input } = calls[0];
   assert.equal(input.access, 'readonly');
   assert.equal(input.cwd, parent.root);
@@ -286,14 +424,21 @@ test('a read-only CLI subagent runs read-only in the parent folder, without tool
 
 test('a general CLI subagent works in its own worktree, capped at "auto", and the branch is left in place and named in the report', async () => {
   const wt = fakeWorktrees({ touched: true, files: ['src/a.ts', 'src/b.ts'] });
-  const { host, parent, calls, prepared } = setup({ defs: cliDefs(finishWith('Edited two files.')), wt, parentAccess: 'full' });
+  const { host, parent, calls, prepared } = setup({
+    defs: cliDefs(finishWith('Edited two files.')),
+    wt,
+    parentAccess: 'full',
+  });
   const out = await host.spawn({ title: 'Fix the bug', prompt: 'do it', type: 'general', provider: 'codex1' }, parent);
   assert.equal(wt.log.created.length, 1);
   assert.equal(wt.log.created[0].providerId, 'codex1');
   assert.equal(calls[0].input.cwd, '/wt/w1');
   assert.equal(calls[0].input.access, 'auto', 'never "full": no sandbox bypass');
   assert.equal(prepared.length, 0, 'a git project gets a worktree, not a shadow copy');
-  assert.match(out, /on branch gustaf\/fix-the-bug \(worktree \/wt\/w1\), left in place; nothing was committed, merged or pushed/);
+  assert.match(
+    out,
+    /on branch gustaf\/fix-the-bug \(worktree \/wt\/w1\), left in place; nothing was committed, merged or pushed/,
+  );
   assert.match(out, /src\/a.ts, src\/b.ts/);
   assert.deepEqual(wt.log.removed, []);
   const run = getRuns()[0];
@@ -309,13 +454,21 @@ test('the worktree of an untouched run stays by default and goes only when the s
   assert.match(outA, /No files were changed\. Branch gustaf\/idle was left in place/);
 
   const clean = fakeWorktrees({ touched: false });
-  const b = setup({ defs: cliDefs(finishWith('Nothing to do.')), wt: clean, settings: { cleanupUntouchedWorktrees: true } });
+  const b = setup({
+    defs: cliDefs(finishWith('Nothing to do.')),
+    wt: clean,
+    settings: { cleanupUntouchedWorktrees: true },
+  });
   const outB = await b.host.spawn({ title: 'Idle', prompt: 'p', type: 'general', provider: 'codex1' }, b.parent);
   assert.deepEqual(clean.log.removed, ['w1']);
   assert.match(outB, /were removed/);
 
   const touched = fakeWorktrees({ touched: true, files: ['x'] });
-  const c = setup({ defs: cliDefs(finishWith('Changed.')), wt: touched, settings: { cleanupUntouchedWorktrees: true } });
+  const c = setup({
+    defs: cliDefs(finishWith('Changed.')),
+    wt: touched,
+    settings: { cleanupUntouchedWorktrees: true },
+  });
   await c.host.spawn({ title: 'Work', prompt: 'p', type: 'general', provider: 'codex1' }, c.parent);
   assert.deepEqual(touched.log.removed, []);
 
@@ -326,7 +479,10 @@ test('the worktree of an untouched run stays by default and goes only when the s
 });
 
 test('a project without git gets a private shadow copy instead of a worktree', async () => {
-  const { host, parent, calls, prepared, wt } = setup({ defs: cliDefs(finishWith('ok')), wt: fakeWorktrees({ none: true }) });
+  const { host, parent, calls, prepared, wt } = setup({
+    defs: cliDefs(finishWith('ok')),
+    wt: fakeWorktrees({ none: true }),
+  });
   review.list = async () => [[{ id: 'r1' }, [{ path: 'new.txt', binary: false }]]];
   const out = await host.spawn({ title: 'Copy', prompt: 'p', type: 'general', provider: 'codex1' }, parent);
   assert.equal(prepared.length, 1);
@@ -366,7 +522,10 @@ test('a tool-call limit breach kills the CLI and reports the limit', async () =>
   const seen = {};
   const script = (input) =>
     new Promise((_, reject) => {
-      input.signal.addEventListener('abort', () => ((seen.killed = true), reject(new DOMException('Aborted', 'AbortError'))));
+      input.signal.addEventListener(
+        'abort',
+        () => ((seen.killed = true), reject(new DOMException('Aborted', 'AbortError'))),
+      );
       for (let i = 0; i < 5; i++) input.onActivity(act(`c${i}`, 'Bash', { command: `cmd ${i}` }));
     });
   const { host, parent } = setup({ defs: cliDefs(script), hostCfg: { budgets: { explore: { maxToolCalls: 2 } } } });
@@ -389,11 +548,17 @@ test('the user token budget stops a CLI subagent that is running', async () => {
   const seen = {};
   const script = (input) =>
     new Promise((_, reject) => {
-      input.signal.addEventListener('abort', () => ((seen.killed = true), reject(new DOMException('Aborted', 'AbortError'))));
+      input.signal.addEventListener(
+        'abort',
+        () => ((seen.killed = true), reject(new DOMException('Aborted', 'AbortError'))),
+      );
       input.onActivity(act('c1', 'Bash', { command: 'x' }));
     });
   let n = 0;
-  const { host, parent } = setup({ defs: cliDefs(script), hostCfg: { checkBudget: async () => (++n > 2 ? 'day' : null) } });
+  const { host, parent } = setup({
+    defs: cliDefs(script),
+    hostCfg: { checkBudget: async () => (++n > 2 ? 'day' : null) },
+  });
   const out = await host.spawn({ title: 'Costly', prompt: 'p', type: 'explore', provider: 'codex1' }, parent);
   assert.equal(seen.killed, true);
   assert.match(out, /was stopped: the daily token budget is exceeded/);
@@ -427,32 +592,61 @@ test('quota failure with retries moves to the next fallback provider, else retri
   const ok = (input) => (order.push('B'), finishWith('B did it')(input));
   const defs = { A: { name: 'Alpha', kind: 'cli', script: quota }, B: { name: 'Beta', kind: 'cli', script: ok } };
   const s = setup({ defs });
-  const out = await s.host.delegate({ retries: 1, tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A', fallbackProviders: ['B'] }] }, s.parent);
+  const out = await s.host.delegate(
+    {
+      retries: 1,
+      tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A', fallbackProviders: ['B'] }],
+    },
+    s.parent,
+  );
   assert.deepEqual(order, ['A', 'B']);
   assert.match(out, /t "Task".*: completed, 2 attempts/);
   assert.match(out, /via Beta/);
 
   const order2 = [];
-  const flaky = () => (order2.push('A'), order2.length === 1 ? Promise.reject(new Error('usage limit reached')) : finishWith('second time')({ onActivity() {}, onText() {} }));
+  const flaky = () => (
+    order2.push('A'),
+    order2.length === 1
+      ? Promise.reject(new Error('usage limit reached'))
+      : finishWith('second time')({ onActivity() {}, onText() {} })
+  );
   const s2 = setup({ defs: { A: { name: 'Alpha', kind: 'cli', script: flaky } } });
-  const out2 = await s2.host.delegate({ retries: 1, tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A' }] }, s2.parent);
+  const out2 = await s2.host.delegate(
+    { retries: 1, tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A' }] },
+    s2.parent,
+  );
   assert.deepEqual(order2, ['A', 'A']);
   assert.match(out2, /completed, 2 attempts/);
 
   const s3 = setup({ defs });
-  await assert.rejects(s3.host.delegate({ retries: 1, tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A', fallbackProviders: ['zzz'] }] }, s3.parent), /Task "t": Fallback provider "zzz"/);
+  await assert.rejects(
+    s3.host.delegate(
+      {
+        retries: 1,
+        tasks: [{ id: 't', title: 'Task', prompt: 'p', type: 'explore', provider: 'A', fallbackProviders: ['zzz'] }],
+      },
+      s3.parent,
+    ),
+    /Task "t": Fallback provider "zzz"/,
+  );
 });
 
 test('a failed worktree attempt that will be retried is cleaned up when untouched, kept when it holds work', async () => {
   const fail = () => Promise.reject(new Error('Not logged in: codex login'));
   const wt = fakeWorktrees({ touched: false });
   const s = setup({ defs: { A: { name: 'Alpha', kind: 'cli', script: fail } }, wt });
-  await s.host.delegate({ retries: 1, tasks: [{ id: 't', title: 'Edit', prompt: 'p', type: 'general', files: ['a'], provider: 'A' }] }, s.parent);
+  await s.host.delegate(
+    { retries: 1, tasks: [{ id: 't', title: 'Edit', prompt: 'p', type: 'general', files: ['a'], provider: 'A' }] },
+    s.parent,
+  );
   assert.equal(wt.log.created.length, 2);
   assert.deepEqual(wt.log.removed, ['w1'], 'only the replaced attempt; the last one is kept');
   const wt2 = fakeWorktrees({ touched: true, files: ['a'] });
   const s2 = setup({ defs: { A: { name: 'Alpha', kind: 'cli', script: fail } }, wt: wt2 });
-  await s2.host.delegate({ retries: 1, tasks: [{ id: 't', title: 'Edit', prompt: 'p', type: 'general', files: ['a'], provider: 'A' }] }, s2.parent);
+  await s2.host.delegate(
+    { retries: 1, tasks: [{ id: 't', title: 'Edit', prompt: 'p', type: 'general', files: ['a'], provider: 'A' }] },
+    s2.parent,
+  );
   assert.deepEqual(wt2.log.removed, []);
 });
 
@@ -468,25 +662,49 @@ test('mixed providers: a CLI task after an API task gets its report, in dependen
     events.push('cli:start');
     return finishWith('CLI implemented X')(input);
   };
-  const defs = { api1: { name: 'Anthropic', kind: 'api', script: apiTurn }, codex1: { name: 'Codex', kind: 'cli', script: cliTurn } };
+  const defs = {
+    api1: { name: 'Anthropic', kind: 'api', script: apiTurn },
+    codex1: { name: 'Codex', kind: 'cli', script: cliTurn },
+  };
   const wt = fakeWorktrees({ touched: true, files: ['x.ts'] });
   const s = setup({ defs, wt });
-  const out = await s.host.delegate({
-    tasks: [
-      { id: 'impl', title: 'Implement', prompt: 'implement the plan', type: 'general', files: ['x.ts'], provider: 'codex1', dependsOn: ['plan'] },
-      { id: 'plan', title: 'Plan', prompt: 'make a plan', type: 'plan', provider: 'api1' },
-    ],
-  }, s.parent);
+  const out = await s.host.delegate(
+    {
+      tasks: [
+        {
+          id: 'impl',
+          title: 'Implement',
+          prompt: 'implement the plan',
+          type: 'general',
+          files: ['x.ts'],
+          provider: 'codex1',
+          dependsOn: ['plan'],
+        },
+        { id: 'plan', title: 'Plan', prompt: 'make a plan', type: 'plan', provider: 'api1' },
+      ],
+    },
+    s.parent,
+  );
   assert.deepEqual(events, ['api:start', 'api:end', 'cli:start']);
   const cliCall = s.calls.find((c) => c.name === 'codex1');
   assert.match(cliCall.input.messages[0].parts[0].text, /API report: plan is X/);
   assert.match(out, /impl "Implement" \(general, codex1, after plan\): completed/);
   assert.match(out, /plan "Plan" \(plan, api1\): completed/);
-  assert.deepEqual(getRuns().map((r) => r.providerId).sort(), ['api1', 'codex1']);
+  assert.deepEqual(
+    getRuns()
+      .map((r) => r.providerId)
+      .sort(),
+    ['api1', 'codex1'],
+  );
 });
 
 test('a CLI task that fails to prepare its directory fails cleanly', async () => {
-  const wt = { ...fakeWorktrees(), create: async () => { throw new Error('git_error: no space left'); } };
+  const wt = {
+    ...fakeWorktrees(),
+    create: async () => {
+      throw new Error('git_error: no space left');
+    },
+  };
   const { host, parent, calls } = setup({ defs: cliDefs(finishWith('x')), wt });
   const out = await host.spawn({ title: 'W', prompt: 'p', type: 'general', provider: 'codex1' }, parent);
   assert.match(out, /could not prepare an isolated directory: git_error: no space left/);
@@ -503,9 +721,17 @@ test('the report of a CLI subagent is capped like any other', async () => {
 
 test('without provider or role nothing changes: the API subagent loop runs as before', async () => {
   const seen = [];
-  const adapter = { supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: async (i) => (seen.push(i), { parts: [{ type: 'text', text: 'API says hi' }], usage }) };
+  const adapter = {
+    supportsComputer: false,
+    supportsReasoning: () => false,
+    listModels: async () => [],
+    turn: async (i) => (seen.push(i), { parts: [{ type: 'text', text: 'API says hi' }], usage }),
+  };
   const s = setup({ defs: cliDefs(finishWith('x')) });
-  const out = await s.host.spawn({ title: 'Plain', prompt: 'p', type: 'explore' }, { ...s.parent, adapter, root: s.root });
+  const out = await s.host.spawn(
+    { title: 'Plain', prompt: 'p', type: 'explore' },
+    { ...s.parent, adapter, root: s.root },
+  );
   assert.match(out, /Subagent "Plain" \(explore\) finished\./);
   assert.equal(seen.length, 1);
   assert.equal(s.calls.length, 0);
@@ -518,7 +744,13 @@ test('stopped while its worktree is being created: the CLI never starts and the 
   const base = fakeWorktrees({ touched: false });
   let release;
   const gate = new Promise((r) => (release = r));
-  const wt = { ...base, create: async (a) => { await gate; return base.create(a); } };
+  const wt = {
+    ...base,
+    create: async (a) => {
+      await gate;
+      return base.create(a);
+    },
+  };
   const { host, parent, calls } = setup({ defs: cliDefs(finishWith('should not run')), wt });
   const pending = host.spawn({ title: 'Slow setup', prompt: 'p', type: 'general', provider: 'codex1' }, parent);
   await sleep(20);
@@ -526,7 +758,11 @@ test('stopped while its worktree is being created: the CLI never starts and the 
   release();
   const out = await pending;
   assert.equal(calls.length, 0, 'no CLI process for a stopped task');
-  assert.deepEqual(base.log.removed, ['w1'], 'the cleanup setting is off, but an untouched worktree of a task that never ran is not kept');
+  assert.deepEqual(
+    base.log.removed,
+    ['w1'],
+    'the cleanup setting is off, but an untouched worktree of a task that never ran is not kept',
+  );
   assert.equal(getRuns()[0].status, 'cancelled');
   assert.match(out, /was cancelled/);
 });
@@ -535,7 +771,14 @@ test('a parent stop that lands after the slot was granted never prepares a direc
   const wt = fakeWorktrees();
   let s;
   // The budget check is the last await before the run starts: the parent is stopped right there.
-  s = setup({ defs: cliDefs(finishWith('x')), wt, hostCfg: { checkBudget: async () => (s.ctl.abort(), null), settings: settingsWith({ allowedProviders: ['codex1'], stopOnBudget: true }) } });
+  s = setup({
+    defs: cliDefs(finishWith('x')),
+    wt,
+    hostCfg: {
+      checkBudget: async () => (s.ctl.abort(), null),
+      settings: settingsWith({ allowedProviders: ['codex1'], stopOnBudget: true }),
+    },
+  });
   const out = await s.host.spawn({ title: 'Late stop', prompt: 'p', type: 'general', provider: 'codex1' }, s.parent);
   assert.equal(wt.log.created.length, 0);
   assert.equal(s.calls.length, 0);
@@ -549,10 +792,16 @@ test('gitSubagentWorktrees.inspect: a checkout whose status cannot be listed cou
   const saved = { diff: worktrees.diff, list: worktrees.list };
   try {
     worktrees.diff = async () => ({ files: [] });
-    worktrees.list = async () => { throw new Error('ps'); };
+    worktrees.list = async () => {
+      throw new Error('ps');
+    };
     assert.equal((await gitSubagentWorktrees.inspect('/p', 'w1')).touched, true);
     worktrees.list = async () => [{ taskId: 'w1', dirty: false, headSha: 'abc', baseCommit: 'abc', ahead: 0 }];
-    assert.equal((await gitSubagentWorktrees.inspect('/p', 'w1')).touched, false, 'a clean, known checkout is untouched');
+    assert.equal(
+      (await gitSubagentWorktrees.inspect('/p', 'w1')).touched,
+      false,
+      'a clean, known checkout is untouched',
+    );
   } finally {
     Object.assign(worktrees, saved);
   }

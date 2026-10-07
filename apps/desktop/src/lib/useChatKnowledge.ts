@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { knowledge, loadChatKnowledge, onKnowledgeChange, saveChatKnowledge, toggleId, type KnowledgeCollection } from "../agent/knowledge";
+import {
+  knowledge,
+  loadChatKnowledge,
+  onKnowledgeChange,
+  saveChatKnowledge,
+  toggleId,
+  type KnowledgeCollection,
+} from "../agent/knowledge";
 
 /**
  * Knowledge collections selected for one chat (settings key `chatKnowledge`, like the chat mode) and the list of collections
@@ -14,7 +21,10 @@ export function useChatKnowledge(chatId: number | null) {
     const before = prevId.current;
     prevId.current = chatId;
     if (chatId === null) {
-      if (before !== null) { ref.current = []; setSelected([]); }
+      if (before !== null) {
+        ref.current = [];
+        setSelected([]);
+      }
       return;
     }
     if (before === null) {
@@ -24,15 +34,31 @@ export function useChatKnowledge(chatId: number | null) {
     let cancelled = false;
     ref.current = [];
     setSelected([]);
-    loadChatKnowledge(chatId).then((ids) => { if (!cancelled) { ref.current = ids; setSelected(ids); } });
-    return () => { cancelled = true; };
+    loadChatKnowledge(chatId).then((ids) => {
+      if (!cancelled) {
+        ref.current = ids;
+        setSelected(ids);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [chatId]);
   useEffect(() => {
     let alive = true;
-    const load = () => knowledge.list().then((list) => { if (alive) setCollections(Array.isArray(list) ? list : []); }, () => {});
+    const load = () =>
+      knowledge.list().then(
+        (list) => {
+          if (alive) setCollections(Array.isArray(list) ? list : []);
+        },
+        () => {},
+      );
     void load();
     const off = onKnowledgeChange(() => void load());
-    return () => { alive = false; off(); };
+    return () => {
+      alive = false;
+      off();
+    };
   }, []);
   const toggle = useCallback((id: string) => {
     ref.current = toggleId(ref.current, id);

@@ -16,7 +16,12 @@ async function mermaidFor(theme: "dark" | "light"): Promise<MermaidApi> {
   const mermaid = await loading;
   if (configuredFor !== theme) {
     // "strict": no click handlers or HTML labels from the diagram text; the SVG is sanitised by Mermaid's DOMPurify.
-    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: theme === "dark" ? "dark" : "default", fontFamily: "inherit" });
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: theme === "dark" ? "dark" : "default",
+      fontFamily: "inherit",
+    });
     configuredFor = theme;
   }
   return mermaid;
@@ -71,21 +76,41 @@ export function MermaidBlock({ code }: { code: string }) {
         {failed && <span className="mermaid-note">{t("mermaidInvalid")}</span>}
         <span className="grow" />
         {!!svg && !failed && (
-          <button className="icon-btn" title={showCode ? t("mermaidShowDiagram") : t("mermaidShowCode")} aria-label={showCode ? t("mermaidShowDiagram") : t("mermaidShowCode")} aria-pressed={showCode} onClick={() => setShowCode(!showCode)}>
+          <button
+            className="icon-btn"
+            title={showCode ? t("mermaidShowDiagram") : t("mermaidShowCode")}
+            aria-label={showCode ? t("mermaidShowDiagram") : t("mermaidShowCode")}
+            aria-pressed={showCode}
+            onClick={() => setShowCode(!showCode)}
+          >
             {showCode ? <Workflow size={14} /> : <Code2 size={14} />}
           </button>
         )}
         <button
-          className="icon-btn" title={t("copy")} aria-label={t("copy")}
-          onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+          className="icon-btn"
+          title={t("copy")}
+          aria-label={t("copy")}
+          onClick={() => {
+            navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
       </div>
       {diagram ? (
-        <div ref={host} className="mermaid-diagram" role="img" aria-label={t("mermaidDiagram")} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div
+          ref={host}
+          className="mermaid-diagram"
+          role="img"
+          aria-label={t("mermaidDiagram")}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
       ) : (
-        <pre><code>{code}</code></pre>
+        <pre>
+          <code>{code}</code>
+        </pre>
       )}
     </div>
   );

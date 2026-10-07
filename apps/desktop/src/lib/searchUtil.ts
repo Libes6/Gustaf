@@ -1,4 +1,4 @@
-import { cmdKey } from "./shortcuts.ts";
+import { matches } from "./shortcuts.ts";
 // Pure helpers for the Cmd+K search palette (no Tauri/DOM/React imports, so node tests can cover them).
 // The index and the query escaping live in src-tauri/src/db.rs; this file only deals with what comes back.
 
@@ -67,7 +67,8 @@ export function mergeHits<T extends { messageId: number }>(shown: readonly T[], 
  * arrives); otherwise it moves like `moveHighlight` (wrapping at the ends, also when everything is loaded).
  */
 export function arrowDown(current: number, count: number, hasMore: boolean): { next: number; loadMore: boolean } {
-  if (hasMore && count > 0 && current >= count - 1) return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
+  if (hasMore && count > 0 && current >= count - 1)
+    return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
   return { next: moveHighlight(current, 1, count), loadMore: false };
 }
 
@@ -105,5 +106,9 @@ type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean
  * Ctrl is not accepted on macOS (Ctrl+K is "delete to end of line" in text fields); on Windows and Linux Ctrl is the main key.
  */
 export function isSearchShortcut(e: KeyLike): boolean {
-  return cmdKey(e) && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
+  // Read the fields one by one: a real KeyboardEvent keeps them as prototype getters, so spreading it would copy nothing.
+  return matches(
+    { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: !!e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey },
+    "search",
+  );
 }

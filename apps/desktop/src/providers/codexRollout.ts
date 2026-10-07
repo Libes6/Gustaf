@@ -24,7 +24,14 @@ const brief = (s: string, n: number) => clip(s.replace(/\s+/g, " ").trim(), n);
 const text = (v: unknown): string => (typeof v === "string" ? v : "");
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
 
-const STATE: Record<string, SubagentState> = { starting: "running", running: "running", completed: "completed", shutdown: "completed", failed: "failed", stopped: "stopped" };
+const STATE: Record<string, SubagentState> = {
+  starting: "running",
+  running: "running",
+  completed: "completed",
+  shutdown: "completed",
+  failed: "failed",
+  stopped: "stopped",
+};
 
 /** "/root/queue_resume" to "queue resume": the last segment of an agent path or task name, readable. */
 export function humanTask(task: string): string {
@@ -75,7 +82,8 @@ export function rolloutActivities(scan: RolloutScan): Activity[] {
       id: rolloutActivityId(key),
       name: "subagent",
       args: { tool: "rollout", ...(threadId ? { agent: threadId } : {}) },
-      status: state === "completed" ? "success" : state === "failed" ? "error" : state === "stopped" ? "unknown" : "running",
+      status:
+        state === "completed" ? "success" : state === "failed" ? "error" : state === "stopped" ? "unknown" : "running",
       ...(report ? { output: clip(report, MAX_OUTPUT) } : {}),
       subagent: info,
     });
@@ -124,18 +132,31 @@ export function createRolloutTracker(o: TrackerOptions): RolloutTracker {
   let agents = 0;
   let finished: Activity[] | null = null;
 
-  const debug = (kind: string, data: Record<string, unknown>) => { try { o.onDebug?.(kind, data); } catch { /* debugging aid only */ } };
+  const debug = (kind: string, data: Record<string, unknown>) => {
+    try {
+      o.onDebug?.(kind, data);
+    } catch {
+      /* debugging aid only */
+    }
+  };
   const handle = (res: RolloutScan) => {
     scans++;
     for (const n of Array.isArray(res?.notes) ? res.notes : []) {
-      if (typeof n === "string" && !notes.has(n)) { notes.add(n); debug("rollout-note", { note: n }); }
+      if (typeof n === "string" && !notes.has(n)) {
+        notes.add(n);
+        debug("rollout-note", { note: n });
+      }
     }
     for (const a of rolloutActivities(res)) {
       const sig = JSON.stringify(a);
       if (sent.get(a.id) === sig) continue;
       sent.set(a.id, sig);
       latest.set(a.id, a);
-      try { o.onActivity(a); } catch { /* the caller's state is its own business */ }
+      try {
+        o.onActivity(a);
+      } catch {
+        /* the caller's state is its own business */
+      }
     }
     agents = Math.max(agents, sent.size);
   };
@@ -184,7 +205,11 @@ export function createRolloutTracker(o: TrackerOptions): RolloutTracker {
       if (agents === 0 && held.size) {
         // The scan found nothing (no files, other Codex version): one merged generic card instead of one per wait.
         const all = [...held.values()];
-        finished.push({ ...all[all.length - 1], id: all[0].id, args: { ...all[all.length - 1].args, waits: all.length } });
+        finished.push({
+          ...all[all.length - 1],
+          id: all[0].id,
+          args: { ...all[all.length - 1].args, waits: all.length },
+        });
       }
       debug("rollout-total", { thread: thread ? thread.slice(0, 8) : null, scans, agents, held: held.size, errors });
       return finished;

@@ -9,13 +9,35 @@ const FP = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 /** A tiny stand-in for the Rust server state machine. */
 function fakeServer(initial: Partial<MobileStatus> = {}, devices: MobileDevice[] = []) {
-  let s: MobileStatus = { enabled: false, running: false, host: null, port: null, savedPort: 0, fingerprint: null, protocol: 1, devices: devices.length, pairing: null, error: null, ...initial };
+  let s: MobileStatus = {
+    enabled: false,
+    running: false,
+    host: null,
+    port: null,
+    savedPort: 0,
+    fingerprint: null,
+    protocol: 1,
+    devices: devices.length,
+    pairing: null,
+    error: null,
+    ...initial,
+  };
   let list = devices;
   mockInvoke({
     mobile_server_status: () => s,
     mobile_devices: () => list,
-    mobile_server_start: (a: { port: number | null }) => (s = { ...s, enabled: true, running: true, host: "192.168.1.20", port: a.port || 51234, savedPort: a.port || 51234, fingerprint: FP }),
-    mobile_server_stop: () => (s = { ...s, enabled: false, running: false, host: null, port: null, fingerprint: null, pairing: null }),
+    mobile_server_start: (a: { port: number | null }) =>
+      (s = {
+        ...s,
+        enabled: true,
+        running: true,
+        host: "192.168.1.20",
+        port: a.port || 51234,
+        savedPort: a.port || 51234,
+        fingerprint: FP,
+      }),
+    mobile_server_stop: () =>
+      (s = { ...s, enabled: false, running: false, host: null, port: null, fingerprint: null, pairing: null }),
     mobile_pairing_start: () => (s = { ...s, pairing: { code: "K7Q2X9PM", expiresAt: Date.now() + 120_000 } }),
     mobile_pairing_cancel: () => (s = { ...s, pairing: null }),
     mobile_device_revoke: (a: { id: string }) => {
@@ -25,7 +47,13 @@ function fakeServer(initial: Partial<MobileStatus> = {}, devices: MobileDevice[]
   });
 }
 
-const device = (over: Partial<MobileDevice> = {}): MobileDevice => ({ id: "d1", name: "Pixel 9", createdAt: 1_700_000_000_000, lastSeenAt: null, ...over });
+const device = (over: Partial<MobileDevice> = {}): MobileDevice => ({
+  id: "d1",
+  name: "Pixel 9",
+  createdAt: 1_700_000_000_000,
+  lastSeenAt: null,
+  ...over,
+});
 
 describe("MobileSettings", () => {
   it("is off by default, warns about the LAN, and the switch starts and stops the server", async () => {
@@ -41,7 +69,9 @@ describe("MobileSettings", () => {
     await waitFor(() => expect(sw).toHaveAttribute("aria-checked", "true"));
     expect(callsOf("mobile_server_start")).toEqual([{ port: null }]);
     expect(await screen.findByText("Listening on 192.168.1.20:51234 (local network only)")).toBeInTheDocument();
-    expect(screen.getByText("a1b2 c3d4 e5f6 0718 293a 4b5c 6d7e 8f90 a1b2 c3d4 e5f6 0718 293a 4b5c 6d7e 8f90")).toBeInTheDocument();
+    expect(
+      screen.getByText("a1b2 c3d4 e5f6 0718 293a 4b5c 6d7e 8f90 a1b2 c3d4 e5f6 0718 293a 4b5c 6d7e 8f90"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pair a phone" })).toBeInTheDocument();
 
     fireEvent.click(sw);
@@ -79,7 +109,14 @@ describe("MobileSettings", () => {
   });
 
   it("an expired code is not shown", async () => {
-    fakeServer({ running: true, enabled: true, host: "192.168.1.20", port: 51234, fingerprint: FP, pairing: { code: "K7Q2X9PM", expiresAt: Date.now() - 1000 } });
+    fakeServer({
+      running: true,
+      enabled: true,
+      host: "192.168.1.20",
+      port: 51234,
+      fingerprint: FP,
+      pairing: { code: "K7Q2X9PM", expiresAt: Date.now() - 1000 },
+    });
     renderApp(<MobileSettings />);
     expect(await screen.findByText("The code expired. Show a new one to pair.")).toBeInTheDocument();
     expect(screen.queryByTestId("pair-code")).not.toBeInTheDocument();
@@ -100,7 +137,10 @@ describe("MobileSettings", () => {
 
   it("shows the empty state and a start error", async () => {
     fakeServer();
-    mockInvoke({ mobile_server_start: () => Promise.reject("no private LAN address found; connect to a Wi-Fi or Ethernet network first") });
+    mockInvoke({
+      mobile_server_start: () =>
+        Promise.reject("no private LAN address found; connect to a Wi-Fi or Ethernet network first"),
+    });
     renderApp(<MobileSettings />);
     expect(await screen.findByText("No phone is paired.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("switch", { name: "Mobile companion server" }));

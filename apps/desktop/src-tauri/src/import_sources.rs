@@ -75,11 +75,24 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
 /// Parses `2026-01-05T09:00:00(.123)(Z|±hh:mm)` into milliseconds since the epoch.
 pub fn parse_iso_ms(s: &str) -> Option<i64> {
     let b = s.as_bytes();
-    if b.len() < 19 || b[4] != b'-' || b[7] != b'-' || !(b[10] == b'T' || b[10] == b' ') || b[13] != b':' || b[16] != b':' {
+    if b.len() < 19
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || !(b[10] == b'T' || b[10] == b' ')
+        || b[13] != b':'
+        || b[16] != b':'
+    {
         return None;
     }
     let n = |a: usize, z: usize| s.get(a..z)?.parse::<i64>().ok();
-    let (y, mo, d, h, mi, se) = (n(0, 4)?, n(5, 7)?, n(8, 10)?, n(11, 13)?, n(14, 16)?, n(17, 19)?);
+    let (y, mo, d, h, mi, se) = (
+        n(0, 4)?,
+        n(5, 7)?,
+        n(8, 10)?,
+        n(11, 13)?,
+        n(14, 16)?,
+        n(17, 19)?,
+    );
     if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || se > 60 {
         return None;
     }
@@ -100,9 +113,16 @@ pub fn parse_iso_ms(s: &str) -> Option<i64> {
     }
     let offset = match rest {
         "" | "Z" | "z" => 0,
-        o if o.len() == 6 && (o.starts_with('+') || o.starts_with('-')) && o.as_bytes()[3] == b':' => {
+        o if o.len() == 6
+            && (o.starts_with('+') || o.starts_with('-'))
+            && o.as_bytes()[3] == b':' =>
+        {
             let v = o[1..3].parse::<i64>().ok()? * 60 + o[4..6].parse::<i64>().ok()?;
-            if o.starts_with('-') { -v } else { v }
+            if o.starts_with('-') {
+                -v
+            } else {
+                v
+            }
         }
         _ => return None,
     };
@@ -111,7 +131,10 @@ pub fn parse_iso_ms(s: &str) -> Option<i64> {
 
 fn file_times(path: &Path) -> (i64, i64) {
     let ms = |t: io::Result<std::time::SystemTime>| {
-        t.ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0)
+        t.ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0)
     };
     match std::fs::metadata(path) {
         Ok(m) => (ms(m.created()), ms(m.modified())),
@@ -124,7 +147,12 @@ fn file_times(path: &Path) -> (i64, i64) {
 
 /// Reads one line without ever holding more than `max` bytes. Returns `Ok(None)` at EOF, otherwise the number of bytes
 /// consumed; `buf` is cleared if the line was longer than `max` (the rest of it is discarded) and `over` is set.
-fn read_line_bounded<R: BufRead>(r: &mut R, buf: &mut Vec<u8>, max: usize, over: &mut bool) -> io::Result<Option<u64>> {
+fn read_line_bounded<R: BufRead>(
+    r: &mut R,
+    buf: &mut Vec<u8>,
+    max: usize,
+    over: &mut bool,
+) -> io::Result<Option<u64>> {
     buf.clear();
     *over = false;
     let mut consumed = 0u64;
@@ -167,7 +195,9 @@ fn clip(s: &str, max: usize) -> String {
 }
 
 fn has_jsonl_ext(p: &Path) -> bool {
-    p.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("jsonl"))
+    p.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("jsonl"))
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -177,8 +207,16 @@ fn text_of_blocks(content: &Value) -> Option<String> {
     match content {
         Value::String(s) => Some(s.clone()),
         Value::Array(a) => {
-            let t: Vec<&str> = a.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str()).collect();
-            if t.is_empty() { None } else { Some(t.join("\n")) }
+            let t: Vec<&str> = a
+                .iter()
+                .filter(|b| b["type"] == "text")
+                .filter_map(|b| b["text"].as_str())
+                .collect();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.join("\n"))
+            }
         }
         _ => None,
     }
@@ -187,9 +225,15 @@ fn text_of_blocks(content: &Value) -> Option<String> {
 /// Wrappers Claude Code stores as user lines that are not something the user typed.
 fn claude_noise(text: &str) -> bool {
     let t = text.trim_start();
-    ["<local-command-", "<command-", "<system-reminder>", "Caveat: The messages below", "[Request interrupted"]
-        .iter()
-        .any(|p| t.starts_with(p))
+    [
+        "<local-command-",
+        "<command-",
+        "<system-reminder>",
+        "Caveat: The messages below",
+        "[Request interrupted",
+    ]
+    .iter()
+    .any(|p| t.starts_with(p))
 }
 
 pub fn scan_claude_file(path: &Path) -> Option<SourceSession> {
@@ -199,17 +243,38 @@ pub fn scan_claude_file(path: &Path) -> Option<SourceSession> {
     let mut r = BufReader::with_capacity(64 * 1024, file.take(MAX_SCAN_BYTES));
     let (mut buf, mut over) = (Vec::new(), false);
     let (mut count, mut first_ts, mut last_ts) = (0i64, 0i64, 0i64);
-    let (mut id, mut cwd, mut custom, mut summary, mut first_user) = (stem, None::<String>, None::<String>, None::<String>, None::<String>);
+    let (mut id, mut cwd, mut custom, mut summary, mut first_user) = (
+        stem,
+        None::<String>,
+        None::<String>,
+        None::<String>,
+        None::<String>,
+    );
     while let Ok(Some(_)) = read_line_bounded(&mut r, &mut buf, MAX_LINE, &mut over) {
         if over || buf.is_empty() {
             continue;
         }
-        let Ok(v) = serde_json::from_slice::<Value>(&buf) else { continue };
+        let Ok(v) = serde_json::from_slice::<Value>(&buf) else {
+            continue;
+        };
         match v["type"].as_str() {
-            Some("custom-title") => custom = v["customTitle"].as_str().map(|s| clip(s, MAX_TITLE_CHARS)).filter(|s| !s.is_empty()),
-            Some("summary") => summary = summary.or_else(|| v["summary"].as_str().map(|s| clip(s, MAX_TITLE_CHARS)).filter(|s| !s.is_empty())),
+            Some("custom-title") => {
+                custom = v["customTitle"]
+                    .as_str()
+                    .map(|s| clip(s, MAX_TITLE_CHARS))
+                    .filter(|s| !s.is_empty())
+            }
+            Some("summary") => {
+                summary = summary.or_else(|| {
+                    v["summary"]
+                        .as_str()
+                        .map(|s| clip(s, MAX_TITLE_CHARS))
+                        .filter(|s| !s.is_empty())
+                })
+            }
             Some(kind @ ("user" | "assistant")) => {
-                if v["isSidechain"] == true || v["isMeta"] == true || v["isCompactSummary"] == true {
+                if v["isSidechain"] == true || v["isMeta"] == true || v["isCompactSummary"] == true
+                {
                     continue;
                 }
                 if let Some(s) = v["sessionId"].as_str() {
@@ -218,10 +283,14 @@ pub fn scan_claude_file(path: &Path) -> Option<SourceSession> {
                     }
                 }
                 if cwd.is_none() {
-                    cwd = v["cwd"].as_str().filter(|s| !s.is_empty()).map(String::from);
+                    cwd = v["cwd"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(String::from);
                 }
                 let ts = v["timestamp"].as_str().and_then(parse_iso_ms).unwrap_or(0);
-                let text = text_of_blocks(&v["message"]["content"]).filter(|t| !t.trim().is_empty());
+                let text =
+                    text_of_blocks(&v["message"]["content"]).filter(|t| !t.trim().is_empty());
                 let real = match (&text, kind) {
                     (Some(t), "user") => !claude_noise(t),
                     (Some(_), _) => true,
@@ -262,18 +331,25 @@ pub fn scan_claude_file(path: &Path) -> Option<SourceSession> {
 
 pub fn scan_claude(root: &Path) -> Vec<SourceSession> {
     let mut out = Vec::new();
-    let Ok(dirs) = std::fs::read_dir(root) else { return out };
+    let Ok(dirs) = std::fs::read_dir(root) else {
+        return out;
+    };
     for dir in dirs.flatten().take(MAX_DIRS) {
         let Ok(ft) = dir.file_type() else { continue };
         if !ft.is_dir() {
             continue;
         }
-        let Ok(files) = std::fs::read_dir(dir.path()) else { continue };
+        let Ok(files) = std::fs::read_dir(dir.path()) else {
+            continue;
+        };
         for f in files.flatten() {
             let p = f.path();
             let name = f.file_name().to_string_lossy().to_string();
             // Sub-agent transcripts (agent-*.jsonl) belong to a parent session; symlinks are never followed.
-            if !f.file_type().is_ok_and(|t| t.is_file()) || !has_jsonl_ext(&p) || name.starts_with("agent-") {
+            if !f.file_type().is_ok_and(|t| t.is_file())
+                || !has_jsonl_ext(&p)
+                || name.starts_with("agent-")
+            {
                 continue;
             }
             if let Some(s) = scan_claude_file(&p) {
@@ -288,7 +364,11 @@ pub fn scan_claude(root: &Path) -> Vec<SourceSession> {
 }
 
 fn finish(mut v: Vec<SourceSession>) -> Vec<SourceSession> {
-    v.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.id.cmp(&b.id)));
+    v.sort_by(|a, b| {
+        b.updated_at
+            .cmp(&a.updated_at)
+            .then_with(|| a.id.cmp(&b.id))
+    });
     v.truncate(MAX_SESSIONS);
     v
 }
@@ -299,8 +379,15 @@ fn finish(mut v: Vec<SourceSession>) -> Vec<SourceSession> {
 fn codex_noise(text: &str) -> bool {
     let t = text.trim_start();
     [
-        "<environment_context>", "<user_instructions>", "<permissions", "<collaboration_mode>", "<dynamic_tools>",
-        "<recommended_plugins>", "<turn_aborted>", "# AGENTS.md instructions", "<INSTRUCTIONS>",
+        "<environment_context>",
+        "<user_instructions>",
+        "<permissions",
+        "<collaboration_mode>",
+        "<dynamic_tools>",
+        "<recommended_plugins>",
+        "<turn_aborted>",
+        "# AGENTS.md instructions",
+        "<INSTRUCTIONS>",
     ]
     .iter()
     .any(|p| t.starts_with(p))
@@ -317,7 +404,9 @@ pub fn scan_codex_file(path: &Path) -> Option<SourceSession> {
         if over || buf.is_empty() {
             continue;
         }
-        let Ok(v) = serde_json::from_slice::<Value>(&buf) else { continue };
+        let Ok(v) = serde_json::from_slice::<Value>(&buf) else {
+            continue;
+        };
         lines += 1;
         let ts = v["timestamp"].as_str().and_then(parse_iso_ms).unwrap_or(0);
         if ts > 0 {
@@ -326,14 +415,23 @@ pub fn scan_codex_file(path: &Path) -> Option<SourceSession> {
             }
             last_ts = last_ts.max(ts);
         }
-        let meta = if v["type"] == "session_meta" { &v["payload"] } else if lines == 1 && v["type"].is_null() { &v } else { &Value::Null };
+        let meta = if v["type"] == "session_meta" {
+            &v["payload"]
+        } else if lines == 1 && v["type"].is_null() {
+            &v
+        } else {
+            &Value::Null
+        };
         if !meta.is_null() && id.is_none() {
             // Sub-agent threads (source is an object, or a parent thread is named) belong to their parent session.
             if meta["source"].is_object() || meta["parent_thread_id"].is_string() {
                 return None;
             }
             id = meta["id"].as_str().map(String::from);
-            cwd = meta["cwd"].as_str().filter(|s| !s.is_empty()).map(String::from);
+            cwd = meta["cwd"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(String::from);
             if let Some(t) = meta["timestamp"].as_str().and_then(parse_iso_ms) {
                 first_ts = t;
             }
@@ -352,7 +450,12 @@ pub fn scan_codex_file(path: &Path) -> Option<SourceSession> {
             }
             let text = item["content"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|b| b["text"].as_str()).collect::<Vec<_>>().join("\n"))
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|b| b["text"].as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                })
                 .filter(|t| !t.trim().is_empty());
             let Some(text) = text else { continue };
             if role == "user" && codex_noise(&text) {
@@ -386,13 +489,18 @@ fn collect_rollouts(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
     if depth > 5 || out.len() >= MAX_SESSIONS * 4 {
         return;
     }
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let Ok(ft) = e.file_type() else { continue };
         let p = e.path();
         if ft.is_dir() {
             collect_rollouts(&p, depth + 1, out);
-        } else if ft.is_file() && has_jsonl_ext(&p) && e.file_name().to_string_lossy().starts_with("rollout-") {
+        } else if ft.is_file()
+            && has_jsonl_ext(&p)
+            && e.file_name().to_string_lossy().starts_with("rollout-")
+        {
             out.push(p);
         }
     }
@@ -409,7 +517,9 @@ pub fn scan_codex(root: &Path) -> Vec<SourceSession> {
 
 /// Reads a session file that lives under `root`, at most `MAX_READ_BYTES`, cut at a line boundary.
 pub fn read_session(root: &Path, path: &Path) -> Result<SessionText, String> {
-    let root = root.canonicalize().map_err(|_| "history folder not found".to_string())?;
+    let root = root
+        .canonicalize()
+        .map_err(|_| "history folder not found".to_string())?;
     let real = path.canonicalize().map_err(|e| e.to_string())?;
     if !real.starts_with(&root) || !has_jsonl_ext(&real) {
         return Err("not a session file".into());
@@ -419,7 +529,9 @@ pub fn read_session(root: &Path, path: &Path) -> Result<SessionText, String> {
         return Err("not a session file".into());
     }
     let mut bytes = Vec::new();
-    file.take(MAX_READ_BYTES + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    file.take(MAX_READ_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
     let truncated = bytes.len() as u64 > MAX_READ_BYTES;
     if truncated {
         bytes.truncate(MAX_READ_BYTES as usize);
@@ -427,7 +539,10 @@ pub fn read_session(root: &Path, path: &Path) -> Result<SessionText, String> {
             bytes.truncate(i + 1);
         }
     }
-    Ok(SessionText { text: String::from_utf8_lossy(&bytes).into_owned(), truncated })
+    Ok(SessionText {
+        text: String::from_utf8_lossy(&bytes).into_owned(),
+        truncated,
+    })
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -509,13 +624,19 @@ fn open_export(path: &Path) -> Result<BufReader<File>, String> {
     }
     let mut r = BufReader::with_capacity(256 * 1024, File::open(path).map_err(|e| e.to_string())?);
     // Skip a UTF-8 byte order mark.
-    if r.fill_buf().map_err(|e| e.to_string())?.starts_with(&[0xEF, 0xBB, 0xBF]) {
+    if r.fill_buf()
+        .map_err(|e| e.to_string())?
+        .starts_with(&[0xEF, 0xBB, 0xBF])
+    {
         r.consume(3);
     }
     Ok(r)
 }
 
-fn each_conversation(path: &Path, mut f: impl FnMut(Box<RawValue>) -> Result<bool, String>) -> Result<(), String> {
+fn each_conversation(
+    path: &Path,
+    mut f: impl FnMut(Box<RawValue>) -> Result<bool, String>,
+) -> Result<(), String> {
     let stopped = std::cell::Cell::new(false);
     let mut seen = 0usize;
     let mut de = serde_json::Deserializer::from_reader(open_export(path)?);
@@ -574,8 +695,16 @@ pub fn read_chatgpt(path: &Path, ids: &[String]) -> Result<ConversationBatch, St
             id: Option<String>,
             conversation_id: Option<String>,
         }
-        let Ok(Ids { id, conversation_id }) = serde_json::from_str::<Ids>(raw.get()) else { return Ok(true) };
-        let Some(id) = id.or(conversation_id) else { return Ok(true) };
+        let Ok(Ids {
+            id,
+            conversation_id,
+        }) = serde_json::from_str::<Ids>(raw.get())
+        else {
+            return Ok(true);
+        };
+        let Some(id) = id.or(conversation_id) else {
+            return Ok(true);
+        };
         if !want.remove(id.as_str()) {
             return Ok(true);
         }
@@ -600,13 +729,20 @@ fn home() -> PathBuf {
 
 /// `CLAUDE_CONFIG_DIR` wins; else `~/.claude/projects` (also `%USERPROFILE%\.claude` on Windows); on Linux the
 /// XDG location `$XDG_CONFIG_HOME/claude/projects` is used when only that one exists.
-fn claude_root_in(home: &Path, config_dir_env: Option<PathBuf>, xdg_config: Option<PathBuf>) -> PathBuf {
+fn claude_root_in(
+    home: &Path,
+    config_dir_env: Option<PathBuf>,
+    xdg_config: Option<PathBuf>,
+) -> PathBuf {
     if let Some(d) = config_dir_env {
         return d.join("projects");
     }
     let default = home.join(".claude").join("projects");
     if !default.is_dir() {
-        if let Some(x) = xdg_config.map(|c| c.join("claude").join("projects")).filter(|p| p.is_dir()) {
+        if let Some(x) = xdg_config
+            .map(|c| c.join("claude").join("projects"))
+            .filter(|p| p.is_dir())
+        {
             return x;
         }
     }
@@ -614,7 +750,9 @@ fn claude_root_in(home: &Path, config_dir_env: Option<PathBuf>, xdg_config: Opti
 }
 
 fn claude_root() -> PathBuf {
-    let env = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|v| !v.is_empty()).map(PathBuf::from);
+    let env = std::env::var_os("CLAUDE_CONFIG_DIR")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from);
     claude_root_in(&home(), env, dirs::config_dir())
 }
 
@@ -633,15 +771,26 @@ fn root_for(source: &str) -> Result<PathBuf, String> {
     }
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Lists sessions of `source` ("claude" or "codex") found in its history folder.
 #[tauri::command]
 pub async fn import_scan(source: String) -> Result<Vec<SourceSession>, String> {
     let root = root_for(&source)?;
-    blocking(move || Ok(if source == "claude" { scan_claude(&root) } else { scan_codex(&root) })).await
+    blocking(move || {
+        Ok(if source == "claude" {
+            scan_claude(&root)
+        } else {
+            scan_codex(&root)
+        })
+    })
+    .await
 }
 
 /// Raw text of one session file of `source`; the path must be inside that source's history folder.
@@ -659,7 +808,10 @@ pub async fn import_chatgpt_scan(path: String) -> Result<Vec<SourceSession>, Str
 
 /// Raw JSON of selected conversations of a ChatGPT export file the user picked.
 #[tauri::command]
-pub async fn import_chatgpt_read(path: String, ids: Vec<String>) -> Result<ConversationBatch, String> {
+pub async fn import_chatgpt_read(
+    path: String,
+    ids: Vec<String>,
+) -> Result<ConversationBatch, String> {
     blocking(move || read_chatgpt(Path::new(&path), &ids)).await
 }
 
@@ -679,25 +831,46 @@ mod tests {
         let xdg = tempfile::tempdir().unwrap();
         let default = home.path().join(".claude").join("projects");
         // Nothing exists: the default location.
-        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), default);
+        assert_eq!(
+            claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())),
+            default
+        );
         // Only the XDG location exists.
         let x = xdg.path().join("claude").join("projects");
         fs::create_dir_all(&x).unwrap();
-        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), x);
+        assert_eq!(
+            claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())),
+            x
+        );
         // The default wins when both exist.
         fs::create_dir_all(&default).unwrap();
-        assert_eq!(claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())), default);
+        assert_eq!(
+            claude_root_in(home.path(), None, Some(xdg.path().to_path_buf())),
+            default
+        );
         // An explicit CLAUDE_CONFIG_DIR wins over everything.
         let explicit = PathBuf::from("custom");
-        assert_eq!(claude_root_in(home.path(), Some(explicit.clone()), None), explicit.join("projects"));
+        assert_eq!(
+            claude_root_in(home.path(), Some(explicit.clone()), None),
+            explicit.join("projects")
+        );
     }
 
     #[test]
     fn iso_times() {
         assert_eq!(parse_iso_ms("1970-01-01T00:00:00Z"), Some(0));
-        assert_eq!(parse_iso_ms("2026-01-05T09:00:00.250Z"), Some(1_767_603_600_250));
-        assert_eq!(parse_iso_ms("2026-01-05T11:00:00+02:00"), Some(1_767_603_600_000));
-        assert_eq!(parse_iso_ms("2026-01-05T09:00:00.1Z"), Some(1_767_603_600_100));
+        assert_eq!(
+            parse_iso_ms("2026-01-05T09:00:00.250Z"),
+            Some(1_767_603_600_250)
+        );
+        assert_eq!(
+            parse_iso_ms("2026-01-05T11:00:00+02:00"),
+            Some(1_767_603_600_000)
+        );
+        assert_eq!(
+            parse_iso_ms("2026-01-05T09:00:00.1Z"),
+            Some(1_767_603_600_100)
+        );
         assert_eq!(parse_iso_ms("nonsense"), None);
         assert_eq!(parse_iso_ms("2026-13-05T09:00:00Z"), None);
     }
@@ -705,17 +878,25 @@ mod tests {
     #[test]
     fn bounded_lines_skip_huge_ones() {
         let mut data = b"short\n".to_vec();
-        data.extend(std::iter::repeat(b'x').take(100));
+        data.extend(std::iter::repeat_n(b'x', 100));
         data.extend(b"\nlast");
         let mut r = BufReader::with_capacity(8, &data[..]);
         let (mut buf, mut over) = (Vec::new(), false);
-        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over).unwrap().is_some());
+        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over)
+            .unwrap()
+            .is_some());
         assert_eq!((buf.as_slice(), over), (&b"short"[..], false));
-        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over).unwrap().is_some());
+        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over)
+            .unwrap()
+            .is_some());
         assert!(over && buf.is_empty());
-        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over).unwrap().is_some());
+        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over)
+            .unwrap()
+            .is_some());
         assert_eq!((buf.as_slice(), over), (&b"last"[..], false));
-        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over).unwrap().is_none());
+        assert!(read_line_bounded(&mut r, &mut buf, 20, &mut over)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -735,8 +916,14 @@ mod tests {
                 r#"{"type":"user","timestamp":"2026-01-05T09:01:00.000Z","message":{"role":"user","content":"<command-name>/clear</command-name>"}}"#,
             ],
         );
-        write(&root.join("-tmp-demo/agent-abc.jsonl"), &[r#"{"type":"user","message":{"role":"user","content":"x"}}"#]);
-        write(&root.join("-tmp-demo/empty.jsonl"), &[r#"{"type":"summary","summary":"only a summary"}"#]);
+        write(
+            &root.join("-tmp-demo/agent-abc.jsonl"),
+            &[r#"{"type":"user","message":{"role":"user","content":"x"}}"#],
+        );
+        write(
+            &root.join("-tmp-demo/empty.jsonl"),
+            &[r#"{"type":"summary","summary":"only a summary"}"#],
+        );
         write(&root.join("-tmp-demo/notes.txt"), &["hello"]);
         write(
             &root.join("-tmp-other/s2.jsonl"),
@@ -751,7 +938,10 @@ mod tests {
         assert_eq!(found[0].title, "Named session");
         assert_eq!(found[0].project_path.as_deref(), Some("/tmp/other"));
         let s1 = &found[1];
-        assert_eq!((s1.id.as_str(), s1.title.as_str(), s1.message_count), ("sess-1", "Fix the build", 2));
+        assert_eq!(
+            (s1.id.as_str(), s1.title.as_str(), s1.message_count),
+            ("sess-1", "Fix the build", 2)
+        );
         assert_eq!(s1.project_path.as_deref(), Some("/tmp/demo"));
         assert_eq!(s1.created_at, 1_767_603_600_000);
         assert_eq!(s1.updated_at, 1_767_603_600_000 + 60_000);
@@ -763,9 +953,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("p/s.jsonl");
         fs::create_dir_all(p.parent().unwrap()).unwrap();
-        let mut body = String::from(r#"{"type":"user","cwd":"/a","timestamp":"2026-01-05T09:00:00Z","message":{"role":"user","content":"first"}}"#);
+        let mut body = String::from(
+            r#"{"type":"user","cwd":"/a","timestamp":"2026-01-05T09:00:00Z","message":{"role":"user","content":"first"}}"#,
+        );
         body.push('\n');
-        body.push_str(&format!(r#"{{"type":"user","message":{{"role":"user","content":"{}"}}}}"#, "y".repeat(MAX_LINE + 10)));
+        body.push_str(&format!(
+            r#"{{"type":"user","message":{{"role":"user","content":"{}"}}}}"#,
+            "y".repeat(MAX_LINE + 10)
+        ));
         body.push('\n');
         body.push_str(r#"{"type":"assistant","timestamp":"2026-01-05T09:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}"#);
         fs::write(&p, body).unwrap();
@@ -791,24 +986,41 @@ mod tests {
         );
         write(
             &root.join("2026/01/05/rollout-sub.jsonl"),
-            &[r#"{"timestamp":"2026-01-05T09:00:00.000Z","type":"session_meta","payload":{"id":"sub","cwd":"/x","source":{"subagent":{"other":"guardian"}}}}"#,
-              r#"{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}}"#],
+            &[
+                r#"{"timestamp":"2026-01-05T09:00:00.000Z","type":"session_meta","payload":{"id":"sub","cwd":"/x","source":{"subagent":{"other":"guardian"}}}}"#,
+                r#"{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}}"#,
+            ],
         );
-        write(&root.join("2026/01/05/other.jsonl"), &[r#"{"type":"session_meta","payload":{"id":"zzz"}}"#]);
+        write(
+            &root.join("2026/01/05/other.jsonl"),
+            &[r#"{"type":"session_meta","payload":{"id":"zzz"}}"#],
+        );
         // Older format: the first line carries the id, with no type.
         write(
             &root.join("2025/rollout-legacy.jsonl"),
-            &[r#"{"id":"legacy-1","timestamp":"2025-05-01T10:00:00.000Z","instructions":"x"}"#,
-              r#"{"type":"message","role":"user","content":[{"type":"input_text","text":"old"}]}"#],
+            &[
+                r#"{"id":"legacy-1","timestamp":"2025-05-01T10:00:00.000Z","instructions":"x"}"#,
+                r#"{"type":"message","role":"user","content":[{"type":"input_text","text":"old"}]}"#,
+            ],
         );
         let found = scan_codex(&root);
         // The sub-agent thread and the file without a rollout- name are left out.
         assert_eq!(found.len(), 2, "{found:?}");
         let s = &found[0];
-        assert_eq!((s.id.as_str(), s.title.as_str(), s.message_count), ("codex-1", "Add a test", 2));
+        assert_eq!(
+            (s.id.as_str(), s.title.as_str(), s.message_count),
+            ("codex-1", "Add a test", 2)
+        );
         assert_eq!(s.project_path.as_deref(), Some("/tmp/work"));
         assert_eq!(s.updated_at, 1_767_603_600_000 + 5000);
-        assert_eq!((found[1].id.as_str(), found[1].title.as_str(), found[1].message_count), ("legacy-1", "old", 1));
+        assert_eq!(
+            (
+                found[1].id.as_str(),
+                found[1].title.as_str(),
+                found[1].message_count
+            ),
+            ("legacy-1", "old", 1)
+        );
     }
 
     #[test]
@@ -818,14 +1030,18 @@ mod tests {
         write(&root.join("a/s.jsonl"), &["{}"]);
         write(&dir.path().join("outside.jsonl"), &["{}"]);
         write(&root.join("a/notes.txt"), &["x"]);
-        assert_eq!(read_session(&root, &root.join("a/s.jsonl")).unwrap().text, "{}\n");
+        assert_eq!(
+            read_session(&root, &root.join("a/s.jsonl")).unwrap().text,
+            "{}\n"
+        );
         assert!(read_session(&root, &dir.path().join("outside.jsonl")).is_err());
         assert!(read_session(&root, &root.join("a/../../outside.jsonl")).is_err());
         assert!(read_session(&root, &root.join("a/notes.txt")).is_err());
         assert!(read_session(&root, &root.join("missing.jsonl")).is_err());
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(dir.path().join("outside.jsonl"), root.join("a/link.jsonl")).unwrap();
+            std::os::unix::fs::symlink(dir.path().join("outside.jsonl"), root.join("a/link.jsonl"))
+                .unwrap();
             assert!(read_session(&root, &root.join("a/link.jsonl")).is_err());
         }
     }
@@ -852,9 +1068,20 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = export_file(dir.path());
         let found = scan_chatgpt(&p).unwrap();
-        assert_eq!(found.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["c2", "c1"]);
+        assert_eq!(
+            found.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+            ["c2", "c1"]
+        );
         let c1 = found.iter().find(|s| s.id == "c1").unwrap();
-        assert_eq!((c1.title.as_str(), c1.message_count, c1.created_at, c1.updated_at), ("First chat", 1, 1_767_603_600_500, 1_767_603_700_000));
+        assert_eq!(
+            (
+                c1.title.as_str(),
+                c1.message_count,
+                c1.created_at,
+                c1.updated_at
+            ),
+            ("First chat", 1, 1_767_603_600_500, 1_767_603_700_000)
+        );
         let batch = read_chatgpt(&p, &["c2".to_string(), "nope".to_string()]).unwrap();
         assert_eq!(batch.conversations.len(), 1);
         assert!(batch.conversations[0].contains("\"conversation_id\":\"c2\""));

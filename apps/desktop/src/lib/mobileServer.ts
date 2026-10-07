@@ -30,5 +30,6 @@ export const mobileServer = {
   devices: () => invoke<MobileDevice[]>("mobile_devices"),
   revoke: (id: string) => invoke<boolean>("mobile_device_revoke", { id }),
   /** The webview owns run state; the server only learns it from this report (replaces the previous one). */
-  reportStatus: (statuses: { chatId: number; status: MobileChatStatus }[]) => invoke<void>("mobile_report_status", { statuses }),
+  reportStatus: (statuses: { chatId: number; status: MobileChatStatus }[]) =>
+    invoke<void>("mobile_report_status", { statuses }),
 };

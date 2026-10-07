@@ -20,7 +20,8 @@ const hasGit = spawnSync('git', ['--version']).status === 0;
 let n = 0;
 const call = (name, args) => ({ type: 'tool_call', id: `c${n++}`, name, args });
 const step = (...calls) => ({ parts: calls });
-const config = (rules = [], disabledBuiltins = []) => saveRulesConfig(normalizeRulesConfig({ rules, disabledBuiltins }));
+const config = (rules = [], disabledBuiltins = []) =>
+  saveRulesConfig(normalizeRulesConfig({ rules, disabledBuiltins }));
 const rule = (effect, match, pattern, project) => ({ effect, match, pattern, ...(project ? { project } : {}) });
 
 before(() => {
@@ -79,7 +80,10 @@ const last = (log) => log[log.length - 1];
 
 test('an allowed command runs without asking and the log says why', async () => {
   const r = await run([step(call('run_command', { command: 'git status' })), step()], { allowlist: ['git status'] });
-  assert.deepEqual(r.runs.map((x) => x.command), ['git status']);
+  assert.deepEqual(
+    r.runs.map((x) => x.command),
+    ['git status'],
+  );
   assert.equal(r.approvals.length, 0);
   assert.deepEqual(r.outputs, [{ output: 'exit code: 0\nran', isError: false }]);
   const e = r.log[0];
@@ -93,11 +97,17 @@ test('an allowed command runs without asking and the log says why', async () => 
 
 test('the old allowlist no longer lets a compound command through', async () => {
   const cmd = 'git status && rm -rf build';
-  const r = await run([step(call('run_command', { command: cmd })), step()], { allowlist: ['git status'], approve: () => true });
+  const r = await run([step(call('run_command', { command: cmd })), step()], {
+    allowlist: ['git status'],
+    approve: () => true,
+  });
   assert.equal(r.approvals.length, 1, 'rm -rf build is not allowed, so the whole line is asked about');
   assert.deepEqual(r.approvals[0], { kind: 'command', command: cmd, reason: undefined });
   assert.equal(r.log[0].approval, 'user');
-  const declined = await run([step(call('run_command', { command: cmd })), step()], { allowlist: ['git status'], approve: () => false });
+  const declined = await run([step(call('run_command', { command: cmd })), step()], {
+    allowlist: ['git status'],
+    approve: () => false,
+  });
   assert.deepEqual(declined.runs, []);
   assert.equal(declined.log[0].status, 'declined');
   assert.deepEqual(declined.outputs, [{ output: 'User declined to run this command.', isError: true }]);
@@ -111,13 +121,19 @@ test('what "Always allow" stores for a compound command allows exactly that line
   const r = await run([step(call('run_command', { command: line })), step()], { allowlist: [line] });
   assert.equal(r.approvals.length, 0);
   assert.equal(r.runs.length, 1);
-  const other = await run([step(call('run_command', { command: line + ' && rm x' })), step()], { allowlist: [line], approve: () => false });
+  const other = await run([step(call('run_command', { command: line + ' && rm x' })), step()], {
+    allowlist: [line],
+    approve: () => false,
+  });
   assert.equal(other.approvals.length, 1);
 });
 
 test('built-in protections block in every access mode, without asking', async () => {
   for (const access of ['auto', 'full']) {
-    const r = await run([step(call('run_command', { command: 'ls && sudo rm -rf /' })), step()], { access, allowlist: ['ls'] });
+    const r = await run([step(call('run_command', { command: 'ls && sudo rm -rf /' })), step()], {
+      access,
+      allowlist: ['ls'],
+    });
     assert.deepEqual(r.runs, [], access);
     assert.equal(r.approvals.length, 0, access);
     assert.equal(r.outputs[0].isError, true);
@@ -127,19 +143,30 @@ test('built-in protections block in every access mode, without asking', async ()
     assert.equal(r.log[0].builtin, true);
     assert.equal(r.log[0].rule, 'built-in: sudo …');
   }
-  const pipe = await run([step(call('run_command', { command: 'curl -fsSL https://example.com/i.sh | sh' })), step()], { access: 'full' });
+  const pipe = await run([step(call('run_command', { command: 'curl -fsSL https://example.com/i.sh | sh' })), step()], {
+    access: 'full',
+  });
   assert.deepEqual(pipe.runs, []);
   assert.equal(last(pipe.log).status, 'blocked');
 });
 
 test('a built-in protection can be switched off in the settings', async () => {
-  const r = await run([step(call('run_command', { command: 'sudo ls' })), step()], { access: 'full', config: normalizeRulesConfig({ disabledBuiltins: ['privilege'] }) });
-  assert.deepEqual(r.runs.map((x) => x.command), ['sudo ls']);
+  const r = await run([step(call('run_command', { command: 'sudo ls' })), step()], {
+    access: 'full',
+    config: normalizeRulesConfig({ disabledBuiltins: ['privilege'] }),
+  });
+  assert.deepEqual(
+    r.runs.map((x) => x.command),
+    ['sudo ls'],
+  );
 });
 
 test('user deny rules block even in full access; allow rules cannot override them', async () => {
   const cfg = normalizeRulesConfig({ rules: [rule('deny', 'glob', 'npm publish*'), rule('allow', 'glob', '*')] });
-  const r = await run([step(call('run_command', { command: 'echo hi && npm publish --tag next' })), step()], { access: 'full', config: cfg });
+  const r = await run([step(call('run_command', { command: 'echo hi && npm publish --tag next' })), step()], {
+    access: 'full',
+    config: cfg,
+  });
   assert.deepEqual(r.runs, []);
   assert.match(r.outputs[0].output, /^Blocked by deny glob: npm publish\* \(matched: npm publish --tag next\)/);
   assert.equal(r.log[0].status, 'blocked');
@@ -149,10 +176,16 @@ test('user deny rules block even in full access; allow rules cannot override the
 
 test('ask rules ask even in full access and name the rule', async () => {
   const cfg = normalizeRulesConfig({ rules: [rule('ask', 'prefix', 'git push')] });
-  const r = await run([step(call('run_command', { command: 'git push origin main' })), step()], { access: 'full', config: cfg });
+  const r = await run([step(call('run_command', { command: 'git push origin main' })), step()], {
+    access: 'full',
+    config: cfg,
+  });
   assert.equal(r.approvals.length, 1);
   assert.equal(r.approvals[0].reason, 'ask prefix: git push');
-  assert.deepEqual(r.runs.map((x) => x.command), ['git push origin main']);
+  assert.deepEqual(
+    r.runs.map((x) => x.command),
+    ['git push origin main'],
+  );
   assert.equal(r.log[0].approval, 'user');
   assert.equal(r.log[0].rule, 'ask prefix: git push');
 });
@@ -170,41 +203,81 @@ test('with no rule the access mode decides, as before', async () => {
 
 test('read-only runs refuse write tools and commands even if the model calls them anyway', async () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-ro-'));
-  const r = await run([step(call('run_command', { command: 'ls' }), call('write_file', { path: 'x.txt', content: 'x' }), call('edit_file', { path: 'x.txt', old_string: 'a', new_string: 'b' })), step()], { access: 'readonly', root, allowlist: ['ls'] });
+  const r = await run(
+    [
+      step(
+        call('run_command', { command: 'ls' }),
+        call('write_file', { path: 'x.txt', content: 'x' }),
+        call('edit_file', { path: 'x.txt', old_string: 'a', new_string: 'b' }),
+      ),
+      step(),
+    ],
+    { access: 'readonly', root, allowlist: ['ls'] },
+  );
   assert.deepEqual(r.runs, []);
   assert.equal(existsSync(join(root, 'x.txt')), false);
   assert.equal(r.outputs.length, 3);
   assert.ok(r.outputs.every((o) => o.isError && /read-only/i.test(o.output)));
-  assert.deepEqual(r.log.map((e) => e.status), ['blocked', 'blocked', 'blocked']);
+  assert.deepEqual(
+    r.log.map((e) => e.status),
+    ['blocked', 'blocked', 'blocked'],
+  );
   assert.equal(r.approvals.length, 0);
 });
 
 test('rules saved while a run is going apply to the very next command', async () => {
-  const r = await run([
-    step(call('run_command', { command: 'make build' })),
-    () => {
-      config([rule('deny', 'prefix', 'make')]);
-      return step(call('run_command', { command: 'make build' }));
-    },
-    step(),
-  ], { access: 'full' });
-  assert.deepEqual(r.runs.map((x) => x.command), ['make build'], 'only the first one ran');
-  assert.deepEqual(r.log.map((e) => e.status), ['success', 'blocked']);
+  const r = await run(
+    [
+      step(call('run_command', { command: 'make build' })),
+      () => {
+        config([rule('deny', 'prefix', 'make')]);
+        return step(call('run_command', { command: 'make build' }));
+      },
+      step(),
+    ],
+    { access: 'full' },
+  );
+  assert.deepEqual(
+    r.runs.map((x) => x.command),
+    ['make build'],
+    'only the first one ran',
+  );
+  assert.deepEqual(
+    r.log.map((e) => e.status),
+    ['success', 'blocked'],
+  );
 });
 
 test('bad tool input is an error, not a crash, and is logged', async () => {
-  const r = await run([step(call('run_command', {}), call('run_command', { command: '   ' }), call('run_command', { command: 42 }), call('nope', {})), step()], { access: 'full' });
+  const r = await run(
+    [
+      step(
+        call('run_command', {}),
+        call('run_command', { command: '   ' }),
+        call('run_command', { command: 42 }),
+        call('nope', {}),
+      ),
+      step(),
+    ],
+    { access: 'full' },
+  );
   assert.deepEqual(r.runs, []);
   assert.equal(r.outputs.length, 4);
   assert.ok(r.outputs.every((o) => o.isError));
   assert.match(r.outputs[0].output, /non-empty/);
   assert.match(r.outputs[3].output, /Unknown tool/);
-  assert.deepEqual(r.log.map((e) => e.status), ['error', 'error', 'error', 'error']);
+  assert.deepEqual(
+    r.log.map((e) => e.status),
+    ['error', 'error', 'error', 'error'],
+  );
   assert.equal(r.log[3].tool, 'nope');
 });
 
 test('a failing command is an error entry with its first lines of output', async () => {
-  const r = await run([step(call('run_command', { command: 'make' })), step()], { access: 'full', runResult: { code: 1, output: 'boom', timed_out: false } });
+  const r = await run([step(call('run_command', { command: 'make' })), step()], {
+    access: 'full',
+    runResult: { code: 1, output: 'boom', timed_out: false },
+  });
   assert.equal(r.log[0].status, 'error');
   assert.match(r.log[0].detail, /exit code: 1/);
 });
@@ -217,15 +290,28 @@ test('secrets in a command are scrubbed in the log but the command still runs un
 });
 
 test('stopping the run while a command waits for approval cancels it and the calls after it', async () => {
-  const r = await run([step(call('run_command', { command: 'make a' }), call('run_command', { command: 'make b' }), call('read_file', { path: 'x' })), step()], {
-    access: 'auto',
-    approve: (_req, ctl) => {
-      ctl.abort();
-      return false;
+  const r = await run(
+    [
+      step(
+        call('run_command', { command: 'make a' }),
+        call('run_command', { command: 'make b' }),
+        call('read_file', { path: 'x' }),
+      ),
+      step(),
+    ],
+    {
+      access: 'auto',
+      approve: (_req, ctl) => {
+        ctl.abort();
+        return false;
+      },
     },
-  });
+  );
   assert.deepEqual(r.runs, []);
-  assert.deepEqual(r.log.map((e) => e.status), ['cancelled', 'cancelled', 'cancelled']);
+  assert.deepEqual(
+    r.log.map((e) => e.status),
+    ['cancelled', 'cancelled', 'cancelled'],
+  );
   assert.equal(r.approvals.length, 1, 'nothing more is asked after the stop');
 });
 
@@ -244,13 +330,19 @@ edits('an edit is logged with an undo that restores the file; a created file is 
   const root = mkdtempSync(join(tmpdir(), 'agent-edit-'));
   writeFileSync(join(root, 'a.txt'), 'one\r\ntwo');
   let during;
-  const r = await run([
-    step(call('edit_file', { path: 'a.txt', old_string: 'one', new_string: 'ONE' }), call('write_file', { path: 'dir/new.txt', content: 'fresh' })),
-    async () => {
-      during = await undoLogEntry(getActionLog().entries.find((e) => e.undo)?.id);
-      return step();
-    },
-  ], { access: 'full', root });
+  const r = await run(
+    [
+      step(
+        call('edit_file', { path: 'a.txt', old_string: 'one', new_string: 'ONE' }),
+        call('write_file', { path: 'dir/new.txt', content: 'fresh' }),
+      ),
+      async () => {
+        during = await undoLogEntry(getActionLog().entries.find((e) => e.undo)?.id);
+        return step();
+      },
+    ],
+    { access: 'full', root },
+  );
   assert.deepEqual(during, { ok: false, reason: 'busy' }, 'not while the agent is still working in that folder');
   assert.equal(readFileSync(join(root, 'a.txt'), 'utf8'), 'ONE\r\ntwo');
   const [e1, e2] = r.log;
@@ -274,7 +366,14 @@ edits('an edit is logged with an undo that restores the file; a created file is 
 edits('two edits of one file are undone newest first, and a changed file refuses undo', async () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-edit2-'));
   writeFileSync(join(root, 'a.txt'), 'v0');
-  const r = await run([step(call('write_file', { path: 'a.txt', content: 'v1' })), step(call('write_file', { path: 'a.txt', content: 'v2' })), step()], { access: 'full', root });
+  const r = await run(
+    [
+      step(call('write_file', { path: 'a.txt', content: 'v1' })),
+      step(call('write_file', { path: 'a.txt', content: 'v2' })),
+      step(),
+    ],
+    { access: 'full', root },
+  );
   const [e1, e2] = r.log;
   assert.deepEqual(await undoLogEntry(e1.id), { ok: false, reason: 'later' });
   writeFileSync(join(root, 'a.txt'), 'v2 plus the user');
@@ -290,41 +389,106 @@ edits('two edits of one file are undone newest first, and a changed file refuses
 edits('a failed edit leaves an error entry and no undo', async () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-edit3-'));
   writeFileSync(join(root, 'a.txt'), 'abc');
-  const r = await run([step(call('edit_file', { path: 'a.txt', old_string: 'zzz', new_string: 'y' }), call('edit_file', { path: '../escape.txt', old_string: 'a', new_string: 'b' })), step()], { access: 'full', root });
-  assert.deepEqual(r.log.map((e) => [e.status, e.undo]), [['error', undefined], ['error', undefined]]);
+  const r = await run(
+    [
+      step(
+        call('edit_file', { path: 'a.txt', old_string: 'zzz', new_string: 'y' }),
+        call('edit_file', { path: '../escape.txt', old_string: 'a', new_string: 'b' }),
+      ),
+      step(),
+    ],
+    { access: 'full', root },
+  );
+  assert.deepEqual(
+    r.log.map((e) => [e.status, e.undo]),
+    [
+      ['error', undefined],
+      ['error', undefined],
+    ],
+  );
   assert.equal(readFileSync(join(root, 'a.txt'), 'utf8'), 'abc');
   rmSync(root, { recursive: true, force: true });
 });
 
-edits('in a review copy the entry names the review, the project scopes the rules, and undo needs the change to be pending', async () => {
-  const app = mkdtempSync(join(tmpdir(), 'agent-app-'));
-  const id = '1759400000000000000-4242';
-  const work = join(app, 'reviews', id, 'work');
-  mkdirSync(work, { recursive: true });
-  writeFileSync(join(app, 'reviews', id, 'review.json'), JSON.stringify({ id, root: '/Users/me/projA', workspace: work }));
-  writeFileSync(join(work, 'a.txt'), 'one');
-  const cfg = normalizeRulesConfig({ rules: [rule('allow', 'prefix', 'make', '/Users/me/projA'), rule('deny', 'prefix', 'make deploy', '/Users/me/projB')] });
-  const r = await run([step(call('write_file', { path: 'a.txt', content: 'two' }), call('run_command', { command: 'make build' }), call('run_command', { command: 'make deploy' })), step()], { access: 'auto', root: work, reviewMode: true, config: cfg });
-  assert.equal(r.approvals.length, 0, 'project A allows make; the deny rule belongs to project B and does not apply here');
-  assert.deepEqual(r.runs.map((x) => x.command), ['make build', 'make deploy']);
-  assert.deepEqual(r.log.slice(1).map((e) => [e.approval, e.rule]), [['rule', 'allow prefix: make'], ['rule', 'allow prefix: make']]);
-  assert.equal(r.log[0].project, '/Users/me/projA');
-  const entry = r.log[0];
-  assert.equal(entry.undo.reviewId, id);
-  state.reviewDiff = () => '';
-  assert.deepEqual(await undoLogEntry(entry.id), { ok: false, reason: 'closed' }, 'the change was accepted or rejected meanwhile');
-  assert.equal(readFileSync(join(work, 'a.txt'), 'utf8'), 'two');
-  state.reviewDiff = () => 'diff --git a b\n+two\n';
-  assert.deepEqual(await undoLogEntry(entry.id), { ok: true });
-  assert.equal(readFileSync(join(work, 'a.txt'), 'utf8'), 'one');
-  rmSync(app, { recursive: true, force: true });
-});
+edits(
+  'in a review copy the entry names the review, the project scopes the rules, and undo needs the change to be pending',
+  async () => {
+    const app = mkdtempSync(join(tmpdir(), 'agent-app-'));
+    const id = '1759400000000000000-4242';
+    const work = join(app, 'reviews', id, 'work');
+    mkdirSync(work, { recursive: true });
+    writeFileSync(
+      join(app, 'reviews', id, 'review.json'),
+      JSON.stringify({ id, root: '/Users/me/projA', workspace: work }),
+    );
+    writeFileSync(join(work, 'a.txt'), 'one');
+    const cfg = normalizeRulesConfig({
+      rules: [
+        rule('allow', 'prefix', 'make', '/Users/me/projA'),
+        rule('deny', 'prefix', 'make deploy', '/Users/me/projB'),
+      ],
+    });
+    const r = await run(
+      [
+        step(
+          call('write_file', { path: 'a.txt', content: 'two' }),
+          call('run_command', { command: 'make build' }),
+          call('run_command', { command: 'make deploy' }),
+        ),
+        step(),
+      ],
+      { access: 'auto', root: work, reviewMode: true, config: cfg },
+    );
+    assert.equal(
+      r.approvals.length,
+      0,
+      'project A allows make; the deny rule belongs to project B and does not apply here',
+    );
+    assert.deepEqual(
+      r.runs.map((x) => x.command),
+      ['make build', 'make deploy'],
+    );
+    assert.deepEqual(
+      r.log.slice(1).map((e) => [e.approval, e.rule]),
+      [
+        ['rule', 'allow prefix: make'],
+        ['rule', 'allow prefix: make'],
+      ],
+    );
+    assert.equal(r.log[0].project, '/Users/me/projA');
+    const entry = r.log[0];
+    assert.equal(entry.undo.reviewId, id);
+    state.reviewDiff = () => '';
+    assert.deepEqual(
+      await undoLogEntry(entry.id),
+      { ok: false, reason: 'closed' },
+      'the change was accepted or rejected meanwhile',
+    );
+    assert.equal(readFileSync(join(work, 'a.txt'), 'utf8'), 'two');
+    state.reviewDiff = () => 'diff --git a b\n+two\n';
+    assert.deepEqual(await undoLogEntry(entry.id), { ok: true });
+    assert.equal(readFileSync(join(work, 'a.txt'), 'utf8'), 'one');
+    rmSync(app, { recursive: true, force: true });
+  },
+);
 
 edits('review mode in a folder that is not a review copy offers no undo and cannot tell the project', async () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-norev-'));
   writeFileSync(join(root, 'a.txt'), 'one');
-  const cfg = normalizeRulesConfig({ rules: [rule('allow', 'prefix', 'make', root), rule('deny', 'prefix', 'make deploy', '/some/project')] });
-  const r = await run([step(call('write_file', { path: 'a.txt', content: 'two' }), call('run_command', { command: 'make' }), call('run_command', { command: 'make deploy' })), step()], { access: 'full', root, reviewMode: true, config: cfg });
+  const cfg = normalizeRulesConfig({
+    rules: [rule('allow', 'prefix', 'make', root), rule('deny', 'prefix', 'make deploy', '/some/project')],
+  });
+  const r = await run(
+    [
+      step(
+        call('write_file', { path: 'a.txt', content: 'two' }),
+        call('run_command', { command: 'make' }),
+        call('run_command', { command: 'make deploy' }),
+      ),
+      step(),
+    ],
+    { access: 'full', root, reviewMode: true, config: cfg },
+  );
   assert.equal(r.log[0].undo, undefined, 'the review cannot be identified, so the change cannot be proven pending');
   assert.equal(r.log[1].status, 'success', 'make: no applicable deny/ask rule, full access');
   assert.equal(r.log[2].status, 'blocked', 'unknown project: a project deny rule still applies');
@@ -332,47 +496,78 @@ edits('review mode in a folder that is not a review copy offers no undo and cann
   rmSync(root, { recursive: true, force: true });
 });
 
-
 test('memory changes ask even in full access and readonly refuses forged calls', async () => {
-  const r = await run([step(call('remember',{scope:'global',text:'Prefer Russian'}))], {access:'full'});
-  assert.equal(r.approvals[0].kind,'memory'); assert.match(r.outputs[0].output,/Saved fact/);
-  const denied = await run([step(call('remember',{scope:'global',text:'Never stored'}))], {approve:()=>false});
-  assert.equal(denied.outputs[0].isError,true);
-  const readonly = await run([step(call('remember',{scope:'global',text:'Never stored'}))], {access:'readonly'});
-  assert.equal(readonly.approvals.length,0); assert.equal(readonly.outputs[0].isError,true);
-});
-test('post-edit diagnostics respects command approval and reports failure without undoing the edit',async()=>{
-  const {saveDiagnostics}=await import('../src/agent/diagnostics.ts');
-  const r=await run([step(call('write_file',{path:'new.txt',content:'value'}))],{
-    setup: root=>saveDiagnostics(root,{enabled:true,command:'npm run typecheck',timeoutMs:30000}),
-    runResult:{code:1,output:'type mismatch',timed_out:false}
+  const r = await run([step(call('remember', { scope: 'global', text: 'Prefer Russian' }))], { access: 'full' });
+  assert.equal(r.approvals[0].kind, 'memory');
+  assert.match(r.outputs[0].output, /Saved fact/);
+  const denied = await run([step(call('remember', { scope: 'global', text: 'Never stored' }))], {
+    approve: () => false,
   });
-  assert.equal(r.approvals[0].command,'npm run typecheck');
-  assert.match(r.outputs[0].output,/Diagnostics did not pass/);assert.match(r.outputs[0].output,/type mismatch/);
-  assert.equal(readFileSync(join(r.root,'new.txt'),'utf8'),'value');
+  assert.equal(denied.outputs[0].isError, true);
+  const readonly = await run([step(call('remember', { scope: 'global', text: 'Never stored' }))], {
+    access: 'readonly',
+  });
+  assert.equal(readonly.approvals.length, 0);
+  assert.equal(readonly.outputs[0].isError, true);
+});
+test('post-edit diagnostics respects command approval and reports failure without undoing the edit', async () => {
+  const { saveDiagnostics } = await import('../src/agent/diagnostics.ts');
+  const r = await run([step(call('write_file', { path: 'new.txt', content: 'value' }))], {
+    setup: (root) => saveDiagnostics(root, { enabled: true, command: 'npm run typecheck', timeoutMs: 30000 }),
+    runResult: { code: 1, output: 'type mismatch', timed_out: false },
+  });
+  assert.equal(r.approvals[0].command, 'npm run typecheck');
+  assert.match(r.outputs[0].output, /Diagnostics did not pass/);
+  assert.match(r.outputs[0].output, /type mismatch/);
+  assert.equal(readFileSync(join(r.root, 'new.txt'), 'utf8'), 'value');
 });
 
-
-test('web disabled or declined never executes a native request',async()=>{
- const {setSetting}=await import('./helpers/apiStub.mjs');
- const r=await run([step(call('web_fetch',{url:'https://example.com'}))]);assert.equal(r.outputs[0].isError,true);assert.match(r.outputs[0].output,/disabled/);
- const denied=await run([step(call('web_fetch',{url:'https://example.com'}))],{setup:()=>setSetting('webTools',{enabled:true,allow:[],deny:[]}),approve:()=>false});assert.equal(denied.approvals[0].kind,'web');assert.equal(denied.outputs[0].isError,true);
- const domain=await run([step(call('web_fetch',{url:'https://blocked.example.com'}))],{access:'full',setup:()=>setSetting('webTools',{enabled:true,allow:[],deny:['example.com']})});assert.equal(domain.approvals.length,0);assert.equal(domain.outputs[0].isError,true);
+test('web disabled or declined never executes a native request', async () => {
+  const { setSetting } = await import('./helpers/apiStub.mjs');
+  const r = await run([step(call('web_fetch', { url: 'https://example.com' }))]);
+  assert.equal(r.outputs[0].isError, true);
+  assert.match(r.outputs[0].output, /disabled/);
+  const denied = await run([step(call('web_fetch', { url: 'https://example.com' }))], {
+    setup: () => setSetting('webTools', { enabled: true, allow: [], deny: [] }),
+    approve: () => false,
+  });
+  assert.equal(denied.approvals[0].kind, 'web');
+  assert.equal(denied.outputs[0].isError, true);
+  const domain = await run([step(call('web_fetch', { url: 'https://blocked.example.com' }))], {
+    access: 'full',
+    setup: () => setSetting('webTools', { enabled: true, allow: [], deny: ['example.com'] }),
+  });
+  assert.equal(domain.approvals.length, 0);
+  assert.equal(domain.outputs[0].isError, true);
 });
-test('terminal reading always asks, including full access',async()=>{const r=await run([step(call('read_terminal',{id:1,lines:30}))],{access:'full',approve:()=>false});assert.equal(r.approvals[0].kind,'terminal');assert.equal(r.outputs[0].isError,true);});
+test('terminal reading always asks, including full access', async () => {
+  const r = await run([step(call('read_terminal', { id: 1, lines: 30 }))], { access: 'full', approve: () => false });
+  assert.equal(r.approvals[0].kind, 'terminal');
+  assert.equal(r.outputs[0].isError, true);
+});
 
 test('request_secret: the value reaches one command as an env variable, is masked in its output and never in a message', async () => {
   const asked = [];
   let ref = '';
-  const r = await run([
-    step(call('request_secret', { name: 'GitHub token', reason: 'push the branch' })),
-    ({ input }) => { ref = /REF ([A-Z0-9]{8})/.exec(JSON.stringify(input.messages))[1]; return step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` })); },
-    () => step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` })),
-    step(),
-  ], {
-    requestSecret: async (req) => (asked.push(req), 'ghp_SECRETVALUE123'),
-    runResult: ({ command }) => ({ code: 0, output: command.includes('GUSTAF_SECRET_') ? 'token=ghp_SECRETVALUE123' : '', timed_out: false }),
-  });
+  const r = await run(
+    [
+      step(call('request_secret', { name: 'GitHub token', reason: 'push the branch' })),
+      ({ input }) => {
+        ref = /REF ([A-Z0-9]{8})/.exec(JSON.stringify(input.messages))[1];
+        return step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` }));
+      },
+      () => step(call('run_command', { command: `echo $GUSTAF_SECRET_${ref}` })),
+      step(),
+    ],
+    {
+      requestSecret: async (req) => (asked.push(req), 'ghp_SECRETVALUE123'),
+      runResult: ({ command }) => ({
+        code: 0,
+        output: command.includes('GUSTAF_SECRET_') ? 'token=ghp_SECRETVALUE123' : '',
+        timed_out: false,
+      }),
+    },
+  );
   assert.deepEqual(asked, [{ name: 'GitHub token', reason: 'push the branch' }]);
   ref = /REF ([A-Z0-9]{8})/.exec(r.outputs[0].output)[1];
   assert.match(r.outputs[0].output, /\$GUSTAF_SECRET_[A-Z0-9]{8}/);
@@ -384,10 +579,11 @@ test('request_secret: the value reaches one command as an env variable, is maske
 });
 
 test('request_secret: declined, and not offered without a secret prompt (scheduled runs, subagents)', async () => {
-  const declined = await run([step(call('request_secret', { name: 'key', reason: 'x' })), step()], { requestSecret: async () => null });
+  const declined = await run([step(call('request_secret', { name: 'key', reason: 'x' })), step()], {
+    requestSecret: async () => null,
+  });
   assert.equal(declined.outputs[0].isError, true);
   assert.match(declined.outputs[0].output, /declined/);
   const absent = await run([step(call('request_secret', { name: 'key', reason: 'x' })), step()]);
   assert.match(absent.outputs[0].output, /only in an interactive chat/);
 });
-

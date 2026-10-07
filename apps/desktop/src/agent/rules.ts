@@ -12,7 +12,13 @@
 export type Effect = "allow" | "ask" | "deny";
 /** `exact` is only produced when old "always allowed" entries that are not a single simple command are migrated. */
 export type MatchKind = "prefix" | "glob" | "exact";
-export type Rule = { id: string; effect: Effect; match: MatchKind; pattern: string; /** Project folder; absent = all projects. */ project?: string };
+export type Rule = {
+  id: string;
+  effect: Effect;
+  match: MatchKind;
+  pattern: string;
+  /** Project folder; absent = all projects. */ project?: string;
+};
 export type RulesConfig = { version: 1; rules: Rule[]; disabledBuiltins: string[] };
 export type Access = "readonly" | "auto" | "full";
 
@@ -44,10 +50,21 @@ export type Segment = {
   nested: string[];
   origin: "command" | "substitution" | "wrapper" | "script";
 };
-export type ParsedCommand = { raw: string; segments: Segment[]; /** Set when the text could not be parsed completely. */ error?: string };
+export type ParsedCommand = {
+  raw: string;
+  segments: Segment[];
+  /** Set when the text could not be parsed completely. */ error?: string;
+};
 
 type Pending = { delim: string; quoted: boolean; strip: boolean; feedsShell: boolean; owner?: Segment };
-type Cmd = { start: number; words: string[]; redirects: Redirect[]; heredocs: { delim: string; quoted: boolean; strip: boolean }[]; hereString?: string; nested: string[] };
+type Cmd = {
+  start: number;
+  words: string[];
+  redirects: Redirect[];
+  heredocs: { delim: string; quoted: boolean; strip: boolean }[];
+  hereString?: string;
+  nested: string[];
+};
 type Ctx = { out: Segment[]; errors: string[] };
 
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=/;
@@ -66,7 +83,21 @@ export const progName = (word: string | undefined) => (word ?? "").split("/").po
 
 /** `$'…'` with the escapes the shell decodes, so `$'\x72\x6d'` is seen as `rm`. */
 function ansiC(ctx: Ctx, src: string, i: number): { text: string; end: number } {
-  const simple = new Map<string, string>([["n", "\n"], ["t", "\t"], ["r", "\r"], ["a", "\x07"], ["b", "\b"], ["e", "\x1b"], ["E", "\x1b"], ["f", "\f"], ["v", "\v"], ["\\", "\\"], ["'", "'"], ['"', '"'], ["?", "?"]]);
+  const simple = new Map<string, string>([
+    ["n", "\n"],
+    ["t", "\t"],
+    ["r", "\r"],
+    ["a", "\x07"],
+    ["b", "\b"],
+    ["e", "\x1b"],
+    ["E", "\x1b"],
+    ["f", "\f"],
+    ["v", "\v"],
+    ["\\", "\\"],
+    ["'", "'"],
+    ['"', '"'],
+    ["?", "?"],
+  ]);
   let j = i + 2;
   let text = "";
   while (j < src.length && src[j] !== "'") {
@@ -110,7 +141,13 @@ function ansiC(ctx: Ctx, src: string, i: number): { text: string; end: number } 
 }
 
 /** Reads `$(…)`, `$((…))`, `${…}`, `$name` or `` `…` `` at `src[i]`; null when `src[i]` is a plain `$`. */
-function expansion(ctx: Ctx, src: string, i: number, depth: number, nested: string[]): { raw: string; end: number } | null {
+function expansion(
+  ctx: Ctx,
+  src: string,
+  i: number,
+  depth: number,
+  nested: string[],
+): { raw: string; end: number } | null {
   const n = src.length;
   const c = src[i];
   const d = src[i + 1];
@@ -135,8 +172,8 @@ function expansion(ctx: Ctx, src: string, i: number, depth: number, nested: stri
     let level = 2;
     while (j < n && level > 0) {
       const ch = src[j];
-      if (ch === "(") level++, j++;
-      else if (ch === ")") level--, j++;
+      if (ch === "(") (level++, j++);
+      else if (ch === ")") (level--, j++);
       else if (ch === "$" || ch === "`") j = expansion(ctx, src, j, depth, nested)?.end ?? j + 1;
       else if (ch === "'" || ch === '"') {
         const q = src.indexOf(ch, j + 1);
@@ -157,8 +194,8 @@ function expansion(ctx: Ctx, src: string, i: number, depth: number, nested: stri
     let level = 1;
     while (j < n && level > 0) {
       const ch = src[j];
-      if (ch === "{") level++, j++;
-      else if (ch === "}") level--, j++;
+      if (ch === "{") (level++, j++);
+      else if (ch === "}") (level--, j++);
       else if (ch === "$" || ch === "`") j = expansion(ctx, src, j, depth, nested)?.end ?? j + 1;
       else if (ch === "'") {
         const q = src.indexOf("'", j + 1);
@@ -188,10 +225,10 @@ function scanDouble(ctx: Ctx, src: string, i: number, depth: number, nested: str
     if (c === '"') return { text, end: j + 1 };
     if (c === "\\") {
       const d = src[j + 1];
-      if (d === undefined) text += "\\", j++;
+      if (d === undefined) ((text += "\\"), j++);
       else if (d === "\n") j += 2;
       else {
-        text += "$`\"\\".includes(d) ? d : "\\" + d;
+        text += '$`"\\'.includes(d) ? d : "\\" + d;
         j += 2;
       }
       continue;
@@ -211,7 +248,13 @@ function scanDouble(ctx: Ctx, src: string, i: number, depth: number, nested: str
   return { text, end: n };
 }
 
-function readWord(ctx: Ctx, src: string, start: number, depth: number, nested: string[]): { text: string; end: number; quoted: boolean } {
+function readWord(
+  ctx: Ctx,
+  src: string,
+  start: number,
+  depth: number,
+  nested: string[],
+): { text: string; end: number; quoted: boolean } {
   const n = src.length;
   let i = start;
   let text = "";
@@ -221,7 +264,7 @@ function readWord(ctx: Ctx, src: string, start: number, depth: number, nested: s
     if (WORD_END.has(c)) break;
     if (c === "\\") {
       const d = src[i + 1];
-      if (d === undefined) text += c, i++;
+      if (d === undefined) ((text += c), i++);
       else if (d === "\n") i += 2;
       else {
         text += d;
@@ -253,8 +296,8 @@ function readWord(ctx: Ctx, src: string, start: number, depth: number, nested: s
       i++; // $"…" is a quoted string too
     } else if (c === "$" || c === "`") {
       const e = expansion(ctx, src, i, depth, nested);
-      if (e) text += e.raw, (i = e.end);
-      else text += c, i++;
+      if (e) ((text += e.raw), (i = e.end));
+      else ((text += c), i++);
     } else text += src[i++];
   }
   return { text, end: i, quoted };
@@ -342,7 +385,15 @@ function scriptOf(words: string[]): string | undefined {
   return undefined;
 }
 
-function buildSegments(ctx: Ctx, cmd: Cmd, src: string, end: number, pipe: string[], depth: number, origin: Segment["origin"]): { main?: Segment; progs: string[]; feedsShell: boolean } {
+function buildSegments(
+  ctx: Ctx,
+  cmd: Cmd,
+  src: string,
+  end: number,
+  pipe: string[],
+  depth: number,
+  origin: Segment["origin"],
+): { main?: Segment; progs: string[]; feedsShell: boolean } {
   const words = [...cmd.words];
   const assignments: string[] = [];
   for (;;) {
@@ -352,26 +403,54 @@ function buildSegments(ctx: Ctx, cmd: Cmd, src: string, end: number, pipe: strin
   }
   const writes = cmd.redirects.some(isWrite);
   const empty = !words.length && !assignments.length && !cmd.redirects.length;
-  if (empty || (words.length === 1 && CLOSERS.has(words[0]) && !assignments.length && !writes)) return { progs: [], feedsShell: false };
+  if (empty || (words.length === 1 && CLOSERS.has(words[0]) && !assignments.length && !writes))
+    return { progs: [], feedsShell: false };
 
-  const main: Segment = { text: clip(src.slice(Math.max(cmd.start, 0), end).trim()), words, assignments, redirects: cmd.redirects, writes, pipeFrom: [...pipe], nested: cmd.nested, origin };
+  const main: Segment = {
+    text: clip(src.slice(Math.max(cmd.start, 0), end).trim()),
+    words,
+    assignments,
+    redirects: cmd.redirects,
+    writes,
+    pipeFrom: [...pipe],
+    nested: cmd.nested,
+    origin,
+  };
   ctx.out.push(main);
   const progs: string[] = words.length ? [progName(words[0])] : [];
   const inner = words.length ? innerCommands(words) : [];
   for (const w of inner) {
-    ctx.out.push({ text: clip(w.join(" ")), words: w, assignments: [], redirects: [], writes: false, pipeFrom: [...pipe], nested: [], origin: "wrapper" });
+    ctx.out.push({
+      text: clip(w.join(" ")),
+      words: w,
+      assignments: [],
+      redirects: [],
+      writes: false,
+      pipeFrom: [...pipe],
+      nested: [],
+      origin: "wrapper",
+    });
     progs.push(progName(w[0]));
   }
   for (const w of words.length ? [words, ...inner] : []) {
     const script = scriptOf(w);
-    if (script !== undefined && depth + 1 <= MAX_DEPTH) progs.push(...scriptAt(ctx, script, 0, null, depth + 1, "script").progs);
+    if (script !== undefined && depth + 1 <= MAX_DEPTH)
+      progs.push(...scriptAt(ctx, script, 0, null, depth + 1, "script").progs);
   }
   const feedsShell = (words.length ? [words, ...inner] : []).some((w) => SHELLS.has(progName(w[0])));
-  if (cmd.hereString !== undefined && feedsShell && depth + 1 <= MAX_DEPTH) scriptAt(ctx, cmd.hereString, 0, null, depth + 1, "script");
+  if (cmd.hereString !== undefined && feedsShell && depth + 1 <= MAX_DEPTH)
+    scriptAt(ctx, cmd.hereString, 0, null, depth + 1, "script");
   return { main, progs, feedsShell };
 }
 
-function scriptAt(ctx: Ctx, src: string, start: number, closer: ")" | null, depth: number, origin: Segment["origin"]): { end: number; progs: string[] } {
+function scriptAt(
+  ctx: Ctx,
+  src: string,
+  start: number,
+  closer: ")" | null,
+  depth: number,
+  origin: Segment["origin"],
+): { end: number; progs: string[] } {
   const n = src.length;
   if (depth > MAX_DEPTH) {
     fail(ctx, "commands are nested too deeply");
@@ -421,7 +500,7 @@ function scriptAt(ctx: Ctx, src: string, start: number, closer: ")" | null, dept
       } else if (!p.quoted) {
         // Unquoted heredocs still expand `$(…)` and backticks.
         const found: string[] = [];
-        for (let k = 0; k < body.length; ) {
+        for (let k = 0; k < body.length;) {
           if (body[k] === "\\") k += 2;
           else if (body[k] === "$" || body[k] === "`") k = expansion(ctx, body, k, depth, found)?.end ?? k + 1;
           else k++;
@@ -451,12 +530,12 @@ function scriptAt(ctx: Ctx, src: string, start: number, closer: ")" | null, dept
       op = ">";
       j++;
       while (j < n && op.length < 3 && (src[j] === ">" || src[j] === "&" || src[j] === "|")) op += src[j++];
-    } else if (src.startsWith("<<<", j)) op = "<<<", (j += 3);
-    else if (src.startsWith("<<-", j)) op = "<<-", (j += 3);
-    else if (src.startsWith("<<", j)) op = "<<", (j += 2);
-    else if (src.startsWith("<&", j)) op = "<&", (j += 2);
-    else if (src.startsWith("<>", j)) op = "<>", (j += 2);
-    else op = "<", j++;
+    } else if (src.startsWith("<<<", j)) ((op = "<<<"), (j += 3));
+    else if (src.startsWith("<<-", j)) ((op = "<<-"), (j += 3));
+    else if (src.startsWith("<<", j)) ((op = "<<"), (j += 2));
+    else if (src.startsWith("<&", j)) ((op = "<&"), (j += 2));
+    else if (src.startsWith("<>", j)) ((op = "<>"), (j += 2));
+    else ((op = "<"), j++);
     while (src[j] === " " || src[j] === "\t") j++;
     let target = "";
     let quoted = false;
@@ -601,7 +680,13 @@ export function prefixWords(pattern: string): string[] | null {
   if (wordsCache.has(pattern)) return wordsCache.get(pattern)!;
   const parsed = parseCommand(pattern);
   const [seg] = parsed.segments;
-  const ok = !parsed.error && parsed.segments.length === 1 && !seg.assignments.length && !seg.redirects.length && !seg.nested.length && seg.words.length > 0;
+  const ok =
+    !parsed.error &&
+    parsed.segments.length === 1 &&
+    !seg.assignments.length &&
+    !seg.redirects.length &&
+    !seg.nested.length &&
+    seg.words.length > 0;
   const words = ok ? seg.words : null;
   if (wordsCache.size > 1000) wordsCache.clear();
   wordsCache.set(pattern, words);
@@ -616,12 +701,18 @@ export function validatePattern(match: "prefix" | "glob", raw: string): PatternC
   const pattern = raw.trim();
   if (!pattern) return { ok: false, error: "empty" };
   if (pattern.length > MAX_PATTERN) return { ok: false, error: "tooLong" };
-  if (match === "glob") return /[;&|<>`\n]|\$\(/.test(pattern) ? { ok: false, error: "compound" } : { ok: true, pattern: normalizeSpaces(pattern) };
+  if (match === "glob")
+    return /[;&|<>`\n]|\$\(/.test(pattern)
+      ? { ok: false, error: "compound" }
+      : { ok: true, pattern: normalizeSpaces(pattern) };
   const parsed = parseCommand(pattern);
   if (parsed.error) return { ok: false, error: "unsupported" };
-  if (parsed.segments.length !== 1 || parsed.segments[0].nested.length) return { ok: false, error: parsed.segments.length ? "compound" : "empty" };
+  if (parsed.segments.length !== 1 || parsed.segments[0].nested.length)
+    return { ok: false, error: parsed.segments.length ? "compound" : "empty" };
   const seg = parsed.segments[0];
-  return seg.assignments.length || seg.redirects.length || !seg.words.length ? { ok: false, error: "unsupported" } : { ok: true, pattern };
+  return seg.assignments.length || seg.redirects.length || !seg.words.length
+    ? { ok: false, error: "unsupported" }
+    : { ok: true, pattern };
 }
 
 const matchWords = (rule: Rule, words: string[]): boolean => {
@@ -646,8 +737,43 @@ export type BuiltinRule = {
   testRaw?(raw: string): boolean;
 };
 
-const HOME_CRITICAL = new Set(["*", ".*", "Documents", "Desktop", "Downloads", "Library", "Pictures", "Movies", "Music", "Public", "Applications", ".ssh", ".gnupg", ".config"]);
-const SYSTEM_DIRS = new Set(["System", "Library", "usr", "bin", "sbin", "etc", "var", "private", "opt", "Applications", "dev", "boot", "lib", "lib64", "root", "srv", "sys", "proc", "cores"]);
+const HOME_CRITICAL = new Set([
+  "*",
+  ".*",
+  "Documents",
+  "Desktop",
+  "Downloads",
+  "Library",
+  "Pictures",
+  "Movies",
+  "Music",
+  "Public",
+  "Applications",
+  ".ssh",
+  ".gnupg",
+  ".config",
+]);
+const SYSTEM_DIRS = new Set([
+  "System",
+  "Library",
+  "usr",
+  "bin",
+  "sbin",
+  "etc",
+  "var",
+  "private",
+  "opt",
+  "Applications",
+  "dev",
+  "boot",
+  "lib",
+  "lib64",
+  "root",
+  "srv",
+  "sys",
+  "proc",
+  "cores",
+]);
 
 /** True for targets whose recursive removal/permission change would wreck the machine: `/`, `~`, `$HOME`, system folders, a home folder. */
 export function isDangerousTarget(target: string): boolean {
@@ -679,7 +805,8 @@ export function isDangerousTarget(target: string): boolean {
   if ((a === "Users" || a === "home") && comps.length === 3 && HOME_CRITICAL.has(c)) return true;
   if (a === "Volumes" && comps.length <= 2) return true;
   const base = wild ? comps.slice(0, -1) : comps;
-  if (SYSTEM_DIRS.has(a) && base.length <= 2) return !(a === "private" && base.length === 2 && b !== "tmp" && b !== "var" && b !== "etc");
+  if (SYSTEM_DIRS.has(a) && base.length <= 2)
+    return !(a === "private" && base.length === 2 && b !== "tmp" && b !== "var" && b !== "etc");
   return false;
 }
 
@@ -702,7 +829,12 @@ const flagged = (words: string[], short: RegExp, long: string) => {
 };
 
 /** Options after which an interpreter runs the text on the command line instead of a file. */
-const INTERPRETER_CODE_FLAGS = new Map<string, readonly string[]>([["node", ["-e", "--eval", "-p", "--print"]], ["perl", ["-e", "-E"]], ["ruby", ["-e"]], ["php", ["-r"]]]);
+const INTERPRETER_CODE_FLAGS = new Map<string, readonly string[]>([
+  ["node", ["-e", "--eval", "-p", "--print"]],
+  ["perl", ["-e", "-E"]],
+  ["ruby", ["-e"]],
+  ["php", ["-r"]],
+]);
 const DOWNLOADERS = new Set(["curl", "wget", "fetch"]);
 const isPython = (prog: string) => /^python[0-9.]*$/.test(prog);
 const isInterpreter = (prog: string) => SHELLS.has(prog) || isPython(prog) || INTERPRETER_CODE_FLAGS.has(prog);
@@ -711,7 +843,7 @@ const isInterpreter = (prog: string) => SHELLS.has(prog) || isPython(prog) || IN
 function runsStdin(words: string[]): boolean {
   const prog = progName(words[0]);
   if (SHELLS.has(prog)) return scriptOf(words) === undefined && (words.includes("-s") || operands(words).length === 0);
-  const codeFlags = isPython(prog) ? ["-c", "-m"] : INTERPRETER_CODE_FLAGS.get(prog) ?? [];
+  const codeFlags = isPython(prog) ? ["-c", "-m"] : (INTERPRETER_CODE_FLAGS.get(prog) ?? []);
   if (words.slice(1).some((w) => codeFlags.includes(w))) return false;
   const files = operands(words);
   return files.length === 0 || files[0] === "-";
@@ -728,7 +860,11 @@ export const BUILTIN_RULES: readonly BuiltinRule[] = [
     example: "rm -rf / · rm -rf ~ · rm -rf $HOME",
     test: (s) => {
       const prog = progName(s.words[0]);
-      if (prog === "rm") return s.words.includes("--no-preserve-root") || (flagged(s.words, /^-[A-Za-z]*[rR][A-Za-z]*$/, "--recursive") && operands(s.words).some(isDangerousTarget));
+      if (prog === "rm")
+        return (
+          s.words.includes("--no-preserve-root") ||
+          (flagged(s.words, /^-[A-Za-z]*[rR][A-Za-z]*$/, "--recursive") && operands(s.words).some(isDangerousTarget))
+        );
       if (prog === "find") {
         const paths: string[] = [];
         for (const w of s.words.slice(1)) {
@@ -744,11 +880,14 @@ export const BUILTIN_RULES: readonly BuiltinRule[] = [
   {
     id: "chmod-root",
     example: "chmod -R 777 / · chown -R me ~",
-    test: (s) => ["chmod", "chown", "chgrp"].includes(progName(s.words[0])) && flagged(s.words, /^-[A-Za-z]*R[A-Za-z]*$/, "--recursive") && operands(s.words).some(isDangerousTarget),
+    test: (s) =>
+      ["chmod", "chown", "chgrp"].includes(progName(s.words[0])) &&
+      flagged(s.words, /^-[A-Za-z]*R[A-Za-z]*$/, "--recursive") &&
+      operands(s.words).some(isDangerousTarget),
   },
   {
     id: "curl-sh",
-    example: "curl … | sh · sh -c \"$(curl …)\"",
+    example: 'curl … | sh · sh -c "$(curl …)"',
     test: (s) => {
       const prog = progName(s.words[0]);
       if (!isInterpreter(prog) && !["eval", "source", "."].includes(prog)) return false;
@@ -763,7 +902,12 @@ export const BUILTIN_RULES: readonly BuiltinRule[] = [
       const prog = progName(s.words[0]);
       const sub = (s.words[1] ?? "").toLowerCase();
       if (/^mkfs(?:\.|$)/.test(prog) || /^newfs(?:_|$)/.test(prog)) return true;
-      if (prog === "diskutil" && (/^(?:erase|partition|zerodisk|randomdisk|secureerase|reformat)/.test(sub) || (sub === "apfs" && /^delete/i.test(s.words[2] ?? "")))) return true;
+      if (
+        prog === "diskutil" &&
+        (/^(?:erase|partition|zerodisk|randomdisk|secureerase|reformat)/.test(sub) ||
+          (sub === "apfs" && /^delete/i.test(s.words[2] ?? "")))
+      )
+        return true;
       if (prog === "dd" && s.words.some((w) => /^of=\/dev\/(?!null$|stdout$|stderr$|tty$|fd\/)/.test(w))) return true;
       return s.redirects.some((r) => isWrite(r) && /^\/dev\/(?:r?disk|sd|hd|nvme|mmcblk|vd|xvd|loop)/.test(r.target));
     },
@@ -788,7 +932,14 @@ export const BUILTIN_IDS = BUILTIN_RULES.map((b) => b.id);
 // ---------------------------------------------------------------------------------------------------------------
 
 export type Decision = "allow" | "ask" | "deny" | "default";
-export type RuleRef = { id: string; effect: Effect; match: MatchKind | "builtin"; pattern: string; project?: string; builtin?: boolean };
+export type RuleRef = {
+  id: string;
+  effect: Effect;
+  match: MatchKind | "builtin";
+  pattern: string;
+  project?: string;
+  builtin?: boolean;
+};
 export type SegmentVerdict = { text: string; decision: Decision; rule?: RuleRef };
 export type Evaluation = {
   /** `default`: no rule decided; the access mode does (ask in "ask for commands", run in "full access"). */
@@ -804,8 +955,20 @@ export type Evaluation = {
 /** Shell builtins that run no program: allowed without a rule so `cd app && npm test` needs only a rule for `npm test`. */
 const INERT = new Set(["cd", "pwd", "true", "false", ":"]);
 
-const ref = (r: Rule): RuleRef => ({ id: r.id, effect: r.effect, match: r.match, pattern: r.pattern, ...(r.project ? { project: r.project } : {}) });
-const builtinRef = (b: BuiltinRule): RuleRef => ({ id: `builtin:${b.id}`, effect: "deny", match: "builtin", pattern: b.example, builtin: true });
+const ref = (r: Rule): RuleRef => ({
+  id: r.id,
+  effect: r.effect,
+  match: r.match,
+  pattern: r.pattern,
+  ...(r.project ? { project: r.project } : {}),
+});
+const builtinRef = (b: BuiltinRule): RuleRef => ({
+  id: `builtin:${b.id}`,
+  effect: "deny",
+  match: "builtin",
+  pattern: b.example,
+  builtin: true,
+});
 
 /** Words to try for deny/ask rules: the command as written and with the program name normalised (`/bin/RM` -> `rm`). */
 function wideWords(seg: Segment): string[][] {
@@ -817,7 +980,11 @@ function wideWords(seg: Segment): string[][] {
  * Judges a command line. Every simple command in it must be allowed for the whole to be allowed; one deny anywhere
  * denies the whole, one ask anywhere asks. Deny beats ask beats allow. `exact` rules compare the whole line.
  */
-export function evaluateCommand(command: string, rules: readonly Rule[], options: { disabledBuiltins?: readonly string[] } = {}): Evaluation {
+export function evaluateCommand(
+  command: string,
+  rules: readonly Rule[],
+  options: { disabledBuiltins?: readonly string[] } = {},
+): Evaluation {
   const parsed = parseCommand(command);
   const off = new Set(options.disabledBuiltins ?? []);
   const builtins = BUILTIN_RULES.filter((b) => !off.has(b.id));
@@ -864,7 +1031,8 @@ export function evaluateCommand(command: string, rules: readonly Rule[], options
   if (exactAsk) return result("ask", ref(exactAsk), whole);
   const exactAllow = exactHit("allow");
   if (exactAllow) return result("allow", ref(exactAllow));
-  if (!parsed.error && segments.length && segments.every((v) => v.decision === "allow")) return result("allow", segments.find((v) => v.rule)?.rule);
+  if (!parsed.error && segments.length && segments.every((v) => v.decision === "allow"))
+    return result("allow", segments.find((v) => v.rule)?.rule);
   return result("default");
 }
 
@@ -885,7 +1053,8 @@ export function commandAction(decision: Decision, access: Access): CommandAction
 export const DEFAULT_RULES: RulesConfig = { version: 1, rules: [], disabledBuiltins: [] };
 
 let idCounter = 0;
-export const newRuleId = () => `r${Date.now().toString(36)}${(idCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export const newRuleId = () =>
+  `r${Date.now().toString(36)}${(idCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const EFFECTS: readonly string[] = ["allow", "ask", "deny"];
 const MATCHES: readonly string[] = ["prefix", "glob", "exact"];
@@ -900,7 +1069,14 @@ export function normalizeRulesConfig(raw: unknown): RulesConfig {
     if (rules.length >= MAX_RULES) break;
     if (!item || typeof item !== "object") continue;
     const r = item as Record<string, unknown>;
-    if (typeof r.effect !== "string" || !EFFECTS.includes(r.effect) || typeof r.match !== "string" || !MATCHES.includes(r.match) || typeof r.pattern !== "string") continue;
+    if (
+      typeof r.effect !== "string" ||
+      !EFFECTS.includes(r.effect) ||
+      typeof r.match !== "string" ||
+      !MATCHES.includes(r.match) ||
+      typeof r.pattern !== "string"
+    )
+      continue;
     const match = r.match as MatchKind;
     let pattern = r.pattern.trim();
     if (match === "exact") {
@@ -910,19 +1086,27 @@ export function normalizeRulesConfig(raw: unknown): RulesConfig {
       if (!check.ok) continue;
       pattern = check.pattern;
     }
-    const project = typeof r.project === "string" && r.project.trim() && r.project.length <= 1000 ? r.project.trim() : undefined;
+    const project =
+      typeof r.project === "string" && r.project.trim() && r.project.length <= 1000 ? r.project.trim() : undefined;
     const key = [r.effect, match, pattern, project ?? ""].join("\u0000");
     if (seen.has(key)) continue;
     seen.add(key);
-    const id = typeof r.id === "string" && r.id && r.id.length <= 80 && !rules.some((x) => x.id === r.id) ? r.id : newRuleId();
+    const id =
+      typeof r.id === "string" && r.id && r.id.length <= 80 && !rules.some((x) => x.id === r.id) ? r.id : newRuleId();
     rules.push({ id, effect: r.effect as Effect, match, pattern, ...(project ? { project } : {}) });
   }
-  const disabled = Array.isArray(obj.disabledBuiltins) ? [...new Set(obj.disabledBuiltins.filter((x): x is string => typeof x === "string" && BUILTIN_IDS.includes(x)))] : [];
+  const disabled = Array.isArray(obj.disabledBuiltins)
+    ? [...new Set(obj.disabledBuiltins.filter((x): x is string => typeof x === "string" && BUILTIN_IDS.includes(x)))]
+    : [];
   return { version: 1, rules, disabledBuiltins: disabled };
 }
 
 /** Folders are compared without trailing slashes, and macOS' `/private/var`, `/private/tmp` equal `/var`, `/tmp`. */
-export const normalizeProjectPath = (p: string) => p.trim().replace(/\/+$/, "").replace(/^\/private(?=\/(?:var|tmp|etc)(?:\/|$))/, "");
+export const normalizeProjectPath = (p: string) =>
+  p
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/^\/private(?=\/(?:var|tmp|etc)(?:\/|$))/, "");
 export const sameProject = (a: string, b: string) => normalizeProjectPath(a) === normalizeProjectPath(b);
 
 /**
@@ -952,14 +1136,19 @@ export function legacyAllowRules(allowlist: readonly string[]): Rule[] {
 export type RunRules = { config: RulesConfig; allowlist: readonly string[]; project: string | null | undefined };
 
 /** Decides one command for a run: rules of the project and global ones, the old allowlist and the built-in defaults. */
-export function decideCommand(command: string, run: RunRules, access: Access): { action: CommandAction; evaluation: Evaluation } {
+export function decideCommand(
+  command: string,
+  run: RunRules,
+  access: Access,
+): { action: CommandAction; evaluation: Evaluation } {
   const rules = [...applicableRules(run.config.rules, run.project), ...legacyAllowRules(run.allowlist)];
   const evaluation = evaluateCommand(command, rules, { disabledBuiltins: run.config.disabledBuiltins });
   return { action: commandAction(evaluation.decision, access), evaluation };
 }
 
 /** Label of a rule for logs and messages: `deny prefix: sudo`. */
-export const describeRule = (r: RuleRef) => (r.builtin ? `built-in: ${r.pattern}` : `${r.effect} ${r.match}: ${r.pattern}`);
+export const describeRule = (r: RuleRef) =>
+  r.builtin ? `built-in: ${r.pattern}` : `${r.effect} ${r.match}: ${r.pattern}`;
 
 /** Message returned to the model when a command is blocked. */
 export function blockedMessage(e: Evaluation, access: Access): string {
@@ -970,4 +1159,5 @@ export function blockedMessage(e: Evaluation, access: Access): string {
 }
 
 /** Why a command asks for confirmation, for the approval card. */
-export const askReason = (e: Evaluation): string | undefined => (e.decision === "ask" && e.rule ? describeRule(e.rule) : undefined);
+export const askReason = (e: Evaluation): string | undefined =>
+  e.decision === "ask" && e.rule ? describeRule(e.rule) : undefined;

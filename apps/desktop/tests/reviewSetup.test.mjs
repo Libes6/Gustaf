@@ -2,17 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { commandAllowed, commandNeedsApproval, commandVerdict } from '../src/lib/commandRules.ts';
 import {
-  clipOutput, hasReviewSetup, MAX_LINK_DIRS, normalizeLinkDir, normalizeReviewSetup, OUTPUT_LIMIT, parseLinkDirs, summarizeRun,
+  clipOutput,
+  hasReviewSetup,
+  MAX_LINK_DIRS,
+  normalizeLinkDir,
+  normalizeReviewSetup,
+  OUTPUT_LIMIT,
+  parseLinkDirs,
+  summarizeRun,
 } from '../src/lib/reviewSetup.ts';
 
 test('link directories are normalized to plain project-relative paths', () => {
   assert.equal(normalizeLinkDir('node_modules'), 'node_modules');
   assert.equal(normalizeLinkDir(' ./packages//a/node_modules/ '), 'packages/a/node_modules');
-  for (const bad of ['', '  ', '.', '/', '/etc', '../x', 'a/../b', '.git', 'a/.git/hooks', 'a\\b', 'a\0b']) assert.equal(normalizeLinkDir(bad), null, JSON.stringify(bad));
+  for (const bad of ['', '  ', '.', '/', '/etc', '../x', 'a/../b', '.git', 'a/.git/hooks', 'a\\b', 'a\0b'])
+    assert.equal(normalizeLinkDir(bad), null, JSON.stringify(bad));
 });
 
 test('parseLinkDirs accepts lines and commas, drops invalid and duplicate entries and caps the count', () => {
-  assert.deepEqual(parseLinkDirs('node_modules\n./node_modules, vendor\n../out\n/abs\n\n.venv'), ['node_modules', 'vendor', '.venv']);
+  assert.deepEqual(parseLinkDirs('node_modules\n./node_modules, vendor\n../out\n/abs\n\n.venv'), [
+    'node_modules',
+    'vendor',
+    '.venv',
+  ]);
   const many = Array.from({ length: MAX_LINK_DIRS + 5 }, (_, i) => `d${i}`).join('\n');
   assert.equal(parseLinkDirs(many).length, MAX_LINK_DIRS);
 });

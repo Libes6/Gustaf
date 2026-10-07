@@ -9,8 +9,27 @@ import { callsOf, mockInvoke } from "./tauri";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
-const col = (id: string, name: string, chunks: number) => ({ id, name, sources: [], include: [], config: {}, createdAt: 1, consentedAt: 1, indexing: false, status: { state: "ready", files: 1, chunks, bytes: 1, indexedAt: 1, issues: [], warnings: [], lastError: null } });
-const model = { id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, images: true, tools: true, created: 1, firstSeen: 1 };
+const col = (id: string, name: string, chunks: number) => ({
+  id,
+  name,
+  sources: [],
+  include: [],
+  config: {},
+  createdAt: 1,
+  consentedAt: 1,
+  indexing: false,
+  status: { state: "ready", files: 1, chunks, bytes: 1, indexedAt: 1, issues: [], warnings: [], lastError: null },
+});
+const model = {
+  id: "m1",
+  name: "Model One",
+  providerId: "p1",
+  contextWindow: 200_000,
+  images: true,
+  tools: true,
+  created: 1,
+  firstSeen: 1,
+};
 
 function Harness({ chatId, onManage }: { chatId: number | null; onManage?: () => void }) {
   const [text, setText] = useState("");
@@ -19,9 +38,30 @@ function Harness({ chatId, onManage }: { chatId: number | null; onManage?: () =>
   const knowledge = useChatKnowledge(chatId);
   return (
     <Composer
-      text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible root={null} projectName={undefined} files={[]}
-      provider={provider()} selectedModel={model} modelName="Model One" supports={{ computer: false, reasoning: false }} running={false}
-      mode="agent" onModeChange={() => {}} onSend={() => {}} onStop={() => {}} contextTokens={0} lastInput={undefined} canCompact={false} canRestore={false} onCompact={() => {}} onRestore={() => {}}
+      text={text}
+      setText={setText}
+      images={images}
+      setImages={setImages}
+      taRef={taRef}
+      visible
+      root={null}
+      projectName={undefined}
+      files={[]}
+      provider={provider()}
+      selectedModel={model}
+      modelName="Model One"
+      supports={{ computer: false, reasoning: false }}
+      running={false}
+      mode="agent"
+      onModeChange={() => {}}
+      onSend={() => {}}
+      onStop={() => {}}
+      contextTokens={0}
+      lastInput={undefined}
+      canCompact={false}
+      canRestore={false}
+      onCompact={() => {}}
+      onRestore={() => {}}
       knowledge={{ ...knowledge, onManage }}
     />
   );
@@ -31,8 +71,14 @@ function settingsBackend(collections: unknown[], initial: Record<string, unknown
   const store: Record<string, unknown> = { ...initial };
   mockInvoke({
     knowledge_list: () => collections,
-    db_select: ({ sql, params }: any) => (/from settings where key/.test(sql) && String(params[0]) in store ? [{ value: JSON.stringify(store[String(params[0])]) }] : []),
-    db_execute: ({ params }: any) => { store[String(params[0])] = JSON.parse(params[1]); return [1, 1]; },
+    db_select: ({ sql, params }: any) =>
+      /from settings where key/.test(sql) && String(params[0]) in store
+        ? [{ value: JSON.stringify(store[String(params[0])]) }]
+        : [],
+    db_execute: ({ params }: any) => {
+      store[String(params[0])] = JSON.parse(params[1]);
+      return [1, 1];
+    },
   });
   return store;
 }
@@ -61,7 +107,9 @@ describe("Composer knowledge picker", () => {
     renderApp(<Harness chatId={9} />, makeApp());
     await waitFor(() => expect(callsOf("knowledge_list").length).toBeGreaterThan(0));
     await userEvent.click(screen.getByRole("button", { name: "Attach" }));
-    await waitFor(() => expect(screen.getByRole("menuitemradio", { name: /Team wiki/ })).toHaveAttribute("aria-checked", "true"));
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemradio", { name: /Team wiki/ })).toHaveAttribute("aria-checked", "true"),
+    );
   });
 
   it("keeps the choice of a chat that does not exist yet in memory only", async () => {

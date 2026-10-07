@@ -5,34 +5,35 @@ mod cursor_accounts;
 mod cursor_import;
 mod db;
 mod git;
+mod git_branches;
 mod git_publish;
 mod hook_exec;
 mod hunks;
 mod import_sources;
+mod knowledge;
+mod legacy;
+mod lsp;
 mod mcp;
+mod merge_queue;
+mod mobile_server;
 mod oauth;
 mod pr_watch;
+mod preview;
+mod proc_tree;
+mod quick_ask;
 mod rawlog;
 mod review;
 mod scratch;
 mod secrets;
-mod skills;
-mod shell;
-mod tools;
-mod preview;
 mod semantic;
-mod knowledge;
-mod legacy;
-mod lsp;
-mod web_tools;
+mod shell;
+mod skills;
+mod terminal;
+mod tools;
 mod updater;
+mod web_tools;
 mod webhooks;
 mod worktree;
-mod merge_queue;
-mod terminal;
-mod mobile_server;
-mod proc_tree;
-mod quick_ask;
 
 pub use knowledge::{extract_pdf_with_exe, pdf_child_main};
 use std::sync::Mutex;
@@ -130,10 +131,14 @@ pub fn run() {
             tools::run_command,
             hook_exec::run_hook,
             proc_tree::process_kill_tree,
+            proc_tree::process_snapshot,
+            proc_tree::app_logs_dir,
             git::git,
             git::git_status,
             git::git_commit_context,
             git::git_commit,
+            git_branches::git_branches,
+            git_branches::git_switch_branch,
             git_publish::git_publish_info,
             git_publish::git_push,
             git_publish::git_create_branch,
@@ -172,6 +177,7 @@ pub fn run() {
             rawlog::raw_log_append,
             rawlog::raw_log_clear,
             rawlog::raw_log_info,
+            rawlog::raw_log_prune,
             codex_agents::codex_agents_scan,
             mcp::mcp_start,
             mcp::mcp_request,
@@ -191,6 +197,7 @@ pub fn run() {
             mobile_server::mobile_devices,
             mobile_server::mobile_device_revoke,
             mobile_server::mobile_report_status,
+            mobile_server::mobile_command_reply,
             quick_ask::quick_ask_configure,
             quick_ask::quick_ask_show,
             quick_ask::quick_ask_hide,

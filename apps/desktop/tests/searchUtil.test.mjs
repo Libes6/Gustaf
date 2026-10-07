@@ -1,8 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MARK_OPEN, MARK_CLOSE, MIN_QUERY_CHARS, PAGE_SIZE, mergeHits, arrowDown,
-  parseSnippet, searchableQuery, moveHighlight, nearestMessageId, turnHasMessage, isSearchShortcut,
+  MARK_OPEN,
+  MARK_CLOSE,
+  MIN_QUERY_CHARS,
+  PAGE_SIZE,
+  mergeHits,
+  arrowDown,
+  parseSnippet,
+  searchableQuery,
+  moveHighlight,
+  nearestMessageId,
+  turnHasMessage,
+  isSearchShortcut,
 } from '../src/lib/searchUtil.ts';
 
 const hit = (s) => `${MARK_OPEN}${s}${MARK_CLOSE}`;
@@ -77,7 +87,11 @@ test('searchableQuery needs two characters with a letter or digit', () => {
   assert.equal(searchableQuery('мир'), 'мир');
   assert.equal(searchableQuery('日本'), '日本');
   assert.equal(searchableQuery('😀😀'), null, 'emoji alone have no letters');
-  assert.equal(searchableQuery('"exact phrase"'), '"exact phrase"', 'the raw text is passed on; escaping is done in Rust');
+  assert.equal(
+    searchableQuery('"exact phrase"'),
+    '"exact phrase"',
+    'the raw text is passed on; escaping is done in Rust',
+  );
 });
 
 test('moveHighlight wraps around and recovers from a stale index', () => {
@@ -129,9 +143,19 @@ test('isSearchShortcut is Cmd+K on any keyboard layout', () => {
 
 test('mergeHits appends a page and skips messages that are already shown', () => {
   const h = (id) => ({ messageId: id });
-  assert.deepEqual(mergeHits([h(1), h(2)], [h(3), h(4)]).map((x) => x.messageId), [1, 2, 3, 4]);
-  assert.deepEqual(mergeHits([h(1), h(2)], [h(2), h(3), h(3)]).map((x) => x.messageId), [1, 2, 3], 'overlap and repeats within a page');
-  assert.deepEqual(mergeHits([], [h(5)]).map((x) => x.messageId), [5]);
+  assert.deepEqual(
+    mergeHits([h(1), h(2)], [h(3), h(4)]).map((x) => x.messageId),
+    [1, 2, 3, 4],
+  );
+  assert.deepEqual(
+    mergeHits([h(1), h(2)], [h(2), h(3), h(3)]).map((x) => x.messageId),
+    [1, 2, 3],
+    'overlap and repeats within a page',
+  );
+  assert.deepEqual(
+    mergeHits([], [h(5)]).map((x) => x.messageId),
+    [5],
+  );
   const shown = [h(1)];
   mergeHits(shown, [h(2)]);
   assert.equal(shown.length, 1, 'the input is not mutated');

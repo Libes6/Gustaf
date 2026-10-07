@@ -8,7 +8,9 @@ export const loadChatMode = async (chatId: number): Promise<ChatMode> =>
 let queue: Promise<unknown> = Promise.resolve();
 /** Stores the mode of one chat; writes are serialized so quick switches cannot overwrite each other. */
 export const saveChatMode = (chatId: number, mode: ChatMode): Promise<void> =>
-  (queue = queue.then(async () => {
-    const map = normalizeChatModes(await getSetting<unknown>(CHAT_MODES_SETTING, null).catch(() => null));
-    await setSetting(CHAT_MODES_SETTING, withChatMode(map, chatId, mode));
-  }).catch(() => {})) as Promise<void>;
+  (queue = queue
+    .then(async () => {
+      const map = normalizeChatModes(await getSetting<unknown>(CHAT_MODES_SETTING, null).catch(() => null));
+      await setSetting(CHAT_MODES_SETTING, withChatMode(map, chatId, mode));
+    })
+    .catch(() => {})) as Promise<void>;

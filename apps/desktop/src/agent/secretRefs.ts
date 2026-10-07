@@ -11,7 +11,8 @@ const REF = /GUSTAF_SECRET_([A-Z0-9]{8})\b/g;
 /** Keeps a value and returns its reference (8 upper-case characters). */
 export function issueSecret(name: string, value: string, random: () => number = Math.random): string {
   let ref = "";
-  do ref = Array.from({ length: 8 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(random() * 32)]).join(""); while (store.has(ref));
+  do ref = Array.from({ length: 8 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(random() * 32)]).join("");
+  while (store.has(ref));
   store.set(ref, { name, value });
   return ref;
 }
@@ -22,7 +23,7 @@ export function secretEnv(command: string): { env: Record<string, string>; used:
   const used: string[] = [];
   for (const m of command.matchAll(REF)) {
     const e = store.get(m[1]);
-    if (e && !used.includes(m[1])) (env[SECRET_ENV_PREFIX + m[1]] = e.value), used.push(m[1]);
+    if (e && !used.includes(m[1])) ((env[SECRET_ENV_PREFIX + m[1]] = e.value), used.push(m[1]));
   }
   return { env, used };
 }

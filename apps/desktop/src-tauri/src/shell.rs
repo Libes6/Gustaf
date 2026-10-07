@@ -2,6 +2,8 @@
 //! macOS: zsh (login shell). Linux: bash if present, else sh. Windows: Windows PowerShell 5.1.
 //! The TypeScript twin is `src/providers/shell.ts`.
 
+// `PowerShell` is the real product name; renaming the variant would only to satisfy the lint.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shell {
     Zsh,
@@ -22,7 +24,10 @@ impl Shell {
     }
 
     pub fn current() -> Shell {
-        Shell::pick(std::env::consts::OS, std::path::Path::new("/bin/bash").exists())
+        Shell::pick(
+            std::env::consts::OS,
+            std::path::Path::new("/bin/bash").exists(),
+        )
     }
 
     pub fn program(self) -> &'static str {

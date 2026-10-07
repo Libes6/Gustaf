@@ -8,11 +8,17 @@ import { chat, makeApp, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 const KEY = "sk-ant-api03-" + "a1B2c3D4e5F6g7H8i9J0k1L2";
-const row = (id: number, role: string, text: string) => ({ id, chat_id: 1, created_at: 1_700_000_000_000, content: JSON.stringify({ role, parts: [{ type: "text", text }] }) });
+const row = (id: number, role: string, text: string) => ({
+  id,
+  chat_id: 1,
+  created_at: 1_700_000_000_000,
+  content: JSON.stringify({ role, parts: [{ type: "text", text }] }),
+});
 
 const backend = () =>
   mockInvoke({
-    db_select: ({ sql }: { sql: string }) => (/from messages/.test(sql) ? [row(1, "user", `use ${KEY} please`), row(2, "assistant", "**done**")] : []),
+    db_select: ({ sql }: { sql: string }) =>
+      /from messages/.test(sql) ? [row(1, "user", `use ${KEY} please`), row(2, "assistant", "**done**")] : [],
   });
 const c = chat({ id: 1, project_id: null, title: "Deploy notes" });
 

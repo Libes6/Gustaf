@@ -21,8 +21,16 @@ const SYNTHETIC = new Set(["default", "auto"]);
  */
 export function newModelKeys(models: Model[], now = Date.now()): Set<string> {
   const baseline = new Map<string, number>();
-  for (const m of models) if (!SYNTHETIC.has(m.id)) baseline.set(m.providerId, Math.min(baseline.get(m.providerId) ?? Infinity, m.firstSeen));
-  return new Set(models.filter((m) => !SYNTHETIC.has(m.id) && m.firstSeen > (baseline.get(m.providerId) ?? Infinity) && now - m.firstSeen < NEW_MS).map(favKey));
+  for (const m of models)
+    if (!SYNTHETIC.has(m.id)) baseline.set(m.providerId, Math.min(baseline.get(m.providerId) ?? Infinity, m.firstSeen));
+  return new Set(
+    models
+      .filter(
+        (m) =>
+          !SYNTHETIC.has(m.id) && m.firstSeen > (baseline.get(m.providerId) ?? Infinity) && now - m.firstSeen < NEW_MS,
+      )
+      .map(favKey),
+  );
 }
 
 /** `200K`, `1M`: the context window as a short label. */
@@ -38,7 +46,9 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
   const selKey = app.selection ? favKey({ providerId: app.selection.providerId, id: app.selection.model }) : "";
   // Open where the current model is: favourites when it is starred, else its provider's tab.
   const [tab, setTab] = useState<string>(() =>
-    selKey && app.favorites.includes(selKey) ? "fav" : app.selection?.providerId ?? (app.favorites.length ? "fav" : app.providers[0]?.id ?? "fav"),
+    selKey && app.favorites.includes(selKey)
+      ? "fav"
+      : (app.selection?.providerId ?? (app.favorites.length ? "fav" : (app.providers[0]?.id ?? "fav"))),
   );
   const [q, setQ] = useState("");
   const [more, setMore] = useState(false);
@@ -63,7 +73,12 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
         ? models.filter((m) => app.favorites.includes(favKey(m)))
         : models.filter((m) => m.providerId === tab);
     // Grouped by provider (pinned order) when several providers are listed (search, favourites), newest first within each.
-    ms = [...ms].sort((a, b) => (rank.get(a.providerId) ?? 1e9) - (rank.get(b.providerId) ?? 1e9) || b.created - a.created || a.name.localeCompare(b.name));
+    ms = [...ms].sort(
+      (a, b) =>
+        (rank.get(a.providerId) ?? 1e9) - (rank.get(b.providerId) ?? 1e9) ||
+        b.created - a.created ||
+        a.name.localeCompare(b.name),
+    );
     return ms;
   }, [app.models, app.favorites, app.hiddenModels, app.providers, tab, q]);
   const visible = more || q ? list : list.slice(0, VISIBLE);
@@ -96,8 +111,12 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
   useEffect(() => {
     let live = true;
     setLoading(true);
-    Promise.resolve(app.ensureModels?.()).catch(() => {}).finally(() => live && setLoading(false));
-    return () => { live = false; };
+    Promise.resolve(app.ensureModels?.())
+      .catch(() => {})
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
   }, []);
   // On open: highlight the current model and bring it into view (expanding "other models" if it is below the fold).
   const opened = useRef(false);
@@ -125,7 +144,9 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
   const move = (i: number) => ((scrollToHl.current = true), setHl(i));
   const retry = () => {
     setLoading(true);
-    Promise.resolve(app.refreshModels({ only: [tab] })).catch(() => {}).finally(() => setLoading(false));
+    Promise.resolve(app.refreshModels({ only: [tab] }))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
   const toggleFav = (m: Model) => {
@@ -140,18 +161,40 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
     else if (e.key === "Home" && e.target === e.currentTarget) (e.preventDefault(), move(0));
     else if (e.key === "End" && e.target === e.currentTarget) (e.preventDefault(), move(visible.length - 1));
     else if (e.key === "Enter" && visible[hl]) pick(visible[hl]);
-    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && visible[hl]) (e.preventDefault(), toggleFav(visible[hl]));
-    else if (cmdKey(e) && /^[1-9]$/.test(e.key) && visible[Number(e.key) - 1]) (e.preventDefault(), pick(visible[Number(e.key) - 1]));
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && visible[hl])
+      (e.preventDefault(), toggleFav(visible[hl]));
+    else if (cmdKey(e) && /^[1-9]$/.test(e.key) && visible[Number(e.key) - 1])
+      (e.preventDefault(), pick(visible[Number(e.key) - 1]));
   };
 
   return (
-    <div className="popover picker" ref={ref} role="dialog" aria-label={t("modelPicker")} onKeyDown={onKey} style={height ? { height } : undefined}>
+    <div
+      className="popover picker"
+      ref={ref}
+      role="dialog"
+      aria-label={t("modelPicker")}
+      onKeyDown={onKey}
+      style={height ? { height } : undefined}
+    >
       <div className="picker-rail">
-        <button className={tab === "fav" && !q ? "active" : ""} title={t("favorites")} aria-label={t("favorites")} aria-pressed={tab === "fav" && !q} onClick={() => setTab("fav")}>
+        <button
+          className={tab === "fav" && !q ? "active" : ""}
+          title={t("favorites")}
+          aria-label={t("favorites")}
+          aria-pressed={tab === "fav" && !q}
+          onClick={() => setTab("fav")}
+        >
           <Star size={17} fill={tab === "fav" ? "currentColor" : "none"} />
         </button>
         {providers.map((p) => (
-          <button key={p.id} className={tab === p.id && !q ? "active" : ""} title={p.name} aria-label={p.name} aria-pressed={tab === p.id && !q} onClick={() => setTab(p.id)}>
+          <button
+            key={p.id}
+            className={tab === p.id && !q ? "active" : ""}
+            title={p.name}
+            aria-label={p.name}
+            aria-pressed={tab === p.id && !q}
+            onClick={() => setTab(p.id)}
+          >
             <ProviderIcon kind={p.kind} cli={p.cli} size={18} />
           </button>
         ))}
@@ -160,64 +203,112 @@ export function ModelPicker({ onClose, multi }: { onClose: () => void; multi?: M
         <div className="picker-search">
           <Search size={15} />
           <input
-            autoFocus role="combobox" aria-label={t("searchModels")} aria-expanded aria-controls="model-list" aria-autocomplete="list" aria-keyshortcuts="Control+D Meta+D"
-            aria-activedescendant={visible[hl] ? `model-opt-${hl}` : undefined} placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
+            autoFocus
+            role="combobox"
+            aria-label={t("searchModels")}
+            aria-expanded
+            aria-controls="model-list"
+            aria-autocomplete="list"
+            aria-keyshortcuts="Control+D Meta+D"
+            aria-activedescendant={visible[hl] ? `model-opt-${hl}` : undefined}
+            placeholder={t("searchModels")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
         <div className="picker-list">
           <div id="model-list" role="listbox" aria-label={t("modelPicker")} style={{ display: "contents" }}>
-          {visible.map((m, i) => {
-            const fav = app.favorites.includes(favKey(m));
-            const sel = favKey(m) === selKey;
-            const ctx = contextLabel(m.contextWindow);
-            return (
-              <div key={favKey(m)} id={`model-opt-${i}`} role="option" aria-selected={sel} className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`} onMouseMove={() => i !== hl && setHl(i)} onClick={(e) => (multi && e.shiftKey ? multi.toggle(m) : pick(m))}>
-                <div className="info">
-                  <div className="model-name" title={m.name !== m.id ? `${m.name} · ${m.id}` : m.name}>
-                    <ModelIcon model={`${m.id} ${m.name}`} provider={app.providers.find(p => p.id === m.providerId)} size={18} /> <span className="model-label">{m.name}</span>
-                    {fresh.has(favKey(m)) && <span className="badge-new">NEW</span>}
-                  </div>
-                  <div className="model-prov">
-                    <ProviderIcon kind={kindOf(m.providerId)} size={12} /> <span className="model-label">{nameOf(m.providerId)}</span>
-                    {ctx && <span className="model-ctx" title={t("contextWindowTokens", { tokens: m.contextWindow!.toLocaleString(app.locale) })}>{ctx}</span>}
-                  </div>
-                </div>
-                {multi?.keys.includes(favKey(m)) && <span className="multi-mark" role="img" aria-label={t("fanOutPicked")}>{multi.keys.indexOf(favKey(m)) + 1}</span>}
-                {sel && <Check size={15} className="sel-check" aria-hidden="true" />}
-                {i < 9 && <span className="kbd-chip">{displayKeys(`⌘${i + 1}`)}</span>}
-                <button
-                  className={`star${fav ? " on" : ""}`}
-                  title={t("favorite")}
-                  aria-label={t("favorite")}
-                  aria-pressed={fav}
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFav(m);
-                  }}
+            {visible.map((m, i) => {
+              const fav = app.favorites.includes(favKey(m));
+              const sel = favKey(m) === selKey;
+              const ctx = contextLabel(m.contextWindow);
+              return (
+                <div
+                  key={favKey(m)}
+                  id={`model-opt-${i}`}
+                  role="option"
+                  aria-selected={sel}
+                  className={`model-row${i === hl ? " hl" : ""}${sel ? " sel" : ""}`}
+                  onMouseMove={() => i !== hl && setHl(i)}
+                  onClick={(e) => (multi && e.shiftKey ? multi.toggle(m) : pick(m))}
                 >
-                  <Star size={14} fill={fav ? "currentColor" : "none"} />
-                </button>
-              </div>
-            );
-          })}
+                  <div className="info">
+                    <div className="model-name" title={m.name !== m.id ? `${m.name} · ${m.id}` : m.name}>
+                      <ModelIcon
+                        model={`${m.id} ${m.name}`}
+                        provider={app.providers.find((p) => p.id === m.providerId)}
+                        size={18}
+                      />{" "}
+                      <span className="model-label">{m.name}</span>
+                      {fresh.has(favKey(m)) && <span className="badge-new">NEW</span>}
+                    </div>
+                    <div className="model-prov">
+                      <ProviderIcon kind={kindOf(m.providerId)} size={12} />{" "}
+                      <span className="model-label">{nameOf(m.providerId)}</span>
+                      {ctx && (
+                        <span
+                          className="model-ctx"
+                          title={t("contextWindowTokens", { tokens: m.contextWindow!.toLocaleString(app.locale) })}
+                        >
+                          {ctx}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {multi?.keys.includes(favKey(m)) && (
+                    <span className="multi-mark" role="img" aria-label={t("fanOutPicked")}>
+                      {multi.keys.indexOf(favKey(m)) + 1}
+                    </span>
+                  )}
+                  {sel && <Check size={15} className="sel-check" aria-hidden="true" />}
+                  {i < 9 && <span className="kbd-chip">{displayKeys(`⌘${i + 1}`)}</span>}
+                  <button
+                    className={`star${fav ? " on" : ""}`}
+                    title={t("favorite")}
+                    aria-label={t("favorite")}
+                    aria-pressed={fav}
+                    tabIndex={-1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFav(m);
+                    }}
+                  >
+                    <Star size={14} fill={fav ? "currentColor" : "none"} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
           {!q && tab !== "fav" && app.modelErrors[tab] ? (
             <div className={visible.length ? "picker-error inline" : "picker-error"} role="alert">
               <span>{visible.length ? t("modelsRefreshFailed") : app.modelErrors[tab]}</span>
-              <button className="btn-soft" onClick={retry} disabled={loading}><RotateCw size={12} aria-hidden="true" /> {t("retry")}</button>
+              <button className="btn-soft" onClick={retry} disabled={loading}>
+                <RotateCw size={12} aria-hidden="true" /> {t("retry")}
+              </button>
             </div>
-          ) : !visible.length && (
-            <div className="picker-empty" aria-live="polite">
-              {loading && !(tab === "fav" && !q) ? t("modelsLoading") : tab === "fav" && !q ? t("noFavorites") : t("noModels")}
-            </div>
+          ) : (
+            !visible.length && (
+              <div className="picker-empty" aria-live="polite">
+                {loading && !(tab === "fav" && !q)
+                  ? t("modelsLoading")
+                  : tab === "fav" && !q
+                    ? t("noFavorites")
+                    : t("noModels")}
+              </div>
+            )
           )}
           {!q && list.length > VISIBLE && (
             <button className="picker-more" onClick={() => setMore(!more)}>
-              {more ? <ChevronDown size={13} /> : <ChevronRight size={13} />} {t("otherModels", { count: list.length - VISIBLE })}
+              {more ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{" "}
+              {t("otherModels", { count: list.length - VISIBLE })}
             </button>
           )}
         </div>
-        {multi && <div className="picker-hint">{multi.keys.length ? t("fanOutPickedHint", { count: multi.keys.length, max: multi.max }) : t("fanOutHint")}</div>}
+        {multi && (
+          <div className="picker-hint">
+            {multi.keys.length ? t("fanOutPickedHint", { count: multi.keys.length, max: multi.max }) : t("fanOutHint")}
+          </div>
+        )}
         <button className="picker-more picker-manage" onClick={() => (onClose(), app.openSettings("providers"))}>
           <Settings2 size={13} /> {t("provManage")}
         </button>

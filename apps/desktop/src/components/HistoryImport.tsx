@@ -12,7 +12,7 @@ import { duplicateKeys, importChats } from "../lib/importers/run";
 import { importStore, recordImport } from "../lib/importers/store";
 
 const errorText = (e: unknown) => String(e instanceof Error ? e.message : e);
-const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
+export const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
   { id: "claude-code", label: "Claude Code", icon: Terminal },
   { id: "codex", label: "Codex", icon: Terminal },
   { id: "chatgpt", label: "ChatGPT", icon: MessagesSquare },
@@ -20,10 +20,17 @@ const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
 /** ChatGPT conversations are fetched from the export file this many at a time (each fetch streams through the file once). */
 const CHATGPT_BATCH = 20;
 
-/** Lists sessions of Claude Code and Codex, or conversations of a ChatGPT export, and imports the ticked ones. */
-export function HistoryImport({ onDone }: { onDone: (imported: number) => void }) {
+/** Lists sessions of Claude Code and Codex, or conversations of a ChatGPT export, and imports the ticked ones. The source tab is chosen by ImportPanel. */
+export function HistoryImport({
+  source,
+  onDone,
+  onBusy,
+}: {
+  source: ImportSource;
+  onDone: (imported: number) => void;
+  onBusy?: (busy: boolean) => void;
+}) {
   const t = useT();
-  const [source, setSource] = useState<ImportSource>("claude-code");
   const [sessions, setSessions] = useState<SourceSession[] | null>(null);
   const [exportPath, setExportPath] = useState("");
   const [known, setKnown] = useState<Set<string>>(new Set());
@@ -45,7 +52,11 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
     setLoading(true);
     try {
       const list =
-        src === "chatgpt" ? (path ? await importSources.chatgptScan(path) : []) : await importSources.scan(src === "codex" ? "codex" : "claude");
+        src === "chatgpt"
+          ? path
+            ? await importSources.chatgptScan(path)
+            : []
+          : await importSources.scan(src === "codex" ? "codex" : "claude");
       const keys = duplicateKeys(await importStore.existing());
       if (mine !== scanId.current) return;
       setKnown(new Set(list.filter((s) => keys.ids.has(`${src}:${s.id}`)).map((s) => s.id)));
@@ -105,7 +116,10 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
       }
       if (!cache.has(s.id)) {
         // Fetch this conversation together with the next ones that still need importing.
-        const ids = items.slice(i, i + CHATGPT_BATCH).map((x) => x.id).filter((id) => !known.has(id));
+        const ids = items
+          .slice(i, i + CHATGPT_BATCH)
+          .map((x) => x.id)
+          .filter((id) => !known.has(id));
         const batch = await importSources.chatgptRead(exportPath, ids);
         for (const id of ids) cache.set(id, null);
         for (const raw of batch.conversations) {
@@ -126,7 +140,8 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
       );
       if (r.imported) await recordImport(source, r.imported);
       setStatus(
-        t("importChatsResult", { imported: r.imported, skipped: r.skipped }) + (r.failed ? ` ${t("historyFailed", { count: r.failed })}` : ""),
+        t("importChatsResult", { imported: r.imported, skipped: r.skipped }) +
+          (r.failed ? ` ${t("historyFailed", { count: r.failed })}` : ""),
       );
       await scan(source, exportPath);
       if (r.imported) onDone(r.imported);
@@ -137,26 +152,23 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
     }
   };
 
+  useEffect(() => {
+    onBusy?.(!!progress);
+  }, [progress, onBusy]);
   const Icon = SOURCES.find((s) => s.id === source)!.icon;
   const selectableShown = selectable(shown, known);
   return (
     <div>
-      <h4 aria-level={2}>{t("historyImport")}</h4>
-      <p className="h4-sub">{t("historyImportSub")}</p>
-      <div className="seg" role="group" aria-label={t("historyImport")}>
-        {SOURCES.map((s) => (
-          <button key={s.id} aria-pressed={source === s.id} className={source === s.id ? "active" : ""} disabled={!!progress} onClick={() => setSource(s.id)}>
-            {s.label}
-          </button>
-        ))}
-      </div>
       {source === "chatgpt" && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="card-row">
             <FileJson size={15} />
             <div className="grow">
               <div className="t">{exportPath ? exportPath.split(/[\\/]/).pop() : t("historyPickFile")}</div>
-              <div className="d" style={exportPath ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : undefined}>
+              <div
+                className="d"
+                style={exportPath ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : undefined}
+              >
                 {exportPath || t("historyPickFileSub")}
               </div>
             </div>
@@ -166,17 +178,30 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
           </div>
         </div>
       )}
-      {error && <div className="error-box" role="alert">{error}</div>}
+      {error && (
+        <div className="error-box" role="alert">
+          {error}
+        </div>
+      )}
       {loading && (
         <div className="card">
-          <div className="card-row"><Loader2 size={15} className="spin" /> {t("historyScanning")}</div>
+          <div className="card-row">
+            <Loader2 size={15} className="spin" /> {t("historyScanning")}
+          </div>
         </div>
       )}
       {sessions && (
         <>
           <div className="input-group" style={{ marginBottom: 8 }}>
-            <span className="icon"><Search size={14} /></span>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("historySearch")} aria-label={t("historySearch")} />
+            <span className="icon">
+              <Search size={14} />
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("historySearch")}
+              aria-label={t("historySearch")}
+            />
           </div>
           <div className="card" style={{ maxHeight: 340, overflowY: "auto" }}>
             {!sessions.length && <div className="card-row d">{t("historyNothing")}</div>}
@@ -185,30 +210,50 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
               const done = known.has(s.id);
               return (
                 <label key={s.id} className="card-row" style={done ? { opacity: 0.6 } : undefined}>
-                  <input type="checkbox" className="check" disabled={done || !!progress} checked={picked.has(s.id)} onChange={() => toggle(s.id)} />
+                  <input
+                    type="checkbox"
+                    className="check"
+                    disabled={done || !!progress}
+                    checked={picked.has(s.id)}
+                    onChange={() => toggle(s.id)}
+                  />
                   <Icon size={15} />
                   <div className="grow">
-                    <div className="t" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title || t("historyUntitled")}</div>
+                    <div className="t" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {s.title || t("historyUntitled")}
+                    </div>
                     <div className="d" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {[s.projectPath, s.updatedAt ? t.date(s.updatedAt) : ""].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                  <span className="d">{done ? t("historyImported") : t("historyMessages", { count: s.messageCount })}</span>
+                  <span className="d">
+                    {done ? t("historyImported") : t("historyMessages", { count: s.messageCount })}
+                  </span>
                 </label>
               );
             })}
-            {shown.length > visible.length && <div className="card-row d">{t("historyMore", { count: shown.length - visible.length })}</div>}
+            {shown.length > visible.length && (
+              <div className="card-row d">{t("historyMore", { count: shown.length - visible.length })}</div>
+            )}
           </div>
           <div className="onb-foot">
             <span className="d" style={{ color: "var(--text-2)" }}>
-              {progress ? t("importing", { done: progress[0], total: progress[1] }) : t("historySelected", { count: picked.size })}
+              {progress
+                ? t("importing", { done: progress[0], total: progress[1] })
+                : t("historySelected", { count: picked.size })}
               {!progress && !!selectableShown.length && (
-                <button className="btn-soft" style={{ marginLeft: 10 }} onClick={() => setPicked(new Set([...picked, ...selectableShown.map((s) => s.id)]))}>
+                <button
+                  className="btn-soft"
+                  style={{ marginLeft: 10 }}
+                  onClick={() => setPicked(new Set([...picked, ...selectableShown.map((s) => s.id)]))}
+                >
                   {t("historySelectShown")}
                 </button>
               )}
               {!progress && !!picked.size && (
-                <button className="btn-soft" style={{ marginLeft: 6 }} onClick={() => setPicked(new Set())}>{t("historyClear")}</button>
+                <button className="btn-soft" style={{ marginLeft: 6 }} onClick={() => setPicked(new Set())}>
+                  {t("historyClear")}
+                </button>
               )}
             </span>
             <button className="btn btn-primary" disabled={!picked.size || !!progress} onClick={run}>
@@ -217,7 +262,11 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
           </div>
         </>
       )}
-      {status && <div className="ok" role="status" style={{ fontSize: 12.5, marginTop: 8 }}>{status}</div>}
+      {status && (
+        <div className="ok" role="status" style={{ fontSize: 12.5, marginTop: 8 }}>
+          {status}
+        </div>
+      )}
     </div>
   );
 }

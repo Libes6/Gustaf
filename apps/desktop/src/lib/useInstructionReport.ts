@@ -14,7 +14,11 @@ export function useInstructionReport(root: string | null, provider: ProviderConf
   const cli = provider?.cli;
   const reload = useCallback(() => {
     if (!root) return setReport(null);
-    loadProjectInstructions({ root, project: root, native: nativeInstructionFiles(kind ? { kind, cli } : undefined) }).then(setReport, () => setReport(null));
+    loadProjectInstructions({
+      root,
+      project: root,
+      native: nativeInstructionFiles(kind ? { kind, cli } : undefined),
+    }).then(setReport, () => setReport(null));
   }, [root, kind, cli]);
   useEffect(() => {
     reload();

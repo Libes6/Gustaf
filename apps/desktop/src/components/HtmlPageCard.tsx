@@ -19,20 +19,54 @@ export function HtmlPageCard({ page }: { page: HtmlPage }) {
         <span className="grow" />
         {page.complete && (
           <>
-            <button className="icon-btn" title={showCode ? t("htmlPageShowPage") : t("htmlPageShowCode")} aria-label={showCode ? t("htmlPageShowPage") : t("htmlPageShowCode")} aria-pressed={showCode} onClick={() => setShowCode(!showCode)}><FileCode2 size={14} /></button>
-            <button className="icon-btn" title={tall ? t("htmlPageSmaller") : t("htmlPageLarger")} aria-label={tall ? t("htmlPageSmaller") : t("htmlPageLarger")} onClick={() => setTall(!tall)}>{tall ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
+            <button
+              className="icon-btn"
+              title={showCode ? t("htmlPageShowPage") : t("htmlPageShowCode")}
+              aria-label={showCode ? t("htmlPageShowPage") : t("htmlPageShowCode")}
+              aria-pressed={showCode}
+              onClick={() => setShowCode(!showCode)}
+            >
+              <FileCode2 size={14} />
+            </button>
+            <button
+              className="icon-btn"
+              title={tall ? t("htmlPageSmaller") : t("htmlPageLarger")}
+              aria-label={tall ? t("htmlPageSmaller") : t("htmlPageLarger")}
+              onClick={() => setTall(!tall)}
+            >
+              {tall ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
           </>
         )}
-        <button className="icon-btn" title={t("copy")} aria-label={t("copy")} onClick={() => { navigator.clipboard.writeText(page.html); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>
+        <button
+          className="icon-btn"
+          title={t("copy")}
+          aria-label={t("copy")}
+          onClick={() => {
+            navigator.clipboard.writeText(page.html);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
+        >
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
       </div>
       {!page.complete ? (
-        <div className="html-page-pending" role="status">{t("htmlPageWriting")}</div>
+        <div className="html-page-pending" role="status">
+          {t("htmlPageWriting")}
+        </div>
       ) : showCode ? (
-        <pre><code>{page.html}</code></pre>
+        <pre>
+          <code>{page.html}</code>
+        </pre>
       ) : (
-        <iframe title={page.title} sandbox="" referrerPolicy="no-referrer" srcDoc={page.html} className={`html-page-frame${tall ? " tall" : ""}`} />
+        <iframe
+          title={page.title}
+          sandbox=""
+          referrerPolicy="no-referrer"
+          srcDoc={page.html}
+          className={`html-page-frame${tall ? " tall" : ""}`}
+        />
       )}
     </div>
   );

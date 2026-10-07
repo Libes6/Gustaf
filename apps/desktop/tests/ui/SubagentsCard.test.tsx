@@ -6,9 +6,24 @@ import type { Part } from "../../src/providers/types";
 import { renderApp } from "./render";
 import { mockInvoke } from "./tauri";
 
-const agent = (id: string, over: Partial<SubagentActivity["subagent"]> = {}, top: Partial<SubagentActivity> = {}): SubagentActivity => ({
-  type: "activity", id, name: "subagent", args: {}, status: "running",
-  subagent: { provider: "codex", agentId: `thread-${id}`, title: `Task ${id}`, action: "wait", state: "running", ...over },
+const agent = (
+  id: string,
+  over: Partial<SubagentActivity["subagent"]> = {},
+  top: Partial<SubagentActivity> = {},
+): SubagentActivity => ({
+  type: "activity",
+  id,
+  name: "subagent",
+  args: {},
+  status: "running",
+  subagent: {
+    provider: "codex",
+    agentId: `thread-${id}`,
+    title: `Task ${id}`,
+    action: "wait",
+    state: "running",
+    ...over,
+  },
   ...top,
 });
 
@@ -16,7 +31,11 @@ describe("SubagentsCard", () => {
   it("shows Codex agents read from rollout files: title, state, latest step and tokens", () => {
     mockInvoke({});
     const agents = [
-      agent("a", { action: "scan", state: "completed", result: "alpha ok", tokens: 1500, toolUses: 3 }, { status: "success", output: "alpha ok" }),
+      agent(
+        "a",
+        { action: "scan", state: "completed", result: "alpha ok", tokens: 1500, toolUses: 3 },
+        { status: "success", output: "alpha ok" },
+      ),
       agent("b", { action: "scan", state: "running", step: "cargo test", role: "task_b" }),
       agent("c", { action: "scan", state: "running" }),
     ];
@@ -33,7 +52,11 @@ describe("SubagentsCard", () => {
   it("shows one card with counts and one row per agent; a row expands to its task and report", () => {
     mockInvoke({});
     const agents = [
-      agent("a", { state: "completed", waits: 5, prompt: "Count the files", result: "42 files" }, { status: "success", output: "42 files\nin total" }),
+      agent(
+        "a",
+        { state: "completed", waits: 5, prompt: "Count the files", result: "42 files" },
+        { status: "success", output: "42 files\nin total" },
+      ),
       agent("b", { state: "waiting" }),
       agent("c", { state: "failed", result: "boom" }, { status: "error", output: "boom" }),
     ];
@@ -56,10 +79,10 @@ describe("SubagentsCard", () => {
     expect(within(rows[0]).getByText(/42 files\s+in total/)).toBeInTheDocument();
   });
 
-  it("an agent still running when the turn ended reads as Ended; unnamed agents show a short id", () => {
+  it("an agent still running when the turn ended reads as Status unknown; unnamed agents show a short id", () => {
     mockInvoke({});
     renderApp(<SubagentsCard agents={[agent("x", { title: "", agentId: "019a-abcdef" }, { status: "unknown" })]} />);
-    expect(screen.getByText("Ended")).toBeInTheDocument();
+    expect(screen.getByText("Status unknown")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent abcdef/ })).toBeInTheDocument();
   });
 
@@ -84,10 +107,20 @@ describe("SubagentsCard", () => {
     mockInvoke({});
     const parts: Part[] = [
       { type: "activity", id: "cmd", name: "command_execution", args: { command: "ls" }, status: "success" },
-      agent("a"), agent("b"), agent("c"), agent("d"), agent("e"),
+      agent("a"),
+      agent("b"),
+      agent("c"),
+      agent("d"),
+      agent("e"),
       { type: "text", text: "all done" },
     ];
-    renderApp(<>{renderWithSubagents(parts, (p, i) => (p.type === "activity" ? <ToolCard key={p.id} call={p} /> : <p key={i}>{p.type === "text" ? p.text : ""}</p>))}</>);
+    renderApp(
+      <>
+        {renderWithSubagents(parts, (p, i) =>
+          p.type === "activity" ? <ToolCard key={p.id} call={p} /> : <p key={i}>{p.type === "text" ? p.text : ""}</p>,
+        )}
+      </>,
+    );
     expect(screen.getAllByRole("region", { name: "Subagents" })).toHaveLength(1);
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     expect(screen.queryByText("collab_tool_call")).toBeNull();

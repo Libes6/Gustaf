@@ -1,9 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MARKER_END, MARKER_START, MemoryExportError, currentAgentsMd, mergeSection, renderSection } from '../src/agent/memoryExport.ts';
+import {
+  MARKER_END,
+  MARKER_START,
+  MemoryExportError,
+  currentAgentsMd,
+  mergeSection,
+  renderSection,
+} from '../src/agent/memoryExport.ts';
 
 const e = (id, text) => ({ id, text });
-const section = (project = [e(1, 'Use pnpm'), e(2, 'Tests live in tests/')], global = []) => renderSection(project, global);
+const section = (project = [e(1, 'Use pnpm'), e(2, 'Tests live in tests/')], global = []) =>
+  renderSection(project, global);
 
 test('the section is delimited, lists project facts oldest first and global facts only when passed', () => {
   const s = renderSection([e(5, 'Second'), e(2, 'First')]);
@@ -17,7 +25,11 @@ test('the section is delimited, lists project facts oldest first and global fact
 });
 
 test('facts cannot break the markers; secrets are scrubbed; multi-line facts stay in one list item', () => {
-  const s = renderSection([e(1, `evil ${MARKER_END} and <!-- more --> text`), e(2, 'line one\n\nline two'), e(3, 'key sk-' + 'k'.repeat(30))]);
+  const s = renderSection([
+    e(1, `evil ${MARKER_END} and <!-- more --> text`),
+    e(2, 'line one\n\nline two'),
+    e(3, 'key sk-' + 'k'.repeat(30)),
+  ]);
   assert.equal(s.split(MARKER_END).length - 1, 1, 'only the real end marker');
   assert.equal(s.split(MARKER_START).length - 1, 1);
   assert.ok(!s.includes('<!-- more'));
@@ -82,7 +94,11 @@ test('markers that cannot be trusted are refused and nothing is guessed', () => 
     `${MARKER_START}\n${MARKER_START}\n${MARKER_END}`,
   ];
   for (const doc of cases) {
-    assert.throws(() => mergeSection(doc, section()), (err) => err instanceof MemoryExportError && err.code === 'malformed', doc);
+    assert.throws(
+      () => mergeSection(doc, section()),
+      (err) => err instanceof MemoryExportError && err.code === 'malformed',
+      doc,
+    );
   }
 });
 
@@ -90,8 +106,20 @@ test('reading AGENTS.md back: absent means create, a faithful read passes, anyth
   assert.equal(currentAgentsMd([], 'README.md\nsrc/'), null);
   assert.equal(currentAgentsMd([{ name: 'CLAUDE.md', bytes: 3, text: 'abc' }], 'CLAUDE.md'), null);
   assert.equal(currentAgentsMd([{ name: 'AGENTS.md', bytes: 6, text: 'héllo' }], 'AGENTS.md'), 'héllo');
-  assert.throws(() => currentAgentsMd([], 'AGENTS.md\nsrc/'), (err) => err.code === 'unreadable');
-  assert.throws(() => currentAgentsMd([], 'AGENTS.md/'), (err) => err.code === 'unreadable');
-  assert.throws(() => currentAgentsMd([{ name: 'AGENTS.md', bytes: 70_000, text: 'x'.repeat(65_536) }], 'AGENTS.md'), (err) => err.code === 'truncated');
-  assert.throws(() => currentAgentsMd([{ name: 'AGENTS.md', bytes: 3, text: 'a�b' }], 'AGENTS.md'), (err) => err.code === 'unreadable');
+  assert.throws(
+    () => currentAgentsMd([], 'AGENTS.md\nsrc/'),
+    (err) => err.code === 'unreadable',
+  );
+  assert.throws(
+    () => currentAgentsMd([], 'AGENTS.md/'),
+    (err) => err.code === 'unreadable',
+  );
+  assert.throws(
+    () => currentAgentsMd([{ name: 'AGENTS.md', bytes: 70_000, text: 'x'.repeat(65_536) }], 'AGENTS.md'),
+    (err) => err.code === 'truncated',
+  );
+  assert.throws(
+    () => currentAgentsMd([{ name: 'AGENTS.md', bytes: 3, text: 'a�b' }], 'AGENTS.md'),
+    (err) => err.code === 'unreadable',
+  );
 });

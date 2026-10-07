@@ -58,6 +58,15 @@ export class MockServer implements DesktopApi {
     return (this.messages.get(chatId) ?? []).map((m) => ({ ...m, tools: [...m.tools] }));
   }
 
+  async createChat(projectId: number, text: string, title?: string) {
+    const chat: ChatSummary = { id: this.nextId++, projectId, title: title ?? (text.split("\n")[0] ?? "").slice(0, 60), archived: false, updatedAt: Date.now(), running: false };
+    this.chats.unshift(chat);
+    this.messages.set(chat.id, []);
+    this.emit({ type: "chat.updated", chat: { ...chat } });
+    await this.sendMessage(chat.id, { text });
+    return { chatId: chat.id };
+  }
+
   async sendMessage(chatId: number, req: SendMessageRequest) {
     const chat = this.chats.find((c) => c.id === chatId);
     if (!chat) throw new Error("not found");

@@ -4,8 +4,22 @@ import { useT } from "../i18n";
 import { formatDuration } from "../lib/formatDuration";
 import { displayKeys } from "../lib/platform";
 import {
-  MAX_COLUMNS, MIN_COLUMNS, anyRunning, canContinue, canRun, compareChatTitle, compareReducer, continueMessages, elapsedMs, emptyCompare,
-  estimateOutput, startCompare, toggleTarget, type Column, type CompareRun, type CompareTarget,
+  MAX_COLUMNS,
+  MIN_COLUMNS,
+  anyRunning,
+  canContinue,
+  canRun,
+  compareChatTitle,
+  compareReducer,
+  continueMessages,
+  elapsedMs,
+  emptyCompare,
+  estimateOutput,
+  startCompare,
+  toggleTarget,
+  type Column,
+  type CompareRun,
+  type CompareTarget,
 } from "../lib/compare";
 import { addMessage, createChat } from "../lib/data";
 import { useDialogFocus } from "../lib/useDialogFocus";
@@ -53,9 +67,13 @@ export function Compare({ onClose }: { onClose: () => void }) {
   const models = useMemo(() => {
     const s = filter.trim().toLowerCase();
     return app.models
-      .filter((m) => !app.hiddenModels.includes(modelKey(m)) && !app.providers.find((p) => p.id === m.providerId)?.disabled)
+      .filter(
+        (m) => !app.hiddenModels.includes(modelKey(m)) && !app.providers.find((p) => p.id === m.providerId)?.disabled,
+      )
       .filter((m) => !s || m.id.toLowerCase().includes(s) || m.name.toLowerCase().includes(s))
-      .sort((a, b) => a.providerId.localeCompare(b.providerId) || b.created - a.created || a.name.localeCompare(b.name));
+      .sort(
+        (a, b) => a.providerId.localeCompare(b.providerId) || b.created - a.created || a.name.localeCompare(b.name),
+      );
   }, [app.models, app.hiddenModels, app.providers, filter]);
   const providerName = (id: string) => app.providers.find((p) => p.id === id)?.name ?? id;
   const project = app.projects.find((p) => p.id === app.draftProject);
@@ -117,23 +135,39 @@ export function Compare({ onClose }: { onClose: () => void }) {
             placeholder={t("comparePrompt")}
             aria-label={t("comparePrompt")}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); start(); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                start();
+              }
+            }}
           />
           <div className="compare-models">
             <div className="compare-chosen" aria-live="polite">
               {chosen.map((c) => (
                 <span key={c.key} className="compare-chip">
                   {c.label}
-                  <button aria-label={t("compareRemove", { name: c.label })} onClick={() => setChosen(toggleTarget(chosen, c))} disabled={busy}>
+                  <button
+                    aria-label={t("compareRemove", { name: c.label })}
+                    onClick={() => setChosen(toggleTarget(chosen, c))}
+                    disabled={busy}
+                  >
                     <X size={11} />
                   </button>
                 </span>
               ))}
-              <span className="compare-count">{t("compareCount", { count: chosen.length, min: MIN_COLUMNS, max: MAX_COLUMNS })}</span>
+              <span className="compare-count">
+                {t("compareCount", { count: chosen.length, min: MIN_COLUMNS, max: MAX_COLUMNS })}
+              </span>
             </div>
             <label className="compare-filter">
               <Search size={13} />
-              <input value={filter} placeholder={t("compareFilter")} aria-label={t("compareFilter")} onChange={(e) => setFilter(e.target.value)} />
+              <input
+                value={filter}
+                placeholder={t("compareFilter")}
+                aria-label={t("compareFilter")}
+                onChange={(e) => setFilter(e.target.value)}
+              />
             </label>
             <div className="compare-list" role="group" aria-label={t("compareModels")}>
               {models.map((m) => {
@@ -171,7 +205,11 @@ export function Compare({ onClose }: { onClose: () => void }) {
             )}
             <span className="compare-hint">{t("compareShortcut", { keys: displayKeys("⌘↵") })}</span>
           </div>
-          {error && <div className="compare-error" role="alert">{error}</div>}
+          {error && (
+            <div className="compare-error" role="alert">
+              {error}
+            </div>
+          )}
         </div>
 
         {cols.length > 0 && (
@@ -197,10 +235,23 @@ export function Compare({ onClose }: { onClose: () => void }) {
 
 function toTarget(m: Model, app: { providers: { id: string; name: string }[] }): CompareTarget {
   const provider = app.providers.find((p) => p.id === m.providerId);
-  return { key: modelKey(m), providerId: m.providerId, model: m.id, label: provider ? `${m.name} · ${provider.name}` : m.name };
+  return {
+    key: modelKey(m),
+    providerId: m.providerId,
+    model: m.id,
+    label: provider ? `${m.name} · ${provider.name}` : m.name,
+  };
 }
 
-function ColumnView({ c, provider, providerName, continuing, onStop, onRerun, onContinue }: {
+function ColumnView({
+  c,
+  provider,
+  providerName,
+  continuing,
+  onStop,
+  onRerun,
+  onContinue,
+}: {
   c: Column;
   provider: ReturnType<typeof useApp>["providers"][number] | undefined;
   providerName: string;
@@ -227,12 +278,20 @@ function ColumnView({ c, provider, providerName, continuing, onStop, onRerun, on
         <span className={`compare-status ${c.status}`}>{t(`compareStatus_${c.status}`)}</span>
       </header>
       <div className="compare-col-body" ref={bodyRef}>
-        {c.text ? <Markdown text={c.text} /> : running && !c.retry ? <div className="compare-wait">{t("compareWaiting")}</div> : null}
+        {c.text ? (
+          <Markdown text={c.text} />
+        ) : running && !c.retry ? (
+          <div className="compare-wait">{t("compareWaiting")}</div>
+        ) : null}
         {c.retry && <div className="compare-retry">{t("retryingIn", retryNoticeVars(c.retry))}</div>}
         {c.status === "error" && c.error && (
           <div className="compare-col-error" role="alert">
             <div>{c.error.message}</div>
-            {c.error.kind && <div className="compare-error-note">{c.error.retryable ? t("compareRetryable") : t("compareNotRetryable")}</div>}
+            {c.error.kind && (
+              <div className="compare-error-note">
+                {c.error.retryable ? t("compareRetryable") : t("compareNotRetryable")}
+              </div>
+            )}
           </div>
         )}
         {c.status === "stopped" && !c.text && <div className="compare-wait">{t("compareStoppedEmpty")}</div>}
@@ -265,6 +324,15 @@ function Meter({ c }: { c: Column }) {
   const t = useT();
   if (c.status === "running") return <LiveMeter stats={{ start: c.start, chars: c.chars, input: c.input }} />;
   const time = formatDuration(elapsedMs(c, 0) / 1000, t, { tenths: true });
-  if (c.usage) return <span className="live-meter" title={t("compareUsageHint")}>{t("compareUsage", { input: t.num(c.usage.input), output: t.num(c.usage.output), time })}</span>;
-  return <span className="live-meter" title={t("liveMeterHint")}>{t("liveMeter", { input: t.num(c.input), output: t.num(estimateOutput(c)), time })}</span>;
+  if (c.usage)
+    return (
+      <span className="live-meter" title={t("compareUsageHint")}>
+        {t("compareUsage", { input: t.num(c.usage.input), output: t.num(c.usage.output), time })}
+      </span>
+    );
+  return (
+    <span className="live-meter" title={t("liveMeterHint")}>
+      {t("liveMeter", { input: t.num(c.input), output: t.num(estimateOutput(c)), time })}
+    </span>
+  );
 }

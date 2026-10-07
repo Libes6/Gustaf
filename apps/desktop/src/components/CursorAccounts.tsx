@@ -36,7 +36,9 @@ export function CursorAccounts() {
         () => live && setWho((w) => ({ ...w, [a.id]: "error" })),
       );
     }
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [names]);
 
   /** Creates (or reuses) the profile, runs the login and polls `status` until the account is signed in. */
@@ -45,20 +47,29 @@ export function CursorAccounts() {
     const name = existing?.cliProfile ?? profileName(Date.now());
     let stop = false;
     let process: Awaited<ReturnType<typeof startCursorLogin>> | undefined;
-    cancel.current = () => { stop = true; };
+    cancel.current = () => {
+      stop = true;
+    };
     setFlow({ output: "", waiting: true });
     try {
       const dir = await cursorProfiles.create(name);
       let exited = false;
-      process = await startCursorLogin(dir, (chunk) => setFlow((f) => f && { ...f, output: (f.output + chunk).slice(-2000) }));
-      process.done.then(() => { exited = true; });
+      process = await startCursorLogin(dir, (chunk) =>
+        setFlow((f) => f && { ...f, output: (f.output + chunk).slice(-2000) }),
+      );
+      process.done.then(() => {
+        exited = true;
+      });
       const deadline = Date.now() + LOGIN_TIMEOUT_MS;
       let identity: CursorIdentity | undefined;
       while (!stop && Date.now() < deadline) {
         await sleep(POLL_MS);
         const finished = exited;
         const s = await cursorProfiles.status(name).catch(() => undefined);
-        if (s?.loggedIn) { identity = s; break; }
+        if (s?.loggedIn) {
+          identity = s;
+          break;
+        }
         // The CLI already ended before this check and the account is still signed out: give up.
         if (finished) break;
       }
@@ -69,7 +80,17 @@ export function CursorAccounts() {
       }
       const id = existing?.id ?? `cli-${name}`;
       if (!existing) {
-        await saveProvider({ id, kind: "cli", cli: "cursor-agent", cliProfile: name, name: identity.email ?? `Cursor ${accounts.length + 1}`, baseUrl: "" }, null);
+        await saveProvider(
+          {
+            id,
+            kind: "cli",
+            cli: "cursor-agent",
+            cliProfile: name,
+            name: identity.email ?? `Cursor ${accounts.length + 1}`,
+            baseUrl: "",
+          },
+          null,
+        );
         await updatePool((pool) => addToPool(pool, id));
       }
       setWho((w) => ({ ...w, [id]: identity! }));
@@ -92,39 +113,69 @@ export function CursorAccounts() {
   const link = flow ? loginUrl(flow.output) : undefined;
   return (
     <>
-    <div className="card">
-      <div className="card-row">
-        <div className="grow">
-          <div className="t">{t("cursorAccounts")}</div>
-          <div className="d">{t("cursorAccountsHint")}</div>
-        </div>
-        <button className="btn-soft" disabled={!!flow} onClick={() => login()}><Plus size={13} /> {t("addCursorAccount")}</button>
-      </div>
-      {accounts.map((a) => {
-        const s = who[a.id];
-        return (
-          <div className="card-row" key={a.id}>
-            <div className="grow">
-              <div className="t">{a.name}</div>
-              <div className="d">{s === "error" ? t("cursorAccountStatusError") : !s ? "…" : s.loggedIn ? s.email ?? t("cursorAccountLoggedIn") : t("cursorAccountLoggedOut")}</div>
-            </div>
-            <button className="btn-soft" disabled={!!flow} onClick={() => login(a)}><LogIn size={13} /> {t("cursorReLogin")}</button>
-            <button className="icon-btn" disabled={!!flow} title={t("cursorRemoveAccount")} onClick={() => remove(a)}><Trash2 size={14} /></button>
+      <div className="card">
+        <div className="card-row">
+          <div className="grow">
+            <div className="t">{t("cursorAccounts")}</div>
+            <div className="d">{t("cursorAccountsHint")}</div>
           </div>
-        );
-      })}
-      {flow && (
-        <div className="card-row" style={{ display: "block" }}>
-          {flow.error ? <div className="err" style={{ whiteSpace: "pre-wrap" }}>{flow.error}</div> : (
-            <div className="d"><Loader2 size={13} className="spin" /> {t("cursorLoginWaiting")}</div>
-          )}
-          {flow.output && <pre className="mono d" style={{ whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>{flow.output}</pre>}
-          {link && <button className="btn-soft" onClick={() => openUrl(link)}><ExternalLink size={13} /> {t("cursorLoginOpenLink")}</button>}
-          <button className="btn-ghost small" onClick={() => (flow.waiting ? cancel.current?.() : setFlow(null))}>{t(flow.waiting ? "cancel" : "dismiss")}</button>
+          <button className="btn-soft" disabled={!!flow} onClick={() => login()}>
+            <Plus size={13} /> {t("addCursorAccount")}
+          </button>
         </div>
-      )}
-    </div>
-    <CursorPool />
+        {accounts.map((a) => {
+          const s = who[a.id];
+          return (
+            <div className="card-row" key={a.id}>
+              <div className="grow">
+                <div className="t">{a.name}</div>
+                <div className="d">
+                  {s === "error"
+                    ? t("cursorAccountStatusError")
+                    : !s
+                      ? "…"
+                      : s.loggedIn
+                        ? (s.email ?? t("cursorAccountLoggedIn"))
+                        : t("cursorAccountLoggedOut")}
+                </div>
+              </div>
+              <button className="btn-soft" disabled={!!flow} onClick={() => login(a)}>
+                <LogIn size={13} /> {t("cursorReLogin")}
+              </button>
+              <button className="icon-btn" disabled={!!flow} title={t("cursorRemoveAccount")} onClick={() => remove(a)}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          );
+        })}
+        {flow && (
+          <div className="card-row" style={{ display: "block" }}>
+            {flow.error ? (
+              <div className="err" style={{ whiteSpace: "pre-wrap" }}>
+                {flow.error}
+              </div>
+            ) : (
+              <div className="d">
+                <Loader2 size={13} className="spin" /> {t("cursorLoginWaiting")}
+              </div>
+            )}
+            {flow.output && (
+              <pre className="mono d" style={{ whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>
+                {flow.output}
+              </pre>
+            )}
+            {link && (
+              <button className="btn-soft" onClick={() => openUrl(link)}>
+                <ExternalLink size={13} /> {t("cursorLoginOpenLink")}
+              </button>
+            )}
+            <button className="btn-ghost small" onClick={() => (flow.waiting ? cancel.current?.() : setFlow(null))}>
+              {t(flow.waiting ? "cancel" : "dismiss")}
+            </button>
+          </div>
+        )}
+      </div>
+      <CursorPool />
     </>
   );
 }

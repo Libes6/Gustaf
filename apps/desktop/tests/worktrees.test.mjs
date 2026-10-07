@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WORKTREE_ERROR_CODES, WorktreeError, needsShadowCopyFallback, parseWorktreeError } from '../src/lib/worktrees.ts';
+import {
+  WORKTREE_ERROR_CODES,
+  WorktreeError,
+  needsShadowCopyFallback,
+  parseWorktreeError,
+} from '../src/lib/worktrees.ts';
 
 test('every backend error code maps to a typed error', () => {
   for (const code of WORKTREE_ERROR_CODES) {
@@ -30,6 +35,8 @@ test('an existing WorktreeError passes through', () => {
 });
 
 test('only repository problems fall back to the shadow copy', () => {
-  for (const c of ['not_a_git_repo', 'bare_repo', 'no_commits']) assert.equal(needsShadowCopyFallback(`${c}: x`), true, c);
-  for (const c of ['dirty', 'task_exists', 'git_error', 'invalid_base']) assert.equal(needsShadowCopyFallback(`${c}: x`), false, c);
+  for (const c of ['not_a_git_repo', 'bare_repo', 'no_commits'])
+    assert.equal(needsShadowCopyFallback(`${c}: x`), true, c);
+  for (const c of ['dirty', 'task_exists', 'git_error', 'invalid_base'])
+    assert.equal(needsShadowCopyFallback(`${c}: x`), false, c);
 });

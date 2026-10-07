@@ -1,7 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { shq, psq, winArg, shellFor, invocationScript, findCliScript, detectScript, cliCandidates, dirname, isWinShim } from '../src/providers/shell.ts';
+import {
+  shq,
+  psq,
+  winArg,
+  shellFor,
+  invocationScript,
+  findCliScript,
+  detectScript,
+  cliCandidates,
+  dirname,
+  isWinShim,
+} from '../src/providers/shell.ts';
 import { detectPlatform } from '../src/lib/platform.ts';
 
 const posix = process.platform !== 'win32';
@@ -55,27 +66,57 @@ test('paths', () => {
 });
 
 test('POSIX invocation quotes every argument and the prompt', () => {
-  const s = invocationScript('posix', { executable: '/opt/my tools/claude', args: ['-p', '--model', 'x'], prompt: "it's $(date)", prependExecutableDir: true, nullStdin: true });
-  assert.equal(s, `export PATH='/opt/my tools':"$PATH"; exec '/opt/my tools/claude' '-p' '--model' 'x' 'it'\\''s $(date)' < /dev/null`);
-  assert.equal(invocationScript('posix', { executable: 'node', args: ['/a b/s.mjs'], env: { K: "v'1" } }), `exec env K='v'\\''1' 'node' '/a b/s.mjs'`);
+  const s = invocationScript('posix', {
+    executable: '/opt/my tools/claude',
+    args: ['-p', '--model', 'x'],
+    prompt: "it's $(date)",
+    prependExecutableDir: true,
+    nullStdin: true,
+  });
+  assert.equal(
+    s,
+    `export PATH='/opt/my tools':"$PATH"; exec '/opt/my tools/claude' '-p' '--model' 'x' 'it'\\''s $(date)' < /dev/null`,
+  );
+  assert.equal(
+    invocationScript('posix', { executable: 'node', args: ['/a b/s.mjs'], env: { K: "v'1" } }),
+    `exec env K='v'\\''1' 'node' '/a b/s.mjs'`,
+  );
 });
 
 test('POSIX invocation runs in a real shell without interpreting the prompt', { skip: !posix }, () => {
   const prompt = `a "b" 'c' $HOME \`id\` ; echo injected\nline2`;
-  const script = invocationScript('posix', { executable: process.execPath, args: ['-e', 'process.stdout.write(process.argv[1])'], prompt });
+  const script = invocationScript('posix', {
+    executable: process.execPath,
+    args: ['-e', 'process.stdout.write(process.argv[1])'],
+    prompt,
+  });
   assert.equal(execFileSync('/bin/sh', ['-c', script]).toString(), prompt);
 });
 
 test('PowerShell invocation: exe gets escaped args, shim gets the prompt on stdin', () => {
-  const exe = invocationScript('powershell', { executable: 'C:\\bin\\claude.exe', args: ['-p'], prompt: 'say "hi" & more', nullStdin: true });
+  const exe = invocationScript('powershell', {
+    executable: 'C:\\bin\\claude.exe',
+    args: ['-p'],
+    prompt: 'say "hi" & more',
+    nullStdin: true,
+  });
   assert.equal(exe, `$null | & 'C:\\bin\\claude.exe' '-p' 'say \\"hi\\" & more'; exit $LASTEXITCODE`);
-  const shim = invocationScript('powershell', { executable: 'C:\\npm\\claude.cmd', args: ['-p'], prompt: '& calc | "x" %PATH%', prependExecutableDir: true });
+  const shim = invocationScript('powershell', {
+    executable: 'C:\\npm\\claude.cmd',
+    args: ['-p'],
+    prompt: '& calc | "x" %PATH%',
+    prependExecutableDir: true,
+  });
   assert.ok(shim.startsWith(`$env:PATH = 'C:\\npm' + ';' + $env:PATH; `));
   assert.ok(shim.includes(`| & 'C:\\npm\\claude.cmd' '-p'; exit $LASTEXITCODE`));
   assert.ok(!shim.includes('calc'), 'prompt must not appear as text');
   const b64 = /FromBase64String\('([^']+)'\)/.exec(shim)[1];
   assert.equal(Buffer.from(b64, 'base64').toString('utf8'), '& calc | "x" %PATH%');
-  const env = invocationScript('powershell', { executable: 'node', args: ["it's.mjs"], env: { GUSTAF_CODEX_BINARY: 'C:\\a b\\codex.cmd' } });
+  const env = invocationScript('powershell', {
+    executable: 'node',
+    args: ["it's.mjs"],
+    env: { GUSTAF_CODEX_BINARY: 'C:\\a b\\codex.cmd' },
+  });
   assert.equal(env, `$env:GUSTAF_CODEX_BINARY = 'C:\\a b\\codex.cmd'; & 'node' 'it''s.mjs'; exit $LASTEXITCODE`);
 });
 
@@ -88,7 +129,7 @@ test('CLI candidates differ per OS and drop the ChatGPT bundle outside macOS', (
 
 test('discovery scripts', () => {
   const mac = findCliScript('macos', 'claude');
-  assert.ok(mac.includes('(N)') && mac.includes('command -v \'claude\''));
+  assert.ok(mac.includes('(N)') && mac.includes("command -v 'claude'"));
   const linux = findCliScript('linux', 'claude');
   assert.ok(!linux.includes('(N)'));
   assert.ok(findCliScript('linux', 'codex', true).includes('--version'));

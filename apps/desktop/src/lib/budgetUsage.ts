@@ -1,5 +1,16 @@
 import { db, getSetting } from "./api";
-import { BUDGETS_SETTING, exceededBudget, localDayKey, localDayStart, nextLocalDayStart, normalizeBudgets, parseUsageRow, summarizeUsage, withExtraTokens, type UsageTotals } from "./budgets";
+import {
+  BUDGETS_SETTING,
+  exceededBudget,
+  localDayKey,
+  localDayStart,
+  nextLocalDayStart,
+  normalizeBudgets,
+  parseUsageRow,
+  summarizeUsage,
+  withExtraTokens,
+  type UsageTotals,
+} from "./budgets";
 import { loadAgentUsage } from "../agent/agentRuns";
 import { ledgerChat, ledgerDay } from "../agent/agentRunsModel";
 
@@ -26,16 +37,25 @@ export async function currentBudgetStop(chatId: number | undefined, now = Date.n
     const dayStart = localDayStart(now);
     const key = `${dayStart}:${chatId ?? ""}`;
     if (!cache || cache.key !== key || now - cache.at > CACHE_MS) {
-      const dayRows = settings.dayTokens === null ? [] : await db.select<Row>(`${SELECT} created_at >= ? and ${FILTER}`, [dayStart]);
-      const chatRows = chatId === undefined || settings.chatTokens === null ? undefined : await db.select<Row>(`${SELECT} chat_id = ? and ${FILTER}`, [chatId]);
+      const dayRows =
+        settings.dayTokens === null ? [] : await db.select<Row>(`${SELECT} created_at >= ? and ${FILTER}`, [dayStart]);
+      const chatRows =
+        chatId === undefined || settings.chatTokens === null
+          ? undefined
+          : await db.select<Row>(`${SELECT} chat_id = ? and ${FILTER}`, [chatId]);
       cache = {
-        key, at: now,
+        key,
+        at: now,
         day: summarizeUsage(dayRows.map(parseUsageRow), { from: dayStart, to: nextLocalDayStart(dayStart) }),
         ...(chatRows ? { chat: summarizeUsage(chatRows.map(parseUsageRow)) } : {}),
       };
     }
     const agents = await loadAgentUsage();
-    return exceededBudget(settings, withExtraTokens(cache.day, ledgerDay(agents, localDayKey(dayStart))), cache.chat && withExtraTokens(cache.chat, ledgerChat(agents, chatId)));
+    return exceededBudget(
+      settings,
+      withExtraTokens(cache.day, ledgerDay(agents, localDayKey(dayStart))),
+      cache.chat && withExtraTokens(cache.chat, ledgerChat(agents, chatId)),
+    );
   } catch {
     return null;
   }

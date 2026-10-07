@@ -29,14 +29,15 @@ export const SUGGEST_SYSTEM_PROMPT = [
   `Propose at most ${MAX_SUGGESTIONS} facts, each one short self-contained sentence of at most ${MAX_FACT_CHARS} characters.`,
   "Only keep facts that will still be true and useful later: project conventions (tooling, structure, commands, style), the user's stated preferences, and decisions that were made and should not be revisited.",
   "Never include secrets, passwords, tokens, personal data, file contents, code snippets, one-off task details, or anything only relevant to this single conversation.",
-  "Use scope \"project\" for facts about this project (only when hasProject is true) and \"global\" for the user's general preferences.",
+  'Use scope "project" for facts about this project (only when hasProject is true) and "global" for the user\'s general preferences.',
   "If nothing qualifies, return an empty list.",
   'Reply with strict JSON only, no commentary: {"facts":[{"text":"...","scope":"project"|"global"}]}. Do not use tools, commands or computer actions.',
 ].join(" ");
 
 /** Characters of chat text to send: 30% of the model's context window at ~3 characters per token, within fixed bounds. */
 export function suggestBudget(contextWindow?: number): number {
-  const w = typeof contextWindow === "number" && Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 8192;
+  const w =
+    typeof contextWindow === "number" && Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 8192;
   return Math.min(MAX_SUGGEST_CHARS, Math.max(MIN_SUGGEST_CHARS, Math.floor(w * 0.3 * 3)));
 }
 
@@ -67,7 +68,10 @@ export type TranscriptEntry = { role: "user" | "assistant"; text: string };
  * The bounded, scrubbed conversation for the request. Only user and assistant text counts (tool outputs are excluded). The
  * newest messages are kept when the budget is short; each message is clipped to `MAX_MESSAGE_CHARS`; secrets are redacted.
  */
-export function buildTranscript(messages: Msg[], budget: number = MAX_SUGGEST_CHARS): { entries: TranscriptEntry[]; truncated: boolean } {
+export function buildTranscript(
+  messages: Msg[],
+  budget: number = MAX_SUGGEST_CHARS,
+): { entries: TranscriptEntry[]; truncated: boolean } {
   const limit = Math.max(MIN_SUGGEST_CHARS, Math.floor(budget));
   const picked: TranscriptEntry[] = [];
   let used = 0;
@@ -77,8 +81,14 @@ export function buildTranscript(messages: Msg[], budget: number = MAX_SUGGEST_CH
     if (m.role !== "user" && m.role !== "assistant") continue;
     let text = redactSecrets(conversationText(m));
     if (!text) continue;
-    if (text.length > MAX_MESSAGE_CHARS) { text = `${text.slice(0, MAX_MESSAGE_CHARS)} […]`; truncated = true; }
-    if (used + text.length > limit) { truncated = true; break; }
+    if (text.length > MAX_MESSAGE_CHARS) {
+      text = `${text.slice(0, MAX_MESSAGE_CHARS)} […]`;
+      truncated = true;
+    }
+    if (used + text.length > limit) {
+      truncated = true;
+      break;
+    }
     used += text.length;
     picked.push({ role: m.role, text });
   }
@@ -86,9 +96,16 @@ export function buildTranscript(messages: Msg[], budget: number = MAX_SUGGEST_CH
 }
 
 /** The system prompt and the JSON user message for one suggestion request. */
-export function buildSuggestPrompt(messages: Msg[], o: { hasProject: boolean; budget?: number }): { system: string; user: string; entries: number } {
+export function buildSuggestPrompt(
+  messages: Msg[],
+  o: { hasProject: boolean; budget?: number },
+): { system: string; user: string; entries: number } {
   const { entries, truncated } = buildTranscript(messages, o.budget);
-  return { system: SUGGEST_SYSTEM_PROMPT, user: JSON.stringify({ hasProject: o.hasProject, truncated, transcript: entries }), entries: entries.length };
+  return {
+    system: SUGGEST_SYSTEM_PROMPT,
+    user: JSON.stringify({ hasProject: o.hasProject, truncated, transcript: entries }),
+    entries: entries.length,
+  };
 }
 
 /** Case, whitespace, trailing punctuation and bullet markers do not make a different fact. */
@@ -102,7 +119,8 @@ export function normalizeFact(text: string): string {
     .trim();
 }
 
-const clean = (v: unknown) => (typeof v === "string" ? v.replace(ANSI, "").replace(CONTROL, " ").replace(/\s+/g, " ").trim() : "");
+const clean = (v: unknown) =>
+  typeof v === "string" ? v.replace(ANSI, "").replace(CONTROL, " ").replace(/\s+/g, " ").trim() : "";
 
 /**
  * Parses the model's reply into suggestions. Tolerates reasoning blocks, code fences, text around the JSON, a bare array of
@@ -111,18 +129,26 @@ const clean = (v: unknown) => (typeof v === "string" ? v.replace(ANSI, "").repla
  * was found at all. Scope falls back to `project` (or `global` without a project).
  */
 export function parseSuggestions(raw: string, o: { hasProject?: boolean } = {}): SuggestParse {
-  const text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(THINKING, "");
+  const text = String(raw ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(THINKING, "");
   const json = firstJson(text);
   if (json === null || typeof json !== "object") return { ok: false, suggestions: [] };
   const obj = json as Record<string, unknown>;
-  const list = Array.isArray(json) ? json : Array.isArray(obj.facts) ? obj.facts : Array.isArray(obj.memories) ? obj.memories : [];
+  const list = Array.isArray(json)
+    ? json
+    : Array.isArray(obj.facts)
+      ? obj.facts
+      : Array.isArray(obj.memories)
+        ? obj.memories
+        : [];
   const hasProject = o.hasProject !== false;
   const seen = new Set<string>();
   const suggestions: Suggestion[] = [];
   for (const item of list) {
     if (suggestions.length >= MAX_SUGGESTIONS) break;
     const rec = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
-    const fact = redactSecrets(clean(typeof item === "string" ? item : rec?.text ?? rec?.fact));
+    const fact = redactSecrets(clean(typeof item === "string" ? item : (rec?.text ?? rec?.fact)));
     if (!fact || fact.length > MAX_FACT_CHARS || fact.includes(REDACTED)) continue;
     const key = normalizeFact(fact);
     if (!key || seen.has(key)) continue;
@@ -136,7 +162,13 @@ export function parseSuggestions(raw: string, o: { hasProject?: boolean } = {}):
 
 /** The parsed suggestions from a model reply; only text parts count. */
 export const suggestionsFromParts = (parts: Part[], o: { hasProject?: boolean } = {}) =>
-  parseSuggestions(parts.filter((p): p is Extract<Part, { type: "text" }> => p.type === "text").map((p) => p.text).join("\n"), o);
+  parseSuggestions(
+    parts
+      .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join("\n"),
+    o,
+  );
 
 /** Drops suggestions whose normalised text is already saved (in the global or the project scope shown to the user). */
 export function dedupeSuggestions<T extends { text: string }>(suggestions: T[], existing: { text: string }[]): T[] {

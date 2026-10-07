@@ -7,7 +7,20 @@
 // the stream URL: a server cannot redirect messages (and the bearer token) to another host.
 import { SIGN_IN_NEEDED } from "./oauth";
 import { abortError, HttpStatusError, readText, type HttpOptions, type InitInfo } from "./http";
-import { answerServerRequest, checkInitialize, encode, errorText, initializeParams, MAX_MESSAGE_BYTES, notification, parseBody, request, SseDecoder, type Parsed, type RpcId } from "./protocol";
+import {
+  answerServerRequest,
+  checkInitialize,
+  encode,
+  errorText,
+  initializeParams,
+  MAX_MESSAGE_BYTES,
+  notification,
+  parseBody,
+  request,
+  SseDecoder,
+  type Parsed,
+  type RpcId,
+} from "./protocol";
 
 class StreamClosed extends Error {}
 type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
@@ -80,7 +93,8 @@ export class McpSseClient {
       void this.pump(res.body.getReader(), gen);
       this.endpoint = await endpoint;
     } catch (e) {
-      if (timedOut) throw new Error(`MCP server did not send its message endpoint within ${Math.round(timeoutMs / 1000)} s`);
+      if (timedOut)
+        throw new Error(`MCP server did not send its message endpoint within ${Math.round(timeoutMs / 1000)} s`);
       throw e;
     } finally {
       clearTimeout(timer);
@@ -91,7 +105,16 @@ export class McpSseClient {
   private async getStream(signal: AbortSignal): Promise<Response> {
     const attempt = async () => {
       const bearer = await this.o.auth?.header();
-      return this.o.fetch(this.o.url, { method: "GET", headers: { ...this.o.headers, ...(bearer ? { Authorization: bearer } : {}), Accept: "text/event-stream", "Cache-Control": "no-cache" }, signal });
+      return this.o.fetch(this.o.url, {
+        method: "GET",
+        headers: {
+          ...this.o.headers,
+          ...(bearer ? { Authorization: bearer } : {}),
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+        signal,
+      });
     };
     let res = await attempt();
     if (res.status === 401 && this.o.auth) {
@@ -105,7 +128,10 @@ export class McpSseClient {
     }
     if (!res.ok) {
       const text = (await readText(res, 64 * 1024).catch(() => "")).slice(0, 500);
-      throw new HttpStatusError(res.status, `MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`);
+      throw new HttpStatusError(
+        res.status,
+        `MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`,
+      );
     }
     return res;
   }
@@ -136,7 +162,8 @@ export class McpSseClient {
       try {
         const base = new URL(this.o.url);
         const target = new URL(ev.data.trim(), base);
-        if (target.origin !== base.origin || target.username || target.password) throw new Error("the MCP server sent a message endpoint on another origin");
+        if (target.origin !== base.origin || target.username || target.password)
+          throw new Error("the MCP server sent a message endpoint on another origin");
         w.resolve(target.toString());
       } catch (e) {
         w.reject(e instanceof Error ? e : new Error("invalid MCP message endpoint"));
@@ -200,7 +227,8 @@ export class McpSseClient {
         f();
       };
       const cancelled = (reason: string) => {
-        if (method !== "initialize" && this.endpoint) this.post(notification("notifications/cancelled", { requestId: id, reason }), 5_000).catch(() => {});
+        if (method !== "initialize" && this.endpoint)
+          this.post(notification("notifications/cancelled", { requestId: id, reason }), 5_000).catch(() => {});
       };
       const timer = setTimeout(() => {
         finish(() => reject(new Error(`MCP request ${method} timed out after ${Math.round(timeoutMs / 1000)} s`)));
@@ -227,7 +255,17 @@ export class McpSseClient {
       signal?.addEventListener("abort", onAbort, { once: true });
       try {
         const bearer = await this.o.auth?.header();
-        const res = await this.o.fetch(endpoint, { method: "POST", headers: { ...this.o.headers, ...(bearer ? { Authorization: bearer } : {}), "Content-Type": "application/json", Accept: "application/json, text/event-stream" }, body: encode(msg), signal: ctl.signal });
+        const res = await this.o.fetch(endpoint, {
+          method: "POST",
+          headers: {
+            ...this.o.headers,
+            ...(bearer ? { Authorization: bearer } : {}),
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+          },
+          body: encode(msg),
+          signal: ctl.signal,
+        });
         if (res.ok) {
           res.body?.cancel().catch(() => {});
           return res.status;
@@ -237,7 +275,10 @@ export class McpSseClient {
           return 401;
         }
         const text = (await readText(res, 64 * 1024).catch(() => "")).slice(0, 500);
-        throw new HttpStatusError(res.status, `MCP server answered HTTP ${res.status}${res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`);
+        throw new HttpStatusError(
+          res.status,
+          `MCP server answered HTTP ${res.status}${res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`,
+        );
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener("abort", onAbort);

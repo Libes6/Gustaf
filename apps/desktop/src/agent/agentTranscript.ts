@@ -27,10 +27,21 @@ function boundPart(p: Part): Stored | null {
       return { type: "text", text: clip(p.text, MAX_TEXT_PART) };
     case "tool_call": {
       const json = JSON.stringify(p.args ?? {}) ?? "{}";
-      return { type: "tool_call", id: p.id, name: p.name, args: json.length <= MAX_ARGS_JSON ? p.args ?? {} : { truncated: clip(json, MAX_ARGS_JSON) } };
+      return {
+        type: "tool_call",
+        id: p.id,
+        name: p.name,
+        args: json.length <= MAX_ARGS_JSON ? (p.args ?? {}) : { truncated: clip(json, MAX_ARGS_JSON) },
+      };
     }
     case "tool_result":
-      return { type: "tool_result", id: p.id, name: p.name, output: clip(p.output ?? "", MAX_RESULT_PART), ...(p.isError ? { isError: true } : {}) };
+      return {
+        type: "tool_result",
+        id: p.id,
+        name: p.name,
+        output: clip(p.output ?? "", MAX_RESULT_PART),
+        ...(p.isError ? { isError: true } : {}),
+      };
     case "image":
       return { type: "text", text: "[image omitted]" };
     default:
@@ -40,7 +51,11 @@ function boundPart(p: Part): Stored | null {
 
 /** One message as stored: images and activity parts removed, long fields cut, secrets scrubbed, the whole thing bounded. */
 export function messageJson(parts: readonly Part[]): string {
-  const bounded = parts.slice(0, MAX_PARTS_PER_MESSAGE).map(boundPart).filter((p): p is Stored => !!p).map((p) => redactValue(p));
+  const bounded = parts
+    .slice(0, MAX_PARTS_PER_MESSAGE)
+    .map(boundPart)
+    .filter((p): p is Stored => !!p)
+    .map((p) => redactValue(p));
   const json = JSON.stringify(bounded);
   if (json.length <= MAX_MESSAGE_JSON) return json;
   // Still too big (many large parts): shrink every long string to an even share, which always fits.
@@ -55,7 +70,8 @@ export function messageJson(parts: readonly Part[]): string {
   return out.length <= MAX_MESSAGE_JSON ? out : "[]";
 }
 
-export const noteJson = (text: string, error?: boolean) => JSON.stringify([{ type: "text", text: clip(text, MAX_TEXT_PART), ...(error ? { error: true } : {}) }]);
+export const noteJson = (text: string, error?: boolean) =>
+  JSON.stringify([{ type: "text", text: clip(text, MAX_TEXT_PART), ...(error ? { error: true } : {}) }]);
 
 const parse = (json: string): unknown => {
   try {
@@ -83,7 +99,15 @@ export function rowsToSteps(rows: readonly MessageRow[]): TranscriptStep[] {
     if (row.role === "step") {
       // Rows migrated from the old `agentRuns` setting hold one step object.
       const s = parse(row.parts_json) as Stored | null;
-      if (s && (s.kind === "tool" || s.kind === "text" || s.kind === "note")) steps.push({ at, kind: s.kind, ...(typeof s.tool === "string" ? { tool: s.tool } : {}), text: str(s.text, STEP_TEXT), ...(typeof s.result === "string" ? { result: str(s.result, STEP_RESULT) } : {}), ...(s.error === true ? { error: true } : {}) });
+      if (s && (s.kind === "tool" || s.kind === "text" || s.kind === "note"))
+        steps.push({
+          at,
+          kind: s.kind,
+          ...(typeof s.tool === "string" ? { tool: s.tool } : {}),
+          text: str(s.text, STEP_TEXT),
+          ...(typeof s.result === "string" ? { result: str(s.result, STEP_RESULT) } : {}),
+          ...(s.error === true ? { error: true } : {}),
+        });
       continue;
     }
     const parts = asParts(row.parts_json);
@@ -91,9 +115,14 @@ export function rowsToSteps(rows: readonly MessageRow[]): TranscriptStep[] {
       const text = parts.map((p) => str(p.text, STEP_TEXT)).join("");
       if (text) steps.push({ at, kind: "note", text });
     } else if (row.role === "note") {
-      for (const p of parts) steps.push({ at, kind: "note", text: str(p.text, STEP_TEXT), ...(p.error === true ? { error: true } : {}) });
+      for (const p of parts)
+        steps.push({ at, kind: "note", text: str(p.text, STEP_TEXT), ...(p.error === true ? { error: true } : {}) });
     } else if (row.role === "assistant") {
-      const text = parts.filter((p) => p.type === "text").map((p) => str(p.text, STEP_TEXT)).join("").trim();
+      const text = parts
+        .filter((p) => p.type === "text")
+        .map((p) => str(p.text, STEP_TEXT))
+        .join("")
+        .trim();
       if (text) steps.push({ at, kind: "text", text });
       for (const p of parts) {
         if (p.type !== "tool_call" || typeof p.id !== "string") continue;
@@ -152,7 +181,9 @@ export function continuationPrompt(prev: PreviousRun, followUp: string): string 
     clip(prev.task?.trim() || "(not available)", MAX_SEED_PROMPT),
     "",
     `--- Earlier tool calls (${calls.length}${calls.length > shown.length ? `, newest ${shown.length} shown` : ""}) ---`,
-    ...(shown.length ? shown.map((s) => `- ${s.tool ?? "tool"} ${clip(s.text, 160)}${s.error ? " (failed)" : ""}`) : ["(none)"]),
+    ...(shown.length
+      ? shown.map((s) => `- ${s.tool ?? "tool"} ${clip(s.text, 160)}${s.error ? " (failed)" : ""}`)
+      : ["(none)"]),
     "",
     "--- Earlier report ---",
     clip(prev.report?.trim() || "(the run produced no report)", MAX_SEED_REPORT),

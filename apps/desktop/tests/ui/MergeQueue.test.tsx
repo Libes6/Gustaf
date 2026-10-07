@@ -9,29 +9,101 @@ import { chat, makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke, mockSettings } from "./tauri";
 
 const noop = () => {};
-const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+const flush = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 const info = (over: Record<string, unknown> = {}) => ({
-  taskId: "t1", path: "/store/abc/t1", branch: "gustaf/fix-login", baseCommit: "deadbeef", baseBranch: "main", createdAt: 1,
-  provider: null, model: null, headSha: "cafe", changedFiles: 0, ahead: 2, behind: 0, dirty: false, existsOnDisk: true, ...over,
+  taskId: "t1",
+  path: "/store/abc/t1",
+  branch: "gustaf/fix-login",
+  baseCommit: "deadbeef",
+  baseBranch: "main",
+  createdAt: 1,
+  provider: null,
+  model: null,
+  headSha: "cafe",
+  changedFiles: 0,
+  ahead: 2,
+  behind: 0,
+  dirty: false,
+  existsOnDisk: true,
+  ...over,
 });
-const gitStatus = { repo: true, toplevel: "/work/alpha", prefix: "", branch: "main", detached: false, head: "abc1234", files: [], total: 0, inProgress: null };
-const wsChat = (id: number, taskId: string, title: string) => chat({ id, project_id: 1, title, workspace_task_id: taskId, workspace_branch: `gustaf/${taskId}`, workspace_base: "deadbeef" });
-const report = (over: Record<string, unknown> = {}) => ({ taskId: "t1", branch: "gustaf/fix-login", target: "main", clean: true, checks: [{ againstTaskId: null, against: "main", clean: true, conflicts: [], truncated: false }], ...over });
+const gitStatus = {
+  repo: true,
+  toplevel: "/work/alpha",
+  prefix: "",
+  branch: "main",
+  detached: false,
+  head: "abc1234",
+  files: [],
+  total: 0,
+  inProgress: null,
+};
+const wsChat = (id: number, taskId: string, title: string) =>
+  chat({
+    id,
+    project_id: 1,
+    title,
+    workspace_task_id: taskId,
+    workspace_branch: `gustaf/${taskId}`,
+    workspace_base: "deadbeef",
+  });
+const report = (over: Record<string, unknown> = {}) => ({
+  taskId: "t1",
+  branch: "gustaf/fix-login",
+  target: "main",
+  clean: true,
+  checks: [{ againstTaskId: null, against: "main", clean: true, conflicts: [], truncated: false }],
+  ...over,
+});
 const conflicted = report({
   clean: false,
   checks: [
-    { againstTaskId: null, against: "main", clean: false, conflicts: [{ path: "src/a.ts", kind: "content" }, { path: "docs/b.md", kind: "modify_delete" }], truncated: false },
-    { againstTaskId: "t2", against: "gustaf/add-search", clean: false, conflicts: [{ path: "src/c.ts", kind: "add_add" }], truncated: false },
+    {
+      againstTaskId: null,
+      against: "main",
+      clean: false,
+      conflicts: [
+        { path: "src/a.ts", kind: "content" },
+        { path: "docs/b.md", kind: "modify_delete" },
+      ],
+      truncated: false,
+    },
+    {
+      againstTaskId: "t2",
+      against: "gustaf/add-search",
+      clean: false,
+      conflicts: [{ path: "src/c.ts", kind: "add_add" }],
+      truncated: false,
+    },
   ],
 });
 
 const item = (taskId: string, status: string, over: Record<string, unknown> = {}) => ({
-  taskId, branch: `gustaf/${taskId}`, status, error: null, conflicts: [], strategy: "merge", testCommand: null, targetBranch: "main",
-  enqueuedAt: 1, startedAt: null, finishedAt: null, ...over,
+  taskId,
+  branch: `gustaf/${taskId}`,
+  status,
+  error: null,
+  conflicts: [],
+  strategy: "merge",
+  testCommand: null,
+  targetBranch: "main",
+  enqueuedAt: 1,
+  startedAt: null,
+  finishedAt: null,
+  ...over,
 });
 
 /** A tiny stand-in for the backend queue: `script` decides what each `queue_run_next` does to the state. */
-function fakeQueue(script: ((s: { halted: boolean; items: any[] }) => { outcome: string; taskId?: string | null; needsTest?: unknown }) []) {
+function fakeQueue(
+  script: ((s: { halted: boolean; items: any[] }) => {
+    outcome: string;
+    taskId?: string | null;
+    needsTest?: unknown;
+  })[],
+) {
   const state = { version: 1, halted: false, items: [] as any[], updatedAt: 1 };
   const snap = () => JSON.parse(JSON.stringify(state));
   let step = 0;
@@ -41,7 +113,11 @@ function fakeQueue(script: ((s: { halted: boolean; items: any[] }) => { outcome:
       queue_status: () => snap(),
       queue_enqueue: (a: { taskIds: string[]; strategy: string; testCommand: string | null }) => {
         state.items = state.items.filter((i) => !a.taskIds.includes(i.taskId));
-        state.items.push(...a.taskIds.map((id, n) => item(id, "queued", { strategy: a.strategy, testCommand: a.testCommand, enqueuedAt: 10 + n })));
+        state.items.push(
+          ...a.taskIds.map((id, n) =>
+            item(id, "queued", { strategy: a.strategy, testCommand: a.testCommand, enqueuedAt: 10 + n }),
+          ),
+        );
         return snap();
       },
       queue_run_next: () => {
@@ -51,17 +127,35 @@ function fakeQueue(script: ((s: { halted: boolean; items: any[] }) => { outcome:
       queue_report_test: (a: { taskId: string; ok: boolean; output: string }) => {
         const it = state.items.find((i) => i.taskId === a.taskId);
         it.status = a.ok ? "merging" : "failed";
-        if (!a.ok) { it.error = a.output; state.halted = true; }
+        if (!a.ok) {
+          it.error = a.output;
+          state.halted = true;
+        }
         return snap();
       },
-      queue_resume: () => { state.halted = false; return snap(); },
-      queue_cancel: () => { state.items.forEach((i) => { if (!["merged", "failed", "skipped"].includes(i.status)) { i.status = "skipped"; i.error = "cancelled"; } }); state.halted = false; return snap(); },
+      queue_resume: () => {
+        state.halted = false;
+        return snap();
+      },
+      queue_cancel: () => {
+        state.items.forEach((i) => {
+          if (!["merged", "failed", "skipped"].includes(i.status)) {
+            i.status = "skipped";
+            i.error = "cancelled";
+          }
+        });
+        state.halted = false;
+        return snap();
+      },
     },
   };
 }
 
 const sidebar = (over: Record<string, unknown> = {}) =>
-  renderApp(<Sidebar onCreateProject={noop} onSearch={noop} />, makeApp({ projects: [project()], chats: [wsChat(5, "t1", "Fix login"), wsChat(6, "t2", "Add search")], ...over }));
+  renderApp(
+    <Sidebar onCreateProject={noop} onSearch={noop} />,
+    makeApp({ projects: [project()], chats: [wsChat(5, "t1", "Fix login"), wsChat(6, "t2", "Add search")], ...over }),
+  );
 const openProjectQueue = async () => {
   await flush();
   fireEvent.contextMenu(screen.getByText("Alpha"));
@@ -69,7 +163,11 @@ const openProjectQueue = async () => {
   return screen.getByRole("dialog", { name: "Merge queue" });
 };
 
-beforeEach(() => { resetWorkspaceStore(); resetMergeQueueStore(); clearComposerDrafts(); });
+beforeEach(() => {
+  resetWorkspaceStore();
+  resetMergeQueueStore();
+  clearComposerDrafts();
+});
 
 describe("conflict badge", () => {
   it("shows 'conflicts with <target> (N files)' and a popover with the files and kinds", async () => {
@@ -94,7 +192,9 @@ describe("conflict badge", () => {
     expect(within(pop).getByText("changed and deleted")).toBeInTheDocument();
     expect(within(pop).getByText("added on both sides")).toBeInTheDocument();
     fireEvent.keyDown(pop, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Conflicts of Fix login" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Conflicts of Fix login" })).not.toBeInTheDocument(),
+    );
   });
 
   it("is throttled: a re-render does not ask git again", async () => {
@@ -109,7 +209,13 @@ describe("conflict badge", () => {
   });
 
   it("shows nothing and stops asking when git is too old", async () => {
-    mockInvoke({ git_status: gitStatus, worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search" })], conflicts_check: () => { throw "git_too_old: git 2.30 found, 2.38 needed"; } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search" })],
+      conflicts_check: () => {
+        throw "git_too_old: git 2.30 found, 2.38 needed";
+      },
+    });
     sidebar();
     await flush();
     await flush();
@@ -128,7 +234,12 @@ describe("conflict badge", () => {
 
 describe("merge queue dialog", () => {
   it("row menu 'Merge into main…' opens the dialog with that workspace checked", async () => {
-    mockInvoke({ git_status: gitStatus, worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })], conflicts_check: report(), queue_status: { version: 1, halted: false, items: [], updatedAt: 1 } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })],
+      conflicts_check: report(),
+      queue_status: { version: 1, halted: false, items: [], updatedAt: 1 },
+    });
     sidebar();
     await waitFor(() => expect(callsOf("worktree_list").length).toBeGreaterThan(0));
     await flush();
@@ -141,12 +252,29 @@ describe("merge queue dialog", () => {
 
   it("runs enqueue, needs_test through the approval path, report_test and merged; offers archive", async () => {
     const q = fakeQueue([
-      (s) => { s.items[0].status = "testing"; return { outcome: "needs_test", taskId: "t1", needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" } }; },
-      (s) => { s.items[0].status = "merged"; s.items[0].finishedAt = 5; return { outcome: "merged", taskId: "t1" }; },
+      (s) => {
+        s.items[0].status = "testing";
+        return {
+          outcome: "needs_test",
+          taskId: "t1",
+          needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" },
+        };
+      },
+      (s) => {
+        s.items[0].status = "merged";
+        s.items[0].finishedAt = 5;
+        return { outcome: "merged", taskId: "t1" };
+      },
     ]);
-    mockSettings({ "mergeStrategy:/work/alpha": "squash", "reviewSetup:/work/alpha": { linkDirs: [], setupCommand: "", testCommand: "npm test" } });
+    mockSettings({
+      "mergeStrategy:/work/alpha": "squash",
+      "reviewSetup:/work/alpha": { linkDirs: [], setupCommand: "", testCommand: "npm test" },
+    });
     mockInvoke({
-      git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers,
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      ...q.handlers,
       run_command: { code: 0, output: "all green\n", timed_out: false },
       worktree_remove: { removed: true, branchDeleted: false, branchKeptReason: null },
     });
@@ -163,30 +291,55 @@ describe("merge queue dialog", () => {
     expect(within(approval).getByText("npm test")).toBeInTheDocument();
     expect(within(approval).getByText("Runs in /store/abc/t1")).toBeInTheDocument();
     expect(callsOf("run_command")).toEqual([]);
-    expect(callsOf("queue_enqueue")).toEqual([{ root: "/work/alpha", taskIds: ["t1"], strategy: "squash", testCommand: "npm test" }]);
+    expect(callsOf("queue_enqueue")).toEqual([
+      { root: "/work/alpha", taskIds: ["t1"], strategy: "squash", testCommand: "npm test" },
+    ]);
     await userEvent.click(within(approval).getByRole("button", { name: "Allow" }));
 
     await waitFor(() => expect(within(dialog).getByText("Merged", { selector: ".mq-status" })).toBeInTheDocument());
     expect(callsOf("run_command")).toEqual([{ root: "/store/abc/t1", command: "npm test", timeoutMs: 300000 }]);
-    expect(callsOf("queue_report_test")).toEqual([{ root: "/work/alpha", taskId: "t1", ok: true, output: "all green\n" }]);
+    expect(callsOf("queue_report_test")).toEqual([
+      { root: "/work/alpha", taskId: "t1", ok: true, output: "all green\n" },
+    ]);
     expect(within(dialog).getByText("Finished: 1 of 1 merged.")).toBeInTheDocument();
     expect(callsOf("queue_run_next").length).toBeGreaterThanOrEqual(2);
     // The strategy is remembered as the project's default.
-    expect(callsOf("db_execute").some((a) => /insert into settings/.test(a.sql) && a.params[0] === "mergeStrategy:/work/alpha")).toBe(true);
+    expect(
+      callsOf("db_execute").some(
+        (a) => /insert into settings/.test(a.sql) && a.params[0] === "mergeStrategy:/work/alpha",
+      ),
+    ).toBe(true);
 
     // Archive is one click and not automatic.
     expect(callsOf("worktree_remove")).toEqual([]);
     await userEvent.click(within(dialog).getByRole("button", { name: "Archive this workspace" }));
-    await waitFor(() => expect(callsOf("worktree_remove")).toEqual([{ root: "/work/alpha", taskId: "t1", force: false, deleteBranch: false }]));
+    await waitFor(() =>
+      expect(callsOf("worktree_remove")).toEqual([
+        { root: "/work/alpha", taskId: "t1", force: false, deleteBranch: false },
+      ]),
+    );
   });
 
   it("a command the rules allow runs without a prompt; a declined one fails the item and halts", async () => {
     const q = fakeQueue([
-      (s) => { s.items[0].status = "testing"; return { outcome: "needs_test", taskId: "t1", needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" } }; },
+      (s) => {
+        s.items[0].status = "testing";
+        return {
+          outcome: "needs_test",
+          taskId: "t1",
+          needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" },
+        };
+      },
       () => ({ outcome: "halted" }),
     ]);
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers, run_command: { code: 0, output: "", timed_out: false } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      ...q.handlers,
+      run_command: { code: 0, output: "", timed_out: false },
+    });
     sidebar({ chats: [wsChat(5, "t1", "Fix login")] });
     const dialog = await openProjectQueue();
     await userEvent.type(within(dialog).getByLabelText("Test command (optional)"), "npm test");
@@ -196,24 +349,48 @@ describe("merge queue dialog", () => {
     await userEvent.click(within(approval).getByRole("button", { name: "Deny" }));
     await waitFor(() => expect(within(dialog).getByText("Failed", { selector: ".mq-status" })).toBeInTheDocument());
     expect(callsOf("run_command")).toEqual([]);
-    expect(callsOf("queue_report_test")[0]).toMatchObject({ taskId: "t1", ok: false, output: "The test command was not approved, so it was not run." });
+    expect(callsOf("queue_report_test")[0]).toMatchObject({
+      taskId: "t1",
+      ok: false,
+      output: "The test command was not approved, so it was not run.",
+    });
     expect(within(dialog).getByText(/Stopped after a failure/)).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Resume" })).toBeInTheDocument();
   });
 
   it("an allowlisted test command runs directly with no approval card", async () => {
     const q = fakeQueue([
-      (s) => { s.items[0].status = "testing"; return { outcome: "needs_test", taskId: "t1", needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" } }; },
-      (s) => { s.items[0].status = "merged"; return { outcome: "merged", taskId: "t1" }; },
+      (s) => {
+        s.items[0].status = "testing";
+        return {
+          outcome: "needs_test",
+          taskId: "t1",
+          needsTest: { taskId: "t1", worktreePath: "/store/abc/t1", command: "npm test" },
+        };
+      },
+      (s) => {
+        s.items[0].status = "merged";
+        return { outcome: "merged", taskId: "t1" };
+      },
     ]);
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers, run_command: { code: 1, output: "1 failing\n", timed_out: false } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      ...q.handlers,
+      run_command: { code: 1, output: "1 failing\n", timed_out: false },
+    });
     sidebar({ chats: [wsChat(5, "t1", "Fix login")], allowlist: ["npm test"] });
     const dialog = await openProjectQueue();
     await userEvent.type(within(dialog).getByLabelText("Test command (optional)"), "npm test");
     await userEvent.click(within(dialog).getByRole("checkbox", { name: /Fix login/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Start" }));
-    await waitFor(() => expect(callsOf("queue_report_test")).toEqual([{ root: "/work/alpha", taskId: "t1", ok: false, output: "1 failing\n" }]));
+    await waitFor(() =>
+      expect(callsOf("queue_report_test")).toEqual([
+        { root: "/work/alpha", taskId: "t1", ok: false, output: "1 failing\n" },
+      ]),
+    );
     expect(screen.queryByRole("alertdialog", { name: /command/i })).not.toBeInTheDocument();
     // The failed test's output is shown with the failed item.
     await waitFor(() => expect(within(dialog).getByText(/1 failing/)).toBeInTheDocument());
@@ -221,8 +398,24 @@ describe("merge queue dialog", () => {
 
   it("a failure with conflicts halts, lists the files and drafts (never sends) a resolve instruction; Resume retries", async () => {
     const q = fakeQueue([
-      (s) => { Object.assign(s.items[0], { status: "failed", error: "merge conflict", finishedAt: 3, conflicts: [{ path: "src/a.ts", kind: "content" }, { path: "gone.txt", kind: "modify_delete" }] }); s.halted = true; return { outcome: "failed", taskId: "t1" }; },
-      (s) => { s.items[0].status = "merged"; s.items[0].finishedAt = 9; return { outcome: "merged", taskId: "t1" }; },
+      (s) => {
+        Object.assign(s.items[0], {
+          status: "failed",
+          error: "merge conflict",
+          finishedAt: 3,
+          conflicts: [
+            { path: "src/a.ts", kind: "content" },
+            { path: "gone.txt", kind: "modify_delete" },
+          ],
+        });
+        s.halted = true;
+        return { outcome: "failed", taskId: "t1" };
+      },
+      (s) => {
+        s.items[0].status = "merged";
+        s.items[0].finishedAt = 9;
+        return { outcome: "merged", taskId: "t1" };
+      },
     ]);
     mockSettings({});
     mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers });
@@ -242,8 +435,8 @@ describe("merge queue dialog", () => {
     expect(screen.queryByRole("dialog", { name: "Merge queue" })).not.toBeInTheDocument();
     const draft = takeComposerDraft(5)!;
     expect(draft).toBe(
-      "Merging this branch into main failed with conflicts in these files:\n- src/a.ts (content)\n- gone.txt (changed and deleted)\n\n"
-      + "Resolve the conflicts keeping both intents (the changes of this branch and the ones already in main), run `npm test` to check the result, and commit the result. Do not push.",
+      "Merging this branch into main failed with conflicts in these files:\n- src/a.ts (content)\n- gone.txt (changed and deleted)\n\n" +
+        "Resolve the conflicts keeping both intents (the changes of this branch and the ones already in main), run `npm test` to check the result, and commit the result. Do not push.",
     );
     // Nothing was sent: no message was written.
     expect(callsOf("db_execute").some((a) => /insert into messages/.test(a.sql))).toBe(false);
@@ -254,16 +447,29 @@ describe("merge queue dialog", () => {
     const again = screen.getByRole("dialog", { name: "Merge queue" });
     await userEvent.click(await within(again).findByRole("button", { name: "Resume" }));
     await waitFor(() => expect(within(again).getByText("Merged", { selector: ".mq-status" })).toBeInTheDocument());
-    expect(callsOf("queue_enqueue").slice(-1)[0]).toMatchObject({ taskIds: ["t1"], strategy: "merge", testCommand: "npm test" });
+    expect(callsOf("queue_enqueue").slice(-1)[0]).toMatchObject({
+      taskIds: ["t1"],
+      strategy: "merge",
+      testCommand: "npm test",
+    });
     expect(callsOf("queue_resume")).toHaveLength(1);
   });
 
   it("Cancel while halted skips the unfinished items", async () => {
     const q = fakeQueue([
-      (s) => { Object.assign(s.items[0], { status: "failed", error: "boom", finishedAt: 3 }); s.halted = true; return { outcome: "failed", taskId: "t1" }; },
+      (s) => {
+        Object.assign(s.items[0], { status: "failed", error: "boom", finishedAt: 3 });
+        s.halted = true;
+        return { outcome: "failed", taskId: "t1" };
+      },
     ]);
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })], conflicts_check: report(), ...q.handlers });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })],
+      conflicts_check: report(),
+      ...q.handlers,
+    });
     sidebar();
     const dialog = await openProjectQueue();
     await userEvent.click(within(dialog).getByRole("checkbox", { name: /Fix login/ }));
@@ -279,7 +485,12 @@ describe("merge queue dialog", () => {
   it("reordering with the move buttons changes the enqueue order", async () => {
     const q = fakeQueue([() => ({ outcome: "idle" })]);
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })], conflicts_check: report(), ...q.handlers });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info(), info({ taskId: "t2", branch: "gustaf/add-search", path: "/store/abc/t2" })],
+      conflicts_check: report(),
+      ...q.handlers,
+    });
     sidebar();
     const dialog = await openProjectQueue();
     await userEvent.click(within(dialog).getByRole("checkbox", { name: /Fix login/ }));
@@ -291,7 +502,12 @@ describe("merge queue dialog", () => {
 
   it("workspaces with uncommitted changes cannot be checked", async () => {
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info({ dirty: true })], conflicts_check: report(), queue_status: { version: 1, halted: false, items: [], updatedAt: 1 } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info({ dirty: true })],
+      conflicts_check: report(),
+      queue_status: { version: 1, halted: false, items: [], updatedAt: 1 },
+    });
     sidebar({ chats: [wsChat(5, "t1", "Fix login")] });
     const dialog = await openProjectQueue();
     expect(within(dialog).getByRole("checkbox", { name: /Fix login/ })).toBeDisabled();
@@ -300,7 +516,13 @@ describe("merge queue dialog", () => {
   });
 
   it("shows the persisted queue when the dialog is reopened (after a restart) and continues it", async () => {
-    const q = fakeQueue([(s) => { s.items[0].status = "merged"; s.items[0].finishedAt = 4; return { outcome: "merged", taskId: "t1" }; }]);
+    const q = fakeQueue([
+      (s) => {
+        s.items[0].status = "merged";
+        s.items[0].finishedAt = 4;
+        return { outcome: "merged", taskId: "t1" };
+      },
+    ]);
     q.state.items.push(item("t1", "merging", { enqueuedAt: 3 }));
     mockSettings({});
     mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers });
@@ -313,15 +535,24 @@ describe("merge queue dialog", () => {
   });
 
   it.each([
-    ["target_dirty: main has 2 uncommitted change(s)", /main checkout has uncommitted changes.*Commit or stash them there, then press Try again/],
-    ["target_not_checked_out: main checkout is on dev", /not on the branch this workspace merges into.*Switch it to that branch/],
+    [
+      "target_dirty: main has 2 uncommitted change(s)",
+      /main checkout has uncommitted changes.*Commit or stash them there, then press Try again/,
+    ],
+    [
+      "target_not_checked_out: main checkout is on dev",
+      /not on the branch this workspace merges into.*Switch it to that branch/,
+    ],
     ["queue_busy: another run is active", /Another merge step is still running/],
   ])("run_next error %s is explained with the fix, and Try again continues", async (raw, message) => {
     let calls = 0;
     const q = fakeQueue([]);
     mockSettings({});
     mockInvoke({
-      git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), ...q.handlers,
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      ...q.handlers,
       queue_run_next: () => {
         if (calls++ === 0) throw raw;
         q.state.items[0].status = "merged";
@@ -341,12 +572,22 @@ describe("merge queue dialog", () => {
 
   it("enqueue errors (a workspace with uncommitted changes) show a plain message", async () => {
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), queue_status: { version: 1, halted: false, items: [], updatedAt: 1 }, queue_enqueue: () => { throw "dirty: task t1 has 3 uncommitted change(s); commit them first"; } });
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      queue_status: { version: 1, halted: false, items: [], updatedAt: 1 },
+      queue_enqueue: () => {
+        throw "dirty: task t1 has 3 uncommitted change(s); commit them first";
+      },
+    });
     sidebar({ chats: [wsChat(5, "t1", "Fix login")] });
     const dialog = await openProjectQueue();
     await userEvent.click(within(dialog).getByRole("checkbox", { name: /Fix login/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Start" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/A workspace has uncommitted changes\. Commit them in that workspace first/);
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      /A workspace has uncommitted changes\. Commit them in that workspace first/,
+    );
     expect(callsOf("queue_run_next")).toEqual([]);
     // Back on the form, nothing running.
     expect(within(dialog).getByRole("button", { name: "Start" })).toBeEnabled();
@@ -354,14 +595,28 @@ describe("merge queue dialog", () => {
 
   it("shows messages in Russian", async () => {
     mockSettings({});
-    mockInvoke({ git_status: gitStatus, worktree_list: [info()], conflicts_check: report(), queue_status: { version: 1, halted: false, items: [], updatedAt: 1 }, queue_enqueue: () => { throw "target_dirty: x"; } });
-    renderApp(<Sidebar onCreateProject={noop} onSearch={noop} />, makeApp({ projects: [project()], chats: [wsChat(5, "t1", "Fix login")] }), "ru");
+    mockInvoke({
+      git_status: gitStatus,
+      worktree_list: [info()],
+      conflicts_check: report(),
+      queue_status: { version: 1, halted: false, items: [], updatedAt: 1 },
+      queue_enqueue: () => {
+        throw "target_dirty: x";
+      },
+    });
+    renderApp(
+      <Sidebar onCreateProject={noop} onSearch={noop} />,
+      makeApp({ projects: [project()], chats: [wsChat(5, "t1", "Fix login")] }),
+      "ru",
+    );
     await flush();
     fireEvent.contextMenu(screen.getByText("Alpha"));
     await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Очередь слияния…" }));
     const dialog = screen.getByRole("dialog", { name: "Очередь слияния" });
     await userEvent.click(within(dialog).getByRole("checkbox", { name: /Fix login/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Запустить" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/основной рабочей папке есть незафиксированные изменения/);
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      /основной рабочей папке есть незафиксированные изменения/,
+    );
   });
 });

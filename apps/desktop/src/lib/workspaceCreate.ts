@@ -24,17 +24,37 @@ export type WorkspaceFailed = {
  * that no existing workspace uses) and a new chat linked to it. A failed chat insert removes the worktree again so
  * nothing is left behind. Setup (dependency links, setup command) is a separate step: `setupWorkspace`.
  */
-export async function createWorkspace(o: { projectId: number; root: string; title: string; slugSource?: string; provider?: string | null; model?: string | null }): Promise<WorkspaceCreated | WorkspaceFailed> {
+export async function createWorkspace(o: {
+  projectId: number;
+  root: string;
+  title: string;
+  slugSource?: string;
+  provider?: string | null;
+  model?: string | null;
+}): Promise<WorkspaceCreated | WorkspaceFailed> {
   let info: WorktreeInfo;
   try {
-    const taken = await worktrees.list(o.root).then((l) => l.map((w) => w.taskId), () => []);
-    info = await worktrees.create({ root: o.root, taskId: newTaskId(taken), slug: slugFromText(o.slugSource ?? o.title), provider: o.provider, model: o.model });
+    const taken = await worktrees.list(o.root).then(
+      (l) => l.map((w) => w.taskId),
+      () => [],
+    );
+    info = await worktrees.create({
+      root: o.root,
+      taskId: newTaskId(taken),
+      slug: slugFromText(o.slugSource ?? o.title),
+      provider: o.provider,
+      model: o.model,
+    });
   } catch (e) {
     const err = parseWorktreeError(e);
     return { ok: false, fallback: needsShadowCopyFallback(err), message: err.message };
   }
   try {
-    const chatId = await createWorkspaceChat(o.projectId, o.title, { taskId: info.taskId, branch: info.branch, base: info.baseCommit });
+    const chatId = await createWorkspaceChat(o.projectId, o.title, {
+      taskId: info.taskId,
+      branch: info.branch,
+      base: info.baseCommit,
+    });
     const root = joinCheckout(info.path, await repoPrefix(o.root));
     void refreshWorkspaces(o.root, { force: true });
     return { ok: true, chatId, info, root };
@@ -51,11 +71,20 @@ type T = (key: Key, vars?: Record<string, string | number>) => string;
  * Dependency links and the project's setup command in the new checkout (same approval rules as the shadow copy).
  * Never throws: the workspace is usable without its setup, so a problem comes back as the notice text ("" when fine).
  */
-export async function setupWorkspace(projectRoot: string, created: WorkspaceCreated, o: SetupOptions, t: T): Promise<string> {
+export async function setupWorkspace(
+  projectRoot: string,
+  created: WorkspaceCreated,
+  o: SetupOptions,
+  t: T,
+): Promise<string> {
   try {
     const setup = await prepareWorkspaceSetup(projectRoot, created.info.taskId, created.root, o);
     if (setup === "declined") return t("workspaceSetupDeclined");
-    if (setup && !setup.ok) return t("workspaceSetupFailed", { code: setup.timedOut ? t("reviewTimedOut") : String(setup.code ?? "?"), output: setup.output.slice(-600) });
+    if (setup && !setup.ok)
+      return t("workspaceSetupFailed", {
+        code: setup.timedOut ? t("reviewTimedOut") : String(setup.code ?? "?"),
+        output: setup.output.slice(-600),
+      });
     return "";
   } catch (e) {
     return t("workspaceSetupFailedOpen", { message: String((e as Error)?.message ?? e) });

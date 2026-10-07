@@ -1,5 +1,14 @@
 import { fsx, git, review } from "./api";
-import { captureAfter, captureBefore, reviewLocation, undoEdit, type FileSnapshot, type UndoDeps, type UndoRecord, type UndoResult } from "./fileUndo";
+import {
+  captureAfter,
+  captureBefore,
+  reviewLocation,
+  undoEdit,
+  type FileSnapshot,
+  type UndoDeps,
+  type UndoRecord,
+  type UndoResult,
+} from "./fileUndo";
 
 export async function checkpoint(root: string) {
   await git(root, ["add", "-A"], true);
@@ -73,7 +82,11 @@ export function snapshotFile(root: string, path: unknown) {
  * Records the result of an edit as an undo entry. In a review copy the entry also names the review, so undo can check that
  * the change is still pending; if that review cannot be identified there is no undo.
  */
-export async function sealSnapshot(root: string, snap: FileSnapshot, reviewMode: boolean): Promise<UndoRecord | undefined> {
+export async function sealSnapshot(
+  root: string,
+  snap: FileSnapshot,
+  reviewMode: boolean,
+): Promise<UndoRecord | undefined> {
   const where = reviewLocation(root);
   if (reviewMode && !where) return undefined;
   return captureAfter(undoDeps(root), snap, root, reviewMode ? where?.id : undefined).catch(() => undefined);

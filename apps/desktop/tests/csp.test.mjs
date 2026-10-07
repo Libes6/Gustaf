@@ -26,8 +26,23 @@ const caps = JSON.parse(readFileSync(join(root, 'src-tauri/capabilities/default.
 const security = conf.app.security;
 
 /** Tauri accepts a string or a { directive: string | string[] } map; both become one policy string. */
-const cspString = (csp) => typeof csp === 'string' ? csp : Object.entries(csp).map(([k, v]) => `${k} ${[].concat(v).join(' ')}`).join('; ');
-const parseCsp = (csp) => Object.fromEntries(cspString(csp).split(';').map((d) => d.trim()).filter(Boolean).map((d) => { const [name, ...src] = d.split(/\s+/); return [name, src]; }));
+const cspString = (csp) =>
+  typeof csp === 'string'
+    ? csp
+    : Object.entries(csp)
+        .map(([k, v]) => `${k} ${[].concat(v).join(' ')}`)
+        .join('; ');
+const parseCsp = (csp) =>
+  Object.fromEntries(
+    cspString(csp)
+      .split(';')
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => {
+        const [name, ...src] = d.split(/\s+/);
+        return [name, src];
+      }),
+  );
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 1. Policy shape
@@ -57,7 +72,11 @@ test('production CSP is set and every source is on the allow-list', () => {
   for (const name of Object.keys(ALLOWED)) assert.ok(policy[name], `directive ${name} is missing`);
   for (const [name, sources] of Object.entries(policy)) {
     assert.ok(ALLOWED[name], `unexpected directive ${name}: review it, then add it to ALLOWED in tests/csp.test.mjs`);
-    for (const s of sources) assert.ok(ALLOWED[name].includes(s), `${name} gained source ${s}: review it, then add it to ALLOWED in tests/csp.test.mjs`);
+    for (const s of sources)
+      assert.ok(
+        ALLOWED[name].includes(s),
+        `${name} gained source ${s}: review it, then add it to ALLOWED in tests/csp.test.mjs`,
+      );
   }
 });
 
@@ -74,12 +93,21 @@ test('dev CSP only adds what Vite needs on top of the production policy', () => 
 
 test('production policy has no escape hatches for scripts or network', () => {
   const p = parseCsp(security.csp);
-  assert.ok(!p['script-src'].includes("'unsafe-inline'"), "script-src 'unsafe-inline' would also void Tauri's nonces/hashes");
-  for (const [name, sources] of Object.entries(p)) for (const s of sources) {
-    assert.ok(!/^\*$|^https?:$|^https?:\/\/\*|^ws:$|^wss:$/.test(s), `${name} ${s} is a wildcard/scheme-wide source`);
-    if (name !== 'img-src' && name !== 'font-src') assert.ok(s !== 'data:' && s !== 'blob:', `${name} must not allow ${s}`);
-  }
-  assert.deepEqual(p['connect-src'].filter((s) => /^https?:/.test(s)), ['http://ipc.localhost'], 'network goes through plugin-http (IPC), not the webview');
+  assert.ok(
+    !p['script-src'].includes("'unsafe-inline'"),
+    "script-src 'unsafe-inline' would also void Tauri's nonces/hashes",
+  );
+  for (const [name, sources] of Object.entries(p))
+    for (const s of sources) {
+      assert.ok(!/^\*$|^https?:$|^https?:\/\/\*|^ws:$|^wss:$/.test(s), `${name} ${s} is a wildcard/scheme-wide source`);
+      if (name !== 'img-src' && name !== 'font-src')
+        assert.ok(s !== 'data:' && s !== 'blob:', `${name} must not allow ${s}`);
+    }
+  assert.deepEqual(
+    p['connect-src'].filter((s) => /^https?:/.test(s)),
+    ['http://ipc.localhost'],
+    'network goes through plugin-http (IPC), not the webview',
+  );
 });
 
 test("Tauri's automatic nonce/hash injection stays enabled", () => {
@@ -109,7 +137,11 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
     [/new\s+EventSource\s*\(/, 'EventSource'],
     [/sendBeacon\s*\(/, 'sendBeacon'],
     [/new\s+(Shared)?Worker\s*\(/, 'Worker (no worker-src)'],
-    [/dangerouslySetInnerHTML|\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(/, 'raw HTML injection', RAW_HTML_ALLOWED],
+    [
+      /dangerouslySetInnerHTML|\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(/,
+      'raw HTML injection',
+      RAW_HTML_ALLOWED,
+    ],
     [/createElement\(\s*["'`]script/, 'dynamic script element'],
     [/@import|url\(\s*["']?https?:/, 'CSS remote import'],
     [/\beval\s*\(/, 'eval'],
@@ -118,19 +150,45 @@ test('source: no new network/frame/script surfaces that the CSP was not designed
   for (const f of files) {
     const text = readFileSync(f, 'utf8');
     const rel = f.slice(root.length).split(sep).join('/');
-    for (const [re, what, allowed] of rules) assert.ok(!re.test(text) || allowed?.includes(rel), `${rel}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`);
+    for (const [re, what, allowed] of rules)
+      assert.ok(
+        !re.test(text) || allowed?.includes(rel),
+        `${rel}: ${what}. Review the CSP (tests/csp.test.mjs, docs/features/security.md) before allowing it.`,
+      );
   }
   // The one HTML injection: Mermaid's SVG, produced with securityLevel "strict" (no HTML labels, no click handlers) and
   // sanitised by Mermaid's DOMPurify before it is returned.
-  assert.match(readFileSync(join(root, 'src/components/MermaidBlock.tsx'), 'utf8'), /securityLevel:\s*"strict"/, 'Mermaid must render with securityLevel "strict"');
-  const iframes = files.filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length).split(sep).join("/"));
-  assert.deepEqual(iframes, ['src/components/CanvasPanel.tsx', 'src/components/HtmlPageCard.tsx', 'src/components/ProjectPreview.tsx', 'src/components/ShareHtmlDialog.tsx'], 'only canvas, agent HTML pages, isolated local project preview and HTML sharing may create an iframe');
-  assert.match(readFileSync(join(root, 'src/components/HtmlPageCard.tsx'), 'utf8'), /sandbox=""/, 'agent HTML pages must be fully sandboxed (no scripts)');
+  assert.match(
+    readFileSync(join(root, 'src/components/MermaidBlock.tsx'), 'utf8'),
+    /securityLevel:\s*"strict"/,
+    'Mermaid must render with securityLevel "strict"',
+  );
+  const iframes = files
+    .filter((f) => /<iframe\b/.test(readFileSync(f, 'utf8')))
+    .map((f) => f.slice(root.length).split(sep).join('/'));
+  assert.deepEqual(
+    iframes,
+    [
+      'src/components/CanvasPanel.tsx',
+      'src/components/HtmlPageCard.tsx',
+      'src/components/ProjectPreview.tsx',
+      'src/components/ShareHtmlDialog.tsx',
+    ],
+    'only canvas, agent HTML pages, isolated local project preview and HTML sharing may create an iframe',
+  );
+  assert.match(
+    readFileSync(join(root, 'src/components/HtmlPageCard.tsx'), 'utf8'),
+    /sandbox=""/,
+    'agent HTML pages must be fully sandboxed (no scripts)',
+  );
   const share = readFileSync(join(root, 'src/components/ShareHtmlDialog.tsx'), 'utf8');
   assert.match(share, /sandbox=""/, 'the share preview frame must be fully sandboxed (no scripts)');
   const panel = readFileSync(join(root, 'src/components/CanvasPanel.tsx'), 'utf8');
   assert.match(panel, /sandbox="allow-scripts"/, 'canvas iframe must keep sandbox="allow-scripts"');
-  assert.ok(!/allow-same-origin|allow-top-navigation|allow-popups|allow-forms|allow-modals/.test(panel), 'canvas sandbox must not gain capabilities');
+  assert.ok(
+    !/allow-same-origin|allow-top-navigation|allow-popups|allow-forms|allow-modals/.test(panel),
+    'canvas sandbox must not gain capabilities',
+  );
 });
 
 test('canvas document: no inline code, nonce on the only script, hardened own CSP', () => {
@@ -139,11 +197,25 @@ test('canvas document: no inline code, nonce on the only script, hardened own CS
   assert.equal(scripts.length, 2, 'payload (application/json) and runtime only');
   const nonce = /content-security-policy[^>]*script-src 'nonce-([0-9a-f]+)'/i.exec(html)?.[1];
   assert.ok(nonce, 'canvas CSP must carry a nonce');
-  assert.ok(scripts.some((a) => /type="application\/json"/.test(a)), 'payload must be a non-executable JSON script');
+  assert.ok(
+    scripts.some((a) => /type="application\/json"/.test(a)),
+    'payload must be a non-executable JSON script',
+  );
   const runtime = scripts.find((a) => /src=/.test(a));
-  assert.ok(runtime?.includes(`nonce="${nonce}"`) && runtime.includes(`src="${CANVAS_RUNTIME_URL}"`), 'runtime must be an external nonce\'d script');
+  assert.ok(
+    runtime?.includes(`nonce="${nonce}"`) && runtime.includes(`src="${CANVAS_RUNTIME_URL}"`),
+    "runtime must be an external nonce'd script",
+  );
   const meta = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)[1];
-  for (const needed of ["default-src 'none'", "connect-src 'none'", "frame-src 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'none'"]) assert.ok(meta.includes(needed), `canvas CSP lost ${needed}`);
+  for (const needed of [
+    "default-src 'none'",
+    "connect-src 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ])
+    assert.ok(meta.includes(needed), `canvas CSP lost ${needed}`);
   assert.ok(!/script-src[^;]*'unsafe-inline'/.test(meta), 'canvas script-src must not allow inline scripts');
 });
 
@@ -160,34 +232,67 @@ before(() => {
   execFileSync(process.execPath, [viteBin, 'build', '--outDir', dist, '--emptyOutDir'], { cwd: root, stdio: 'pipe' });
   built = true;
 });
-after(() => { if (dist) rmSync(dist, { recursive: true, force: true }); });
+after(() => {
+  if (dist) rmSync(dist, { recursive: true, force: true });
+});
 
 /** Hosts that appear in the bundle as constants (provider presets, doc links, XML namespaces), never as loaded resources. */
 const KNOWN_HOSTS = new Set([
   // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
-  'api.search.brave.com', 'www.w3.org', 'react.dev', 'github.com', 'localhost', '127.0.0.1', 'example.com', 'api.openai.com', 'generativelanguage.googleapis.com', 'api.anthropic.com',
-  'openrouter.ai', 'platform.openai.com', 'aistudio.google.com', 'console.anthropic.com', 'cursor.com', 'claude.ai', 'chatgpt.com', 'developers.openai.com', 'api.x.ai', 'console.x.ai',
+  'api.search.brave.com',
+  'www.w3.org',
+  'react.dev',
+  'github.com',
+  'localhost',
+  '127.0.0.1',
+  'example.com',
+  'api.openai.com',
+  'generativelanguage.googleapis.com',
+  'api.anthropic.com',
+  'openrouter.ai',
+  'platform.openai.com',
+  'aistudio.google.com',
+  'console.anthropic.com',
+  'cursor.com',
+  'claude.ai',
+  'chatgpt.com',
+  'developers.openai.com',
+  'api.x.ai',
+  'console.x.ai',
   // Mermaid's lazy chunks: links in parser error messages (chevrotain, langium, Wikipedia), ELK's XML namespace URIs and
   // a bundler message (rolldown); strings only, never fetched.
-  'chevrotain.io', 'langium.org', 'en.wikipedia.org', 'www.eclipse.org', 'rolldown.rs',
+  'chevrotain.io',
+  'langium.org',
+  'en.wikipedia.org',
+  'www.eclipse.org',
+  'rolldown.rs',
 ]);
 
 /** The two HTML entries: the app and the quick-ask window (src-tauri/src/quick_ask.rs loads `quick-ask.html`). */
 const ENTRIES = ['index.html', 'quick-ask.html'];
 
-for (const entry of ENTRIES) test(`build: ${entry} has no inline script, inline handler, style block or external reference`, (t) => {
-  if (!built) return t.skip('build skipped');
-  assert.ok(existsSync(join(dist, entry)), `${entry} missing from the build output (vite.config.ts build.rollupOptions.input)`);
-  const html = readFileSync(join(dist, entry), 'utf8');
-  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(m[1], /\bsrc="\/assets\//, `inline <script> in ${entry} (CSP script-src has no 'unsafe-inline'): ${m[0].slice(0, 120)}`);
-    assert.equal(m[2].trim(), '', 'script with src must be empty');
-  }
-  assert.ok(!/\son[a-z]+\s*=/i.test(html), `inline event handler attribute in ${entry}`);
-  assert.ok(!/<style\b/i.test(html), `a <style> block in ${entry} would need a hash/nonce`);
-  assert.ok(!/\sstyle\s*=/i.test(html), `inline style attribute in ${entry}`);
-  for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)) assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `external reference in ${entry}: ${m[1]}`);
-});
+for (const entry of ENTRIES)
+  test(`build: ${entry} has no inline script, inline handler, style block or external reference`, (t) => {
+    if (!built) return t.skip('build skipped');
+    assert.ok(
+      existsSync(join(dist, entry)),
+      `${entry} missing from the build output (vite.config.ts build.rollupOptions.input)`,
+    );
+    const html = readFileSync(join(dist, entry), 'utf8');
+    for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+      assert.match(
+        m[1],
+        /\bsrc="\/assets\//,
+        `inline <script> in ${entry} (CSP script-src has no 'unsafe-inline'): ${m[0].slice(0, 120)}`,
+      );
+      assert.equal(m[2].trim(), '', 'script with src must be empty');
+    }
+    assert.ok(!/\son[a-z]+\s*=/i.test(html), `inline event handler attribute in ${entry}`);
+    assert.ok(!/<style\b/i.test(html), `a <style> block in ${entry} would need a hash/nonce`);
+    assert.ok(!/\sstyle\s*=/i.test(html), `inline style attribute in ${entry}`);
+    for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g))
+      assert.ok(m[1].startsWith('/') && !m[1].startsWith('//'), `external reference in ${entry}: ${m[1]}`);
+  });
 
 test('build: the main bundle needs no eval, so script-src unsafe-eval is only for the canvas frame', (t) => {
   if (!built) return t.skip('build skipped');
@@ -201,13 +306,19 @@ test('build: the main bundle needs no eval, so script-src unsafe-eval is only fo
     // `self || Function("return this")()` is the global-object fallback of lodash-style code (Mermaid's dependencies):
     // in a webview `self` exists, so the Function call never runs. Any other Function(...) still fails.
     const code = js.replace(/\|\|\s*Function\(\s*["'`]return this["'`]\s*\)\(\)/g, '');
-    assert.ok(!/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(code), `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/features/security.md and this test.`);
+    assert.ok(
+      !/(^|[^\w.$])new\s+Function\s*\(|(^|[^\w.$])Function\s*\(\s*["'`]/.test(code),
+      `${f.slice(dist.length)} uses new Function(...). script-src 'unsafe-eval' is then needed by the app itself, not just the canvas: update docs/features/security.md and this test.`,
+    );
     assert.ok(!/(setTimeout|setInterval)\(\s*["'`]/.test(js), `${f.slice(dist.length)} passes a string to a timer`);
   }
   assert.ok(appChunks >= 2, 'expected the main chunk and the lazy CanvasPanel chunk to be scanned');
   const runtime = readFileSync(join(dist, 'canvas/runtime.js'), 'utf8');
   assert.match(runtime, /new Function\(/, 'the canvas runtime is the one place that evaluates code');
-  assert.ok(existsSync(join(dist, 'canvas/runtime-icons.js')), 'icons runtime missing (loaded for sources that import lucide-react)');
+  assert.ok(
+    existsSync(join(dist, 'canvas/runtime-icons.js')),
+    'icons runtime missing (loaded for sources that import lucide-react)',
+  );
 });
 
 test('build: no external URL outside the known constants, no remote CSS references', (t) => {
@@ -215,12 +326,19 @@ test('build: no external URL outside the known constants, no remote CSS referenc
   for (const f of walk(join(dist, 'assets'))) {
     const text = readFileSync(f, 'utf8');
     if (text.includes(RUNTIME_MARK)) continue; // runs in the sandbox with connect-src 'none'
-    if (f.endsWith('.css')) assert.ok(!/@import|url\(\s*["']?(https?:|\/\/)/.test(text), `${f.slice(dist.length)}: remote CSS reference`);
+    if (f.endsWith('.css'))
+      assert.ok(!/@import|url\(\s*["']?(https?:|\/\/)/.test(text), `${f.slice(dist.length)}: remote CSS reference`);
     for (const m of text.matchAll(/(?:https?|wss?):\/\/([A-Za-z0-9.-]+)/g)) {
-      assert.ok(KNOWN_HOSTS.has(m[1]), `${f.slice(dist.length)}: new external host ${m[1]} (${m[0]}). If it is loaded by the webview, add it to the CSP; if it is only an API/doc link (plugin-http / opener), add it to KNOWN_HOSTS.`);
+      assert.ok(
+        KNOWN_HOSTS.has(m[1]),
+        `${f.slice(dist.length)}: new external host ${m[1]} (${m[0]}). If it is loaded by the webview, add it to the CSP; if it is only an API/doc link (plugin-http / opener), add it to KNOWN_HOSTS.`,
+      );
     }
   }
-  assert.ok(existsSync(join(dist, 'canvas/runtime.js')), 'dist/canvas/runtime.js missing: the canvas iframe loads it with <script src>');
+  assert.ok(
+    existsSync(join(dist, 'canvas/runtime.js')),
+    'dist/canvas/runtime.js missing: the canvas iframe loads it with <script src>',
+  );
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -259,15 +377,27 @@ function serve(dir, cspHeader) {
 <iframe id="legacy" sandbox="allow-scripts" srcdoc="${attr(legacyInlineDocument)}"></iframe>`;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x').pathname;
-    const send = (body, type, html) => { res.writeHead(200, { 'content-type': type, ...(html ? { 'content-security-policy': cspHeader } : {}) }); res.end(body); };
+    const send = (body, type, html) => {
+      res.writeHead(200, { 'content-type': type, ...(html ? { 'content-security-policy': cspHeader } : {}) });
+      res.end(body);
+    };
     if (url === '/__csp/canvas.html') return send(fixture, 'text/html', true);
     if (url === '/__csp/canvas-nocsp.html') return send(fixture, 'text/html', false); // control: same page without the app CSP
-    if (url === '/__csp/page.js') return send('window.__msgs = []; addEventListener("message", (e) => window.__msgs.push(e.data));', 'text/javascript');
+    if (url === '/__csp/page.js')
+      return send(
+        'window.__msgs = []; addEventListener("message", (e) => window.__msgs.push(e.data));',
+        'text/javascript',
+      );
     const file = normalize(join(dir, url === '/' ? 'index.html' : url));
-    if (!file.startsWith(dir) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
+    if (!file.startsWith(dir) || !existsSync(file) || statSync(file).isDirectory()) {
+      res.writeHead(404);
+      return res.end();
+    }
     send(readFileSync(file), mime[extname(file)] ?? 'application/octet-stream', file.endsWith('.html'));
   });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` })));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` })),
+  );
 }
 
 /** The app talks to Rust through invoke(); outside Tauri every command resolves to "nothing" so the UI can render. */
@@ -282,11 +412,20 @@ test('browser: the production build boots under the production CSP without viola
   const { server, origin } = await serve(dist, cspString(security.csp));
   try {
     const page = await chrome.open(`${origin}/`, { init: TAURI_STUB });
-    const rendered = await page.waitFor("document.getElementById('root') && document.getElementById('root').children.length > 0");
+    const rendered = await page.waitFor(
+      "document.getElementById('root') && document.getElementById('root').children.length > 0",
+    );
     await new Promise((r) => setTimeout(r, 1500));
-    assert.deepEqual(violations(page.messages), [], 'CSP violations while loading the app:\n' + page.messages.join('\n'));
+    assert.deepEqual(
+      violations(page.messages),
+      [],
+      'CSP violations while loading the app:\n' + page.messages.join('\n'),
+    );
     assert.ok(rendered, 'the app did not render anything:\n' + page.messages.join('\n'));
-  } finally { server.close(); await chrome.close(); }
+  } finally {
+    server.close();
+    await chrome.close();
+  }
 });
 
 test('browser: the quick-ask entry boots under the production CSP without violations', async (t) => {
@@ -298,9 +437,16 @@ test('browser: the quick-ask entry boots under the production CSP without violat
     const page = await chrome.open(`${origin}/quick-ask.html`, { init: TAURI_STUB });
     const rendered = await page.waitFor("document.querySelector('[role=dialog] textarea') !== null");
     await new Promise((r) => setTimeout(r, 1000));
-    assert.deepEqual(violations(page.messages), [], 'CSP violations while loading the quick-ask window:\n' + page.messages.join('\n'));
+    assert.deepEqual(
+      violations(page.messages),
+      [],
+      'CSP violations while loading the quick-ask window:\n' + page.messages.join('\n'),
+    );
     assert.ok(rendered, 'the quick-ask window did not render its input:\n' + page.messages.join('\n'));
-  } finally { server.close(); await chrome.close(); }
+  } finally {
+    server.close();
+    await chrome.close();
+  }
 });
 
 test('browser: canvas srcdoc iframe still runs under the parent CSP and stays isolated', async (t) => {
@@ -310,24 +456,50 @@ test('browser: canvas srcdoc iframe still runs under the parent CSP and stays is
   const { server, origin } = await serve(dist, cspString(security.csp));
   try {
     const page = await chrome.open(`${origin}/__csp/canvas.html`);
-    const got = await page.waitFor("window.__msgs && ['probe', 'icons'].every(t => window.__msgs.some(m => m && m.type === t))");
+    const got = await page.waitFor(
+      "window.__msgs && ['probe', 'icons'].every(t => window.__msgs.some(m => m && m.type === t))",
+    );
     assert.ok(got, 'the canvas never reported back (script, eval or style blocked?):\n' + page.messages.join('\n'));
     await new Promise((r) => setTimeout(r, 500));
     const msgs = await page.eval('window.__msgs');
     const probe = msgs.find((m) => m?.type === 'probe');
     assert.equal(probe.text, 'hello canvas', 'component did not render');
-    assert.equal(probe.evalWorks, true, "new Function inside the canvas is blocked: parent script-src needs 'unsafe-eval'");
+    assert.equal(
+      probe.evalWorks,
+      true,
+      "new Function inside the canvas is blocked: parent script-src needs 'unsafe-eval'",
+    );
     assert.equal(probe.styled, 'rgb(1, 2, 3)', 'inline style did not apply (style-src)');
     assert.equal(probe.fetchBlocked, true, 'canvas can reach the network');
     assert.equal(probe.parentBlocked, true, 'canvas can read the parent document');
-    assert.equal(msgs.find((m) => m?.type === 'icons')?.svg, true, 'the lucide-react canvas (runtime-icons.js) did not render');
-    assert.ok(!msgs.some((m) => m?.type === 'gustaf-canvas-error'), 'canvas runtime reported an error: ' + JSON.stringify(msgs));
-    assert.ok(!msgs.some((m) => m?.type === 'inline-ran'), 'an inline script ran under the app CSP (inheritance assumption is wrong)');
-    assert.deepEqual([...new Set(probe.violated)], ['connect-src'], 'the only refusal inside the canvas may be its own fetch: ' + JSON.stringify(probe.violated));
+    assert.equal(
+      msgs.find((m) => m?.type === 'icons')?.svg,
+      true,
+      'the lucide-react canvas (runtime-icons.js) did not render',
+    );
+    assert.ok(
+      !msgs.some((m) => m?.type === 'gustaf-canvas-error'),
+      'canvas runtime reported an error: ' + JSON.stringify(msgs),
+    );
+    assert.ok(
+      !msgs.some((m) => m?.type === 'inline-ran'),
+      'an inline script ran under the app CSP (inheritance assumption is wrong)',
+    );
+    assert.deepEqual(
+      [...new Set(probe.violated)],
+      ['connect-src'],
+      'the only refusal inside the canvas may be its own fetch: ' + JSON.stringify(probe.violated),
+    );
     // Control: without the app CSP the legacy inline bootstrap does run, so its absence above is caused by the inherited policy.
     const control = await chrome.open(`${origin}/__csp/canvas-nocsp.html`);
-    assert.ok(await control.waitFor("window.__msgs && window.__msgs.some(m => m && m.type === 'inline-ran')"), 'control failed: the legacy inline script should run when the parent has no CSP');
-  } finally { server.close(); await chrome.close(); }
+    assert.ok(
+      await control.waitFor("window.__msgs && window.__msgs.some(m => m && m.type === 'inline-ran')"),
+      'control failed: the legacy inline script should run when the parent has no CSP',
+    );
+  } finally {
+    server.close();
+    await chrome.close();
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -339,10 +511,17 @@ const scoped = (id) => perms.find((p) => typeof p === 'object' && p.identifier =
 
 test('capabilities: http scope has no catch-all and no duplicates', () => {
   const urls = scoped('http:default').allow.map((a) => a.url);
-  assert.ok(!urls.some((u) => /^http:\/\/\*(:\*)?$/.test(u)), 'http://* lets the app send API keys in clear text to any host');
+  assert.ok(
+    !urls.some((u) => /^http:\/\/\*(:\*)?$/.test(u)),
+    'http://* lets the app send API keys in clear text to any host',
+  );
   assert.ok(urls.includes('https://*'));
   assert.equal(new Set(urls).size, urls.length, 'duplicate http scope entries');
-  for (const u of urls) assert.ok(/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\\\[|\(|\[|\*\.[a-z.]+:\*$)/.test(u), `unexpected http scope entry ${u}`);
+  for (const u of urls)
+    assert.ok(
+      /^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\\\[|\(|\[|\*\.[a-z.]+:\*$)/.test(u),
+      `unexpected http scope entry ${u}`,
+    );
 });
 
 test('capabilities: the http scope covers the OAuth endpoints the MCP sign-in accepts (https anywhere, http on loopback) and nothing weaker', () => {
@@ -357,9 +536,11 @@ test('capabilities: the http scope covers the OAuth endpoints the MCP sign-in ac
     'https://auth.example.com/oauth2/token',
     'http://localhost:9000/token',
     'http://127.0.0.1:9000/.well-known/oauth-authorization-server',
-  ]) assert.ok(covered(u), `${u} must be inside the http scope for OAuth to work`);
+  ])
+    assert.ok(covered(u), `${u} must be inside the http scope for OAuth to work`);
   // ... and a public authorization server over plain http (mcp/oauth.ts refuses it too) stays outside it.
-  for (const u of ['http://auth.example.com/token', 'http://8.8.8.8/token', 'http://auth.example.com:80/token']) assert.ok(!covered(u), `${u} must not be reachable`);
+  for (const u of ['http://auth.example.com/token', 'http://8.8.8.8/token', 'http://auth.example.com:80/token'])
+    assert.ok(!covered(u), `${u} must not be reachable`);
   // The browser step needs no capability beyond opening default URLs (https/http) with the opener plugin.
   assert.ok(perms.includes('opener:allow-default-urls'));
 });
@@ -378,9 +559,21 @@ test('capabilities: shell is limited to `zsh -lc <script>`', () => {
 });
 
 test('capabilities: broad plugin defaults stay replaced by the permissions actually used', () => {
-  const ids = perms.map((p) => typeof p === 'string' ? p : p.identifier);
-  for (const broad of ['dialog:default', 'opener:default', 'notification:default', 'shell:default', 'global-shortcut:default', 'core:window:default']) assert.ok(!ids.includes(broad), `${broad} grants more than the app uses`);
-  for (const unused of ['core:window:allow-show', 'core:window:allow-hide', 'core:window:allow-set-focus']) assert.ok(!ids.includes(unused), `${unused} is not called from the frontend (computer.rs hides/shows the window in Rust)`);
+  const ids = perms.map((p) => (typeof p === 'string' ? p : p.identifier));
+  for (const broad of [
+    'dialog:default',
+    'opener:default',
+    'notification:default',
+    'shell:default',
+    'global-shortcut:default',
+    'core:window:default',
+  ])
+    assert.ok(!ids.includes(broad), `${broad} grants more than the app uses`);
+  for (const unused of ['core:window:allow-show', 'core:window:allow-hide', 'core:window:allow-set-focus'])
+    assert.ok(
+      !ids.includes(unused),
+      `${unused} is not called from the frontend (computer.rs hides/shows the window in Rust)`,
+    );
   assert.equal(new Set(ids).size, ids.length, 'duplicate permission entries');
 });
 
@@ -389,24 +582,54 @@ test('capabilities: broad plugin defaults stay replaced by the permissions actua
 // ---------------------------------------------------------------------------------------------------------------------
 
 const quickCaps = JSON.parse(readFileSync(join(root, 'src-tauri/capabilities/quick-ask.json'), 'utf8'));
-const quickIds = quickCaps.permissions.map((p) => typeof p === 'string' ? p : p.identifier);
+const quickIds = quickCaps.permissions.map((p) => (typeof p === 'string' ? p : p.identifier));
 
 test('capabilities: quick-ask applies to its own window only and main does not get it', () => {
   assert.deepEqual(quickCaps.windows, ['quick-ask']);
   assert.deepEqual(caps.windows, ['main'], 'the default capability must not grow to the quick-ask window');
-  assert.equal(conf.app.windows.some((w) => w.label === 'quick-ask'), false, 'the window is created on demand by Rust, not at startup');
+  assert.equal(
+    conf.app.windows.some((w) => w.label === 'quick-ask'),
+    false,
+    'the window is created on demand by Rust, not at startup',
+  );
 });
 
 test('capabilities: quick-ask grants exactly events, dragging and the model-request http scope', () => {
-  assert.deepEqual([...quickIds].sort(), ['core:event:allow-emit-to', 'core:event:allow-listen', 'core:event:allow-unlisten', 'core:window:allow-start-dragging', 'http:default'].sort());
-  for (const forbidden of ['shell', 'dialog', 'opener', 'notification', 'global-shortcut', 'updater', 'process', 'core:default']) {
-    assert.ok(!quickIds.some((id) => id.startsWith(forbidden)), `quick-ask must not hold ${forbidden}*: window operations are Rust commands in quick_ask.rs`);
+  assert.deepEqual(
+    [...quickIds].sort(),
+    [
+      'core:event:allow-emit-to',
+      'core:event:allow-listen',
+      'core:event:allow-unlisten',
+      'core:window:allow-start-dragging',
+      'http:default',
+    ].sort(),
+  );
+  for (const forbidden of [
+    'shell',
+    'dialog',
+    'opener',
+    'notification',
+    'global-shortcut',
+    'updater',
+    'process',
+    'core:default',
+  ]) {
+    assert.ok(
+      !quickIds.some((id) => id.startsWith(forbidden)),
+      `quick-ask must not hold ${forbidden}*: window operations are Rust commands in quick_ask.rs`,
+    );
   }
   assert.equal(new Set(quickIds).size, quickIds.length, 'duplicate permission entries');
 });
 
 test('capabilities: the quick-ask http scope is the same as the main window (it makes the same provider requests) and has no catch-all', () => {
-  const mine = quickCaps.permissions.find((p) => typeof p === 'object' && p.identifier === 'http:default').allow.map((a) => a.url);
-  assert.deepEqual(mine, scoped('http:default').allow.map((a) => a.url));
+  const mine = quickCaps.permissions
+    .find((p) => typeof p === 'object' && p.identifier === 'http:default')
+    .allow.map((a) => a.url);
+  assert.deepEqual(
+    mine,
+    scoped('http:default').allow.map((a) => a.url),
+  );
   assert.ok(!mine.some((u) => /^http:\/\/\*(:\*)?$/.test(u)));
 });

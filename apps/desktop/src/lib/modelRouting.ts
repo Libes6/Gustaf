@@ -10,7 +10,8 @@ import type { ModelInfo, ProviderConfig } from "../providers/types";
 
 type Catalog = { providers: ProviderConfig[]; models: ModelInfo[] };
 
-const findModel = (c: Catalog, ref: ModelRef) => c.models.find((m) => m.providerId === ref.providerId && m.id === ref.model);
+const findModel = (c: Catalog, ref: ModelRef) =>
+  c.models.find((m) => m.providerId === ref.providerId && m.id === ref.model);
 const findProvider = (c: Catalog, ref: ModelRef) => c.providers.find((p) => p.id === ref.providerId && !p.disabled);
 
 /** CLI agents run their own tools (and approvals) in the folder, so they cannot host a subagent loop. */
@@ -44,26 +45,61 @@ export function providerDirectory(c: Catalog): ProviderDirectory {
       const cli = cliSubagentSupport(p);
       if (cli) {
         if (!cli.ok) return { ok: false, reason: cli.reason };
-        if (model && model !== "default" && own.length && !own.some((m) => m.id === model)) return { ok: false, reason: `model "${model}" is not one of its models (${own.slice(0, 8).map((m) => m.id).join(", ")}).` };
-        return { ok: true, kind: "cli", adapter: await getAdapter(p), cli: cli.cli, model: model ?? "default", name: p.name };
+        if (model && model !== "default" && own.length && !own.some((m) => m.id === model))
+          return {
+            ok: false,
+            reason: `model "${model}" is not one of its models (${own
+              .slice(0, 8)
+              .map((m) => m.id)
+              .join(", ")}).`,
+          };
+        return {
+          ok: true,
+          kind: "cli",
+          adapter: await getAdapter(p),
+          cli: cli.cli,
+          model: model ?? "default",
+          name: p.name,
+        };
       }
       const info = model ? own.find((m) => m.id === model) : own.find((m) => m.tools !== false);
-      if (!info) return { ok: false, reason: model ? `model "${model}" is not one of its listed models.` : "it has no listed model with tool support; name one in `model`." };
+      if (!info)
+        return {
+          ok: false,
+          reason: model
+            ? `model "${model}" is not one of its listed models.`
+            : "it has no listed model with tool support; name one in `model`.",
+        };
       if (info.tools === false) return { ok: false, reason: `model "${info.id}" has no tool support.` };
-      return { ok: true, kind: "api", adapter: await getAdapter(p), supportsTools: info.tools, model: info.id, name: p.name };
+      return {
+        ok: true,
+        kind: "api",
+        adapter: await getAdapter(p),
+        supportsTools: info.tools,
+        model: info.id,
+        name: p.name,
+      };
     },
   };
 }
 
 /** A CLI subagent hit a usage limit on a Cursor account of the rotation pool: park it until its reset, like a chat run does. Other failures change nothing. */
-export async function parkCliAccount(info: { providerId: string; failure: CliFailure; message: string }): Promise<void> {
+export async function parkCliAccount(info: {
+  providerId: string;
+  failure: CliFailure;
+  message: string;
+}): Promise<void> {
   const quota = info.failure.quota;
   if (info.failure.kind !== "quota" || !quota) return;
   await updatePool((pool) => markExhausted(pool, info.providerId, exhaustedUntil(quota, Date.now()), info.message));
 }
 
 /** Provider and model for compaction / commit messages: the cheap model when configured and usable, else the given one. */
-export function cheapTarget(s: AgentSettings, c: Catalog, fallback: { provider: ProviderConfig; model: string }): { provider: ProviderConfig; model: string; info?: ModelInfo } {
+export function cheapTarget(
+  s: AgentSettings,
+  c: Catalog,
+  fallback: { provider: ProviderConfig; model: string },
+): { provider: ProviderConfig; model: string; info?: ModelInfo } {
   const ref = cheapModelFor(s, { providerId: fallback.provider.id, model: fallback.model }, (r) => isUsable(c, r));
   const provider = findProvider(c, ref) ?? fallback.provider;
   const model = provider === fallback.provider && ref.providerId !== fallback.provider.id ? fallback.model : ref.model;
@@ -74,7 +110,11 @@ export function cheapTarget(s: AgentSettings, c: Catalog, fallback: { provider: 
  * Provider and model for the AI review of changes: the model configured for the `review` agent type when it is usable
  * (Settings > Agents), else the cheap model, else the given one.
  */
-export function reviewTarget(s: AgentSettings, c: Catalog, fallback: { provider: ProviderConfig; model: string }): { provider: ProviderConfig; model: string; info?: ModelInfo } {
+export function reviewTarget(
+  s: AgentSettings,
+  c: Catalog,
+  fallback: { provider: ProviderConfig; model: string },
+): { provider: ProviderConfig; model: string; info?: ModelInfo } {
   const ref = s.models.review;
   const provider = ref && isUsable(c, ref) ? findProvider(c, ref) : undefined;
   if (ref && provider) return { provider, model: ref.model, info: findModel(c, ref) };

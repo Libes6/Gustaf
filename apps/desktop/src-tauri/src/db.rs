@@ -92,7 +92,11 @@ const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
 
 fn add_missing_columns(conn: &Connection) -> rusqlite::Result<()> {
     for (table, column, decl) in ADDED_COLUMNS {
-        let present: i64 = conn.query_row("select count(*) from pragma_table_info(?) where name = ?", [table, column], |r| r.get(0))?;
+        let present: i64 = conn.query_row(
+            "select count(*) from pragma_table_info(?) where name = ?",
+            [table, column],
+            |r| r.get(0),
+        )?;
         if present == 0 {
             conn.execute_batch(&format!("alter table {table} add column {column} {decl}"))?;
         }
@@ -135,7 +139,10 @@ fn to_sql(v: Value) -> rusqlite::types::Value {
     match v {
         Value::Null => V::Null,
         Value::Bool(b) => V::Integer(b as i64),
-        Value::Number(n) => n.as_i64().map(V::Integer).unwrap_or_else(|| V::Real(n.as_f64().unwrap_or(0.0))),
+        Value::Number(n) => n
+            .as_i64()
+            .map(V::Integer)
+            .unwrap_or_else(|| V::Real(n.as_f64().unwrap_or(0.0))),
         Value::String(s) => V::Text(s),
         other => V::Text(other.to_string()),
     }
@@ -143,7 +150,11 @@ fn to_sql(v: Value) -> rusqlite::types::Value {
 
 // ponytail: the webview is our own trusted code, so it gets a thin SQL bridge instead of one command per query.
 #[tauri::command]
-pub fn db_select(db: State<Db>, sql: String, params: Vec<Value>) -> Result<Vec<Map<String, Value>>, String> {
+pub fn db_select(
+    db: State<Db>,
+    sql: String,
+    params: Vec<Value>,
+) -> Result<Vec<Map<String, Value>>, String> {
     select(&lock(&db), &sql, params)
 }
 
@@ -152,7 +163,11 @@ pub fn db_execute(db: State<Db>, sql: String, params: Vec<Value>) -> Result<(usi
     execute(&lock(&db), &sql, params)
 }
 
-fn select(conn: &Connection, sql: &str, params: Vec<Value>) -> Result<Vec<Map<String, Value>>, String> {
+fn select(
+    conn: &Connection,
+    sql: &str,
+    params: Vec<Value>,
+) -> Result<Vec<Map<String, Value>>, String> {
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let cols: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
     let rows = stmt
@@ -226,7 +241,13 @@ const YE_UPPER: char = '\u{415}';
 
 /// The query/index fold in Rust (the triggers use `fold_sql`, which must stay equivalent).
 pub fn fold_yo(s: &str) -> String {
-    s.chars().map(|c| match c { YO_LOWER => YE_LOWER, YO_UPPER => YE_UPPER, c => c }).collect()
+    s.chars()
+        .map(|c| match c {
+            YO_LOWER => YE_LOWER,
+            YO_UPPER => YE_UPPER,
+            c => c,
+        })
+        .collect()
 }
 
 /// The same fold as a SQL expression over `expr`, built from `replace()` so triggers need no custom function.
@@ -280,24 +301,38 @@ fn index_rows_sql(row: &str, from: &str) -> String {
 }
 
 fn insert_index_sql(row: &str, from: &str) -> String {
-    format!("insert into messages_fts(rowid, chat_id, role, model, text) {}", index_rows_sql(row, from))
+    format!(
+        "insert into messages_fts(rowid, chat_id, role, model, text) {}",
+        index_rows_sql(row, from)
+    )
 }
 
-const SEARCH_OBJECTS: [&str; 4] = ["messages_fts", "messages_fts_ai", "messages_fts_ad", "messages_fts_au"];
+const SEARCH_OBJECTS: [&str; 4] = [
+    "messages_fts",
+    "messages_fts_ai",
+    "messages_fts_ad",
+    "messages_fts_au",
+];
 
 /// Idempotent migration. Does nothing when the index exists, is complete and has the current version; otherwise
 /// (first start after the upgrade, a version bump, a missing trigger) rebuilds table, triggers and contents from
 /// `messages` in one transaction, so a failure leaves the old state untouched.
 fn init_search(conn: &Connection) -> rusqlite::Result<()> {
     let stored: Option<String> = conn
-        .query_row("select value from settings where key = ?", [SEARCH_VERSION_KEY], |r| r.get(0))
+        .query_row(
+            "select value from settings where key = ?",
+            [SEARCH_VERSION_KEY],
+            |r| r.get(0),
+        )
         .optional()?;
     let present: i64 = conn.query_row(
         "select count(*) from sqlite_master where name in ('messages_fts', 'messages_fts_ai', 'messages_fts_ad', 'messages_fts_au')",
         [],
         |r| r.get(0),
     )?;
-    if stored.as_deref() == Some(SEARCH_VERSION.to_string().as_str()) && present == SEARCH_OBJECTS.len() as i64 {
+    if stored.as_deref() == Some(SEARCH_VERSION.to_string().as_str())
+        && present == SEARCH_OBJECTS.len() as i64
+    {
         return Ok(());
     }
 
@@ -340,7 +375,11 @@ fn init_search(conn: &Connection) -> rusqlite::Result<()> {
 /// prefixes (`func` finds `function`), which suits search-as-you-type and inflected languages. Terms without a
 /// letter or digit are dropped because they would not produce any token.
 pub fn fts_match(query: &str) -> Option<String> {
-    let chars: Vec<char> = query.chars().take(MAX_QUERY_CHARS).map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let chars: Vec<char> = query
+        .chars()
+        .take(MAX_QUERY_CHARS)
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
     let mut terms: Vec<String> = Vec::new();
     let mut i = 0;
     while i < chars.len() && terms.len() < MAX_QUERY_TERMS {
@@ -353,7 +392,13 @@ pub fn fts_match(query: &str) -> Option<String> {
             i += 1;
         }
         let start = i;
-        while i < chars.len() && if quoted { chars[i] != '"' } else { !chars[i].is_whitespace() && chars[i] != '"' } {
+        while i < chars.len()
+            && if quoted {
+                chars[i] != '"'
+            } else {
+                !chars[i].is_whitespace() && chars[i] != '"'
+            }
+        {
             i += 1;
         }
         let text: String = fold_yo(&chars[start..i].iter().collect::<String>());
@@ -364,7 +409,11 @@ pub fn fts_match(query: &str) -> Option<String> {
             continue;
         }
         let prefix = !quoted && text.chars().count() >= 2;
-        terms.push(format!("{}{}", fts_quote(&text), if prefix { "*" } else { "" }));
+        terms.push(format!(
+            "{}{}",
+            fts_quote(&text),
+            if prefix { "*" } else { "" }
+        ));
     }
     if terms.is_empty() {
         None
@@ -450,7 +499,10 @@ select count(*) from (
 /// the original. `snip` is returned unchanged when the slice cannot be located.
 fn restore_snippet(snip: &str, orig: &str) -> String {
     let chars: Vec<char> = snip.chars().collect();
-    let plain: String = chars.iter().filter(|&&c| c != MARK_OPEN && c != MARK_CLOSE).collect();
+    let plain: String = chars
+        .iter()
+        .filter(|&&c| c != MARK_OPEN && c != MARK_CLOSE)
+        .collect();
     let folded = fold_yo(orig);
     // snippet() may add a '…' at either end; the text itself may also contain one, so try the plain form first.
     let lead = plain.starts_with('…');
@@ -466,7 +518,9 @@ fn restore_snippet(snip: &str, orig: &str) -> String {
         if cut_trail {
             core = &core[..core.len() - '…'.len_utf8()];
         }
-        let Some(pos) = folded.find(core) else { continue };
+        let Some(pos) = folded.find(core) else {
+            continue;
+        };
         let mut src = orig.chars().skip(folded[..pos].chars().count());
         let mut out = String::with_capacity(snip.len());
         let last_plain = plain.chars().count() - 1;
@@ -492,48 +546,91 @@ fn restore_snippet(snip: &str, orig: &str) -> String {
 /// `SEARCH_CAP`. `project_id` / `model` narrow the results when given; the model filter keeps messages recorded
 /// with that model (assistant replies). The order is deterministic (rank, then message id), so consecutive pages
 /// do not repeat or skip hits unless messages are added in between.
-pub fn search(conn: &Connection, query: &str, project_id: Option<i64>, model: Option<&str>, limit: usize, offset: usize) -> Result<SearchPage, String> {
-    let empty = || SearchPage { hits: Vec::new(), total: 0, total_capped: false, by_recency: false, has_more: false };
-    let Some(expr) = fts_match(query) else { return Ok(empty()) };
+pub fn search(
+    conn: &Connection,
+    query: &str,
+    project_id: Option<i64>,
+    model: Option<&str>,
+    limit: usize,
+    offset: usize,
+) -> Result<SearchPage, String> {
+    let empty = || SearchPage {
+        hits: Vec::new(),
+        total: 0,
+        total_capped: false,
+        by_recency: false,
+        has_more: false,
+    };
+    let Some(expr) = fts_match(query) else {
+        return Ok(empty());
+    };
     let model = model.filter(|m| !m.is_empty());
-    let limit = limit.clamp(1, MAX_RESULTS).min(SEARCH_CAP.saturating_sub(offset));
+    let limit = limit
+        .clamp(1, MAX_RESULTS)
+        .min(SEARCH_CAP.saturating_sub(offset));
     if limit == 0 {
         return Ok(empty());
     }
     let run = || -> rusqlite::Result<SearchPage> {
-        let counted: i64 = conn
-            .prepare_cached(COUNT_SQL)?
-            .query_row(params![expr, model, project_id, RANK_UP_TO as i64 + 1], |r| r.get(0))?;
+        let counted: i64 = conn.prepare_cached(COUNT_SQL)?.query_row(
+            params![expr, model, project_id, RANK_UP_TO as i64 + 1],
+            |r| r.get(0),
+        )?;
         let total_capped = counted as usize > SEARCH_CAP;
         let total = (counted as usize).min(SEARCH_CAP);
         let by_recency = counted as usize > RANK_UP_TO;
-        let (score, order) = if by_recency { ("0", "rowid desc") } else { ("rank", "rank, rowid desc") };
-        let sql = SEARCH_SQL.replace("{orig}", &text_sql("m")).replace("{score}", score).replace("{order}", order);
+        let (score, order) = if by_recency {
+            ("0", "rowid desc")
+        } else {
+            ("rank", "rank, rowid desc")
+        };
+        let sql = SEARCH_SQL
+            .replace("{orig}", &text_sql("m"))
+            .replace("{score}", score)
+            .replace("{order}", order);
         let mut stmt = conn.prepare_cached(&sql)?;
         let page: Vec<(SearchHit, Option<String>)> = stmt
-            .query_map(params![expr, model, project_id, limit as i64, offset as i64], |r| {
-                Ok((
-                    SearchHit {
-                        message_id: r.get("message_id")?,
-                        chat_id: r.get("chat_id")?,
-                        chat_title: r.get("chat_title")?,
-                        project_id: r.get("project_id")?,
-                        project_name: r.get("project_name")?,
-                        archived: r.get::<_, i64>("archived")? != 0,
-                        role: r.get("role")?,
-                        model: r.get("model")?,
-                        created_at: r.get("created_at")?,
-                        snippet: String::new(),
-                    },
-                    r.get::<_, Option<String>>("orig")?,
-                ))
-            })?
+            .query_map(
+                params![expr, model, project_id, limit as i64, offset as i64],
+                |r| {
+                    Ok((
+                        SearchHit {
+                            message_id: r.get("message_id")?,
+                            chat_id: r.get("chat_id")?,
+                            chat_title: r.get("chat_title")?,
+                            project_id: r.get("project_id")?,
+                            project_name: r.get("project_name")?,
+                            archived: r.get::<_, i64>("archived")? != 0,
+                            role: r.get("role")?,
+                            model: r.get("model")?,
+                            created_at: r.get("created_at")?,
+                            snippet: String::new(),
+                        },
+                        r.get::<_, Option<String>>("orig")?,
+                    ))
+                },
+            )?
             .collect::<rusqlite::Result<_>>()?;
         let mut snippets: HashMap<i64, String> = HashMap::new();
-        if let (Some(lo), Some(hi)) = (page.iter().map(|(h, _)| h.message_id).min(), page.iter().map(|(h, _)| h.message_id).max()) {
-            let ids = serde_json::to_string(&page.iter().map(|(h, _)| h.message_id).collect::<Vec<_>>()).unwrap_or_default();
+        if let (Some(lo), Some(hi)) = (
+            page.iter().map(|(h, _)| h.message_id).min(),
+            page.iter().map(|(h, _)| h.message_id).max(),
+        ) {
+            let ids =
+                serde_json::to_string(&page.iter().map(|(h, _)| h.message_id).collect::<Vec<_>>())
+                    .unwrap_or_default();
             let mut stmt = conn.prepare_cached(SNIPPET_SQL)?;
-            let rows = stmt.query_map(params![expr, MARK_OPEN.to_string(), MARK_CLOSE.to_string(), lo, hi, ids], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+            let rows = stmt.query_map(
+                params![
+                    expr,
+                    MARK_OPEN.to_string(),
+                    MARK_CLOSE.to_string(),
+                    lo,
+                    hi,
+                    ids
+                ],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
+            )?;
             for row in rows {
                 let (id, snip) = row?;
                 snippets.insert(id, snip);
@@ -551,7 +648,13 @@ pub fn search(conn: &Connection, query: &str, project_id: Option<i64>, model: Op
             })
             .collect();
         let has_more = offset + hits.len() < total;
-        Ok(SearchPage { hits, total, total_capped, by_recency, has_more })
+        Ok(SearchPage {
+            hits,
+            total,
+            total_capped,
+            by_recency,
+            has_more,
+        })
     };
     match run() {
         Ok(page) => Ok(page),
@@ -566,7 +669,9 @@ pub fn indexed_models(conn: &Connection) -> Result<Vec<String>, String> {
     let mut stmt = conn
         .prepare("select distinct model from messages_fts where model is not null order by model")
         .map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
     rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
 }
 
@@ -580,7 +685,14 @@ pub fn search_messages(
     limit: Option<usize>,
     offset: Option<usize>,
 ) -> Result<SearchPage, String> {
-    search(&lock(&db), &query, project_id, model.as_deref(), limit.unwrap_or(DEFAULT_RESULTS), offset.unwrap_or(0))
+    search(
+        &lock(&db),
+        &query,
+        project_id,
+        model.as_deref(),
+        limit.unwrap_or(DEFAULT_RESULTS),
+        offset.unwrap_or(0),
+    )
 }
 
 #[tauri::command(async)]
@@ -597,7 +709,8 @@ mod tests {
     // Same statements as src/lib/data.ts (loadDraft / writeDraft).
     const UPSERT: &str = "insert into drafts(scope, chat_id, project_id, text, attachments_json, updated_at) values(?, ?, ?, ?, ?, ?) \
         on conflict(scope) do update set text = excluded.text, attachments_json = excluded.attachments_json, updated_at = excluded.updated_at";
-    const UPSERT_TEXT_ONLY: &str = "insert into drafts(scope, chat_id, project_id, text, updated_at) values(?, ?, ?, ?, ?) \
+    const UPSERT_TEXT_ONLY: &str =
+        "insert into drafts(scope, chat_id, project_id, text, updated_at) values(?, ?, ?, ?, ?) \
         on conflict(scope) do update set text = excluded.text, updated_at = excluded.updated_at";
 
     fn memory() -> Connection {
@@ -613,7 +726,13 @@ mod tests {
     }
 
     fn new_chat(conn: &Connection) -> i64 {
-        execute(conn, "insert into chats(title, created_at, updated_at) values('t', 1, 1)", vec![]).unwrap().1
+        execute(
+            conn,
+            "insert into chats(title, created_at, updated_at) values('t', 1, 1)",
+            vec![],
+        )
+        .unwrap()
+        .1
     }
 
     #[test]
@@ -625,14 +744,33 @@ mod tests {
         insert into chat_branches values(2,1,1,'source');
         insert into messages(chat_id,role,content,created_at) select 2,role,json_remove(json_patch(content,'{\"meta\":{\"branchHistory\":true}}'),'$.meta.responseId'),created_at from messages where chat_id=1 and id<=1;").unwrap();
         conn.execute("delete from chats where id=1", []).unwrap();
-        let title: String = conn.query_row("select source_title from chat_branches where chat_id=2", [], |r| r.get(0)).unwrap();
+        let title: String = conn
+            .query_row(
+                "select source_title from chat_branches where chat_id=2",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(title, "source");
         let (image, session): (String, Option<String>) = conn.query_row("select json_extract(content,'$.parts[0].data'),json_extract(content,'$.meta.responseId') from messages where chat_id=2", [], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
         assert_eq!(image, "AA");
         assert_eq!(session, None);
-        assert_eq!(conn.query_row("select json_extract(content,'$.meta.branchHistory') from messages where chat_id=2", [], |r| r.get::<_,i64>(0)).unwrap(), 1);
+        assert_eq!(
+            conn.query_row(
+                "select json_extract(content,'$.meta.branchHistory') from messages where chat_id=2",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            1
+        );
         conn.execute("delete from chats where id=2", []).unwrap();
-        assert_eq!(conn.query_row("select count(*) from chat_branches", [], |r| r.get::<_,i64>(0)).unwrap(), 0);
+        assert_eq!(
+            conn.query_row("select count(*) from chat_branches", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
     }
 
     #[test]
@@ -641,17 +779,38 @@ mod tests {
         let path = dir.path().join("app.db");
         let conn = open(&path).unwrap();
         let chat = new_chat(&conn);
-        execute(&conn, "insert into messages(chat_id, role, content, created_at) values(?, 'user', '{}', 1)", vec![json!(chat)]).unwrap();
+        execute(
+            &conn,
+            "insert into messages(chat_id, role, content, created_at) values(?, 'user', '{}', 1)",
+            vec![json!(chat)],
+        )
+        .unwrap();
         // Simulate a database created before the drafts table existed.
         conn.execute_batch("drop table drafts").unwrap();
         drop(conn);
 
         let conn = open(&path).unwrap();
         assert_eq!(count(&conn, "drafts"), 0);
-        assert_eq!(count(&conn, "messages"), 1, "existing data survives the migration");
+        assert_eq!(
+            count(&conn, "messages"),
+            1,
+            "existing data survives the migration"
+        );
         init(&conn).unwrap();
         init(&conn).unwrap();
-        execute(&conn, UPSERT, vec![json!("new:"), Value::Null, Value::Null, json!("hi"), json!("[]"), json!(1)]).unwrap();
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                json!("new:"),
+                Value::Null,
+                Value::Null,
+                json!("hi"),
+                json!("[]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
         drop(conn);
 
         let conn = open(&path).unwrap();
@@ -673,9 +832,18 @@ mod tests {
         drop(old);
 
         let conn = open(&path).unwrap();
-        let rows = select(&conn, "select title, workspace_task_id, workspace_branch, workspace_base from chats", vec![]).unwrap();
+        let rows = select(
+            &conn,
+            "select title, workspace_task_id, workspace_branch, workspace_base from chats",
+            vec![],
+        )
+        .unwrap();
         assert_eq!(rows[0]["title"], json!("old chat"));
-        assert_eq!(rows[0]["workspace_task_id"], Value::Null, "existing chats stay ordinary chats");
+        assert_eq!(
+            rows[0]["workspace_task_id"],
+            Value::Null,
+            "existing chats stay ordinary chats"
+        );
         execute(
             &conn,
             "insert into chats(title, created_at, updated_at, workspace_task_id, workspace_branch, workspace_base) values('ws', 1, 1, 't1', 'gustaf/x', 'abc123')",
@@ -686,9 +854,20 @@ mod tests {
         drop(conn);
         let conn = open(&path).unwrap();
         init(&conn).unwrap();
-        let rows = select(&conn, "select workspace_branch from chats where workspace_task_id = 't1'", vec![]).unwrap();
+        let rows = select(
+            &conn,
+            "select workspace_branch from chats where workspace_task_id = 't1'",
+            vec![],
+        )
+        .unwrap();
         assert_eq!(rows[0]["workspace_branch"], json!("gustaf/x"));
-        let cols: i64 = conn.query_row("select count(*) from pragma_table_info('chats') where name like 'workspace_%'", [], |r| r.get(0)).unwrap();
+        let cols: i64 = conn
+            .query_row(
+                "select count(*) from pragma_table_info('chats') where name like 'workspace_%'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(cols, 3);
     }
 
@@ -699,39 +878,157 @@ mod tests {
         let scope = json!(format!("chat:{chat}"));
         let attachments = json!(r#"[{"type":"image","data":"AAAA"}]"#);
 
-        execute(&conn, UPSERT, vec![scope.clone(), json!(chat), Value::Null, json!("first"), attachments.clone(), json!(1)]).unwrap();
-        execute(&conn, UPSERT, vec![scope.clone(), json!(chat), Value::Null, json!("second"), attachments.clone(), json!(2)]).unwrap();
-        assert_eq!(count(&conn, "drafts"), 1, "upsert replaces instead of duplicating");
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                scope.clone(),
+                json!(chat),
+                Value::Null,
+                json!("first"),
+                attachments.clone(),
+                json!(1),
+            ],
+        )
+        .unwrap();
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                scope.clone(),
+                json!(chat),
+                Value::Null,
+                json!("second"),
+                attachments.clone(),
+                json!(2),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            count(&conn, "drafts"),
+            1,
+            "upsert replaces instead of duplicating"
+        );
 
         // A text-only update keeps the stored attachments.
-        execute(&conn, UPSERT_TEXT_ONLY, vec![scope.clone(), json!(chat), Value::Null, json!("third"), json!(3)]).unwrap();
-        let rows = select(&conn, "select text, attachments_json, updated_at from drafts where scope = ?", vec![scope.clone()]).unwrap();
+        execute(
+            &conn,
+            UPSERT_TEXT_ONLY,
+            vec![
+                scope.clone(),
+                json!(chat),
+                Value::Null,
+                json!("third"),
+                json!(3),
+            ],
+        )
+        .unwrap();
+        let rows = select(
+            &conn,
+            "select text, attachments_json, updated_at from drafts where scope = ?",
+            vec![scope.clone()],
+        )
+        .unwrap();
         assert_eq!(rows[0]["text"], json!("third"));
         assert_eq!(rows[0]["attachments_json"], attachments);
         assert_eq!(rows[0]["updated_at"], json!(3));
 
-        let (deleted, _) = execute(&conn, "delete from drafts where scope = ?", vec![scope.clone()]).unwrap();
+        let (deleted, _) = execute(
+            &conn,
+            "delete from drafts where scope = ?",
+            vec![scope.clone()],
+        )
+        .unwrap();
         assert_eq!(deleted, 1);
         assert_eq!(count(&conn, "drafts"), 0);
 
         // A text-only insert (no existing row) falls back to the empty attachment list.
-        execute(&conn, UPSERT_TEXT_ONLY, vec![scope.clone(), json!(chat), Value::Null, json!("fresh"), json!(4)]).unwrap();
-        let rows = select(&conn, "select attachments_json from drafts where scope = ?", vec![scope]).unwrap();
+        execute(
+            &conn,
+            UPSERT_TEXT_ONLY,
+            vec![
+                scope.clone(),
+                json!(chat),
+                Value::Null,
+                json!("fresh"),
+                json!(4),
+            ],
+        )
+        .unwrap();
+        let rows = select(
+            &conn,
+            "select attachments_json from drafts where scope = ?",
+            vec![scope],
+        )
+        .unwrap();
         assert_eq!(rows[0]["attachments_json"], json!("[]"));
     }
 
     #[test]
     fn deleting_the_owner_removes_its_drafts() {
         let conn = memory();
-        let project = execute(&conn, "insert into projects(name, created_at) values('p', 1)", vec![]).unwrap().1;
-        let chat = execute(&conn, "insert into chats(project_id, title, created_at, updated_at) values(?, 't', 1, 1)", vec![json!(project)]).unwrap().1;
-        execute(&conn, UPSERT, vec![json!(format!("chat:{chat}")), json!(chat), Value::Null, json!("a"), json!("[]"), json!(1)]).unwrap();
-        execute(&conn, UPSERT, vec![json!(format!("new:{project}")), Value::Null, json!(project), json!("b"), json!("[]"), json!(1)]).unwrap();
-        execute(&conn, UPSERT, vec![json!("new:"), Value::Null, Value::Null, json!("c"), json!("[]"), json!(1)]).unwrap();
+        let project = execute(
+            &conn,
+            "insert into projects(name, created_at) values('p', 1)",
+            vec![],
+        )
+        .unwrap()
+        .1;
+        let chat = execute(
+            &conn,
+            "insert into chats(project_id, title, created_at, updated_at) values(?, 't', 1, 1)",
+            vec![json!(project)],
+        )
+        .unwrap()
+        .1;
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                json!(format!("chat:{chat}")),
+                json!(chat),
+                Value::Null,
+                json!("a"),
+                json!("[]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                json!(format!("new:{project}")),
+                Value::Null,
+                json!(project),
+                json!("b"),
+                json!("[]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
+        execute(
+            &conn,
+            UPSERT,
+            vec![
+                json!("new:"),
+                Value::Null,
+                Value::Null,
+                json!("c"),
+                json!("[]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
         assert_eq!(count(&conn, "drafts"), 3);
 
         // Removing the project cascades to its chats and both of their drafts; the project-less draft stays.
-        execute(&conn, "delete from projects where id = ?", vec![json!(project)]).unwrap();
+        execute(
+            &conn,
+            "delete from projects where id = ?",
+            vec![json!(project)],
+        )
+        .unwrap();
         let rows = select(&conn, "select scope from drafts", vec![]).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["scope"], json!("new:"));
@@ -748,10 +1045,40 @@ mod tests {
         (select id from agent_runs where status not in ('queued', 'running') order by created_at desc, id desc limit ?)";
     const DELETE_FINISHED: &str = "delete from agent_runs where status not in ('queued', 'running') and (? is null or project_root = ?)";
 
-    fn run_row(conn: &Connection, id: &str, chat: Option<i64>, status: &str, created: i64, report: Option<&str>) {
+    fn run_row(
+        conn: &Connection,
+        id: &str,
+        chat: Option<i64>,
+        status: &str,
+        created: i64,
+        report: Option<&str>,
+    ) {
         let chat = chat.map(|c| json!(c)).unwrap_or(Value::Null);
         let report = report.map(|r| json!(r)).unwrap_or(Value::Null);
-        execute(conn, UPSERT_RUN, vec![json!(id), chat, json!("t"), json!("explore"), json!("m"), json!(status), json!(1), Value::Null, json!(5), json!(2), Value::Null, report, json!("p"), json!("/proj"), json!(created), Value::Null, Value::Null]).unwrap();
+        execute(
+            conn,
+            UPSERT_RUN,
+            vec![
+                json!(id),
+                chat,
+                json!("t"),
+                json!("explore"),
+                json!("m"),
+                json!(status),
+                json!(1),
+                Value::Null,
+                json!(5),
+                json!(2),
+                Value::Null,
+                report,
+                json!("p"),
+                json!("/proj"),
+                json!(created),
+                Value::Null,
+                Value::Null,
+            ],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -760,17 +1087,28 @@ mod tests {
         let path = dir.path().join("app.db");
         let conn = open(&path).unwrap();
         run_row(&conn, "r1", None, "completed", 1, Some("report"));
-        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+        execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(1)],
+        )
+        .unwrap();
         drop(conn);
 
         // Re-opening is a no-op for existing tables.
         let conn = open(&path).unwrap();
-        assert_eq!((count(&conn, "agent_runs"), count(&conn, "agent_messages")), (1, 1));
+        assert_eq!(
+            (count(&conn, "agent_runs"), count(&conn, "agent_messages")),
+            (1, 1)
+        );
         // An older database (created before these tables existed) just gets them.
         conn.execute_batch("drop trigger agent_runs_chat_deleted; drop table agent_messages; drop table agent_runs;").unwrap();
         drop(conn);
         let conn = open(&path).unwrap();
-        assert_eq!((count(&conn, "agent_runs"), count(&conn, "agent_messages")), (0, 0));
+        assert_eq!(
+            (count(&conn, "agent_runs"), count(&conn, "agent_messages")),
+            (0, 0)
+        );
         init(&conn).unwrap();
         init(&conn).unwrap();
         run_row(&conn, "r2", None, "running", 2, None);
@@ -804,11 +1142,25 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
-        assert_eq!(columns, ["id", "name", "token_hash", "created_at", "last_seen_at", "revoked_at"]);
+        assert_eq!(
+            columns,
+            [
+                "id",
+                "name",
+                "token_hash",
+                "created_at",
+                "last_seen_at",
+                "revoked_at"
+            ]
+        );
         conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d2', 'iPhone', 'h2', 6)", []).unwrap();
         // Token hashes are unique, and revoking keeps the row.
         assert!(conn.execute("insert into paired_devices(id, name, token_hash, created_at) values('d3', 'x', 'h2', 7)", []).is_err());
-        conn.execute("update paired_devices set revoked_at = 9 where id = 'd2'", []).unwrap();
+        conn.execute(
+            "update paired_devices set revoked_at = 9 where id = 'd2'",
+            [],
+        )
+        .unwrap();
         assert_eq!(count(&conn, "paired_devices"), 1);
         let _ = chat;
     }
@@ -819,36 +1171,130 @@ mod tests {
         run_row(&conn, "r1", None, "running", 1, None);
         run_row(&conn, "r1", None, "completed", 1, Some("final report"));
         run_row(&conn, "r1", None, "completed", 1, None); // a later update without a report keeps it
-        let rows = select(&conn, "select status, report from agent_runs where id = 'r1'", vec![]).unwrap();
-        assert_eq!((rows[0]["status"].clone(), rows[0]["report"].clone()), (json!("completed"), json!("final report")));
+        let rows = select(
+            &conn,
+            "select status, report from agent_runs where id = 'r1'",
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(
+            (rows[0]["status"].clone(), rows[0]["report"].clone()),
+            (json!("completed"), json!("final report"))
+        );
 
-        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[{\"type\":\"text\",\"text\":\"a\"}]"), json!(1)]).unwrap();
-        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(2)]).unwrap(); // same seq replaces
-        execute(&conn, INSERT_MESSAGE, vec![json!("r1"), json!(1), json!("assistant"), json!("[]"), json!(3)]).unwrap();
+        execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![
+                json!("r1"),
+                json!(0),
+                json!("user"),
+                json!("[{\"type\":\"text\",\"text\":\"a\"}]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
+        execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![json!("r1"), json!(0), json!("user"), json!("[]"), json!(2)],
+        )
+        .unwrap(); // same seq replaces
+        execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![
+                json!("r1"),
+                json!(1),
+                json!("assistant"),
+                json!("[]"),
+                json!(3),
+            ],
+        )
+        .unwrap();
         assert_eq!(count(&conn, "agent_messages"), 2);
-        let order = select(&conn, "select seq from agent_messages where run_id = 'r1' order by seq", vec![]).unwrap();
-        assert_eq!(order.iter().map(|r| r["seq"].as_i64().unwrap()).collect::<Vec<_>>(), vec![0, 1]);
+        let order = select(
+            &conn,
+            "select seq from agent_messages where run_id = 'r1' order by seq",
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(
+            order
+                .iter()
+                .map(|r| r["seq"].as_i64().unwrap())
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
         // A message of a run that does not exist is rejected (the app writes the run row first).
-        assert!(execute(&conn, INSERT_MESSAGE, vec![json!("ghost"), json!(0), json!("user"), json!("[]"), json!(1)]).is_err());
+        assert!(execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![
+                json!("ghost"),
+                json!(0),
+                json!("user"),
+                json!("[]"),
+                json!(1)
+            ]
+        )
+        .is_err());
 
         execute(&conn, "delete from agent_runs where id = 'r1'", vec![]).unwrap();
-        assert_eq!(count(&conn, "agent_messages"), 0, "messages are deleted with their run");
+        assert_eq!(
+            count(&conn, "agent_messages"),
+            0,
+            "messages are deleted with their run"
+        );
     }
 
     #[test]
     fn deleting_a_chat_removes_the_agent_runs_it_started() {
         let conn = memory();
-        let project = execute(&conn, "insert into projects(name, created_at) values('p', 1)", vec![]).unwrap().1;
-        let chat = execute(&conn, "insert into chats(project_id, title, created_at, updated_at) values(?, 't', 1, 1)", vec![json!(project)]).unwrap().1;
+        let project = execute(
+            &conn,
+            "insert into projects(name, created_at) values('p', 1)",
+            vec![],
+        )
+        .unwrap()
+        .1;
+        let chat = execute(
+            &conn,
+            "insert into chats(project_id, title, created_at, updated_at) values(?, 't', 1, 1)",
+            vec![json!(project)],
+        )
+        .unwrap()
+        .1;
         let other = new_chat(&conn);
         run_row(&conn, "mine", Some(chat), "completed", 1, None);
         run_row(&conn, "theirs", Some(other), "completed", 2, None);
         run_row(&conn, "loose", None, "completed", 3, None);
-        execute(&conn, INSERT_MESSAGE, vec![json!("mine"), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+        execute(
+            &conn,
+            INSERT_MESSAGE,
+            vec![
+                json!("mine"),
+                json!(0),
+                json!("user"),
+                json!("[]"),
+                json!(1),
+            ],
+        )
+        .unwrap();
         // Through the project cascade too.
-        execute(&conn, "delete from projects where id = ?", vec![json!(project)]).unwrap();
+        execute(
+            &conn,
+            "delete from projects where id = ?",
+            vec![json!(project)],
+        )
+        .unwrap();
         let ids = select(&conn, "select id from agent_runs order by id", vec![]).unwrap();
-        assert_eq!(ids.iter().map(|r| r["id"].as_str().unwrap().to_string()).collect::<Vec<_>>(), vec!["loose", "theirs"]);
+        assert_eq!(
+            ids.iter()
+                .map(|r| r["id"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>(),
+            vec!["loose", "theirs"]
+        );
         assert_eq!(count(&conn, "agent_messages"), 0);
     }
 
@@ -857,17 +1303,43 @@ mod tests {
         let conn = memory();
         for i in 0..10 {
             run_row(&conn, &format!("d{i}"), None, "completed", 100 + i, None);
-            execute(&conn, INSERT_MESSAGE, vec![json!(format!("d{i}")), json!(0), json!("user"), json!("[]"), json!(1)]).unwrap();
+            execute(
+                &conn,
+                INSERT_MESSAGE,
+                vec![
+                    json!(format!("d{i}")),
+                    json!(0),
+                    json!("user"),
+                    json!("[]"),
+                    json!(1),
+                ],
+            )
+            .unwrap();
         }
         run_row(&conn, "live", None, "running", 1, None);
         run_row(&conn, "queued", None, "queued", 2, None);
         execute(&conn, PRUNE_RUNS, vec![json!(3)]).unwrap();
-        let ids = select(&conn, "select id from agent_runs order by created_at", vec![]).unwrap();
-        assert_eq!(ids.iter().map(|r| r["id"].as_str().unwrap().to_string()).collect::<Vec<_>>(), vec!["live", "queued", "d7", "d8", "d9"]);
+        let ids = select(
+            &conn,
+            "select id from agent_runs order by created_at",
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(
+            ids.iter()
+                .map(|r| r["id"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>(),
+            vec!["live", "queued", "d7", "d8", "d9"]
+        );
         assert_eq!(count(&conn, "agent_messages"), 3);
 
         // "Clear" removes finished runs of one project (or of all), never active ones.
-        execute(&conn, DELETE_FINISHED, vec![json!("/other"), json!("/other")]).unwrap();
+        execute(
+            &conn,
+            DELETE_FINISHED,
+            vec![json!("/other"), json!("/other")],
+        )
+        .unwrap();
         assert_eq!(count(&conn, "agent_runs"), 5);
         execute(&conn, DELETE_FINISHED, vec![Value::Null, Value::Null]).unwrap();
         assert_eq!(count(&conn, "agent_runs"), 2);
@@ -876,7 +1348,18 @@ mod tests {
     #[test]
     fn draft_for_a_missing_chat_is_rejected() {
         let conn = memory();
-        let err = execute(&conn, UPSERT, vec![json!("chat:99"), json!(99), Value::Null, json!("x"), json!("[]"), json!(1)]);
+        let err = execute(
+            &conn,
+            UPSERT,
+            vec![
+                json!("chat:99"),
+                json!(99),
+                Value::Null,
+                json!("x"),
+                json!("[]"),
+                json!(1),
+            ],
+        );
         assert!(err.is_err());
         assert_eq!(count(&conn, "drafts"), 0);
     }
@@ -884,25 +1367,49 @@ mod tests {
     #[test]
     fn poisoned_lock_does_not_brick_the_database() {
         let db = Db(Mutex::new(memory()));
-        execute(&lock(&db), "insert into settings(key, value) values('k', 'v')", vec![]).unwrap();
+        execute(
+            &lock(&db),
+            "insert into settings(key, value) values('k', 'v')",
+            vec![],
+        )
+        .unwrap();
 
         let panicked = catch_unwind(AssertUnwindSafe(|| {
             let _guard = db.0.lock().unwrap();
             panic!("simulated panic while holding the database lock");
         }));
         assert!(panicked.is_err());
-        assert!(db.0.is_poisoned(), "precondition: the panic poisoned the mutex");
+        assert!(
+            db.0.is_poisoned(),
+            "precondition: the panic poisoned the mutex"
+        );
 
-        let rows = select(&lock(&db), "select value from settings where key = 'k'", vec![]).unwrap();
+        let rows = select(
+            &lock(&db),
+            "select value from settings where key = 'k'",
+            vec![],
+        )
+        .unwrap();
         assert_eq!(rows[0]["value"], json!("v"));
-        execute(&lock(&db), "insert into settings(key, value) values('k2', 'v2')", vec![]).unwrap();
+        execute(
+            &lock(&db),
+            "insert into settings(key, value) values('k2', 'v2')",
+            vec![],
+        )
+        .unwrap();
         assert!(!db.0.is_poisoned(), "poison flag is cleared after recovery");
     }
 
     // ---- full-text search ----
 
     fn project(conn: &Connection, name: &str) -> i64 {
-        execute(conn, "insert into projects(name, created_at) values(?, 1)", vec![json!(name)]).unwrap().1
+        execute(
+            conn,
+            "insert into projects(name, created_at) values(?, 1)",
+            vec![json!(name)],
+        )
+        .unwrap()
+        .1
     }
 
     fn chat_in(conn: &Connection, project: Option<i64>, title: &str) -> i64 {
@@ -928,14 +1435,21 @@ mod tests {
     }
 
     fn add_text(conn: &Connection, chat: i64, role: &str, text: &str, model: Option<&str>) -> i64 {
-        let meta = model.map(|m| json!({ "provider": "p", "model": m })).unwrap_or(Value::Null);
-        let content = json!({ "role": role, "parts": [{ "type": "text", "text": text }], "meta": meta });
+        let meta = model
+            .map(|m| json!({ "provider": "p", "model": m }))
+            .unwrap_or(Value::Null);
+        let content =
+            json!({ "role": role, "parts": [{ "type": "text", "text": text }], "meta": meta });
         add_json(conn, chat, role, &content.to_string())
     }
 
     /// Ids of the matching messages in ranking order.
     fn ranked(conn: &Connection, query: &str) -> Vec<i64> {
-        search_hits(conn, query, None, None, 100).unwrap().iter().map(|h| h.message_id).collect()
+        search_hits(conn, query, None, None, 100)
+            .unwrap()
+            .iter()
+            .map(|h| h.message_id)
+            .collect()
     }
 
     /// Ids of the matching messages, ascending (for assertions that do not care about the ranking).
@@ -946,11 +1460,23 @@ mod tests {
     }
 
     fn indexed_text(conn: &Connection, id: i64) -> Option<String> {
-        let rows = select(conn, "select text from messages_fts where rowid = ?", vec![json!(id)]).unwrap();
-        rows.first().map(|r| r["text"].as_str().unwrap().to_string())
+        let rows = select(
+            conn,
+            "select text from messages_fts where rowid = ?",
+            vec![json!(id)],
+        )
+        .unwrap();
+        rows.first()
+            .map(|r| r["text"].as_str().unwrap().to_string())
     }
 
-    fn search_hits(conn: &Connection, query: &str, project: Option<i64>, model: Option<&str>, limit: usize) -> Result<Vec<SearchHit>, String> {
+    fn search_hits(
+        conn: &Connection,
+        query: &str,
+        project: Option<i64>,
+        model: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<SearchHit>, String> {
         search(conn, query, project, model, limit, 0).map(|p| p.hits)
     }
 
@@ -966,10 +1492,23 @@ mod tests {
     fn fts5_and_json_functions_are_available_without_extra_cargo_features() {
         // The bundled SQLite of rusqlite (feature `bundled`, see Cargo.toml) is compiled with FTS5 and JSON.
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("create virtual table t using fts5(a); insert into t values('hello world')").unwrap();
-        let n: i64 = conn.query_row("select count(*) from t where t match 'hello'", [], |r| r.get(0)).unwrap();
+        conn.execute_batch(
+            "create virtual table t using fts5(a); insert into t values('hello world')",
+        )
+        .unwrap();
+        let n: i64 = conn
+            .query_row("select count(*) from t where t match 'hello'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
         assert_eq!(n, 1);
-        let v: String = conn.query_row("select json_extract('{\"a\":[1,{\"b\":\"x\"}]}', '$.a[1].b')", [], |r| r.get(0)).unwrap();
+        let v: String = conn
+            .query_row(
+                "select json_extract('{\"a\":[1,{\"b\":\"x\"}]}', '$.a[1].b')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(v, "x");
     }
 
@@ -982,7 +1521,13 @@ mod tests {
         // A database from before search existed: no index, no triggers, no version row.
         drop_search_index(&conn);
         let a = add_text(&conn, chat, "user", "remember the pineapple plan", None);
-        let b = add_text(&conn, chat, "assistant", "the pineapple plan is ready", Some("m1"));
+        let b = add_text(
+            &conn,
+            chat,
+            "assistant",
+            "the pineapple plan is ready",
+            Some("m1"),
+        );
         let image = add_json(
             &conn,
             chat,
@@ -995,14 +1540,28 @@ mod tests {
             "tool",
             &json!({ "role": "tool", "parts": [{ "type": "tool_result", "id": "1", "name": "run", "output": "pineapple in tool output" }], "meta": {} }).to_string(),
         );
-        assert!(select(&conn, "select 1 from sqlite_master where name = 'messages_fts'", vec![]).unwrap().is_empty());
+        assert!(select(
+            &conn,
+            "select 1 from sqlite_master where name = 'messages_fts'",
+            vec![]
+        )
+        .unwrap()
+        .is_empty());
         drop(conn);
 
         let conn = open(&path).unwrap();
-        assert_eq!(found(&conn, "pineapple"), vec![a, b], "text parts are indexed, tool output is not");
+        assert_eq!(
+            found(&conn, "pineapple"),
+            vec![a, b],
+            "text parts are indexed, tool output is not"
+        );
         assert_eq!(indexed_text(&conn, image), None);
         assert_eq!(indexed_text(&conn, tool), None);
-        assert_eq!(count(&conn, "messages"), 4, "backfill does not touch messages");
+        assert_eq!(
+            count(&conn, "messages"),
+            4,
+            "backfill does not touch messages"
+        );
         // Data written after the migration is indexed by the triggers.
         let c = add_text(&conn, chat, "user", "pineapple again", None);
         assert_eq!(found(&conn, "pineapple"), vec![a, b, c]);
@@ -1024,21 +1583,42 @@ mod tests {
         init(&conn).unwrap();
         drop(conn);
         let conn = open(&path).unwrap();
-        assert_eq!(count(&conn, "messages_fts"), 2, "a complete, current index is left alone");
+        assert_eq!(
+            count(&conn, "messages_fts"),
+            2,
+            "a complete, current index is left alone"
+        );
         assert_eq!(found(&conn, "alpha"), vec![a]);
 
         // A newer SEARCH_VERSION (simulated by an older stored one) rebuilds from the messages table.
-        execute(&conn, "update settings set value = '0' where key = 'searchIndexVersion'", vec![]).unwrap();
+        execute(
+            &conn,
+            "update settings set value = '0' where key = 'searchIndexVersion'",
+            vec![],
+        )
+        .unwrap();
         init(&conn).unwrap();
-        assert_eq!(count(&conn, "messages_fts"), 1, "sentinel row is gone after the rebuild");
+        assert_eq!(
+            count(&conn, "messages_fts"),
+            1,
+            "sentinel row is gone after the rebuild"
+        );
         assert_eq!(found(&conn, "alpha"), vec![a]);
-        let version = select(&conn, "select value from settings where key = 'searchIndexVersion'", vec![]).unwrap();
+        let version = select(
+            &conn,
+            "select value from settings where key = 'searchIndexVersion'",
+            vec![],
+        )
+        .unwrap();
         assert_eq!(version[0]["value"], json!(SEARCH_VERSION.to_string()));
 
         // A missing trigger is repaired too (otherwise new messages would silently stay unsearchable).
         conn.execute_batch("drop trigger messages_fts_ai").unwrap();
         let b = add_text(&conn, chat, "user", "gamma delta", None);
-        assert!(found(&conn, "gamma").is_empty(), "precondition: without the trigger the message is not indexed");
+        assert!(
+            found(&conn, "gamma").is_empty(),
+            "precondition: without the trigger the message is not indexed"
+        );
         init(&conn).unwrap();
         assert_eq!(found(&conn, "gamma"), vec![b]);
         add_text(&conn, chat, "user", "epsilon", None);
@@ -1058,24 +1638,57 @@ mod tests {
         assert_eq!(found(&conn, "kiwi"), vec![a, b, c]);
 
         // addMessage's last_insert_rowid must be the message id even though a trigger inserts into another table.
-        let (_, id) = execute(&conn, "insert into messages(chat_id, role, content, created_at) values(?, 'user', ?, 1)", vec![json!(chat), json!(r#"{"role":"user","parts":[{"type":"text","text":"limes"}]}"#)]).unwrap();
+        let (_, id) = execute(
+            &conn,
+            "insert into messages(chat_id, role, content, created_at) values(?, 'user', ?, 1)",
+            vec![
+                json!(chat),
+                json!(r#"{"role":"user","parts":[{"type":"text","text":"limes"}]}"#),
+            ],
+        )
+        .unwrap();
         assert_eq!(found(&conn, "limes"), vec![id]);
 
         // restoreContext-style rewrite of `content`.
         let rewritten = json!({ "role": "user", "parts": [{ "type": "text", "text": "first draft about mangos" }], "meta": {} }).to_string();
-        execute(&conn, "update messages set content = ? where chat_id = ? and id = ?", vec![json!(rewritten), json!(chat), json!(a)]).unwrap();
+        execute(
+            &conn,
+            "update messages set content = ? where chat_id = ? and id = ?",
+            vec![json!(rewritten), json!(chat), json!(a)],
+        )
+        .unwrap();
         assert_eq!(found(&conn, "mangos"), vec![a]);
-        assert_eq!(found(&conn, "kiwis"), vec![b], "the old text is no longer indexed");
+        assert_eq!(
+            found(&conn, "kiwis"),
+            vec![b],
+            "the old text is no longer indexed"
+        );
 
         // Updates of unrelated columns keep the row, and a rewrite to unsearchable content drops it.
-        execute(&conn, "update chats set title = 'renamed' where id = ?", vec![json!(chat)]).unwrap();
+        execute(
+            &conn,
+            "update chats set title = 'renamed' where id = ?",
+            vec![json!(chat)],
+        )
+        .unwrap();
         assert_eq!(found(&conn, "mangos"), vec![a]);
-        let blank = json!({ "role": "user", "parts": [{ "type": "image", "data": "AAAA" }] }).to_string();
-        execute(&conn, "update messages set content = ? where id = ?", vec![json!(blank), json!(a)]).unwrap();
+        let blank =
+            json!({ "role": "user", "parts": [{ "type": "image", "data": "AAAA" }] }).to_string();
+        execute(
+            &conn,
+            "update messages set content = ? where id = ?",
+            vec![json!(blank), json!(a)],
+        )
+        .unwrap();
         assert!(found(&conn, "mangos").is_empty());
 
         // Rewinding: deleteMessagesFrom.
-        execute(&conn, "delete from messages where chat_id = ? and id >= ?", vec![json!(chat), json!(b)]).unwrap();
+        execute(
+            &conn,
+            "delete from messages where chat_id = ? and id >= ?",
+            vec![json!(chat), json!(b)],
+        )
+        .unwrap();
         assert_eq!(found(&conn, "kiwi"), vec![c]);
         assert_eq!(count(&conn, "messages_fts"), 1);
     }
@@ -1109,13 +1722,32 @@ mod tests {
         let conn = memory();
         let chat = chat_in(&conn, None, "t");
         let part = |t: &str, text: &str| json!({ "type": t, "text": text });
-        let msg = |role: &str, parts: Vec<Value>, meta: Value| json!({ "role": role, "parts": parts, "meta": meta }).to_string();
+        let msg = |role: &str, parts: Vec<Value>, meta: Value| {
+            json!({ "role": role, "parts": parts, "meta": meta }).to_string()
+        };
 
-        let plain = add_json(&conn, chat, "user", &msg("user", vec![part("text", "hello world")], json!({})));
+        let plain = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg("user", vec![part("text", "hello world")], json!({})),
+        );
         assert_eq!(indexed_text(&conn, plain).as_deref(), Some("hello world"));
 
         // Text next to an image: the base64 payload never reaches the index.
-        let mixed = add_json(&conn, chat, "user", &msg("user", vec![part("text", "look at this"), json!({ "type": "image", "data": "SECRETBASE64DATA" })], json!({})));
+        let mixed = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg(
+                "user",
+                vec![
+                    part("text", "look at this"),
+                    json!({ "type": "image", "data": "SECRETBASE64DATA" }),
+                ],
+                json!({}),
+            ),
+        );
         assert_eq!(indexed_text(&conn, mixed).as_deref(), Some("look at this"));
         assert!(found(&conn, "SECRETBASE64DATA").is_empty());
 
@@ -1135,33 +1767,115 @@ mod tests {
                 json!({ "provider": "p", "model": "m" }),
             ),
         );
-        assert_eq!(indexed_text(&conn, agent).as_deref(), Some("let me check\nand then fix it"), "text parts joined in order");
-        assert!(found(&conn, "TOOLARGUMENT").is_empty() && found(&conn, "ACTIVITYOUTPUT").is_empty());
+        assert_eq!(
+            indexed_text(&conn, agent).as_deref(),
+            Some("let me check\nand then fix it"),
+            "text parts joined in order"
+        );
+        assert!(
+            found(&conn, "TOOLARGUMENT").is_empty() && found(&conn, "ACTIVITYOUTPUT").is_empty()
+        );
 
         // Role 'tool' messages hold results only.
-        let tool = add_json(&conn, chat, "tool", &msg("tool", vec![json!({ "type": "tool_result", "id": "1", "name": "x", "output": "RESULTOUTPUT" })], json!({})));
+        let tool = add_json(
+            &conn,
+            chat,
+            "tool",
+            &msg(
+                "tool",
+                vec![
+                    json!({ "type": "tool_result", "id": "1", "name": "x", "output": "RESULTOUTPUT" }),
+                ],
+                json!({}),
+            ),
+        );
         assert_eq!(indexed_text(&conn, tool), None);
 
         // `@file` mentions append `<file>` blocks to the stored user text; they are not part of the question.
-        let mention = add_json(&conn, chat, "user", &msg("user", vec![part("text", "fix this\n\n<file path=\"a.ts\">\nFILEBODYMARKER\n</file>")], json!({})));
+        let mention = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg(
+                "user",
+                vec![part(
+                    "text",
+                    "fix this\n\n<file path=\"a.ts\">\nFILEBODYMARKER\n</file>",
+                )],
+                json!({}),
+            ),
+        );
         assert_eq!(indexed_text(&conn, mention).as_deref(), Some("fix this"));
         // ...but an assistant may legitimately write such text.
-        let quoted = add_json(&conn, chat, "assistant", &msg("assistant", vec![part("text", "see\n\n<file path=\"x\"> tag usage")], json!({})));
-        assert_eq!(indexed_text(&conn, quoted).as_deref(), Some("see\n\n<file path=\"x\"> tag usage"));
+        let quoted = add_json(
+            &conn,
+            chat,
+            "assistant",
+            &msg(
+                "assistant",
+                vec![part("text", "see\n\n<file path=\"x\"> tag usage")],
+                json!({}),
+            ),
+        );
+        assert_eq!(
+            indexed_text(&conn, quoted).as_deref(),
+            Some("see\n\n<file path=\"x\"> tag usage")
+        );
 
         // Imported Cursor turns: unwrap <user_query>, skip system notifications.
-        let cursor = add_json(&conn, chat, "user", &msg("user", vec![part("text", "<timestamp>Monday</timestamp>\n<user_query>\nbuild the thing\n</user_query>")], json!({ "imported": "cursor" })));
-        assert_eq!(indexed_text(&conn, cursor).as_deref(), Some("build the thing"));
+        let cursor = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg(
+                "user",
+                vec![part(
+                    "text",
+                    "<timestamp>Monday</timestamp>\n<user_query>\nbuild the thing\n</user_query>",
+                )],
+                json!({ "imported": "cursor" }),
+            ),
+        );
+        assert_eq!(
+            indexed_text(&conn, cursor).as_deref(),
+            Some("build the thing")
+        );
         assert!(found(&conn, "Monday").is_empty());
-        let notification = add_json(&conn, chat, "user", &msg("user", vec![part("text", "<system_notification>shell finished</system_notification>")], json!({})));
+        let notification = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg(
+                "user",
+                vec![part(
+                    "text",
+                    "<system_notification>shell finished</system_notification>",
+                )],
+                json!({}),
+            ),
+        );
         assert_eq!(indexed_text(&conn, notification), None);
 
         // Compaction summaries repeat messages that are indexed themselves.
-        let summary = add_json(&conn, chat, "user", &msg("user", vec![part("text", "SUMMARYTEXT of the chat")], json!({ "compacted": true, "model": "m" })));
+        let summary = add_json(
+            &conn,
+            chat,
+            "user",
+            &msg(
+                "user",
+                vec![part("text", "SUMMARYTEXT of the chat")],
+                json!({ "compacted": true, "model": "m" }),
+            ),
+        );
         assert_eq!(indexed_text(&conn, summary), None);
 
         // Nothing readable left: no row.
-        let blank = add_json(&conn, chat, "assistant", &msg("assistant", vec![part("text", " \n\t ")], json!({})));
+        let blank = add_json(
+            &conn,
+            chat,
+            "assistant",
+            &msg("assistant", vec![part("text", " \n\t ")], json!({})),
+        );
         assert_eq!(indexed_text(&conn, blank), None);
     }
 
@@ -1186,7 +1900,12 @@ mod tests {
         ];
         for content in odd {
             let id = add_json(&conn, chat, "assistant", content);
-            execute(&conn, "update messages set content = content || ' ' where id = ?", vec![json!(id)]).unwrap();
+            execute(
+                &conn,
+                "update messages set content = content || ' ' where id = ?",
+                vec![json!(id)],
+            )
+            .unwrap();
         }
         assert_eq!(count(&conn, "messages"), odd.len() as i64);
         // The two well-formed-enough rows are searchable ("ok" also matches "ok2" as a prefix): one has a string
@@ -1199,21 +1918,65 @@ mod tests {
     #[test]
     fn query_escaping_produces_safe_fts_expressions() {
         assert_eq!(fts_match("foo bar").as_deref(), Some(r#""foo"* "bar"*"#));
-        assert_eq!(fts_match("  spaced   out ").as_deref(), Some(r#""spaced"* "out"*"#));
-        assert_eq!(fts_match(r#""exact phrase" tail"#).as_deref(), Some(r#""exact phrase" "tail"*"#));
-        assert_eq!(fts_match(r#""unterminated phrase"#).as_deref(), Some(r#""unterminated phrase""#));
+        assert_eq!(
+            fts_match("  spaced   out ").as_deref(),
+            Some(r#""spaced"* "out"*"#)
+        );
+        assert_eq!(
+            fts_match(r#""exact phrase" tail"#).as_deref(),
+            Some(r#""exact phrase" "tail"*"#)
+        );
+        assert_eq!(
+            fts_match(r#""unterminated phrase"#).as_deref(),
+            Some(r#""unterminated phrase""#)
+        );
         assert_eq!(fts_match(r#"foo"bar"#).as_deref(), Some(r#""foo"* "bar""#));
-        assert_eq!(fts_match("a").as_deref(), Some(r#""a""#), "one-letter terms are not prefix-expanded");
-        assert_eq!(fts_match("AND OR NOT NEAR").as_deref(), Some(r#""AND"* "OR"* "NOT"* "NEAR"*"#), "operators are plain words");
-        assert_eq!(fts_match("text:foo -bar ^baz").as_deref(), Some(r#""text:foo"* "-bar"* "^baz"*"#));
-        assert_eq!(fts_match("snake_case C++ a.b").as_deref(), Some(r#""snake_case"* "C++"* "a.b"*"#));
-        assert_eq!(fts_match("привет мир").as_deref(), Some(r#""привет"* "мир"*"#));
-        for nothing in ["", "   ", "\"", "\"\"", "- * ( ) { } : ^ ~ + ;", "\t\n", "\u{0}"] {
+        assert_eq!(
+            fts_match("a").as_deref(),
+            Some(r#""a""#),
+            "one-letter terms are not prefix-expanded"
+        );
+        assert_eq!(
+            fts_match("AND OR NOT NEAR").as_deref(),
+            Some(r#""AND"* "OR"* "NOT"* "NEAR"*"#),
+            "operators are plain words"
+        );
+        assert_eq!(
+            fts_match("text:foo -bar ^baz").as_deref(),
+            Some(r#""text:foo"* "-bar"* "^baz"*"#)
+        );
+        assert_eq!(
+            fts_match("snake_case C++ a.b").as_deref(),
+            Some(r#""snake_case"* "C++"* "a.b"*"#)
+        );
+        assert_eq!(
+            fts_match("привет мир").as_deref(),
+            Some(r#""привет"* "мир"*"#)
+        );
+        for nothing in [
+            "",
+            "   ",
+            "\"",
+            "\"\"",
+            "- * ( ) { } : ^ ~ + ;",
+            "\t\n",
+            "\u{0}",
+        ] {
             assert_eq!(fts_match(nothing), None, "{nothing:?}");
         }
-        assert_eq!(fts_quote("a\"b"), "\"a\"\"b\"", "embedded quotes are doubled");
-        let many = (0..100).map(|i| format!("w{i}")).collect::<Vec<_>>().join(" ");
-        assert_eq!(fts_match(&many).unwrap().matches(' ').count() + 1, MAX_QUERY_TERMS);
+        assert_eq!(
+            fts_quote("a\"b"),
+            "\"a\"\"b\"",
+            "embedded quotes are doubled"
+        );
+        let many = (0..100)
+            .map(|i| format!("w{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert_eq!(
+            fts_match(&many).unwrap().matches(' ').count() + 1,
+            MAX_QUERY_TERMS
+        );
         let long = "x".repeat(10_000);
         assert!(fts_match(&long).unwrap().len() <= MAX_QUERY_CHARS + 4);
     }
@@ -1222,12 +1985,69 @@ mod tests {
     fn hostile_queries_never_error() {
         let conn = memory();
         let chat = chat_in(&conn, None, "t");
-        let id = add_text(&conn, chat, "assistant", "foo not bar and some words; DROP TABLE messages", None);
+        let id = add_text(
+            &conn,
+            chat,
+            "assistant",
+            "foo not bar and some words; DROP TABLE messages",
+            None,
+        );
         let nasty = [
-            "\"", "\"\"", "\"\"\"", "\"unbalanced", "unbalanced\"", "AND", "OR", "NOT", "a AND", "AND a", "a OR OR b", "NOT NOT", "NEAR(a b)",
-            "NEAR/2", "a NEAR/0 b", "-foo", "foo*", "*", "**", "^foo", "text:foo", "text : foo", "{text}: foo", "(", ")", "(foo", "foo)", "((()))",
-            "{", "}", "[", "]", "'", "''", "foo'bar", "a;b", "; DROP TABLE messages; --", "%", "_", "\\", "\\\"", "?", "!", "~", "+", "foo +bar", "foo\u{0}bar",
-            "\u{1}", "\u{2}", "é", "ё", "日本語", "😀", "a\nb", "a\tb",
+            "\"",
+            "\"\"",
+            "\"\"\"",
+            "\"unbalanced",
+            "unbalanced\"",
+            "AND",
+            "OR",
+            "NOT",
+            "a AND",
+            "AND a",
+            "a OR OR b",
+            "NOT NOT",
+            "NEAR(a b)",
+            "NEAR/2",
+            "a NEAR/0 b",
+            "-foo",
+            "foo*",
+            "*",
+            "**",
+            "^foo",
+            "text:foo",
+            "text : foo",
+            "{text}: foo",
+            "(",
+            ")",
+            "(foo",
+            "foo)",
+            "((()))",
+            "{",
+            "}",
+            "[",
+            "]",
+            "'",
+            "''",
+            "foo'bar",
+            "a;b",
+            "; DROP TABLE messages; --",
+            "%",
+            "_",
+            "\\",
+            "\\\"",
+            "?",
+            "!",
+            "~",
+            "+",
+            "foo +bar",
+            "foo\u{0}bar",
+            "\u{1}",
+            "\u{2}",
+            "é",
+            "ё",
+            "日本語",
+            "😀",
+            "a\nb",
+            "a\tb",
         ];
         for q in nasty {
             let res = search_hits(&conn, q, None, None, 10);
@@ -1242,7 +2062,9 @@ mod tests {
         assert_eq!(found(&conn, "DROP TABLE"), vec![id]);
         assert_eq!(count(&conn, "messages"), 1, "the table is still there");
         // A model or project id that matches nothing is just an empty result.
-        assert!(search_hits(&conn, "foo", Some(12345), Some("nope"), 10).unwrap().is_empty());
+        assert!(search_hits(&conn, "foo", Some(12345), Some("nope"), 10)
+            .unwrap()
+            .is_empty());
         assert!(search_hits(&conn, "", None, None, 10).unwrap().is_empty());
     }
 
@@ -1264,33 +2086,77 @@ mod tests {
             v
         };
 
-        assert_eq!(ids(search_hits(&conn, "pelican", None, None, 50).unwrap()), vec![q1, a1, a2, a3]);
-        assert_eq!(ids(search_hits(&conn, "pelican", Some(p1), None, 50).unwrap()), vec![q1, a1]);
-        assert_eq!(ids(search_hits(&conn, "pelican", Some(p2), None, 50).unwrap()), vec![a2]);
-        assert_eq!(ids(search_hits(&conn, "pelican", None, Some("m1"), 50).unwrap()), vec![a1, a3]);
-        assert_eq!(ids(search_hits(&conn, "pelican", Some(p1), Some("m1"), 50).unwrap()), vec![a1]);
-        assert!(search_hits(&conn, "pelican", Some(p2), Some("m1"), 50).unwrap().is_empty());
-        assert!(search_hits(&conn, "pelican", None, Some("m3"), 50).unwrap().is_empty());
-        assert_eq!(ids(search_hits(&conn, "pelican", None, Some(""), 50).unwrap()), vec![q1, a1, a2, a3], "an empty model means no filter");
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", None, None, 50).unwrap()),
+            vec![q1, a1, a2, a3]
+        );
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", Some(p1), None, 50).unwrap()),
+            vec![q1, a1]
+        );
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", Some(p2), None, 50).unwrap()),
+            vec![a2]
+        );
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", None, Some("m1"), 50).unwrap()),
+            vec![a1, a3]
+        );
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", Some(p1), Some("m1"), 50).unwrap()),
+            vec![a1]
+        );
+        assert!(search_hits(&conn, "pelican", Some(p2), Some("m1"), 50)
+            .unwrap()
+            .is_empty());
+        assert!(search_hits(&conn, "pelican", None, Some("m3"), 50)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            ids(search_hits(&conn, "pelican", None, Some(""), 50).unwrap()),
+            vec![q1, a1, a2, a3],
+            "an empty model means no filter"
+        );
 
         // Result fields come from the joined chat/project rows.
         let hits = search_hits(&conn, "pelican answer", Some(p1), None, 50).unwrap();
         let hit = hits.iter().find(|h| h.message_id == a1).unwrap();
-        assert_eq!((hit.chat_id, hit.chat_title.as_str(), hit.project_id), (c1, "Plan the launch", Some(p1)));
-        assert_eq!((hit.project_name.as_deref(), hit.role.as_str(), hit.model.as_deref()), (Some("Alpha project"), "assistant", Some("m1")));
+        assert_eq!(
+            (hit.chat_id, hit.chat_title.as_str(), hit.project_id),
+            (c1, "Plan the launch", Some(p1))
+        );
+        assert_eq!(
+            (
+                hit.project_name.as_deref(),
+                hit.role.as_str(),
+                hit.model.as_deref()
+            ),
+            (Some("Alpha project"), "assistant", Some("m1"))
+        );
         assert!(!hit.archived);
         let loose = search_hits(&conn, "pelican note", None, None, 50).unwrap();
-        assert_eq!((loose[0].project_id, loose[0].project_name.clone()), (None, None));
+        assert_eq!(
+            (loose[0].project_id, loose[0].project_name.clone()),
+            (None, None)
+        );
         let user_hit = search_hits(&conn, "pelican question", None, None, 50).unwrap();
         assert_eq!(user_hit[0].model, None);
 
         // Archived chats stay searchable and are flagged.
-        execute(&conn, "update chats set archived = 1 where id = ?", vec![json!(c2)]).unwrap();
+        execute(
+            &conn,
+            "update chats set archived = 1 where id = ?",
+            vec![json!(c2)],
+        )
+        .unwrap();
         let archived = search_hits(&conn, "reply", None, None, 50).unwrap();
         assert!(archived[0].archived);
 
         // Models offered by the filter: only models that have indexed messages.
-        assert_eq!(indexed_models(&conn).unwrap(), vec!["m1".to_string(), "m2".to_string()]);
+        assert_eq!(
+            indexed_models(&conn).unwrap(),
+            vec!["m1".to_string(), "m2".to_string()]
+        );
     }
 
     #[test]
@@ -1304,21 +2170,51 @@ mod tests {
         assert_eq!(hits[0], strong, "a shorter, denser match ranks first");
         assert_eq!(&hits[1..], &[second, first], "equal scores: newest first");
         assert_eq!(search_hits(&conn, "words", None, None, 2).unwrap().len(), 2);
-        assert_eq!(search_hits(&conn, "words", None, None, 0).unwrap().len(), 1, "limit is clamped to at least one");
-        assert_eq!(search_hits(&conn, "words", None, None, 1_000_000).unwrap().len(), 3);
+        assert_eq!(
+            search_hits(&conn, "words", None, None, 0).unwrap().len(),
+            1,
+            "limit is clamped to at least one"
+        );
+        assert_eq!(
+            search_hits(&conn, "words", None, None, 1_000_000)
+                .unwrap()
+                .len(),
+            3
+        );
 
-        let long = format!("{} the needle is right here {}", "filler ".repeat(200), "more ".repeat(200));
+        let long = format!(
+            "{} the needle is right here {}",
+            "filler ".repeat(200),
+            "more ".repeat(200)
+        );
         add_text(&conn, chat, "assistant", &long, Some("m"));
         let hit = &search_hits(&conn, "needle", None, None, 5).unwrap()[0];
-        assert!(hit.snippet.contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")), "{:?}", hit.snippet);
-        assert!(hit.snippet.contains('…'), "long messages are shortened around the match");
+        assert!(
+            hit.snippet
+                .contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")),
+            "{:?}",
+            hit.snippet
+        );
+        assert!(
+            hit.snippet.contains('…'),
+            "long messages are shortened around the match"
+        );
         assert!(hit.snippet.chars().count() < 400);
         // Prefix matching marks the whole word that matched.
         let prefix = &search_hits(&conn, "needl", None, None, 5).unwrap()[0];
-        assert!(prefix.snippet.contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")));
+        assert!(prefix
+            .snippet
+            .contains(&format!("{MARK_OPEN}needle{MARK_CLOSE}")));
         // Phrases match exactly, in order.
-        assert_eq!(search_hits(&conn, "\"needle is right\"", None, None, 5).unwrap().len(), 1);
-        assert!(search_hits(&conn, "\"right needle\"", None, None, 5).unwrap().is_empty());
+        assert_eq!(
+            search_hits(&conn, "\"needle is right\"", None, None, 5)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(search_hits(&conn, "\"right needle\"", None, None, 5)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -1327,17 +2223,33 @@ mod tests {
         let chat = chat_in(&conn, None, "t");
         let ru = add_text(&conn, chat, "user", "Привет, как дела? Ёлка во дворе", None);
         let fr = add_text(&conn, chat, "assistant", "Un café très agréable", Some("m"));
-        for q in ["привет", "ПРИВЕТ", "Привет", "приве", "дела", "ёлка", "ЁЛКА", "елка"] {
+        for q in [
+            "привет",
+            "ПРИВЕТ",
+            "Привет",
+            "приве",
+            "дела",
+            "ёлка",
+            "ЁЛКА",
+            "елка",
+        ] {
             assert_eq!(found(&conn, q), vec![ru], "{q}");
         }
         for q in ["cafe", "CAFÉ", "agreable", "tres"] {
             assert_eq!(found(&conn, q), vec![fr], "{q}");
         }
-        assert!(found(&conn, "привет cafe").is_empty(), "all terms must match");
+        assert!(
+            found(&conn, "привет cafe").is_empty(),
+            "all terms must match"
+        );
     }
 
     fn texts_of(conn: &Connection, query: &str) -> Vec<String> {
-        search_hits(conn, query, None, None, 100).unwrap().into_iter().map(|h| h.snippet).collect()
+        search_hits(conn, query, None, None, 100)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.snippet)
+            .collect()
     }
 
     #[test]
@@ -1347,22 +2259,63 @@ mod tests {
         let with_yo = add_text(&conn, chat, "user", "Всё про ёлку и Ёжика", None);
         let with_ye = add_text(&conn, chat, "assistant", "Все про елку и ежика", Some("m"));
         let other = add_text(&conn, chat, "user", "совсем другое", None);
-        for q in ["все", "всё", "ВСЁ", "ВСЕ", "елку", "ёлку", "Ёлк", "елк", "ежика", "ЁЖИКА", "\"ёлку и\"", "\"елку и\""] {
+        for q in [
+            "все",
+            "всё",
+            "ВСЁ",
+            "ВСЕ",
+            "елку",
+            "ёлку",
+            "Ёлк",
+            "елк",
+            "ежика",
+            "ЁЖИКА",
+            "\"ёлку и\"",
+            "\"елку и\"",
+        ] {
             assert_eq!(found(&conn, q), vec![with_yo, with_ye], "{q}");
         }
         assert_eq!(found(&conn, "все ёжик"), vec![with_yo, with_ye]);
         assert!(!found(&conn, "ёлку").contains(&other));
-        assert!(found(&conn, "совсем ёлка").is_empty(), "other terms still all have to match");
+        assert!(
+            found(&conn, "совсем ёлка").is_empty(),
+            "other terms still all have to match"
+        );
         // The index holds the folded copy, the stored message is untouched.
-        assert_eq!(indexed_text(&conn, with_yo).as_deref(), Some("Все про елку и Ежика"));
-        let stored = select(&conn, "select content from messages where id = ?", vec![json!(with_yo)]).unwrap();
-        assert!(stored[0]["content"].as_str().unwrap().contains("Всё про ёлку и Ёжика"));
+        assert_eq!(
+            indexed_text(&conn, with_yo).as_deref(),
+            Some("Все про елку и Ежика")
+        );
+        let stored = select(
+            &conn,
+            "select content from messages where id = ?",
+            vec![json!(with_yo)],
+        )
+        .unwrap();
+        assert!(stored[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Всё про ёлку и Ёжика"));
         // Updates fold too.
-        execute(&conn, "update messages set content = ? where id = ?", vec![json!(json!({ "role": "user", "parts": [{ "type": "text", "text": "Ещё ёрш" }] }).to_string()), json!(other)]).unwrap();
+        execute(
+            &conn,
+            "update messages set content = ? where id = ?",
+            vec![
+                json!(
+                    json!({ "role": "user", "parts": [{ "type": "text", "text": "Ещё ёрш" }] })
+                        .to_string()
+                ),
+                json!(other),
+            ],
+        )
+        .unwrap();
         assert_eq!(found(&conn, "ерш"), vec![other]);
         assert_eq!(found(&conn, "ёрш"), vec![other]);
         assert_eq!(fold_yo("ёЁеЕ"), "еЕеЕ");
-        assert_eq!(fts_match("Ёлка \"всё\"").as_deref(), Some(r#""Елка"* "все""#));
+        assert_eq!(
+            fts_match("Ёлка \"всё\"").as_deref(),
+            Some(r#""Елка"* "все""#)
+        );
     }
 
     #[test]
@@ -1370,18 +2323,42 @@ mod tests {
         let conn = memory();
         let chat = chat_in(&conn, None, "t");
         add_text(&conn, chat, "user", "Всё про ёлку и Ёжика", None);
-        let long = format!("{} вот ёлка здесь и ещё ёлочка {}", "слово ".repeat(80), "ещё ".repeat(80));
+        let long = format!(
+            "{} вот ёлка здесь и ещё ёлочка {}",
+            "слово ".repeat(80),
+            "ещё ".repeat(80)
+        );
         add_text(&conn, chat, "assistant", &long, Some("m"));
         for snip in texts_of(&conn, "елка") {
-            assert!(snip.contains(&format!("{MARK_OPEN}ёлка{MARK_CLOSE}")) || snip.contains(&format!("{MARK_OPEN}ёлку{MARK_CLOSE}")), "{snip:?}");
-            assert!(!snip.contains("елк"), "folded letters never leak into the snippet: {snip:?}");
+            assert!(
+                snip.contains(&format!("{MARK_OPEN}ёлка{MARK_CLOSE}"))
+                    || snip.contains(&format!("{MARK_OPEN}ёлку{MARK_CLOSE}")),
+                "{snip:?}"
+            );
+            assert!(
+                !snip.contains("елк"),
+                "folded letters never leak into the snippet: {snip:?}"
+            );
         }
         let long_snip = &texts_of(&conn, "ёлка")[0];
-        assert!(long_snip.contains('…') && long_snip.contains("ещё"), "{long_snip:?}");
+        assert!(
+            long_snip.contains('…') && long_snip.contains("ещё"),
+            "{long_snip:?}"
+        );
         // Restoring is a no-op without ё and survives an ellipsis that belongs to the text.
-        assert_eq!(restore_snippet("a \u{1}b\u{2} c", "a b c"), "a \u{1}b\u{2} c");
-        assert_eq!(restore_snippet("…\u{1}ёлка\u{2}…", "xx… ёлка …yy").replace('…', "."), ".\u{1}ёлка\u{2}.");
-        assert_eq!(restore_snippet("\u{1}елка\u{2}", "other text"), "\u{1}елка\u{2}", "unlocatable: unchanged");
+        assert_eq!(
+            restore_snippet("a \u{1}b\u{2} c", "a b c"),
+            "a \u{1}b\u{2} c"
+        );
+        assert_eq!(
+            restore_snippet("…\u{1}ёлка\u{2}…", "xx… ёлка …yy").replace('…', "."),
+            ".\u{1}ёлка\u{2}."
+        );
+        assert_eq!(
+            restore_snippet("\u{1}елка\u{2}", "other text"),
+            "\u{1}елка\u{2}",
+            "unlocatable: unchanged"
+        );
     }
 
     #[test]
@@ -1390,20 +2367,51 @@ mod tests {
         let chat = chat_in(&conn, None, "t");
         let id = add_text(&conn, chat, "user", "Ёлка", None);
         // An index from the previous version holds the unfolded text.
-        execute(&conn, "delete from messages_fts where rowid = ?", vec![json!(id)]).unwrap();
+        execute(
+            &conn,
+            "delete from messages_fts where rowid = ?",
+            vec![json!(id)],
+        )
+        .unwrap();
         execute(&conn, "insert into messages_fts(rowid, chat_id, role, model, text) values(?, ?, 'user', null, 'Ёлка')", vec![json!(id), json!(chat)]).unwrap();
-        execute(&conn, "update settings set value = ? where key = 'searchIndexVersion'", vec![json!((SEARCH_VERSION - 1).to_string())]).unwrap();
-        assert!(found(&conn, "елка").is_empty(), "the old index does not fold");
+        execute(
+            &conn,
+            "update settings set value = ? where key = 'searchIndexVersion'",
+            vec![json!((SEARCH_VERSION - 1).to_string())],
+        )
+        .unwrap();
+        assert!(
+            found(&conn, "елка").is_empty(),
+            "the old index does not fold"
+        );
         init_search(&conn).unwrap();
         assert_eq!(found(&conn, "елка"), vec![id]);
         assert_eq!(indexed_text(&conn, id).as_deref(), Some("Елка"));
-        let v = select(&conn, "select value from settings where key = 'searchIndexVersion'", vec![]).unwrap();
-        assert_eq!(v[0]["value"].as_str(), Some(SEARCH_VERSION.to_string().as_str()));
+        let v = select(
+            &conn,
+            "select value from settings where key = 'searchIndexVersion'",
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(
+            v[0]["value"].as_str(),
+            Some(SEARCH_VERSION.to_string().as_str())
+        );
     }
 
     fn many(conn: &Connection, n: usize) -> Vec<i64> {
         let chat = chat_in(conn, None, "paged");
-        (0..n).map(|i| add_text(conn, chat, "assistant", &format!("common word number {i}"), Some("m"))).collect()
+        (0..n)
+            .map(|i| {
+                add_text(
+                    conn,
+                    chat,
+                    "assistant",
+                    &format!("common word number {i}"),
+                    Some("m"),
+                )
+            })
+            .collect()
     }
 
     #[test]
@@ -1411,7 +2419,10 @@ mod tests {
         let conn = memory();
         let ids = many(&conn, 25);
         let all = search(&conn, "common", None, None, 100, 0).unwrap();
-        assert_eq!((all.total, all.total_capped, all.has_more, all.hits.len()), (25, false, false, 25));
+        assert_eq!(
+            (all.total, all.total_capped, all.has_more, all.hits.len()),
+            (25, false, false, 25)
+        );
         let order: Vec<i64> = all.hits.iter().map(|h| h.message_id).collect();
         let mut paged = Vec::new();
         let mut offset = 0;
@@ -1425,7 +2436,10 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(paged, order, "pages concatenate to the single-shot order, no repeats or gaps");
+        assert_eq!(
+            paged, order,
+            "pages concatenate to the single-shot order, no repeats or gaps"
+        );
         let mut sorted = paged.clone();
         sorted.sort();
         sorted.dedup();
@@ -1442,7 +2456,12 @@ mod tests {
         add_text(&conn, other, "user", "common thing", None);
         let scoped = search(&conn, "common", Some(p), None, 10, 0).unwrap();
         assert_eq!((scoped.total, scoped.hits.len()), (1, 1));
-        assert_eq!(search(&conn, "common", None, Some("m"), 10, 0).unwrap().total, 25);
+        assert_eq!(
+            search(&conn, "common", None, Some("m"), 10, 0)
+                .unwrap()
+                .total,
+            25
+        );
     }
 
     #[test]
@@ -1455,9 +2474,16 @@ mod tests {
         let expect: Vec<i64> = ids.iter().rev().take(40).copied().collect();
         assert_eq!(got, expect, "newest first");
         let next = search(&conn, "common", None, None, 40, 40).unwrap();
-        assert_eq!(next.hits[0].message_id, ids[ids.len() - 41], "pages continue without a gap");
+        assert_eq!(
+            next.hits[0].message_id,
+            ids[ids.len() - 41],
+            "pages continue without a gap"
+        );
         let narrow = search(&conn, "\"number 7\"", None, None, 40, 0).unwrap();
-        assert!(!narrow.by_recency, "ranked again once the query is specific");
+        assert!(
+            !narrow.by_recency,
+            "ranked again once the query is specific"
+        );
     }
 
     #[test]
@@ -1465,12 +2491,21 @@ mod tests {
         let conn = memory();
         many(&conn, SEARCH_CAP + 20);
         let first = search(&conn, "common", None, None, 40, 0).unwrap();
-        assert_eq!((first.total, first.total_capped, first.has_more), (SEARCH_CAP, true, true));
+        assert_eq!(
+            (first.total, first.total_capped, first.has_more),
+            (SEARCH_CAP, true, true)
+        );
         let last = search(&conn, "common", None, None, 100, SEARCH_CAP - 30).unwrap();
         assert_eq!(last.hits.len(), 30, "the page is cut at the cap");
         assert!(!last.has_more);
-        assert!(search(&conn, "common", None, None, 100, SEARCH_CAP).unwrap().hits.is_empty());
-        assert!(search(&conn, "common", None, None, 100, usize::MAX / 2).unwrap().hits.is_empty());
+        assert!(search(&conn, "common", None, None, 100, SEARCH_CAP)
+            .unwrap()
+            .hits
+            .is_empty());
+        assert!(search(&conn, "common", None, None, 100, usize::MAX / 2)
+            .unwrap()
+            .hits
+            .is_empty());
     }
 
     /// `cargo test --release -- --ignored search_perf --nocapture`: timings on a synthetic history.
@@ -1480,24 +2515,63 @@ mod tests {
         use std::time::Instant;
         let conn = memory();
         let chat = chat_in(&conn, None, "perf");
-        let words = ["alpha", "beta", "gamma", "delta", "parser", "модель", "ёжик", "ещё", "function", "render", "token", "stream", "файл", "ошибка"];
+        let words = [
+            "alpha",
+            "beta",
+            "gamma",
+            "delta",
+            "parser",
+            "модель",
+            "ёжик",
+            "ещё",
+            "function",
+            "render",
+            "token",
+            "stream",
+            "файл",
+            "ошибка",
+        ];
         let tx = conn.unchecked_transaction().unwrap();
         for i in 0..30_000usize {
-            let text: Vec<&str> = (0..60).map(|j| words[(i * 7 + j * 13 + j * j) % words.len()]).collect();
-            add_text(&conn, chat, if i % 2 == 0 { "user" } else { "assistant" }, &format!("the message {i} {}{}", text.join(" "), if i % 8 == 0 { " zebra" } else { "" }), Some("m"));
+            let text: Vec<&str> = (0..60)
+                .map(|j| words[(i * 7 + j * 13 + j * j) % words.len()])
+                .collect();
+            add_text(
+                &conn,
+                chat,
+                if i % 2 == 0 { "user" } else { "assistant" },
+                &format!(
+                    "the message {i} {}{}",
+                    text.join(" "),
+                    if i % 8 == 0 { " zebra" } else { "" }
+                ),
+                Some("m"),
+            );
         }
         tx.commit().unwrap();
         let time = |label: &str, q: &str, offset: usize, project: Option<i64>| {
             let t = Instant::now();
             let page = search(&conn, q, project, None, 40, offset).unwrap();
-            println!("{label:<34} {:>7.1} ms  hits={} total={}{}", t.elapsed().as_secs_f64() * 1000.0, page.hits.len(), page.total, if page.total_capped { "+" } else { "" });
+            println!(
+                "{label:<34} {:>7.1} ms  hits={} total={}{}",
+                t.elapsed().as_secs_f64() * 1000.0,
+                page.hits.len(),
+                page.total,
+                if page.total_capped { "+" } else { "" }
+            );
         };
         let raw = |label: &str, sql: &str| {
             let t = Instant::now();
             let n: i64 = conn.query_row(sql, [], |r| r.get(0)).unwrap();
-            println!("{label:<34} {:>7.1} ms  n={n}", t.elapsed().as_secs_f64() * 1000.0);
+            println!(
+                "{label:<34} {:>7.1} ms  n={n}",
+                t.elapsed().as_secs_f64() * 1000.0
+            );
         };
-        raw("raw count of all matches", "select count(*) from messages_fts where messages_fts match '\"the\"*'");
+        raw(
+            "raw count of all matches",
+            "select count(*) from messages_fts where messages_fts match '\"the\"*'",
+        );
         raw("raw count capped 1001", "select count(*) from (select 1 from messages_fts where messages_fts match '\"the\"*' limit 1001)");
         raw("raw top40 by rank", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by rank, rowid desc limit 40)");
         raw("raw top40 by rowid desc", "select count(*) from (select rowid from messages_fts where messages_fts match '\"the\"*' order by rowid desc limit 40)");
@@ -1522,10 +2596,26 @@ mod tests {
         let chat = chat_in(&conn, None, "t");
         let text = format!("{} tailmarker", "x".repeat(MAX_INDEXED_CHARS + 50_000));
         let id = add_text(&conn, chat, "assistant", &text, None);
-        let rows = select(&conn, "select length(text) as n from messages_fts where rowid = ?", vec![json!(id)]).unwrap();
+        let rows = select(
+            &conn,
+            "select length(text) as n from messages_fts where rowid = ?",
+            vec![json!(id)],
+        )
+        .unwrap();
         assert_eq!(rows[0]["n"], json!(MAX_INDEXED_CHARS as i64));
-        assert!(found(&conn, "tailmarker").is_empty(), "text past the cap is not searchable");
-        let stored = select(&conn, "select length(content) as n from messages where id = ?", vec![json!(id)]).unwrap();
-        assert!(stored[0]["n"].as_i64().unwrap() > MAX_INDEXED_CHARS as i64, "the message itself is untouched");
+        assert!(
+            found(&conn, "tailmarker").is_empty(),
+            "text past the cap is not searchable"
+        );
+        let stored = select(
+            &conn,
+            "select length(content) as n from messages where id = ?",
+            vec![json!(id)],
+        )
+        .unwrap();
+        assert!(
+            stored[0]["n"].as_i64().unwrap() > MAX_INDEXED_CHARS as i64,
+            "the message itself is untouched"
+        );
     }
 }

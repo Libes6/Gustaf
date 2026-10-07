@@ -15,21 +15,66 @@ vi.mock("../../src/components/AgentsPanel", () => ({ AgentsColumn: () => null, A
 const model = vi.hoisted(() => ({ turn: undefined as undefined | ((input: any) => Promise<any>) }));
 vi.mock("../../src/providers", async (orig) => ({
   ...(await orig<typeof import("../../src/providers")>()),
-  getAdapter: async () => ({ supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: (input: any) => model.turn!(input) }),
+  getAdapter: async () => ({
+    supportsComputer: false,
+    supportsReasoning: () => false,
+    listModels: async () => [],
+    turn: (input: any) => model.turn!(input),
+  }),
 }));
 
 const noop = () => {};
 const info = (over: Record<string, unknown> = {}) => ({
-  taskId: "t1", path: "/store/abc/t1", branch: "gustaf/fix-login", baseCommit: "deadbeef", baseBranch: "main", createdAt: 1,
-  provider: null, model: null, headSha: "cafe", changedFiles: 3, ahead: 2, behind: 1, dirty: false, existsOnDisk: true, ...over,
+  taskId: "t1",
+  path: "/store/abc/t1",
+  branch: "gustaf/fix-login",
+  baseCommit: "deadbeef",
+  baseBranch: "main",
+  createdAt: 1,
+  provider: null,
+  model: null,
+  headSha: "cafe",
+  changedFiles: 3,
+  ahead: 2,
+  behind: 1,
+  dirty: false,
+  existsOnDisk: true,
+  ...over,
 });
-const gitStatus = (over: Record<string, unknown> = {}) => ({ repo: true, toplevel: "/work/alpha", prefix: "", branch: "main", detached: false, head: "abc1234", files: [], total: 0, inProgress: null, ...over });
-const wsChat = (over: Record<string, unknown> = {}) => chat({ id: 5, project_id: 1, title: "Fix login", workspace_task_id: "t1", workspace_branch: "gustaf/fix-login", workspace_base: "deadbeef", ...over });
-const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+const gitStatus = (over: Record<string, unknown> = {}) => ({
+  repo: true,
+  toplevel: "/work/alpha",
+  prefix: "",
+  branch: "main",
+  detached: false,
+  head: "abc1234",
+  files: [],
+  total: 0,
+  inProgress: null,
+  ...over,
+});
+const wsChat = (over: Record<string, unknown> = {}) =>
+  chat({
+    id: 5,
+    project_id: 1,
+    title: "Fix login",
+    workspace_task_id: "t1",
+    workspace_branch: "gustaf/fix-login",
+    workspace_base: "deadbeef",
+    ...over,
+  });
+const flush = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 
 const sidebar = (over: Record<string, unknown> = {}) =>
-  renderApp(<Sidebar onCreateProject={noop} onSearch={noop} />, makeApp({ projects: [project()], chats: [chat({ id: 1, title: "Plain chat" }), wsChat()], ...over }));
-const workspaceRow = () => screen.getByRole("group", { name: "Workspaces of Alpha" }).querySelector(".row.workspace") as HTMLElement;
+  renderApp(
+    <Sidebar onCreateProject={noop} onSearch={noop} />,
+    makeApp({ projects: [project()], chats: [chat({ id: 1, title: "Plain chat" }), wsChat()], ...over }),
+  );
+const workspaceRow = () =>
+  screen.getByRole("group", { name: "Workspaces of Alpha" }).querySelector(".row.workspace") as HTMLElement;
 
 beforeEach(() => resetWorkspaceStore());
 
@@ -90,7 +135,10 @@ describe("Sidebar workspaces", () => {
   });
 
   it("Archive removes the workspace (branch kept) and re-reads the list", async () => {
-    mockInvoke({ worktree_list: [info({ ahead: 2 })], worktree_remove: { removed: true, branchDeleted: false, branchKeptReason: null } });
+    mockInvoke({
+      worktree_list: [info({ ahead: 2 })],
+      worktree_remove: { removed: true, branchDeleted: false, branchKeptReason: null },
+    });
     sidebar();
     await waitFor(() => expect(within(workspaceRow()).getByText("3 changed")).toBeInTheDocument());
     fireEvent.contextMenu(screen.getByText("Fix login", { selector: ".row.workspace .label" }));
@@ -98,18 +146,31 @@ describe("Sidebar workspaces", () => {
     // Ahead of the base: deleting the branch would lose commits, so it is not offered.
     expect(within(menu).queryByRole("menuitem", { name: "Archive and delete branch" })).not.toBeInTheDocument();
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Archive workspace" }));
-    await waitFor(() => expect(callsOf("worktree_remove")).toEqual([{ root: "/work/alpha", taskId: "t1", force: false, deleteBranch: false }]));
+    await waitFor(() =>
+      expect(callsOf("worktree_remove")).toEqual([
+        { root: "/work/alpha", taskId: "t1", force: false, deleteBranch: false },
+      ]),
+    );
     await waitFor(() => expect(callsOf("worktree_list").length).toBeGreaterThan(1));
   });
 
   it("offers Archive and delete branch only when the branch is level with its base", async () => {
-    mockInvoke({ worktree_list: [info({ ahead: 0, behind: 0, changedFiles: 0 })], worktree_remove: { removed: true, branchDeleted: true, branchKeptReason: null } });
+    mockInvoke({
+      worktree_list: [info({ ahead: 0, behind: 0, changedFiles: 0 })],
+      worktree_remove: { removed: true, branchDeleted: true, branchKeptReason: null },
+    });
     sidebar();
     await waitFor(() => expect(callsOf("worktree_list").length).toBeGreaterThan(0));
     await flush();
     fireEvent.contextMenu(screen.getByText("Fix login", { selector: ".row.workspace .label" }));
-    await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Archive and delete branch" }));
-    await waitFor(() => expect(callsOf("worktree_remove")).toEqual([{ root: "/work/alpha", taskId: "t1", force: false, deleteBranch: true }]));
+    await userEvent.click(
+      within(screen.getByRole("menu")).getByRole("menuitem", { name: "Archive and delete branch" }),
+    );
+    await waitFor(() =>
+      expect(callsOf("worktree_remove")).toEqual([
+        { root: "/work/alpha", taskId: "t1", force: false, deleteBranch: true },
+      ]),
+    );
   });
 
   it("a dirty workspace asks first; Archive anyway forces, Cancel does not remove", async () => {
@@ -131,9 +192,16 @@ describe("Sidebar workspaces", () => {
 
     fireEvent.contextMenu(screen.getByText("Fix login", { selector: ".row.workspace .label" }));
     await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Archive workspace" }));
-    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Archive anyway" }));
+    await userEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Archive anyway" }),
+    );
     await waitFor(() => expect(callsOf("worktree_remove").map((a) => a.force)).toEqual([false, false, true]));
-    expect(callsOf("worktree_remove")[2]).toEqual({ root: "/work/alpha", taskId: "t1", force: true, deleteBranch: false });
+    expect(callsOf("worktree_remove")[2]).toEqual({
+      root: "/work/alpha",
+      taskId: "t1",
+      force: true,
+      deleteBranch: false,
+    });
   });
 
   it("New workspace… is offered for git projects and creates the workspace and a linked chat", async () => {
@@ -155,11 +223,25 @@ describe("Sidebar workspaces", () => {
     expect(create.taskId).toMatch(/^w[a-z0-9]+-[a-z0-9]{4}$/);
     const insert = callsOf("db_execute").find((a) => /insert into chats/.test(a.sql));
     expect(insert.sql).toMatch(/workspace_task_id, workspace_branch, workspace_base/);
-    expect(insert.params).toEqual([1, "Fix login flow please", expect.any(Number), expect.any(Number), "w1", "gustaf/fix-login-flow", "deadbeef"]);
+    expect(insert.params).toEqual([
+      1,
+      "Fix login flow please",
+      expect.any(Number),
+      expect.any(Number),
+      "w1",
+      "gustaf/fix-login-flow",
+      "deadbeef",
+    ]);
   });
 
   it("New workspace… explains a missing repository instead of creating anything", async () => {
-    mockInvoke({ git_status: gitStatus(), worktree_list: [], worktree_create: () => { throw "no_commits: the repository has no commits yet"; } });
+    mockInvoke({
+      git_status: gitStatus(),
+      worktree_list: [],
+      worktree_create: () => {
+        throw "no_commits: the repository has no commits yet";
+      },
+    });
     sidebar({ chats: [] });
     await flush();
     fireEvent.contextMenu(screen.getByText("Alpha"));
@@ -174,7 +256,9 @@ describe("Sidebar workspaces", () => {
     sidebar({ chats: [] });
     await flush();
     fireEvent.contextMenu(screen.getByText("Alpha"));
-    expect(within(screen.getByRole("menu")).queryByRole("menuitem", { name: "New workspace…" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("menu")).queryByRole("menuitem", { name: "New workspace…" }),
+    ).not.toBeInTheDocument();
     expect(within(screen.getByRole("menu")).getByRole("menuitem", { name: /Pin/ })).toBeInTheDocument();
   });
 });
@@ -185,8 +269,22 @@ describe("Composer workspace option and the working folder of a chat", () => {
   const selection = { providerId: "p1", model: "m1" };
   const draft = { key: "k", chatId: null, projectId: 1 };
   // The review copy is off by default; the tests that exercise the copy turn the global setting on explicitly.
-  const view = (session: { key: string; chatId: number | null; projectId: number | null }, chats = [] as ReturnType<typeof chat>[], reviewCopy = false) =>
-    renderApp(<ChatView session={session} visible />, makeApp({ projects: [project()], chats, providers: [provider()], selection, reviewCopy, sessions: { active: "k", items: [session] } }));
+  const view = (
+    session: { key: string; chatId: number | null; projectId: number | null },
+    chats = [] as ReturnType<typeof chat>[],
+    reviewCopy = false,
+  ) =>
+    renderApp(
+      <ChatView session={session} visible />,
+      makeApp({
+        projects: [project()],
+        chats,
+        providers: [provider()],
+        selection,
+        reviewCopy,
+        sessions: { active: "k", items: [session] },
+      }),
+    );
 
   it("offers Run in new workspace in a git project", async () => {
     mockInvoke({ git_status: gitStatus(), db_select: () => rows });
@@ -203,8 +301,18 @@ describe("Composer workspace option and the working folder of a chat", () => {
   });
 
   it("hides the option when the chat already has messages", async () => {
-    const stored = [{ id: 1, chat_id: 6, created_at: 1, content: JSON.stringify({ role: "user", parts: [{ type: "text", text: "hi" }] }) }];
-    mockInvoke({ git_status: gitStatus(), db_select: ({ sql }: { sql: string }) => (/from messages where chat_id/.test(sql) ? stored : []) });
+    const stored = [
+      {
+        id: 1,
+        chat_id: 6,
+        created_at: 1,
+        content: JSON.stringify({ role: "user", parts: [{ type: "text", text: "hi" }] }),
+      },
+    ];
+    mockInvoke({
+      git_status: gitStatus(),
+      db_select: ({ sql }: { sql: string }) => (/from messages where chat_id/.test(sql) ? stored : []),
+    });
     view({ key: "k", chatId: 6, projectId: 1 }, [chat({ id: 6, project_id: 1 })]);
     await screen.findByText("hi");
     await flush();
@@ -214,8 +322,10 @@ describe("Composer workspace option and the working folder of a chat", () => {
   it("an ordinary chat still runs in the project folder with a shadow copy", async () => {
     model.turn = vi.fn(async () => ({ parts: [{ type: "text", text: "done" }], usage }));
     mockInvoke({
-      git_status: gitStatus(), db_select: () => rows,
-      review_prepare: { id: "1-2", root: "/work/alpha", workspace: "/shadow/work", linked: [] }, git: "abc123\n",
+      git_status: gitStatus(),
+      db_select: () => rows,
+      review_prepare: { id: "1-2", root: "/work/alpha", workspace: "/shadow/work", linked: [] },
+      git: "abc123\n",
     });
     view({ key: "k", chatId: 6, projectId: 1 }, [chat({ id: 6, project_id: 1 })], true);
     await flush();
@@ -238,7 +348,11 @@ describe("Composer workspace option and the working folder of a chat", () => {
     expect((model.turn as any).mock.calls[0][0].cwd).toBe("/store/abc/t1");
     expect(callsOf("review_prepare")).toEqual([]);
     // Every project command (checkpoint) targets the worktree, never /work/alpha.
-    expect(callsOf("git").map((a) => a.root).filter((r) => r !== undefined && r !== "/work/alpha" && r !== "/store/abc/t1")).toEqual([]);
+    expect(
+      callsOf("git")
+        .map((a) => a.root)
+        .filter((r) => r !== undefined && r !== "/work/alpha" && r !== "/store/abc/t1"),
+    ).toEqual([]);
     expect(callsOf("git").some((a) => a.root === "/store/abc/t1" && a.shadow)).toBe(true);
     expect(callsOf("git").some((a) => a.root === "/work/alpha" && a.shadow)).toBe(false);
   });
@@ -257,20 +371,34 @@ describe("Composer workspace option and the working folder of a chat", () => {
   it("Run in new workspace creates the worktree and a linked chat, then runs the first message in it", async () => {
     model.turn = vi.fn(async () => ({ parts: [{ type: "text", text: "done" }], usage }));
     mockInvoke({
-      git_status: gitStatus(), db_select: () => rows, worktree_list: [],
+      git_status: gitStatus(),
+      db_select: () => rows,
+      worktree_list: [],
       worktree_create: info({ taskId: "w1", path: "/store/abc/w1", branch: "gustaf/add-a-readme", changedFiles: 0 }),
-      db_execute: [1, 77], git: "abc123\n",
+      db_execute: [1, 77],
+      git: "abc123\n",
     });
     const { app } = view(draft);
     await userEvent.click(await screen.findByRole("button", { name: "New workspace" }));
     expect(screen.getByRole("button", { name: "New workspace" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.type(screen.getByRole("textbox"), "Add a README{Enter}");
     await screen.findByText("done");
-    expect(callsOf("worktree_create")[0]).toMatchObject({ root: "/work/alpha", slug: "add-a-readme", provider: "p1", model: "m1" });
+    expect(callsOf("worktree_create")[0]).toMatchObject({
+      root: "/work/alpha",
+      slug: "add-a-readme",
+      provider: "p1",
+      model: "m1",
+    });
     expect(app.promoteChat).toHaveBeenCalledWith("k", 77);
     expect((model.turn as any).mock.calls[0][0].cwd).toBe("/store/abc/w1");
     expect(callsOf("review_prepare")).toEqual([]);
-    expect(callsOf("db_execute").some((a) => /insert into chats\(project_id, title, created_at, updated_at, workspace_task_id/.test(a.sql) && a.params[4] === "w1")).toBe(true);
+    expect(
+      callsOf("db_execute").some(
+        (a) =>
+          /insert into chats\(project_id, title, created_at, updated_at, workspace_task_id/.test(a.sql) &&
+          a.params[4] === "w1",
+      ),
+    ).toBe(true);
     // The option is for the next message only.
     await waitFor(() => expect(screen.queryByRole("button", { name: "New workspace" })).not.toBeInTheDocument());
   });
@@ -278,10 +406,15 @@ describe("Composer workspace option and the working folder of a chat", () => {
   it("without a usable repository the option explains and falls back to the normal flow", async () => {
     model.turn = vi.fn(async () => ({ parts: [{ type: "text", text: "done" }], usage }));
     mockInvoke({
-      git_status: gitStatus(), db_select: () => rows, worktree_list: [],
-      worktree_create: () => { throw "not_a_git_repo: the project folder is not inside a git repository"; },
+      git_status: gitStatus(),
+      db_select: () => rows,
+      worktree_list: [],
+      worktree_create: () => {
+        throw "not_a_git_repo: the project folder is not inside a git repository";
+      },
       review_prepare: { id: "1-2", root: "/work/alpha", workspace: "/shadow/work", linked: [] },
-      db_execute: [1, 78], git: "abc123\n",
+      db_execute: [1, 78],
+      git: "abc123\n",
     });
     view(draft, [], true);
     await userEvent.click(await screen.findByRole("button", { name: "New workspace" }));

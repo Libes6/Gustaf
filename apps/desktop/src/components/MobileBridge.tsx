@@ -23,7 +23,12 @@ export function MobileStatusBridge() {
     const ids = new Set<number>([...busy, ...waiting, ...flags.failed, ...flags.unread, ...live]);
     const report: { chatId: number; status: MobileChatStatus }[] = [];
     for (const chatId of [...ids].sort((a, b) => a - b)) {
-      const s = deriveStatus({ waiting: waiting.has(chatId), running: live.has(chatId) || busy.includes(chatId), failed: flags.failed.has(chatId), unread: flags.unread.has(chatId) });
+      const s = deriveStatus({
+        waiting: waiting.has(chatId),
+        running: live.has(chatId) || busy.includes(chatId),
+        failed: flags.failed.has(chatId),
+        unread: flags.unread.has(chatId),
+      });
       if (s) report.push({ chatId, status: s === "unread" ? "done" : s });
     }
     const key = JSON.stringify(report);

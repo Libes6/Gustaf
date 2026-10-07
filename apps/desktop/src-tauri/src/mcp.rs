@@ -14,10 +14,17 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
+// Only the unix-only output draining below reads from a child pipe through `Read`.
+#[cfg(unix)]
+use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
+
+/// Pulls the JSON-RPC id out of the prefix of an oversized message (compiled once, not per dropped message).
+static ID_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r#""id"\s*:\s*(\d+)"#).expect("a valid regex"));
 
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 const MAX_MESSAGE: usize = 16 * 1024 * 1024;
@@ -214,7 +221,11 @@ fn login_shell_path() -> Option<String> {
         std::thread::sleep(Duration::from_millis(20));
     }
     let text = String::from_utf8_lossy(&reader.join().ok()?).into_owned();
-    text.lines().rev().find_map(|l| l.strip_prefix(MARK)).map(str::to_string).filter(|p| !p.is_empty())
+    text.lines()
+        .rev()
+        .find_map(|l| l.strip_prefix(MARK))
+        .map(str::to_string)
+        .filter(|p| !p.is_empty())
 }
 
 #[cfg(unix)]
@@ -234,8 +245,12 @@ fn resolve_command(command: &str, path: &str) -> Result<String, String> {
         return Ok(command.to_string());
     }
     // Windows resolves bare names through PATHEXT (`npx` is `npx.cmd`).
-    let names: Vec<String> = if cfg!(windows) && std::path::Path::new(command).extension().is_none() {
-        ["", ".exe", ".cmd", ".bat", ".com"].iter().map(|e| format!("{command}{e}")).collect()
+    let names: Vec<String> = if cfg!(windows) && std::path::Path::new(command).extension().is_none()
+    {
+        ["", ".exe", ".cmd", ".bat", ".com"]
+            .iter()
+            .map(|e| format!("{command}{e}"))
+            .collect()
     } else {
         vec![command.to_string()]
     };
@@ -249,7 +264,9 @@ fn resolve_command(command: &str, path: &str) -> Result<String, String> {
             }
         }
     }
-    Err(format!("command not found: {command} (searched the login shell PATH)"))
+    Err(format!(
+        "command not found: {command} (searched the login shell PATH)"
+    ))
 }
 
 fn validate_spec(spec: &Spec) -> Result<(), String> {
@@ -259,10 +276,18 @@ fn validate_spec(spec: &Spec) -> Result<(), String> {
     if spec.args.len() > 256 || spec.args.iter().any(|a| a.len() > 16384) {
         return Err("too many or too long arguments".into());
     }
-    if spec.env.len() > 256 || spec.env.keys().any(|k| k.is_empty() || k.contains('=') || k.contains('\0')) {
+    if spec.env.len() > 256
+        || spec
+            .env
+            .keys()
+            .any(|k| k.is_empty() || k.contains('=') || k.contains('\0'))
+    {
         return Err("invalid environment variables".into());
     }
-    if spec.command.contains('\0') || spec.args.iter().any(|a| a.contains('\0')) || spec.env.values().any(|v| v.contains('\0')) {
+    if spec.command.contains('\0')
+        || spec.args.iter().any(|a| a.contains('\0'))
+        || spec.env.values().any(|v| v.contains('\0'))
+    {
         return Err("NUL byte in command, arguments or environment".into());
     }
     Ok(())
@@ -270,13 +295,22 @@ fn validate_spec(spec: &Spec) -> Result<(), String> {
 
 /// Reads one line of at most `max` bytes. `Ok(None)` at EOF; an over-long line is consumed and returned as
 /// `Err(prefix)` with its first bytes, so the caller can still tell which request it answered.
-fn read_line_bounded(r: &mut impl BufRead, max: usize) -> std::io::Result<Option<Result<Vec<u8>, Vec<u8>>>> {
+fn read_line_bounded(
+    r: &mut impl BufRead,
+    max: usize,
+) -> std::io::Result<Option<Result<Vec<u8>, Vec<u8>>>> {
     let mut line = Vec::new();
     let mut over = false;
     loop {
         let buf = r.fill_buf()?;
         if buf.is_empty() {
-            return Ok(if line.is_empty() && !over { None } else if over { Some(Err(line)) } else { Some(Ok(line)) });
+            return Ok(if line.is_empty() && !over {
+                None
+            } else if over {
+                Some(Err(line))
+            } else {
+                Some(Ok(line))
+            });
         }
         let (take, found) = match buf.iter().position(|&b| b == b'\n') {
             Some(i) => (i, true),
@@ -302,7 +336,10 @@ fn read_line_bounded(r: &mut impl BufRead, max: usize) -> std::io::Result<Option
 
 fn error_text(e: &Value) -> String {
     let code = e.get("code").and_then(Value::as_i64).unwrap_or(0);
-    let msg = e.get("message").and_then(Value::as_str).unwrap_or("unknown error");
+    let msg = e
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown error");
     clip(&format!("MCP error {code}: {msg}"), 2000)
 }
 
@@ -316,6 +353,8 @@ fn signal_group(pid: u32, sig: i32) {
 
 /// Closes stdin (already done by the caller), then escalates: wait, SIGTERM, wait, SIGKILL.
 fn terminate(mut child: Child) -> Option<std::process::ExitStatus> {
+    // Used by the unix-only process-group kill; nothing reads it on Windows.
+    #[cfg_attr(windows, allow(unused_variables))]
     let pid = child.id();
     let wait = |child: &mut Child, ms: u64| {
         let end = Instant::now() + Duration::from_millis(ms);
@@ -419,10 +458,19 @@ impl Server {
     fn start_inner(self: &Arc<Self>) -> Result<(), String> {
         let spec = lock(&self.inner).spec.clone();
         validate_spec(&spec)?;
-        let path = spec.env.get("PATH").cloned().unwrap_or_else(|| search_path().to_string());
+        let path = spec
+            .env
+            .get("PATH")
+            .cloned()
+            .unwrap_or_else(|| search_path().to_string());
         let program = resolve_command(&spec.command, &path)?;
         let mut cmd = Command::new(&program);
-        cmd.args(&spec.args).envs(&spec.env).env("PATH", &path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.args(&spec.args)
+            .envs(&spec.env)
+            .env("PATH", &path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         if let Some(cwd) = spec.cwd.as_deref().filter(|c| !c.is_empty()) {
             cmd.current_dir(cwd);
         }
@@ -431,14 +479,17 @@ impl Server {
             use std::os::unix::process::CommandExt;
             cmd.process_group(0);
         }
-        let mut child = cmd.spawn().map_err(|e| format!("failed to start {program}: {e}"))?;
-        let (stdin, stdout, stderr) = match (child.stdin.take(), child.stdout.take(), child.stderr.take()) {
-            (Some(a), Some(b), Some(c)) => (a, b, c),
-            _ => {
-                terminate(child);
-                return Err("failed to open the server's stdio".into());
-            }
-        };
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to start {program}: {e}"))?;
+        let (stdin, stdout, stderr) =
+            match (child.stdin.take(), child.stdout.take(), child.stderr.take()) {
+                (Some(a), Some(b), Some(c)) => (a, b, c),
+                _ => {
+                    terminate(child);
+                    return Err("failed to open the server's stdio".into());
+                }
+            };
         let (tx, rx) = mpsc::channel::<Vec<u8>>();
         let gen = {
             let mut i = lock(&self.inner);
@@ -484,13 +535,15 @@ impl Server {
             "capabilities": {},
             "clientInfo": { "name": "Gustaf", "version": env!("CARGO_PKG_VERSION") },
         });
-        let result = self.send_request("initialize", Some(params), INIT_TIMEOUT, true, None).and_then(|r| {
-            if r.get("protocolVersion").and_then(Value::as_str).is_some() {
-                Ok(r)
-            } else {
-                Err("invalid initialize result (no protocolVersion)".to_string())
-            }
-        });
+        let result = self
+            .send_request("initialize", Some(params), INIT_TIMEOUT, true, None)
+            .and_then(|r| {
+                if r.get("protocolVersion").and_then(Value::as_str).is_some() {
+                    Ok(r)
+                } else {
+                    Err("invalid initialize result (no protocolVersion)".to_string())
+                }
+            });
         match result {
             Ok(init) => {
                 let mut init = init;
@@ -531,18 +584,19 @@ impl Server {
         };
         if let Some(child) = child {
             let status = terminate(child);
-            lock(&self.inner).push_log(&format!("[stopped] {}", status.map(|s| s.to_string()).unwrap_or_else(|| "killed".into())));
+            lock(&self.inner).push_log(&format!(
+                "[stopped] {}",
+                status
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "killed".into())
+            ));
         }
         self.set_state(state, error);
     }
 
     fn read_loop(self: Arc<Self>, stdout: std::process::ChildStdout, gen: u64) {
         let mut r = BufReader::new(stdout);
-        loop {
-            let line = match read_line_bounded(&mut r, MAX_MESSAGE) {
-                Ok(Some(l)) => l,
-                _ => break,
-            };
+        while let Ok(Some(line)) = read_line_bounded(&mut r, MAX_MESSAGE) {
             if lock(&self.inner).gen != gen {
                 return;
             }
@@ -550,11 +604,17 @@ impl Server {
                 Ok(bytes) => self.handle_line(&bytes),
                 Err(prefix) => {
                     let head = String::from_utf8_lossy(&prefix).into_owned();
-                    let id = regex::Regex::new(r#""id"\s*:\s*(\d+)"#).ok().and_then(|re| re.captures(&head)).and_then(|c| c[1].parse::<u64>().ok());
+                    let id = ID_RE.captures(&head).and_then(|c| c[1].parse::<u64>().ok());
                     let mut i = lock(&self.inner);
-                    i.push_log(&format!("[dropped a message over {} MB]", MAX_MESSAGE >> 20));
+                    i.push_log(&format!(
+                        "[dropped a message over {} MB]",
+                        MAX_MESSAGE >> 20
+                    ));
                     if let Some(tx) = id.and_then(|id| i.pending.remove(&id)) {
-                        let _ = tx.send(Err(format!("MCP response exceeded {} MB", MAX_MESSAGE >> 20)));
+                        let _ = tx.send(Err(format!(
+                            "MCP response exceeded {} MB",
+                            MAX_MESSAGE >> 20
+                        )));
                     }
                 }
             }
@@ -581,7 +641,10 @@ impl Server {
                     (Some(r), None) => Ok(r.clone()),
                     (None, None) => Err("invalid JSON-RPC response".into()),
                 };
-                if let Some(tx) = id.as_u64().and_then(|n| lock(&self.inner).pending.remove(&n)) {
+                if let Some(tx) = id
+                    .as_u64()
+                    .and_then(|n| lock(&self.inner).pending.remove(&n))
+                {
                     let _ = tx.send(reply);
                 }
             }
@@ -589,8 +652,12 @@ impl Server {
                 // Requests from the server: answer the harmless ones; sampling, elicitation etc. are not offered.
                 let reply = match method {
                     "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
-                    "roots/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "roots": [] } }),
-                    _ => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("Method not found: {}", clip(method, 100)) } }),
+                    "roots/list" => {
+                        json!({ "jsonrpc": "2.0", "id": id, "result": { "roots": [] } })
+                    }
+                    _ => {
+                        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("Method not found: {}", clip(method, 100)) } })
+                    }
                 };
                 let _ = self.write(&reply);
             }
@@ -609,8 +676,19 @@ impl Server {
                 }
                 "notifications/message" => {
                     let p = msg.get("params").cloned().unwrap_or(Value::Null);
-                    let level = p.get("level").and_then(Value::as_str).unwrap_or("info").to_string();
-                    let data = p.get("data").map(|d| d.as_str().map(str::to_string).unwrap_or_else(|| d.to_string())).unwrap_or_default();
+                    let level = p
+                        .get("level")
+                        .and_then(Value::as_str)
+                        .unwrap_or("info")
+                        .to_string();
+                    let data = p
+                        .get("data")
+                        .map(|d| {
+                            d.as_str()
+                                .map(str::to_string)
+                                .unwrap_or_else(|| d.to_string())
+                        })
+                        .unwrap_or_default();
                     lock(&self.inner).push_log(&format!("[{level}] {data}"));
                 }
                 _ => {}
@@ -629,7 +707,9 @@ impl Server {
             i.tx = None;
             i.pid = None;
             // Publish the restart before waking pending callers: their next request must wait.
-            if was == State::Running { i.state = State::Restarting; }
+            if was == State::Running {
+                i.state = State::Restarting;
+            }
             i.fail_pending("MCP server exited");
             (i.child.take(), was)
         };
@@ -639,7 +719,12 @@ impl Server {
             if i.gen != gen {
                 return;
             }
-            i.push_log(&format!("[exited] {}", status.map(|s| s.to_string()).unwrap_or_else(|| "unknown status".into())));
+            i.push_log(&format!(
+                "[exited] {}",
+                status
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "unknown status".into())
+            ));
         }
         if was != State::Running {
             // Exit during the handshake: `start` reports it.
@@ -657,7 +742,7 @@ impl Server {
                 if i.gen != gen {
                     return;
                 }
-                if i.started_at.map_or(false, |t| t.elapsed() > STABLE_AFTER) {
+                if i.started_at.is_some_and(|t| t.elapsed() > STABLE_AFTER) {
                     i.crashes = 0;
                 }
                 i.crashes += 1;
@@ -701,7 +786,10 @@ impl Server {
         }
         line.push(b'\n');
         let i = lock(&self.inner);
-        i.tx.as_ref().ok_or("MCP server is not running")?.send(line).map_err(|_| "MCP server is not running".to_string())
+        i.tx.as_ref()
+            .ok_or("MCP server is not running")?
+            .send(line)
+            .map_err(|_| "MCP server is not running".to_string())
     }
 
     fn send_notification(&self, method: &str, params: Option<Value>) -> Result<(), String> {
@@ -712,7 +800,14 @@ impl Server {
         self.write(&msg)
     }
 
-    fn send_request(&self, method: &str, params: Option<Value>, timeout: Duration, starting: bool, key: Option<&str>) -> Result<Value, String> {
+    fn send_request(
+        &self,
+        method: &str,
+        params: Option<Value>,
+        timeout: Duration,
+        starting: bool,
+        key: Option<&str>,
+    ) -> Result<Value, String> {
         let (id, rx) = {
             let mut i = lock(&self.inner);
             let ok = i.state == State::Running || (starting && i.state == State::Starting);
@@ -754,8 +849,14 @@ impl Server {
             Ok(r) => r,
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 lock(&self.inner).pending.remove(&id);
-                let _ = self.send_notification("notifications/cancelled", Some(json!({ "requestId": id, "reason": "timeout" })));
-                Err(format!("MCP request {method} timed out after {} s", timeout.as_secs_f32().round()))
+                let _ = self.send_notification(
+                    "notifications/cancelled",
+                    Some(json!({ "requestId": id, "reason": "timeout" })),
+                );
+                Err(format!(
+                    "MCP request {method} timed out after {} s",
+                    timeout.as_secs_f32().round()
+                ))
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => Err("MCP server exited".into()),
         }
@@ -771,16 +872,26 @@ impl Server {
             };
             match state {
                 State::Running => return Ok(()),
-                State::Starting | State::Restarting if Instant::now() < end => std::thread::sleep(Duration::from_millis(25)),
+                State::Starting | State::Restarting if Instant::now() < end => {
+                    std::thread::sleep(Duration::from_millis(25))
+                }
                 State::Error => return Err(err.unwrap_or_else(|| "MCP server failed".into())),
                 s => return Err(format!("MCP server is {}", s.name())),
             }
         }
     }
 
-    pub fn request(&self, method: &str, params: Option<Value>, timeout_ms: Option<u64>, key: Option<&str>) -> Result<Value, String> {
+    pub fn request(
+        &self,
+        method: &str,
+        params: Option<Value>,
+        timeout_ms: Option<u64>,
+        key: Option<&str>,
+    ) -> Result<Value, String> {
         self.wait_ready(Duration::from_secs(45))?;
-        let ms = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).clamp(100, MAX_TIMEOUT_MS);
+        let ms = timeout_ms
+            .unwrap_or(DEFAULT_TIMEOUT_MS)
+            .clamp(100, MAX_TIMEOUT_MS);
         self.send_request(method, params, Duration::from_millis(ms), false, key)
     }
 
@@ -807,7 +918,10 @@ impl Server {
             }
         };
         if let Some(id) = id {
-            let _ = self.send_notification("notifications/cancelled", Some(json!({ "requestId": id, "reason": "cancelled by the user" })));
+            let _ = self.send_notification(
+                "notifications/cancelled",
+                Some(json!({ "requestId": id, "reason": "cancelled by the user" })),
+            );
         }
     }
 }
@@ -820,17 +934,26 @@ pub struct Mcp {
 
 impl Mcp {
     pub fn new(notify: Notifier) -> Self {
-        Mcp { servers: Mutex::new(HashMap::new()), notify }
+        Mcp {
+            servers: Mutex::new(HashMap::new()),
+            notify,
+        }
     }
 
     fn get(&self, id: &str) -> Result<Arc<Server>, String> {
-        lock(&self.servers).get(id).cloned().ok_or_else(|| format!("unknown MCP server {id}"))
+        lock(&self.servers)
+            .get(id)
+            .cloned()
+            .ok_or_else(|| format!("unknown MCP server {id}"))
     }
 
     /// Starts the server if needed (restarting it when the spec changed) and returns its status once it runs.
     pub fn ensure(&self, id: &str, spec: Spec) -> Result<Status, String> {
         validate_spec(&spec)?;
-        let server = lock(&self.servers).entry(id.to_string()).or_insert_with(|| Server::new(id, spec.clone(), self.notify.clone())).clone();
+        let server = lock(&self.servers)
+            .entry(id.to_string())
+            .or_insert_with(|| Server::new(id, spec.clone(), self.notify.clone()))
+            .clone();
         let changed = lock(&server.inner).spec != spec;
         if changed {
             server.kill_current(State::Stopped, None);
@@ -848,7 +971,14 @@ impl Mcp {
         Ok(server.status())
     }
 
-    pub fn request(&self, id: &str, method: &str, params: Option<Value>, timeout_ms: Option<u64>, key: Option<&str>) -> Result<Value, String> {
+    pub fn request(
+        &self,
+        id: &str,
+        method: &str,
+        params: Option<Value>,
+        timeout_ms: Option<u64>,
+        key: Option<&str>,
+    ) -> Result<Value, String> {
         self.get(id)?.request(method, params, timeout_ms, key)
     }
 
@@ -864,7 +994,11 @@ impl Mcp {
     }
 
     pub fn stop(&self, id: &str, forget: bool) {
-        let server = if forget { lock(&self.servers).remove(id) } else { lock(&self.servers).get(id).cloned() };
+        let server = if forget {
+            lock(&self.servers).remove(id)
+        } else {
+            lock(&self.servers).get(id).cloned()
+        };
         if let Some(s) = server {
             s.kill_current(State::Stopped, None);
         }
@@ -882,7 +1016,10 @@ impl Mcp {
     /// Stops every server in parallel (app exit).
     pub fn shutdown(&self) {
         let list: Vec<Arc<Server>> = lock(&self.servers).drain().map(|(_, s)| s).collect();
-        let handles: Vec<_> = list.into_iter().map(|s| std::thread::spawn(move || s.kill_current(State::Stopped, None))).collect();
+        let handles: Vec<_> = list
+            .into_iter()
+            .map(|s| std::thread::spawn(move || s.kill_current(State::Stopped, None)))
+            .collect();
         for h in handles {
             let _ = h.join();
         }
@@ -905,8 +1042,12 @@ pub fn shutdown(app: &tauri::AppHandle) {
     }
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn app_mcp(app: &tauri::AppHandle) -> tauri::State<'_, Mcp> {
@@ -920,8 +1061,18 @@ pub async fn mcp_start(app: tauri::AppHandle, id: String, spec: Spec) -> Result<
 }
 
 #[tauri::command]
-pub async fn mcp_request(app: tauri::AppHandle, id: String, method: String, params: Option<Value>, timeout_ms: Option<u64>, request_key: Option<String>) -> Result<Value, String> {
-    blocking(move || app_mcp(&app).request(&id, &method, params, timeout_ms, request_key.as_deref())).await
+pub async fn mcp_request(
+    app: tauri::AppHandle,
+    id: String,
+    method: String,
+    params: Option<Value>,
+    timeout_ms: Option<u64>,
+    request_key: Option<String>,
+) -> Result<Value, String> {
+    blocking(move || {
+        app_mcp(&app).request(&id, &method, params, timeout_ms, request_key.as_deref())
+    })
+    .await
 }
 
 /// Cancels the request started with `request_key` (see `Server::cancel`).
@@ -931,12 +1082,21 @@ pub fn mcp_cancel(app: tauri::AppHandle, id: String, request_key: String) {
 }
 
 #[tauri::command]
-pub async fn mcp_notify(app: tauri::AppHandle, id: String, method: String, params: Option<Value>) -> Result<(), String> {
+pub async fn mcp_notify(
+    app: tauri::AppHandle,
+    id: String,
+    method: String,
+    params: Option<Value>,
+) -> Result<(), String> {
     blocking(move || app_mcp(&app).notify(&id, &method, params)).await
 }
 
 #[tauri::command]
-pub async fn mcp_stop(app: tauri::AppHandle, id: String, forget: Option<bool>) -> Result<(), String> {
+pub async fn mcp_stop(
+    app: tauri::AppHandle,
+    id: String,
+    forget: Option<bool>,
+) -> Result<(), String> {
     blocking(move || {
         app_mcp(&app).stop(&id, forget.unwrap_or(false));
         Ok(())
@@ -959,7 +1119,10 @@ mod tests {
     use super::*;
 
     fn fixture() -> String {
-        format!("{}/../tests/fixtures/fake-mcp-server.mjs", env!("CARGO_MANIFEST_DIR"))
+        format!(
+            "{}/../tests/fixtures/fake-mcp-server.mjs",
+            env!("CARGO_MANIFEST_DIR")
+        )
     }
 
     fn node() -> Option<String> {
@@ -970,21 +1133,46 @@ mod tests {
         let node = node()?;
         let mut args = vec![fixture()];
         args.extend(extra.iter().map(|s| s.to_string()));
-        Some(Spec { command: node, args, env: HashMap::from([("FAKE_SECRET".to_string(), "s3cret".to_string())]), cwd: None })
+        Some(Spec {
+            command: node,
+            args,
+            env: HashMap::from([("FAKE_SECRET".to_string(), "s3cret".to_string())]),
+            cwd: None,
+        })
     }
 
     fn mcp() -> (Mcp, Arc<Mutex<Vec<String>>>) {
         let events = Arc::new(Mutex::new(Vec::new()));
         let e = events.clone();
-        (Mcp::new(Arc::new(move |id: &str, kind: &str| lock(&e).push(format!("{id}:{kind}")))), events)
+        (
+            Mcp::new(Arc::new(move |id: &str, kind: &str| {
+                lock(&e).push(format!("{id}:{kind}"))
+            })),
+            events,
+        )
     }
 
-    fn call(m: &Mcp, id: &str, tool: &str, args: Value, timeout: Option<u64>) -> Result<Value, String> {
-        m.request(id, "tools/call", Some(json!({ "name": tool, "arguments": args })), timeout, None)
+    fn call(
+        m: &Mcp,
+        id: &str,
+        tool: &str,
+        args: Value,
+        timeout: Option<u64>,
+    ) -> Result<Value, String> {
+        m.request(
+            id,
+            "tools/call",
+            Some(json!({ "name": tool, "arguments": args })),
+            timeout,
+            None,
+        )
     }
 
     fn status(m: &Mcp, id: &str) -> Status {
-        m.statuses().into_iter().find(|s| s.id == id).expect("server status")
+        m.statuses()
+            .into_iter()
+            .find(|s| s.id == id)
+            .expect("server status")
     }
 
     fn wait_for(limit_ms: u64, mut f: impl FnMut() -> bool) -> bool {
@@ -1002,53 +1190,106 @@ mod tests {
     fn bounded_line_reader() {
         let data = b"{\"a\":1}\n\n{\"id\":7,\"result\":\"xxxxxxxxxxxxxxxxxxxx\"}\ntail";
         let mut r = BufReader::with_capacity(4, &data[..]);
-        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(b"{\"a\":1}".to_vec())));
+        assert_eq!(
+            read_line_bounded(&mut r, 30).unwrap(),
+            Some(Ok(b"{\"a\":1}".to_vec()))
+        );
         assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(Vec::new())));
         match read_line_bounded(&mut r, 30).unwrap() {
             Some(Err(prefix)) => assert!(String::from_utf8_lossy(&prefix).starts_with("{\"id\":7")),
             other => panic!("expected an oversized line, got {other:?}"),
         }
-        assert_eq!(read_line_bounded(&mut r, 30).unwrap(), Some(Ok(b"tail".to_vec())));
+        assert_eq!(
+            read_line_bounded(&mut r, 30).unwrap(),
+            Some(Ok(b"tail".to_vec()))
+        );
         assert_eq!(read_line_bounded(&mut r, 30).unwrap(), None);
     }
 
     #[cfg(unix)]
     #[test]
     fn spec_validation_and_command_lookup() {
-        assert!(validate_spec(&Spec { command: " ".into(), ..Default::default() }).is_err());
-        assert!(validate_spec(&Spec { command: "x".into(), env: HashMap::from([("A=B".into(), "1".into())]), ..Default::default() }).is_err());
-        assert!(validate_spec(&Spec { command: "x".into(), args: vec!["a\0b".into()], ..Default::default() }).is_err());
-        assert!(validate_spec(&Spec { command: "npx".into(), args: vec!["-y".into(), "pkg".into()], ..Default::default() }).is_ok());
+        assert!(validate_spec(&Spec {
+            command: " ".into(),
+            ..Default::default()
+        })
+        .is_err());
+        assert!(validate_spec(&Spec {
+            command: "x".into(),
+            env: HashMap::from([("A=B".into(), "1".into())]),
+            ..Default::default()
+        })
+        .is_err());
+        assert!(validate_spec(&Spec {
+            command: "x".into(),
+            args: vec!["a\0b".into()],
+            ..Default::default()
+        })
+        .is_err());
+        assert!(validate_spec(&Spec {
+            command: "npx".into(),
+            args: vec!["-y".into(), "pkg".into()],
+            ..Default::default()
+        })
+        .is_ok());
         assert_eq!(resolve_command("/bin/echo", "").unwrap(), "/bin/echo");
-        assert_eq!(resolve_command("sh", "/nonexistent:/bin").unwrap(), "/bin/sh");
+        assert_eq!(
+            resolve_command("sh", "/nonexistent:/bin").unwrap(),
+            "/bin/sh"
+        );
         assert!(resolve_command("definitely-not-a-command-xyz", "/bin").is_err());
     }
 
     #[test]
     fn handshake_list_call_and_notifications() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, events) = mcp();
         let st = m.ensure("a", spec.clone()).unwrap();
         assert_eq!(st.state, "running");
         assert_eq!(st.init.as_ref().unwrap()["serverInfo"]["name"], "fake");
-        assert_eq!(st.init.as_ref().unwrap()["protocolVersion"], PROTOCOL_VERSION);
+        assert_eq!(
+            st.init.as_ref().unwrap()["protocolVersion"],
+            PROTOCOL_VERSION
+        );
         // A second ensure with the same spec reuses the process.
         assert_eq!(m.ensure("a", spec.clone()).unwrap().pid, st.pid);
 
         let tools = m.request("a", "tools/list", None, None, None).unwrap();
-        let names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+        let names: Vec<&str> = tools["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap())
+            .collect();
         assert!(names.contains(&"echo") && names.contains(&"sleep"));
-        assert_eq!(call(&m, "a", "echo", json!({ "text": "hi" }), None).unwrap()["content"][0]["text"], "hi");
+        assert_eq!(
+            call(&m, "a", "echo", json!({ "text": "hi" }), None).unwrap()["content"][0]["text"],
+            "hi"
+        );
         // Environment from the spec reaches the server (secrets are passed this way).
-        assert_eq!(call(&m, "a", "env", json!({ "name": "FAKE_SECRET" }), None).unwrap()["content"][0]["text"], "s3cret");
+        assert_eq!(
+            call(&m, "a", "env", json!({ "name": "FAKE_SECRET" }), None).unwrap()["content"][0]
+                ["text"],
+            "s3cret"
+        );
         // Unknown method: the JSON-RPC error comes back as an error.
-        assert!(m.request("a", "nope/nope", None, None, None).unwrap_err().contains("-32601"));
+        assert!(m
+            .request("a", "nope/nope", None, None, None)
+            .unwrap_err()
+            .contains("-32601"));
 
         let before = status(&m, "a").tools_epoch;
         call(&m, "a", "change", json!({}), None).unwrap();
         assert!(wait_for(2000, || status(&m, "a").tools_epoch == before + 1));
         assert!(lock(&events).iter().any(|e| e == "a:tools_changed"));
-        assert!(m.logs("a").iter().any(|l| l.contains("fake server started")), "stderr is captured");
+        assert!(
+            m.logs("a")
+                .iter()
+                .any(|l| l.contains("fake server started")),
+            "stderr is captured"
+        );
 
         m.stop("a", false);
         assert_eq!(status(&m, "a").state, "stopped");
@@ -1065,7 +1306,9 @@ mod tests {
 
     #[test]
     fn timeouts_and_oversized_responses() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, _) = mcp();
         m.ensure("t", spec).unwrap();
         let t = Instant::now();
@@ -1073,22 +1316,33 @@ mod tests {
         assert!(err.contains("timed out"), "{err}");
         assert!(t.elapsed() < Duration::from_secs(3));
         // The server is still usable after a timeout.
-        assert_eq!(call(&m, "t", "echo", json!({ "text": "ok" }), None).unwrap()["content"][0]["text"], "ok");
+        assert_eq!(
+            call(&m, "t", "echo", json!({ "text": "ok" }), None).unwrap()["content"][0]["text"],
+            "ok"
+        );
         let err = call(&m, "t", "big", json!({}), Some(20_000)).unwrap_err();
         assert!(err.contains("exceeded"), "{err}");
-        assert_eq!(call(&m, "t", "echo", json!({ "text": "after" }), None).unwrap()["content"][0]["text"], "after");
+        assert_eq!(
+            call(&m, "t", "echo", json!({ "text": "after" }), None).unwrap()["content"][0]["text"],
+            "after"
+        );
         m.shutdown();
     }
 
     #[test]
     fn crash_restarts_with_backoff() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, _) = mcp();
         let pid = m.ensure("c", spec).unwrap().pid;
         let err = call(&m, "c", "crash", json!({}), None).unwrap_err();
         assert!(err.contains("exited"), "{err}");
         // A request waits for the restart instead of failing.
-        assert_eq!(call(&m, "c", "echo", json!({ "text": "back" }), None).unwrap()["content"][0]["text"], "back");
+        assert_eq!(
+            call(&m, "c", "echo", json!({ "text": "back" }), None).unwrap()["content"][0]["text"],
+            "back"
+        );
         let st = status(&m, "c");
         assert_eq!(st.state, "running");
         assert_eq!(st.restarts, 1);
@@ -1099,31 +1353,53 @@ mod tests {
 
     #[test]
     fn repeated_crashes_end_in_error() {
-        let Some(spec) = spec(&["--exit-after-init"]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&["--exit-after-init"]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, _) = mcp();
         let _ = m.ensure("x", spec);
-        assert!(wait_for(20_000, || status(&m, "x").state == "error"), "{:?}", m.statuses());
+        assert!(
+            wait_for(20_000, || status(&m, "x").state == "error"),
+            "{:?}",
+            m.statuses()
+        );
         let st = status(&m, "x");
-        assert!(st.error.unwrap_or_default().contains("crashed"), "{:?}", m.logs("x"));
+        assert!(
+            st.error.unwrap_or_default().contains("crashed"),
+            "{:?}",
+            m.logs("x")
+        );
         m.shutdown();
     }
 
     #[test]
     fn handshake_failures_and_stop_during_start() {
-        let Some(spec) = spec(&["--no-init"]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&["--no-init"]) else {
+            return eprintln!("node not found; skipping");
+        };
         let m = Arc::new(mcp().0);
-        let quick = Spec { command: node().unwrap(), args: vec!["-e".into(), "process.exit(2)".into()], ..Default::default() };
+        let quick = Spec {
+            command: node().unwrap(),
+            args: vec!["-e".into(), "process.exit(2)".into()],
+            ..Default::default()
+        };
         let err = m.ensure("q", quick).unwrap_err();
         assert!(err.contains("handshake failed"), "{err}");
         assert_eq!(status(&m, "q").state, "error");
-        let missing = Spec { command: "no-such-mcp-binary-xyz".into(), ..Default::default() };
+        let missing = Spec {
+            command: "no-such-mcp-binary-xyz".into(),
+            ..Default::default()
+        };
         assert!(m.ensure("m", missing).unwrap_err().contains("not found"));
         assert_eq!(status(&m, "m").state, "error");
         // A server that never answers initialize can be stopped while the start waits.
         let started = Instant::now();
         let m2 = m.clone();
         let h = std::thread::spawn(move || m2.ensure("n", spec));
-        assert!(wait_for(5000, || m.statuses().iter().any(|s| s.id == "n" && s.state == "starting")));
+        assert!(wait_for(5000, || m
+            .statuses()
+            .iter()
+            .any(|s| s.id == "n" && s.state == "starting")));
         m.stop("n", false);
         assert!(h.join().unwrap().is_err());
         assert!(started.elapsed() < Duration::from_secs(10));
@@ -1133,38 +1409,83 @@ mod tests {
 
     #[test]
     fn cancel_returns_at_once_notifies_the_server_and_drops_the_late_answer() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, _) = mcp();
         m.ensure("c", spec).unwrap();
         let m = Arc::new(m);
         let worker = {
             let m = m.clone();
-            std::thread::spawn(move || m.request("c", "tools/call", Some(json!({ "name": "slow", "arguments": { "ms": 700 } })), Some(20_000), Some("k1")))
+            std::thread::spawn(move || {
+                m.request(
+                    "c",
+                    "tools/call",
+                    Some(json!({ "name": "slow", "arguments": { "ms": 700 } })),
+                    Some(20_000),
+                    Some("k1"),
+                )
+            })
         };
-        assert!(wait_for(2000, || lock(&m.get("c").unwrap().inner).keys.contains_key("k1")));
+        assert!(wait_for(2000, || lock(&m.get("c").unwrap().inner)
+            .keys
+            .contains_key("k1")));
         let t = Instant::now();
         m.cancel("c", "k1");
         let err = worker.join().unwrap().unwrap_err();
         assert_eq!(err, CANCELLED);
-        assert!(t.elapsed() < Duration::from_millis(500), "cancel must not wait for the server");
-        assert!(wait_for(3000, || m.logs("c").iter().any(|l| l.contains("cancelled 2"))), "server was not told: {:?}", m.logs("c"));
+        assert!(
+            t.elapsed() < Duration::from_millis(500),
+            "cancel must not wait for the server"
+        );
+        assert!(
+            wait_for(3000, || m
+                .logs("c")
+                .iter()
+                .any(|l| l.contains("cancelled 2"))),
+            "server was not told: {:?}",
+            m.logs("c")
+        );
         // Let the late answer arrive: it must be dropped, and the server stays usable.
         std::thread::sleep(Duration::from_millis(900));
         assert!(lock(&m.get("c").unwrap().inner).pending.is_empty());
-        assert_eq!(call(&m, "c", "echo", json!({ "text": "after" }), None).unwrap()["content"][0]["text"], "after");
+        assert_eq!(
+            call(&m, "c", "echo", json!({ "text": "after" }), None).unwrap()["content"][0]["text"],
+            "after"
+        );
         m.shutdown();
     }
 
     #[test]
     fn cancel_before_the_request_arrives_wins() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, _) = mcp();
         m.ensure("e", spec).unwrap();
         m.cancel("e", "early");
-        let err = m.request("e", "tools/call", Some(json!({ "name": "echo", "arguments": { "text": "x" } })), None, Some("early")).unwrap_err();
+        let err = m
+            .request(
+                "e",
+                "tools/call",
+                Some(json!({ "name": "echo", "arguments": { "text": "x" } })),
+                None,
+                Some("early"),
+            )
+            .unwrap_err();
         assert_eq!(err, CANCELLED);
         // Only that one request was affected.
-        assert_eq!(m.request("e", "tools/call", Some(json!({ "name": "echo", "arguments": { "text": "y" } })), None, Some("other")).unwrap()["content"][0]["text"], "y");
+        assert_eq!(
+            m.request(
+                "e",
+                "tools/call",
+                Some(json!({ "name": "echo", "arguments": { "text": "y" } })),
+                None,
+                Some("other")
+            )
+            .unwrap()["content"][0]["text"],
+            "y"
+        );
         // Cancelling something that already finished is harmless.
         m.cancel("e", "other");
         m.shutdown();
@@ -1172,7 +1493,9 @@ mod tests {
 
     #[test]
     fn resource_and_prompt_list_changes_bump_their_epochs() {
-        let Some(spec) = spec(&[]) else { return eprintln!("node not found; skipping") };
+        let Some(spec) = spec(&[]) else {
+            return eprintln!("node not found; skipping");
+        };
         let (m, events) = mcp();
         m.ensure("n", spec).unwrap();
         call(&m, "n", "changeall", json!({}), None).unwrap();
@@ -1181,7 +1504,11 @@ mod tests {
             s.tools_epoch == 1 && s.resources_epoch == 1 && s.prompts_epoch == 1
         }));
         let ev = lock(&events).clone();
-        assert!(ev.contains(&"n:resources_changed".to_string()) && ev.contains(&"n:prompts_changed".to_string()), "{ev:?}");
+        assert!(
+            ev.contains(&"n:resources_changed".to_string())
+                && ev.contains(&"n:prompts_changed".to_string()),
+            "{ev:?}"
+        );
         m.shutdown();
     }
 }

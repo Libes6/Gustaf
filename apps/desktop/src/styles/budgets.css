@@ -6,7 +6,7 @@
 .budget-alert {
   pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
   background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); font-size: 12.5px;
+  box-shadow: var(--shadow-sm); font-size: calc(12.5px * var(--ui-scale, 1));
 }
 .budget-alert.warning { border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .budget-alert.exceeded { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
@@ -20,6 +20,6 @@
 .budget-state { margin-top: 3px; }
 .budget-state.warning { color: var(--warn); }
 .budget-state.exceeded { color: var(--red); }
-.budget-error { color: var(--red); font-size: 12.5px; margin-top: 3px; }
+.budget-error { color: var(--red); font-size: calc(12.5px * var(--ui-scale, 1)); margin-top: 3px; }
 .input.budget-input { width: 150px; height: 30px; flex: none; text-align: right; }
 .input.budget-input[aria-invalid="true"] { border-color: var(--red); }

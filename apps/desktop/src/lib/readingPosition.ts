@@ -4,7 +4,13 @@ const KEY = "gustaf-reading";
 const LIMIT = 200;
 
 type Positions = Record<string, number>;
-const read = (): Positions => { try { return JSON.parse(localStorage.getItem(KEY) ?? "{}") ?? {}; } catch { return {}; } };
+const read = (): Positions => {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+};
 
 /** Pixels from the bottom when the chat was last left, or null (at the end / never opened). */
 export function savedPosition(chatId: number): number | null {
@@ -20,5 +26,7 @@ export function savePosition(chatId: number, fromBottom: number) {
     const keys = Object.keys(all);
     for (const k of keys.slice(0, Math.max(0, keys.length - LIMIT))) delete all[k];
     localStorage.setItem(KEY, JSON.stringify(all));
-  } catch { /* storage unavailable */ }
+  } catch {
+    /* storage unavailable */
+  }
 }

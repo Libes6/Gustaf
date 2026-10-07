@@ -2,7 +2,20 @@
 // `Mcp-Session-Id` and `MCP-Protocol-Version` headers, re-initializes once when the session expired (404).
 // `fetch` is injected (the app passes Tauri's HTTP plugin; tests pass a fake), so this file has no Tauri imports.
 import { SIGN_IN_NEEDED } from "./oauth";
-import { answerServerRequest, checkInitialize, encode, errorText, initializeParams, MAX_MESSAGE_BYTES, notification, parseBody, request, SseDecoder, type Parsed, type RpcId } from "./protocol";
+import {
+  answerServerRequest,
+  checkInitialize,
+  encode,
+  errorText,
+  initializeParams,
+  MAX_MESSAGE_BYTES,
+  notification,
+  parseBody,
+  request,
+  SseDecoder,
+  type Parsed,
+  type RpcId,
+} from "./protocol";
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 export type InitInfo = ReturnType<typeof checkInitialize>;
@@ -35,9 +48,17 @@ export class HttpStatusError extends Error {
  * What the runtime needs from a remote transport: streamable HTTP (`McpHttpClient`) and the legacy HTTP+SSE transport
  * (`McpSseClient`, sse.ts) both provide it.
  */
-export type RemoteClient = Pick<McpHttpClient, "connect" | "request" | "close" | "info" | "toolsEpoch" | "resourcesEpoch" | "promptsEpoch">;
+export type RemoteClient = Pick<
+  McpHttpClient,
+  "connect" | "request" | "close" | "info" | "toolsEpoch" | "resourcesEpoch" | "promptsEpoch"
+>;
 /** Statuses of the initialize POST after which the server is probed as a legacy SSE server (not auth, rate limit or timeout answers). */
-export const isLegacySseHint = (e: unknown): e is HttpStatusError => e instanceof HttpStatusError && e.initialize && e.status >= 400 && e.status < 500 && ![401, 403, 408, 429].includes(e.status);
+export const isLegacySseHint = (e: unknown): e is HttpStatusError =>
+  e instanceof HttpStatusError &&
+  e.initialize &&
+  e.status >= 400 &&
+  e.status < 500 &&
+  ![401, 403, 408, 429].includes(e.status);
 export const abortError = () => new DOMException("Aborted", "AbortError");
 
 export async function readText(res: Response, max: number): Promise<string> {
@@ -79,7 +100,10 @@ export class McpHttpClient {
   /** Runs the initialize handshake once; a failure lets the next call try again. */
   connect(timeoutMs = 30_000): Promise<InitInfo> {
     this.connecting ??= (async () => {
-      const result = await this.post(request(this.nextId++, "initialize", initializeParams(this.o.clientVersion ?? "0")), timeoutMs).catch((e) => {
+      const result = await this.post(
+        request(this.nextId++, "initialize", initializeParams(this.o.clientVersion ?? "0")),
+        timeoutMs,
+      ).catch((e) => {
         if (e instanceof HttpStatusError) e.initialize = true;
         throw e;
       });
@@ -115,7 +139,10 @@ export class McpHttpClient {
     this.connecting = undefined;
     this.session = undefined;
     if (!session) return;
-    await this.o.fetch(this.o.url, { method: "DELETE", headers: { ...this.o.headers, "Mcp-Session-Id": session } }).then((r) => r.body?.cancel()).catch(() => {});
+    await this.o
+      .fetch(this.o.url, { method: "DELETE", headers: { ...this.o.headers, "Mcp-Session-Id": session } })
+      .then((r) => r.body?.cancel())
+      .catch(() => {});
   }
 
   private handle(p: Parsed) {
@@ -143,7 +170,10 @@ export class McpHttpClient {
       const fire = () => {
         if (expect !== undefined && msg.method !== "initialize" && this.session) {
           // Best effort and not awaited; the caller must not wait for the server.
-          this.postOnce(notification("notifications/cancelled", { requestId: expect, reason: "cancelled by the user" }), 5_000).catch(() => {});
+          this.postOnce(
+            notification("notifications/cancelled", { requestId: expect, reason: "cancelled by the user" }),
+            5_000,
+          ).catch(() => {});
         }
         reject(abortError());
       };
@@ -160,7 +190,11 @@ export class McpHttpClient {
   }
 
   /** `postOnce`, and after a 401 (OAuth only) one retry with a refreshed token. */
-  private async postAuthorized(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  private async postAuthorized(
+    msg: { id?: RpcId; method?: string },
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     try {
       return await this.postOnce(msg, timeoutMs, signal);
     } catch (e) {
@@ -175,7 +209,11 @@ export class McpHttpClient {
     }
   }
 
-  private async postOnce(msg: { id?: RpcId; method?: string }, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  private async postOnce(
+    msg: { id?: RpcId; method?: string },
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     const ctl = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -207,7 +245,10 @@ export class McpHttpClient {
       }
       if (!res.ok) {
         const text = (await readText(res, 64 * 1024).catch(() => "")).slice(0, 500);
-        throw new HttpStatusError(res.status, `MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`);
+        throw new HttpStatusError(
+          res.status,
+          `MCP server answered HTTP ${res.status}${res.status === 401 || res.status === 403 ? " (check the authorization headers)" : ""}${text ? `: ${text}` : ""}`,
+        );
       }
       const sid = res.headers.get("mcp-session-id");
       if (sid && msg.method === "initialize") this.session = sid.slice(0, 1024);

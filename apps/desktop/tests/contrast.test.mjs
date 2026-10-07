@@ -2,7 +2,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { accentVars, contrastRatio, focusRingColor, ACCENT_PRESETS, DEFAULT_ACCENT, MIN_TEXT_CONTRAST, MIN_UI_CONTRAST } from '../src/lib/themeUtil.ts';
+import {
+  accentVars,
+  contrastRatio,
+  focusRingColor,
+  ACCENT_PRESETS,
+  DEFAULT_ACCENT,
+  MIN_TEXT_CONTRAST,
+  MIN_UI_CONTRAST,
+} from '../src/lib/themeUtil.ts';
 
 const css = fs.readFileSync(new URL('../src/styles/theme.css', import.meta.url), 'utf8');
 const block = (sel) => {
@@ -10,7 +18,8 @@ const block = (sel) => {
   assert.ok(i >= 0, `${sel} block missing`);
   return css.slice(i, css.indexOf('}', i));
 };
-const vars = (b) => Object.fromEntries([...b.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{3,6})\s*;/g)].map((m) => [m[1], m[2]]));
+const vars = (b) =>
+  Object.fromEntries([...b.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{3,6})\s*;/g)].map((m) => [m[1], m[2]]));
 const dark = vars(block(':root'));
 const themes = {
   dark: { ...dark, ...accentVars(DEFAULT_ACCENT, 'dark') },
@@ -18,19 +27,35 @@ const themes = {
 };
 
 const SURFACES = ['--bg', '--bg-side', '--bg-elev', '--bg-input', '--bg-hover', '--bg-code'];
-const TEXTS = ['--text', '--text-2', '--text-3', '--accent-soft', '--green', '--red', '--warn', '--error-fg', '--diff-add-fg', '--diff-del-fg', '--diff-hunk'];
+const TEXTS = [
+  '--text',
+  '--text-2',
+  '--text-3',
+  '--accent-soft',
+  '--green',
+  '--red',
+  '--warn',
+  '--error-fg',
+  '--diff-add-fg',
+  '--diff-del-fg',
+  '--diff-hunk',
+];
 const CODE_TEXTS = ['--hl-comment', '--hl-keyword', '--hl-string', '--hl-number', '--hl-title', '--hl-type'];
 const PAIRS = [
-  ['--on-accent', '--accent-soft'], ['--bubble-fg', '--bubble'], ['--btn-primary-fg', '--btn-primary-bg'], ['--badge-fg', '--badge-bg'],
+  ['--on-accent', '--accent-soft'],
+  ['--bubble-fg', '--bubble'],
+  ['--btn-primary-fg', '--btn-primary-bg'],
+  ['--badge-fg', '--badge-bg'],
 ];
 
 for (const [name, v] of Object.entries(themes)) {
   test(`${name}: text tokens reach ${MIN_TEXT_CONTRAST}:1 on the main surfaces`, () => {
-    for (const fg of TEXTS) for (const bg of SURFACES) {
-      assert.ok(v[fg] && v[bg], `${fg} / ${bg} defined`);
-      const r = contrastRatio(v[fg], v[bg]);
-      assert.ok(r >= MIN_TEXT_CONTRAST, `${name}: ${fg} ${v[fg]} on ${bg} ${v[bg]} is ${r.toFixed(2)}`);
-    }
+    for (const fg of TEXTS)
+      for (const bg of SURFACES) {
+        assert.ok(v[fg] && v[bg], `${fg} / ${bg} defined`);
+        const r = contrastRatio(v[fg], v[bg]);
+        assert.ok(r >= MIN_TEXT_CONTRAST, `${name}: ${fg} ${v[fg]} on ${bg} ${v[bg]} is ${r.toFixed(2)}`);
+      }
     for (const fg of CODE_TEXTS) {
       const r = contrastRatio(v[fg], v['--bg-code']);
       assert.ok(r >= MIN_TEXT_CONTRAST, `${name}: ${fg} on --bg-code is ${r.toFixed(2)}`);

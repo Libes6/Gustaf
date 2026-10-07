@@ -11,14 +11,17 @@ export const MAX_PR_TITLE_CHARS = 256;
 export const MAX_PR_BODY_CHARS = 20_000;
 
 /** Same list as the backend, which enforces it too: pushing these needs an explicit confirmation. */
-export const isProtectedBranch = (name: string | null | undefined): boolean => !!name && (PROTECTED_BRANCHES as readonly string[]).includes(name);
+export const isProtectedBranch = (name: string | null | undefined): boolean =>
+  !!name && (PROTECTED_BRANCHES as readonly string[]).includes(name);
 
 export type ParsedRemote = { host: string; owner: string; repo: string; protocol: "https" | "ssh" | "git" };
 
 /** `https://host/owner/repo(.git)`, `git@host:owner/repo(.git)`, `ssh://git@host[:port]/owner/repo` or `git://...`; credentials never kept. */
 export function parseRemoteUrl(raw: string): ParsedRemote | null {
   const url = raw.trim();
-  let host = "", path = "", protocol: ParsedRemote["protocol"] = "https";
+  let host = "",
+    path = "",
+    protocol: ParsedRemote["protocol"] = "https";
   const scp = /^(?:[\w.-]+@)?([\w.-]+):(?!\/\/)([^\s]+)$/.exec(url);
   const schemed = /^(https?|ssh|git):\/\/(?:[^/@\s]*@)?([\w.-]+)(?::\d+)?\/([^\s]+)$/i.exec(url);
   if (schemed) {
@@ -31,7 +34,11 @@ export function parseRemoteUrl(raw: string): ParsedRemote | null {
     host = scp[1];
     path = scp[2];
   } else return null;
-  const parts = path.replace(/\/+$/, "").replace(/\.git$/, "").split("/").filter(Boolean);
+  const parts = path
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "")
+    .split("/")
+    .filter(Boolean);
   if (parts.length < 2) return null;
   const repo = parts[parts.length - 1];
   const owner = parts.slice(0, -1).join("/");
@@ -46,11 +53,20 @@ export const isGithubRemote = (url: string): boolean => parseRemoteUrl(url)?.hos
 export function chooseRemote(info: PublishInfo): string | null {
   const fromUpstream = info.upstream && info.remotes.find((r) => info.upstream!.startsWith(`${r.name}/`));
   if (fromUpstream) return fromUpstream.name;
-  return info.remotes.find((r) => r.name === "origin")?.name ?? (info.remotes.length === 1 ? info.remotes[0].name : null);
+  return (
+    info.remotes.find((r) => r.name === "origin")?.name ?? (info.remotes.length === 1 ? info.remotes[0].name : null)
+  );
 }
 
 export type PushProblem = "noRepo" | "detached" | "noCommits" | "noRemote" | null;
-export type PushPlan = { problem: PushProblem; remote: string | null; branch: string | null; setUpstream: boolean; needsConfirm: boolean; upToDate: boolean };
+export type PushPlan = {
+  problem: PushProblem;
+  remote: string | null;
+  branch: string | null;
+  setUpstream: boolean;
+  needsConfirm: boolean;
+  upToDate: boolean;
+};
 
 /** What a click on Push would do. `needsConfirm` is true for protected branches (the UI asks and offers a new branch). */
 export function planPush(info: PublishInfo | null | undefined, remote?: string | null): PushPlan {
@@ -62,7 +78,9 @@ export function planPush(info: PublishInfo | null | undefined, remote?: string |
   if (!picked) return { problem: "noRemote", ...none, branch: info.branch };
   const upstreamHere = !!info.upstream && info.upstream.startsWith(`${picked}/`);
   return {
-    problem: null, remote: picked, branch: info.branch,
+    problem: null,
+    remote: picked,
+    branch: info.branch,
     setUpstream: !upstreamHere,
     needsConfirm: isProtectedBranch(info.branch),
     upToDate: upstreamHere && info.ahead === 0,
@@ -72,18 +90,29 @@ export function planPush(info: PublishInfo | null | undefined, remote?: string |
 /** Invoke parameters for `git_push`; the backend validates them again and has no force option. */
 export function pushArgs(plan: PushPlan, root: string, confirmedProtected: boolean) {
   if (plan.problem || !plan.remote || !plan.branch) throw new Error("Nothing to push");
-  return { root, remote: plan.remote, branch: plan.branch, setUpstream: plan.setUpstream, confirmProtected: plan.needsConfirm && confirmedProtected };
+  return {
+    root,
+    remote: plan.remote,
+    branch: plan.branch,
+    setUpstream: plan.setUpstream,
+    confirmProtected: plan.needsConfirm && confirmedProtected,
+  };
 }
 
 /** Command a user can run by hand when the app cannot do it. */
-export const manualPushCommand = (remote: string, branch: string, setUpstream: boolean) => `git push${setUpstream ? " -u" : ""} ${remote} ${branch}`;
-export const manualPrCommand = (base: string, head: string, draft: boolean) => `gh pr create --base ${base} --head ${head}${draft ? " --draft" : ""}`;
+export const manualPushCommand = (remote: string, branch: string, setUpstream: boolean) =>
+  `git push${setUpstream ? " -u" : ""} ${remote} ${branch}`;
+export const manualPrCommand = (base: string, head: string, draft: boolean) =>
+  `gh pr create --base ${base} --head ${head}${draft ? " --draft" : ""}`;
 
 /** `origin/main` -> `main` for the base selector of one remote; the branch being merged is not offered. */
 export function baseOptions(remoteBranches: string[], remote: string | null, head: string | null): string[] {
   if (!remote) return [];
   const prefix = `${remote}/`;
-  return remoteBranches.filter((b) => b.startsWith(prefix)).map((b) => b.slice(prefix.length)).filter((b) => b && b !== head);
+  return remoteBranches
+    .filter((b) => b.startsWith(prefix))
+    .map((b) => b.slice(prefix.length))
+    .filter((b) => b && b !== head);
 }
 
 /** Default base: the remote's HEAD branch, else `main`/`master`/`develop`, else the first option. */
@@ -92,9 +121,17 @@ export function defaultBase(options: string[], remoteHead?: string | null): stri
   return ["main", "master", "develop"].find((b) => options.includes(b)) ?? options[0] ?? "";
 }
 
-export type PrProblem = "ghMissing" | "ghSignedOut" | "noRemote" | "notPushed" | "noBase" | "sameBase" | "noTitle" | "titleTooLong" | null;
+export type PrProblem =
+  "ghMissing" | "ghSignedOut" | "noRemote" | "notPushed" | "noBase" | "sameBase" | "noTitle" | "titleTooLong" | null;
 
-export function prProblem(opts: { gh: GhStatus | null; remote: string | null; branch: string | null; base: string; title: string; pushed: boolean }): PrProblem {
+export function prProblem(opts: {
+  gh: GhStatus | null;
+  remote: string | null;
+  branch: string | null;
+  base: string;
+  title: string;
+  pushed: boolean;
+}): PrProblem {
   if (opts.gh && !opts.gh.installed) return "ghMissing";
   if (opts.gh && !opts.gh.authenticated) return "ghSignedOut";
   if (!opts.remote) return "noRemote";
@@ -128,7 +165,12 @@ export const PR_SYSTEM_PROMPT = [
 const clip = (text: string, max: number) => (text.length > max ? text.slice(0, max) : text);
 
 /** System prompt and JSON user message for the description; the diff is capped here again as a second line of defence. */
-export function buildPrPrompt(ctx: CommitContext, title: string, base: string, budget: number = MAX_DIFF_CHARS): { system: string; user: string } {
+export function buildPrPrompt(
+  ctx: CommitContext,
+  title: string,
+  base: string,
+  budget: number = MAX_DIFF_CHARS,
+): { system: string; user: string } {
   const limit = Math.max(MIN_DIFF_CHARS, Math.floor(budget));
   const cut = ctx.diff.length > limit;
   const user = JSON.stringify({
@@ -154,19 +196,34 @@ const HTML = /<!--[\s\S]*?-->|<\/?(?:script|style|iframe|object|embed|img|svg|fo
 
 /** Cleans a model reply into a pull request description: no reasoning, ANSI/control characters, wrapping fence, preamble or raw HTML; bounded. */
 export function sanitizePrBody(raw: string): string {
-  let text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(ANSI, "").replace(THINKING, "").replace(CONTROL, "").trim();
+  let text = String(raw ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(ANSI, "")
+    .replace(THINKING, "")
+    .replace(CONTROL, "")
+    .trim();
   text = text.replace(PREAMBLE, "");
   const fenced = FENCED.exec(text);
   if (fenced) text = fenced[1].trim();
   text = text.replace(LABEL, "").replace(HTML, "");
-  text = text.split("\n").map((l) => l.replace(/[ \t]+$/, "")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  text = text
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+$/, ""))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (text.length <= MAX_PR_BODY_CHARS) return text;
   const cutAt = text.lastIndexOf("\n", MAX_PR_BODY_CHARS);
   return text.slice(0, cutAt > MAX_PR_BODY_CHARS / 2 ? cutAt : MAX_PR_BODY_CHARS).trimEnd();
 }
 
 export function prBodyFromParts(parts: Part[]): string {
-  return sanitizePrBody(parts.filter((p): p is Extract<Part, { type: "text" }> => p.type === "text").map((p) => p.text).join("\n"));
+  return sanitizePrBody(
+    parts
+      .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join("\n"),
+  );
 }
 
 /** Only https links are opened in the browser; the URL comes from `gh` output, which is not trusted either. */

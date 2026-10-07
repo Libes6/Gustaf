@@ -10,7 +10,9 @@ const { runAgent } = await import('../src/agent/agent.ts');
 const { clearActionLog, getActionLog } = await import('../src/agent/actionLogStore.ts');
 
 let n = 0;
-const batch = (...actions) => ({ parts: [{ type: 'tool_call', id: `k${n++}`, name: 'gustaf_computer', args: { actions }, computer: { actions } }] });
+const batch = (...actions) => ({
+  parts: [{ type: 'tool_call', id: `k${n++}`, name: 'gustaf_computer', args: { actions }, computer: { actions } }],
+});
 const type = (text) => ({ type: 'type', text });
 const key = (...keys) => ({ type: 'keypress', keys });
 const click = { type: 'click', x: 1, y: 2 };
@@ -25,7 +27,12 @@ async function run(script, { access = 'full', answer = () => true, shot } = {}) 
   await runAgent({
     root: null,
     history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
-    adapter: { supportsComputer: true, supportsReasoning: () => false, listModels: async () => [], turn: async () => script[i++] ?? { parts: [{ type: 'text', text: 'done' }] } },
+    adapter: {
+      supportsComputer: true,
+      supportsReasoning: () => false,
+      listModels: async () => [],
+      turn: async () => script[i++] ?? { parts: [{ type: 'text', text: 'done' }] },
+    },
     providerId: 'p',
     model: 'm',
     access,
@@ -82,9 +89,21 @@ test('a declined batch is not executed', async () => {
 
 test('results are factual summaries with the screenshot; a failed step is an error that still has the screenshot', async () => {
   const ok = await run([batch({ type: 'open_app', name: 'Telegram' }, click)], {
-    shot: () => ({ png: 'PNG', width: 1, height: 1, frontApp: 'Telegram', windowTitle: 'Екатерина', changed: true, settled: true, cursor: [1, 2] }),
+    shot: () => ({
+      png: 'PNG',
+      width: 1,
+      height: 1,
+      frontApp: 'Telegram',
+      windowTitle: 'Екатерина',
+      changed: true,
+      settled: true,
+      cursor: [1, 2],
+    }),
   });
-  assert.equal(ok.results[0].output, 'Executed 2 actions. Front app: Telegram — "Екатерина". Cursor: 1,2. Screen changed: yes.');
+  assert.equal(
+    ok.results[0].output,
+    'Executed 2 actions. Front app: Telegram — "Екатерина". Cursor: 1,2. Screen changed: yes.',
+  );
   assert.equal(ok.results[0].image, 'PNG');
   assert.equal(ok.approvals.length, 0, 'open_app runs without asking in Full access');
 

@@ -8,8 +8,16 @@ import { chat, makeApp, renderApp } from "./render";
 import { mockInvoke } from "./tauri";
 
 const noop = () => {};
-const chats = [chat({ id: 31, project_id: null, title: "Alpha chat" }), chat({ id: 32, project_id: null, title: "Beta chat" }), chat({ id: 33, project_id: null, title: "Gamma chat" })];
-const recentRows = () => screen.getAllByRole("button").filter((b) => b.classList.contains("row-main")).map((b) => b.textContent);
+const chats = [
+  chat({ id: 31, project_id: null, title: "Alpha chat" }),
+  chat({ id: 32, project_id: null, title: "Beta chat" }),
+  chat({ id: 33, project_id: null, title: "Gamma chat" }),
+];
+const recentRows = () =>
+  screen
+    .getAllByRole("button")
+    .filter((b) => b.classList.contains("row-main"))
+    .map((b) => b.textContent);
 const openMenuFor = async (title: string) => {
   const row = screen.getAllByText(title)[0].closest(".row") as HTMLElement;
   await userEvent.click(within(row).getByRole("button", { name: "More" }));

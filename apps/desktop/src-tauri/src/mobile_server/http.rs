@@ -13,8 +13,14 @@
 //! gets the same 401 body, and authentication is checked BEFORE the route is looked up, so an unauthenticated client cannot
 //! learn which paths exist.
 
+// The Err side of these helpers is the ready-made HTTP response (`Resp`); boxing it would touch every handler.
+#![allow(clippy::result_large_err)]
+
 use super::{
-    data::{self, Store, DEFAULT_CHATS, DEFAULT_MESSAGES, MAX_ACTIVE_DEVICES, MAX_CHATS, MAX_MESSAGES},
+    commands::{BusError, CommandBus},
+    data::{
+        self, Store, DEFAULT_CHATS, DEFAULT_MESSAGES, MAX_ACTIVE_DEVICES, MAX_CHATS, MAX_MESSAGES,
+    },
     events::{self, Detector, StatusBoard},
     net,
     pairing::{self, PairError, PairingState, RateLimiter},
@@ -61,6 +67,11 @@ const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(15);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_PAIR_BODY: usize = 4 * 1024;
+/// A message from the phone: text up to `MAX_SEND_CHARS` characters, so up to 4 bytes each plus the JSON around it.
+const MAX_COMMAND_BODY: usize = 96 * 1024;
+const MAX_SEND_CHARS: usize = 20_000;
+/// How long a command waits for the webview to accept it (the run itself continues afterwards).
+const COMMAND_WAIT: Duration = Duration::from_secs(10);
 const MAX_SOCKETS: usize = 32;
 const MAX_SOCKETS_PER_DEVICE: usize = 4;
 /// Keep-alive ping interval; a socket that sent nothing (not even a pong) for `SOCKET_IDLE` is dropped.
@@ -73,6 +84,7 @@ const TOUCH_EVERY: Duration = Duration::from_secs(15);
 pub struct Ctx {
     pub store: Arc<Store>,
     pub board: Arc<StatusBoard>,
+    pub bus: Arc<CommandBus>,
     pub pairing: Mutex<PairingState>,
     /// Failed bearer-token checks per address (a token is 256 random bits, so this only stops pointless hammering).
     auth_limiter: Mutex<RateLimiter>,
@@ -89,12 +101,25 @@ pub struct Ctx {
 }
 
 impl Ctx {
-    pub fn new(store: Arc<Store>, board: Arc<StatusBoard>, shutdown: watch::Receiver<bool>, desktop_name: String, app_version: String, allow_loopback: bool) -> Ctx {
+    pub fn new(
+        store: Arc<Store>,
+        board: Arc<StatusBoard>,
+        bus: Arc<CommandBus>,
+        shutdown: watch::Receiver<bool>,
+        desktop_name: String,
+        app_version: String,
+        allow_loopback: bool,
+    ) -> Ctx {
         Ctx {
             store,
             board,
+            bus,
             pairing: Mutex::new(PairingState::default()),
-            auth_limiter: Mutex::new(RateLimiter::new(20, Duration::from_secs(60), Duration::from_secs(60))),
+            auth_limiter: Mutex::new(RateLimiter::new(
+                20,
+                Duration::from_secs(60),
+                Duration::from_secs(60),
+            )),
             events: broadcast::channel(256).0,
             revoked: broadcast::channel(16).0,
             shutdown,
@@ -110,7 +135,10 @@ impl Ctx {
 
     /// Called after a device was revoked: its live sockets close, its `last_seen_at` bookkeeping is dropped.
     pub fn device_revoked(&self, id: &str) {
-        self.last_touch.lock().unwrap_or_else(|p| p.into_inner()).remove(id);
+        self.last_touch
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(id);
         let _ = self.revoked.send(id.to_string());
     }
 }
@@ -120,7 +148,10 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 pub fn unix_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 // ---- Responses --------------------------------------------------------------------------------------------------------
@@ -131,32 +162,51 @@ fn respond(status: StatusCode, body: Vec<u8>) -> Resp {
     let mut res = Response::new(Full::new(Bytes::from(body)));
     *res.status_mut() = status;
     let h = res.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json; charset=utf-8"));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json; charset=utf-8"),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
     res
 }
 
 fn json<T: Serialize>(status: StatusCode, value: &T) -> Resp {
     match serde_json::to_vec(value) {
         Ok(body) => respond(status, body),
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "internal", "Internal error"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal",
+            "Internal error",
+        ),
     }
 }
 
 fn error(status: StatusCode, code: &str, message: &str) -> Resp {
-    respond(status, serde_json::to_vec(&serde_json::json!({ "code": code, "message": message })).unwrap_or_default())
+    respond(
+        status,
+        serde_json::to_vec(&serde_json::json!({ "code": code, "message": message }))
+            .unwrap_or_default(),
+    )
 }
 
 /// The one response for every authentication failure.
 fn unauthorized() -> Resp {
     let mut res = error(StatusCode::UNAUTHORIZED, "unauthorized", "Unauthorized");
-    res.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+    res.headers_mut()
+        .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
     res
 }
 
 fn too_many(wait: Duration) -> Resp {
-    let mut res = error(StatusCode::TOO_MANY_REQUESTS, "rate_limited", "Too many attempts; try again later");
+    let mut res = error(
+        StatusCode::TOO_MANY_REQUESTS,
+        "rate_limited",
+        "Too many attempts; try again later",
+    );
     if let Ok(v) = HeaderValue::from_str(&wait.as_secs().max(1).to_string()) {
         res.headers_mut().insert(header::RETRY_AFTER, v);
     }
@@ -168,11 +218,17 @@ fn bad_request(message: &str) -> Resp {
 }
 
 fn internal() -> Resp {
-    error(StatusCode::INTERNAL_SERVER_ERROR, "internal", "Internal error")
+    error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "internal",
+        "Internal error",
+    )
 }
 
 /// Runs a blocking database call off the async threads. Any failure is a generic 500 (database messages never leave).
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, Resp> {
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, Resp> {
     match tokio::task::spawn_blocking(f).await {
         Ok(Ok(v)) => Ok(v),
         Ok(Err(e)) => {
@@ -199,11 +255,15 @@ async fn authenticate(ctx: &Arc<Ctx>, peer: IpAddr, headers: &HeaderMap) -> Resu
         lock(&ctx.auth_limiter).record_failure(peer, Instant::now());
         unauthorized()
     };
-    let Some(token) = bearer(headers).filter(|t| pairing::token_shape_ok(t)) else { return Err(fail(ctx)) };
+    let Some(token) = bearer(headers).filter(|t| pairing::token_shape_ok(t)) else {
+        return Err(fail(ctx));
+    };
     let presented = pairing::hash_token(token);
     let store = ctx.store.clone();
     let devices = blocking(move || store.active_devices()).await?;
-    let Some(id) = pairing::find_device(&devices, &presented).map(str::to_owned) else { return Err(fail(ctx)) };
+    let Some(id) = pairing::find_device(&devices, &presented).map(str::to_owned) else {
+        return Err(fail(ctx));
+    };
     let due = {
         let mut touched = lock(&ctx.last_touch);
         let due = touched.get(&id).is_none_or(|t| t.elapsed() >= TOUCH_EVERY);
@@ -222,16 +282,22 @@ async fn authenticate(ctx: &Arc<Ctx>, peer: IpAddr, headers: &HeaderMap) -> Resu
 // ---- Routing ----------------------------------------------------------------------------------------------------------
 
 async fn handle(ctx: Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Result<Resp, Infallible> {
-    Ok(match timeout(REQUEST_TIMEOUT, dispatch(ctx, peer, req)).await {
-        Ok(res) => res,
-        Err(_) => error(StatusCode::GATEWAY_TIMEOUT, "internal", "Timed out"),
-    })
+    Ok(
+        match timeout(REQUEST_TIMEOUT, dispatch(ctx, peer, req)).await {
+            Ok(res) => res,
+            Err(_) => error(StatusCode::GATEWAY_TIMEOUT, "internal", "Timed out"),
+        },
+    )
 }
 
 async fn dispatch(ctx: Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Resp {
     let path = req.uri().path().to_string();
     if path == "/v1/pair" {
-        return if req.method() == Method::POST { pair(&ctx, peer, req).await } else { method_not_allowed("POST") };
+        return if req.method() == Method::POST {
+            pair(&ctx, peer, req).await
+        } else {
+            method_not_allowed("POST")
+        };
     }
     let device = match authenticate(&ctx, peer, req.headers()).await {
         Ok(id) => id,
@@ -256,25 +322,46 @@ async fn dispatch(ctx: Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Resp {
         (["v1", "chats"], true) => list_chats(&ctx, req.uri().query()).await,
         (["v1", "chats", id, "messages"], true) => list_messages(&ctx, id, req.uri().query()).await,
         (["v1", "events"], true) => events_socket(ctx, device, req),
-        (["v1", "info" | "projects" | "chats" | "events"], false) | (["v1", "chats", _, "messages"], false) => method_not_allowed("GET"),
+        (["v1", "chats"], false) if req.method() == Method::POST => new_chat(&ctx, req).await,
+        (["v1", "chats", id, "messages"], false) if req.method() == Method::POST => {
+            send_message(&ctx, id, req).await
+        }
+        (["v1", "chats", id, "stop"], false) if req.method() == Method::POST => {
+            stop_chat(&ctx, id).await
+        }
+        (["v1", "chats", _, "messages"], false) => method_not_allowed("GET, POST"),
+        (["v1", "chats", _, "stop"], _) => method_not_allowed("POST"),
+        (["v1", "chats"], false) => method_not_allowed("GET, POST"),
+        (["v1", "info" | "projects" | "events"], false) => method_not_allowed("GET"),
         _ => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
     }
 }
 
 fn method_not_allowed(allow: &'static str) -> Resp {
-    let mut res = error(StatusCode::METHOD_NOT_ALLOWED, "bad_request", "Method not allowed");
-    res.headers_mut().insert(header::ALLOW, HeaderValue::from_static(allow));
+    let mut res = error(
+        StatusCode::METHOD_NOT_ALLOWED,
+        "bad_request",
+        "Method not allowed",
+    );
+    res.headers_mut()
+        .insert(header::ALLOW, HeaderValue::from_static(allow));
     res
 }
 
 /// Query string into pairs; values are never percent-decoded because every accepted parameter is a plain number or flag.
 fn query(q: Option<&str>) -> HashMap<&str, &str> {
-    q.unwrap_or("").split('&').filter(|p| !p.is_empty()).map(|p| p.split_once('=').unwrap_or((p, ""))).collect()
+    q.unwrap_or("")
+        .split('&')
+        .filter(|p| !p.is_empty())
+        .map(|p| p.split_once('=').unwrap_or((p, "")))
+        .collect()
 }
 
 /// A non-negative integer made of ASCII digits only.
 fn number(v: &str) -> Option<i64> {
-    (!v.is_empty() && v.len() <= 15 && v.bytes().all(|b| b.is_ascii_digit())).then(|| v.parse().ok()).flatten()
+    (!v.is_empty() && v.len() <= 15 && v.bytes().all(|b| b.is_ascii_digit()))
+        .then(|| v.parse().ok())
+        .flatten()
 }
 
 async fn list_chats(ctx: &Arc<Ctx>, q: Option<&str>) -> Resp {
@@ -301,7 +388,10 @@ async fn list_chats(ctx: &Arc<Ctx>, q: Option<&str>) -> Resp {
     let store = ctx.store.clone();
     match blocking(move || store.chats(project, archived, limit)).await {
         Ok(rows) => {
-            let out: Vec<_> = rows.iter().map(|r| data::chat_summary(r, ctx.board.get(r.id))).collect();
+            let out: Vec<_> = rows
+                .iter()
+                .map(|r| data::chat_summary(r, ctx.board.get(r.id)))
+                .collect();
             json(StatusCode::OK, &out)
         }
         Err(res) => res,
@@ -309,7 +399,9 @@ async fn list_chats(ctx: &Arc<Ctx>, q: Option<&str>) -> Resp {
 }
 
 async fn list_messages(ctx: &Arc<Ctx>, id: &str, q: Option<&str>) -> Resp {
-    let Some(chat_id) = number(id) else { return error(StatusCode::NOT_FOUND, "not_found", "Not found") };
+    let Some(chat_id) = number(id) else {
+        return error(StatusCode::NOT_FOUND, "not_found", "Not found");
+    };
     let q = query(q);
     let limit = match q.get("limit") {
         None => DEFAULT_MESSAGES,
@@ -326,11 +418,182 @@ async fn list_messages(ctx: &Arc<Ctx>, id: &str, q: Option<&str>) -> Resp {
         },
     };
     let store = ctx.store.clone();
-    match blocking(move || Ok(if store.chat_exists(chat_id)? { Some(store.messages(chat_id, limit, before)?) } else { None })).await {
+    match blocking(move || {
+        Ok(if store.chat_exists(chat_id)? {
+            Some(store.messages(chat_id, limit, before)?)
+        } else {
+            None
+        })
+    })
+    .await
+    {
         Ok(Some(rows)) => json(StatusCode::OK, &data::shape_messages(&rows)),
         Ok(None) => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
         Err(res) => res,
     }
+}
+
+// ---- Commands (phone to desktop) ---------------------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SendBody {
+    text: String,
+    provider_id: Option<String>,
+    model: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NewChatBody {
+    project_id: i64,
+    text: String,
+    title: Option<String>,
+}
+
+async fn read_body<T: serde::de::DeserializeOwned>(req: Request<Incoming>) -> Result<T, Resp> {
+    let body = match Limited::new(req.into_body(), MAX_COMMAND_BODY)
+        .collect()
+        .await
+    {
+        Ok(b) => b.to_bytes(),
+        Err(_) => return Err(bad_request("Request body too large or unreadable")),
+    };
+    serde_json::from_slice::<T>(&body).map_err(|_| bad_request("Invalid JSON body"))
+}
+
+fn clean_text(raw: &str) -> Result<String, Resp> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Err(bad_request("text must not be empty"));
+    }
+    if text.chars().count() > MAX_SEND_CHARS {
+        return Err(bad_request("text is too long"));
+    }
+    Ok(text.to_string())
+}
+
+/// Forwards a command to the webview and shapes its answer: accepted (202), or the webview's refusal.
+async fn forward(ctx: &Arc<Ctx>, kind: &str, payload: Value) -> Resp {
+    match ctx.bus.request(kind, payload, COMMAND_WAIT).await {
+        Ok(reply) if reply.ok => {
+            let mut body = match reply.data {
+                Value::Object(m) => m,
+                _ => serde_json::Map::new(),
+            };
+            body.insert("ok".into(), Value::Bool(true));
+            json(StatusCode::ACCEPTED, &Value::Object(body))
+        }
+        Ok(reply) => {
+            let message = data::clip_chars(&reply.message, 200);
+            match reply.code.as_str() {
+                "busy" => error(
+                    StatusCode::CONFLICT,
+                    "bad_request",
+                    if message.is_empty() {
+                        "The chat is busy"
+                    } else {
+                        &message
+                    },
+                ),
+                "not_found" => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
+                "bad_request" => bad_request(if message.is_empty() {
+                    "Rejected"
+                } else {
+                    &message
+                }),
+                _ => error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal",
+                    if message.is_empty() {
+                        "The desktop could not run this"
+                    } else {
+                        &message
+                    },
+                ),
+            }
+        }
+        Err(BusError::Timeout) => error(
+            StatusCode::GATEWAY_TIMEOUT,
+            "internal",
+            "The desktop app did not answer. Is its window open?",
+        ),
+        Err(BusError::Unavailable) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "internal",
+            "The desktop app is not ready",
+        ),
+    }
+}
+
+async fn chat_exists(ctx: &Arc<Ctx>, id: i64) -> Result<(), Resp> {
+    let store = ctx.store.clone();
+    if blocking(move || store.chat_exists(id)).await? {
+        Ok(())
+    } else {
+        Err(error(StatusCode::NOT_FOUND, "not_found", "Not found"))
+    }
+}
+
+async fn send_message(ctx: &Arc<Ctx>, id: &str, req: Request<Incoming>) -> Resp {
+    let Some(chat_id) = number(id) else {
+        return error(StatusCode::NOT_FOUND, "not_found", "Not found");
+    };
+    let body: SendBody = match read_body(req).await {
+        Ok(b) => b,
+        Err(res) => return res,
+    };
+    let text = match clean_text(&body.text) {
+        Ok(t) => t,
+        Err(res) => return res,
+    };
+    if let Err(res) = chat_exists(ctx, chat_id).await {
+        return res;
+    }
+    let clip = |v: Option<String>| {
+        v.map(|s| data::clip_chars(s.trim(), 200))
+            .filter(|s| !s.is_empty())
+    };
+    forward(ctx, "send", serde_json::json!({ "chatId": chat_id, "text": text, "providerId": clip(body.provider_id), "model": clip(body.model) })).await
+}
+
+async fn stop_chat(ctx: &Arc<Ctx>, id: &str) -> Resp {
+    let Some(chat_id) = number(id) else {
+        return error(StatusCode::NOT_FOUND, "not_found", "Not found");
+    };
+    if let Err(res) = chat_exists(ctx, chat_id).await {
+        return res;
+    }
+    forward(ctx, "stop", serde_json::json!({ "chatId": chat_id })).await
+}
+
+async fn new_chat(ctx: &Arc<Ctx>, req: Request<Incoming>) -> Resp {
+    let body: NewChatBody = match read_body(req).await {
+        Ok(b) => b,
+        Err(res) => return res,
+    };
+    let text = match clean_text(&body.text) {
+        Ok(t) => t,
+        Err(res) => return res,
+    };
+    let store = ctx.store.clone();
+    let projects = match blocking(move || store.projects()).await {
+        Ok(p) => p,
+        Err(res) => return res,
+    };
+    if !projects.iter().any(|p| p.id == body.project_id) {
+        return error(StatusCode::NOT_FOUND, "not_found", "Not found");
+    }
+    let title = body
+        .title
+        .map(|t| data::clip_chars(t.trim(), 200))
+        .filter(|t| !t.is_empty());
+    forward(
+        ctx,
+        "newChat",
+        serde_json::json!({ "projectId": body.project_id, "text": text, "title": title }),
+    )
+    .await
 }
 
 // ---- Pairing ----------------------------------------------------------------------------------------------------------
@@ -347,9 +610,19 @@ struct PairBody {
 }
 
 fn clean_device_name(raw: &str) -> String {
-    let name: String = raw.chars().filter(|c| !c.is_control()).collect::<String>().split_whitespace().collect::<Vec<_>>().join(" ");
+    let name: String = raw
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     let name = data::clip_chars(&name, 64);
-    if name.is_empty() { "Phone".to_string() } else { name }
+    if name.is_empty() {
+        "Phone".to_string()
+    } else {
+        name
+    }
 }
 
 async fn pair(ctx: &Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Resp {
@@ -364,37 +637,69 @@ async fn pair(ctx: &Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Resp {
         Ok(b) => b.to_bytes(),
         Err(_) => return bad(ctx, "Request body too large or unreadable"),
     };
-    let Ok(parsed) = serde_json::from_slice::<PairBody>(&body) else { return bad(ctx, "Expected {code, deviceName}") };
+    let Ok(parsed) = serde_json::from_slice::<PairBody>(&body) else {
+        return bad(ctx, "Expected {code, deviceName}");
+    };
     if parsed.code.is_empty() || parsed.code.chars().count() > 64 {
         return bad(ctx, "Invalid code");
     }
     if let Some(info) = &parsed.public_info {
-        if !info.is_object() || info.as_object().is_some_and(|o| o.len() > 16) || info.to_string().len() > 2048 {
+        if !info.is_object()
+            || info.as_object().is_some_and(|o| o.len() > 16)
+            || info.to_string().len() > 2048
+        {
             return bad(ctx, "publicInfo must be a small object");
         }
     }
-    if parsed.protocol.is_some_and(|p| p != i64::from(PROTOCOL_VERSION)) {
-        return error(StatusCode::BAD_REQUEST, "version_mismatch", "Unsupported protocol version");
+    if parsed
+        .protocol
+        .is_some_and(|p| p != i64::from(PROTOCOL_VERSION))
+    {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "version_mismatch",
+            "Unsupported protocol version",
+        );
     }
     let store = ctx.store.clone();
     match blocking(move || store.active_devices().map(|d| d.len())).await {
-        Ok(n) if n >= MAX_ACTIVE_DEVICES => return error(StatusCode::CONFLICT, "bad_request", "Too many paired devices; revoke one first"),
+        Ok(n) if n >= MAX_ACTIVE_DEVICES => {
+            return error(
+                StatusCode::CONFLICT,
+                "bad_request",
+                "Too many paired devices; revoke one first",
+            )
+        }
         Ok(_) => {}
         Err(res) => return res,
     }
     match lock(&ctx.pairing).attempt(peer, &parsed.code, Instant::now()) {
         Ok(()) => {}
         Err(PairError::Locked(wait)) => return too_many(wait),
-        Err(PairError::Invalid) => return error(StatusCode::UNAUTHORIZED, "unauthorized", "Invalid or expired pairing code"),
+        Err(PairError::Invalid) => {
+            return error(
+                StatusCode::UNAUTHORIZED,
+                "unauthorized",
+                "Invalid or expired pairing code",
+            )
+        }
     }
     let token = pairing::new_token();
     let device_id = uuid::Uuid::new_v4().to_string();
     let name = clean_device_name(&parsed.device_name);
-    let (store, hash, id, n) = (ctx.store.clone(), pairing::hash_token(&token), device_id.clone(), name);
+    let (store, hash, id, n) = (
+        ctx.store.clone(),
+        pairing::hash_token(&token),
+        device_id.clone(),
+        name,
+    );
     if let Err(res) = blocking(move || store.insert_device(&id, &n, &hash, unix_ms())).await {
         return res;
     }
-    json(StatusCode::OK, &serde_json::json!({ "protocol": PROTOCOL_VERSION, "deviceId": device_id, "token": token, "desktopName": ctx.desktop_name }))
+    json(
+        StatusCode::OK,
+        &serde_json::json!({ "protocol": PROTOCOL_VERSION, "deviceId": device_id, "token": token, "desktopName": ctx.desktop_name }),
+    )
 }
 
 // ---- WebSocket --------------------------------------------------------------------------------------------------------
@@ -408,13 +713,18 @@ impl SocketGuard {
     fn acquire(ctx: &Arc<Ctx>, device: &str) -> Option<SocketGuard> {
         let mut per_device = lock(&ctx.sockets);
         let mine = per_device.entry(device.to_string()).or_insert(0);
-        if *mine >= MAX_SOCKETS_PER_DEVICE || ctx.total_sockets.load(Ordering::SeqCst) >= MAX_SOCKETS {
+        if *mine >= MAX_SOCKETS_PER_DEVICE
+            || ctx.total_sockets.load(Ordering::SeqCst) >= MAX_SOCKETS
+        {
             return None;
         }
         *mine += 1;
         ctx.total_sockets.fetch_add(1, Ordering::SeqCst);
         ctx.subscribers.fetch_add(1, Ordering::SeqCst);
-        Some(SocketGuard { ctx: ctx.clone(), device: device.to_string() })
+        Some(SocketGuard {
+            ctx: ctx.clone(),
+            device: device.to_string(),
+        })
     }
 }
 
@@ -434,19 +744,37 @@ impl Drop for SocketGuard {
 
 fn events_socket(ctx: Arc<Ctx>, device: String, mut req: Request<Incoming>) -> Resp {
     let h = req.headers();
-    let has = |name: header::HeaderName, token: &str| h.get_all(name).iter().filter_map(|v| v.to_str().ok()).any(|v| v.split(',').any(|t| t.trim().eq_ignore_ascii_case(token)));
-    let key = h.get("sec-websocket-key").and_then(|v| v.to_str().ok()).map(str::to_owned);
+    let has = |name: header::HeaderName, token: &str| {
+        h.get_all(name)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .any(|v| v.split(',').any(|t| t.trim().eq_ignore_ascii_case(token)))
+    };
+    let key = h
+        .get("sec-websocket-key")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
     let version_ok = h.get("sec-websocket-version").and_then(|v| v.to_str().ok()) == Some("13");
-    let Some(key) = key.filter(|_| has(header::UPGRADE, "websocket") && has(header::CONNECTION, "upgrade") && version_ok) else {
+    let Some(key) = key.filter(|_| {
+        has(header::UPGRADE, "websocket") && has(header::CONNECTION, "upgrade") && version_ok
+    }) else {
         return bad_request("WebSocket upgrade expected");
     };
-    let Some(guard) = SocketGuard::acquire(&ctx, &device) else { return too_many(Duration::from_secs(5)) };
+    let Some(guard) = SocketGuard::acquire(&ctx, &device) else {
+        return too_many(Duration::from_secs(5));
+    };
     let on_upgrade = hyper::upgrade::on(&mut req);
     let accept = derive_accept_key(key.as_bytes());
     tokio::spawn(async move {
-        let Ok(upgraded) = on_upgrade.await else { return };
-        let config = WebSocketConfig::default().max_message_size(Some(16 * 1024)).max_frame_size(Some(16 * 1024));
-        let ws = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(config)).await;
+        let Ok(upgraded) = on_upgrade.await else {
+            return;
+        };
+        let config = WebSocketConfig::default()
+            .max_message_size(Some(16 * 1024))
+            .max_frame_size(Some(16 * 1024));
+        let ws =
+            WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(config))
+                .await;
         socket_loop(ctx, device, ws, guard).await;
     });
     let mut res = Response::new(Full::new(Bytes::new()));
@@ -464,18 +792,31 @@ async fn close<S>(ws: &mut WebSocketStream<S>, code: CloseCode, reason: &str)
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
-    let _ = ws.send(Message::Close(Some(CloseFrame { code, reason: reason.to_string().into() }))).await;
+    let _ = ws
+        .send(Message::Close(Some(CloseFrame {
+            code,
+            reason: reason.to_string().into(),
+        })))
+        .await;
 }
 
-async fn socket_loop<S>(ctx: Arc<Ctx>, device: String, mut ws: WebSocketStream<S>, _guard: SocketGuard)
-where
+async fn socket_loop<S>(
+    ctx: Arc<Ctx>,
+    device: String,
+    mut ws: WebSocketStream<S>,
+    _guard: SocketGuard,
+) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     // Subscribe before the hello goes out so nothing published in between is missed.
     let mut rx = ctx.events.subscribe();
     let mut revoked = ctx.revoked.subscribe();
     let mut shutdown = ctx.shutdown.clone();
-    if ws.send(Message::text(events::hello(PROTOCOL_VERSION))).await.is_err() {
+    if ws
+        .send(Message::text(events::hello(PROTOCOL_VERSION)))
+        .await
+        .is_err()
+    {
         return;
     }
     let mut tick = interval(PING_EVERY);
@@ -580,11 +921,15 @@ pub async fn serve(listener: TcpListener, acceptor: TlsAcceptor, ctx: Arc<Ctx>) 
         if !net::peer_allowed(peer.ip(), ctx.allow_loopback) {
             continue;
         }
-        let Ok(permit) = permits.clone().try_acquire_owned() else { continue };
+        let Ok(permit) = permits.clone().try_acquire_owned() else {
+            continue;
+        };
         let (acceptor, ctx, mut shutdown) = (acceptor.clone(), ctx.clone(), ctx.shutdown.clone());
         tokio::spawn(async move {
             let _permit = permit;
-            let Ok(Ok(tls)) = timeout(TLS_HANDSHAKE_TIMEOUT, acceptor.accept(tcp)).await else { return };
+            let Ok(Ok(tls)) = timeout(TLS_HANDSHAKE_TIMEOUT, acceptor.accept(tcp)).await else {
+                return;
+            };
             let ip = peer.ip();
             let service = service_fn(move |req| handle(ctx.clone(), ip, req));
             let conn = hyper::server::conn::http1::Builder::new()

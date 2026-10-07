@@ -15,7 +15,15 @@ type Group = { server: McpServer; prompts: McpPrompt[]; error?: string };
  * composer. The user is in control at every step: prompts are listed on open, `prompts/get` runs only on "Insert", and
  * the result is only put into the text box (nothing is sent and the model never sees prompts as tools).
  */
-export function McpPromptDialog({ project, onInsert, onClose }: { project: string | null; onInsert: (text: string) => void; onClose: () => void }) {
+export function McpPromptDialog({
+  project,
+  onInsert,
+  onClose,
+}: {
+  project: string | null;
+  onInsert: (text: string) => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose);
@@ -30,7 +38,10 @@ export function McpPromptDialog({ project, onInsert, onClose }: { project: strin
   useEffect(() => {
     const c = new AbortController();
     ctl.current = c;
-    listPromptsForPicker(project, c.signal).then((g) => !c.signal.aborted && setGroups(g), () => !c.signal.aborted && setGroups([]));
+    listPromptsForPicker(project, c.signal).then(
+      (g) => !c.signal.aborted && setGroups(g),
+      () => !c.signal.aborted && setGroups([]),
+    );
     return () => c.abort();
   }, [project]);
 
@@ -61,28 +72,53 @@ export function McpPromptDialog({ project, onInsert, onClose }: { project: strin
 
   return createPortal(
     <div className="review-overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <section ref={ref} className="review-dialog mcp-prompt-dialog" role="dialog" aria-modal="true" aria-label={t("mcpPromptTitle")}>
+      <section
+        ref={ref}
+        className="review-dialog mcp-prompt-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("mcpPromptTitle")}
+      >
         <header>
           <strong>{chosen ? chosen.prompt.title || chosen.prompt.name : t("mcpPromptTitle")}</strong>
-          <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={close}><X size={17} /></button>
+          <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={close}>
+            <X size={17} />
+          </button>
         </header>
         <div className="mcp-prompt-body">
           {!chosen && (
             <>
-              {!groups && <div className="d"><Loader2 size={14} className="spin" /> {t("mcpPromptLoading")}</div>}
+              {!groups && (
+                <div className="d">
+                  <Loader2 size={14} className="spin" /> {t("mcpPromptLoading")}
+                </div>
+              )}
               {groups && !withPrompts.length && <div className="d">{t("mcpPromptNone")}</div>}
               {withPrompts.map((g) => (
                 <div key={g.server.id} role="group" aria-label={g.server.name}>
                   <div className="mcp-label">{g.server.name}</div>
                   {g.prompts.map((p) => (
-                    <button key={p.name} className="menu-item mcp-prompt-item" onClick={() => (setChosen({ server: g.server, prompt: p }), setValues({}), setMissing([]), setError(""))}>
+                    <button
+                      key={p.name}
+                      className="menu-item mcp-prompt-item"
+                      onClick={() => (
+                        setChosen({ server: g.server, prompt: p }),
+                        setValues({}),
+                        setMissing([]),
+                        setError("")
+                      )}
+                    >
                       <span className="t">{p.title || p.name}</span>
                       {p.description && <span className="d mcp-desc">{p.description}</span>}
                     </button>
                   ))}
                 </div>
               ))}
-              {failed.map((g) => <div key={g.server.id} className="d warn">{g.server.name}: {g.error}</div>)}
+              {failed.map((g) => (
+                <div key={g.server.id} className="d warn">
+                  {g.server.name}: {g.error}
+                </div>
+              ))}
             </>
           )}
           {chosen && (
@@ -91,7 +127,10 @@ export function McpPromptDialog({ project, onInsert, onClose }: { project: strin
               {!chosen.prompt.arguments.length && <div className="d">{t("mcpPromptNoArgs")}</div>}
               {chosen.prompt.arguments.map((a, i) => (
                 <label key={a.name} className="field">
-                  <span>{a.name}{a.required ? ` (${t("mcpPromptRequired")})` : ""}</span>
+                  <span>
+                    {a.name}
+                    {a.required ? ` (${t("mcpPromptRequired")})` : ""}
+                  </span>
                   <input
                     className="input mono"
                     data-autofocus={i === 0 ? "" : undefined}
@@ -104,11 +143,23 @@ export function McpPromptDialog({ project, onInsert, onClose }: { project: strin
                   />
                 </label>
               ))}
-              {missing.length > 0 && <div className="error-box" role="alert">{t("mcpPromptMissing", { names: missing.join(", ") })}</div>}
-              {error && <div className="error-box" role="alert">{error}</div>}
+              {missing.length > 0 && (
+                <div className="error-box" role="alert">
+                  {t("mcpPromptMissing", { names: missing.join(", ") })}
+                </div>
+              )}
+              {error && (
+                <div className="error-box" role="alert">
+                  {error}
+                </div>
+              )}
               <div className="dialog-foot">
-                <button className="btn btn-ghost" onClick={() => setChosen(null)} disabled={busy}>{t("mcpPromptBack")}</button>
-                <button className="btn btn-primary" onClick={insert} disabled={busy}>{busy ? <Loader2 size={13} className="spin" /> : null} {t("mcpPromptInsert")}</button>
+                <button className="btn btn-ghost" onClick={() => setChosen(null)} disabled={busy}>
+                  {t("mcpPromptBack")}
+                </button>
+                <button className="btn btn-primary" onClick={insert} disabled={busy}>
+                  {busy ? <Loader2 size={13} className="spin" /> : null} {t("mcpPromptInsert")}
+                </button>
               </div>
             </>
           )}

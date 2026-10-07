@@ -39,7 +39,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onEscape?: ()
     root.addEventListener("keydown", onKey);
     return () => {
       root.removeEventListener("keydown", onKey);
-      if (previous?.isConnected && (document.activeElement === document.body || root.contains(document.activeElement))) previous.focus?.();
+      if (previous?.isConnected && (document.activeElement === document.body || root.contains(document.activeElement)))
+        previous.focus?.();
     };
   }, [ref, active]);
 }

@@ -3,19 +3,40 @@ import { openSession, promoteSession, isAuthError, type Sessions } from "./lib/c
 import type { Jump } from "./lib/searchUtil";
 import type { Access } from "./agent/agent";
 import { detectLocale, translate, type Locale } from "./i18n";
+import { checkProviders, runProviderCheck } from "./lib/providerCheck";
 import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
 import { worktrees } from "./lib/worktrees";
 import { removeLegacyReviewOverrides } from "./lib/reviewCopy";
+import { DEFAULT_FOLLOW_UP, normalizeFollowUp, type FollowUpAction } from "./lib/followUp";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
 export type Model = ModelInfo & { firstSeen: number };
 export const modelKey = (m: { providerId: string; id: string }) => `${m.providerId}\n${m.id}`;
 export type Selection = { providerId: string; model: string };
 export type Section = { id: string; name: string; chatIds: number[] };
-export type SettingsPage = "general" | "import" | "providers" | "usage" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile";
+import type { ProviderHealth } from "./lib/providerDiagnostics";
+export type SettingsPage =
+  | "general"
+  | "storage"
+  | "web"
+  | "shortcuts"
+  | "import"
+  | "providers"
+  | "usage"
+  | "agents"
+  | "computer"
+  | "mcp"
+  | "scheduled"
+  | "git"
+  | "rules"
+  | "memory"
+  | "archive"
+  | "knowledge"
+  | "mobile"
+  | "diagnostics";
 
 function usePersisted<T>(key: string, initial: T, ready: boolean) {
   const [value, setValue] = useState<T>(initial);
@@ -47,27 +68,75 @@ function useAppState() {
   const [access, setAccess] = usePersisted<Access>("access", "auto", true);
   const [computerUse, setComputerUse] = usePersisted("computerUse", false, true);
   const [reviewCopy, setReviewCopy] = usePersisted<boolean>("reviewCopy", false, true);
+  const [followUp, setFollowUpRaw] = usePersisted<FollowUpAction>("followUpMode", DEFAULT_FOLLOW_UP, true);
+  const setFollowUp = (v: FollowUpAction) => setFollowUpRaw(normalizeFollowUp(v));
   const [favorites, setFavorites] = usePersisted<string[]>("favorites", [], true);
   const [hiddenModels, setHiddenModels] = usePersisted<string[]>("hiddenModels", [], true);
   const [checkedAt, setCheckedAt] = useState(0);
-  const [allowlist, setAllowlist] = usePersisted<string[]>("cmdAllowlist", ["git status", "git diff", "ls", "npm test", "npm run build"], true);
+  const [allowlist, setAllowlist] = usePersisted<string[]>(
+    "cmdAllowlist",
+    ["git status", "git diff", "ls", "npm test", "npm run build"],
+    true,
+  );
   const [sections, setSections] = usePersisted<Section[]>("sections", [], true);
-  const [tokenStats, setTokenStats] = usePersisted<Record<string, TokenUsage & { providerId: string; model: string; turns: number }>>("tokenStats", {}, true);
-  const [limits, setLimits] = usePersisted<Record<string, { windows: LimitWindow[]; checkedAt: number }>>("subscriptionLimits", {}, true);
+  const [tokenStats, setTokenStats] = usePersisted<
+    Record<
+      string,
+      TokenUsage & {
+        providerId: string;
+        model: string;
+        turns: number;
+        /** Effort level of the latest turn that had one. */ level?: Reasoning;
+      }
+    >
+  >("tokenStats", {}, true);
+  const [limits, setLimits] = usePersisted<Record<string, { windows: LimitWindow[]; checkedAt: number }>>(
+    "subscriptionLimits",
+    {},
+    true,
+  );
   const [limitErrors, setLimitErrors] = useState<Record<string, string>>({});
   const [loadingLimits, setLoadingLimits] = useState<string | null>(null);
-  const recordTokens = (providerId: string, model: string, usage?: TokenUsage) => {
+  const recordTokens = (providerId: string, model: string, usage?: TokenUsage, level?: Reasoning) => {
     if (!usage) return;
     const key = modelKey({ providerId, id: model });
-    setTokenStats(stats => { const old = stats[key]; return { ...stats, [key]: { providerId, model, turns: (old?.turns ?? 0) + 1, input: (old?.input ?? 0) + usage.input, output: (old?.output ?? 0) + usage.output, cached: (old?.cached ?? 0) + usage.cached, cacheWrite: (old?.cacheWrite ?? 0) + usage.cacheWrite, reasoning: (old?.reasoning ?? 0) + usage.reasoning } }; });
+    setTokenStats((stats) => {
+      const old = stats[key];
+      return {
+        ...stats,
+        [key]: {
+          providerId,
+          model,
+          turns: (old?.turns ?? 0) + 1,
+          input: (old?.input ?? 0) + usage.input,
+          output: (old?.output ?? 0) + usage.output,
+          cached: (old?.cached ?? 0) + usage.cached,
+          cacheWrite: (old?.cacheWrite ?? 0) + usage.cacheWrite,
+          reasoning: (old?.reasoning ?? 0) + usage.reasoning,
+          ...((level ?? old?.level) ? { level: level ?? old?.level } : {}),
+        },
+      };
+    });
   };
-  const recordLimits = (id: string, windows: LimitWindow[]) => setLimits(all => ({ ...all, [id]: { windows: [...(all[id]?.windows ?? []).filter(w => !windows.some(next => next.id === w.id)), ...windows], checkedAt: Date.now() } }));
+  const recordLimits = (id: string, windows: LimitWindow[]) =>
+    setLimits((all) => ({
+      ...all,
+      [id]: {
+        windows: [...(all[id]?.windows ?? []).filter((w) => !windows.some((next) => next.id === w.id)), ...windows],
+        checkedAt: Date.now(),
+      },
+    }));
   const refreshLimits = async (p: ProviderConfig) => {
     if (loadingLimits) return;
-    setLoadingLimits(p.id); setLimitErrors(s => ({ ...s, [p.id]: "" }));
-    try { recordLimits(p.id, await readSubscriptionLimits(p)); }
-    catch (e) { setLimitErrors(s => ({ ...s, [p.id]: String(e instanceof Error ? e.message : e) })); }
-    finally { setLoadingLimits(null); }
+    setLoadingLimits(p.id);
+    setLimitErrors((s) => ({ ...s, [p.id]: "" }));
+    try {
+      recordLimits(p.id, await readSubscriptionLimits(p));
+    } catch (e) {
+      setLimitErrors((s) => ({ ...s, [p.id]: String(e instanceof Error ? e.message : e) }));
+    } finally {
+      setLoadingLimits(null);
+    }
   };
   const [usage, setUsage] = usePersisted<Record<string, number>>("usage", {}, true);
 
@@ -76,39 +145,85 @@ function useAppState() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [modelErrors, setModelErrors] = useState<Record<string, string>>({});
-  const [sessions, setSessions] = useState<Sessions>({ active: "initial", items: [{ key: "initial", chatId: null, projectId: null }] });
-  const activeSession = sessions.items.find(s => s.key === sessions.active)!;
+  const [sessions, setSessions] = useState<Sessions>({
+    active: "initial",
+    items: [{ key: "initial", chatId: null, projectId: null }],
+  });
+  const activeSession = sessions.items.find((s) => s.key === sessions.active)!;
   const activeChat = activeSession.chatId;
   const draftProject = activeSession.projectId;
-  const openChat = (id: number, projectId: number | null) => { setSessions(s => openSession(s, id, projectId, crypto.randomUUID())); setView("chat"); };
+  const openChat = (id: number, projectId: number | null) => {
+    setSessions((s) => openSession(s, id, projectId, crypto.randomUUID()));
+    setView("chat");
+  };
   // Opening a search result: the chat view scrolls to `jump.messageId` once the chat is shown (lib/useMessageJump.ts).
   const [jump, setJump] = useState<Jump | null>(null);
-  const openChatAt = (id: number, projectId: number | null, messageId: number) => { setJump({ chatId: id, messageId, seq: Date.now() }); openChat(id, projectId); };
+  const openChatAt = (id: number, projectId: number | null, messageId: number) => {
+    setJump({ chatId: id, messageId, seq: Date.now() });
+    openChat(id, projectId);
+  };
   const clearJump = useCallback(() => setJump(null), []);
-  const newChat = (projectId: number | null = null) => { setSessions(s => openSession(s, null, projectId, crypto.randomUUID())); setView("chat"); };
-  const setSessionBusy = (key: string, busy: boolean) => setSessions(s => ({ ...s, items: s.items.map(item => item.key === key ? { ...item, busy } : item) }));
-  const promoteChat = (key: string, id: number) => setSessions(s => promoteSession(s, key, id));
-  const [providerHealth, setProviderHealth] = usePersisted<Record<string, { status: "ok" | "auth" | "error"; message: string }>>("providerHealth", {}, true);
+  const newChat = (projectId: number | null = null) => {
+    setSessions((s) => openSession(s, null, projectId, crypto.randomUUID()));
+    setView("chat");
+  };
+  const setSessionBusy = (key: string, busy: boolean) =>
+    setSessions((s) => ({ ...s, items: s.items.map((item) => (item.key === key ? { ...item, busy } : item)) }));
+  const promoteChat = (key: string, id: number) => setSessions((s) => promoteSession(s, key, id));
+  const [providerHealth, setProviderHealth] = usePersisted<Record<string, ProviderHealth>>("providerHealth", {}, true);
   const [checkingProvider, setCheckingProvider] = useState<string | null>(null);
-  const recordProviderResult = (id: string, message = "") => setProviderHealth(s => ({ ...s, [id]: { status: message ? isAuthError(message) ? "auth" : "error" : "ok", message } }));
+  const recordProviderResult = (id: string, message = "") =>
+    setProviderHealth((s) => ({
+      ...s,
+      [id]: { status: message ? (isAuthError(message) ? "auth" : "error") : "ok", message, at: Date.now() },
+    }));
+  // The check itself: a tiny turn on the provider; never throws, returns the text to record ("" = works).
+  const runCheck = (p: ProviderConfig) =>
+    runProviderCheck(
+      async (signal) => {
+        const adapter = await getAdapter(p);
+        const model =
+          selection?.providerId === p.id
+            ? selection.model
+            : (models.find((m) => m.providerId === p.id)?.id ?? "default");
+        bumpUsage(p.id);
+        const out = await adapter.turn({
+          system: "Reply OK. Do not use tools or access files.",
+          messages: [{ role: "user", parts: [{ type: "text", text: "Reply OK" }] }],
+          model,
+          tools: [],
+          access: "readonly",
+          signal,
+          onText: () => {},
+          onLimits: (windows) => recordLimits(p.id, windows),
+        });
+        recordTokens(p.id, model, out.usage);
+      },
+      translate(locale, "providerCheckTimeout"),
+    );
   const checkProvider = async (p: ProviderConfig) => {
     if (checkingProvider) return;
     setCheckingProvider(p.id);
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 30000);
     try {
-      const adapter = await getAdapter(p);
-      const model = selection?.providerId === p.id ? selection.model : models.find(m => m.providerId === p.id)?.id ?? "default";
-      bumpUsage(p.id);
-      const out = await adapter.turn({ system: "Reply OK. Do not use tools or access files.", messages: [{ role: "user", parts: [{ type: "text", text: "Reply OK" }] }], model, tools: [], access: "readonly", signal: ctl.signal, onText: () => {}, onLimits: windows => recordLimits(p.id, windows) });
-      recordTokens(p.id, model, out.usage);
-      if (ctl.signal.aborted) throw new Error("Проверка превысила 30 секунд");
-      recordProviderResult(p.id);
-    } catch (e) { recordProviderResult(p.id, ctl.signal.aborted ? "Проверка превысила 30 секунд" : String(e instanceof Error ? e.message : e)); }
-    finally { clearTimeout(timer); setCheckingProvider(null); }
+      recordProviderResult(p.id, await runCheck(p));
+    } finally {
+      setCheckingProvider(null);
+    }
+  };
+  /** Re-checks every enabled provider; each result is recorded on its own provider. */
+  const checkAllProviders = async () => {
+    if (checkingProvider) return;
+    await checkProviders(
+      providers.filter((p) => !p.disabled),
+      runCheck,
+      recordProviderResult,
+      setCheckingProvider,
+    );
   };
   const [view, setView] = useState<"chat" | "settings">("chat");
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
+  /** The setting to scroll to and highlight once its page is shown (settings search); cleared by the settings view. */
+  const [settingTarget, setSettingTarget] = useState<string | null>(null);
   const [sideHidden, setSideHidden] = useState(false);
 
   const reload = useCallback(async () => {
@@ -139,29 +254,95 @@ function useAppState() {
     removeLegacyReviewOverrides();
     // Workspaces (git worktrees) whose folder was deleted behind our back: tidy the leftovers once per start; failures
     // (not a git repository, git missing, a folder that moved) are of no interest here.
-    listProjects().then((ps) => {
-      for (const root of new Set(ps.map((p) => p.path).filter((p): p is string => !!p))) worktrees.prune(root).catch(() => {});
-    }).catch(() => {});
+    listProjects()
+      .then((ps) => {
+        for (const root of new Set(ps.map((p) => p.path).filter((p): p is string => !!p)))
+          worktrees.prune(root).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
-  const openSettings = (page: SettingsPage = "general") => {
+  const openSettings = (page: SettingsPage = "general", target: string | null = null) => {
+    setSettingTarget(target);
     setSettingsPage(page);
     setView("settings");
   };
 
   // CLIs list a synthetic `default` model; its name follows the UI language instead of whatever the adapter wrote.
-  const shownModels = useMemo(() => models.map((m) => (m.id === "default" ? { ...m, name: translate(locale, "modelDefault") } : m)), [models, locale]);
+  const shownModels = useMemo(
+    () => models.map((m) => (m.id === "default" ? { ...m, name: translate(locale, "modelDefault") } : m)),
+    [models, locale],
+  );
 
   const bumpUsage = (providerId: string) => setUsage((u) => ({ ...u, [providerId]: (u[providerId] ?? 0) + 1 }));
 
   return {
     ready: localeLoaded && onboardedLoaded,
-    locale, setLocale, onboarded, setOnboarded,
-    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
-    favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
-    projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
-    activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
-    view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
+    locale,
+    setLocale,
+    onboarded,
+    setOnboarded,
+    selection,
+    setSelection,
+    reasoning,
+    setReasoning,
+    access,
+    setAccess,
+    computerUse,
+    setComputerUse,
+    reviewCopy,
+    setReviewCopy,
+    followUp: normalizeFollowUp(followUp),
+    setFollowUp,
+    favorites,
+    setFavorites,
+    hiddenModels,
+    setHiddenModels,
+    checkedAt,
+    allowlist,
+    setAllowlist,
+    sections,
+    setSections,
+    usage,
+    bumpUsage,
+    tokenStats,
+    recordTokens,
+    limits,
+    recordLimits,
+    refreshLimits,
+    loadingLimits,
+    limitErrors,
+    projects,
+    chats,
+    reload,
+    providers,
+    models: shownModels,
+    modelErrors,
+    refreshModels,
+    ensureModels,
+    activeChat,
+    draftProject,
+    sessions,
+    setSessionBusy,
+    openChat,
+    openChatAt,
+    jump,
+    clearJump,
+    newChat,
+    promoteChat,
+    providerHealth,
+    recordProviderResult,
+    checkProvider,
+    checkAllProviders,
+    checkingProvider,
+    view,
+    setView,
+    settingsPage,
+    openSettings,
+    settingTarget,
+    clearSettingTarget: () => setSettingTarget(null),
+    sideHidden,
+    setSideHidden,
   };
 }
 

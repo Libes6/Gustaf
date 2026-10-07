@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { detectLocale } from "../../src/i18n";
 import { Settings } from "../../src/components/Settings";
 import type { SettingsPage } from "../../src/state";
 import { chat, makeApp, project, provider, renderApp } from "./render";
@@ -8,15 +9,20 @@ import { mockInvoke, mockSettings } from "./tauri";
 
 const PAGES: [SettingsPage, string][] = [
   ["general", "General"],
+  ["storage", "Storage"],
+  ["web", "Web tools"],
+  ["shortcuts", "Keyboard shortcuts"],
   ["import", "Import"],
   ["providers", "Model providers"],
   ["usage", "Usage"],
+  ["agents", "Agents & budgets"],
   ["computer", "Computer use"],
   ["mcp", "MCP"],
   ["scheduled", "Scheduled"],
   ["git", "Git & commands"],
   ["rules", "Rules"],
   ["archive", "Archived chats"],
+  ["diagnostics", "Diagnostics"],
 ];
 
 const page = () => screen.getByRole("heading", { level: 1 });
@@ -31,8 +37,60 @@ describe("Settings", () => {
     await waitFor(() => expect(page()).toBeInTheDocument());
   });
 
+  it("keyboard shortcuts are their own menu item and no longer part of General", async () => {
+    mockSettings({});
+    const { app, unmount } = renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    expect(within(nav()).getByRole("button", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    expect(page()).toHaveTextContent("General");
+    expect(screen.queryByText("Keyboard shortcuts", { selector: "h1, h4" })).toBeNull();
+    await userEvent.click(within(nav()).getByRole("button", { name: "Keyboard shortcuts" }));
+    expect(app.openSettings).toHaveBeenCalledWith("shortcuts");
+    unmount();
+  });
+
+  it("General has no raw CLI events recorder (no developer block, no switch)", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    await waitFor(() => expect(page()).toHaveTextContent("General"));
+    expect(screen.queryByText("Developer")).toBeNull();
+    expect(screen.queryByText(/raw CLI events/i)).toBeNull();
+    expect(screen.queryByRole("switch", { name: /raw CLI/i })).toBeNull();
+  });
+
+  it("General has no voice input, storage or web sections (they have their own pages)", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    await waitFor(() => expect(page()).toHaveTextContent("General"));
+    expect(screen.queryByText("Voice input")).toBeNull();
+    expect(screen.queryByText("Web tools for API models")).toBeNull();
+    expect(screen.queryByText("Clean up idle workspaces")).toBeNull();
+  });
+
+  it("the web tools page has a labelled switch and separate labelled fields", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "web" }));
+    expect(await screen.findByRole("switch", { name: "Enable web tools" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByLabelText(/Brave API key/)).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Denied domains")).toBeInTheDocument();
+  });
+
+  it("the storage page holds the workspace clean-up", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "storage" }));
+    expect(await screen.findByRole("switch", { name: "Clean up idle workspaces" })).toBeInTheDocument();
+  });
+
+  it("English is the default UI language even when the system language is Russian", () => {
+    const spy = vi.spyOn(navigator, "language", "get").mockReturnValue("ru-RU");
+    expect(detectLocale()).toBe("en");
+    spy.mockRestore();
+  });
+
   it("the archive page lists archived chats", async () => {
-    mockInvoke({ db_select: ({ sql }: { sql: string }) => (/archived = 1/.test(sql) ? [chat({ id: 9, title: "Old archived chat" })] : []) });
+    mockInvoke({
+      db_select: ({ sql }: { sql: string }) =>
+        /archived = 1/.test(sql) ? [chat({ id: 9, title: "Old archived chat" })] : [],
+    });
     renderApp(<Settings />, makeApp({ settingsPage: "archive" }));
     expect(await screen.findByText("Old archived chat")).toBeInTheDocument();
   });
@@ -71,5 +129,26 @@ describe("Settings", () => {
     const { app } = renderApp(<Settings />, makeApp({ settingsPage: "general" }));
     await userEvent.click(screen.getByRole("button", { name: "Русский" }));
     expect(app.setLocale).toHaveBeenCalledWith("ru");
+  });
+
+  it("the usage page shows the effort level of a model's latest turn, and none for a model without one", async () => {
+    mockSettings({});
+    const stat = (model: string, level?: string) => ({
+      providerId: "p1",
+      model,
+      turns: 2,
+      input: 10,
+      output: 5,
+      cached: 0,
+      cacheWrite: 0,
+      reasoning: 0,
+      ...(level ? { level } : {}),
+    });
+    const tokenStats = { "p1\nm1": stat("m1", "high"), "p1\nm2": stat("m2") } as never;
+    renderApp(<Settings />, makeApp({ settingsPage: "usage", providers: [provider()], tokenStats }));
+    const withLevel = (await screen.findByText("m1")).closest(".card-row") as HTMLElement;
+    expect(within(withLevel).getByTitle("Reasoning effort")).toHaveTextContent("High");
+    const without = screen.getByText("m2").closest(".card-row") as HTMLElement;
+    expect(within(without).queryByTitle("Reasoning effort")).not.toBeInTheDocument();
   });
 });

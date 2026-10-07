@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { manifest, targets } from '../release-manifest.mjs';
 import { root, versionFiles, nextVersion } from '../version.mjs';
+import { releaseAssetName } from '../release-asset-name.mjs';
 test('stable SemVer bumps and rejects invalid or non-increasing versions', () => {
   assert.equal(nextVersion('1.2.3', 'patch'), '1.2.4');
   assert.equal(nextVersion('1.2.3', 'minor'), '1.3.0');
@@ -64,12 +65,29 @@ test('asset staging excludes internal package archives while retaining installer
   try {
     const bundle = path.join(tmp, 'apps/desktop/src-tauri/target/release/bundle');
     fs.mkdirSync(bundle, { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'apps/desktop/src-tauri/tauri.conf.json'), JSON.stringify({ version: '1.2.3' }));
     for (const name of ['Gustaf.app.tar.gz', 'Gustaf.app.tar.gz.sig', 'Gustaf.dmg', 'Gustaf.deb', 'Gustaf.deb.sig', 'control.tar.gz', 'data.tar.gz', 'unrelated.sig']) fs.writeFileSync(path.join(bundle, name), 'fixture');
     const host = `${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch === 'arm64' ? 'aarch64' : process.arch === 'x64' ? 'x86_64' : process.arch}`;
     execFileSync(process.execPath, [path.join(root, 'scripts/stage-release.mjs'), host], { cwd: tmp });
     const names = fs.readdirSync(path.join(tmp, 'release-assets'));
     assert.equal(names.length, 5);
-    assert.ok(names.includes(host + '-Gustaf.app.tar.gz.sig'));
+    assert.ok(names.includes(releaseAssetName(host, '1.2.3', 'Gustaf.app.tar.gz.sig')));
     assert.ok(!names.some(name => /control|data|unrelated/.test(name)));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+test('release filenames identify version, OS and architecture and preserve signature pairing', () => {
+  for (const [platform, original, expected] of [
+    ['darwin-aarch64', 'Gustaf.app.tar.gz', 'Gustaf-1.2.3-macOS-arm64.app.tar.gz'],
+    ['darwin-x86_64', 'Gustaf_1.2.3_x64.dmg', 'Gustaf-1.2.3-macOS-x64.dmg'],
+    ['windows-x86_64', 'Gustaf_1.2.3_x64-setup.exe', 'Gustaf-1.2.3-Windows-x64-setup.exe'],
+    ['windows-x86_64', 'Gustaf_1.2.3_x64_en-US.msi', 'Gustaf-1.2.3-Windows-x64.msi'],
+    ['linux-x86_64', 'Gustaf_1.2.3_amd64.AppImage', 'Gustaf-1.2.3-Linux-x64.AppImage'],
+    ['linux-x86_64', 'Gustaf_1.2.3_amd64.deb', 'Gustaf-1.2.3-Linux-x64.deb'],
+    ['linux-x86_64', 'Gustaf-1.2.3-1.x86_64.rpm', 'Gustaf-1.2.3-Linux-x64.rpm'],
+  ]) {
+    assert.equal(releaseAssetName(platform, '1.2.3', original), expected);
+    assert.equal(releaseAssetName(platform, '1.2.3', original + '.sig'), expected + '.sig');
+  }
+  assert.equal(releaseAssetName('linux-x86_64', '1.2.3', 'data.tar.gz'), null);
+  assert.throws(() => releaseAssetName('unsupported', '1.2.3', 'Gustaf.dmg'));
 });

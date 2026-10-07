@@ -11,7 +11,8 @@ export const DEFAULT_ACCENT = "#a884ee";
 export type ChatWidth = "standard" | "wide" | "full";
 export const CHAT_WIDTHS: readonly ChatWidth[] = ["standard", "wide", "full"];
 export const DEFAULT_CHAT_WIDTH: ChatWidth = "standard";
-export const parseChatWidth = (v: unknown): ChatWidth => (CHAT_WIDTHS.includes(v as ChatWidth) ? (v as ChatWidth) : DEFAULT_CHAT_WIDTH);
+export const parseChatWidth = (v: unknown): ChatWidth =>
+  CHAT_WIDTHS.includes(v as ChatWidth) ? (v as ChatWidth) : DEFAULT_CHAT_WIDTH;
 /** CSS value of `--chat-width` for a setting. */
 export const chatWidthCss = (w: ChatWidth) => (w === "wide" ? "960px" : w === "full" ? "100%" : "720px");
 /** Offered in Settings; any other valid hex is accepted through the custom field. */
@@ -41,11 +42,20 @@ export function hexToRgb(hex: string): RGB {
   return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB;
 }
 
-export const rgbToHex = (rgb: RGB) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+export const rgbToHex = (rgb: RGB) =>
+  "#" +
+  rgb
+    .map((v) =>
+      Math.max(0, Math.min(255, Math.round(v)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("");
 
 /** `amount` 0..1 of `to` mixed into `from`. */
 export function mix(from: string, to: string, amount: number): string {
-  const a = hexToRgb(from), b = hexToRgb(to);
+  const a = hexToRgb(from),
+    b = hexToRgb(to);
   return rgbToHex(a.map((v, i) => v + (b[i] - v) * amount) as RGB);
 }
 
@@ -90,7 +100,8 @@ const PAGE_BG: Record<ResolvedTheme, string> = { dark: "#181818", light: "#fffff
 
 /** The accent nudged toward white (dark theme) or black (light theme) until it reaches `min` against the page background. */
 export function focusRingColor(accent: string, theme: ResolvedTheme, min = MIN_UI_CONTRAST + 0.5): string {
-  const bg = PAGE_BG[theme], to = theme === "dark" ? "#ffffff" : "#000000";
+  const bg = PAGE_BG[theme],
+    to = theme === "dark" ? "#ffffff" : "#000000";
   let c = normalizeHex(accent) ?? DEFAULT_ACCENT;
   for (let i = 0; i < 20 && contrastRatio(c, bg) < min; i++) c = mix(c, to, 0.1);
   return c;
@@ -99,7 +110,10 @@ export function focusRingColor(accent: string, theme: ResolvedTheme, min = MIN_U
 /** CSS variables derived from the accent: `--accent` itself, a soft variant for links/buttons, the message bubble and the text on top of each. */
 export function accentVars(accent: string, theme: ResolvedTheme): Record<string, string> {
   const base = normalizeHex(accent) ?? DEFAULT_ACCENT;
-  const soft = theme === "dark" ? lightenUntilReadable(mix(base, "#ffffff", 0.42)) : darkenUntilReadable(mix(base, "#000000", 0.3));
+  const soft =
+    theme === "dark"
+      ? lightenUntilReadable(mix(base, "#ffffff", 0.42))
+      : darkenUntilReadable(mix(base, "#000000", 0.3));
   const bubble = darkenUntilReadable(theme === "dark" ? mix(base, "#000000", 0.45) : base);
   return {
     "--accent": base,

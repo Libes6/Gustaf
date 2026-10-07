@@ -15,7 +15,10 @@ export function legacyProjectPath(path: string): string | null {
  * Reads `path` with `read`; when that fails and the path is inside `.gustaf/`, reads the same file in `.mcode/`.
  * Resolves to the value and the path it came from; rejects with the first error when neither can be read.
  */
-export async function readProjectFile<T>(read: (path: string) => Promise<T>, path: string): Promise<{ value: T; path: string }> {
+export async function readProjectFile<T>(
+  read: (path: string) => Promise<T>,
+  path: string,
+): Promise<{ value: T; path: string }> {
   try {
     return { value: await read(path), path };
   } catch (first) {

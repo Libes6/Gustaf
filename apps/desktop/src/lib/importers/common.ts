@@ -84,7 +84,11 @@ export function toMs(v: unknown, unit: "iso" | "seconds" = "iso"): number | unde
   return undefined;
 }
 
-export const baseName = (path: string) => path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || path;
+export const baseName = (path: string) =>
+  path
+    .replace(/[\\/]+$/, "")
+    .split(/[\\/]/)
+    .pop() || path;
 
 export function projectOf(cwd: unknown): ImportedChat["project"] {
   if (!str(cwd) || !cwd.trim()) return null;
@@ -122,7 +126,9 @@ export function outputText(v: unknown): string {
   if (str(v)) return v;
   if (Array.isArray(v)) {
     return v
-      .map((b) => (str(b) ? b : rec(b) ? (str(b.text) ? b.text : /image/.test(String(b.type)) ? "[image omitted]" : "") : ""))
+      .map((b) =>
+        str(b) ? b : rec(b) ? (str(b.text) ? b.text : /image/.test(String(b.type)) ? "[image omitted]" : "") : "",
+      )
       .filter(Boolean)
       .join("\n");
   }
@@ -156,7 +162,10 @@ export function pairTools(messages: ImportedMessage[]): ImportedMessage[] {
     }
     out.push(m);
     i++;
-    const calls = m.role === "assistant" ? m.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call") : [];
+    const calls =
+      m.role === "assistant"
+        ? m.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call")
+        : [];
     if (!calls.length) continue;
     const results = new Map<string, Extract<Part, { type: "tool_result" }>>();
     let at = messages[i]?.createdAt;
@@ -177,6 +186,7 @@ export function pairTools(messages: ImportedMessage[]): ImportedMessage[] {
 export function capMessages(messages: ImportedMessage[]): { messages: ImportedMessage[]; clipped: boolean } {
   if (messages.length <= LIMITS.messages) return { messages, clipped: false };
   let end = LIMITS.messages;
-  while (end > 0 && messages[end - 1].role !== "tool" && messages[end - 1].parts.some((p) => p.type === "tool_call")) end--;
+  while (end > 0 && messages[end - 1].role !== "tool" && messages[end - 1].parts.some((p) => p.type === "tool_call"))
+    end--;
   return { messages: messages.slice(0, end), clipped: true };
 }

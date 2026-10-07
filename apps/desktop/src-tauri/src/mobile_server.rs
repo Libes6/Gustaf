@@ -11,6 +11,7 @@
 //!
 //! This file is the lifecycle (`start`, `Handle`) and the Tauri commands the Settings page uses.
 
+mod commands;
 mod data;
 mod events;
 mod http;
@@ -75,28 +76,64 @@ fn io_err(what: &str, e: std::io::Error) -> String {
 }
 
 /// Starts the server. Errors (not private, port busy, no LAN address, files unusable) come back as messages.
-pub fn start(cfg: &Config, db_path: &Path, data_dir: &Path, board: Arc<StatusBoard>) -> Result<Handle, String> {
+pub fn start(
+    cfg: &Config,
+    db_path: &Path,
+    data_dir: &Path,
+    board: Arc<StatusBoard>,
+    bus: Arc<commands::CommandBus>,
+) -> Result<Handle, String> {
     let ip = match cfg.bind {
         Some(ip) => net::validate_bind(IpAddr::V4(ip), cfg.allow_loopback)?,
-        None => net::detect_lan_ip().ok_or("no private LAN address found; connect to a Wi-Fi or Ethernet network first")?,
+        None => net::detect_lan_ip()
+            .ok_or("no private LAN address found; connect to a Wi-Fi or Ethernet network first")?,
     };
     let identity = tls::load_or_create(data_dir)?;
     let tls_config = tls::server_config(&identity)?;
     let store = Arc::new(data::Store::open(db_path)?);
-    let std_listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(ip), cfg.port)).map_err(|e| io_err(&format!("{ip}:{}", cfg.port), e))?;
-    std_listener.set_nonblocking(true).map_err(|e| io_err("listener", e))?;
-    let addr = std_listener.local_addr().map_err(|e| io_err("listener", e))?;
+    let std_listener = TcpListener::bind(SocketAddr::new(IpAddr::V4(ip), cfg.port))
+        .map_err(|e| io_err(&format!("{ip}:{}", cfg.port), e))?;
+    std_listener
+        .set_nonblocking(true)
+        .map_err(|e| io_err("listener", e))?;
+    let addr = std_listener
+        .local_addr()
+        .map_err(|e| io_err("listener", e))?;
 
-    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("mobile-server").enable_all().build().map_err(|e| io_err("runtime", e))?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_name("mobile-server")
+        .enable_all()
+        .build()
+        .map_err(|e| io_err("runtime", e))?;
     let (shutdown, shutdown_rx) = watch::channel(false);
-    let ctx = Arc::new(Ctx::new(store, board, shutdown_rx, cfg.desktop_name.clone(), cfg.app_version.clone(), cfg.allow_loopback));
+    let ctx = Arc::new(Ctx::new(
+        store,
+        board,
+        bus,
+        shutdown_rx,
+        cfg.desktop_name.clone(),
+        cfg.app_version.clone(),
+        cfg.allow_loopback,
+    ));
     {
         let _enter = runtime.enter();
-        let listener = tokio::net::TcpListener::from_std(std_listener).map_err(|e| io_err("listener", e))?;
-        runtime.spawn(http::serve(listener, TlsAcceptor::from(tls_config), ctx.clone()));
+        let listener =
+            tokio::net::TcpListener::from_std(std_listener).map_err(|e| io_err("listener", e))?;
+        runtime.spawn(http::serve(
+            listener,
+            TlsAcceptor::from(tls_config),
+            ctx.clone(),
+        ));
         runtime.spawn(http::poller(ctx.clone()));
     }
-    Ok(Handle { runtime: Some(runtime), shutdown, ctx, addr, fingerprint: identity.fingerprint })
+    Ok(Handle {
+        runtime: Some(runtime),
+        shutdown,
+        ctx,
+        addr,
+        fingerprint: identity.fingerprint,
+    })
 }
 
 impl Handle {
@@ -110,17 +147,34 @@ impl Handle {
 
     /// A fresh pairing code (the previous one stops working).
     pub fn issue_code(&self) -> IssuedCode {
-        let (code, expires) = self.ctx.pairing.lock().unwrap_or_else(|p| p.into_inner()).issue(Instant::now());
-        IssuedCode { code, expires_at: expiry_ms(expires) }
+        let (code, expires) = self
+            .ctx
+            .pairing
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .issue(Instant::now());
+        IssuedCode {
+            code,
+            expires_at: expiry_ms(expires),
+        }
     }
 
     pub fn active_code(&self) -> Option<IssuedCode> {
         let pairing = self.ctx.pairing.lock().unwrap_or_else(|p| p.into_inner());
-        pairing.active(Instant::now()).map(|(code, expires)| IssuedCode { code: code.to_string(), expires_at: expiry_ms(expires) })
+        pairing
+            .active(Instant::now())
+            .map(|(code, expires)| IssuedCode {
+                code: code.to_string(),
+                expires_at: expiry_ms(expires),
+            })
     }
 
     pub fn cancel_code(&self) {
-        self.ctx.pairing.lock().unwrap_or_else(|p| p.into_inner()).clear();
+        self.ctx
+            .pairing
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clear();
     }
 
     pub fn devices(&self) -> Result<Vec<data::Device>, String> {
@@ -159,7 +213,10 @@ impl Drop for Handle {
 }
 
 fn expiry_ms(expires: Instant) -> i64 {
-    http::unix_ms() + expires.saturating_duration_since(Instant::now()).as_millis() as i64
+    http::unix_ms()
+        + expires
+            .saturating_duration_since(Instant::now())
+            .as_millis() as i64
 }
 
 // ---- Tauri side -------------------------------------------------------------------------------------------------------
@@ -168,7 +225,21 @@ fn expiry_ms(expires: Instant) -> i64 {
 pub struct MobileServer {
     handle: Mutex<Option<Handle>>,
     board: Arc<StatusBoard>,
+    bus: Arc<commands::CommandBus>,
     last_error: Mutex<Option<String>>,
+}
+
+/// Delivers phone commands to the webview as the `mobile-command` event (lib/mobileCommands.ts answers with `mobile_command_reply`).
+struct TauriSink(AppHandle);
+
+impl commands::Sink for TauriSink {
+    fn emit(&self, id: u64, kind: &str, payload: &serde_json::Value) {
+        use tauri::Emitter;
+        let _ = self.0.emit(
+            "mobile-command",
+            serde_json::json!({ "id": id, "kind": kind, "payload": payload }),
+        );
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -209,7 +280,14 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 fn load_saved(db: &Db) -> Saved {
     let conn = lock(&db.0);
-    conn.query_row("select value from settings where key = ?", [SETTINGS_KEY], |r| r.get::<_, String>(0)).ok().and_then(|v| serde_json::from_str(&v).ok()).unwrap_or_default()
+    conn.query_row(
+        "select value from settings where key = ?",
+        [SETTINGS_KEY],
+        |r| r.get::<_, String>(0),
+    )
+    .ok()
+    .and_then(|v| serde_json::from_str(&v).ok())
+    .unwrap_or_default()
 }
 
 fn save(db: &Db, saved: &Saved) {
@@ -261,7 +339,10 @@ fn status_of(server: &MobileServer, db: &Db) -> Status {
             fingerprint: Some(h.fingerprint().to_string()),
             protocol: PROTOCOL_VERSION,
             devices: h.devices().map(|d| d.len()).unwrap_or(0),
-            pairing: h.active_code().map(|c| PairingInfo { code: c.code, expires_at: c.expires_at }),
+            pairing: h.active_code().map(|c| PairingInfo {
+                code: c.code,
+                expires_at: c.expires_at,
+            }),
             error,
         },
         None => Status {
@@ -280,16 +361,44 @@ fn status_of(server: &MobileServer, db: &Db) -> Status {
 }
 
 fn count_devices(db: &Db) -> usize {
-    lock(&db.0).query_row("select count(*) from paired_devices where revoked_at is null", [], |r| r.get::<_, i64>(0)).unwrap_or(0) as usize
+    lock(&db.0)
+        .query_row(
+            "select count(*) from paired_devices where revoked_at is null",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0) as usize
 }
 
-fn start_with(app: &AppHandle, server: &MobileServer, db: &Db, port: u16, explicit: bool) -> Result<(), String> {
+fn start_with(
+    app: &AppHandle,
+    server: &MobileServer,
+    db: &Db,
+    port: u16,
+    explicit: bool,
+) -> Result<(), String> {
     let dir = data_dir(app)?;
     let board = server.board.clone();
-    let mk = |port: u16| Config { bind: None, port, allow_loopback: false, desktop_name: desktop_name(), app_version: app.package_info().version.to_string() };
-    let handle = match start(&mk(port), &dir.join("app.db"), &dir, board.clone()) {
+    let bus = server.bus.clone();
+    bus.set_sink(Some(Arc::new(TauriSink(app.clone()))));
+    let mk = |port: u16| Config {
+        bind: None,
+        port,
+        allow_loopback: false,
+        desktop_name: desktop_name(),
+        app_version: app.package_info().version.to_string(),
+    };
+    let handle = match start(
+        &mk(port),
+        &dir.join("app.db"),
+        &dir,
+        board.clone(),
+        bus.clone(),
+    ) {
         // A remembered port that is taken now is not an error: pick another and remember that one.
-        Err(e) if !explicit && port != 0 && e.starts_with("port in use") => start(&mk(0), &dir.join("app.db"), &dir, board)?,
+        Err(e) if !explicit && port != 0 && e.starts_with("port in use") => {
+            start(&mk(0), &dir.join("app.db"), &dir, board, bus)?
+        }
         other => other?,
     };
     let _ = db; // saved by the caller once the actual port is known
@@ -299,7 +408,12 @@ fn start_with(app: &AppHandle, server: &MobileServer, db: &Db, port: u16, explic
 
 /// `port`: `None` = the remembered one (or a random free one the first time), `Some(0)` = a new random one, `Some(n)` = exactly n.
 #[tauri::command]
-pub fn mobile_server_start(app: AppHandle, server: State<MobileServer>, db: State<Db>, port: Option<u16>) -> Result<Status, String> {
+pub fn mobile_server_start(
+    app: AppHandle,
+    server: State<MobileServer>,
+    db: State<Db>,
+    port: Option<u16>,
+) -> Result<Status, String> {
     if lock(&server.handle).is_none() {
         let saved = load_saved(&db);
         let (want, explicit) = match port {
@@ -309,8 +423,17 @@ pub fn mobile_server_start(app: AppHandle, server: State<MobileServer>, db: Stat
         match start_with(&app, &server, &db, want, explicit) {
             Ok(()) => {
                 *lock(&server.last_error) = None;
-                let actual = lock(&server.handle).as_ref().map(|h| h.addr().port()).unwrap_or(0);
-                save(&db, &Saved { enabled: true, port: actual });
+                let actual = lock(&server.handle)
+                    .as_ref()
+                    .map(|h| h.addr().port())
+                    .unwrap_or(0);
+                save(
+                    &db,
+                    &Saved {
+                        enabled: true,
+                        port: actual,
+                    },
+                );
             }
             Err(e) => {
                 *lock(&server.last_error) = Some(e.clone());
@@ -360,7 +483,10 @@ pub fn mobile_pairing_cancel(server: State<MobileServer>, db: State<Db>) -> Stat
 }
 
 #[tauri::command]
-pub fn mobile_devices(server: State<MobileServer>, db: State<Db>) -> Result<Vec<data::Device>, String> {
+pub fn mobile_devices(
+    server: State<MobileServer>,
+    db: State<Db>,
+) -> Result<Vec<data::Device>, String> {
     if let Some(h) = lock(&server.handle).as_ref() {
         return h.devices();
     }
@@ -369,21 +495,35 @@ pub fn mobile_devices(server: State<MobileServer>, db: State<Db>) -> Result<Vec<
         .prepare("select id, name, created_at, last_seen_at from paired_devices where revoked_at is null order by created_at desc, rowid desc")
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], |r| Ok(data::Device { id: r.get(0)?, name: r.get(1)?, created_at: r.get(2)?, last_seen_at: r.get(3)? }))
+        .query_map([], |r| {
+            Ok(data::Device {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                created_at: r.get(2)?,
+                last_seen_at: r.get(3)?,
+            })
+        })
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
 }
 
 /// Revokes a device (also while the server is stopped; then it simply cannot connect when the server starts again).
 #[tauri::command]
-pub fn mobile_device_revoke(server: State<MobileServer>, db: State<Db>, id: String) -> Result<bool, String> {
+pub fn mobile_device_revoke(
+    server: State<MobileServer>,
+    db: State<Db>,
+    id: String,
+) -> Result<bool, String> {
     if let Some(h) = lock(&server.handle).as_ref() {
         return h.revoke(&id);
     }
     let conn = lock(&db.0);
-    conn.execute("update paired_devices set revoked_at = ? where id = ? and revoked_at is null", rusqlite::params![http::unix_ms(), id])
-        .map(|n| n > 0)
-        .map_err(|e| e.to_string())
+    conn.execute(
+        "update paired_devices set revoked_at = ? where id = ? and revoked_at is null",
+        rusqlite::params![http::unix_ms(), id],
+    )
+    .map(|n| n > 0)
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Deserialize)]
@@ -397,7 +537,30 @@ pub struct StatusReport {
 /// Replaces the previous report. Cheap and safe to call whether or not the server runs.
 #[tauri::command]
 pub fn mobile_report_status(server: State<MobileServer>, statuses: Vec<StatusReport>) {
-    server.board.replace(statuses.into_iter().map(|s| (s.chat_id, s.status)));
+    server
+        .board
+        .replace(statuses.into_iter().map(|s| (s.chat_id, s.status)));
+}
+
+/// The webview's answer to a `mobile-command` event; ignored when the request already timed out.
+#[tauri::command]
+pub fn mobile_command_reply(
+    server: State<MobileServer>,
+    id: u64,
+    ok: bool,
+    code: Option<String>,
+    message: Option<String>,
+    data: Option<serde_json::Value>,
+) {
+    server.bus.reply(
+        id,
+        commands::Reply {
+            ok,
+            code: code.unwrap_or_default(),
+            message: message.unwrap_or_default(),
+            data: data.unwrap_or(serde_json::Value::Null),
+        },
+    );
 }
 
 /// Called once at startup: when the switch was left on, the server comes back up.
@@ -411,8 +574,17 @@ pub fn init(app: &tauri::App) {
     }
     match start_with(&handle, &server, &db, saved.port, false) {
         Ok(()) => {
-            let actual = lock(&server.handle).as_ref().map(|h| h.addr().port()).unwrap_or(0);
-            save(&db, &Saved { enabled: true, port: actual });
+            let actual = lock(&server.handle)
+                .as_ref()
+                .map(|h| h.addr().port())
+                .unwrap_or(0);
+            save(
+                &db,
+                &Saved {
+                    enabled: true,
+                    port: actual,
+                },
+            );
         }
         Err(e) => {
             eprintln!("mobile server: cannot start: {e}");

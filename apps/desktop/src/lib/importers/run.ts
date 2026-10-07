@@ -34,7 +34,8 @@ export function duplicateKeys(existing: { title: string; created_at: number; sou
 }
 
 export const isDuplicate = (chat: ImportedChat, keys: ReturnType<typeof duplicateKeys>) =>
-  keys.ids.has(storedSourceId(chat.source, chat.sourceId)) || (!!chat.createdAt && keys.times.has(timeKey(chat.title, chat.createdAt)));
+  keys.ids.has(storedSourceId(chat.source, chat.sourceId)) ||
+  (!!chat.createdAt && keys.times.has(timeKey(chat.title, chat.createdAt)));
 
 /**
  * Imports chats one at a time. `load` supplies a chat when its turn comes (so a big selection is never held in memory
@@ -83,7 +84,8 @@ export async function importChats(
       continue;
     }
     try {
-      for (const m of chat.messages) await store.addMessage(id, { role: m.role, parts: m.parts, meta: m.meta }, m.createdAt ?? chat.createdAt);
+      for (const m of chat.messages)
+        await store.addMessage(id, { role: m.role, parts: m.parts, meta: m.meta }, m.createdAt ?? chat.createdAt);
       await store.finish(id, { createdAt: chat.createdAt, updatedAt: chat.updatedAt });
     } catch (e) {
       await store.discard(id).catch(() => {});

@@ -26,11 +26,13 @@ export function setPlatformForTests(p: Platform | undefined) {
 export const isMac = () => currentPlatform() === "macos";
 export const isWindows = () => currentPlatform() === "windows";
 
-export const platformLabel = (p: Platform = currentPlatform()) => ({ macos: "macOS", windows: "Windows", linux: "Linux" })[p];
-export const shellLabel = (p: Platform = currentPlatform()) => ({ macos: "zsh", windows: "PowerShell", linux: "bash" })[p];
+export const platformLabel = (p: Platform = currentPlatform()) =>
+  ({ macos: "macOS", windows: "Windows", linux: "Linux" })[p];
+export const shellLabel = (p: Platform = currentPlatform()) =>
+  ({ macos: "zsh", windows: "PowerShell", linux: "bash" })[p];
 /** i18n key naming the OS secret store (Keychain / Credential Manager / Secret Service), for `{store}` placeholders. */
 export const keyStoreKey = (p: Platform = currentPlatform()) =>
-  ({ macos: "keyStoreMac", windows: "keyStoreWindows", linux: "keyStoreLinux" } as const)[p];
+  (({ macos: "keyStoreMac", windows: "keyStoreWindows", linux: "keyStoreLinux" }) as const)[p];
 
 /** Display form of a combo written with the macOS symbols: `⌘` becomes `Ctrl+`, `⇧` `Shift+`, `⌥` `Alt+` elsewhere. */
 export function displayKeys(display: string, p: Platform = currentPlatform()): string {

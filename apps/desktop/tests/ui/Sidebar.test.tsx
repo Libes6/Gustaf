@@ -15,8 +15,14 @@ const chats = [
   chat({ id: 3, project_id: null, title: "Loose question" }),
 ];
 
-const setup = (over: Record<string, unknown> = {}, props: { onSearch?: () => void; onCreateProject?: () => void } = {}) =>
-  renderApp(<Sidebar onCreateProject={props.onCreateProject ?? noop} onSearch={props.onSearch ?? noop} />, makeApp({ projects: [project()], chats, ...over }));
+const setup = (
+  over: Record<string, unknown> = {},
+  props: { onSearch?: () => void; onCreateProject?: () => void } = {},
+) =>
+  renderApp(
+    <Sidebar onCreateProject={props.onCreateProject ?? noop} onSearch={props.onSearch ?? noop} />,
+    makeApp({ projects: [project()], chats, ...over }),
+  );
 
 describe("Sidebar", () => {
   it("lists projects with their chats and the recent chats", () => {
@@ -66,7 +72,11 @@ describe("Sidebar", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "Beta{Enter}");
     await waitFor(() => expect(app.reload).toHaveBeenCalled());
-    expect(callsOf("db_execute").some((a) => /update projects set name/.test(a.sql) && a.params[0] === "Beta" && a.params[1] === 1)).toBe(true);
+    expect(
+      callsOf("db_execute").some(
+        (a) => /update projects set name/.test(a.sql) && a.params[0] === "Beta" && a.params[1] === 1,
+      ),
+    ).toBe(true);
   });
 
   it("Escape cancels an inline rename without writing", async () => {
@@ -85,7 +95,11 @@ describe("Sidebar", () => {
     const input = screen.getByDisplayValue("Loose question");
     await userEvent.clear(input);
     await userEvent.type(input, "Renamed{Enter}");
-    await waitFor(() => expect(callsOf("db_execute").some((a) => /update chats set title/.test(a.sql) && a.params[0] === "Renamed")).toBe(true));
+    await waitFor(() =>
+      expect(callsOf("db_execute").some((a) => /update chats set title/.test(a.sql) && a.params[0] === "Renamed")).toBe(
+        true,
+      ),
+    );
   });
 
   it("the full-text search button calls onSearch", async () => {
@@ -112,7 +126,9 @@ describe("Sidebar", () => {
     setup();
     expect(screen.queryByRole("status", { name: "Waiting for your approval" })).not.toBeInTheDocument();
     let done = noop;
-    act(() => { done = beginApproval(2, "main"); });
+    act(() => {
+      done = beginApproval(2, "main");
+    });
     // Chat 2 appears under its project and in Recent.
     expect(screen.getAllByRole("status", { name: "Waiting for your approval" }).length).toBeGreaterThan(0);
     const row = screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement;
@@ -128,12 +144,18 @@ describe("Sidebar", () => {
     const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
     expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
     let handle: ReturnType<typeof beginLiveRun> | undefined;
-    act(() => { handle = beginLiveRun(3, "Nightly", noop); });
+    act(() => {
+      handle = beginLiveRun(3, "Nightly", noop);
+    });
     // A running chat folds into the Working group of Recent (T6); opening the group shows it with its badge.
     expect(screen.queryByText("Loose question")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Working/ }));
     expect(within(row()).getByRole("img", { name: "Thinking…" })).toBeInTheDocument();
-    expect(within(screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getAllByText("Refactor router")[0].closest(".row") as HTMLElement).queryByRole("img", {
+        name: "Thinking…",
+      }),
+    ).not.toBeInTheDocument();
     act(() => handle?.end());
     expect(within(row()).queryByRole("img", { name: "Thinking…" })).not.toBeInTheDocument();
   });
@@ -157,10 +179,16 @@ describe("Sidebar", () => {
     setup();
     const row = () => screen.getByText("Loose question").closest(".row") as HTMLElement;
     let done = noop;
-    act(() => { chatStatusStore.runEnded(3, "failed"); done = beginApproval(3, "main"); });
+    act(() => {
+      chatStatusStore.runEnded(3, "failed");
+      done = beginApproval(3, "main");
+    });
     expect(within(row()).getByRole("status", { name: "Waiting for your approval" })).toBeInTheDocument();
     expect(within(row()).queryByRole("status", { name: "The last run failed" })).not.toBeInTheDocument();
-    act(() => { done(); chatStatusStore.runStarted(3); });
+    act(() => {
+      done();
+      chatStatusStore.runStarted(3);
+    });
   });
 
   it("archives a chat with the row button", async () => {

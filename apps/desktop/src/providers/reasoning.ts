@@ -7,7 +7,9 @@
 //  - Codex CLI: `-c model_reasoning_effort=<level>`; only low/medium/high are offered (every reasoning model takes them).
 //  - Cursor Agent CLI: bracket overrides on the model id, e.g. `claude-opus-4-8[effort=high]` (cursor-agent --help).
 //    Not run against a logged-in account: which models accept `effort` is a guess (Claude and GPT-5+ families).
-import type { Reasoning } from "./types";
+//  - Cursor SDK (API-key adapter): `Cursor.models.list()` reports per-model `parameters`; the effort one is sent back as `model.params`.
+//  - OpenRouter: models whose `supported_parameters` include `reasoning` take `reasoning: { effort }` (low/medium/high).
+import type { EffortSpec, ModelInfo, Reasoning } from "./types";
 
 /** Every level, weakest first; a model offers a subset in this order. */
 export const ALL_LEVELS: readonly Reasoning[] = ["low", "medium", "high", "xhigh", "max"];
@@ -55,7 +57,9 @@ export function cursorLevels(model: string, listed?: Iterable<string>): readonly
   const m = model.toLowerCase();
   if (m.includes("[") || CURSOR_LEVEL_SUFFIX.test(m)) return NONE;
   // A plain id listed next to its own level variants (`gpt-5.2` beside `gpt-5.2-high`) belongs to the old scheme too.
-  if (listed) for (const id of listed) if (id.toLowerCase().startsWith(`${m}-`) && CURSOR_LEVEL_SUFFIX.test(id.toLowerCase())) return NONE;
+  if (listed)
+    for (const id of listed)
+      if (id.toLowerCase().startsWith(`${m}-`) && CURSOR_LEVEL_SUFFIX.test(id.toLowerCase())) return NONE;
   return /^(claude-(opus|sonnet|fable|mythos)-|gpt-5|gpt-6)/.test(m) ? BASIC : NONE;
 }
 
@@ -73,10 +77,66 @@ export function pickLevel(level: Reasoning | undefined, levels: readonly Reasoni
   if (!level || !levels.length) return undefined;
   if (levels.includes(level)) return level;
   const want = ALL_LEVELS.indexOf(level);
-  return [...levels].sort((a, b) => Math.abs(ALL_LEVELS.indexOf(a) - want) - Math.abs(ALL_LEVELS.indexOf(b) - want) || ALL_LEVELS.indexOf(a) - ALL_LEVELS.indexOf(b))[0];
+  return [...levels].sort(
+    (a, b) =>
+      Math.abs(ALL_LEVELS.indexOf(a) - want) - Math.abs(ALL_LEVELS.indexOf(b) - want) ||
+      ALL_LEVELS.indexOf(a) - ALL_LEVELS.indexOf(b),
+  )[0];
 }
 
 /** Reset target in the composer: `medium` when offered, else the middle level. */
 export function defaultLevel(levels: readonly Reasoning[]): Reasoning | undefined {
   return levels.includes("medium") ? "medium" : levels[Math.floor((levels.length - 1) / 2)];
 }
+
+// ---- effort that the provider reports per model ----------------------------------------------------------------------
+
+const VALUE_LEVEL: Record<string, Reasoning> = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  "x-high": "xhigh",
+  "extra-high": "xhigh",
+  extra_high: "xhigh",
+  max: "max",
+};
+
+/** The effort parameter of a Cursor SDK model (`ModelListItem.parameters`), or undefined when it has none (or fewer than two usable stops). */
+export function sdkEffort(parameters: unknown): EffortSpec | undefined {
+  if (!Array.isArray(parameters)) return undefined;
+  for (const p of parameters) {
+    if (!p || typeof p.id !== "string" || !/effort|reasoning/i.test(p.id) || !Array.isArray(p.values)) continue;
+    const values: Partial<Record<Reasoning, string>> = {};
+    for (const v of p.values) {
+      const raw = typeof v?.value === "string" ? v.value : "";
+      const level = VALUE_LEVEL[raw.toLowerCase().replace(/\s+/g, "-")];
+      if (level && !values[level]) values[level] = raw;
+    }
+    if (Object.keys(values).length >= 2) return { param: p.id, values };
+  }
+  return undefined;
+}
+
+/** OpenRouter lists `supported_parameters`; `reasoning` means the unified `reasoning.effort` field is honoured. */
+export function openRouterEffort(supportedParameters: unknown): EffortSpec | undefined {
+  if (!Array.isArray(supportedParameters) || !supportedParameters.includes("reasoning")) return undefined;
+  return { param: "reasoning", values: { low: "low", medium: "medium", high: "high" } };
+}
+
+export const specLevels = (spec: EffortSpec | undefined): readonly Reasoning[] =>
+  spec ? ALL_LEVELS.filter((l) => spec.values[l] !== undefined) : NONE;
+
+// The last model list of each provider (fresh or cached) feeds this, so adapters know a model's effort without listing again.
+const reported = new Map<string, Map<string, EffortSpec>>();
+export function rememberEfforts(models: readonly ModelInfo[]) {
+  // Replaces the entry of every provider present in `models`, so a partial refresh keeps the others.
+  const next = new Map<string, Map<string, EffortSpec>>();
+  for (const m of models) {
+    if (!next.has(m.providerId)) next.set(m.providerId, new Map());
+    if (m.effort) next.get(m.providerId)!.set(m.id, m.effort);
+  }
+  for (const [id, own] of next) reported.set(id, own);
+}
+export const reportedEffort = (providerId: string, model: string): EffortSpec | undefined =>
+  reported.get(providerId)?.get(model);

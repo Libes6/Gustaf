@@ -14,7 +14,11 @@ const root = fileURLToPath(new URL('../..', import.meta.url));
 const SCHEMA = /const SCHEMA: &str = "([\s\S]*?)";/.exec(readFileSync(`${root}/src-tauri/src/db.rs`, 'utf8'))[1];
 
 // Columns added to existing tables by the idempotent migration (ADDED_COLUMNS in db.rs), applied the same way.
-const ADDED_COLUMNS = [...(/const ADDED_COLUMNS[^=]*= &\[([\s\S]*?)\];/.exec(readFileSync(`${root}/src-tauri/src/db.rs`, 'utf8'))?.[1] ?? '').matchAll(/\("(\w+)", "(\w+)", "(\w+)"\)/g)];
+const ADDED_COLUMNS = [
+  ...(
+    /const ADDED_COLUMNS[^=]*= &\[([\s\S]*?)\];/.exec(readFileSync(`${root}/src-tauri/src/db.rs`, 'utf8'))?.[1] ?? ''
+  ).matchAll(/\("(\w+)", "(\w+)", "(\w+)"\)/g),
+];
 
 export const FAKE_BASE_URL = 'https://fake-llm.test/v1';
 const enc = new TextEncoder();
@@ -22,14 +26,18 @@ const sse = (obj) => enc.encode(`data: ${typeof obj === 'string' ? obj : JSON.st
 
 function deferred() {
   let resolve;
-  const promise = new Promise((r) => { resolve = r; });
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 }
 
 const json = (obj, status = 200) => ({
   status,
   headers: [['content-type', 'application/json']],
-  chunks: (async function* () { yield enc.encode(JSON.stringify(obj)); })(),
+  chunks: (async function* () {
+    yield enc.encode(JSON.stringify(obj));
+  })(),
 });
 
 /**
@@ -51,13 +59,20 @@ export class FakeProvider {
   }
 
   /** Chat-completion request bodies, oldest first. */
-  get chatBodies() { return this.requests.filter((r) => r.path === '/chat/completions').map((r) => r.body); }
+  get chatBodies() {
+    return this.requests.filter((r) => r.path === '/chat/completions').map((r) => r.body);
+  }
 
   handle(method, url, body) {
     const path = new URL(url).pathname.replace(/^\/v1/, '');
     this.requests.push({ method, path, body: body ? JSON.parse(body) : null });
     if (path === '/models') return json({ data: this.models.map((id) => ({ id, created: 1700000000 })) });
-    if (path === '/chat/completions') return { status: 200, headers: [['content-type', 'text/event-stream']], chunks: this.#stream(this.#queue.shift() ?? { text: 'OK' }) };
+    if (path === '/chat/completions')
+      return {
+        status: 200,
+        headers: [['content-type', 'text/event-stream']],
+        chunks: this.#stream(this.#queue.shift() ?? { text: 'OK' }),
+      };
     return json({ error: { message: `fake provider: no route for ${path}` } }, 404);
   }
 
@@ -66,7 +81,16 @@ export class FakeProvider {
     if (spec.toolCalls) {
       let index = 0;
       for (const c of spec.toolCalls) {
-        yield delta({ tool_calls: [{ index, id: `call_${index}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } }] });
+        yield delta({
+          tool_calls: [
+            {
+              index,
+              id: `call_${index}`,
+              type: 'function',
+              function: { name: c.name, arguments: JSON.stringify(c.args) },
+            },
+          ],
+        });
         index++;
       }
     } else {
@@ -83,7 +107,15 @@ export class FakeProvider {
 }
 
 function bind(params = []) {
-  return params.map((v) => (v === undefined ? null : typeof v === 'boolean' ? Number(v) : v !== null && typeof v === 'object' ? JSON.stringify(v) : v));
+  return params.map((v) =>
+    v === undefined
+      ? null
+      : typeof v === 'boolean'
+        ? Number(v)
+        : v !== null && typeof v === 'object'
+          ? JSON.stringify(v)
+          : v,
+  );
 }
 
 export class FakeBackend {
@@ -106,15 +138,22 @@ export class FakeBackend {
 
   constructor() {
     this.db.exec(SCHEMA);
-    for (const [, table, column, decl] of ADDED_COLUMNS) this.db.exec(`alter table ${table} add column ${column} ${decl}`);
+    for (const [, table, column, decl] of ADDED_COLUMNS)
+      this.db.exec(`alter table ${table} add column ${column} ${decl}`);
   }
 
   /** Handler override for one command: `backend.on('git_status', (args) => ...)`. */
-  on(cmd, fn) { this.#overrides.set(cmd, fn); }
-  callsOf(cmd) { return this.calls.filter(([c]) => c === cmd).map(([, a]) => a); }
+  on(cmd, fn) {
+    this.#overrides.set(cmd, fn);
+  }
+  callsOf(cmd) {
+    return this.calls.filter(([c]) => c === cmd).map(([, a]) => a);
+  }
 
   setting(key, value) {
-    this.db.prepare('insert into settings(key, value) values(?, ?) on conflict(key) do update set value = excluded.value').run(key, JSON.stringify(value));
+    this.db
+      .prepare('insert into settings(key, value) values(?, ?) on conflict(key) do update set value = excluded.value')
+      .run(key, JSON.stringify(value));
   }
   getSetting(key) {
     const row = this.db.prepare('select value from settings where key = ?').get(key);
@@ -133,38 +172,67 @@ export class FakeBackend {
   }
 
   seedProject(name, path = null) {
-    return Number(this.db.prepare('insert into projects(name, path, source_id, created_at) values(?, ?, ?, ?)').run(name, path, path ? `local:${path}` : null, Date.now()).lastInsertRowid);
+    return Number(
+      this.db
+        .prepare('insert into projects(name, path, source_id, created_at) values(?, ?, ?, ?)')
+        .run(name, path, path ? `local:${path}` : null, Date.now()).lastInsertRowid,
+    );
   }
 
   /** `messages`: [role, text, meta?]. Returns the new chat and message ids. */
   seedChat(title, messages, projectId = null) {
     const now = Date.now();
-    const chatId = Number(this.db.prepare('insert into chats(project_id, title, created_at, updated_at) values(?, ?, ?, ?)').run(projectId, title, now, now).lastInsertRowid);
+    const chatId = Number(
+      this.db
+        .prepare('insert into chats(project_id, title, created_at, updated_at) values(?, ?, ?, ?)')
+        .run(projectId, title, now, now).lastInsertRowid,
+    );
     const messageIds = messages.map(([role, text, meta]) =>
-      Number(this.db.prepare('insert into messages(chat_id, role, content, created_at) values(?, ?, ?, ?)').run(chatId, role, JSON.stringify({ role, parts: [{ type: 'text', text }], meta }), now).lastInsertRowid));
+      Number(
+        this.db
+          .prepare('insert into messages(chat_id, role, content, created_at) values(?, ?, ?, ?)')
+          .run(chatId, role, JSON.stringify({ role, parts: [{ type: 'text', text }], meta }), now).lastInsertRowid,
+      ),
+    );
     return { chatId, messageIds };
   }
 
-  rows(sql, ...params) { return this.db.prepare(sql).all(...params).map((r) => ({ ...r })); }
+  rows(sql, ...params) {
+    return this.db
+      .prepare(sql)
+      .all(...params)
+      .map((r) => ({ ...r }));
+  }
 
   async invoke(cmd, args = {}) {
     this.calls.push([cmd, args]);
     const override = this.#overrides.get(cmd);
     if (override) return override(args);
     switch (cmd) {
-      case 'db_select': return this.rows(args.sql, ...bind(args.params));
+      case 'db_select':
+        return this.rows(args.sql, ...bind(args.params));
       case 'db_execute': {
         const r = this.db.prepare(args.sql).run(...bind(args.params));
         return [Number(r.changes), Number(r.lastInsertRowid)];
       }
-      case 'secret_get': return this.secrets.get(args.id) ?? null;
-      case 'secret_set': this.secrets.set(args.id, args.value); return null;
-      case 'secret_delete': this.secrets.delete(args.id); return null;
-      case 'search_messages': return this.searchMessages(args);
-      case 'search_models': return [];
-      case 'plugin:http|fetch': return this.httpFetch(args.clientConfig);
-      case 'plugin:http|fetch_send': return this.httpSend(args.rid);
-      case 'plugin:http|fetch_read_body': return this.httpRead(args.rid);
+      case 'secret_get':
+        return this.secrets.get(args.id) ?? null;
+      case 'secret_set':
+        this.secrets.set(args.id, args.value);
+        return null;
+      case 'secret_delete':
+        this.secrets.delete(args.id);
+        return null;
+      case 'search_messages':
+        return this.searchMessages(args);
+      case 'search_models':
+        return [];
+      case 'plugin:http|fetch':
+        return this.httpFetch(args.clientConfig);
+      case 'plugin:http|fetch_send':
+        return this.httpSend(args.rid);
+      case 'plugin:http|fetch_read_body':
+        return this.httpRead(args.rid);
       case 'plugin:http|fetch_cancel':
       case 'plugin:http|fetch_cancel_body':
         this.#fetches.get(args.rid)?.cancel?.();
@@ -173,29 +241,65 @@ export class FakeBackend {
       case 'review_run':
         this.shellCommands.push(args.command);
         return { code: 0, output: 'ok\n', timed_out: false };
-      case 'plugin:dialog|save': return this.savePath;
+      case 'plugin:dialog|save':
+        return this.savePath;
       case 'fs_write': {
         const path = `${args.root.replace(/\/$/, '')}/${args.path}`;
         this.files.set(path, args.content);
         return `wrote ${path}`;
       }
-      case 'review_prepare': return { id: 'review-1', root: args.root, workspace: `${args.root}/.ws` };
-      case 'review_list': case 'fs_files': case 'import_scan': case 'cursor_scan': case 'read_instructions': case 'import_chatgpt_scan': return [];
+      case 'review_prepare':
+        return { id: 'review-1', root: args.root, workspace: `${args.root}/.ws` };
+      case 'review_list':
+      case 'fs_files':
+      case 'import_scan':
+      case 'cursor_scan':
+      case 'read_instructions':
+      case 'import_chatgpt_scan':
+        return [];
       case 'git': // checkpoints and the project badge: a repository on `main` with one commit and a clean tree
-        return args.args?.includes('--abbrev-ref') ? 'main\n' : args.args?.includes('rev-parse') ? 'c0ffee0123456789\n' : '';
-      case 'git_status': return { branch: 'main', files: [] };
+        return args.args?.includes('--abbrev-ref')
+          ? 'main\n'
+          : args.args?.includes('rev-parse')
+            ? 'c0ffee0123456789\n'
+            : '';
+      case 'git_status':
+        return { branch: 'main', files: [] };
       case 'worktree_create': {
-        const info = { taskId: args.taskId, path: `/fake/worktrees/${args.taskId}`, branch: `gustaf/${args.slug}`, baseCommit: 'c0ffee0123456789', baseBranch: 'main', createdAt: 1, provider: args.provider, model: args.model, headSha: 'c0ffee0123456789', changedFiles: 0, ahead: 0, behind: 0, dirty: false, existsOnDisk: true };
+        const info = {
+          taskId: args.taskId,
+          path: `/fake/worktrees/${args.taskId}`,
+          branch: `gustaf/${args.slug}`,
+          baseCommit: 'c0ffee0123456789',
+          baseBranch: 'main',
+          createdAt: 1,
+          provider: args.provider,
+          model: args.model,
+          headSha: 'c0ffee0123456789',
+          changedFiles: 0,
+          ahead: 0,
+          behind: 0,
+          dirty: false,
+          existsOnDisk: true,
+        };
         this.worktrees.push(info);
         return info;
       }
-      case 'worktree_list': return this.worktrees;
-      case 'worktree_remove': this.worktrees = this.worktrees.filter((w) => w.taskId !== args.taskId); return { removed: true, branchDeleted: false, branchKeptReason: null };
-      case 'worktree_link_dirs': return [];
-      case 'worktree_prune': return { removed: [] };
-      case 'cu_permissions': return { accessibility: true, screen: true };
-      case 'cu_screen_size': return { width: 1440, height: 900 };
-      case 'mcp_status': return [];
+      case 'worktree_list':
+        return this.worktrees;
+      case 'worktree_remove':
+        this.worktrees = this.worktrees.filter((w) => w.taskId !== args.taskId);
+        return { removed: true, branchDeleted: false, branchKeptReason: null };
+      case 'worktree_link_dirs':
+        return [];
+      case 'worktree_prune':
+        return { removed: [] };
+      case 'cu_permissions':
+        return { accessibility: true, screen: true };
+      case 'cu_screen_size':
+        return { width: 1440, height: 900 };
+      case 'mcp_status':
+        return [];
       default:
         // Plugin plumbing (window, event, opener, notification, shortcut) is accepted and ignored. Any other command the
         // fake backend does not implement answers empty, so a screen renders its empty state.
@@ -209,23 +313,49 @@ export class FakeBackend {
     const empty = { hits: [], total: 0, totalCapped: false, byRecency: false, hasMore: false };
     if (!words.length) return empty;
     const hits = [];
-    const rows = this.rows(`select m.id, m.chat_id, m.role, m.content, m.created_at, c.title, c.project_id, c.archived, p.name as project_name
+    const rows = this
+      .rows(`select m.id, m.chat_id, m.role, m.content, m.created_at, c.title, c.project_id, c.archived, p.name as project_name
       from messages m join chats c on c.id = m.chat_id left join projects p on p.id = c.project_id order by m.id desc`);
     for (const r of rows) {
       if (projectId != null && r.project_id !== projectId) continue;
       const msg = JSON.parse(r.content);
       if (model && msg.meta?.model !== model) continue;
-      const text = (msg.parts ?? []).filter((p) => p.type === 'text').map((p) => p.text).join('\n');
+      const text = (msg.parts ?? [])
+        .filter((p) => p.type === 'text')
+        .map((p) => p.text)
+        .join('\n');
       const low = text.toLowerCase();
       if (!words.every((w) => low.includes(w))) continue;
       const at = low.indexOf(words[0]);
       const start = Math.max(0, at - 40);
-      const snippet = text.slice(start, at) + MARK_OPEN + text.slice(at, at + words[0].length) + MARK_CLOSE + text.slice(at + words[0].length, at + 80);
-      hits.push({ messageId: r.id, chatId: r.chat_id, chatTitle: r.title, projectId: r.project_id, projectName: r.project_name, archived: !!r.archived, role: r.role, model: msg.meta?.model ?? null, createdAt: r.created_at, snippet });
+      const snippet =
+        text.slice(start, at) +
+        MARK_OPEN +
+        text.slice(at, at + words[0].length) +
+        MARK_CLOSE +
+        text.slice(at + words[0].length, at + 80);
+      hits.push({
+        messageId: r.id,
+        chatId: r.chat_id,
+        chatTitle: r.title,
+        projectId: r.project_id,
+        projectName: r.project_name,
+        archived: !!r.archived,
+        role: r.role,
+        model: msg.meta?.model ?? null,
+        createdAt: r.created_at,
+        snippet,
+      });
     }
     const start = offset ?? 0;
     const page = hits.slice(start, start + (limit ?? 40));
-    return { hits: page, total: hits.length, totalCapped: false, byRecency: false, hasMore: start + page.length < hits.length };
+    return {
+      hits: page,
+      total: hits.length,
+      totalCapped: false,
+      byRecency: false,
+      hasMore: start + page.length < hits.length,
+    };
   }
 
   // ---- plugin-http protocol (see node_modules/@tauri-apps/plugin-http/dist-js/index.js) -------------------------------
@@ -239,8 +369,17 @@ export class FakeBackend {
     const body = f.cfg.data ? Buffer.from(f.cfg.data).toString('utf8') : null;
     const res = this.provider.handle(f.cfg.method, f.cfg.url, body);
     f.iter = res.chunks[Symbol.asyncIterator]();
-    f.cancel = () => { f.cancelled = true; f.iter.return?.(); };
-    return { status: res.status, statusText: res.status === 200 ? 'OK' : 'Error', url: f.cfg.url, headers: res.headers, rid };
+    f.cancel = () => {
+      f.cancelled = true;
+      f.iter.return?.();
+    };
+    return {
+      status: res.status,
+      statusText: res.status === 200 ? 'OK' : 'Error',
+      url: f.cfg.url,
+      headers: res.headers,
+      rid,
+    };
   }
   /** One body chunk followed by a 0 byte, or a lone 1 byte at the end of the stream (the plugin's framing). */
   async httpRead(rid) {

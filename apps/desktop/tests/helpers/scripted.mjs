@@ -14,7 +14,12 @@ export function scriptedAdapter(script, seen = { turns: [] }) {
     supportsReasoning: () => false,
     listModels: async () => [],
     turn: async (input) => {
-      seen.turns.push({ access: input.access, tools: input.tools.map((t) => t.name), system: input.system, messages: [...input.messages] });
+      seen.turns.push({
+        access: input.access,
+        tools: input.tools.map((t) => t.name),
+        system: input.system,
+        messages: [...input.messages],
+      });
       const next = script[i++] ?? say('done');
       return typeof next === 'function' ? next(input) : next;
     },

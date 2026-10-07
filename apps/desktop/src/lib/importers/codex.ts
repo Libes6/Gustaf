@@ -7,13 +7,33 @@
 import type { Part } from "../../providers/types.ts";
 import { IMAGE_OMITTED } from "../exportChats.ts";
 import {
-  LIMITS, capMessages, cleanArgs, cleanText, eachLine, outputText, pairTools, parseLine, projectOf, rec, str, titleFrom, toMs,
-  type ImportedChat, type ImportedMessage,
+  LIMITS,
+  capMessages,
+  cleanArgs,
+  cleanText,
+  eachLine,
+  outputText,
+  pairTools,
+  parseLine,
+  projectOf,
+  rec,
+  str,
+  titleFrom,
+  toMs,
+  type ImportedChat,
+  type ImportedMessage,
 } from "./common.ts";
 
 const INJECTED = [
-  "<environment_context>", "<user_instructions>", "<permissions", "<collaboration_mode>", "<dynamic_tools>",
-  "<recommended_plugins>", "<turn_aborted>", "<INSTRUCTIONS>", "# AGENTS.md instructions",
+  "<environment_context>",
+  "<user_instructions>",
+  "<permissions",
+  "<collaboration_mode>",
+  "<dynamic_tools>",
+  "<recommended_plugins>",
+  "<turn_aborted>",
+  "<INSTRUCTIONS>",
+  "# AGENTS.md instructions",
 ];
 
 /** User messages Codex adds on its own (context, instructions); never something the person typed. */
@@ -74,7 +94,12 @@ export function parseCodexSession(text: string, fallbackId = ""): ImportedChat |
     open.tool = null;
     if (open.assistant) open.assistant.parts.push(...parts);
     else {
-      open.assistant = { role: "assistant", parts, createdAt: at, meta: { imported: "codex", ...(model ? { model } : {}) } };
+      open.assistant = {
+        role: "assistant",
+        parts,
+        createdAt: at,
+        meta: { imported: "codex", ...(model ? { model } : {}) },
+      };
       messages.push(open.assistant);
     }
   };
@@ -105,7 +130,8 @@ export function parseCodexSession(text: string, fallbackId = ""): ImportedChat |
       updatedAt = Math.max(updatedAt ?? at, at);
     }
     // Header: `session_meta` line, or (older files) an untyped first line carrying the id.
-    const header = o.type === "session_meta" && rec(o.payload) ? o.payload : lineNo === 1 && !str(o.type) && str(o.id) ? o : null;
+    const header =
+      o.type === "session_meta" && rec(o.payload) ? o.payload : lineNo === 1 && !str(o.type) && str(o.id) ? o : null;
     if (header) {
       if (rec(header.source) || str(header.parent_thread_id)) subagent = true;
       if (!id && str(header.id)) id = header.id;
@@ -119,7 +145,12 @@ export function parseCodexSession(text: string, fallbackId = ""): ImportedChat |
       return;
     }
     // Current files wrap items in `response_item`; older ones store the item itself.
-    const item = o.type === "response_item" && rec(o.payload) ? o.payload : o.type === "message" || o.type === "function_call" ? o : null;
+    const item =
+      o.type === "response_item" && rec(o.payload)
+        ? o.payload
+        : o.type === "message" || o.type === "function_call"
+          ? o
+          : null;
     if (!item) return;
     switch (item.type) {
       case "message": {
@@ -131,11 +162,21 @@ export function parseCodexSession(text: string, fallbackId = ""): ImportedChat |
         open.assistant = null;
         open.tool = null;
         if (!firstUser) firstUser = t;
-        messages.push({ role: "user", parts: [{ type: "text", text: cleanText(t) }], createdAt: at, meta: { imported: "codex" } });
+        messages.push({
+          role: "user",
+          parts: [{ type: "text", text: cleanText(t) }],
+          createdAt: at,
+          meta: { imported: "codex" },
+        });
         return;
       }
       case "function_call":
-        return addCall(item.call_id, str(item.name) && item.name ? item.name : "function", parseArgs(item.arguments), at);
+        return addCall(
+          item.call_id,
+          str(item.name) && item.name ? item.name : "function",
+          parseArgs(item.arguments),
+          at,
+        );
       case "custom_tool_call":
         return addCall(item.call_id, str(item.name) && item.name ? item.name : "tool", { input: item.input }, at);
       case "local_shell_call":
@@ -145,7 +186,12 @@ export function parseCodexSession(text: string, fallbackId = ""): ImportedChat |
       case "local_shell_call_output":
         if (str(item.call_id) && item.call_id) {
           addResult(
-            { type: "tool_result", id: item.call_id, name: names.get(item.call_id) ?? "", output: cleanText(toolOutput(item.output), LIMITS.output) },
+            {
+              type: "tool_result",
+              id: item.call_id,
+              name: names.get(item.call_id) ?? "",
+              output: cleanText(toolOutput(item.output), LIMITS.output),
+            },
             at,
           );
         }

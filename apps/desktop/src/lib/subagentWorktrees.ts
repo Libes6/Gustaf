@@ -13,8 +13,17 @@ export const gitSubagentWorktrees: SubagentWorktrees = {
   async create({ projectRoot, title, providerId, model, setup }) {
     let info;
     try {
-      const taken = await worktrees.list(projectRoot).then((l) => l.map((w) => w.taskId), () => []);
-      info = await worktrees.create({ root: projectRoot, taskId: newTaskId(taken), slug: slugFromText(title), provider: providerId, model });
+      const taken = await worktrees.list(projectRoot).then(
+        (l) => l.map((w) => w.taskId),
+        () => [],
+      );
+      info = await worktrees.create({
+        root: projectRoot,
+        taskId: newTaskId(taken),
+        slug: slugFromText(title),
+        provider: providerId,
+        model,
+      });
     } catch (e) {
       if (needsShadowCopyFallback(e)) return null;
       throw parseWorktreeError(e);
@@ -27,7 +36,10 @@ export const gitSubagentWorktrees: SubagentWorktrees = {
   },
 
   async inspect(projectRoot, taskId) {
-    const [diff, list] = await Promise.all([worktrees.diff(projectRoot, taskId), worktrees.list(projectRoot).catch(() => [])]);
+    const [diff, list] = await Promise.all([
+      worktrees.diff(projectRoot, taskId),
+      worktrees.list(projectRoot).catch(() => []),
+    ]);
     const info = list.find((w) => w.taskId === taskId);
     // Without the checkout's status (listing failed or it is missing) its dirty and commit state are unknown: it counts as touched, so it is never removed.
     const committed = !info || (info.headSha != null && info.headSha !== info.baseCommit) || (info.ahead ?? 0) > 0;

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run check)",
+      "Bash(npm run check:quick)",
+      "Bash(npm run test:ui)",
+      "Bash(npm run test:e2e)",
+      "Bash(npm run test:release)",
+      "Bash(npm run version:check)",
+      "Bash(cargo test *)",
+      "Bash(cargo check *)"
+    ]
+  }
+}

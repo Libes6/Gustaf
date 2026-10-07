@@ -2,12 +2,38 @@ import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "../lib/api";
 import { localDayKey } from "../lib/budgets";
 import type { Part } from "../providers/types";
-import { deleteFinished, loadMessages, loadReport, loadStoredRuns, migrateLegacyRuns, pruneRuns, saveMessage, saveRun } from "./agentRunsDb";
 import {
-  AGENT_USAGE_SETTING, EMPTY_LEDGER, addToLedger, appendStep, boundRuns, isActiveStatus, mergeRuns, normalizeLedger,
-  type AgentRun, type AgentUsageLedger, type TranscriptStep,
+  deleteFinished,
+  loadMessages,
+  loadReport,
+  loadStoredRuns,
+  migrateLegacyRuns,
+  pruneRuns,
+  saveMessage,
+  saveRun,
+} from "./agentRunsDb";
+import {
+  AGENT_USAGE_SETTING,
+  EMPTY_LEDGER,
+  addToLedger,
+  appendStep,
+  boundRuns,
+  isActiveStatus,
+  mergeRuns,
+  normalizeLedger,
+  type AgentRun,
+  type AgentUsageLedger,
+  type TranscriptStep,
 } from "./agentRunsModel";
-import { MAX_MESSAGES_PER_RUN, messageJson, noteJson, rowsToSteps, type MessageRow, type PreviousRun, type StoredRole } from "./agentTranscript";
+import {
+  MAX_MESSAGES_PER_RUN,
+  messageJson,
+  noteJson,
+  rowsToSteps,
+  type MessageRow,
+  type PreviousRun,
+  type StoredRole,
+} from "./agentTranscript";
 
 // Background agent runs: one shared in-memory list (like rulesStore.ts) that mirrors the SQLite tables `agent_runs` and
 // `agent_messages` (agentRunsDb.ts). Run rows are written right away when a run is created or finishes and shortly after
@@ -77,7 +103,22 @@ export function createRun(init: NewRun, stop: () => void): string {
   const id = `${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const now = Date.now();
   stoppers.set(id, stop);
-  change(boundRuns([{ ...init, id, status: "queued", createdAt: now, startedAt: 0, tokens: 0, toolUses: 0, currentStep: "", transcript: [] }, ...runs]));
+  change(
+    boundRuns([
+      {
+        ...init,
+        id,
+        status: "queued",
+        createdAt: now,
+        startedAt: 0,
+        tokens: 0,
+        toolUses: 0,
+        currentStep: "",
+        transcript: [],
+      },
+      ...runs,
+    ]),
+  );
   schedule(id, true);
   void enqueue(() => pruneRuns());
   return id;
@@ -91,10 +132,23 @@ export function updateRun(id: string, patch: Partial<AgentRun>) {
 }
 
 /** Adds to the counters and appends a transcript step in one update. A note is also stored as a transcript message. */
-export function recordStep(id: string, step: TranscriptStep | null, add: { tokens?: number; toolUses?: number } = {}, currentStep?: string) {
+export function recordStep(
+  id: string,
+  step: TranscriptStep | null,
+  add: { tokens?: number; toolUses?: number } = {},
+  currentStep?: string,
+) {
   change(
     runs.map((r) =>
-      r.id !== id ? r : { ...r, tokens: r.tokens + (add.tokens ?? 0), toolUses: r.toolUses + (add.toolUses ?? 0), ...(currentStep !== undefined ? { currentStep } : {}), transcript: step ? appendStep(r.transcript, step) : r.transcript },
+      r.id !== id
+        ? r
+        : {
+            ...r,
+            tokens: r.tokens + (add.tokens ?? 0),
+            toolUses: r.toolUses + (add.toolUses ?? 0),
+            ...(currentStep !== undefined ? { currentStep } : {}),
+            transcript: step ? appendStep(r.transcript, step) : r.transcript,
+          },
     ),
   );
   schedule(id);
@@ -109,7 +163,12 @@ function writeMessage(id: string, role: StoredRole, json: string, at: number) {
 }
 
 /** Stores one message of the subagent's own history (the task prompt, an assistant reply or tool results), bounded per message. */
-export function recordMessage(id: string, role: "user" | "assistant" | "tool", parts: readonly Part[], at = Date.now()) {
+export function recordMessage(
+  id: string,
+  role: "user" | "assistant" | "tool",
+  parts: readonly Part[],
+  at = Date.now(),
+) {
   writeMessage(id, role, messageJson(parts), at);
 }
 
@@ -146,7 +205,16 @@ export async function loadPreviousRun(id: string): Promise<(PreviousRun & { chat
   const first = rows.find((r) => r.role === "user");
   const task = first ? rowsToSteps([first])[0]?.text : undefined;
   const report = (await loadReport(id).catch(() => "")) || run.report || run.summary || "";
-  return { title: run.title, type: run.type, status: run.status, ...(run.error ? { error: run.error } : {}), ...(task ? { task } : {}), report, steps: rowsToSteps(rows), ...(run.chatId !== undefined ? { chatId: run.chatId } : {}) };
+  return {
+    title: run.title,
+    type: run.type,
+    status: run.status,
+    ...(run.error ? { error: run.error } : {}),
+    ...(task ? { task } : {}),
+    report,
+    steps: rowsToSteps(rows),
+    ...(run.chatId !== undefined ? { chatId: run.chatId } : {}),
+  };
 }
 
 // ---- subagent tokens for Budgets (persisted under "agentUsage") ----

@@ -13,7 +13,25 @@ use std::{
 const MAX_TIMEOUT_MS: u64 = 60_000;
 const MAX_OUTPUT: usize = 64 * 1024;
 /// Variables a hook may inherit: enough to find tools and behave like a normal shell, nothing that holds credentials.
-const INHERIT: &[&str] = &["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "SHELL", "TERM", "SystemRoot", "ComSpec", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "PATHEXT"];
+const INHERIT: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "SHELL",
+    "TERM",
+    "SystemRoot",
+    "ComSpec",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "TEMP",
+    "TMP",
+    "PATHEXT",
+];
 
 #[derive(Serialize)]
 pub struct HookResult {
@@ -35,9 +53,20 @@ fn clip(mut s: String) -> String {
 }
 
 /// The environment of a hook: the allowlisted variables of this process plus the `GUSTAF_*` pairs (anything else is dropped).
-pub fn hook_env(extra: &[(String, String)], parent: impl Fn(&str) -> Option<String>) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = INHERIT.iter().filter_map(|k| parent(k).map(|v| (k.to_string(), v))).collect();
-    out.extend(extra.iter().filter(|(k, _)| k.starts_with("GUSTAF_")).cloned());
+pub fn hook_env(
+    extra: &[(String, String)],
+    parent: impl Fn(&str) -> Option<String>,
+) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = INHERIT
+        .iter()
+        .filter_map(|k| parent(k).map(|v| (k.to_string(), v)))
+        .collect();
+    out.extend(
+        extra
+            .iter()
+            .filter(|(k, _)| k.starts_with("GUSTAF_"))
+            .cloned(),
+    );
     out
 }
 
@@ -48,11 +77,19 @@ fn kill_tree(pid: u32) {
     }
     #[cfg(windows)]
     {
-        let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).output();
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .output();
     }
 }
 
-pub fn exec(root: &str, command: &str, timeout_ms: u64, stdin: String, env: Vec<(String, String)>) -> Result<HookResult, String> {
+pub fn exec(
+    root: &str,
+    command: &str,
+    timeout_ms: u64,
+    stdin: String,
+    env: Vec<(String, String)>,
+) -> Result<HookResult, String> {
     let shell = Shell::current();
     let merged = shell.merges_stderr_itself();
     let mut cmd = Command::new(shell.program());
@@ -63,7 +100,11 @@ pub fn exec(root: &str, command: &str, timeout_ms: u64, stdin: String, env: Vec<
         .envs(env)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(if merged { Stdio::inherit() } else { Stdio::piped() });
+        .stderr(if merged {
+            Stdio::inherit()
+        } else {
+            Stdio::piped()
+        });
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
@@ -109,11 +150,21 @@ pub fn exec(root: &str, command: &str, timeout_ms: u64, stdin: String, env: Vec<
     if let Some(r) = err_reader {
         bytes.extend(r.join().unwrap_or_default());
     }
-    Ok(HookResult { code, output: clip(String::from_utf8_lossy(&bytes).into_owned()), timed_out })
+    Ok(HookResult {
+        code,
+        output: clip(String::from_utf8_lossy(&bytes).into_owned()),
+        timed_out,
+    })
 }
 
 #[tauri::command]
-pub async fn run_hook(root: String, command: String, timeout_ms: u64, stdin: String, env: Vec<(String, String)>) -> Result<HookResult, String> {
+pub async fn run_hook(
+    root: String,
+    command: String,
+    timeout_ms: u64,
+    stdin: String,
+    env: Vec<(String, String)>,
+) -> Result<HookResult, String> {
     let env = hook_env(&env, |k| std::env::var(k).ok());
     exec(&root, &command, timeout_ms, stdin, env)
 }
@@ -123,13 +174,28 @@ mod tests {
     use super::*;
 
     fn run(command: &str, timeout_ms: u64, stdin: &str, env: &[(&str, &str)]) -> HookResult {
-        let extra: Vec<(String, String)> = env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
-        exec("/tmp", command, timeout_ms, stdin.into(), hook_env(&extra, |k| std::env::var(k).ok())).unwrap()
+        let extra: Vec<(String, String)> = env
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        exec(
+            "/tmp",
+            command,
+            timeout_ms,
+            stdin.into(),
+            hook_env(&extra, |k| std::env::var(k).ok()),
+        )
+        .unwrap()
     }
 
     #[test]
     fn stdin_env_and_exit_code() {
-        let r = run("cat; echo \"$GUSTAF_EVENT\"; exit 2", 5000, "{\"a\":1}", &[("GUSTAF_EVENT", "pre_tool"), ("OTHER", "x")]);
+        let r = run(
+            "cat; echo \"$GUSTAF_EVENT\"; exit 2",
+            5000,
+            "{\"a\":1}",
+            &[("GUSTAF_EVENT", "pre_tool"), ("OTHER", "x")],
+        );
         assert_eq!(r.code, Some(2));
         assert!(r.output.contains("{\"a\":1}") && r.output.contains("pre_tool"));
         assert!(!r.timed_out);
@@ -138,7 +204,12 @@ mod tests {
     #[test]
     fn only_allowlisted_variables_reach_the_hook() {
         std::env::set_var("GUSTAF_TEST_SECRET_TOKEN", "hunter2");
-        let r = run("env", 5000, "", &[("NOT_GUSTAF", "1"), ("GUSTAF_TOOL", "edit_file")]);
+        let r = run(
+            "env",
+            5000,
+            "",
+            &[("NOT_GUSTAF", "1"), ("GUSTAF_TOOL", "edit_file")],
+        );
         assert!(r.output.contains("GUSTAF_TOOL=edit_file"));
         assert!(!r.output.contains("hunter2") && !r.output.contains("NOT_GUSTAF"));
     }
@@ -147,10 +218,18 @@ mod tests {
     fn timeout_kills_the_process_tree() {
         let marker = format!("/tmp/gustaf-hook-{}", std::process::id());
         let started = Instant::now();
-        let r = run(&format!("(sleep 3; touch {marker}) & sleep 30"), 300, "", &[]);
+        let r = run(
+            &format!("(sleep 3; touch {marker}) & sleep 30"),
+            300,
+            "",
+            &[],
+        );
         assert!(r.timed_out && r.code.is_none());
         assert!(started.elapsed() < Duration::from_secs(5));
         std::thread::sleep(Duration::from_millis(3500));
-        assert!(!std::path::Path::new(&marker).exists(), "a child of the hook survived the timeout");
+        assert!(
+            !std::path::Path::new(&marker).exists(),
+            "a child of the hook survived the timeout"
+        );
     }
 }

@@ -1,4 +1,5 @@
 import {
+  API_BASE_PATH,
   PROTOCOL_VERSION,
   type ApiError,
   type ApprovalDecision,
@@ -18,13 +19,16 @@ export type ConnectionState = "connecting" | "connected" | "reconnecting" | "clo
 
 /**
  * What every screen talks to. `GustafClient` (real desktop over HTTPS + WebSocket) and `MockServer` (in memory) implement it.
- * The REST paths used by `GustafClient` are an assumption until the desktop server exists (TASKS.md, "Desktop server").
+ * `GustafClient` speaks the desktop server's `/v1` routes (docs/features/mobile-server.md): read endpoints and the event
+ * socket exist; the write endpoints (send, stop, approvals) are not on the desktop yet.
  */
 export interface DesktopApi {
   listProjects(): Promise<ProjectSummary[]>;
   listChats(projectId: number): Promise<ChatSummary[]>;
   listMessages(chatId: number): Promise<ChatMessage[]>;
   sendMessage(chatId: number, req: SendMessageRequest): Promise<void>;
+  /** Starts a chat in a project with its first message; resolves with the new chat's id once the desktop accepted it. */
+  createChat(projectId: number, text: string, title?: string): Promise<{ chatId: number }>;
   stop(chatId: number): Promise<void>;
   resolveApproval(approvalId: string, decision: ApprovalDecision): Promise<void>;
   /** Opens the event stream (idempotent). Events and connection changes are delivered to the subscribers below. */
@@ -103,7 +107,7 @@ export function pairWithDesktop(
   transport: PinnedTransport = unpinnedTransport,
 ): Promise<PairResponse> {
   const body: PairRequest = { protocol: PROTOCOL_VERSION, code: payload.code, deviceName };
-  return request<PairResponse>(transport, `${baseUrl(payload.host, payload.port)}/pair`, payload.fingerprint, {
+  return request<PairResponse>(transport, `${baseUrl(payload.host, payload.port)}${API_BASE_PATH}/pair`, payload.fingerprint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -137,13 +141,15 @@ export class GustafClient implements DesktopApi {
     });
   }
 
-  listProjects = () => this.call<ProjectSummary[]>("GET", "/projects");
-  listChats = (projectId: number) => this.call<ChatSummary[]>("GET", `/projects/${projectId}/chats`);
-  listMessages = (chatId: number) => this.call<ChatMessage[]>("GET", `/chats/${chatId}/messages`);
-  sendMessage = (chatId: number, req: SendMessageRequest) => this.call<void>("POST", `/chats/${chatId}/messages`, req);
-  stop = (chatId: number) => this.call<void>("POST", `/chats/${chatId}/stop`);
+  listProjects = () => this.call<ProjectSummary[]>("GET", `${API_BASE_PATH}/projects`);
+  listChats = (projectId: number) => this.call<ChatSummary[]>("GET", `${API_BASE_PATH}/chats?project=${projectId}`);
+  listMessages = (chatId: number) => this.call<ChatMessage[]>("GET", `${API_BASE_PATH}/chats/${chatId}/messages`);
+  sendMessage = (chatId: number, req: SendMessageRequest) => this.call<void>("POST", `${API_BASE_PATH}/chats/${chatId}/messages`, req);
+  createChat = (projectId: number, text: string, title?: string) =>
+    this.call<{ chatId: number }>("POST", `${API_BASE_PATH}/chats`, { projectId, text, ...(title ? { title } : {}) });
+  stop = (chatId: number) => this.call<void>("POST", `${API_BASE_PATH}/chats/${chatId}/stop`);
   resolveApproval = (approvalId: string, decision: ApprovalDecision) =>
-    this.call<void>("POST", `/approvals/${encodeURIComponent(approvalId)}`, { decision } satisfies ApprovalResponse);
+    this.call<void>("POST", `${API_BASE_PATH}/approvals/${encodeURIComponent(approvalId)}`, { decision } satisfies ApprovalResponse);
 
   subscribe(listener: (e: ServerEvent) => void) {
     this.listeners.add(listener);
@@ -176,7 +182,7 @@ export class GustafClient implements DesktopApi {
 
   private open() {
     this.setState(this.attempt === 0 ? "connecting" : "reconnecting");
-    const url = `${this.base.replace(/^https/, "wss")}/events`;
+    const url = `${this.base.replace(/^https/, "wss")}${API_BASE_PATH}/events`;
     const ws = this.transport.createWebSocket(url, this.opts.fingerprint, { authorization: `Bearer ${this.opts.token}` });
     this.socket = ws;
     ws.onmessage = (m) => {

@@ -10,13 +10,29 @@ import { createInterface } from 'node:readline';
 const flags = new Set(process.argv.slice(2));
 const send = (msg) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n');
 const tools = [
-  { name: 'echo', description: 'Echo text back', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
+  {
+    name: 'echo',
+    description: 'Echo text back',
+    inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+  },
   { name: 'sleep', description: 'Never answers', inputSchema: { type: 'object' } },
   { name: 'crash', description: 'Exits the process', inputSchema: { type: 'object' } },
   { name: 'change', description: 'Announces a tool list change', inputSchema: { type: 'object' } },
-  { name: 'env', description: 'Reads an environment variable', inputSchema: { type: 'object', properties: { name: { type: 'string' } } } },
-  { name: 'slow', description: 'Answers after ms', inputSchema: { type: 'object', properties: { ms: { type: 'number' } } } },
-  { name: 'changeall', description: 'Announces tool, resource and prompt list changes', inputSchema: { type: 'object' } },
+  {
+    name: 'env',
+    description: 'Reads an environment variable',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' } } },
+  },
+  {
+    name: 'slow',
+    description: 'Answers after ms',
+    inputSchema: { type: 'object', properties: { ms: { type: 'number' } } },
+  },
+  {
+    name: 'changeall',
+    description: 'Announces tool, resource and prompt list changes',
+    inputSchema: { type: 'object' },
+  },
   { name: 'big', description: 'Returns a huge response', inputSchema: { type: 'object' } },
 ];
 
@@ -33,7 +49,14 @@ rl.on('line', (line) => {
   const { id, method, params } = msg;
   if (method === 'initialize') {
     if (flags.has('--no-init')) return;
-    send({ id, result: { protocolVersion: params?.protocolVersion ?? '2025-06-18', capabilities: { tools: { listChanged: true } }, serverInfo: { name: 'fake', version: '1.0.0' } } });
+    send({
+      id,
+      result: {
+        protocolVersion: params?.protocolVersion ?? '2025-06-18',
+        capabilities: { tools: { listChanged: true } },
+        serverInfo: { name: 'fake', version: '1.0.0' },
+      },
+    });
     return;
   }
   if (method === 'notifications/cancelled') {
@@ -60,7 +83,10 @@ rl.on('line', (line) => {
         send({ method: 'notifications/tools/list_changed' });
         return send({ id, result: { content: [{ type: 'text', text: 'changed' }] } });
       case 'slow':
-        setTimeout(() => send({ id, result: { content: [{ type: 'text', text: 'late answer' }] } }), Number(args.ms ?? 300));
+        setTimeout(
+          () => send({ id, result: { content: [{ type: 'text', text: 'late answer' }] } }),
+          Number(args.ms ?? 300),
+        );
         return;
       case 'changeall':
         send({ method: 'notifications/tools/list_changed' });

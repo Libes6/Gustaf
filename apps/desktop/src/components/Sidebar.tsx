@@ -1,12 +1,53 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
-  Archive, Bell, ChevronDown, ChevronRight, Clock, FileDown, Folder, FolderOpen, FolderPlus, HelpCircle, Home, Import,
-  Columns2, GitBranch, GitMerge, LayoutList, Loader2, LogOut, Share2, XCircle, MoreHorizontal, Pencil, Pin, ScrollText, Plug, Search, Settings, SquarePen, TextSearch, Trash2, X, BarChart3, Languages, Terminal,
+  Archive,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileDown,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  HelpCircle,
+  Home,
+  Import,
+  Columns2,
+  GitBranch,
+  GitMerge,
+  LayoutList,
+  Loader2,
+  LogOut,
+  Share2,
+  XCircle,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  ScrollText,
+  Plug,
+  Search,
+  Settings,
+  SquarePen,
+  TextSearch,
+  Trash2,
+  X,
+  BarChart3,
+  Languages,
+  Terminal,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n";
 import { displayKeys, isMac, isWindows } from "../lib/platform";
-import { archiveChat, archiveProjectChats, removeProject, renameChat, renameProject, togglePin, type Chat, type Project } from "../lib/data";
+import {
+  archiveChat,
+  archiveProjectChats,
+  removeProject,
+  renameChat,
+  renameProject,
+  togglePin,
+  type Chat,
+  type Project,
+} from "../lib/data";
 import { useApp } from "../state";
 import { useApprovalChats, useChatFlags } from "../lib/attention";
 import { chatStatusStore, deriveStatus, type ChatStatus } from "../lib/chatStatus";
@@ -14,7 +55,15 @@ import { getGoal, goalsVersion, subscribeGoals } from "../lib/goalStore";
 import { isScratch, loadScratch, scratchRoot, startScratchChat } from "../lib/scratch";
 import { isMuted, loadMuted, mutedVersion, setMuted, subscribeMuted } from "../lib/mutedChats";
 import { placeOf, settle, snooze, snoozePresets, wakeUps, without, type Place } from "../lib/triageCore";
-import { changeTriage, dismissUndo, getTriage, lastUndo, loadTriage, subscribeTriage, undoTriage } from "../lib/triageStore";
+import {
+  changeTriage,
+  dismissUndo,
+  getTriage,
+  lastUndo,
+  loadTriage,
+  subscribeTriage,
+  undoTriage,
+} from "../lib/triageStore";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
@@ -29,11 +78,24 @@ import { MergeQueueDialog, type QueueWorkspace } from "./MergeQueueDialog";
 import { requestComposerDraft } from "../lib/composerBridge";
 import type { QueueItem } from "../lib/mergeQueue";
 import { conflictBadge, hasUnfinished, resolveDraft, summarizeQueue } from "../lib/mergeQueueView";
-import { conflictReport, queueRun, useConflictChecks, useMergeQueueVersion, type QueuePolicy } from "../lib/mergeQueueStore";
+import {
+  conflictReport,
+  queueRun,
+  useConflictChecks,
+  useMergeQueueVersion,
+  type QueuePolicy,
+} from "../lib/mergeQueueStore";
 import { requestTerminalOpen } from "../lib/terminalBridge";
 import { archiveChoices, chatWorkspace, joinCheckout, splitWorkspaceChats, workspaceRow } from "../lib/workspaces";
 import { createWorkspace, setupWorkspace } from "../lib/workspaceCreate";
-import { isGitProject, refreshWorkspaces, repoPrefix, useWorkspacePolling, useWorkspaceVersion, workspaceEntry } from "../lib/workspaceStore";
+import {
+  isGitProject,
+  refreshWorkspaces,
+  repoPrefix,
+  useWorkspacePolling,
+  useWorkspaceVersion,
+  workspaceEntry,
+} from "../lib/workspaceStore";
 import { parseWorktreeError, worktrees } from "../lib/worktrees";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
@@ -57,22 +119,48 @@ function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | nul
 }
 
 /** "Pick a time…" for snoozing a chat: a local date-time in the future. */
-function SnoozeDialog({ chat, onClose, onSnooze }: { chat: Chat; onClose: () => void; onSnooze: (at: number) => void }) {
+function SnoozeDialog({
+  chat,
+  onClose,
+  onSnooze,
+}: {
+  chat: Chat;
+  onClose: () => void;
+  onSnooze: (at: number) => void;
+}) {
   const t = useT();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const local = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const local = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
   const [value, setValue] = useState(() => local(Date.now() + 3 * 3600_000));
   const at = Date.parse(value);
   const ok = Number.isFinite(at) && at > Date.now();
   return (
     <div className="snooze-dialog" role="dialog" aria-label={t("snoozeCustom")}>
       <div className="t">{t("snoozeCustomFor", { title: chat.title })}</div>
-      <input className="input" type="datetime-local" aria-label={t("snoozeCustom")} value={value} min={local(Date.now())} onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Escape") onClose(); if (e.key === "Enter" && ok) onSnooze(at); }} autoFocus />
+      <input
+        className="input"
+        type="datetime-local"
+        aria-label={t("snoozeCustom")}
+        value={value}
+        min={local(Date.now())}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+          if (e.key === "Enter" && ok) onSnooze(at);
+        }}
+        autoFocus
+      />
       {!ok && <div className="field-error">{t("snoozeInPast")}</div>}
       <div className="btns">
-        <button className="btn btn-ghost" onClick={onClose}>{t("cancel")}</button>
-        <button className="btn btn-primary" disabled={!ok} onClick={() => onSnooze(at)}>{t("triageSnooze")}</button>
+        <button className="btn btn-ghost" onClick={onClose}>
+          {t("cancel")}
+        </button>
+        <button className="btn btn-primary" disabled={!ok} onClick={() => onSnooze(at)}>
+          {t("triageSnooze")}
+        </button>
       </div>
     </div>
   );
@@ -83,19 +171,50 @@ function GoalMark({ chatId }: { chatId: number }) {
   const t = useT();
   useSyncExternalStore(subscribeGoals, goalsVersion);
   if (getGoal(chatId)?.status !== "active") return null;
-  return <span className="chat-goal-mark" role="img" aria-label={t("goal")} title={t("goal")}><Flag size={11} aria-hidden="true" /></span>;
+  return (
+    <span className="chat-goal-mark" role="img" aria-label={t("goal")} title={t("goal")}>
+      <Flag size={11} aria-hidden="true" />
+    </span>
+  );
 }
 
 /** One badge per chat, same size and slot for every state; each has an icon shape of its own and a text alternative. */
 function ChatBadge({ status }: { status: ChatStatus | null }) {
   const t = useT();
   if (!status) return null;
-  const label = t(status === "waiting" ? "approvalPendingBadge" : status === "running" ? "thinking" : status === "failed" ? "chatStatusFailed" : "chatStatusUnread");
+  const label = t(
+    status === "waiting"
+      ? "approvalPendingBadge"
+      : status === "running"
+        ? "thinking"
+        : status === "failed"
+          ? "chatStatusFailed"
+          : "chatStatusUnread",
+  );
   const common = { className: `chat-badge ${status}`, "aria-label": label, title: label };
-  if (status === "running") return <span {...common} role="img"><Loader2 size={12} className="spin" aria-hidden="true" /></span>;
-  if (status === "waiting") return <span {...common} role="status">!</span>;
-  if (status === "failed") return <span {...common} role="status"><XCircle size={13} aria-hidden="true" /></span>;
-  return <span {...common} role="img"><span className="dot" aria-hidden="true" /></span>;
+  if (status === "running")
+    return (
+      <span {...common} role="img">
+        <Loader2 size={12} className="spin" aria-hidden="true" />
+      </span>
+    );
+  if (status === "waiting")
+    return (
+      <span {...common} role="status">
+        !
+      </span>
+    );
+  if (status === "failed")
+    return (
+      <span {...common} role="status">
+        <XCircle size={13} aria-hidden="true" />
+      </span>
+    );
+  return (
+    <span {...common} role="img">
+      <span className="dot" aria-hidden="true" />
+    </span>
+  );
 }
 
 export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => void; onCompare: () => void }) {
@@ -105,10 +224,22 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
   const more = useMenu();
   return (
     <nav className="rail drag" aria-label={t("navMain")}>
-      <button className={`rail-btn${app.view === "chat" ? " active" : ""}`} title={t("home")} aria-label={t("home")} aria-current={app.view === "chat" ? "page" : undefined} onClick={() => app.setView("chat")}>
+      <button
+        className={`rail-btn${app.view === "chat" ? " active" : ""}`}
+        title={t("home")}
+        aria-label={t("home")}
+        aria-current={app.view === "chat" ? "page" : undefined}
+        onClick={() => app.setView("chat")}
+      >
         <Home size={17} />
       </button>
-      <button className="rail-btn" title={t("toggleSidebar")} aria-label={t("toggleSidebar")} aria-expanded={!app.sideHidden} onClick={() => app.setSideHidden(!app.sideHidden)}>
+      <button
+        className="rail-btn"
+        title={t("toggleSidebar")}
+        aria-label={t("toggleSidebar")}
+        aria-expanded={!app.sideHidden}
+        onClick={() => app.setSideHidden(!app.sideHidden)}
+      >
         <Clock size={17} />
       </button>
       <button className="rail-btn" title={t("newProject")} aria-label={t("newProject")} onClick={onCreateProject}>
@@ -147,8 +278,18 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
           menu.open(r, [
             { heading: "Gustaf" },
             { label: t("usage"), icon: <BarChart3 size={15} />, onClick: () => app.openSettings("usage") },
-            { label: t("language"), icon: <Languages size={15} />, kbd: app.locale.toUpperCase(), onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru") },
-            { label: t("settings"), icon: <Settings size={15} />, kbd: displayKeys("⌘,"), onClick: () => app.openSettings() },
+            {
+              label: t("language"),
+              icon: <Languages size={15} />,
+              kbd: app.locale.toUpperCase(),
+              onClick: () => app.setLocale(app.locale === "ru" ? "en" : "ru"),
+            },
+            {
+              label: t("settings"),
+              icon: <Settings size={15} />,
+              kbd: displayKeys("⌘,"),
+              onClick: () => app.openSettings(),
+            },
             { sep: true },
             { label: t("resetOnboarding"), icon: <LogOut size={15} />, onClick: () => app.setOnboarded(false) },
           ]);
@@ -181,9 +322,16 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const [snoozedOpen, setSnoozedOpen] = useState(false);
   const [snoozeFor, setSnoozeFor] = useState<Chat | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { void loadScratch(); loadMuted(); }, []);
+  useEffect(() => {
+    void loadScratch();
+    loadMuted();
+  }, []);
   useSyncExternalStore(subscribeMuted, mutedVersion);
-  useEffect(() => { loadTriage(); const id = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    loadTriage();
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [showAll, setShowAll] = useState<Record<number, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -208,9 +356,14 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   useEffect(() => {
     let cancelled = false;
     for (const p of app.projects.slice(0, 40)) {
-      if (p.path) isGitProject(p.path).then((ok) => { if (ok && !cancelled) setGitProjects((s) => (s.has(p.id) ? s : new Set(s).add(p.id))); });
+      if (p.path)
+        isGitProject(p.path).then((ok) => {
+          if (ok && !cancelled) setGitProjects((s) => (s.has(p.id) ? s : new Set(s).add(p.id)));
+        });
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [app.projects]);
 
   const q = query?.toLowerCase() ?? "";
@@ -228,13 +381,24 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   const chatsOf = (pid: number | null) => chatsByProject.get(pid) ?? [];
   // Polled while a project is expanded (and again when a run starts or ends): only projects that have workspace chats.
   const workspaceRoots = useMemo(
-    () => app.projects.filter((p) => p.path && (expanded[p.id] ?? true) && app.chats.some((c) => c.project_id === p.id && chatWorkspace(c))).map((p) => p.path!),
+    () =>
+      app.projects
+        .filter(
+          (p) => p.path && (expanded[p.id] ?? true) && app.chats.some((c) => c.project_id === p.id && chatWorkspace(c)),
+        )
+        .map((p) => p.path!),
     [app.projects, app.chats, expanded],
   );
-  const busyKey = app.sessions.items.filter((s) => s.busy).map((s) => s.chatId).join(",");
+  const busyKey = app.sessions.items
+    .filter((s) => s.busy)
+    .map((s) => s.chatId)
+    .join(",");
   useWorkspacePolling(workspaceRoots, busyKey);
   // Conflict badges: throttled and never awaited by the render (see lib/mergeQueueStore.ts).
-  useConflictChecks(workspaceRoots.map((root) => ({ root, list: workspaceEntry(root).list })), busyKey);
+  useConflictChecks(
+    workspaceRoots.map((root) => ({ root, list: workspaceEntry(root).list })),
+    busyKey,
+  );
 
   const openChat = (c: Chat) => {
     app.openChat(c.id, c.project_id);
@@ -252,15 +416,37 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
       ...app.sections.map((s) => ({
         label: t("addToSection", { name: s.name }),
         icon: <LayoutList size={15} />,
-        onClick: () => app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, c.id])] } : x))),
+        onClick: () =>
+          app.setSections(
+            app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, c.id])] } : x)),
+          ),
       })),
       { sep: true },
-      { label: t("exportMarkdown"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "markdown", t) },
+      {
+        label: t("exportMarkdown"),
+        icon: <FileDown size={15} />,
+        onClick: () => void runChatExport([c], "markdown", t),
+      },
       { label: t("exportJson"), icon: <FileDown size={15} />, onClick: () => void runChatExport([c], "json", t) },
       { label: t("shareHtml"), icon: <Share2 size={15} />, onClick: () => setSharing(c) },
       { label: t("memorySuggestMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openSuggest(c) },
-      { label: isMuted(c.id) ? t("chatUnmute") : t("chatMute"), icon: isMuted(c.id) ? <Bell size={15} /> : <BellOff size={15} />, onClick: () => setMuted(c.id, !isMuted(c.id)) },
-      ...(c.project_id === null && isScratch(c.id) ? [{ label: t("scratchFolder"), icon: <FolderOpen size={15} />, onClick: () => void scratchRoot(c.id, c.title).then((d) => revealItemInDir(d)).catch(() => {}) }] : []),
+      {
+        label: isMuted(c.id) ? t("chatUnmute") : t("chatMute"),
+        icon: isMuted(c.id) ? <Bell size={15} /> : <BellOff size={15} />,
+        onClick: () => setMuted(c.id, !isMuted(c.id)),
+      },
+      ...(c.project_id === null && isScratch(c.id)
+        ? [
+            {
+              label: t("scratchFolder"),
+              icon: <FolderOpen size={15} />,
+              onClick: () =>
+                void scratchRoot(c.id, c.title)
+                  .then((d) => revealItemInDir(d))
+                  .catch(() => {}),
+            },
+          ]
+        : []),
       { sep: true },
       ...triageItems(c),
       { sep: true },
@@ -270,39 +456,92 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
 
   // ---- settle / snooze ----
   // Settling or snoozing also clears "unread" / "failed": otherwise the chat would need attention and come straight back.
-  const settleChat = (c: Chat) => (chatStatusStore.markSeen(c.id), changeTriage((m) => settle(m, c.id, Date.now()), t("triageSettledNotice", { title: c.title })));
-  const snoozeChat = (c: Chat, until: number) => (chatStatusStore.markSeen(c.id), changeTriage((m) => snooze(m, c.id, until), t("triageSnoozedNotice", { title: c.title, time: t.date(until) })));
+  const settleChat = (c: Chat) => (
+    chatStatusStore.markSeen(c.id),
+    changeTriage((m) => settle(m, c.id, Date.now()), t("triageSettledNotice", { title: c.title }))
+  );
+  const snoozeChat = (c: Chat, until: number) => (
+    chatStatusStore.markSeen(c.id),
+    changeTriage((m) => snooze(m, c.id, until), t("triageSnoozedNotice", { title: c.title, time: t.date(until) }))
+  );
   const reopenChat = (c: Chat) => changeTriage((m) => without(m, c.id), t("triageReopenedNotice", { title: c.title }));
   const triageItems = (c: Chat) => {
     const e = triage[c.id];
-    if (e?.snoozedUntil && e.snoozedUntil > Date.now()) return [{ label: t("triageUnsnooze"), icon: <AlarmClock size={15} />, onClick: () => reopenChat(c) }];
-    if (e?.settledAt) return [{ label: t("triageReopen"), icon: <CheckCheck size={15} />, onClick: () => reopenChat(c) }];
+    if (e?.snoozedUntil && e.snoozedUntil > Date.now())
+      return [{ label: t("triageUnsnooze"), icon: <AlarmClock size={15} />, onClick: () => reopenChat(c) }];
+    if (e?.settledAt)
+      return [{ label: t("triageReopen"), icon: <CheckCheck size={15} />, onClick: () => reopenChat(c) }];
     return [
       { label: t("triageSettle"), icon: <CheckCheck size={15} />, onClick: () => settleChat(c) },
       { heading: t("triageSnooze") },
-      ...snoozePresets(Date.now()).map((p) => ({ label: t(`snooze_${p.key}`), description: t.date(p.at), icon: <AlarmClock size={15} />, onClick: () => snoozeChat(c, p.at) })),
+      ...snoozePresets(Date.now()).map((p) => ({
+        label: t(`snooze_${p.key}`),
+        description: t.date(p.at),
+        icon: <AlarmClock size={15} />,
+        onClick: () => snoozeChat(c, p.at),
+      })),
       { label: t("snoozeCustom"), icon: <AlarmClock size={15} />, onClick: () => setSnoozeFor(c) },
     ];
   };
 
   const projectMenu = (anchor: DOMRect | React.MouseEvent, p: Project) =>
     menu.open("clientX" in anchor ? anchor : anchor, [
-      { label: p.pinned ? t("unpin") : t("pin"), icon: <Pin size={15} />, onClick: () => togglePin(p.id).then(app.reload) },
+      {
+        label: p.pinned ? t("unpin") : t("pin"),
+        icon: <Pin size={15} />,
+        onClick: () => togglePin(p.id).then(app.reload),
+      },
       { label: t("edit"), icon: <Pencil size={15} />, onClick: () => setEditing(`p${p.id}`) },
       ...(app.sections.length ? [{ heading: t("section") }] : []),
       ...app.sections.map((s) => ({
         label: s.name,
         icon: <LayoutList size={15} />,
         onClick: () =>
-          app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x))),
+          app.setSections(
+            app.sections.map((x) =>
+              x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, ...chatsOf(p.id).map((c) => c.id)])] } : x,
+            ),
+          ),
       })),
-      ...(p.path && gitProjects.has(p.id) ? [{ label: t("workspaceNew"), icon: <GitBranch size={15} />, onClick: () => (setWorkspaceError(""), setNewWorkspaceFor(p)) }] : []),
-      ...(p.path && gitProjects.has(p.id) && chatsOf(p.id).some((c) => chatWorkspace(c)) ? [{ label: t("mqMenu"), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: null }) }] : []),
-      ...(p.path ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }] : []),
-      ...(p.path ? [{ label: t("memoryMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openProject(p) }] : []),
-      ...(p.path ? [{ label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(p.path!) }] : []),
+      ...(p.path && gitProjects.has(p.id)
+        ? [
+            {
+              label: t("workspaceNew"),
+              icon: <GitBranch size={15} />,
+              onClick: () => (setWorkspaceError(""), setNewWorkspaceFor(p)),
+            },
+          ]
+        : []),
+      ...(p.path && gitProjects.has(p.id) && chatsOf(p.id).some((c) => chatWorkspace(c))
+        ? [
+            {
+              label: t("mqMenu"),
+              icon: <GitMerge size={15} />,
+              onClick: () => setMergeFor({ project: p, preselect: null }),
+            },
+          ]
+        : []),
+      ...(p.path
+        ? [{ label: t("projectInstructions"), icon: <ScrollText size={15} />, onClick: () => setInstructionsFor(p) }]
+        : []),
+      ...(p.path
+        ? [{ label: t("memoryMenu"), icon: <Brain size={15} />, onClick: () => memoryUi.openProject(p) }]
+        : []),
+      ...(p.path
+        ? [
+            {
+              label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"),
+              icon: <FolderOpen size={15} />,
+              onClick: () => revealItemInDir(p.path!),
+            },
+          ]
+        : []),
       { sep: true },
-      { label: t("archiveChats"), icon: <Archive size={15} />, onClick: () => archiveProjectChats(p.id).then(app.reload) },
+      {
+        label: t("archiveChats"),
+        icon: <Archive size={15} />,
+        onClick: () => archiveProjectChats(p.id).then(app.reload),
+      },
       { label: t("removeProject"), icon: <X size={15} />, onClick: () => removeProject(p.id).then(app.reload) },
     ]);
 
@@ -315,7 +554,12 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     });
 
   // Wake settled/snoozed chats that need attention, got newer activity, or whose snooze ran out (not undoable).
-  const attentionIds = app.chats.filter((c) => { const s = statusOf(c); return s === "waiting" || s === "failed" || s === "unread"; }).map((c) => c.id);
+  const attentionIds = app.chats
+    .filter((c) => {
+      const s = statusOf(c);
+      return s === "waiting" || s === "failed" || s === "unread";
+    })
+    .map((c) => c.id);
   const attentionKey = attentionIds.join(",");
   useEffect(() => {
     const ids = wakeUps(triage, now, new Set(attentionIds), new Map(app.chats.map((c) => [c.id, c.updated_at])));
@@ -325,13 +569,23 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const el = e.target instanceof Element ? e.target : null;
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z" || el?.closest("input, textarea, [contenteditable=true]")) return;
+      if (
+        !(e.metaKey || e.ctrlKey) ||
+        e.shiftKey ||
+        e.key.toLowerCase() !== "z" ||
+        el?.closest("input, textarea, [contenteditable=true]")
+      )
+        return;
       if (undoTriage()) e.preventDefault();
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
-  useEffect(() => { if (!undo) return; const id = setTimeout(dismissUndo, 10_000); return () => clearTimeout(id); }, [undo]);
+  useEffect(() => {
+    if (!undo) return;
+    const id = setTimeout(dismissUndo, 10_000);
+    return () => clearTimeout(id);
+  }, [undo]);
   const recent: Record<Place, Chat[]> = { attention: [], working: [], open: [], snoozed: [], settled: [] };
   for (const c of app.chats) recent[placeOf(c.id, triage, statusOf(c), now)].push(c);
 
@@ -341,18 +595,48 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     setWorkspaceBusy(true);
     setWorkspaceError("");
     try {
-      const made = await createWorkspace({ projectId: p.id, root: p.path, title, provider: app.selection?.providerId, model: app.selection?.model });
-      if (!made.ok) return setWorkspaceError(made.fallback ? t("workspaceFallback", { reason: made.message }) : t("workspaceFailed", { message: made.message }));
-      const problem = await setupWorkspace(p.path, made, {
-        access: app.access, allowlist: app.allowlist,
-        approve: (command) => confirm.ask({ title: t("workspaceSetupAskTitle"), body: <><p>{t("workspaceSetupAskBody")}</p><code>{command}</code></>, confirmLabel: t("workspaceSetupRun"), cancelLabel: t("workspaceSetupSkip") }),
-      }, t);
+      const made = await createWorkspace({
+        projectId: p.id,
+        root: p.path,
+        title,
+        provider: app.selection?.providerId,
+        model: app.selection?.model,
+      });
+      if (!made.ok)
+        return setWorkspaceError(
+          made.fallback
+            ? t("workspaceFallback", { reason: made.message })
+            : t("workspaceFailed", { message: made.message }),
+        );
+      const problem = await setupWorkspace(
+        p.path,
+        made,
+        {
+          access: app.access,
+          allowlist: app.allowlist,
+          approve: (command) =>
+            confirm.ask({
+              title: t("workspaceSetupAskTitle"),
+              body: (
+                <>
+                  <p>{t("workspaceSetupAskBody")}</p>
+                  <code>{command}</code>
+                </>
+              ),
+              confirmLabel: t("workspaceSetupRun"),
+              cancelLabel: t("workspaceSetupSkip"),
+            }),
+        },
+        t,
+      );
       setWorkspaceNotice(problem);
       setNewWorkspaceFor(null);
       await app.reload();
       app.openChat(made.chatId, p.id);
       app.setView("chat");
-    } finally { setWorkspaceBusy(false); }
+    } finally {
+      setWorkspaceBusy(false);
+    }
   };
 
   const archiveWorkspace = async (p: Project, c: Chat, o: { force?: boolean; deleteBranch?: boolean } = {}) => {
@@ -360,8 +644,14 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     if (!p.path || !ws) return;
     setWorkspaceNotice("");
     try {
-      const r = await worktrees.remove({ root: p.path, taskId: ws.taskId, force: o.force, deleteBranch: o.deleteBranch });
-      if (o.deleteBranch && r.branchKeptReason) setWorkspaceNotice(t("workspaceBranchKept", { branch: ws.branch ?? ws.taskId, reason: r.branchKeptReason }));
+      const r = await worktrees.remove({
+        root: p.path,
+        taskId: ws.taskId,
+        force: o.force,
+        deleteBranch: o.deleteBranch,
+      });
+      if (o.deleteBranch && r.branchKeptReason)
+        setWorkspaceNotice(t("workspaceBranchKept", { branch: ws.branch ?? ws.taskId, reason: r.branchKeptReason }));
     } catch (e) {
       const err = parseWorktreeError(e);
       if (err.code === "dirty" && !o.force) return setDirtyArchive({ project: p, chat: c });
@@ -383,14 +673,36 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     const choice = archiveChoices(info);
     menu.open(anchor, [
       { label: t("rename"), icon: <Pencil size={15} />, onClick: () => setEditing(`c${c.id}`) },
-      ...(info && choice.canArchive ? [
-        { label: t("workspaceOpenTerminal"), icon: <Terminal size={15} />, onClick: () => void openInTerminal(p, c, info.path) },
-        { label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"), icon: <FolderOpen size={15} />, onClick: () => revealItemInDir(info.path) },
-        { label: t("mqMergeInto", { target: info.baseBranch ?? t("mqTargetFallback") }), icon: <GitMerge size={15} />, onClick: () => setMergeFor({ project: p, preselect: ws!.taskId }) },
-        { sep: true as const },
-        { label: t("workspaceArchive"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c) },
-        ...(choice.offerDeleteBranch ? [{ label: t("workspaceArchiveDelete"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c, { deleteBranch: true }) }] : []),
-      ] : []),
+      ...(info && choice.canArchive
+        ? [
+            {
+              label: t("workspaceOpenTerminal"),
+              icon: <Terminal size={15} />,
+              onClick: () => void openInTerminal(p, c, info.path),
+            },
+            {
+              label: t(isMac() ? "showInFinder" : isWindows() ? "showInExplorer" : "showInFileManager"),
+              icon: <FolderOpen size={15} />,
+              onClick: () => revealItemInDir(info.path),
+            },
+            {
+              label: t("mqMergeInto", { target: info.baseBranch ?? t("mqTargetFallback") }),
+              icon: <GitMerge size={15} />,
+              onClick: () => setMergeFor({ project: p, preselect: ws!.taskId }),
+            },
+            { sep: true as const },
+            { label: t("workspaceArchive"), icon: <Archive size={15} />, onClick: () => void archiveWorkspace(p, c) },
+            ...(choice.offerDeleteBranch
+              ? [
+                  {
+                    label: t("workspaceArchiveDelete"),
+                    icon: <Archive size={15} />,
+                    onClick: () => void archiveWorkspace(p, c, { deleteBranch: true }),
+                  },
+                ]
+              : []),
+          ]
+        : []),
       { sep: true },
       { label: t("archive"), icon: <Archive size={15} />, onClick: () => archiveChat(c.id).then(app.reload) },
     ]);
@@ -412,48 +724,107 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     const badge = row.active ? conflictBadge(conflictReport(p.path, ws.taskId)) : null;
     return (
       <Fragment key={c.id}>
-      <div className={`row workspace${row.active ? "" : " gone"}${current ? " active" : ""}`} data-workspace={row.taskId} onContextMenu={(e) => workspaceMenu(e, p, c)}>
-        <button className="row-main" aria-current={current ? "page" : undefined} onClick={() => openChat(c)}>
-          <span className="ws-branch">
-            <GitBranch size={13} aria-hidden="true" />
-            <span className="label">{c.title}</span>
-            <GoalMark chatId={c.id} /><ChatBadge status={statusOf(c)} />
-          </span>
-          <span className="ws-meta">
-            <span className="branch" title={row.branch}>{row.branch}</span>
-            {!row.active ? <span>{t("workspaceArchived")}</span> : (
-              <>
-                {row.dirty && <span className="dirty" role="img" aria-label={t("workspaceChanged", { count: row.changedFiles ?? 0 })} />}
-                {row.sync && <span className="sync" title={t("workspaceSyncTitle", { ahead: row.ahead ?? 0, behind: row.behind ?? 0, base: info?.baseBranch ?? "base" })}>{row.sync}</span>}
-                {!!row.changedFiles && <span className="changed">{t("workspaceChanged", { count: row.changedFiles })}</span>}
-              </>
-            )}
-          </span>
-        </button>
-        <span className="actions">
-          <button className="icon-btn" title={t("more")} aria-label={t("workspaceMenu", { title: c.title })} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), workspaceMenu(e.currentTarget.getBoundingClientRect(), p, c))}>
-            <MoreHorizontal size={14} />
+        <div
+          className={`row workspace${row.active ? "" : " gone"}${current ? " active" : ""}`}
+          data-workspace={row.taskId}
+          onContextMenu={(e) => workspaceMenu(e, p, c)}
+        >
+          <button className="row-main" aria-current={current ? "page" : undefined} onClick={() => openChat(c)}>
+            <span className="ws-branch">
+              <GitBranch size={13} aria-hidden="true" />
+              <span className="label">{c.title}</span>
+              <GoalMark chatId={c.id} />
+              <ChatBadge status={statusOf(c)} />
+            </span>
+            <span className="ws-meta">
+              <span className="branch" title={row.branch}>
+                {row.branch}
+              </span>
+              {!row.active ? (
+                <span>{t("workspaceArchived")}</span>
+              ) : (
+                <>
+                  {row.dirty && (
+                    <span
+                      className="dirty"
+                      role="img"
+                      aria-label={t("workspaceChanged", { count: row.changedFiles ?? 0 })}
+                    />
+                  )}
+                  {row.sync && (
+                    <span
+                      className="sync"
+                      title={t("workspaceSyncTitle", {
+                        ahead: row.ahead ?? 0,
+                        behind: row.behind ?? 0,
+                        base: info?.baseBranch ?? "base",
+                      })}
+                    >
+                      {row.sync}
+                    </span>
+                  )}
+                  {!!row.changedFiles && (
+                    <span className="changed">{t("workspaceChanged", { count: row.changedFiles })}</span>
+                  )}
+                </>
+              )}
+            </span>
           </button>
-        </span>
-      </div>
-      {badge && <div className="ws-conflict-line"><ConflictBadge badge={badge} title={c.title} /></div>}
+          <span className="actions">
+            <button
+              className="icon-btn"
+              title={t("more")}
+              aria-label={t("workspaceMenu", { title: c.title })}
+              aria-haspopup="menu"
+              onClick={(e) => (e.stopPropagation(), workspaceMenu(e.currentTarget.getBoundingClientRect(), p, c))}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          </span>
+        </div>
+        {badge && (
+          <div className="ws-conflict-line">
+            <ConflictBadge badge={badge} title={c.title} />
+          </div>
+        )}
       </Fragment>
     );
   };
 
   // ---- merge queue ----
-  const queuePolicy = (): QueuePolicy => ({ access: app.access, allowlist: app.allowlist, texts: { declined: t("mqTestDeclined"), blocked: t("mqTestBlocked") } });
+  const queuePolicy = (): QueuePolicy => ({
+    access: app.access,
+    allowlist: app.allowlist,
+    texts: { declined: t("mqTestDeclined"), blocked: t("mqTestBlocked") },
+  });
   const queueWorkspaces = (p: Project): QueueWorkspace[] => {
     const list = workspaceEntry(p.path).list ?? [];
-    return chatsOf(p.id).filter((c) => chatWorkspace(c)).flatMap((c) => {
-      const info = list.find((w) => w.taskId === c.workspace_task_id);
-      return info ? [{ taskId: info.taskId, title: c.title, branch: info.branch, target: info.baseBranch, ahead: info.ahead, dirty: info.dirty, active: info.existsOnDisk }] : [];
-    });
+    return chatsOf(p.id)
+      .filter((c) => chatWorkspace(c))
+      .flatMap((c) => {
+        const info = list.find((w) => w.taskId === c.workspace_task_id);
+        return info
+          ? [
+              {
+                taskId: info.taskId,
+                title: c.title,
+                branch: info.branch,
+                target: info.baseBranch,
+                ahead: info.ahead,
+                dirty: info.dirty,
+                active: info.existsOnDisk,
+              },
+            ]
+          : [];
+      });
   };
   const resolveConflicts = (p: Project, item: QueueItem) => {
     const c = app.chats.find((x) => x.project_id === p.id && x.workspace_task_id === item.taskId);
     if (!c) return;
-    requestComposerDraft(c.id, resolveDraft({ target: item.targetBranch, files: item.conflicts, testCommand: item.testCommand, t }));
+    requestComposerDraft(
+      c.id,
+      resolveDraft({ target: item.targetBranch, files: item.conflicts, testCommand: item.testCommand, t }),
+    );
     setMergeFor(null);
     openChat(c);
   };
@@ -475,15 +846,32 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         onDragStart={(e) => e.dataTransfer.setData("text/chat", String(c.id))}
         onContextMenu={(e) => chatMenu(e, c)}
       >
-        <button className="row-main" aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined} onClick={() => openChat(c)}>
+        <button
+          className="row-main"
+          aria-current={app.activeChat === c.id && app.view === "chat" ? "page" : undefined}
+          onClick={() => openChat(c)}
+        >
           <span className="label">{c.title}</span>
-          <GoalMark chatId={c.id} />{isMuted(c.id) && <BellOff size={11} className="chat-muted-mark" aria-label={t("chatMuted")} />}<ChatBadge status={statusOf(c)} />
+          <GoalMark chatId={c.id} />
+          {isMuted(c.id) && <BellOff size={11} className="chat-muted-mark" aria-label={t("chatMuted")} />}
+          <ChatBadge status={statusOf(c)} />
         </button>
         <span className="actions">
-          <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}>
+          <button
+            className="icon-btn"
+            title={t("more")}
+            aria-label={t("more")}
+            aria-haspopup="menu"
+            onClick={(e) => (e.stopPropagation(), chatMenu(e.currentTarget.getBoundingClientRect(), c))}
+          >
             <MoreHorizontal size={14} />
           </button>
-          <button className="icon-btn" title={t("archive")} aria-label={t("archive")} onClick={(e) => (e.stopPropagation(), archiveChat(c.id).then(app.reload))}>
+          <button
+            className="icon-btn"
+            title={t("archive")}
+            aria-label={t("archive")}
+            onClick={(e) => (e.stopPropagation(), archiveChat(c.id).then(app.reload))}
+          >
             <Archive size={14} />
           </button>
         </span>
@@ -500,7 +888,8 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
     },
   });
 
-  const addSection = () => app.setSections([...app.sections, { id: crypto.randomUUID(), name: t("newSection"), chatIds: [] }]);
+  const addSection = () =>
+    app.setSections([...app.sections, { id: crypto.randomUUID(), name: t("newSection"), chatIds: [] }]);
   const chatById = useMemo(() => new Map(app.chats.map((c) => [c.id, c])), [app.chats]);
   const projects = app.projects.filter((p) => !q || p.name.toLowerCase().includes(q) || chatsOf(p.id).length);
 
@@ -514,20 +903,42 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className="icon-btn" title={t("notifications")} aria-label={t("notifications")}>
           <Bell size={15} />
         </button>
-        <button className="icon-btn" title={`${t("searchAllChats")} ⌘K`} aria-label={t("searchAllChats")} onClick={onSearch}>
+        <button
+          className="icon-btn"
+          title={`${t("searchAllChats")} ⌘K`}
+          aria-label={t("searchAllChats")}
+          onClick={onSearch}
+        >
           <TextSearch size={15} />
         </button>
-        <button className="icon-btn" title={t("search")} aria-label={t("search")} aria-expanded={query !== null} onClick={() => setQuery(query === null ? "" : null)}>
+        <button
+          className="icon-btn"
+          title={t("search")}
+          aria-label={t("search")}
+          aria-expanded={query !== null}
+          onClick={() => setQuery(query === null ? "" : null)}
+        >
           <Search size={15} />
         </button>
       </div>
       {query !== null && (
         <div className="side-search">
-          <input className="input" autoFocus aria-label={t("searchChats")} placeholder={t("searchChats")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery(null)} />
+          <input
+            className="input"
+            autoFocus
+            aria-label={t("searchChats")}
+            placeholder={t("searchChats")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setQuery(null)}
+          />
         </div>
       )}
       <div className="side-scroll">
-        <button className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`} onClick={() => newChat(null)}>
+        <button
+          className={`row${app.activeChat === null && app.draftProject === null && app.view === "chat" ? " active" : ""}`}
+          onClick={() => newChat(null)}
+        >
           <SquarePen size={15} />
           <span className="label">{t("newChat")}</span>
         </button>
@@ -539,22 +950,49 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         {app.sections.map((s) =>
           editing === `s${s.id}` ? (
             <div key={s.id} className="row">
-              <InlineEdit value={s.name} onDone={(v) => (setEditing(null), v && app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, name: v } : x))))} />
+              <InlineEdit
+                value={s.name}
+                onDone={(v) => (
+                  setEditing(null),
+                  v && app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, name: v } : x)))
+                )}
+              />
             </div>
           ) : (
-            <div key={s.id} className={`dropzone${dropOver === s.id ? " over" : ""}`} {...dropProps(s.id, (id) => app.setSections(app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, id])] } : x))))}>
+            <div
+              key={s.id}
+              className={`dropzone${dropOver === s.id ? " over" : ""}`}
+              {...dropProps(s.id, (id) =>
+                app.setSections(
+                  app.sections.map((x) => (x.id === s.id ? { ...x, chatIds: [...new Set([...x.chatIds, id])] } : x)),
+                ),
+              )}
+            >
               <div className="section-title" onDoubleClick={() => setEditing(`s${s.id}`)}>
                 <span style={{ flex: 1 }}>{s.name}</span>
-                <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={() => app.setSections(app.sections.filter((x) => x.id !== s.id))}>
+                <button
+                  className="icon-btn"
+                  title={t("delete")}
+                  aria-label={t("delete")}
+                  onClick={() => app.setSections(app.sections.filter((x) => x.id !== s.id))}
+                >
                   <Trash2 size={13} />
                 </button>
               </div>
-              {s.chatIds.map((id) => chatById.get(id)).filter((c): c is Chat => !!c && match(c)).map((c) => chatRow(c, false))}
+              {s.chatIds
+                .map((id) => chatById.get(id))
+                .filter((c): c is Chat => !!c && match(c))
+                .map((c) => chatRow(c, false))}
               {!s.chatIds.length && <div className="hint">{t("dragHere")}</div>}
             </div>
           ),
         )}
-        <div className={`dropzone${dropOver === "new" ? " over" : ""}`} {...dropProps("new", (id) => app.setSections([...app.sections, { id: crypto.randomUUID(), name: t("newSection"), chatIds: [id] }]))}>
+        <div
+          className={`dropzone${dropOver === "new" ? " over" : ""}`}
+          {...dropProps("new", (id) =>
+            app.setSections([...app.sections, { id: crypto.randomUUID(), name: t("newSection"), chatIds: [id] }]),
+          )}
+        >
           <button className="row muted" onClick={addSection}>
             <span className="label">{t("newSection")}</span>
           </button>
@@ -573,23 +1011,41 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
               <div key={p.id}>
                 {editing === `p${p.id}` ? (
                   <div className="row">
-                    <InlineEdit value={p.name} onDone={(v) => (setEditing(null), v && renameProject(p.id, v).then(app.reload))} />
+                    <InlineEdit
+                      value={p.name}
+                      onDone={(v) => (setEditing(null), v && renameProject(p.id, v).then(app.reload))}
+                    />
                   </div>
                 ) : (
                   <div
                     className={`row${menu.isOpen ? "" : ""}${app.draftProject === p.id && app.activeChat === null && app.view === "chat" ? " active" : ""}`}
                     onContextMenu={(e) => (e.preventDefault(), projectMenu(e, p))}
                   >
-                    <button className="row-main" aria-expanded={open} onClick={() => setExpanded({ ...expanded, [p.id]: !open })}>
+                    <button
+                      className="row-main"
+                      aria-expanded={open}
+                      onClick={() => setExpanded({ ...expanded, [p.id]: !open })}
+                    >
                       {open ? <FolderOpen size={15} /> : <Folder size={15} />}
                       <span className="label">{p.name}</span>
                       {!!p.pinned && <Pin size={11} color="var(--text-3)" aria-label={t("pin")} role="img" />}
                     </button>
                     <span className="actions">
-                      <button className="icon-btn" title={t("more")} aria-label={t("more")} aria-haspopup="menu" onClick={(e) => (e.stopPropagation(), projectMenu(e.currentTarget.getBoundingClientRect(), p))}>
+                      <button
+                        className="icon-btn"
+                        title={t("more")}
+                        aria-label={t("more")}
+                        aria-haspopup="menu"
+                        onClick={(e) => (e.stopPropagation(), projectMenu(e.currentTarget.getBoundingClientRect(), p))}
+                      >
                         <MoreHorizontal size={14} />
                       </button>
-                      <button className="icon-btn" title={t("newChatInProject")} aria-label={t("newChatInProject")} onClick={(e) => (e.stopPropagation(), newChat(p.id))}>
+                      <button
+                        className="icon-btn"
+                        title={t("newChatInProject")}
+                        aria-label={t("newChatInProject")}
+                        onClick={(e) => (e.stopPropagation(), newChat(p.id))}
+                      >
                         <SquarePen size={14} />
                       </button>
                     </span>
@@ -597,19 +1053,32 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                 )}
                 {open && shown.map((c) => chatRow(c, true))}
                 {open && workspaces.length > 0 && (
-                  <div role="group" aria-label={t("workspaceGroup", { name: p.name })}>{workspaces.map((c) => workspaceRowEl(p, c))}</div>
+                  <div role="group" aria-label={t("workspaceGroup", { name: p.name })}>
+                    {workspaces.map((c) => workspaceRowEl(p, c))}
+                  </div>
                 )}
-                {open && p.path && (() => {
-                  const q = queueRun(p.path);
-                  if (!(q.busy || q.approval || hasUnfinished(q.state))) return null;
-                  const sum = summarizeQueue(q.state);
-                  return (
-                    <button className="row child muted mq-active" onClick={() => setMergeFor({ project: p, preselect: null })}>
-                      <GitMerge size={13} aria-hidden="true" />
-                      <span className="label">{q.approval ? t("mqSidebarApproval") : q.state?.halted ? t("mqSidebarHalted") : t("mqSidebarActive", { merged: sum.merged, total: sum.total })}</span>
-                    </button>
-                  );
-                })()}
+                {open &&
+                  p.path &&
+                  (() => {
+                    const q = queueRun(p.path);
+                    if (!(q.busy || q.approval || hasUnfinished(q.state))) return null;
+                    const sum = summarizeQueue(q.state);
+                    return (
+                      <button
+                        className="row child muted mq-active"
+                        onClick={() => setMergeFor({ project: p, preselect: null })}
+                      >
+                        <GitMerge size={13} aria-hidden="true" />
+                        <span className="label">
+                          {q.approval
+                            ? t("mqSidebarApproval")
+                            : q.state?.halted
+                              ? t("mqSidebarHalted")
+                              : t("mqSidebarActive", { merged: sum.merged, total: sum.total })}
+                        </span>
+                      </button>
+                    );
+                  })()}
                 {open && list.length > 5 && !showAll[p.id] && (
                   <button className="row child muted" onClick={() => setShowAll({ ...showAll, [p.id]: true })}>
                     {t("showMore")}
@@ -632,56 +1101,135 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
         <button className="section-title" aria-expanded={recentOpen} onClick={() => setRecentOpen(!recentOpen)}>
           {t("recent")} {recentOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
-        {q && app.chats.filter(c => c.title.toLowerCase().includes(q.toLowerCase())).map((c) => chatRow(c, false))}
-        {recentOpen && !q && <>
-          {recent.attention.map((c) => chatRow(c, false))}
-          {recent.working.length > 0 && <>
-            <button className="row muted triage-group" aria-expanded={workingOpen} onClick={() => setWorkingOpen(!workingOpen)}>
-              {workingOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<span className="label">{t("triageWorking")}</span><Loader2 size={12} className="spin" aria-hidden="true" /><span className="count">{recent.working.length}</span>
-            </button>
-            {workingOpen && recent.working.map((c) => chatRow(c, true))}
-          </>}
-          {recent.open.slice(0, recentLimit).map((c) => chatRow(c, false))}
-          {recent.open.length > recentLimit && <button className="hint" onClick={() => setRecentLimit(n => n + 8)}>{t("showMore")}</button>}
-          {recent.snoozed.length > 0 && <>
-            <button className="row muted triage-group" aria-expanded={snoozedOpen} onClick={() => setSnoozedOpen(!snoozedOpen)}>
-              {snoozedOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<span className="label">{t("triageSnoozed")}</span><span className="count">{recent.snoozed.length}</span>
-            </button>
-            {snoozedOpen && recent.snoozed.map((c) => <div key={`z${c.id}`} title={t("triageSnoozedUntil", { time: t.date(triage[c.id]!.snoozedUntil!) })}>{chatRow(c, true)}</div>)}
-          </>}
-        </>}
+        {q && app.chats.filter((c) => c.title.toLowerCase().includes(q.toLowerCase())).map((c) => chatRow(c, false))}
+        {recentOpen && !q && (
+          <>
+            {recent.attention.map((c) => chatRow(c, false))}
+            {recent.working.length > 0 && (
+              <>
+                <button
+                  className="row muted triage-group"
+                  aria-expanded={workingOpen}
+                  onClick={() => setWorkingOpen(!workingOpen)}
+                >
+                  {workingOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  <span className="label">{t("triageWorking")}</span>
+                  <Loader2 size={12} className="spin" aria-hidden="true" />
+                  <span className="count">{recent.working.length}</span>
+                </button>
+                {workingOpen && recent.working.map((c) => chatRow(c, true))}
+              </>
+            )}
+            {recent.open.slice(0, recentLimit).map((c) => chatRow(c, false))}
+            {recent.open.length > recentLimit && (
+              <button className="hint" onClick={() => setRecentLimit((n) => n + 8)}>
+                {t("showMore")}
+              </button>
+            )}
+            {recent.snoozed.length > 0 && (
+              <>
+                <button
+                  className="row muted triage-group"
+                  aria-expanded={snoozedOpen}
+                  onClick={() => setSnoozedOpen(!snoozedOpen)}
+                >
+                  {snoozedOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  <span className="label">{t("triageSnoozed")}</span>
+                  <span className="count">{recent.snoozed.length}</span>
+                </button>
+                {snoozedOpen &&
+                  recent.snoozed.map((c) => (
+                    <div
+                      key={`z${c.id}`}
+                      title={t("triageSnoozedUntil", { time: t.date(triage[c.id]!.snoozedUntil!) })}
+                    >
+                      {chatRow(c, true)}
+                    </div>
+                  ))}
+              </>
+            )}
+          </>
+        )}
         {undo && (
           <div className="hint triage-undo" role="status">
             <span>{undo.label}</span>
-            <button className="btn-ghost" onClick={() => undoTriage()}>{t("triageUndo")}</button>
+            <button className="btn-ghost" onClick={() => undoTriage()}>
+              {t("triageUndo")}
+            </button>
           </div>
         )}
-        {snoozeFor && <SnoozeDialog chat={snoozeFor} onClose={() => setSnoozeFor(null)} onSnooze={(at) => (snoozeChat(snoozeFor, at), setSnoozeFor(null))} />}
-
-
+        {snoozeFor && (
+          <SnoozeDialog
+            chat={snoozeFor}
+            onClose={() => setSnoozeFor(null)}
+            onSnooze={(at) => (snoozeChat(snoozeFor, at), setSnoozeFor(null))}
+          />
+        )}
       </div>
       {menu.node}
       {workspaceNotice && (
         <div className="hint" role="status" style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
           <span style={{ flex: 1, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{workspaceNotice}</span>
-          <button className="icon-btn" title={t("dismiss")} aria-label={t("dismiss")} onClick={() => setWorkspaceNotice("")}><X size={13} /></button>
+          <button
+            className="icon-btn"
+            title={t("dismiss")}
+            aria-label={t("dismiss")}
+            onClick={() => setWorkspaceNotice("")}
+          >
+            <X size={13} />
+          </button>
         </div>
       )}
       {confirm.node}
-      {newWorkspaceFor && <NewWorkspaceDialog projectName={newWorkspaceFor.name} busy={workspaceBusy} error={workspaceError} onCancel={() => setNewWorkspaceFor(null)} onCreate={(title) => void startWorkspace(newWorkspaceFor, title)} />}
+      {newWorkspaceFor && (
+        <NewWorkspaceDialog
+          projectName={newWorkspaceFor.name}
+          busy={workspaceBusy}
+          error={workspaceError}
+          onCancel={() => setNewWorkspaceFor(null)}
+          onCreate={(title) => void startWorkspace(newWorkspaceFor, title)}
+        />
+      )}
       {dirtyArchive && (
-        <ConfirmDialog title={t("workspaceArchiveDirtyTitle")} confirmLabel={t("workspaceArchiveAnyway")} danger onCancel={() => setDirtyArchive(null)}
-          onConfirm={() => { const d = dirtyArchive; setDirtyArchive(null); void archiveWorkspace(d.project, d.chat, { force: true }); }}>
-          <p>{t("workspaceArchiveDirtyBody", { branch: dirtyArchive.chat.workspace_branch ?? dirtyArchive.chat.workspace_task_id ?? "" })}</p>
+        <ConfirmDialog
+          title={t("workspaceArchiveDirtyTitle")}
+          confirmLabel={t("workspaceArchiveAnyway")}
+          danger
+          onCancel={() => setDirtyArchive(null)}
+          onConfirm={() => {
+            const d = dirtyArchive;
+            setDirtyArchive(null);
+            void archiveWorkspace(d.project, d.chat, { force: true });
+          }}
+        >
+          <p>
+            {t("workspaceArchiveDirtyBody", {
+              branch: dirtyArchive.chat.workspace_branch ?? dirtyArchive.chat.workspace_task_id ?? "",
+            })}
+          </p>
         </ConfirmDialog>
       )}
       {mergeFor?.project.path && (
-        <MergeQueueDialog root={mergeFor.project.path} projectName={mergeFor.project.name} workspaces={queueWorkspaces(mergeFor.project)} preselect={mergeFor.preselect} policy={queuePolicy()}
-          onClose={() => setMergeFor(null)} onResolve={(item) => resolveConflicts(mergeFor.project, item)} onArchive={(id) => archiveMerged(mergeFor.project, id)} />
+        <MergeQueueDialog
+          root={mergeFor.project.path}
+          projectName={mergeFor.project.name}
+          workspaces={queueWorkspaces(mergeFor.project)}
+          preselect={mergeFor.preselect}
+          policy={queuePolicy()}
+          onClose={() => setMergeFor(null)}
+          onResolve={(item) => resolveConflicts(mergeFor.project, item)}
+          onArchive={(id) => archiveMerged(mergeFor.project, id)}
+        />
       )}
       {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
       {memoryUi.node}
-      {instructionsFor?.path && <ProjectInstructionsDialog name={instructionsFor.name} path={instructionsFor.path} onClose={() => setInstructionsFor(null)} />}
+      {instructionsFor?.path && (
+        <ProjectInstructionsDialog
+          name={instructionsFor.name}
+          path={instructionsFor.path}
+          onClose={() => setInstructionsFor(null)}
+        />
+      )}
     </aside>
   );
 }

@@ -43,7 +43,12 @@ export function depsFor(getApp: () => AppState): ScheduledRunDeps {
       const provider = app.providers.find((p) => p.id === providerId && !p.disabled);
       if (!provider) return { error: t("scheduledNoProvider") };
       const info = app.models.find((m) => m.providerId === providerId && m.id === model);
-      return { adapter: await getAdapter(provider), supportsTools: info?.tools, nativeInstructions: nativeInstructionFiles(provider), ownTools: runsOwnTools(provider) };
+      return {
+        adapter: await getAdapter(provider),
+        supportsTools: info?.tools,
+        nativeInstructions: nativeInstructionFiles(provider),
+        ownTools: runsOwnTools(provider),
+      };
     },
     projectRoot: (projectId) => {
       if (projectId === null) return null;
@@ -54,11 +59,15 @@ export function depsFor(getApp: () => AppState): ScheduledRunDeps {
     reasoning: () => getApp().reasoning,
     findChat: async (projectId, title, preferredId) => {
       if (preferredId) {
-        const [row] = await db.select<{ id: number }>("select id from chats where id = ? and archived = 0", [preferredId]);
+        const [row] = await db.select<{ id: number }>("select id from chats where id = ? and archived = 0", [
+          preferredId,
+        ]);
         if (row) return row.id;
       }
       const rows = await db.select<{ id: number }>(
-        projectId === null ? "select id from chats where title = ? and project_id is null and archived = 0 order by updated_at desc limit 1" : "select id from chats where title = ? and project_id = ? and archived = 0 order by updated_at desc limit 1",
+        projectId === null
+          ? "select id from chats where title = ? and project_id is null and archived = 0 order by updated_at desc limit 1"
+          : "select id from chats where title = ? and project_id = ? and archived = 0 order by updated_at desc limit 1",
         projectId === null ? [title] : [title, projectId],
       );
       return rows[0]?.id ?? null;
@@ -68,7 +77,15 @@ export function depsFor(getApp: () => AppState): ScheduledRunDeps {
     prepareReview: async (root, approve) => {
       const app = getApp();
       const made = await prepareShadowCopy(root, { access: "auto", allowlist: app.allowlist, approve });
-      const error = made.setup === "declined" ? t("reviewSetupDeclined") : made.setup && !made.setup.ok ? t("reviewSetupFailed", { code: made.setup.timedOut ? t("reviewTimedOut") : String(made.setup.code ?? "?"), output: made.setup.output.slice(-600) }) : undefined;
+      const error =
+        made.setup === "declined"
+          ? t("reviewSetupDeclined")
+          : made.setup && !made.setup.ok
+            ? t("reviewSetupFailed", {
+                code: made.setup.timedOut ? t("reviewTimedOut") : String(made.setup.code ?? "?"),
+                output: made.setup.output.slice(-600),
+              })
+            : undefined;
       return { review: made.review, error };
     },
     finishReview: (id) => review.finish(id),
@@ -81,7 +98,15 @@ export function depsFor(getApp: () => AppState): ScheduledRunDeps {
     bumpUsage: (providerId) => getApp().bumpUsage(providerId),
     recordResult: (providerId, error) => getApp().recordProviderResult(providerId, error),
     onLimits: (providerId, windows) => getApp().recordLimits(providerId, windows),
-    note: (kind, detail) => t(kind === "failed" ? "scheduledNoteFailed" : kind === "attention" ? "scheduledNoteAttention" : "scheduledNoteStopped", { detail: detail ?? "" }),
+    note: (kind, detail) =>
+      t(
+        kind === "failed"
+          ? "scheduledNoteFailed"
+          : kind === "attention"
+            ? "scheduledNoteAttention"
+            : "scheduledNoteStopped",
+        { detail: detail ?? "" },
+      ),
     chatChanged: () => void getApp().reload(),
   };
 }
@@ -95,8 +120,18 @@ export function startScheduledRuntime(getApp: () => AppState): () => void {
     async (sc, signal) => {
       const result = await executeScheduledRun(sc, deps, signal);
       // Sidebar flags: done-unread / failed (the notification below stays the scheduled one); attention is shown by the approval badge.
-      reportChatRun(result.chatId, result.status === "success" ? "ok" : result.status === "failed" ? "failed" : "stopped");
-      const body = result.status === "success" ? t("scheduledNotifyDone") : result.status === "attention" ? t("scheduledNotifyAttention") : result.status === "failed" ? result.error?.slice(0, 180) ?? "" : "";
+      reportChatRun(
+        result.chatId,
+        result.status === "success" ? "ok" : result.status === "failed" ? "failed" : "stopped",
+      );
+      const body =
+        result.status === "success"
+          ? t("scheduledNotifyDone")
+          : result.status === "attention"
+            ? t("scheduledNotifyAttention")
+            : result.status === "failed"
+              ? (result.error?.slice(0, 180) ?? "")
+              : "";
       if (body) void notifyUnfocused(t("scheduledNotifyTitle", { title: sc.title }), body);
       return result;
     },

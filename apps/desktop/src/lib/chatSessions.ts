@@ -1,14 +1,20 @@
 export type ChatSession = { key: string; chatId: number | null; projectId: number | null; busy?: boolean };
 export type Sessions = { active: string; items: ChatSession[] };
 export function openSession(state: Sessions, chatId: number | null, projectId: number | null, key: string): Sessions {
-  const existing = state.items.find(s => chatId !== null ? s.chatId === chatId : s.chatId === null && !s.busy && s.projectId === projectId);
-  return existing ? { ...state, active: existing.key } : { active: key, items: [...state.items, { key, chatId, projectId }] };
+  const existing = state.items.find((s) =>
+    chatId !== null ? s.chatId === chatId : s.chatId === null && !s.busy && s.projectId === projectId,
+  );
+  return existing
+    ? { ...state, active: existing.key }
+    : { active: key, items: [...state.items, { key, chatId, projectId }] };
 }
 export function promoteSession(state: Sessions, key: string, chatId: number): Sessions {
-  return { ...state, items: state.items.map(s => s.key === key ? { ...s, chatId } : s) };
+  return { ...state, items: state.items.map((s) => (s.key === key ? { ...s, chatId } : s)) };
 }
 export function isAuthError(message: string) {
-  return /\b401\b|unauthori[sz]ed|failed to authenticate|oauth.*invalid|not logged in|authentication required|invalid.*api.?key/i.test(message);
+  return /\b401\b|unauthori[sz]ed|failed to authenticate|oauth.*invalid|not logged in|authentication required|invalid.*api.?key/i.test(
+    message,
+  );
 }
 
 // ---- Composer drafts: persisted per chat in SQLite (`drafts` table, see src-tauri/src/db.rs) ----
@@ -41,7 +47,9 @@ export function draftScope(chatId: number | null, projectId: number | null): str
 
 export function parseScope(scope: string): { chatId: number | null; projectId: number | null } {
   const id = (s: string) => (/^\d+$/.test(s) ? Number(s) : null);
-  return scope.startsWith("chat:") ? { chatId: id(scope.slice(5)), projectId: null } : { chatId: null, projectId: id(scope.slice(4)) };
+  return scope.startsWith("chat:")
+    ? { chatId: id(scope.slice(5)), projectId: null }
+    : { chatId: null, projectId: id(scope.slice(4)) };
 }
 
 export const isEmptyDraft = (d: Draft) => !d.text.trim() && d.images.length === 0;
@@ -60,7 +68,11 @@ export function boundDraft(d: Draft): Draft & { truncated: boolean; dropped: num
   let total = 0;
   let dropped = 0;
   for (const data of d.images) {
-    const ok = data.length > 0 && data.length <= DRAFT_LIMITS.image && images.length < DRAFT_LIMITS.count && total + data.length <= DRAFT_LIMITS.images;
+    const ok =
+      data.length > 0 &&
+      data.length <= DRAFT_LIMITS.image &&
+      images.length < DRAFT_LIMITS.count &&
+      total + data.length <= DRAFT_LIMITS.images;
     if (!ok) {
       dropped++;
       continue;
@@ -76,7 +88,10 @@ export function serializeDraft(d: Draft): DraftRow | null {
   const { text, images } = boundDraft(d);
   const bounded = { text, images };
   if (isEmptyDraft(bounded)) return null;
-  return { text, attachments: images.length ? JSON.stringify(images.map((data) => ({ type: "image", data }))) : EMPTY_ATTACHMENTS };
+  return {
+    text,
+    attachments: images.length ? JSON.stringify(images.map((data) => ({ type: "image", data }))) : EMPTY_ATTACHMENTS,
+  };
 }
 
 /** Tolerant reader for stored rows: malformed JSON or entries are dropped instead of breaking the composer. */
@@ -87,7 +102,10 @@ export function parseDraft(text: unknown, attachments: unknown): Draft | null {
       const list: unknown = JSON.parse(attachments);
       if (Array.isArray(list)) {
         for (const a of list) {
-          const data = a && typeof a === "object" && (a as { type?: unknown }).type === "image" ? (a as { data?: unknown }).data : null;
+          const data =
+            a && typeof a === "object" && (a as { type?: unknown }).type === "image"
+              ? (a as { data?: unknown }).data
+              : null;
           if (typeof data === "string" && data.length <= DRAFT_LIMITS.image && BASE64.test(data)) images.push(data);
         }
       }
@@ -146,7 +164,13 @@ export function createDraftSaver(write: DraftWriter, opts: { delayMs?: number; o
   return {
     schedule(scope: string, draft: Draft) {
       take(scope);
-      pending.set(scope, { draft, timer: setTimeout(() => { pending.delete(scope); void commit(scope, draft); }, delayMs) });
+      pending.set(scope, {
+        draft,
+        timer: setTimeout(() => {
+          pending.delete(scope);
+          void commit(scope, draft);
+        }, delayMs),
+      });
     },
     seed(scope: string, draft: Draft | null) {
       stored.set(scope, draft ? serializeDraft(draft) : null);

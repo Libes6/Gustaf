@@ -8,7 +8,19 @@ import { makeApp, project, renderApp } from "./render";
 import { mockSettings } from "./tauri";
 
 const sched = (id: string, title: string) =>
-  createSchedule({ title, prompt: "p", projectId: null, providerId: "p", model: "m", access: "auto", schedule: { kind: "daily", time: "09:00" } }, id, 0);
+  createSchedule(
+    {
+      title,
+      prompt: "p",
+      projectId: null,
+      providerId: "p",
+      model: "m",
+      access: "auto",
+      schedule: { kind: "daily", time: "09:00" },
+    },
+    id,
+    0,
+  );
 
 describe("Settings > Scheduled", () => {
   beforeEach(() => resetScheduled());
@@ -27,7 +39,10 @@ describe("Settings > Scheduled", () => {
     renderApp(<Settings />, makeApp({ settingsPage: "scheduled", projects: [project()] }));
     const list = await screen.findByRole("list", { name: "Scheduled prompts" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(list).getByRole("switch", { name: "Enabled: Morning digest" })).toHaveAttribute("aria-checked", "false");
+    expect(within(list).getByRole("switch", { name: "Enabled: Morning digest" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
     await userEvent.click(within(list).getByRole("button", { name: "Actions: Morning digest" }));
     expect(screen.getByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();

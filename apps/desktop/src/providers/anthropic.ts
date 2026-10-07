@@ -22,7 +22,10 @@ export function memberToActions(name: string, input: any, screen: { width: numbe
     case "double_click":
       return [{ type: "double_click", ...at }];
     case "triple_click":
-      return [{ type: "double_click", ...at }, { type: "click", ...at }];
+      return [
+        { type: "double_click", ...at },
+        { type: "click", ...at },
+      ];
     case "left_click_drag":
       return [{ type: "drag", path: [{ x: input.start_coordinate[0], y: input.start_coordinate[1] }, at] }];
     case "mouse_move":
@@ -34,13 +37,23 @@ export function memberToActions(name: string, input: any, screen: { width: numbe
     case "scroll": {
       const px = (input.scroll_amount ?? 3) * 40;
       const d = input.scroll_direction;
-      return [{ type: "scroll", ...at, scroll_y: d === "up" ? -px : d === "down" ? px : 0, scroll_x: d === "left" ? -px : d === "right" ? px : 0 }];
+      return [
+        {
+          type: "scroll",
+          ...at,
+          scroll_y: d === "up" ? -px : d === "down" ? px : 0,
+          scroll_x: d === "left" ? -px : d === "right" ? px : 0,
+        },
+      ];
     }
     case "type":
       return [{ type: "type", text: input.text ?? "" }];
     case "key":
     case "hold_key": // ponytail: hold_key is sent as a single press; add a timed press/release if a task needs it.
-      return Array.from({ length: Math.min(input.repeat ?? 1, 100) }, () => ({ type: "keypress" as const, keys: String(input.text).split("+") }));
+      return Array.from({ length: Math.min(input.repeat ?? 1, 100) }, () => ({
+        type: "keypress" as const,
+        keys: String(input.text).split("+"),
+      }));
     case "wait":
       return [{ type: "wait", ms: Math.min(input.duration ?? 1, 300) * 1000 }];
     default: // screenshot, zoom (ponytail: returns the full screenshot), cursor_position
@@ -63,9 +76,19 @@ function toAnthropic(messages: Msg[], providerId: string) {
         "assistant",
         m.parts.flatMap<any>((p) =>
           p.type === "text"
-            ? p.text ? [{ type: "text", text: p.text }] : []
+            ? p.text
+              ? [{ type: "text", text: p.text }]
+              : []
             : p.type === "tool_call"
-              ? [{ type: "tool_use", id: p.id, name: p.name, input: p.args, ...(p.computer ? { toolset_name: "computer" } : {}) }]
+              ? [
+                  {
+                    type: "tool_use",
+                    id: p.id,
+                    name: p.name,
+                    input: p.args,
+                    ...(p.computer ? { toolset_name: "computer" } : {}),
+                  },
+                ]
               : [],
         ),
       );
@@ -75,15 +98,28 @@ function toAnthropic(messages: Msg[], providerId: string) {
         m.parts.flatMap<any>((p) => {
           if (p.type !== "tool_result") return [];
           const content: any[] = [{ type: "text", text: p.output || "OK" }];
-          if (p.image) content.push({ type: "image", source: { type: "base64", media_type: "image/png", data: p.image } });
-          return [{ type: "tool_result", tool_use_id: p.id, content, is_error: p.isError || undefined, ...(p.computer ? { toolset_name: "computer" } : {}) }];
+          if (p.image)
+            content.push({ type: "image", source: { type: "base64", media_type: "image/png", data: p.image } });
+          return [
+            {
+              type: "tool_result",
+              tool_use_id: p.id,
+              content,
+              is_error: p.isError || undefined,
+              ...(p.computer ? { toolset_name: "computer" } : {}),
+            },
+          ];
         }),
       );
     } else if (m.role === "user") {
       push(
         "user",
         m.parts.flatMap<any>((p) =>
-          p.type === "text" ? [{ type: "text", text: p.text }] : p.type === "image" ? [{ type: "image", source: { type: "base64", media_type: "image/png", data: p.data } }] : [],
+          p.type === "text"
+            ? [{ type: "text", text: p.text }]
+            : p.type === "image"
+              ? [{ type: "image", source: { type: "base64", media_type: "image/png", data: p.data } }]
+              : [],
         ),
       );
     } else {
@@ -111,17 +147,31 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
     async listModels() {
       const res = await request(`${base}/v1/models?limit=100`, { headers: await authHeaders() });
       const j = await res.json();
-      return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.display_name ?? m.id, providerId: cfg.id, created: Date.parse(m.created_at) || 0 }));
+      return (j.data ?? []).map((m: any) => ({
+        id: m.id,
+        name: m.display_name ?? m.id,
+        providerId: cfg.id,
+        created: Date.parse(m.created_at) || 0,
+      }));
     },
 
     async turn(t: TurnInput) {
-      const tools: any[] = t.tools.map((d) => ({ name: d.name, description: d.description, input_schema: d.parameters }));
+      const tools: any[] = t.tools.map((d) => ({
+        name: d.name,
+        description: d.description,
+        input_schema: d.parameters,
+      }));
       if (t.computer) tools.push({ type: "computer_toolset_20260801" });
       // Effort goes in output_config (GA); models without effort support get no field. The upper levels think longer, so
       // they get more room before max_tokens cuts the reply (the request streams, so a large cap does not time out).
       const effort = pickLevel(t.reasoning, anthropicLevels(t.model));
       const body = {
-        model: t.model, max_tokens: effort === "xhigh" || effort === "max" ? 64000 : 16000, system: t.system, messages: toAnthropic(t.messages, cfg.id), tools, stream: true,
+        model: t.model,
+        max_tokens: effort === "xhigh" || effort === "max" ? 64000 : 16000,
+        system: t.system,
+        messages: toAnthropic(t.messages, cfg.id),
+        tools,
+        stream: true,
         ...(effort ? { output_config: { effort } } : {}),
       };
       const { blocks, usageRaw } = await withRetry(
@@ -129,7 +179,12 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
           const blocks: any[] = [];
           let usageRaw = {};
           let stopped = false;
-          const res = await request(`${base}/v1/messages`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/v1/messages`, {
+            method: "POST",
+            headers: await authHeaders(),
+            body: JSON.stringify(body),
+            signal: t.signal,
+          });
           for await (const ev of sse(res, t.signal)) {
             if (ev.type === "message_start") usageRaw = { ...usageRaw, ...ev.message?.usage };
             else if (ev.type === "message_delta") usageRaw = { ...usageRaw, ...ev.usage };
@@ -160,7 +215,13 @@ export function anthropic(cfg: ProviderConfig, key: KeySource): Adapter {
             if (b.json) args = JSON.parse(b.json);
           } catch {}
           const isComputer = b.toolset_name === "computer";
-          parts.push({ type: "tool_call", id: b.id, name: b.name, args, computer: isComputer ? { actions: memberToActions(b.name, args, screen) } : undefined });
+          parts.push({
+            type: "tool_call",
+            id: b.id,
+            name: b.name,
+            args,
+            computer: isComputer ? { actions: memberToActions(b.name, args, screen) } : undefined,
+          });
         }
       }
       return { parts, usage: tokenUsage(usageRaw, true) };

@@ -23,10 +23,19 @@ try {
   if (parsed.error) throw new Error(parsed.error);
   const multi = parsed.files.length > 1;
   const compile = (code: string, name: string) => {
-    try { return transform(code, { transforms: ["typescript", "jsx", "imports"], production: true, jsxRuntime: "classic" }).code; }
-    catch (error) { throw multi ? new Error(`${name}: ${error instanceof Error ? `${error.name}: ${error.message}` : error}`) : error; }
+    try {
+      return transform(code, { transforms: ["typescript", "jsx", "imports"], production: true, jsxRuntime: "classic" })
+        .code;
+    } catch (error) {
+      throw multi ? new Error(`${name}: ${error instanceof Error ? `${error.name}: ${error.message}` : error}`) : error;
+    }
   };
   const exported = loadModules(parsed.files, compile, { react: React, ...icons }) as { default?: React.ComponentType };
-  if (!exported.default) throw new Error(`Export a React component with export default${multi ? ` from ${parsed.files[0].name}` : ""}.`);
-  createRoot(document.getElementById("root")!, { onUncaughtError: report }).render(React.createElement(exported.default));
-} catch (error) { report(error); }
+  if (!exported.default)
+    throw new Error(`Export a React component with export default${multi ? ` from ${parsed.files[0].name}` : ""}.`);
+  createRoot(document.getElementById("root")!, { onUncaughtError: report }).render(
+    React.createElement(exported.default),
+  );
+} catch (error) {
+  report(error);
+}

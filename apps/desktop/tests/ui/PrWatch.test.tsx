@@ -7,7 +7,19 @@ import { getPrWatch, parseWatchCommand, pollPrWatches, startPrWatch } from "../.
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
-const pr = (over: Record<string, unknown> = {}) => JSON.stringify({ state: "OPEN", mergeable: "MERGEABLE", title: "Add parser", url: "https://github.com/o/r/pull/7", number: 7, author: "me", checks: [{ name: "ci", status: "IN_PROGRESS", conclusion: "" }], comments: [], reviews: [], ...over });
+const pr = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    state: "OPEN",
+    mergeable: "MERGEABLE",
+    title: "Add parser",
+    url: "https://github.com/o/r/pull/7",
+    number: 7,
+    author: "me",
+    checks: [{ name: "ci", status: "IN_PROGRESS", conclusion: "" }],
+    comments: [],
+    reviews: [],
+    ...over,
+  });
 
 describe("PR watch", () => {
   it("parses /watch commands", () => {
@@ -23,12 +35,20 @@ describe("PR watch", () => {
     expect(callsOf("gh_pr_view")[0]).toEqual({ root: "/work/alpha", pr: "7" });
     renderApp(<PrWatchBar chatId={41} />);
     expect(screen.getByText("#7 Add parser")).toBeInTheDocument();
-    await act(() => pollPrWatches(Date.now(), async () => pr({ checks: [{ name: "ci", status: "COMPLETED", conclusion: "FAILURE" }] })));
+    await act(() =>
+      pollPrWatches(Date.now(), async () =>
+        pr({ checks: [{ name: "ci", status: "COMPLETED", conclusion: "FAILURE" }] }),
+      ),
+    );
     const q = getQueue(41)!;
     expect(q.paused).toBe(false);
     expect(q.items[0].text).toMatch(/Checks failed: ci/);
     expect(screen.getByRole("status")).toHaveTextContent("checks 0/1 passed · 1 failing");
-    await act(() => pollPrWatches(Date.now(), async () => pr({ checks: [{ name: "ci", status: "COMPLETED", conclusion: "FAILURE" }] })));
+    await act(() =>
+      pollPrWatches(Date.now(), async () =>
+        pr({ checks: [{ name: "ci", status: "COMPLETED", conclusion: "FAILURE" }] }),
+      ),
+    );
     expect(getQueue(41)!.items).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: "Stop watching" }));
     expect(getPrWatch(41)?.stopped?.reason).toBe("user");

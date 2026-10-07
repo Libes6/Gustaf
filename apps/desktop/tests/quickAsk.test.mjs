@@ -4,15 +4,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  INITIAL_QUICK_ASK, DEFAULT_ACCELERATOR, DEFAULT_QUICK_ASK, MAX_CLIPBOARD_CHARS, QUICK_ASK_SYSTEM,
-  acceleratorOf, buildChatPayload, buildUserText, canKeep, clipboardPreview, displayAccelerator, keyName, limitClipboard, normalizeQuickAsk,
-  pickDefaultModel, quickAskErrorKey, quickAskReducer, quickAskTitle, recordAccelerator, usableModels, validateAccelerator,
+  INITIAL_QUICK_ASK,
+  DEFAULT_ACCELERATOR,
+  DEFAULT_QUICK_ASK,
+  MAX_CLIPBOARD_CHARS,
+  QUICK_ASK_SYSTEM,
+  acceleratorOf,
+  buildChatPayload,
+  buildUserText,
+  canKeep,
+  clipboardPreview,
+  displayAccelerator,
+  keyName,
+  limitClipboard,
+  normalizeQuickAsk,
+  pickDefaultModel,
+  quickAskErrorKey,
+  quickAskReducer,
+  quickAskTitle,
+  recordAccelerator,
+  usableModels,
+  validateAccelerator,
 } from '../src/lib/quickAsk.ts';
 
 const model = { providerId: 'p1', model: 'gpt-x' };
 const run = (...actions) => actions.reduce(quickAskReducer, INITIAL_QUICK_ASK);
 const send = { type: 'send', question: ' What is a monad? ', model };
-const key = (code, mods = {}) => ({ key: code, code, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+const key = (code, mods = {}) => ({
+  key: code,
+  code,
+  metaKey: false,
+  ctrlKey: false,
+  altKey: false,
+  shiftKey: false,
+  ...mods,
+});
 
 // ---- state machine ----------------------------------------------------------------------------------------------------
 
@@ -48,7 +74,13 @@ test('stop keeps what arrived; late chunks, finish and failure after stop are ig
   assert.equal(stopped.phase, 'stopped');
   assert.equal(stopped.answer, 'so far');
   assert.ok(canKeep(stopped));
-  for (const late of [{ type: 'delta', text: ' more' }, { type: 'finish' }, { type: 'fail', message: 'aborted' }, { type: 'stop' }]) assert.equal(quickAskReducer(stopped, late), stopped);
+  for (const late of [
+    { type: 'delta', text: ' more' },
+    { type: 'finish' },
+    { type: 'fail', message: 'aborted' },
+    { type: 'stop' },
+  ])
+    assert.equal(quickAskReducer(stopped, late), stopped);
 });
 
 test('a new question after a settled exchange starts clean; reset returns to idle', () => {
@@ -74,7 +106,10 @@ test('open-in-Gustaf payload: a normal two-message chat with the text as sent, m
   const s = run({ ...send, clipboard: 'let x = 1;' }, { type: 'delta', text: '**Answer**' }, { type: 'finish', usage });
   const payload = buildChatPayload(s);
   assert.equal(payload.title, 'What is a monad?');
-  assert.deepEqual(payload.messages.map((m) => m.role), ['user', 'assistant']);
+  assert.deepEqual(
+    payload.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
   assert.equal(payload.messages[0].parts[0].text, 'What is a monad?\n\nClipboard text:\n```\nlet x = 1;\n```');
   assert.equal(payload.messages[0].meta, undefined);
   assert.deepEqual(payload.messages[1].parts, [{ type: 'text', text: '**Answer**' }]);
@@ -134,13 +169,22 @@ const m = (providerId, id) => ({ providerId, id, name: id });
 const all = [m('a', 'gpt-1'), m('a', 'gpt-2'), m('c', 'sonnet'), m('u', 'auto'), m('d', 'llama'), m('o', 'qwen')];
 
 test('usable models exclude CLI-native, disabled and hidden ones', () => {
-  assert.deepEqual(usableModels(providers, all, ['a\ngpt-2']).map((x) => x.id), ['gpt-1', 'qwen']);
+  assert.deepEqual(
+    usableModels(providers, all, ['a\ngpt-2']).map((x) => x.id),
+    ['gpt-1', 'qwen'],
+  );
 });
 
 test('default model: the app selection when usable, else the first usable one (flagged)', () => {
   const usable = usableModels(providers, all);
-  assert.deepEqual(pickDefaultModel({ providerId: 'a', model: 'gpt-2' }, usable), { model: usable[1], fellBack: false });
-  assert.deepEqual(pickDefaultModel({ providerId: 'c', model: 'sonnet' }, usable), { model: usable[0], fellBack: true });
+  assert.deepEqual(pickDefaultModel({ providerId: 'a', model: 'gpt-2' }, usable), {
+    model: usable[1],
+    fellBack: false,
+  });
+  assert.deepEqual(pickDefaultModel({ providerId: 'c', model: 'sonnet' }, usable), {
+    model: usable[0],
+    fellBack: true,
+  });
   assert.deepEqual(pickDefaultModel(null, usable), { model: usable[0], fellBack: false });
   assert.deepEqual(pickDefaultModel(null, []), { model: null, fellBack: false });
 });
@@ -152,7 +196,11 @@ test('the setting is off by default and normalises corrupt values', () => {
   assert.deepEqual(normalizeQuickAsk(undefined), DEFAULT_QUICK_ASK);
   assert.deepEqual(normalizeQuickAsk('x'), DEFAULT_QUICK_ASK);
   assert.deepEqual(normalizeQuickAsk({ enabled: 'yes', accelerator: 7, hideOnBlur: 'no' }), DEFAULT_QUICK_ASK);
-  assert.deepEqual(normalizeQuickAsk({ enabled: true, accelerator: ' Alt+K ', hideOnBlur: false }), { enabled: true, accelerator: 'Alt+K', hideOnBlur: false });
+  assert.deepEqual(normalizeQuickAsk({ enabled: true, accelerator: ' Alt+K ', hideOnBlur: false }), {
+    enabled: true,
+    accelerator: 'Alt+K',
+    hideOnBlur: false,
+  });
   assert.equal(acceleratorOf(DEFAULT_QUICK_ASK, 'windows'), 'Control+Alt+Space');
   assert.equal(acceleratorOf({ ...DEFAULT_QUICK_ASK, accelerator: 'Alt+K' }, 'macos'), 'Alt+K');
 });
@@ -163,7 +211,8 @@ test('default accelerators match the Rust side (default_accelerator_for)', () =>
   assert.ok(body.includes(`"macos" => "${DEFAULT_ACCELERATOR.macos}"`));
   assert.ok(body.includes(`_ => "${DEFAULT_ACCELERATOR.windows}"`));
   assert.equal(DEFAULT_ACCELERATOR.windows, DEFAULT_ACCELERATOR.linux);
-  for (const [p, a] of Object.entries(DEFAULT_ACCELERATOR)) assert.equal(validateAccelerator(a, p, ['CommandOrControl+Shift+Escape']), null, p);
+  for (const [p, a] of Object.entries(DEFAULT_ACCELERATOR))
+    assert.equal(validateAccelerator(a, p, ['CommandOrControl+Shift+Escape']), null, p);
 });
 
 test('key names for the global-shortcut plugin', () => {
@@ -178,21 +227,39 @@ test('key names for the global-shortcut plugin', () => {
 });
 
 test('recording: modifiers first (waiting), then a canonical accelerator', () => {
-  assert.deepEqual(recordAccelerator(key('ControlLeft', { ctrlKey: true }), 'windows'), { ok: false, error: 'waiting' });
-  assert.deepEqual(recordAccelerator(key('Space', { ctrlKey: true, altKey: true }), 'windows'), { ok: true, accelerator: 'Control+Alt+Space' });
-  assert.deepEqual(recordAccelerator(key('KeyK', { metaKey: true, shiftKey: true, altKey: true }), 'macos'), { ok: true, accelerator: 'Alt+Shift+Command+K' });
+  assert.deepEqual(recordAccelerator(key('ControlLeft', { ctrlKey: true }), 'windows'), {
+    ok: false,
+    error: 'waiting',
+  });
+  assert.deepEqual(recordAccelerator(key('Space', { ctrlKey: true, altKey: true }), 'windows'), {
+    ok: true,
+    accelerator: 'Control+Alt+Space',
+  });
+  assert.deepEqual(recordAccelerator(key('KeyK', { metaKey: true, shiftKey: true, altKey: true }), 'macos'), {
+    ok: true,
+    accelerator: 'Alt+Shift+Command+K',
+  });
   assert.deepEqual(recordAccelerator(key('KeyK', { metaKey: true }), 'linux'), { ok: true, accelerator: 'Super+K' });
 });
 
 test('recording rejects bare keys, Shift-only, unsupported keys, OS-reserved and clashing combinations', () => {
   assert.deepEqual(recordAccelerator(key('Space'), 'macos'), { ok: false, error: 'needsModifier' });
   assert.deepEqual(recordAccelerator(key('KeyA', { shiftKey: true }), 'macos'), { ok: false, error: 'needsModifier' });
-  assert.deepEqual(recordAccelerator(key('NumpadAdd', { ctrlKey: true }), 'windows'), { ok: false, error: 'unsupportedKey' });
+  assert.deepEqual(recordAccelerator(key('NumpadAdd', { ctrlKey: true }), 'windows'), {
+    ok: false,
+    error: 'unsupportedKey',
+  });
   assert.deepEqual(recordAccelerator(key('Space', { metaKey: true }), 'macos'), { ok: false, error: 'reserved' });
   assert.deepEqual(recordAccelerator(key('Tab', { altKey: true }), 'windows'), { ok: false, error: 'reserved' });
   // the stop-agent shortcut is CommandOrControl+Shift+Escape
-  assert.deepEqual(recordAccelerator(key('Escape', { metaKey: true, shiftKey: true }), 'macos', ['CommandOrControl+Shift+Escape']), { ok: false, error: 'conflict' });
-  assert.deepEqual(recordAccelerator(key('Escape', { ctrlKey: true, shiftKey: true }), 'linux', ['CommandOrControl+Shift+Escape']), { ok: false, error: 'conflict' });
+  assert.deepEqual(
+    recordAccelerator(key('Escape', { metaKey: true, shiftKey: true }), 'macos', ['CommandOrControl+Shift+Escape']),
+    { ok: false, error: 'conflict' },
+  );
+  assert.deepEqual(
+    recordAccelerator(key('Escape', { ctrlKey: true, shiftKey: true }), 'linux', ['CommandOrControl+Shift+Escape']),
+    { ok: false, error: 'conflict' },
+  );
 });
 
 test('validateAccelerator on stored strings', () => {

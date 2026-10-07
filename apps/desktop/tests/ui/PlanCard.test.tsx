@@ -6,7 +6,15 @@ import { TurnView } from "../../src/components/chat/TurnView";
 import { serializePlan, type Plan } from "../../src/agent/planCore";
 import { renderApp } from "./render";
 
-const plan: Plan = { title: "Add dark mode", steps: [{ id: "1", text: "Add theme tokens", files: ["src/theme.css"] }, { id: "2", text: "Wire the toggle" }], risks: ["Contrast"], questions: ["Persist per project?"] };
+const plan: Plan = {
+  title: "Add dark mode",
+  steps: [
+    { id: "1", text: "Add theme tokens", files: ["src/theme.css"] },
+    { id: "2", text: "Wire the toggle" },
+  ],
+  risks: ["Contrast"],
+  questions: ["Persist per project?"],
+};
 
 describe("PlanCard", () => {
   it("renders the steps as a checklist with risks and questions", () => {
@@ -40,7 +48,10 @@ describe("PlanCard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove step 1" }));
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
     const sent = onApprove.mock.calls[0][0] as Plan;
-    expect(sent.steps.map((s) => [s.id, s.text])).toEqual([["1", "Define tokens"], ["2", "Write tests"]]);
+    expect(sent.steps.map((s) => [s.id, s.text])).toEqual([
+      ["1", "Define tokens"],
+      ["2", "Write tests"],
+    ]);
   });
 
   it("offers no actions when it is not the latest plan", () => {
@@ -50,9 +61,21 @@ describe("PlanCard", () => {
 });
 
 describe("TurnView plan blocks", () => {
-  const turn = (text: string) => ({ user: { id: 1, chat_id: 1, created_at: 1, role: "user", parts: [{ type: "text", text: "plan it" }] }, steps: [{ id: 2, chat_id: 1, created_at: 2, role: "assistant", parts: [{ type: "text", text }] }] }) as any;
-  const handlers = { onEdit: vi.fn(), onRegenerate: vi.fn(), onDelete: vi.fn(), onBranch: vi.fn(), onApprovePlan: vi.fn(), onRejectPlan: vi.fn() };
-  const view = (text: string, busy = false) => renderApp(<TurnView turn={turn(text)} live={false} liveResults={[]} busy={busy} isLastTurn handlers={handlers} />);
+  const turn = (text: string) =>
+    ({
+      user: { id: 1, chat_id: 1, created_at: 1, role: "user", parts: [{ type: "text", text: "plan it" }] },
+      steps: [{ id: 2, chat_id: 1, created_at: 2, role: "assistant", parts: [{ type: "text", text }] }],
+    }) as any;
+  const handlers = {
+    onEdit: vi.fn(),
+    onRegenerate: vi.fn(),
+    onDelete: vi.fn(),
+    onBranch: vi.fn(),
+    onApprovePlan: vi.fn(),
+    onRejectPlan: vi.fn(),
+  };
+  const view = (text: string, busy = false) =>
+    renderApp(<TurnView turn={turn(text)} live={false} liveResults={[]} busy={busy} isLastTurn handlers={handlers} />);
 
   it("shows a plan card for a valid gustaf-plan block and Approve reaches the handler", async () => {
     view(`Findings.\n\n${serializePlan(plan)}`);

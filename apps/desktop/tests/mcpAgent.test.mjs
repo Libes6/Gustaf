@@ -19,8 +19,16 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUg==';
 let seq = 0;
 const fakeServer = (calls = []) => ({
   tools: [
-    { name: 'search', description: 'Search issues', inputSchema: { $schema: 'x', type: 'object', properties: { q: { type: 'string' } } } },
-    { name: 'create', description: 'Create an issue', inputSchema: { type: 'object', properties: { title: { type: 'string' } } } },
+    {
+      name: 'search',
+      description: 'Search issues',
+      inputSchema: { $schema: 'x', type: 'object', properties: { q: { type: 'string' } } },
+    },
+    {
+      name: 'create',
+      description: 'Create an issue',
+      inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
+    },
     { name: 'shot', description: 'Screenshot', inputSchema: { type: 'object' } },
     { name: 'fail', description: 'Fails', inputSchema: { type: 'object' } },
   ],
@@ -35,7 +43,17 @@ const fakeServer = (calls = []) => ({
 /** Registers a stdio server in settings (through the real store) and its fake process. */
 async function addServer(over = {}, calls = []) {
   const id = `srv${++seq}`;
-  const server = { ...blankServer(id, 'stdio'), name: over.name ?? 'gh', command: 'npx', args: ['-y', 'server-github'], env: [{ key: 'GITHUB_TOKEN', value: 'ghp_secret', secret: true }, { key: 'MODE', value: 'x', secret: false }], ...over };
+  const server = {
+    ...blankServer(id, 'stdio'),
+    name: over.name ?? 'gh',
+    command: 'npx',
+    args: ['-y', 'server-github'],
+    env: [
+      { key: 'GITHUB_TOKEN', value: 'ghp_secret', secret: true },
+      { key: 'MODE', value: 'x', secret: false },
+    ],
+    ...over,
+  };
   state.mcp.servers[id] = { ...fakeServer(calls), ...(over.fake ?? {}) };
   delete server.fake;
   await saveMcpServer(server);
@@ -74,7 +92,10 @@ async function run(script, o = {}) {
     signal: new AbortController().signal,
     onText: () => {},
     onMessage: async (m) => {
-      if (m.role === 'tool') outputs.push(...m.parts.map((p) => ({ output: p.output, isError: !!p.isError, ...(p.image ? { image: p.image } : {}) })));
+      if (m.role === 'tool')
+        outputs.push(
+          ...m.parts.map((p) => ({ output: p.output, isError: !!p.isError, ...(p.image ? { image: p.image } : {}) })),
+        );
     },
     approve: async (req) => {
       approvals.push(req);
@@ -135,7 +156,9 @@ test('"Always allow" given during a run applies to the next call of that run', a
   state.reset();
   const id = await addServer();
   const { allowMcpTool } = await import('../src/agent/mcp/runtime.ts');
-  const r = await run([call('mcp__gh__search', {}), call('mcp__gh__search', {})], { approve: async (req) => (await allowMcpTool(req.serverId, req.tool), true) });
+  const r = await run([call('mcp__gh__search', {}), call('mcp__gh__search', {})], {
+    approve: async (req) => (await allowMcpTool(req.serverId, req.tool), true),
+  });
   assert.equal(r.approvals.length, 1);
   assert.deepEqual((await loadMcpConfig()).servers.find((s) => s.id === id).allowedTools, ['search']);
 });
@@ -150,15 +173,22 @@ test('read-only mode offers only tools the user marked read-only and blocks the 
   assert.equal(r.outputs[0].isError, false);
   // A tool that was not offered is unknown to the loop and fails without reaching the server.
   assert.equal(r.outputs[1].isError, true);
-  assert.deepEqual(calls.map((c) => c.name), ['search']);
+  assert.deepEqual(
+    calls.map((c) => c.name),
+    ['search'],
+  );
 });
 
 test('read-only block applies at call time when the mark was removed during the run', async () => {
   state.reset();
   const calls = [];
   const id = await addServer({ readOnlyTools: ['search'] }, calls);
-  const r = await run([async () => (await patchMcpServer(id, { readOnlyTools: [] }), call('mcp__gh__search', {}))], { access: 'readonly' });
-  assert.deepEqual(r.outputs, [{ output: 'Blocked: read-only mode allows only MCP tools the user marked read-only.', isError: true }]);
+  const r = await run([async () => (await patchMcpServer(id, { readOnlyTools: [] }), call('mcp__gh__search', {}))], {
+    access: 'readonly',
+  });
+  assert.deepEqual(r.outputs, [
+    { output: 'Blocked: read-only mode allows only MCP tools the user marked read-only.', isError: true },
+  ]);
   assert.equal(r.log.at(-1).status, 'blocked');
   assert.equal(calls.length, 0);
 });

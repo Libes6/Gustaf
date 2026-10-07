@@ -22,7 +22,13 @@ fn tiny_pdf(text: &str) -> Vec<u8> {
     for o in &offsets {
         out.extend(format!("{o:010} 00000 n \n").bytes());
     }
-    out.extend(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1).bytes());
+    out.extend(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .bytes(),
+    );
     out
 }
 
@@ -35,7 +41,10 @@ fn child_process_extracts_pdf_text_and_reports_bad_files() {
     std::fs::write(&good, tiny_pdf("hello from the child process")).unwrap();
     let pages = gustaf_lib::extract_pdf_with_exe(exe, &good).unwrap();
     assert_eq!(pages.len(), 1);
-    assert!(pages[0].contains("hello from the child process"), "{pages:?}");
+    assert!(
+        pages[0].contains("hello from the child process"),
+        "{pages:?}"
+    );
 
     let bad = dir.join("bad.pdf");
     std::fs::write(&bad, b"%PDF-1.4 not really").unwrap();

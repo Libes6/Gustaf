@@ -50,19 +50,35 @@ export function validateHooks(raw: unknown, source: HookSource): HooksConfig {
     }
     if (!item || typeof item !== "object" || Array.isArray(item)) return issue(i, "A hook must be an object.");
     const h = item as Record<string, unknown>;
-    if (typeof h.event !== "string" || !EVENT_SET.includes(h.event)) return issue(i, `"event" must be one of: ${HOOK_EVENTS.join(", ")}.`);
+    if (typeof h.event !== "string" || !EVENT_SET.includes(h.event))
+      return issue(i, `"event" must be one of: ${HOOK_EVENTS.join(", ")}.`);
     if (typeof h.command !== "string" || !h.command.trim()) return issue(i, '"command" must be a non-empty string.');
-    if (h.command.length > MAX_HOOK_COMMAND) return issue(i, `"command" is longer than ${MAX_HOOK_COMMAND} characters.`);
+    if (h.command.length > MAX_HOOK_COMMAND)
+      return issue(i, `"command" is longer than ${MAX_HOOK_COMMAND} characters.`);
     if (h.matcher !== undefined && typeof h.matcher !== "string") return issue(i, '"matcher" must be a string.');
     const matcher = (h.matcher ?? "*") as string;
     if (matcher.length > MAX_HOOK_MATCHER) return issue(i, `"matcher" is longer than ${MAX_HOOK_MATCHER} characters.`);
     let timeoutMs = DEFAULT_HOOK_TIMEOUT_MS;
     if (h.timeoutMs !== undefined) {
-      if (typeof h.timeoutMs !== "number" || !Number.isInteger(h.timeoutMs) || h.timeoutMs < MIN_HOOK_TIMEOUT_MS || h.timeoutMs > MAX_HOOK_TIMEOUT_MS)
-        return issue(i, `"timeoutMs" must be a whole number between ${MIN_HOOK_TIMEOUT_MS} and ${MAX_HOOK_TIMEOUT_MS}.`);
+      if (
+        typeof h.timeoutMs !== "number" ||
+        !Number.isInteger(h.timeoutMs) ||
+        h.timeoutMs < MIN_HOOK_TIMEOUT_MS ||
+        h.timeoutMs > MAX_HOOK_TIMEOUT_MS
+      )
+        return issue(
+          i,
+          `"timeoutMs" must be a whole number between ${MIN_HOOK_TIMEOUT_MS} and ${MAX_HOOK_TIMEOUT_MS}.`,
+        );
       timeoutMs = h.timeoutMs;
     }
-    hooks.push({ event: h.event as HookEvent, matcher: matcher.trim() || "*", command: h.command.trim(), timeoutMs, source });
+    hooks.push({
+      event: h.event as HookEvent,
+      matcher: matcher.trim() || "*",
+      command: h.command.trim(),
+      timeoutMs,
+      source,
+    });
   });
   return { hooks, issues };
 }
@@ -76,13 +92,22 @@ export const stripLineNumbers = (text: string) =>
 
 /** Parses the text of a hooks file (as read through `fsx.read`, line numbers included or not). */
 export function parseHooksText(text: string, source: HookSource): HooksConfig {
-  if (text.length > MAX_HOOKS_FILE_BYTES) return { hooks: [], issues: [{ source, index: null, message: `The file is larger than ${MAX_HOOKS_FILE_BYTES / 1024} KB and was ignored.` }] };
+  if (text.length > MAX_HOOKS_FILE_BYTES)
+    return {
+      hooks: [],
+      issues: [
+        { source, index: null, message: `The file is larger than ${MAX_HOOKS_FILE_BYTES / 1024} KB and was ignored.` },
+      ],
+    };
   let raw: unknown;
   const plain = /^\s*\d+\|/.test(text) ? stripLineNumbers(text) : text;
   try {
     raw = JSON.parse(plain);
   } catch (e) {
-    return { hooks: [], issues: [{ source, index: null, message: `Invalid JSON: ${String((e as Error)?.message ?? e)}` }] };
+    return {
+      hooks: [],
+      issues: [{ source, index: null, message: `Invalid JSON: ${String((e as Error)?.message ?? e)}` }],
+    };
   }
   return validateHooks(raw, source);
 }
@@ -95,13 +120,21 @@ export function matchesTool(matcher: string, name: string): boolean {
   const parts = matcher.split("|").map((p) => p.trim());
   return parts.some((p) => {
     if (!p || p === "*") return true;
-    const re = new RegExp("^" + p.replace(/[.+^${}()[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
+    const re = new RegExp(
+      "^" +
+        p
+          .replace(/[.+^${}()[\]\\]/g, "\\$&")
+          .replace(/\*/g, ".*")
+          .replace(/\?/g, ".") +
+        "$",
+    );
     return re.test(name);
   });
 }
 
 /** Hooks of `event` whose matcher fits `tool` (stop hooks ignore the matcher). */
-export const hooksFor = (hooks: readonly Hook[], event: HookEvent, tool = "") => hooks.filter((h) => h.event === event && (event === "stop" || matchesTool(h.matcher, tool)));
+export const hooksFor = (hooks: readonly Hook[], event: HookEvent, tool = "") =>
+  hooks.filter((h) => h.event === event && (event === "stop" || matchesTool(h.matcher, tool)));
 
 /** Global hooks first, then the project's when the user enabled them for it. */
 export function effectiveHooks(global: HooksConfig, project: HooksConfig, projectEnabled: boolean): Hook[] {
@@ -113,7 +146,14 @@ export function truncateInput(input: unknown): unknown {
   const cut = (v: unknown, depth: number): unknown => {
     if (typeof v === "string") return clip(v, 500);
     if (Array.isArray(v)) return depth > 3 ? "…" : v.slice(0, 20).map((x) => cut(x, depth + 1));
-    if (v && typeof v === "object") return depth > 3 ? "…" : Object.fromEntries(Object.entries(v).slice(0, 30).map(([k, x]) => [k, cut(x, depth + 1)]));
+    if (v && typeof v === "object")
+      return depth > 3
+        ? "…"
+        : Object.fromEntries(
+            Object.entries(v)
+              .slice(0, 30)
+              .map(([k, x]) => [k, cut(x, depth + 1)]),
+          );
     return v;
   };
   const small = cut(input ?? {}, 0);
@@ -121,7 +161,16 @@ export function truncateInput(input: unknown): unknown {
   return text.length > MAX_PAYLOAD_INPUT ? { truncated: true, preview: text.slice(0, MAX_PAYLOAD_INPUT) } : small;
 }
 
-export type HookPayloadInput = { event: HookEvent; tool?: string; input?: unknown; root: string; project: string | null; chatId?: number; result?: string; isError?: boolean };
+export type HookPayloadInput = {
+  event: HookEvent;
+  tool?: string;
+  input?: unknown;
+  root: string;
+  project: string | null;
+  chatId?: number;
+  result?: string;
+  isError?: boolean;
+};
 
 /** The JSON document a hook reads on stdin. */
 export function buildPayload(p: HookPayloadInput): string {
@@ -138,7 +187,11 @@ export function buildPayload(p: HookPayloadInput): string {
 }
 
 /** The three variables a hook gets (besides the minimal shell environment). */
-export const hookEnv = (event: HookEvent, tool: string | undefined, project: string): Record<string, string> => ({ GUSTAF_EVENT: event, GUSTAF_TOOL: tool ?? "", GUSTAF_PROJECT: project });
+export const hookEnv = (event: HookEvent, tool: string | undefined, project: string): Record<string, string> => ({
+  GUSTAF_EVENT: event,
+  GUSTAF_TOOL: tool ?? "",
+  GUSTAF_PROJECT: project,
+});
 
 export type HookExit = { code: number | null; output: string; timedOut: boolean };
 
@@ -156,7 +209,8 @@ export function hookStatus(event: HookEvent, r: HookExit): "success" | "error" {
 
 /** pre_tool: exit 2 blocks (the text goes back to the model as the tool result); everything else never blocks. */
 export function preToolVerdict(r: HookExit): { blocked: false } | { blocked: true; message: string } {
-  if (!r.timedOut && r.code === HOOK_BLOCK_CODE) return { blocked: true, message: `blocked by hook: ${hookText(r.output) || "no reason given"}` };
+  if (!r.timedOut && r.code === HOOK_BLOCK_CODE)
+    return { blocked: true, message: `blocked by hook: ${hookText(r.output) || "no reason given"}` };
   return { blocked: false };
 }
 

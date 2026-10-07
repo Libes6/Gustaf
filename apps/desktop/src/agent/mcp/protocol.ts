@@ -14,15 +14,29 @@ export type Parsed =
   | { kind: "notification"; method: string; params?: unknown }
   | { kind: "invalid"; reason: string };
 
-export const request = (id: RpcId, method: string, params?: unknown) => ({ jsonrpc: "2.0" as const, id, method, ...(params === undefined ? {} : { params }) });
-export const notification = (method: string, params?: unknown) => ({ jsonrpc: "2.0" as const, method, ...(params === undefined ? {} : { params }) });
+export const request = (id: RpcId, method: string, params?: unknown) => ({
+  jsonrpc: "2.0" as const,
+  id,
+  method,
+  ...(params === undefined ? {} : { params }),
+});
+export const notification = (method: string, params?: unknown) => ({
+  jsonrpc: "2.0" as const,
+  method,
+  ...(params === undefined ? {} : { params }),
+});
 export const resultReply = (id: RpcId, result: unknown) => ({ jsonrpc: "2.0" as const, id, result });
-export const errorReply = (id: RpcId, code: number, message: string) => ({ jsonrpc: "2.0" as const, id, error: { code, message } });
+export const errorReply = (id: RpcId, code: number, message: string) => ({
+  jsonrpc: "2.0" as const,
+  id,
+  error: { code, message },
+});
 
 /** Serializes one outgoing message; refuses messages over the size cap. */
 export function encode(msg: object): string {
   const text = JSON.stringify(msg);
-  if (new TextEncoder().encode(text).length > MAX_OUTGOING_BYTES) throw new Error(`MCP request exceeds ${MAX_OUTGOING_BYTES >> 20} MB`);
+  if (new TextEncoder().encode(text).length > MAX_OUTGOING_BYTES)
+    throw new Error(`MCP request exceeds ${MAX_OUTGOING_BYTES >> 20} MB`);
   return text;
 }
 
@@ -35,7 +49,8 @@ export function classify(msg: unknown): Parsed {
   if (m.jsonrpc !== "2.0") return { kind: "invalid", reason: "missing jsonrpc 2.0" };
   const method = typeof m.method === "string" ? m.method : undefined;
   if (method !== undefined) {
-    if (m.id === undefined || m.id === null) return { kind: "notification", method, ...(m.params !== undefined ? { params: m.params } : {}) };
+    if (m.id === undefined || m.id === null)
+      return { kind: "notification", method, ...(m.params !== undefined ? { params: m.params } : {}) };
     if (!isId(m.id)) return { kind: "invalid", reason: "bad id" };
     return { kind: "request", id: m.id, method, ...(m.params !== undefined ? { params: m.params } : {}) };
   }
@@ -43,7 +58,15 @@ export function classify(msg: unknown): Parsed {
   if (m.error !== undefined) {
     const e = m.error as Record<string, unknown> | null;
     if (!e || typeof e !== "object") return { kind: "invalid", reason: "bad error" };
-    return { kind: "response", id: m.id, error: { code: typeof e.code === "number" ? e.code : 0, message: typeof e.message === "string" ? e.message : "unknown error", ...(e.data !== undefined ? { data: e.data } : {}) } };
+    return {
+      kind: "response",
+      id: m.id,
+      error: {
+        code: typeof e.code === "number" ? e.code : 0,
+        message: typeof e.message === "string" ? e.message : "unknown error",
+        ...(e.data !== undefined ? { data: e.data } : {}),
+      },
+    };
   }
   if (!("result" in m)) return { kind: "invalid", reason: "response without result or error" };
   return { kind: "response", id: m.id, result: m.result };
@@ -60,7 +83,8 @@ export function parseBody(text: string): Parsed[] {
   return (Array.isArray(data) ? data : [data]).slice(0, 1000).map(classify);
 }
 
-export const errorText = (e: { code: number; message: string }) => `MCP error ${e.code}: ${String(e.message).slice(0, 2000)}`;
+export const errorText = (e: { code: number; message: string }) =>
+  `MCP error ${e.code}: ${String(e.message).slice(0, 2000)}`;
 
 /**
  * Incremental text/event-stream decoder: feed it decoded text, get back the `data` payloads of complete events.
@@ -106,12 +130,24 @@ export const initializeParams = (version: string) => ({
 });
 
 /** Checks an `initialize` result and returns the parts the client keeps. */
-export function checkInitialize(result: unknown): { protocolVersion: string; serverInfo?: { name?: string; version?: string }; capabilities: Record<string, unknown>; instructions?: string } {
+export function checkInitialize(result: unknown): {
+  protocolVersion: string;
+  serverInfo?: { name?: string; version?: string };
+  capabilities: Record<string, unknown>;
+  instructions?: string;
+} {
   if (!result || typeof result !== "object") throw new Error("invalid initialize result");
   const r = result as Record<string, any>;
   if (typeof r.protocolVersion !== "string") throw new Error("invalid initialize result (no protocolVersion)");
-  if (!SUPPORTED_VERSIONS.includes(r.protocolVersion)) throw new Error(`unsupported MCP protocol version ${r.protocolVersion.slice(0, 40)}`);
-  const info = r.serverInfo && typeof r.serverInfo === "object" ? { name: typeof r.serverInfo.name === "string" ? r.serverInfo.name.slice(0, 200) : undefined, version: typeof r.serverInfo.version === "string" ? r.serverInfo.version.slice(0, 100) : undefined } : undefined;
+  if (!SUPPORTED_VERSIONS.includes(r.protocolVersion))
+    throw new Error(`unsupported MCP protocol version ${r.protocolVersion.slice(0, 40)}`);
+  const info =
+    r.serverInfo && typeof r.serverInfo === "object"
+      ? {
+          name: typeof r.serverInfo.name === "string" ? r.serverInfo.name.slice(0, 200) : undefined,
+          version: typeof r.serverInfo.version === "string" ? r.serverInfo.version.slice(0, 100) : undefined,
+        }
+      : undefined;
   return {
     protocolVersion: r.protocolVersion,
     ...(info ? { serverInfo: info } : {}),

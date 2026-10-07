@@ -71,4 +71,13 @@ export const ru: Record<StringKey, string> = {
   language: "Язык",
   langSystem: "Системный",
   about: "О приложении",
+  newChatCta: "Чат",
+  newChatTitle: "Над чем работаем?",
+  newChatIn: "Новый чат в {project}",
+  waitingApproval: "Ждёт вашего подтверждения",
+  waitingApprovalDesc: "Агент просит что-то запустить. Ответьте на компьютере, и он продолжит.",
+  welcomeLead: "Управляйте агентом Gustaf на вашем компьютере с телефона.",
+  welcomeStep1: "На компьютере: Настройки → Мобильное → включите сервер для телефона.",
+  welcomeStep2: "Телефон и компьютер должны быть в одной сети Wi-Fi.",
+  welcomeStep3: "Отсканируйте QR-код, который покажет компьютер.",
 };

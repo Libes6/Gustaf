@@ -8,7 +8,10 @@ export const READ_TOOLS: ToolDef[] = [
   {
     name: "read_file",
     description: "Read a text file from the project. Returns lines prefixed with line numbers.",
-    parameters: obj({ path: str("Path relative to the project root"), offset: int("1-based first line"), limit: int("Max lines") }, ["path"]),
+    parameters: obj(
+      { path: str("Path relative to the project root"), offset: int("1-based first line"), limit: int("Max lines") },
+      ["path"],
+    ),
   },
   {
     name: "list_dir",
@@ -23,24 +26,37 @@ export const READ_TOOLS: ToolDef[] = [
 ];
 
 export const WRITE_TOOLS: ToolDef[] = [
-  { name: "diagnostics", description: "Run the configured project type/lint check and return actual output. Obeys the same command approvals as run_command. Requires a configured diagnostics command.", parameters: obj({path:str("Relative file path for LSP diagnostics")}, []) },
+  {
+    name: "diagnostics",
+    description:
+      "Run the configured project type/lint check and return actual output. Obeys the same command approvals as run_command. Requires a configured diagnostics command.",
+    parameters: obj({ path: str("Relative file path for LSP diagnostics") }, []),
+  },
   {
     name: "edit_file",
-    description: "Replace exactly one occurrence of old_string with new_string. Fails if old_string is missing or not unique; include enough context.",
-    parameters: obj({ path: str("Path relative to the project root"), old_string: str("Exact text to replace"), new_string: str("Replacement") }, [
-      "path",
-      "old_string",
-      "new_string",
-    ]),
+    description:
+      "Replace exactly one occurrence of old_string with new_string. Fails if old_string is missing or not unique; include enough context.",
+    parameters: obj(
+      {
+        path: str("Path relative to the project root"),
+        old_string: str("Exact text to replace"),
+        new_string: str("Replacement"),
+      },
+      ["path", "old_string", "new_string"],
+    ),
   },
   {
     name: "write_file",
     description: "Create or overwrite a file with the given content.",
-    parameters: obj({ path: str("Path relative to the project root"), content: str("Full file content") }, ["path", "content"]),
+    parameters: obj({ path: str("Path relative to the project root"), content: str("Full file content") }, [
+      "path",
+      "content",
+    ]),
   },
   {
     name: "run_command",
-    description: "Run a shell command in the project root (zsh on macOS, bash on Linux, PowerShell on Windows). Returns combined stdout/stderr and exit code. The user's command rules may block a command or ask them first; a blocked command must not be retried or reworded.",
+    description:
+      "Run a shell command in the project root (zsh on macOS, bash on Linux, PowerShell on Windows). Returns combined stdout/stderr and exit code. The user's command rules may block a command or ask them first; a blocked command must not be retried or reworded.",
     parameters: obj({ command: str("Command line"), timeout_ms: int("Timeout, default 120000") }, ["command"]),
   },
 ];
@@ -50,6 +66,8 @@ export const SECRET_TOOL: ToolDef = {
   name: "request_secret",
   description:
     "Ask the user for a secret (API key, token, password) that a command needs. The user types it into a private field; you never see the value. You get a reference REF: use it in run_command as the environment variable $GUSTAF_SECRET_<REF> (PowerShell: $env:GUSTAF_SECRET_<REF>). It works for one command; the value is masked in the output. Never ask the user to paste a secret into the chat.",
-  parameters: obj({ name: str("What the secret is, e.g. 'GitHub token'"), reason: str("Why it is needed, one sentence") }, ["name", "reason"]),
+  parameters: obj(
+    { name: str("What the secret is, e.g. 'GitHub token'"), reason: str("Why it is needed, one sentence") },
+    ["name", "reason"],
+  ),
 };
-

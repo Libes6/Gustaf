@@ -1,8 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_FINDINGS, MIN_REVIEW_CHARS, REVIEW_SYSTEM_PROMPT, TRUNCATED_MARK,
-  buildFeedbackMessage, buildReviewPrompt, fairShares, hunkFor, lineNumbers, parseReview, placeFindings, reviewBudget, reviewFromParts, sortFindings,
+  MAX_FINDINGS,
+  MIN_REVIEW_CHARS,
+  REVIEW_SYSTEM_PROMPT,
+  TRUNCATED_MARK,
+  buildFeedbackMessage,
+  buildReviewPrompt,
+  fairShares,
+  hunkFor,
+  lineNumbers,
+  parseReview,
+  placeFindings,
+  reviewBudget,
+  reviewFromParts,
+  sortFindings,
 } from '../src/lib/diffReview.ts';
 
 const file = (path, n, hunks) => ({ path, diff: 'x'.repeat(n), hunks });
@@ -55,13 +67,28 @@ test('budget follows the context window within bounds', () => {
   assert.equal(reviewBudget(10_000_000), 48_000);
 });
 
-const good = { findings: [{ file: 'a.ts', line: 12, severity: 'bug', title: 'Null deref', detail: 'x may be null', suggestion: 'check it' }], summary: 'One bug.' };
+const good = {
+  findings: [
+    { file: 'a.ts', line: 12, severity: 'bug', title: 'Null deref', detail: 'x may be null', suggestion: 'check it' },
+  ],
+  summary: 'One bug.',
+};
 
 test('parses a clean reply', () => {
   const r = parseReview(JSON.stringify(good), ['a.ts']);
   assert.equal(r.ok, true);
   assert.equal(r.summary, 'One bug.');
-  assert.deepEqual(r.findings, [{ id: 'f0', file: 'a.ts', line: 12, severity: 'bug', title: 'Null deref', detail: 'x may be null', suggestion: 'check it' }]);
+  assert.deepEqual(r.findings, [
+    {
+      id: 'f0',
+      file: 'a.ts',
+      line: 12,
+      severity: 'bug',
+      title: 'Null deref',
+      detail: 'x may be null',
+      suggestion: 'check it',
+    },
+  ]);
 });
 
 test('parses fenced, prefixed, reasoning-wrapped replies and braces inside strings', () => {
@@ -90,24 +117,44 @@ test('validates fields: severities, lines, missing parts, unknown files, bare ar
     { file: 'other.ts', title: 'unknown file', detail: 'd' },
     { title: 'no file' },
     { file: 'a.ts' },
-    'string', null, 5,
+    'string',
+    null,
+    5,
   ]);
   const r = parseReview(raw, ['a.ts']);
-  assert.deepEqual(r.findings.map((f) => [f.severity, f.line, f.title]), [['bug', 7, 't'], ['info', undefined, 't2'], ['warn', undefined, 't3']]);
+  assert.deepEqual(
+    r.findings.map((f) => [f.severity, f.line, f.title]),
+    [
+      ['bug', 7, 't'],
+      ['info', undefined, 't2'],
+      ['warn', undefined, 't3'],
+    ],
+  );
   assert.equal(r.findings[1].detail, 't2');
 });
 
 test('bounds counts and lengths and strips control characters', () => {
   const many = Array.from({ length: 100 }, (_, i) => ({ file: 'a', title: `t${i}`, detail: 'd' }));
   assert.equal(parseReview(JSON.stringify({ findings: many })).findings.length, MAX_FINDINGS);
-  const r = parseReview(JSON.stringify({ findings: [{ file: 'a', title: 'x'.repeat(1000) + '\u0007', detail: 'y'.repeat(5000) }], summary: 's'.repeat(5000) }));
+  const r = parseReview(
+    JSON.stringify({
+      findings: [{ file: 'a', title: 'x'.repeat(1000) + '\u0007', detail: 'y'.repeat(5000) }],
+      summary: 's'.repeat(5000),
+    }),
+  );
   assert.ok(r.findings[0].title.length <= 160);
   assert.ok(r.findings[0].detail.length <= 1200);
   assert.ok(r.summary.length <= 600);
 });
 
 test('reviewFromParts reads only text parts', () => {
-  const r = reviewFromParts([{ type: 'activity', id: 'x' }, { type: 'text', text: JSON.stringify(good) }], ['a.ts']);
+  const r = reviewFromParts(
+    [
+      { type: 'activity', id: 'x' },
+      { type: 'text', text: JSON.stringify(good) },
+    ],
+    ['a.ts'],
+  );
   assert.equal(r.findings.length, 1);
 });
 
@@ -129,26 +176,52 @@ test('findings map to hunks by hunkId or line', () => {
 test('placeFindings groups by hunk and keeps the rest loose', () => {
   const fs = [{ id: 'a', line: 11 }, { id: 'b', line: 41 }, { id: 'c', line: 12 }, { id: 'd' }];
   const { byHunk, loose } = placeFindings(fs, hunks);
-  assert.deepEqual(byHunk.get('h1').map((f) => f.id), ['a', 'c']);
-  assert.deepEqual(byHunk.get('h2').map((f) => f.id), ['b']);
-  assert.deepEqual(loose.map((f) => f.id), ['d']);
+  assert.deepEqual(
+    byHunk.get('h1').map((f) => f.id),
+    ['a', 'c'],
+  );
+  assert.deepEqual(
+    byHunk.get('h2').map((f) => f.id),
+    ['b'],
+  );
+  assert.deepEqual(
+    loose.map((f) => f.id),
+    ['d'],
+  );
 });
 
 test('findings sort by severity, then file and line', () => {
   const s = sortFindings([
-    { severity: 'info', file: 'a', line: 1 }, { severity: 'bug', file: 'b', line: 9 }, { severity: 'bug', file: 'a', line: 5 }, { severity: 'warn', file: 'a' },
+    { severity: 'info', file: 'a', line: 1 },
+    { severity: 'bug', file: 'b', line: 9 },
+    { severity: 'bug', file: 'a', line: 5 },
+    { severity: 'warn', file: 'a' },
   ]);
-  assert.deepEqual(s.map((f) => `${f.severity}${f.file}${f.line ?? ''}`), ['buga5', 'bugb9', 'warna', 'infoa1']);
+  assert.deepEqual(
+    s.map((f) => `${f.severity}${f.file}${f.line ?? ''}`),
+    ['buga5', 'bugb9', 'warna', 'infoa1'],
+  );
 });
 
 test('line numbers follow context, additions and deletions', () => {
-  const n = lineNumbers({ old_start: 5, new_start: 7, lines: [{ kind: ' ' }, { kind: '-' }, { kind: '+' }, { kind: '+' }, { kind: ' ' }] });
+  const n = lineNumbers({
+    old_start: 5,
+    new_start: 7,
+    lines: [{ kind: ' ' }, { kind: '-' }, { kind: '+' }, { kind: '+' }, { kind: ' ' }],
+  });
   assert.deepEqual(n, [{ old: 5, new: 7 }, { old: 6 }, { new: 8 }, { new: 9 }, { old: 7, new: 10 }]);
 });
 
 test('feedback message carries file:line, hunk, quoted code and the comment', () => {
   const msg = buildFeedbackMessage([
-    { id: '1', file: 'src/a.ts', line: 12, hunk: '@@ -10 +10 @@', context: '+const x = y;', text: 'Handle null.\nAlso log it.' },
+    {
+      id: '1',
+      file: 'src/a.ts',
+      line: 12,
+      hunk: '@@ -10 +10 @@',
+      context: '+const x = y;',
+      text: 'Handle null.\nAlso log it.',
+    },
     { id: '2', file: 'b.ts', text: 'Whole hunk is wrong', finding: 'Null deref' },
     { id: '3', file: 'c.ts', text: '   ' },
   ]);

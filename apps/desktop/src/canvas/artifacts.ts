@@ -1,10 +1,18 @@
 import { parseFiles, type ArtifactFile } from "./modules.ts";
 
 /** `code` is the raw fence body; `files` is that body split on `// file: path` markers (one App.tsx when unmarked). */
-export type Artifact = { id: string; title: string; code: string; files: ArtifactFile[]; filesError?: string; complete: boolean };
+export type Artifact = {
+  id: string;
+  title: string;
+  code: string;
+  files: ArtifactFile[];
+  filesError?: string;
+  complete: boolean;
+};
 /** A static HTML page written by the agent (T11), shown in a fully sandboxed frame (no scripts, opaque origin). */
 export type HtmlPage = { title: string; html: string; complete: boolean };
-export type Segment = { type: "text"; text: string } | { type: "canvas"; artifact: Artifact } | { type: "page"; page: HtmlPage };
+export type Segment =
+  { type: "text"; text: string } | { type: "canvas"; artifact: Artifact } | { type: "page"; page: HtmlPage };
 
 /** Only top-level fences are interpreted; examples inside longer fences stay Markdown. */
 export function parseArtifacts(text: string): Segment[] {
@@ -13,7 +21,10 @@ export function parseArtifacts(text: string): Segment[] {
   let plain: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const opening = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)\r?$/.exec(lines[i]);
-    if (!opening) { plain.push(lines[i]); continue; }
+    if (!opening) {
+      plain.push(lines[i]);
+      continue;
+    }
     const fence = opening[1];
     let end = i + 1;
     const closing = new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`);
@@ -25,7 +36,10 @@ export function parseArtifacts(text: string): Segment[] {
       if (plain.length) result.push({ type: "text", text: plain.join("\n") });
       plain = [];
       const title = /\btitle="([^"\n]{1,160})"/.exec(opening[2])?.[1] ?? "Page";
-      result.push({ type: "page", page: { title, html: lines.slice(i + 1, end).join("\n"), complete: end < lines.length } });
+      result.push({
+        type: "page",
+        page: { title, html: lines.slice(i + 1, end).join("\n"), complete: end < lines.length },
+      });
     } else {
       if (plain.length) result.push({ type: "text", text: plain.join("\n") });
       plain = [];
@@ -34,7 +48,10 @@ export function parseArtifacts(text: string): Segment[] {
       const id = /\bid="([\w-]{1,80})"/.exec(metadata)?.[1] ?? title;
       const code = lines.slice(i + 1, end).join("\n");
       const { files, error } = parseFiles(code);
-      result.push({ type: "canvas", artifact: { id, title, code, files, ...(error ? { filesError: error } : {}), complete: end < lines.length } });
+      result.push({
+        type: "canvas",
+        artifact: { id, title, code, files, ...(error ? { filesError: error } : {}), complete: end < lines.length },
+      });
     }
     i = end;
   }

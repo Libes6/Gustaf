@@ -15,7 +15,8 @@ const values = new Map<string, Promise<string | null>>();
 let flagWrites: Promise<unknown> = Promise.resolve();
 
 /** Whether a value is stored for `id`: true / false when known, undefined for secrets saved before flags existed. */
-export const secretPresence = async (id: string): Promise<boolean | undefined> => (await getSetting<Record<string, boolean>>(FLAGS, {}).catch(() => ({} as Record<string, boolean>)))[id];
+export const secretPresence = async (id: string): Promise<boolean | undefined> =>
+  (await getSetting<Record<string, boolean>>(FLAGS, {}).catch(() => ({}) as Record<string, boolean>))[id];
 
 function setPresence(id: string, present: boolean | null) {
   const run = flagWrites.then(async () => {
@@ -67,14 +68,19 @@ export const providerSecretId = (providerId: string) => `provider:${providerId}`
  * The lazy key of a provider. A provider known to have no key never touches the Keychain. A failed read (the user
  * denied access, the Keychain is locked) is reported with the provider's name instead of the bare OS message.
  */
-export const providerKey = (providerId: string, label = providerId): KeyGetter => async () => {
-  const id = providerSecretId(providerId);
-  // Known to be absent: remembered as "no value" until the user saves one.
-  if (!values.has(id) && (await secretPresence(id)) === false && !values.has(id)) values.set(id, Promise.resolve(null));
-  try {
-    return (await readSecret(id)) ?? "";
-  } catch (e) {
-    const why = String((e as Error)?.message ?? e).replace(/\.$/, "");
-    throw new Error(`Could not read the API key of ${label} from the Keychain: ${why}. Allow access when the system asks, or enter the key again in Settings.`);
-  }
-};
+export const providerKey =
+  (providerId: string, label = providerId): KeyGetter =>
+  async () => {
+    const id = providerSecretId(providerId);
+    // Known to be absent: remembered as "no value" until the user saves one.
+    if (!values.has(id) && (await secretPresence(id)) === false && !values.has(id))
+      values.set(id, Promise.resolve(null));
+    try {
+      return (await readSecret(id)) ?? "";
+    } catch (e) {
+      const why = String((e as Error)?.message ?? e).replace(/\.$/, "");
+      throw new Error(
+        `Could not read the API key of ${label} from the Keychain: ${why}. Allow access when the system asks, or enter the key again in Settings.`,
+      );
+    }
+  };

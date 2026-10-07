@@ -14,7 +14,10 @@ export function useChatMode(chatId: number | null): [ChatMode, (m: ChatMode) => 
     const before = prevId.current;
     prevId.current = chatId;
     if (chatId === null) {
-      if (before !== null) { modeRef.current = DEFAULT_CHAT_MODE; setModeState(DEFAULT_CHAT_MODE); }
+      if (before !== null) {
+        modeRef.current = DEFAULT_CHAT_MODE;
+        setModeState(DEFAULT_CHAT_MODE);
+      }
       return;
     }
     // New chat promoted to its real id: keep what the user picked and store it.
@@ -25,8 +28,15 @@ export function useChatMode(chatId: number | null): [ChatMode, (m: ChatMode) => 
     let cancelled = false;
     modeRef.current = DEFAULT_CHAT_MODE;
     setModeState(DEFAULT_CHAT_MODE);
-    loadChatMode(chatId).then((m) => { if (!cancelled) { modeRef.current = m; setModeState(m); } });
-    return () => { cancelled = true; };
+    loadChatMode(chatId).then((m) => {
+      if (!cancelled) {
+        modeRef.current = m;
+        setModeState(m);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [chatId]);
   const setMode = useCallback((m: ChatMode) => {
     modeRef.current = m;

@@ -1,6 +1,11 @@
 // Pure logic behind the per-message actions (edit and resend, regenerate, delete, branch). No UI or storage here.
 
-type MsgLike = { id: number; role: "user" | "assistant" | "tool"; parts: { type: string; text?: string; data?: string }[]; meta?: { compacted?: boolean; checkpoint?: string } };
+type MsgLike = {
+  id: number;
+  role: "user" | "assistant" | "tool";
+  parts: { type: string; text?: string; data?: string }[];
+  meta?: { compacted?: boolean; checkpoint?: string };
+};
 type TurnLike = { user?: MsgLike; steps: MsgLike[] };
 
 /** Marker the composer appends before `<file>` blocks of expanded `@path` mentions; they are not part of what the user typed. */
@@ -10,7 +15,10 @@ const ATTACHED_CHAT = "\n\n<gustaf-chat-reference>\n";
 
 /** What the user typed in a stored message: its text without the appended `<file>` blocks. */
 export function editableText(m: MsgLike): string {
-  const text = m.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("");
+  const text = m.parts
+    .filter((p) => p.type === "text")
+    .map((p) => p.text ?? "")
+    .join("");
   // Pasted texts and chat references come after the file blocks (lib/chatContext.ts); they are part of what the user sent.
   const attachments = [ATTACHED_PASTE, ATTACHED_CHAT].map((marker) => text.indexOf(marker)).filter((i) => i >= 0);
   const tail = attachments.length ? Math.min(...attachments) : text.length;
@@ -90,5 +98,13 @@ export function turnActions(turn: TurnLike, ctx: ActionContext): { show: TurnAct
     branch: !turn.user?.meta?.compacted,
   };
   const on = !ctx.busy;
-  return { show, enabled: { edit: show.edit && on, regenerate: show.regenerate && on, remove: show.remove && on, branch: show.branch && on } };
+  return {
+    show,
+    enabled: {
+      edit: show.edit && on,
+      regenerate: show.regenerate && on,
+      remove: show.remove && on,
+      branch: show.branch && on,
+    },
+  };
 }

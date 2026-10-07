@@ -7,7 +7,8 @@ import { acceleratorOf, normalizeQuickAsk, QUICK_ASK_SETTING, type QuickAskSetti
 import { quickAskApi } from "./quickAskApi";
 import type { AppState } from "../state";
 
-export type QuickAskStatus = { state: "off" } | { state: "on"; accelerator: string } | { state: "error"; message: string };
+export type QuickAskStatus =
+  { state: "off" } | { state: "on"; accelerator: string } | { state: "error"; message: string };
 
 let status: QuickAskStatus = { state: "off" };
 const listeners = new Set<() => void>();
@@ -39,7 +40,9 @@ export const resetQuickAskStatus = () => publish({ state: "off" });
  * Called once from the app shell: registers the stored shortcut after start, records usage reported by the quick-ask
  * window (token statistics, usage counter, provider health) and opens the chat it stored ("Open in Gustaf").
  */
-export function useQuickAskHost(app: Pick<AppState, "ready" | "recordTokens" | "bumpUsage" | "recordProviderResult" | "reload" | "openChat">) {
+export function useQuickAskHost(
+  app: Pick<AppState, "ready" | "recordTokens" | "bumpUsage" | "recordProviderResult" | "reload" | "openChat">,
+) {
   const latest = useRef(app);
   latest.current = app;
   useEffect(() => {
@@ -52,22 +55,36 @@ export function useQuickAskHost(app: Pick<AppState, "ready" | "recordTokens" | "
         if (!cancelled && settings.enabled) return applyQuickAsk(settings);
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [app.ready]);
   useEffect(() => {
     // Outside Tauri (a plain browser, some tests) there is no event bridge: the listeners are simply absent.
-    const safe = (subscribe: () => Promise<() => void>) => { try { return subscribe(); } catch { return Promise.resolve(() => {}); } };
+    const safe = (subscribe: () => Promise<() => void>) => {
+      try {
+        return subscribe();
+      } catch {
+        return Promise.resolve(() => {});
+      }
+    };
     const subs = [
-      safe(() => quickAskApi.onUsage((e) => {
-        const a = latest.current;
-        a.bumpUsage(e.providerId);
-        a.recordTokens(e.providerId, e.model, e.usage);
-        a.recordProviderResult(e.providerId, e.error);
-      })),
-      safe(() => quickAskApi.onOpenChat((e) => {
-        const a = latest.current;
-        a.reload().then(() => a.openChat(e.chatId, null)).catch(() => {});
-      })),
+      safe(() =>
+        quickAskApi.onUsage((e) => {
+          const a = latest.current;
+          a.bumpUsage(e.providerId);
+          a.recordTokens(e.providerId, e.model, e.usage);
+          a.recordProviderResult(e.providerId, e.error);
+        }),
+      ),
+      safe(() =>
+        quickAskApi.onOpenChat((e) => {
+          const a = latest.current;
+          a.reload()
+            .then(() => a.openChat(e.chatId, null))
+            .catch(() => {});
+        }),
+      ),
     ];
     return () => subs.forEach((p) => p.then((un) => un()).catch(() => {}));
   }, []);

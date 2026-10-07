@@ -12,16 +12,28 @@ const roots = new Map<number, Promise<string>>();
 const listeners = new Set<() => void>();
 let version = 0;
 
-export const subscribeScratch = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+export const subscribeScratch = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 export const scratchVersion = () => version;
 export const isScratch = (chatId: number | null | undefined) => !!chatId && ids.has(chatId);
-const emit = () => { version++; listeners.forEach((fn) => fn()); };
+const emit = () => {
+  version++;
+  listeners.forEach((fn) => fn());
+};
 
 export function loadScratch() {
-  loaded ??= getSetting<unknown>("scratchChats", []).then((v) => {
-    if (Array.isArray(v)) ids = new Set([...ids, ...v.filter((x): x is number => Number.isInteger(x) && x > 0)]);
-    emit();
-  }).catch(() => { loaded = null; });
+  loaded ??= getSetting<unknown>("scratchChats", [])
+    .then((v) => {
+      if (Array.isArray(v)) ids = new Set([...ids, ...v.filter((x): x is number => Number.isInteger(x) && x > 0)]);
+      emit();
+    })
+    .catch(() => {
+      loaded = null;
+    });
   return loaded;
 }
 
@@ -29,7 +41,13 @@ export function loadScratch() {
 export function scratchRoot(chatId: number, title: string): Promise<string> {
   if (!roots.has(chatId)) {
     const date = new Date().toISOString().slice(0, 10);
-    roots.set(chatId, invoke<string>("scratch_dir", { chatId, name: `${date} ${title}` }).catch((e) => { roots.delete(chatId); throw e; }));
+    roots.set(
+      chatId,
+      invoke<string>("scratch_dir", { chatId, name: `${date} ${title}` }).catch((e) => {
+        roots.delete(chatId);
+        throw e;
+      }),
+    );
   }
   return roots.get(chatId)!;
 }
@@ -45,8 +63,15 @@ export async function createScratchChat(title: string): Promise<number> {
 }
 
 /** Starts a scratch chat from the app (shortcut, sidebar): creates it, refreshes the list and opens it. */
-export async function startScratchChat(app: { locale: string; reload(): Promise<void>; openChat(id: number, projectId: number | null): void; setView(v: "chat"): void }) {
-  const title = translate(app.locale as Locale, "scratchTitle", { date: new Intl.DateTimeFormat(app.locale, { dateStyle: "medium", timeStyle: "short" }).format(Date.now()) });
+export async function startScratchChat(app: {
+  locale: string;
+  reload(): Promise<void>;
+  openChat(id: number, projectId: number | null): void;
+  setView(v: "chat"): void;
+}) {
+  const title = translate(app.locale as Locale, "scratchTitle", {
+    date: new Intl.DateTimeFormat(app.locale, { dateStyle: "medium", timeStyle: "short" }).format(Date.now()),
+  });
   const id = await createScratchChat(title);
   await app.reload();
   app.openChat(id, null);

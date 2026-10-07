@@ -20,7 +20,8 @@ export class OAuthError extends Error {
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
-const isLoopbackHost = (h: string) => h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h.endsWith(".localhost");
+const isLoopbackHost = (h: string) =>
+  h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h.endsWith(".localhost");
 
 /** https anywhere; plain http only to this machine (spec: HTTPS is required except for loopback). */
 export function isSecureEndpoint(url: unknown): url is string {
@@ -35,14 +36,19 @@ export function isSecureEndpoint(url: unknown): url is string {
 }
 
 const mustBeSecure = (url: unknown, what: string): string => {
-  if (!isSecureEndpoint(url)) throw new OAuthError(`${what} must be an https URL (http only for localhost)`, "insecure_endpoint");
+  if (!isSecureEndpoint(url))
+    throw new OAuthError(`${what} must be an https URL (http only for localhost)`, "insecure_endpoint");
   return url;
 };
 
 // ---- challenge and discovery ---------------------------------------------------------------------------------------
 
 /** Parameters of the `Bearer` challenge in a `WWW-Authenticate` header (RFC 6750 / RFC 9728). */
-export function parseWwwAuthenticate(header: string | null | undefined): { resourceMetadata?: string; scope?: string; error?: string } {
+export function parseWwwAuthenticate(header: string | null | undefined): {
+  resourceMetadata?: string;
+  scope?: string;
+  error?: string;
+} {
   if (!header) return {};
   const out: Record<string, string> = {};
   const re = /([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^\s,"]+))/g;
@@ -82,7 +88,11 @@ export function resourceMatches(serverUrl: string, resource: string): boolean {
 export function protectedResourceMetadataUrls(serverUrl: string, hint?: string): string[] {
   const u = new URL(serverUrl);
   const path = u.pathname.replace(/\/+$/, "");
-  const urls = [...(hint && isSecureEndpoint(hint) ? [hint] : []), ...(path ? [`${u.origin}/.well-known/oauth-protected-resource${path}`] : []), `${u.origin}/.well-known/oauth-protected-resource`];
+  const urls = [
+    ...(hint && isSecureEndpoint(hint) ? [hint] : []),
+    ...(path ? [`${u.origin}/.well-known/oauth-protected-resource${path}`] : []),
+    `${u.origin}/.well-known/oauth-protected-resource`,
+  ];
   return [...new Set(urls)];
 }
 
@@ -92,10 +102,19 @@ export function parseProtectedResource(doc: unknown, serverUrl: string): Protect
   if (!doc || typeof doc !== "object") throw new OAuthError("invalid protected resource metadata");
   const d = doc as Record<string, unknown>;
   const resource = typeof d.resource === "string" ? d.resource : "";
-  if (!resource || !resourceMatches(serverUrl, resource)) throw new OAuthError("the protected resource metadata does not describe this server", "resource_mismatch");
-  const servers = (Array.isArray(d.authorization_servers) ? d.authorization_servers : []).filter(isSecureEndpoint).slice(0, 10);
-  if (!servers.length) throw new OAuthError("the protected resource names no usable (https) authorization server", "no_authorization_server");
-  const scopes = Array.isArray(d.scopes_supported) ? d.scopes_supported.filter((x): x is string => typeof x === "string" && !!x && x.length <= 128).slice(0, 50) : [];
+  if (!resource || !resourceMatches(serverUrl, resource))
+    throw new OAuthError("the protected resource metadata does not describe this server", "resource_mismatch");
+  const servers = (Array.isArray(d.authorization_servers) ? d.authorization_servers : [])
+    .filter(isSecureEndpoint)
+    .slice(0, 10);
+  if (!servers.length)
+    throw new OAuthError(
+      "the protected resource names no usable (https) authorization server",
+      "no_authorization_server",
+    );
+  const scopes = Array.isArray(d.scopes_supported)
+    ? d.scopes_supported.filter((x): x is string => typeof x === "string" && !!x && x.length <= 128).slice(0, 50)
+    : [];
   return { resource, authorizationServers: servers, ...(scopes.length ? { scopes } : {}) };
 }
 
@@ -103,11 +122,22 @@ export function parseProtectedResource(doc: unknown, serverUrl: string): Protect
 export function authServerMetadataUrls(issuer: string): string[] {
   const u = new URL(issuer);
   const path = u.pathname.replace(/\/+$/, "");
-  if (!path) return [`${u.origin}/.well-known/oauth-authorization-server`, `${u.origin}/.well-known/openid-configuration`];
-  return [`${u.origin}/.well-known/oauth-authorization-server${path}`, `${u.origin}/.well-known/openid-configuration${path}`, `${u.origin}${path}/.well-known/openid-configuration`];
+  if (!path)
+    return [`${u.origin}/.well-known/oauth-authorization-server`, `${u.origin}/.well-known/openid-configuration`];
+  return [
+    `${u.origin}/.well-known/oauth-authorization-server${path}`,
+    `${u.origin}/.well-known/openid-configuration${path}`,
+    `${u.origin}${path}/.well-known/openid-configuration`,
+  ];
 }
 
-export type AuthServer = { issuer: string; authorizationEndpoint: string; tokenEndpoint: string; registrationEndpoint?: string; revocationEndpoint?: string };
+export type AuthServer = {
+  issuer: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  registrationEndpoint?: string;
+  revocationEndpoint?: string;
+};
 
 /**
  * The 2025-03-26 spec's last resort for servers that publish no metadata at all: `/authorize`, `/token` and
@@ -130,15 +160,20 @@ const normIssuer = (s: string) => s.replace(/\/+$/, "");
 export function parseAuthServerMetadata(doc: unknown, issuer: string): AuthServer {
   if (!doc || typeof doc !== "object") throw new OAuthError("invalid authorization server metadata");
   const d = doc as Record<string, unknown>;
-  if (typeof d.issuer !== "string" || normIssuer(d.issuer) !== normIssuer(issuer)) throw new OAuthError("the authorization server metadata names a different issuer", "issuer_mismatch");
+  if (typeof d.issuer !== "string" || normIssuer(d.issuer) !== normIssuer(issuer))
+    throw new OAuthError("the authorization server metadata names a different issuer", "issuer_mismatch");
   const methods = Array.isArray(d.code_challenge_methods_supported) ? d.code_challenge_methods_supported : [];
-  if (!methods.includes("S256")) throw new OAuthError("the authorization server does not advertise PKCE with S256", "no_pkce");
-  if (Array.isArray(d.grant_types_supported) && !d.grant_types_supported.includes("authorization_code")) throw new OAuthError("the authorization server does not support the authorization code grant", "no_code_grant");
+  if (!methods.includes("S256"))
+    throw new OAuthError("the authorization server does not advertise PKCE with S256", "no_pkce");
+  if (Array.isArray(d.grant_types_supported) && !d.grant_types_supported.includes("authorization_code"))
+    throw new OAuthError("the authorization server does not support the authorization code grant", "no_code_grant");
   return {
     issuer: d.issuer,
     authorizationEndpoint: mustBeSecure(d.authorization_endpoint, "the authorization endpoint"),
     tokenEndpoint: mustBeSecure(d.token_endpoint, "the token endpoint"),
-    ...(d.registration_endpoint !== undefined ? { registrationEndpoint: mustBeSecure(d.registration_endpoint, "the registration endpoint") } : {}),
+    ...(d.registration_endpoint !== undefined
+      ? { registrationEndpoint: mustBeSecure(d.registration_endpoint, "the registration endpoint") }
+      : {}),
     // Revocation is best effort: an unusable endpoint is ignored instead of failing the sign-in.
     ...(isSecureEndpoint(d.revocation_endpoint) ? { revocationEndpoint: d.revocation_endpoint } : {}),
   };
@@ -175,7 +210,15 @@ export async function pkcePair(rng: Rng = systemRng): Promise<{ verifier: string
 
 export const redirectUri = (port: number) => `http://127.0.0.1:${port}${REDIRECT_PATH}`;
 
-export function buildAuthorizationUrl(o: { endpoint: string; clientId: string; redirectUri: string; state: string; challenge: string; resource: string; scope?: string }): string {
+export function buildAuthorizationUrl(o: {
+  endpoint: string;
+  clientId: string;
+  redirectUri: string;
+  state: string;
+  challenge: string;
+  resource: string;
+  scope?: string;
+}): string {
   const u = new URL(o.endpoint);
   const p = u.searchParams;
   p.set("response_type", "code");
@@ -200,12 +243,31 @@ export const registrationBody = (redirect: string, clientName = "Gustaf") => ({
 
 export function parseRegistration(doc: unknown): { clientId: string; clientSecret?: string } {
   const d = doc && typeof doc === "object" ? (doc as Record<string, unknown>) : {};
-  if (typeof d.client_id !== "string" || !d.client_id || d.client_id.length > 1024) throw new OAuthError("the client registration returned no client_id", "registration_failed");
-  return { clientId: d.client_id, ...(typeof d.client_secret === "string" && d.client_secret ? { clientSecret: d.client_secret.slice(0, 4096) } : {}) };
+  if (typeof d.client_id !== "string" || !d.client_id || d.client_id.length > 1024)
+    throw new OAuthError("the client registration returned no client_id", "registration_failed");
+  return {
+    clientId: d.client_id,
+    ...(typeof d.client_secret === "string" && d.client_secret ? { clientSecret: d.client_secret.slice(0, 4096) } : {}),
+  };
 }
 
-type CodeGrant = { grant: "authorization_code"; code: string; redirectUri: string; clientId: string; clientSecret?: string; verifier: string; resource: string };
-type RefreshGrant = { grant: "refresh_token"; refreshToken: string; clientId: string; clientSecret?: string; resource: string; scope?: string };
+type CodeGrant = {
+  grant: "authorization_code";
+  code: string;
+  redirectUri: string;
+  clientId: string;
+  clientSecret?: string;
+  verifier: string;
+  resource: string;
+};
+type RefreshGrant = {
+  grant: "refresh_token";
+  refreshToken: string;
+  clientId: string;
+  clientSecret?: string;
+  resource: string;
+  scope?: string;
+};
 
 /** application/x-www-form-urlencoded body of a token request. */
 export function tokenRequestBody(g: CodeGrant | RefreshGrant): string {
@@ -226,7 +288,12 @@ export function tokenRequestBody(g: CodeGrant | RefreshGrant): string {
 }
 
 /** application/x-www-form-urlencoded body of an RFC 7009 revocation request. */
-export function revocationRequestBody(token: string, hint: "refresh_token" | "access_token", clientId: string, clientSecret?: string): string {
+export function revocationRequestBody(
+  token: string,
+  hint: "refresh_token" | "access_token",
+  clientId: string,
+  clientSecret?: string,
+): string {
   const p = new URLSearchParams();
   p.set("token", token);
   p.set("token_type_hint", hint);
@@ -254,17 +321,27 @@ export type StoredOAuth = {
 };
 
 /** Reads a token endpoint answer. `prev` supplies the refresh token a refresh response may omit. */
-export function parseTokenResponse(doc: unknown, now: number, prev?: Pick<StoredOAuth, "refreshToken" | "scope">): { accessToken: string; refreshToken?: string; expiresAt?: number; scope?: string } {
+export function parseTokenResponse(
+  doc: unknown,
+  now: number,
+  prev?: Pick<StoredOAuth, "refreshToken" | "scope">,
+): { accessToken: string; refreshToken?: string; expiresAt?: number; scope?: string } {
   const d = doc && typeof doc === "object" ? (doc as Record<string, unknown>) : {};
   if (typeof d.error === "string") {
     const code = clip(d.error.replace(/[^A-Za-z0-9_.-]/g, ""), 64) || "oauth_error";
-    const desc = typeof d.error_description === "string" ? `: ${clip(d.error_description.replace(/[^\x20-\x7e]/g, " "), 200)}` : "";
+    const desc =
+      typeof d.error_description === "string"
+        ? `: ${clip(d.error_description.replace(/[^\x20-\x7e]/g, " "), 200)}`
+        : "";
     throw new OAuthError(`the token endpoint answered ${code}${desc}`, code);
   }
-  if (typeof d.access_token !== "string" || !d.access_token) throw new OAuthError("the token endpoint returned no access token", "no_access_token");
-  if (typeof d.token_type !== "string" || d.token_type.toLowerCase() !== "bearer") throw new OAuthError("the token endpoint returned an unsupported token type", "bad_token_type");
+  if (typeof d.access_token !== "string" || !d.access_token)
+    throw new OAuthError("the token endpoint returned no access token", "no_access_token");
+  if (typeof d.token_type !== "string" || d.token_type.toLowerCase() !== "bearer")
+    throw new OAuthError("the token endpoint returned an unsupported token type", "bad_token_type");
   const refreshToken = typeof d.refresh_token === "string" && d.refresh_token ? d.refresh_token : prev?.refreshToken;
-  const expiresIn = typeof d.expires_in === "number" ? d.expires_in : typeof d.expires_in === "string" ? Number(d.expires_in) : NaN;
+  const expiresIn =
+    typeof d.expires_in === "number" ? d.expires_in : typeof d.expires_in === "string" ? Number(d.expires_in) : NaN;
   const scope = typeof d.scope === "string" && d.scope ? clip(d.scope, 512) : prev?.scope;
   return {
     accessToken: d.access_token,
@@ -279,7 +356,16 @@ export function parseStored(text: string | null | undefined): StoredOAuth | null
   if (!text) return null;
   try {
     const d = JSON.parse(text) as Record<string, unknown>;
-    if (typeof d.accessToken !== "string" || !d.accessToken || typeof d.clientId !== "string" || typeof d.tokenEndpoint !== "string" || !isSecureEndpoint(d.tokenEndpoint) || typeof d.resource !== "string" || typeof d.issuer !== "string") return null;
+    if (
+      typeof d.accessToken !== "string" ||
+      !d.accessToken ||
+      typeof d.clientId !== "string" ||
+      typeof d.tokenEndpoint !== "string" ||
+      !isSecureEndpoint(d.tokenEndpoint) ||
+      typeof d.resource !== "string" ||
+      typeof d.issuer !== "string"
+    )
+      return null;
     return {
       accessToken: d.accessToken,
       ...(typeof d.refreshToken === "string" && d.refreshToken ? { refreshToken: d.refreshToken } : {}),
@@ -302,7 +388,10 @@ export function parseStored(text: string | null | undefined): StoredOAuth | null
  * and there is a refresh token), or send the user to sign in again (expired with no refresh token). An unknown expiry
  * means "use": a 401 then triggers one refresh.
  */
-export function tokenDecision(t: Pick<StoredOAuth, "expiresAt" | "refreshToken">, now: number): "use" | "refresh" | "signin" {
+export function tokenDecision(
+  t: Pick<StoredOAuth, "expiresAt" | "refreshToken">,
+  now: number,
+): "use" | "refresh" | "signin" {
   if (t.expiresAt === undefined || now < t.expiresAt - REFRESH_SKEW_MS) return "use";
   if (t.refreshToken) return "refresh";
   return now < t.expiresAt ? "use" : "signin";

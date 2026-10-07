@@ -14,14 +14,18 @@ const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 const ALLOW = {};
 
 function files(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
-    d.isDirectory() ? files(path.join(dir, d.name)) : d.name.endsWith('.tsx') ? [path.join(dir, d.name)] : [],
-  );
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap((d) =>
+      d.isDirectory() ? files(path.join(dir, d.name)) : d.name.endsWith('.tsx') ? [path.join(dir, d.name)] : [],
+    );
 }
 
 /** Reads one JSX opening tag starting at `<`: attribute text (braces and quotes respected) and the index after `>`. */
 export function readTag(src, start) {
-  let depth = 0, quote = '', i = start + 1;
+  let depth = 0,
+    quote = '',
+    i = start + 1;
   for (; i < src.length; i++) {
     const c = src[i];
     if (quote) {
@@ -36,7 +40,8 @@ export function readTag(src, start) {
   return { raw, end: i + 1, selfClosing: raw.endsWith('/>') };
 }
 
-const hasAttr = (tag, names) => names.some((n) => new RegExp(`(^|\\s)${n}(=|\\s|/|>)`).test(tag)) || /\{\.\.\./.test(tag);
+const hasAttr = (tag, names) =>
+  names.some((n) => new RegExp(`(^|\\s)${n}(=|\\s|/|>)`).test(tag)) || /\{\s*\.\.\./.test(tag);
 
 /** True when the children of a button carry text a screen reader can use. */
 export function hasTextContent(children) {
@@ -62,18 +67,24 @@ export function lint(file, src) {
     if (name === 'button') {
       const close = src.indexOf('</button>', end);
       const children = selfClosing || close < 0 ? '' : src.slice(end, close);
-      if (!hasAttr(raw, ['aria-label', 'aria-labelledby', 'title']) && !hasTextContent(children)) problems.push(`${where} <button> has no accessible name`);
+      if (!hasAttr(raw, ['aria-label', 'aria-labelledby', 'title']) && !hasTextContent(children))
+        problems.push(`${where} <button> has no accessible name`);
     } else if (['div', 'span', 'li', 'p', 'section', 'header', 'article'].includes(name)) {
       if (/(^|\s)onClick=/.test(raw)) {
         if (!hasAttr(raw, ['role'])) problems.push(`${where} <${name}> with onClick needs a role (or use <button>)`);
-        else if (!/role="(option|presentation|none)"/.test(raw) && (!hasAttr(raw, ["tabIndex"]) || !hasAttr(raw, ["onKeyDown"]))) problems.push(`${where} <${name} role> with onClick needs tabIndex and onKeyDown`);
+        else if (
+          !/role="(option|presentation|none)"/.test(raw) &&
+          (!hasAttr(raw, ['tabIndex']) || !hasAttr(raw, ['onKeyDown']))
+        )
+          problems.push(`${where} <${name} role> with onClick needs tabIndex and onKeyDown`);
       }
     } else if (name === 'input' || name === 'select' || name === 'textarea') {
       const type = /type="(\w+)"/.exec(raw)?.[1];
       if (type === 'hidden' || type === 'file') continue;
       const before = src.slice(Math.max(0, m.index - 400), m.index);
       const inLabel = before.lastIndexOf('<label') > before.lastIndexOf('</label>');
-      if (!inLabel && !hasAttr(raw, ['aria-label', 'aria-labelledby', 'id'])) problems.push(`${where} <${name}> has no label`);
+      if (!inLabel && !hasAttr(raw, ['aria-label', 'aria-labelledby', 'id']))
+        problems.push(`${where} <${name}> has no label`);
     }
   }
   return problems;
@@ -91,5 +102,11 @@ test('lint helpers: tag reader and text detection', () => {
   assert.ok(hasTextContent('<span className="a">Go</span>'));
   assert.ok(!hasTextContent(' <X size={14} /> '));
   assert.ok(!hasTextContent('{it.icon}'));
-  assert.deepEqual(lint(path.join(SRC, 'x.tsx'), '<div onClick={f}>a</div>\n<button><X size={1}/></button>\n<button aria-label="a"><X/></button>').length, 2);
+  assert.deepEqual(
+    lint(
+      path.join(SRC, 'x.tsx'),
+      '<div onClick={f}>a</div>\n<button><X size={1}/></button>\n<button aria-label="a"><X/></button>',
+    ).length,
+    2,
+  );
 });

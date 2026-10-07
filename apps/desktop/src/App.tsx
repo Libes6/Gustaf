@@ -14,6 +14,7 @@ import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
+import { loadShortcutBindings } from "./lib/shortcutPrefs";
 import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
@@ -37,8 +38,14 @@ function Shell({ app }: { app: AppState }) {
   const navigating = useRef(false);
   useEffect(() => {
     if (app.activeChat === null) return;
-    if (navigating.current) { navigating.current = false; return; }
-    nav.current = visit(nav.current, { chatId: app.activeChat, projectId: app.chats.find((c) => c.id === app.activeChat)?.project_id ?? null });
+    if (navigating.current) {
+      navigating.current = false;
+      return;
+    }
+    nav.current = visit(nav.current, {
+      chatId: app.activeChat,
+      projectId: app.chats.find((c) => c.id === app.activeChat)?.project_id ?? null,
+    });
   }, [app.activeChat]);
   const go = (step: -1 | 1) => {
     const r = move(nav.current, step, (id) => app.chats.some((c) => c.id === id));
@@ -48,6 +55,8 @@ function Shell({ app }: { app: AppState }) {
     app.openChat(r.entry.chatId, r.entry.projectId);
   };
 
+  useEffect(() => void loadShortcutBindings(), []);
+
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (matches(e, "settings")) (e.preventDefault(), app.openSettings());
@@ -55,7 +64,7 @@ function Shell({ app }: { app: AppState }) {
       if (matches(e, "newScratchChat")) (e.preventDefault(), void startScratchChat(app));
       if (matches(e, "chatBack")) (e.preventDefault(), go(-1));
       if (matches(e, "chatForward")) (e.preventDefault(), go(1));
-      if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching(open => !open));
+      if (isSearchShortcut(e) && app.ready && app.onboarded) (e.preventDefault(), setSearching((open) => !open));
       if (matches(e, "closeSettings") && app.view === "settings") app.setView("chat");
     };
     addEventListener("keydown", k);
@@ -65,8 +74,15 @@ function Shell({ app }: { app: AppState }) {
   useEffect(() => {
     const accelerator = acceleratorOf("stopAgent");
     let disposed = false;
-    register(accelerator, () => dispatchEvent(new Event("gustaf-stop"))).then(() => { if (disposed) unregister(accelerator); }).catch(() => {});
-    return () => { disposed = true; unregister(accelerator).catch(() => {}); };
+    register(accelerator, () => dispatchEvent(new Event("gustaf-stop")))
+      .then(() => {
+        if (disposed) unregister(accelerator);
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      unregister(accelerator).catch(() => {});
+    };
   }, []);
   if (!app.ready) return null;
   if (!app.onboarded) return <Onboarding />;
@@ -82,12 +98,17 @@ function Shell({ app }: { app: AppState }) {
       ) : (
         <>
           <Sidebar onCreateProject={() => setCreating(true)} onSearch={() => setSearching(true)} />
-
         </>
       )}
-      {app.sessions.items.map(session => <div key={session.key} className="chat-session" style={{ display: app.view === "chat" && app.sessions.active === session.key ? "flex" : "none" }}>
-        <ChatView session={session} visible={app.view === "chat" && app.sessions.active === session.key} />
-      </div>)}
+      {app.sessions.items.map((session) => (
+        <div
+          key={session.key}
+          className="chat-session"
+          style={{ display: app.view === "chat" && app.sessions.active === session.key ? "flex" : "none" }}
+        >
+          <ChatView session={session} visible={app.view === "chat" && app.sessions.active === session.key} />
+        </div>
+      ))}
       {comparing && <Compare onClose={() => setComparing(false)} />}
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {creating && (
@@ -109,7 +130,9 @@ export default function App() {
     <AppProvider>
       {(app) => (
         <I18nProvider locale={app.locale}>
-          <UpdatesProvider><Shell app={app} /></UpdatesProvider>
+          <UpdatesProvider>
+            <Shell app={app} />
+          </UpdatesProvider>
         </I18nProvider>
       )}
     </AppProvider>

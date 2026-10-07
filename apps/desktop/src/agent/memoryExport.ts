@@ -10,7 +10,11 @@ export const AGENTS_FILE = "AGENTS.md";
 export type ExportCode = "malformed" | "unreadable" | "truncated";
 export class MemoryExportError extends Error {
   code: ExportCode;
-  constructor(code: ExportCode, message: string) { super(message); this.name = "MemoryExportError"; this.code = code; }
+  constructor(code: ExportCode, message: string) {
+    super(message);
+    this.name = "MemoryExportError";
+    this.code = code;
+  }
 }
 
 /** One fact as Markdown list lines: markers and HTML comment delimiters are neutralised, secrets scrubbed, blank lines dropped. */
@@ -32,7 +36,10 @@ const stable = (e: { id: number; text: string }[]) => [...e].sort((a, b) => a.id
  * The managed block (always `\n` newlines, from the start marker to the end marker). Project facts first; global facts only
  * when the caller passes them (the user ticked "include global").
  */
-export function renderSection(project: { id: number; text: string }[], global: { id: number; text: string }[] = []): string {
+export function renderSection(
+  project: { id: number; text: string }[],
+  global: { id: number; text: string }[] = [],
+): string {
   const out = [
     MARKER_START,
     "## Project memory",
@@ -93,7 +100,10 @@ export function currentAgentsMd(files: InstructionRead[], listing: string): stri
     return null;
   }
   if (new TextEncoder().encode(hit.text).length !== hit.bytes) {
-    throw new MemoryExportError(hit.text.includes("�") ? "unreadable" : "truncated", "AGENTS.md could not be read back completely");
+    throw new MemoryExportError(
+      hit.text.includes("�") ? "unreadable" : "truncated",
+      "AGENTS.md could not be read back completely",
+    );
   }
   return hit.text;
 }

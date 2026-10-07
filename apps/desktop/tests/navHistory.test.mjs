@@ -7,12 +7,21 @@ const all = () => true;
 
 test('back and forward walk the visited chats; a new visit drops the forward part', () => {
   let nav = [1, 2, 3].reduce((n, id) => visit(n, e(id)), emptyNav);
-  let r = move(nav, -1, all); assert.equal(r.entry.chatId, 2); nav = r.nav;
-  r = move(nav, -1, all); assert.equal(r.entry.chatId, 1); nav = r.nav;
+  let r = move(nav, -1, all);
+  assert.equal(r.entry.chatId, 2);
+  nav = r.nav;
+  r = move(nav, -1, all);
+  assert.equal(r.entry.chatId, 1);
+  nav = r.nav;
   assert.equal(move(nav, -1, all), null);
-  r = move(nav, 1, all); assert.equal(r.entry.chatId, 2); nav = r.nav;
+  r = move(nav, 1, all);
+  assert.equal(r.entry.chatId, 2);
+  nav = r.nav;
   nav = visit(nav, e(9));
-  assert.deepEqual(nav.items.map((x) => x.chatId), [1, 2, 9]);
+  assert.deepEqual(
+    nav.items.map((x) => x.chatId),
+    [1, 2, 9],
+  );
   assert.equal(move(nav, 1, all), null);
 });
 

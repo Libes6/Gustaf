@@ -9,7 +9,19 @@ import { summarizeCall } from "./actionLog";
 import { logFinish, logPatch, logStart } from "./actionLogStore";
 import { askReason, blockedMessage, DEFAULT_RULES, decideCommand, describeRule, type Access } from "./rules";
 import { getRulesConfig } from "./rulesStore";
-import { cleanOutput, failureSignature, feedbackMessage, GATE_ACTIVITY, isFailure, reportText, repeated, type Check, type CheckResult, type GateReport, type VerificationConfig } from "./verificationCore";
+import {
+  cleanOutput,
+  failureSignature,
+  feedbackMessage,
+  GATE_ACTIVITY,
+  isFailure,
+  reportText,
+  repeated,
+  type Check,
+  type CheckResult,
+  type GateReport,
+  type VerificationConfig,
+} from "./verificationCore";
 
 export type GateHost = {
   config: VerificationConfig;
@@ -57,13 +69,31 @@ export function createGate(host: GateHost) {
   let sigs: string[] = [];
 
   async function runCheck(check: Check, attempt: number): Promise<CheckResult> {
-    const result = (status: CheckResult["status"], extra: Partial<CheckResult> = {}): CheckResult => ({ name: check.name, command: check.command, status, exitCode: null, durationMs: 0, output: "", ...extra });
-    const act = logStart({ tool: "gate", summary: `${check.name}: ${summarizeCall("run_command", { command: check.command })}`, source: "gate", root: host.root, ...(host.project ? { project: host.project } : {}) });
+    const result = (status: CheckResult["status"], extra: Partial<CheckResult> = {}): CheckResult => ({
+      name: check.name,
+      command: check.command,
+      status,
+      exitCode: null,
+      durationMs: 0,
+      output: "",
+      ...extra,
+    });
+    const act = logStart({
+      tool: "gate",
+      summary: `${check.name}: ${summarizeCall("run_command", { command: check.command })}`,
+      source: "gate",
+      root: host.root,
+      ...(host.project ? { project: host.project } : {}),
+    });
     const meta = { check: check.name, command: summarizeCall("run_command", { command: check.command }), attempt };
     logPatch(act, { gate: meta });
     try {
       const config = await getRulesConfig().catch(() => DEFAULT_RULES);
-      const { action, evaluation } = decideCommand(check.command, { config, allowlist: host.allowlist, project: host.project }, host.access);
+      const { action, evaluation } = decideCommand(
+        check.command,
+        { config, allowlist: host.allowlist, project: host.project },
+        host.access,
+      );
       const rule = evaluation.rule ? describeRule(evaluation.rule) : undefined;
       if (action === "block") {
         const message = blockedMessage(evaluation, host.access);
@@ -72,12 +102,22 @@ export function createGate(host: GateHost) {
         return result("denied", { output: message });
       }
       if (action === "ask") {
-        if (!(await host.approve({ kind: "command", command: check.command, reason: `${askReason(evaluation) ?? "Verification check"} (verification: ${check.name})` }))) {
+        if (
+          !(await host.approve({
+            kind: "command",
+            command: check.command,
+            reason: `${askReason(evaluation) ?? "Verification check"} (verification: ${check.name})`,
+          }))
+        ) {
           logFinish(act, host.signal.aborted ? "cancelled" : "declined");
           return result(host.signal.aborted ? "skipped" : "declined");
         }
         logPatch(act, { approval: "user", ...(rule ? { rule } : {}) });
-      } else logPatch(act, evaluation.decision === "allow" ? { approval: "rule", ...(rule ? { rule } : {}) } : { approval: "mode" });
+      } else
+        logPatch(
+          act,
+          evaluation.decision === "allow" ? { approval: "rule", ...(rule ? { rule } : {}) } : { approval: "mode" },
+        );
       if (host.signal.aborted) {
         logFinish(act, "cancelled");
         return result("skipped");
@@ -96,7 +136,11 @@ export function createGate(host: GateHost) {
       const status = timedOut ? "timeout" : r.code === 0 ? "passed" : "failed";
       logPatch(act, { gate: { ...meta, exitCode: r.code, ...(timedOut ? { timedOut: true } : {}) } });
       const output = cleanOutput(r.output ?? "");
-      logFinish(act, status === "passed" ? "success" : "error", timedOut ? `Timed out after ${Math.round(durationMs / 100) / 10} s. ${output}` : output || undefined);
+      logFinish(
+        act,
+        status === "passed" ? "success" : "error",
+        timedOut ? `Timed out after ${Math.round(durationMs / 100) / 10} s. ${output}` : output || undefined,
+      );
       return result(status, { exitCode: r.code, durationMs, output });
     } catch (e) {
       const message = String((e as Error)?.message ?? e);
@@ -122,8 +166,21 @@ export function createGate(host: GateHost) {
     async run(): Promise<GateRun> {
       const attempt = ++runs;
       const id = `gate-${Date.now().toString(36)}-${counter++}`;
-      const results: CheckResult[] = checks.map((c) => ({ name: c.name, command: c.command, status: "skipped", exitCode: null, durationMs: 0, output: "" }));
-      const report = (outcome: GateReport["outcome"], extra: Partial<GateReport> = {}): GateReport => ({ results: results.map((r) => ({ ...r })), attempt, maxFixAttempts: max, outcome, ...extra });
+      const results: CheckResult[] = checks.map((c) => ({
+        name: c.name,
+        command: c.command,
+        status: "skipped",
+        exitCode: null,
+        durationMs: 0,
+        output: "",
+      }));
+      const report = (outcome: GateReport["outcome"], extra: Partial<GateReport> = {}): GateReport => ({
+        results: results.map((r) => ({ ...r })),
+        attempt,
+        maxFixAttempts: max,
+        outcome,
+        ...extra,
+      });
       const progress = () => host.onProgress?.(activity(id, report("running")));
       for (let i = 0; i < checks.length; i++) {
         if (host.signal.aborted) break;
@@ -134,7 +191,11 @@ export function createGate(host: GateHost) {
         if (results[i].status !== "passed") break;
       }
       const bad = results.find((r) => r.status !== "passed" && r.status !== "skipped");
-      const done = (r: GateReport, feedback: string | null = null): GateRun => ({ part: activity(id, r), report: r, feedback });
+      const done = (r: GateReport, feedback: string | null = null): GateRun => ({
+        part: activity(id, r),
+        report: r,
+        feedback,
+      });
       if (!bad) {
         if (host.signal.aborted && results.some((r) => r.status === "skipped")) return done(report("failed"));
         dirty = false;

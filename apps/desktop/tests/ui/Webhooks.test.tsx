@@ -9,10 +9,26 @@ import { callsOf, mockInvoke } from "./tauri";
 const runNow = vi.fn(() => true);
 vi.mock("../../src/lib/scheduledRuntime", () => ({ getRunner: () => ({ runNow }) }));
 const sched = vi.hoisted(() => ({ list: [] as ScheduledPrompt[] }));
-vi.mock("../../src/lib/scheduledPromptsStore", () => ({ getScheduled: () => sched.list, subscribeScheduled: () => () => {} }));
+vi.mock("../../src/lib/scheduledPromptsStore", () => ({
+  getScheduled: () => sched.list,
+  subscribeScheduled: () => () => {},
+}));
 const hooks = await import("../../src/lib/webhooks");
 
-const sc = (over: Partial<ScheduledPrompt> = {}): ScheduledPrompt => ({ id: "nightly", title: "Nightly triage", prompt: "Triage new issues.", projectId: null, providerId: "p1", model: "m", access: "auto", schedule: { kind: "daily", time: "09:00" }, enabled: true, confirmedAt: 1, createdAt: 1, ...over });
+const sc = (over: Partial<ScheduledPrompt> = {}): ScheduledPrompt => ({
+  id: "nightly",
+  title: "Nightly triage",
+  prompt: "Triage new issues.",
+  projectId: null,
+  providerId: "p1",
+  model: "m",
+  access: "auto",
+  schedule: { kind: "daily", time: "09:00" },
+  enabled: true,
+  confirmedAt: 1,
+  createdAt: 1,
+  ...over,
+});
 
 describe("webhook triggers", () => {
   it("switching a hook on starts the server with its secret and shows URL, secret and rotate", async () => {
@@ -33,8 +49,13 @@ describe("webhook triggers", () => {
 
   it("a signed delivery runs the schedule with the payload fenced; rejected ones and switched-off schedules do not run", () => {
     sched.list = [sc()];
-    act(() => hooks.onDelivery({ id: "nightly", at: 5, status: 202, event: "issues", delivery: "d1", preview: '{"n":1}' }));
-    expect(runNow).toHaveBeenCalledWith("nightly", expect.stringContaining("<webhook_payload>\n{\"n\":1}\n</webhook_payload>"));
+    act(() =>
+      hooks.onDelivery({ id: "nightly", at: 5, status: 202, event: "issues", delivery: "d1", preview: '{"n":1}' }),
+    );
+    expect(runNow).toHaveBeenCalledWith(
+      "nightly",
+      expect.stringContaining('<webhook_payload>\n{"n":1}\n</webhook_payload>'),
+    );
     runNow.mockClear();
     act(() => hooks.onDelivery({ id: "nightly", at: 6, status: 401, event: "", delivery: "", preview: "" }));
     sched.list = [sc({ enabled: false })];

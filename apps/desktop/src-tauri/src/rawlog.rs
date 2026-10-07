@@ -22,13 +22,24 @@ pub struct Info {
 }
 
 fn base(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("raw-cli"))
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("raw-cli"))
 }
 
 /// `YYYY-MM-DD` only: the day becomes part of a file name.
 fn valid_day(day: &str) -> bool {
     let b = day.as_bytes();
-    b.len() == 10 && b.iter().enumerate().all(|(i, c)| if i == 4 || i == 7 { *c == b'-' } else { c.is_ascii_digit() })
+    b.len() == 10
+        && b.iter().enumerate().all(|(i, c)| {
+            if i == 4 || i == 7 {
+                *c == b'-'
+            } else {
+                c.is_ascii_digit()
+            }
+        })
 }
 
 fn files(dir: &Path) -> Vec<(PathBuf, u64)> {
@@ -59,7 +70,10 @@ fn enforce_cap(dir: &Path, cap: u64) -> Result<(), String> {
         // Keep about 80% of the cap, cut at a line start.
         let keep = (cap / 5 * 4) as usize;
         let from = bytes.len().saturating_sub(keep);
-        let from = bytes[from..].iter().position(|b| *b == b'\n').map_or(bytes.len(), |p| from + p + 1);
+        let from = bytes[from..]
+            .iter()
+            .position(|b| *b == b'\n')
+            .map_or(bytes.len(), |p| from + p + 1);
         std::fs::write(path, &bytes[from..]).map_err(|e| e.to_string())?;
         let _ = size;
     }
@@ -74,7 +88,11 @@ fn append(dir: &Path, day: &str, lines: &str, cap: u64) -> Result<(), String> {
         return Err("batch too large".into());
     }
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let mut f = OpenOptions::new().create(true).append(true).open(dir.join(format!("{day}.jsonl"))).map_err(|e| e.to_string())?;
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join(format!("{day}.jsonl")))
+        .map_err(|e| e.to_string())?;
     f.write_all(lines.as_bytes()).map_err(|e| e.to_string())?;
     if !lines.ends_with('\n') {
         f.write_all(b"\n").map_err(|e| e.to_string())?;
@@ -98,6 +116,92 @@ fn info(dir: &Path) -> Info {
         files: list.len(),
         latest: list.last().map(|f| f.0.to_string_lossy().into_owned()),
     }
+}
+
+/// Days since 1970-01-01 of a valid `YYYY-MM-DD` (proleptic Gregorian, Hinnant's algorithm).
+fn day_number(day: &str) -> Option<i64> {
+    if !valid_day(day) {
+        return None;
+    }
+    let (y, m, d): (i64, i64, i64) = (
+        day[0..4].parse().ok()?,
+        day[5..7].parse().ok()?,
+        day[8..10].parse().ok()?,
+    );
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return None;
+    }
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some(era * 146_097 + doe - 719_468)
+}
+
+/// Old day files: `<day>.jsonl` regular files (never links, never other names) dated more than `keep_days` before `today`.
+/// The file of `today` and everything newer can never match, even with a bad `keep_days`; `keep_days` below 1 counts as 1.
+fn stale_files(dir: &Path, today: &str, keep_days: u32) -> Vec<(PathBuf, u64)> {
+    let Some(now) = day_number(today) else {
+        return vec![];
+    };
+    let keep = i64::from(keep_days.max(1));
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return vec![];
+    };
+    let mut out: Vec<(PathBuf, u64)> = rd
+        .flatten()
+        .filter_map(|e| {
+            let path = e.path();
+            let meta = std::fs::symlink_metadata(&path).ok()?;
+            if !meta.is_file() || path.extension()? != "jsonl" {
+                return None;
+            }
+            let n = day_number(path.file_stem()?.to_str()?)?;
+            (n < now && now - n > keep).then_some((path, meta.len()))
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Prune {
+    pub files: Vec<String>,
+    pub bytes: u64,
+    pub dry_run: bool,
+}
+
+fn prune(dir: &Path, today: &str, keep_days: u32, dry_run: bool) -> Result<Prune, String> {
+    let mut out = Prune {
+        files: vec![],
+        bytes: 0,
+        dry_run,
+    };
+    for (path, size) in stale_files(dir, today, keep_days) {
+        if !dry_run {
+            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+        out.bytes += size;
+        out.files.push(
+            path.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+        );
+    }
+    Ok(out)
+}
+
+/// Deletes (or, with `dry_run`, only lists) day files older than `keep_days`. Only `<app data>/raw-cli` is touched.
+#[tauri::command]
+pub fn raw_log_prune(
+    app: tauri::AppHandle,
+    today: String,
+    keep_days: u32,
+    dry_run: bool,
+) -> Result<Prune, String> {
+    prune(&base(&app)?, &today, keep_days, dry_run)
 }
 
 #[tauri::command]
@@ -129,7 +233,10 @@ mod tests {
         append(&dir, "2026-10-02", "{\"a\":1}\n", 1000).unwrap();
         append(&dir, "2026-10-03", "{\"b\":2}", 1000).unwrap();
         append(&dir, "2026-10-03", "{\"c\":3}\n", 1000).unwrap();
-        assert_eq!(std::fs::read_to_string(dir.join("2026-10-03.jsonl")).unwrap(), "{\"b\":2}\n{\"c\":3}\n");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("2026-10-03.jsonl")).unwrap(),
+            "{\"b\":2}\n{\"c\":3}\n"
+        );
         let i = info(&dir);
         assert_eq!(i.files, 2);
         assert!(i.latest.unwrap().ends_with("2026-10-03.jsonl"));
@@ -152,7 +259,10 @@ mod tests {
             append(root.path(), day, &line.repeat(3), 700).unwrap();
         }
         // 900 bytes written, cap 700 after the third append: the first day is gone.
-        let names: Vec<String> = files(root.path()).iter().map(|f| f.0.file_name().unwrap().to_string_lossy().into_owned()).collect();
+        let names: Vec<String> = files(root.path())
+            .iter()
+            .map(|f| f.0.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
         assert_eq!(names, ["2026-10-02.jsonl", "2026-10-03.jsonl"]);
         assert!(info(root.path()).bytes <= 700);
     }
@@ -167,8 +277,94 @@ mod tests {
         append(root.path(), "2026-10-03", &text, 200).unwrap();
         let kept = std::fs::read_to_string(root.path().join("2026-10-03.jsonl")).unwrap();
         assert!(kept.len() <= 200 && kept.len() > 100, "{}", kept.len());
-        assert!(kept.starts_with("{\"n\":"), "starts at a whole line: {kept:?}");
+        assert!(
+            kept.starts_with("{\"n\":"),
+            "starts at a whole line: {kept:?}"
+        );
         assert!(kept.ends_with("{\"n\":39}\n"), "newest line kept");
+    }
+
+    #[test]
+    fn prune_keeps_today_recent_days_other_names_and_links() {
+        let root = tempfile::tempdir().unwrap();
+        let d = root.path();
+        for n in [
+            "2026-09-01.jsonl",
+            "2026-09-29.jsonl",
+            "2026-09-30.jsonl",
+            "2026-10-07.jsonl",
+            "2026-10-08.jsonl",
+            "notes.jsonl",
+            "2026-08-01.txt",
+            "2026-13-01.jsonl",
+        ] {
+            std::fs::write(d.join(n), "x\n").unwrap();
+        }
+        std::fs::create_dir(d.join("2026-01-01.jsonl")).unwrap();
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            std::fs::write(outside.path().join("keep"), "secret").unwrap();
+            std::os::unix::fs::symlink(outside.path().join("keep"), d.join("2026-02-01.jsonl"))
+                .unwrap();
+            let dry = prune(d, "2026-10-07", 7, true).unwrap();
+            assert_eq!(dry.files, ["2026-09-01.jsonl", "2026-09-29.jsonl"]);
+            assert!(
+                d.join("2026-09-01.jsonl").exists(),
+                "a dry run deletes nothing"
+            );
+            let done = prune(d, "2026-10-07", 7, false).unwrap();
+            assert_eq!(done.files, dry.files);
+            assert_eq!(done.bytes, 4);
+            assert!(
+                d.join("2026-02-01.jsonl").symlink_metadata().is_ok(),
+                "links stay"
+            );
+            assert!(outside.path().join("keep").exists());
+        }
+        for kept in [
+            "2026-09-30.jsonl",
+            "2026-10-07.jsonl",
+            "2026-10-08.jsonl",
+            "notes.jsonl",
+            "2026-08-01.txt",
+            "2026-13-01.jsonl",
+            "2026-01-01.jsonl",
+        ] {
+            assert!(d.join(kept).exists() || !cfg!(unix), "{kept}");
+        }
+    }
+
+    #[test]
+    fn prune_never_removes_today_even_with_zero_days_and_ignores_a_bad_today() {
+        let root = tempfile::tempdir().unwrap();
+        let d = root.path();
+        std::fs::write(d.join("2026-10-07.jsonl"), "x").unwrap();
+        std::fs::write(d.join("2026-10-06.jsonl"), "x").unwrap();
+        assert!(
+            prune(d, "2026-10-07", 0, false).unwrap().files.is_empty(),
+            "0 counts as 1: yesterday is kept"
+        );
+        assert!(prune(d, "../..", 1, false).unwrap().files.is_empty());
+        assert!(prune(&d.join("missing"), "2026-10-07", 1, false)
+            .unwrap()
+            .files
+            .is_empty());
+        assert!(d.join("2026-10-07.jsonl").exists() && d.join("2026-10-06.jsonl").exists());
+    }
+
+    #[test]
+    fn day_numbers_count_days() {
+        assert_eq!(day_number("1970-01-01"), Some(0));
+        assert_eq!(
+            day_number("2026-03-01").unwrap() - day_number("2026-02-28").unwrap(),
+            1
+        );
+        assert_eq!(
+            day_number("2024-03-01").unwrap() - day_number("2024-02-28").unwrap(),
+            2
+        );
+        assert_eq!(day_number("2026-00-10"), None);
     }
 
     #[test]

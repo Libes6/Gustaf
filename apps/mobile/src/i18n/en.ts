@@ -70,6 +70,15 @@ export const en = {
   language: "Language",
   langSystem: "System",
   about: "About",
+  newChatCta: "Chat",
+  newChatTitle: "What are we working on?",
+  newChatIn: "New chat in {project}",
+  waitingApproval: "Waiting for your approval",
+  waitingApprovalDesc: "The agent asks to run something. Answer on the computer, then it continues.",
+  welcomeLead: "Control the Gustaf agent running on your computer from your phone.",
+  welcomeStep1: "On the computer: Settings → Mobile → turn on the phone server.",
+  welcomeStep2: "Phone and computer must be on the same Wi-Fi.",
+  welcomeStep3: "Scan the QR code the computer shows.",
 } as const;
 
 export type StringKey = keyof typeof en;

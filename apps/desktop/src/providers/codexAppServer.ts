@@ -10,7 +10,9 @@
 //  - child status is monotone: a terminal child is only reopened by a new turn of that child (SendMessage / resume), never by
 //    a late progress frame; the parent turn ending never completes a child that is still running;
 //  - liveness is never guessed: nothing here treats silence as a heartbeat. When the connection or the turn ends with children
-//    still running, they are left "running" and the caller marks them unknown (cli.ts), not completed.
+//    that never reported an end, `settle` closes them: `stopped` when the owning process is confirmed gone (exit, crash, our own
+//    kill after a failed/interrupted/aborted turn), `unknown` when observation merely ran out (the wait limit). Never `completed`,
+//    never left `running`.
 import { isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
 import type { NativeGoal, Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
 
@@ -52,15 +54,24 @@ export type TurnParams = {
   goal?: { objective: string; resume?: boolean };
 };
 
-const policyFor = (p: TurnParams) => (p.approvals && sandboxFor(p.access, p.mode).mode === "workspace-write" ? "on-request" : "never");
+const policyFor = (p: TurnParams) =>
+  p.approvals && sandboxFor(p.access, p.mode).mode === "workspace-write" ? "on-request" : "never";
 
 /** `thread/start` or `thread/resume`. Without an approval handler nothing is asked (`exec` never asked either). */
 export function threadRequest(p: TurnParams): { method: string; params: Json } {
   const sb = sandboxFor(p.access, p.mode);
   // A goal's turns are started by the server, so the effort (a turn/start parameter) has to travel as thread config.
   const config = p.goal && p.reasoning ? { config: { model_reasoning_effort: p.reasoning } } : {};
-  const common = { ...(p.cwd ? { cwd: p.cwd } : {}), ...(p.model ? { model: p.model } : {}), approvalPolicy: policyFor(p), sandbox: sb.mode, ...config };
-  return p.session ? { method: "thread/resume", params: { threadId: p.session, ...common } } : { method: "thread/start", params: common };
+  const common = {
+    ...(p.cwd ? { cwd: p.cwd } : {}),
+    ...(p.model ? { model: p.model } : {}),
+    approvalPolicy: policyFor(p),
+    sandbox: sb.mode,
+    ...config,
+  };
+  return p.session
+    ? { method: "thread/resume", params: { threadId: p.session, ...common } }
+    : { method: "thread/start", params: common };
 }
 
 export function turnRequest(threadId: string, p: TurnParams): Json {
@@ -77,18 +88,44 @@ export function turnRequest(threadId: string, p: TurnParams): Json {
 
 // ---- items ----------------------------------------------------------------------------------------------------------
 
-const STATUS: Record<string, string> = { inprogress: "in_progress", completed: "completed", failed: "failed", declined: "failed" };
+const STATUS: Record<string, string> = {
+  inprogress: "in_progress",
+  completed: "completed",
+  failed: "failed",
+  declined: "failed",
+};
 const status = (v: unknown) => STATUS[str(v).toLowerCase()] ?? str(v);
 
 /** An app-server `ThreadItem` in the shape `nativeActivities("codex", …)` already understands (`codex exec --json` items). */
 export function execItem(item: Json): Json {
   switch (str(item.type)) {
     case "commandExecution":
-      return { type: "command_execution", id: item.id, command: item.command, aggregated_output: item.aggregatedOutput ?? "", exit_code: item.exitCode ?? null, status: status(item.status) };
+      return {
+        type: "command_execution",
+        id: item.id,
+        command: item.command,
+        aggregated_output: item.aggregatedOutput ?? "",
+        exit_code: item.exitCode ?? null,
+        status: status(item.status),
+      };
     case "fileChange":
-      return { type: "file_change", id: item.id, changes: list(item.changes).map((c) => ({ path: rec(c).path, kind: rec(c).kind })), status: status(item.status) };
+      return {
+        type: "file_change",
+        id: item.id,
+        changes: list(item.changes).map((c) => ({ path: rec(c).path, kind: rec(c).kind })),
+        status: status(item.status),
+      };
     case "mcpToolCall":
-      return { type: "mcp_tool_call", id: item.id, server: item.server, tool: item.tool, arguments: item.arguments, result: item.result ?? null, error: item.error ?? null, status: status(item.status) };
+      return {
+        type: "mcp_tool_call",
+        id: item.id,
+        server: item.server,
+        tool: item.tool,
+        arguments: item.arguments,
+        result: item.result ?? null,
+        error: item.error ?? null,
+        status: status(item.status),
+      };
     case "webSearch":
       return { type: "web_search", id: item.id, query: item.query };
     default:
@@ -97,7 +134,17 @@ export function execItem(item: Json): Json {
 }
 
 const TOOL_ITEMS = new Set(["commandExecution", "fileChange", "mcpToolCall", "webSearch", "dynamicToolCall"]);
-const stepOf = (item: Json) => brief(item.type === "commandExecution" ? str(item.command) : item.type === "mcpToolCall" ? `${str(item.server)} ${str(item.tool)}` : item.type === "webSearch" ? `search ${str(item.query)}` : str(item.type), 90);
+const stepOf = (item: Json) =>
+  brief(
+    item.type === "commandExecution"
+      ? str(item.command)
+      : item.type === "mcpToolCall"
+        ? `${str(item.server)} ${str(item.tool)}`
+        : item.type === "webSearch"
+          ? `search ${str(item.query)}`
+          : str(item.type),
+    90,
+  );
 
 // ---- reducer --------------------------------------------------------------------------------------------------------
 
@@ -116,14 +163,23 @@ export type Effect =
 
 const MAX_HELD_PER_THREAD = 100;
 const MAX_HELD_THREADS = 50;
-const HELD = new Set(["turn/started", "turn/completed", "item/started", "item/completed", "thread/tokenUsage/updated", "thread/status/changed"]);
+const HELD = new Set([
+  "turn/started",
+  "turn/completed",
+  "item/started",
+  "item/completed",
+  "thread/tokenUsage/updated",
+  "thread/status/changed",
+  "thread/closed",
+]);
 
 type Child = { activityId: string; state: SubagentState; lastText: string; tokens?: number };
 
 /** "/root/list_files" to "list files": the last segment of an agent path, readable. */
 const humanTask = (path: string) => (path.split("/").filter(Boolean).pop() ?? "").replace(/[_-]+/g, " ").trim();
 
-const childState = (s: unknown): SubagentState => (s === "completed" ? "completed" : s === "interrupted" ? "stopped" : "failed");
+const childState = (s: unknown): SubagentState =>
+  s === "completed" ? "completed" : s === "interrupted" ? "stopped" : "failed";
 
 /** Per-turn state machine. Feed it every JSON-RPC message of the connection; apply the returned effects in order. */
 export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) {
@@ -135,13 +191,25 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
   const streamed = new Set<string>();
   let lastMessage = "";
   /** Separate agent messages of one turn (before and after tool calls) read as paragraphs, not one run-on sentence. */
-  const gap = (id: string) => { const sep = lastMessage && lastMessage !== id ? "\n\n" : ""; lastMessage = id; return sep; };
+  const gap = (id: string) => {
+    const sep = lastMessage && lastMessage !== id ? "\n\n" : "";
+    lastMessage = id;
+    return sep;
+  };
   let baseline: TokenUsage | undefined;
   let latest: { total: TokenUsage; last: TokenUsage } | undefined;
   let usageSeen = 0;
 
-  const info = (threadId: string, c: Child, patch: Partial<SubagentInfo> & Pick<SubagentInfo, "action" | "state">): Activity => ({
-    type: "activity", id: c.activityId, name: "", args: {}, status: "running",
+  const info = (
+    threadId: string,
+    c: Child,
+    patch: Partial<SubagentInfo> & Pick<SubagentInfo, "action" | "state">,
+  ): Activity => ({
+    type: "activity",
+    id: c.activityId,
+    name: "",
+    args: {},
+    status: "running",
     subagent: { provider: "codex", agentId: threadId, title: "", ...patch },
   });
 
@@ -191,13 +259,28 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
         const turn = rec(p.turn);
         const state = childState(turn.status);
         c.state = state;
-        const result = c.lastText ? brief(c.lastText, 300) : str(rec(turn.error).message) ? brief(rec(turn.error).message, 300) : undefined;
-        push({ ...info(threadId, c, { action: "close", state, ...(result ? { result } : {}), ...(c.tokens ? { tokens: c.tokens } : {}), ...(num(turn.durationMs) !== undefined ? { durationMs: num(turn.durationMs) } : {}) }), status: state === "completed" ? "success" : state === "failed" ? "error" : "unknown", ...(c.lastText ? { output: c.lastText.slice(0, 4000) } : {}) });
+        const result = c.lastText
+          ? brief(c.lastText, 300)
+          : str(rec(turn.error).message)
+            ? brief(rec(turn.error).message, 300)
+            : undefined;
+        push({
+          ...info(threadId, c, {
+            action: "close",
+            state,
+            ...(result ? { result } : {}),
+            ...(c.tokens ? { tokens: c.tokens } : {}),
+            ...(num(turn.durationMs) !== undefined ? { durationMs: num(turn.durationMs) } : {}),
+          }),
+          status: state === "completed" ? "success" : state === "failed" ? "error" : "unknown",
+          ...(c.lastText ? { output: c.lastText.slice(0, 4000) } : {}),
+        });
         break;
       }
       case "item/started": {
         const item = rec(p.item);
-        if (TOOL_ITEMS.has(str(item.type))) push(info(threadId, c, { action: "progress", state: c.state, toolUses: 1, step: stepOf(item) }));
+        if (TOOL_ITEMS.has(str(item.type)))
+          push(info(threadId, c, { action: "progress", state: c.state, toolUses: 1, step: stepOf(item) }));
         break;
       }
       case "item/completed": {
@@ -207,13 +290,29 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       }
       case "thread/tokenUsage/updated": {
         const total = num(rec(rec(p.tokenUsage).total).totalTokens);
-        if (total !== undefined) { c.tokens = total; push(info(threadId, c, { action: "progress", state: c.state, tokens: total })); }
+        if (total !== undefined) {
+          c.tokens = total;
+          push(info(threadId, c, { action: "progress", state: c.state, tokens: total }));
+        }
         break;
       }
+      case "thread/closed":
+        // The server unloaded the thread: a child that never reported an end is not running any more.
+        if (c.state === "running" || c.state === "waiting") {
+          c.state = "stopped";
+          push({
+            ...info(threadId, c, { action: "close", state: "stopped", result: "Agent thread closed" }),
+            status: "unknown",
+          });
+        }
+        break;
       case "thread/status/changed":
         if (rec(p.status).type === "systemError" && c.state === "running") {
           c.state = "failed";
-          push({ ...info(threadId, c, { action: "close", state: "failed", result: "Agent failed (system error)" }), status: "error" });
+          push({
+            ...info(threadId, c, { action: "close", state: "failed", result: "Agent failed (system error)" }),
+            status: "error",
+          });
         }
         break;
     }
@@ -233,7 +332,29 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       if (known || !first) return;
       const h = hints.get(threadId);
       const path = str(item.agentPath);
-      publish([{ type: "activity", id: str(item.id) || `agent:${threadId}`, name: "subagent", args: { tool: "spawnAgent", agent: threadId }, status: "running", subagent: { provider: "codex", agentId: threadId, ...(path ? { agentPath: path } : {}), title: humanTask(path) || h?.nickname || "", action: "spawn", state: "running", startedAt: Date.now(), ...(h?.model ? { model: h.model } : {}), ...(h?.role ? { role: h.role } : {}) } }], out);
+      publish(
+        [
+          {
+            type: "activity",
+            id: str(item.id) || `agent:${threadId}`,
+            name: "subagent",
+            args: { tool: "spawnAgent", agent: threadId },
+            status: "running",
+            subagent: {
+              provider: "codex",
+              agentId: threadId,
+              ...(path ? { agentPath: path } : {}),
+              title: humanTask(path) || h?.nickname || "",
+              action: "spawn",
+              state: "running",
+              startedAt: Date.now(),
+              ...(h?.model ? { model: h.model } : {}),
+              ...(h?.role ? { role: h.role } : {}),
+            },
+          },
+        ],
+        out,
+      );
       return;
     }
     if (!known) return;
@@ -241,12 +362,25 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       if (first) return;
       const reopen = known.state !== "running" && known.state !== "waiting";
       known.state = "running";
-      out.push({ kind: "activity", activity: info(threadId, known, { action: reopen ? "send" : "progress", state: "running" }) });
+      out.push({
+        kind: "activity",
+        activity: info(threadId, known, { action: reopen ? "send" : "progress", state: "running" }),
+      });
     } else if ((kind === "completed" || kind === "interrupted") && !first) {
       const state: SubagentState = kind === "completed" ? "completed" : "stopped";
       if (known.state === "completed" || known.state === "failed") return;
       known.state = state;
-      out.push({ kind: "activity", activity: { ...info(threadId, known, { action: "close", state, ...(known.lastText ? { result: brief(known.lastText, 300) } : {}) }), status: state === "completed" ? "success" : "unknown" } });
+      out.push({
+        kind: "activity",
+        activity: {
+          ...info(threadId, known, {
+            action: "close",
+            state,
+            ...(known.lastText ? { result: brief(known.lastText, 300) } : {}),
+          }),
+          status: state === "completed" ? "success" : "unknown",
+        },
+      });
     }
   }
 
@@ -265,12 +399,29 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       const evType = method === "item/started" ? "item.started" : "item.completed";
       if (type === "agentMessage") {
         // A message that never streamed deltas (short or replayed) arrives whole.
-        if (evType === "item.completed" && str(item.text) && !streamed.has(str(item.id))) out.push({ kind: "text", text: gap(str(item.id)) + str(item.text) });
-      } else if (type === "collabAgentToolCall" && str(item.tool) === "spawnAgent" && list(item.receiverThreadIds).length > 1) {
+        if (evType === "item.completed" && str(item.text) && !streamed.has(str(item.id)))
+          out.push({ kind: "text", text: gap(str(item.id)) + str(item.text) });
+      } else if (
+        type === "collabAgentToolCall" &&
+        str(item.tool) === "spawnAgent" &&
+        list(item.receiverThreadIds).length > 1
+      ) {
         // One entry per spawned agent (the shared mapping keys a spawn by its first receiver only).
         const ids = list(item.receiverThreadIds).map(str);
         const states = rec(item.agentsStates);
-        for (const id of ids) publish(nativeActivities("codex", { type: evType, item: { ...item, id: `${str(item.id)}:${id}`, receiverThreadIds: [id], agentsStates: id in states ? { [id]: states[id] } : {} } }), out);
+        for (const id of ids)
+          publish(
+            nativeActivities("codex", {
+              type: evType,
+              item: {
+                ...item,
+                id: `${str(item.id)}:${id}`,
+                receiverThreadIds: [id],
+                agentsStates: id in states ? { [id]: states[id] } : {},
+              },
+            }),
+            out,
+          );
       } else if (type === "subAgentActivity") {
         subAgentActivity(item, evType === "item.started", out);
       } else if (type === "collabAgentToolCall" && isBareCollabWait({ type: evType, item })) {
@@ -296,7 +447,15 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
     } else if (method === "thread/goal/updated") {
       const g = rec(p.goal);
       goalStatus = str(g.status);
-      out.push({ kind: "goal", goal: { status: (goalStatus || "active") as NativeGoal["status"], objective: str(g.objective), tokensUsed: num(g.tokensUsed) ?? 0, timeUsedSeconds: num(g.timeUsedSeconds) ?? 0 } });
+      out.push({
+        kind: "goal",
+        goal: {
+          status: (goalStatus || "active") as NativeGoal["status"],
+          objective: str(g.objective),
+          tokensUsed: num(g.tokensUsed) ?? 0,
+          timeUsedSeconds: num(g.timeUsedSeconds) ?? 0,
+        },
+      });
       // The goal finished after the last turn already ended: nothing more will come.
       if (o.goal && goalStatus !== "active" && turnEnded) out.push({ kind: "done", status: "completed" });
     } else if (method === "turn/completed") {
@@ -306,7 +465,12 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       turnEnded = true;
       // A goal run continues in further server-started turns while the goal is active.
       if (o.goal && s === "completed" && (goalStatus === "active" || goalStatus === "")) out.push({ kind: "idle" });
-      else out.push({ kind: "done", status: s === "interrupted" ? "interrupted" : s === "failed" ? "failed" : "completed", ...(str(e.message) ? { error: str(e.message) } : {}) });
+      else
+        out.push({
+          kind: "done",
+          status: s === "interrupted" ? "interrupted" : s === "failed" ? "failed" : "completed",
+          ...(str(e.message) ? { error: str(e.message) } : {}),
+        });
     } else if (method === "error") {
       const e = rec(p.error);
       if (p.willRetry !== true && str(e.message)) out.push({ kind: "done", status: "failed", error: str(e.message) });
@@ -319,10 +483,37 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
     const id = m.id as string | number;
     const p = rec(m.params);
     // The runner asks the user (or declines when it has no handler); the reply is one of the decisions below.
-    if (method === "item/commandExecution/requestApproval") return [{ kind: "approval", id, ask: { kind: "command", command: str(p.command) || "(command)", ...(str(p.reason) ? { reason: str(p.reason) } : {}) } }];
-    if (method === "item/fileChange/requestApproval") return [{ kind: "approval", id, ask: { kind: "command", command: "Apply file changes outside the workspace", reason: str(p.reason) || (str(p.grantRoot) ? `Write access to ${str(p.grantRoot)}` : "Codex asks to change files") } }];
-    if (method === "mcpServer/elicitation/request") return [{ kind: "reply", reply: { id, result: { action: "decline" } } }];
-    return [{ kind: "reply", reply: { id, error: { code: -32601, message: `Not supported by this client: ${method}` } } }];
+    if (method === "item/commandExecution/requestApproval")
+      return [
+        {
+          kind: "approval",
+          id,
+          ask: {
+            kind: "command",
+            command: str(p.command) || "(command)",
+            ...(str(p.reason) ? { reason: str(p.reason) } : {}),
+          },
+        },
+      ];
+    if (method === "item/fileChange/requestApproval")
+      return [
+        {
+          kind: "approval",
+          id,
+          ask: {
+            kind: "command",
+            command: "Apply file changes outside the workspace",
+            reason:
+              str(p.reason) ||
+              (str(p.grantRoot) ? `Write access to ${str(p.grantRoot)}` : "Codex asks to change files"),
+          },
+        },
+      ];
+    if (method === "mcpServer/elicitation/request")
+      return [{ kind: "reply", reply: { id, result: { action: "decline" } } }];
+    return [
+      { kind: "reply", reply: { id, error: { code: -32601, message: `Not supported by this client: ${method}` } } },
+    ];
   };
 
   return {
@@ -335,7 +526,12 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       if (method === "thread/started") {
         const t = rec(p.thread);
         const id = str(t.id);
-        if (id && id !== rootThreadId) hints.set(id, { model: str(t.model) || undefined, role: str(t.agentRole) || undefined, nickname: str(t.agentNickname) || undefined });
+        if (id && id !== rootThreadId)
+          hints.set(id, {
+            model: str(t.model) || undefined,
+            role: str(t.agentRole) || undefined,
+            nickname: str(t.agentNickname) || undefined,
+          });
         return [];
       }
       const threadId = str(p.threadId);
@@ -346,10 +542,39 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
     usage(): TokenUsage | undefined {
       return latest && baseline && usageSeen ? sub(latest.total, baseline) : undefined;
     },
-    /** Children still running (the caller marks them unknown when the turn or the connection ends). */
-    running(): string[] { return [...children].filter(([, c]) => c.state === "running" || c.state === "waiting").map(([id]) => id); },
+    /**
+     * The connection or turn is over and these children never reported an end: closes each with `state` (see the header) and
+     * returns the entries to publish. `stopped`: the process that owned them is confirmed gone. `unknown`: we only stopped
+     * observing. Terminal children are untouched.
+     */
+    settle(state: "stopped" | "unknown", note: string): Effect[] {
+      const out: Effect[] = [];
+      for (const [threadId, c] of children) {
+        if (c.state !== "running" && c.state !== "waiting") continue;
+        c.state = state;
+        out.push({
+          kind: "activity",
+          activity: {
+            ...info(threadId, c, {
+              action: "close",
+              state,
+              result: c.lastText ? brief(c.lastText, 300) : note,
+              ...(c.tokens ? { tokens: c.tokens } : {}),
+            }),
+            status: "unknown",
+          },
+        });
+      }
+      return out;
+    },
+    /** Children still running (those the caller has not settled yet). */
+    running(): string[] {
+      return [...children].filter(([, c]) => c.state === "running" || c.state === "waiting").map(([id]) => id);
+    },
     /** Test hook. */
-    get held() { return held.size; },
+    get held() {
+      return held.size;
+    },
   };
 }
 
@@ -357,9 +582,21 @@ function usageOf(b: Json): TokenUsage | undefined {
   const input = num(b.inputTokens);
   const output = num(b.outputTokens);
   if (input === undefined || output === undefined) return undefined;
-  return { input, output, cached: num(b.cachedInputTokens) ?? 0, cacheWrite: num(b.cacheWriteInputTokens) ?? 0, reasoning: num(b.reasoningOutputTokens) ?? 0 };
+  return {
+    input,
+    output,
+    cached: num(b.cachedInputTokens) ?? 0,
+    cacheWrite: num(b.cacheWriteInputTokens) ?? 0,
+    reasoning: num(b.reasoningOutputTokens) ?? 0,
+  };
 }
-const sub = (a: TokenUsage, b: TokenUsage): TokenUsage => ({ input: Math.max(0, a.input - b.input), output: Math.max(0, a.output - b.output), cached: Math.max(0, a.cached - b.cached), cacheWrite: Math.max(0, a.cacheWrite - b.cacheWrite), reasoning: Math.max(0, a.reasoning - b.reasoning) });
+const sub = (a: TokenUsage, b: TokenUsage): TokenUsage => ({
+  input: Math.max(0, a.input - b.input),
+  output: Math.max(0, a.output - b.output),
+  cached: Math.max(0, a.cached - b.cached),
+  cacheWrite: Math.max(0, a.cacheWrite - b.cacheWrite),
+  reasoning: Math.max(0, a.reasoning - b.reasoning),
+});
 
 // ---- one turn over a transport --------------------------------------------------------------------------------------
 
@@ -390,7 +627,8 @@ export type TurnHandlers = {
   childWaitMs?: number;
 };
 
-export type TurnResult = { session: string; error: string; running: string[]; usage?: TokenUsage };
+/** `unreported`: children that never reported an end and were settled (`stopped` or `unknown`) when the connection or turn ended. */
+export type TurnResult = { session: string; error: string; unreported: string[]; usage?: TokenUsage };
 
 /** Thrown when the app-server could not be started or spoken to before any output: the caller may fall back to `exec`. */
 export class AppServerUnavailable extends Error {}
@@ -414,7 +652,9 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
   const pending = new Map<number, { resolve: (v: Json) => void; reject: (e: Error) => void }>();
   let reducer: ReturnType<typeof createReducer> | undefined;
   let finish: (r: { status: string; error?: string }) => void = () => {};
-  const finished = new Promise<{ status: string; error?: string }>((resolve) => { finish = resolve; });
+  const finished = new Promise<{ status: string; error?: string }>((resolve) => {
+    finish = resolve;
+  });
   const early: Json[] = [];
 
   let childrenSettled: (() => void) | undefined;
@@ -425,14 +665,20 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
       else if (e.kind === "activity") h.onActivity(e.activity);
       else if (e.kind === "usage") h.onUsage?.(e.usage);
       else if (e.kind === "goal") h.onGoal?.(e.goal);
-      else if (e.kind === "busy") { clearTimeout(idleTimer); idleTimer = undefined; }
-      else if (e.kind === "idle") { clearTimeout(idleTimer); idleTimer = setTimeout(() => finish({ status: "completed" }), h.goalIdleMs ?? GOAL_IDLE_MS); }
-      else if (e.kind === "approval") {
-        const answer = (ok: boolean) => void conn.write(JSON.stringify({ jsonrpc: "2.0", id: e.id, result: { decision: ok ? "accept" : "decline" } })).catch(() => {});
+      else if (e.kind === "busy") {
+        clearTimeout(idleTimer);
+        idleTimer = undefined;
+      } else if (e.kind === "idle") {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => finish({ status: "completed" }), h.goalIdleMs ?? GOAL_IDLE_MS);
+      } else if (e.kind === "approval") {
+        const answer = (ok: boolean) =>
+          void conn
+            .write(JSON.stringify({ jsonrpc: "2.0", id: e.id, result: { decision: ok ? "accept" : "decline" } }))
+            .catch(() => {});
         if (!h.onApproval) answer(false);
         else h.onApproval(e.ask).then(answer, () => answer(false));
-      }
-      else if (e.kind === "reply") void conn.write(JSON.stringify({ jsonrpc: "2.0", ...e.reply })).catch(() => {});
+      } else if (e.kind === "reply") void conn.write(JSON.stringify({ jsonrpc: "2.0", ...e.reply })).catch(() => {});
       else if (e.kind === "done") finish({ status: e.status, error: e.error });
     }
     if (childrenSettled && reducer && reducer.running().length === 0) childrenSettled();
@@ -446,7 +692,10 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
       else w.resolve(rec(m.result));
       return;
     }
-    if (!reducer) { early.push(m); return; }
+    if (!reducer) {
+      early.push(m);
+      return;
+    }
     apply(reducer.onMessage(m));
   });
 
@@ -460,10 +709,18 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     let timer: ReturnType<typeof setTimeout> | undefined;
     const reply = new Promise<Json>((resolve, reject) => {
       pending.set(id, { resolve, reject });
-      timer = setTimeout(() => { pending.delete(id); reject(new Error(`app-server did not answer ${method}`)); }, REQUEST_TIMEOUT_MS);
+      timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`app-server did not answer ${method}`));
+      }, REQUEST_TIMEOUT_MS);
     }).finally(() => clearTimeout(timer));
     void conn.write(JSON.stringify({ jsonrpc: "2.0", id, method, params })).catch(() => {});
-    return Promise.race([reply, exit.then(() => { throw new AppServerUnavailable(conn.stderr().trim().slice(-400) || "app-server exited"); })]);
+    return Promise.race([
+      reply,
+      exit.then(() => {
+        throw new AppServerUnavailable(conn.stderr().trim().slice(-400) || "app-server exited");
+      }),
+    ]);
   };
 
   try {
@@ -473,7 +730,9 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
       await conn.write(JSON.stringify({ jsonrpc: "2.0", method: "initialized" }));
     } catch (e) {
       if (h.signal?.aborted) throw aborted();
-      throw e instanceof AppServerUnavailable ? e : new AppServerUnavailable(e instanceof Error ? e.message : String(e));
+      throw e instanceof AppServerUnavailable
+        ? e
+        : new AppServerUnavailable(e instanceof Error ? e.message : String(e));
     }
     const t = threadRequest(p);
     let thread: Json;
@@ -488,29 +747,67 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
     reducer = createReducer(session, { goal: !!p.goal });
     for (const m of early.splice(0)) apply(reducer.onMessage(m));
     try {
-      if (p.goal) await request("thread/goal/set", { threadId: session, ...(p.goal.resume ? { status: "active" } : { objective: p.goal.objective }) });
+      if (p.goal)
+        await request("thread/goal/set", {
+          threadId: session,
+          ...(p.goal.resume ? { status: "active" } : { objective: p.goal.objective }),
+        });
       else await request("turn/start", turnRequest(session, p));
     } catch (e) {
       if (h.signal?.aborted) throw aborted();
       throw e;
     }
-    const end = await Promise.race([finished, exit.then((x) => ({ status: "lost", error: conn.stderr().trim().slice(-600) || `codex app-server exited${x.code == null ? "" : ` with ${x.code}`}` }))]);
+    const end = await Promise.race([
+      finished,
+      exit.then((x) => ({
+        status: "lost",
+        error: conn.stderr().trim().slice(-600) || `codex app-server exited${x.code == null ? "" : ` with ${x.code}`}`,
+      })),
+    ]);
     if (h.signal?.aborted) throw aborted();
+    let verdict: { state: "stopped" | "unknown"; note: string } = {
+      state: "stopped",
+      note: "Agent did not report a result before the Codex run ended",
+    };
+    if (end.status === "lost")
+      verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
     if (end.status === "completed" && reducer.running().length) {
-      const wait = new Promise<void>((resolve) => { childrenSettled = resolve; });
+      const wait = new Promise<void>((resolve) => {
+        childrenSettled = resolve;
+      });
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const limit = new Promise<void>((resolve) => { timer = setTimeout(resolve, h.childWaitMs ?? CHILD_WAIT_MS); });
-      try { await Promise.race([wait, limit, exit]); } finally { clearTimeout(timer); childrenSettled = undefined; }
+      const limit = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, h.childWaitMs ?? CHILD_WAIT_MS);
+      });
+      const how = await Promise.race([
+        wait.then(() => "settled"),
+        limit.then(() => "limit"),
+        exit.then(() => "exit"),
+      ]).finally(() => {
+        clearTimeout(timer);
+        childrenSettled = undefined;
+      });
       if (h.signal?.aborted) throw aborted();
+      if (how === "limit")
+        verdict = { state: "unknown", note: "Lost track of this agent: no report within the wait limit" };
+      else if (how === "exit")
+        verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
     }
+    // Whatever never reported an end is closed now, never left `running` and never called completed.
+    const unreported = reducer.running();
+    apply(reducer.settle(verdict.state, verdict.note));
     const usage = reducer.usage();
     if (usage) h.onUsage?.(usage);
-    const error = end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";
-    return { session, error, running: reducer.running(), usage };
+    const error =
+      end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";
+    return { session, error, unreported, usage };
+  } catch (e) {
+    // The user stopped the run: we killed the process, so its children are confirmed gone (they are "stopped", not running).
+    if (reducer && h.signal?.aborted) apply(reducer.settle("stopped", "Stopped with the Codex run"));
+    throw e;
   } finally {
     clearTimeout(idleTimer);
     h.signal?.removeEventListener("abort", onAbort);
     conn.kill();
   }
 }
-

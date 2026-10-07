@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterTurn, continuePrompt, goalPrompt, goalReport, isContinuation, newGoal, parseGoalCommand, resumeGoal } from '../src/lib/goalCore.ts';
+import {
+  afterTurn,
+  continuePrompt,
+  goalPrompt,
+  goalReport,
+  isContinuation,
+  newGoal,
+  parseGoalCommand,
+  resumeGoal,
+} from '../src/lib/goalCore.ts';
 
 test('parseGoalCommand reads the objective after /goal', () => {
   assert.equal(parseGoalCommand('/goal make the tests pass'), 'make the tests pass');
@@ -32,7 +41,13 @@ test('afterTurn stops on done, blocked, Stop, failure and the turn limit', () =>
   assert.equal(afterTurn(g(), { outcome: 'ok', lastText: 'GOAL: done', tokens: 0 }).goal.status, 'done');
   const blocked = afterTurn(g(), { outcome: 'ok', lastText: 'GOAL: blocked - which branch?', tokens: 0 });
   assert.deepEqual([blocked.goal.status, blocked.goal.note, blocked.continueWith], ['blocked', 'which branch?', null]);
-  assert.deepEqual([afterTurn(g(), { outcome: 'stopped', lastText: '', tokens: 0 }).goal.status, afterTurn(g(), { outcome: 'stopped', lastText: '', tokens: 0 }).goal.note], ['paused', 'stopped']);
+  assert.deepEqual(
+    [
+      afterTurn(g(), { outcome: 'stopped', lastText: '', tokens: 0 }).goal.status,
+      afterTurn(g(), { outcome: 'stopped', lastText: '', tokens: 0 }).goal.note,
+    ],
+    ['paused', 'stopped'],
+  );
   assert.equal(afterTurn(g(), { outcome: 'failed', lastText: '', tokens: 0 }).continueWith, null);
   const last = afterTurn(g({ turns: 2 }), { outcome: 'ok', lastText: 'more', tokens: 0 });
   assert.deepEqual([last.goal.status, last.goal.note, last.continueWith], ['paused', 'limit', null]);

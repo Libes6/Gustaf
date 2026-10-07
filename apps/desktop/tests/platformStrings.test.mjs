@@ -15,7 +15,7 @@ const PATTERNS = [/\bMac\b/, /macOS/, /\bDock\b/i, /M Code/i, /\bmcode\b/i, /mak
 for (const [locale, dict] of Object.entries(dicts)) {
   test(`${locale}: no Mac-only wording or old app name outside the allow-list`, () => {
     const offenders = Object.entries(dict)
-      .filter(([key, value]) => !MAC_ONLY.has(key) && PATTERNS.some(re => re.test(value)))
+      .filter(([key, value]) => !MAC_ONLY.has(key) && PATTERNS.some((re) => re.test(value)))
       .map(([key, value]) => `${key}: ${value}`);
     assert.deepEqual(offenders, []);
   });
@@ -37,7 +37,8 @@ test('keyStoreKey picks the store for each platform', () => {
   } finally {
     setPlatformForTests(undefined);
   }
-  for (const dict of Object.values(dicts)) for (const p of ['macos', 'windows', 'linux']) assert.ok(dict[keyStoreKey(p)], p);
+  for (const dict of Object.values(dicts))
+    for (const p of ['macos', 'windows', 'linux']) assert.ok(dict[keyStoreKey(p)], p);
 });
 
 test('store placeholders are present in both locales', () => {

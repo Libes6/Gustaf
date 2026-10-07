@@ -19,7 +19,9 @@ const models = [
 ];
 
 const saved = () => {
-  const writes = callsOf("db_execute").filter((a: any) => /insert into settings/.test(a.sql) && a.params[0] === "agentSettings");
+  const writes = callsOf("db_execute").filter(
+    (a: any) => /insert into settings/.test(a.sql) && a.params[0] === "agentSettings",
+  );
   return writes.length ? JSON.parse((writes[writes.length - 1] as any).params[1]) : null;
 };
 
@@ -30,10 +32,16 @@ describe("Settings: agent roles and providers", () => {
     mockSettings({});
     renderApp(<AgentSettingsSection />, makeApp({ providers, models }));
     const select = await screen.findByRole("combobox", { name: "Provider and model for the Planner role" });
-    const labels = within(select).getAllByRole("option").map((o) => o.textContent);
+    const labels = within(select)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
     expect(labels).toEqual(["Not set", "Anthropic · Sonnet", "Codex · Default", "Codex · GPT-5"]);
     const add = screen.getByRole("combobox", { name: "Allow a provider" });
-    expect(within(add).getAllByRole("option").map((o) => o.textContent)).toEqual(["Allow a provider", "Anthropic", "Codex"]);
+    expect(
+      within(add)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Allow a provider", "Anthropic", "Codex"]);
   });
 
   it("stores a role preset and allows its provider; the preset survives a reload", async () => {
@@ -50,9 +58,16 @@ describe("Settings: agent roles and providers", () => {
 
   it("reads stored roles and removes an allowed provider", async () => {
     resetAgentSettings();
-    mockSettings({ agentSettings: { roles: { reviewer: { providerId: "api1", model: "sonnet" } }, allowedProviders: ["api1", "codex1"] } });
+    mockSettings({
+      agentSettings: {
+        roles: { reviewer: { providerId: "api1", model: "sonnet" } },
+        allowedProviders: ["api1", "codex1"],
+      },
+    });
     renderApp(<AgentSettingsSection />, makeApp({ providers, models }));
-    const select = (await screen.findByRole("combobox", { name: "Provider and model for the Reviewer role" })) as HTMLSelectElement;
+    const select = (await screen.findByRole("combobox", {
+      name: "Provider and model for the Reviewer role",
+    })) as HTMLSelectElement;
     await waitFor(() => expect(select.value).toBe("api1\nsonnet"));
     fireEvent.click(screen.getByRole("button", { name: "Stop allowing Codex" }));
     await waitFor(() => expect(saved().allowedProviders).toEqual(["api1"]));

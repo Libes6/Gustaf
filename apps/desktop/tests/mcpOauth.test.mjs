@@ -14,18 +14,35 @@ const SERVER = 'https://mcp.example/api/mcp';
 const AS = 'https://auth.example';
 
 test('WWW-Authenticate challenge parsing', () => {
-  assert.deepEqual(o.parseWwwAuthenticate('Bearer realm="x", resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp", scope="read write", error=invalid_token'), {
-    resourceMetadata: 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp',
-    scope: 'read write',
-    error: 'invalid_token',
-  });
+  assert.deepEqual(
+    o.parseWwwAuthenticate(
+      'Bearer realm="x", resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp", scope="read write", error=invalid_token',
+    ),
+    {
+      resourceMetadata: 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp',
+      scope: 'read write',
+      error: 'invalid_token',
+    },
+  );
   assert.deepEqual(o.parseWwwAuthenticate(null), {});
   assert.deepEqual(o.parseWwwAuthenticate('Basic realm="x"'), {});
 });
 
 test('endpoints must be https (http only for loopback) and resources must match the server', () => {
-  for (const ok of ['https://a.example/x', 'http://localhost:8080/x', 'http://127.0.0.1/x', 'http://[::1]:1/x']) assert.equal(o.isSecureEndpoint(ok), true, ok);
-  for (const bad of ['http://a.example/x', 'http://192.168.1.5/x', 'ftp://a', 'https://u:p@a.example/', 'https://a.example/#f', 'javascript:1', '', null, 5]) assert.equal(o.isSecureEndpoint(bad), false, String(bad));
+  for (const ok of ['https://a.example/x', 'http://localhost:8080/x', 'http://127.0.0.1/x', 'http://[::1]:1/x'])
+    assert.equal(o.isSecureEndpoint(ok), true, ok);
+  for (const bad of [
+    'http://a.example/x',
+    'http://192.168.1.5/x',
+    'ftp://a',
+    'https://u:p@a.example/',
+    'https://a.example/#f',
+    'javascript:1',
+    '',
+    null,
+    5,
+  ])
+    assert.equal(o.isSecureEndpoint(bad), false, String(bad));
   assert.equal(o.canonicalResource('https://MCP.example/api/mcp/?q=1#x'), 'https://mcp.example/api/mcp');
   assert.equal(o.canonicalResource('https://mcp.example/'), 'https://mcp.example');
   assert.equal(o.resourceMatches(SERVER, 'https://mcp.example'), true);
@@ -35,65 +52,211 @@ test('endpoints must be https (http only for loopback) and resources must match 
 });
 
 test('protected resource metadata: lookup order and validation', () => {
-  assert.deepEqual(o.protectedResourceMetadataUrls(SERVER, 'https://hint.example/prm'), ['https://hint.example/prm', 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp', 'https://mcp.example/.well-known/oauth-protected-resource']);
-  assert.deepEqual(o.protectedResourceMetadataUrls('https://mcp.example/'), ['https://mcp.example/.well-known/oauth-protected-resource']);
+  assert.deepEqual(o.protectedResourceMetadataUrls(SERVER, 'https://hint.example/prm'), [
+    'https://hint.example/prm',
+    'https://mcp.example/.well-known/oauth-protected-resource/api/mcp',
+    'https://mcp.example/.well-known/oauth-protected-resource',
+  ]);
+  assert.deepEqual(o.protectedResourceMetadataUrls('https://mcp.example/'), [
+    'https://mcp.example/.well-known/oauth-protected-resource',
+  ]);
   assert.deepEqual(o.protectedResourceMetadataUrls(SERVER, 'http://insecure.example/prm').length, 2);
-  const pr = o.parseProtectedResource({ resource: 'https://mcp.example', authorization_servers: ['http://bad.example', AS], scopes_supported: ['a', 7, 'b'] }, SERVER);
+  const pr = o.parseProtectedResource(
+    {
+      resource: 'https://mcp.example',
+      authorization_servers: ['http://bad.example', AS],
+      scopes_supported: ['a', 7, 'b'],
+    },
+    SERVER,
+  );
   assert.deepEqual(pr, { resource: 'https://mcp.example', authorizationServers: [AS], scopes: ['a', 'b'] });
-  assert.throws(() => o.parseProtectedResource({ resource: 'https://other.example', authorization_servers: [AS] }, SERVER), /does not describe this server/);
-  assert.throws(() => o.parseProtectedResource({ resource: 'https://mcp.example', authorization_servers: ['http://bad.example'] }, SERVER), /no usable/);
+  assert.throws(
+    () => o.parseProtectedResource({ resource: 'https://other.example', authorization_servers: [AS] }, SERVER),
+    /does not describe this server/,
+  );
+  assert.throws(
+    () =>
+      o.parseProtectedResource(
+        { resource: 'https://mcp.example', authorization_servers: ['http://bad.example'] },
+        SERVER,
+      ),
+    /no usable/,
+  );
   assert.throws(() => o.parseProtectedResource(null, SERVER));
 });
 
 test('authorization server metadata: discovery URLs, issuer match, PKCE and secure endpoints', () => {
-  assert.deepEqual(o.authServerMetadataUrls(AS), [`${AS}/.well-known/oauth-authorization-server`, `${AS}/.well-known/openid-configuration`]);
-  assert.deepEqual(o.authServerMetadataUrls(`${AS}/tenant1`), [`${AS}/.well-known/oauth-authorization-server/tenant1`, `${AS}/.well-known/openid-configuration/tenant1`, `${AS}/tenant1/.well-known/openid-configuration`]);
-  const good = { issuer: AS, authorization_endpoint: `${AS}/authorize`, token_endpoint: `${AS}/token`, registration_endpoint: `${AS}/register`, code_challenge_methods_supported: ['plain', 'S256'] };
-  assert.deepEqual(o.parseAuthServerMetadata(good, AS), { issuer: AS, authorizationEndpoint: `${AS}/authorize`, tokenEndpoint: `${AS}/token`, registrationEndpoint: `${AS}/register` });
+  assert.deepEqual(o.authServerMetadataUrls(AS), [
+    `${AS}/.well-known/oauth-authorization-server`,
+    `${AS}/.well-known/openid-configuration`,
+  ]);
+  assert.deepEqual(o.authServerMetadataUrls(`${AS}/tenant1`), [
+    `${AS}/.well-known/oauth-authorization-server/tenant1`,
+    `${AS}/.well-known/openid-configuration/tenant1`,
+    `${AS}/tenant1/.well-known/openid-configuration`,
+  ]);
+  const good = {
+    issuer: AS,
+    authorization_endpoint: `${AS}/authorize`,
+    token_endpoint: `${AS}/token`,
+    registration_endpoint: `${AS}/register`,
+    code_challenge_methods_supported: ['plain', 'S256'],
+  };
+  assert.deepEqual(o.parseAuthServerMetadata(good, AS), {
+    issuer: AS,
+    authorizationEndpoint: `${AS}/authorize`,
+    tokenEndpoint: `${AS}/token`,
+    registrationEndpoint: `${AS}/register`,
+  });
   assert.equal(o.parseAuthServerMetadata({ ...good, issuer: `${AS}/` }, AS).registrationEndpoint, `${AS}/register`);
-  assert.equal(o.parseAuthServerMetadata({ ...good, registration_endpoint: undefined }, AS).registrationEndpoint, undefined);
+  assert.equal(
+    o.parseAuthServerMetadata({ ...good, registration_endpoint: undefined }, AS).registrationEndpoint,
+    undefined,
+  );
   assert.throws(() => o.parseAuthServerMetadata({ ...good, issuer: 'https://evil.example' }, AS), /different issuer/);
-  assert.throws(() => o.parseAuthServerMetadata({ ...good, code_challenge_methods_supported: undefined }, AS), /PKCE with S256/);
-  assert.throws(() => o.parseAuthServerMetadata({ ...good, code_challenge_methods_supported: ['plain'] }, AS), /PKCE with S256/);
+  assert.throws(
+    () => o.parseAuthServerMetadata({ ...good, code_challenge_methods_supported: undefined }, AS),
+    /PKCE with S256/,
+  );
+  assert.throws(
+    () => o.parseAuthServerMetadata({ ...good, code_challenge_methods_supported: ['plain'] }, AS),
+    /PKCE with S256/,
+  );
   assert.throws(() => o.parseAuthServerMetadata({ ...good, token_endpoint: 'http://auth.example/token' }, AS), /https/);
-  assert.throws(() => o.parseAuthServerMetadata({ ...good, registration_endpoint: 'http://auth.example/r' }, AS), /https/);
-  assert.throws(() => o.parseAuthServerMetadata({ ...good, grant_types_supported: ['implicit'] }, AS), /authorization code/);
+  assert.throws(
+    () => o.parseAuthServerMetadata({ ...good, registration_endpoint: 'http://auth.example/r' }, AS),
+    /https/,
+  );
+  assert.throws(
+    () => o.parseAuthServerMetadata({ ...good, grant_types_supported: ['implicit'] }, AS),
+    /authorization code/,
+  );
   // A local authorization server may use http on loopback.
-  assert.equal(o.parseAuthServerMetadata({ ...good, issuer: 'http://localhost:9000', authorization_endpoint: 'http://localhost:9000/a', token_endpoint: 'http://localhost:9000/t' }, 'http://localhost:9000').tokenEndpoint, 'http://localhost:9000/t');
+  assert.equal(
+    o.parseAuthServerMetadata(
+      {
+        ...good,
+        issuer: 'http://localhost:9000',
+        authorization_endpoint: 'http://localhost:9000/a',
+        token_endpoint: 'http://localhost:9000/t',
+      },
+      'http://localhost:9000',
+    ).tokenEndpoint,
+    'http://localhost:9000/t',
+  );
 });
 
 test('PKCE S256 matches the RFC 7636 example; state and verifier are random and long enough', async () => {
-  assert.equal(await o.codeChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+  assert.equal(
+    await o.codeChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
+    'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+  );
   const a = await o.pkcePair();
   const b = await o.pkcePair();
   assert.notEqual(a.verifier, b.verifier);
   assert.match(a.verifier, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(await o.codeChallenge(a.verifier), a.challenge);
   assert.match(o.randomToken(24), /^[A-Za-z0-9_-]{32}$/);
-  assert.equal(o.randomToken(3, (x) => x.fill(255)), '____');
+  assert.equal(
+    o.randomToken(3, (x) => x.fill(255)),
+    '____',
+  );
 });
 
 test('authorization URL and request bodies', () => {
-  const u = new URL(o.buildAuthorizationUrl({ endpoint: `${AS}/authorize?tenant=1`, clientId: 'cid', redirectUri: o.redirectUri(5555), state: 'st', challenge: 'ch', resource: 'https://mcp.example/api/mcp', scope: 'a b' }));
+  const u = new URL(
+    o.buildAuthorizationUrl({
+      endpoint: `${AS}/authorize?tenant=1`,
+      clientId: 'cid',
+      redirectUri: o.redirectUri(5555),
+      state: 'st',
+      challenge: 'ch',
+      resource: 'https://mcp.example/api/mcp',
+      scope: 'a b',
+    }),
+  );
   assert.equal(u.origin + u.pathname, `${AS}/authorize`);
-  assert.deepEqual(Object.fromEntries(u.searchParams), { tenant: '1', response_type: 'code', client_id: 'cid', redirect_uri: 'http://127.0.0.1:5555/callback', state: 'st', code_challenge: 'ch', code_challenge_method: 'S256', resource: 'https://mcp.example/api/mcp', scope: 'a b' });
-  assert.ok(!new URL(o.buildAuthorizationUrl({ endpoint: `${AS}/a`, clientId: 'c', redirectUri: 'r', state: 's', challenge: 'c', resource: 'x' })).searchParams.has('scope'));
+  assert.deepEqual(Object.fromEntries(u.searchParams), {
+    tenant: '1',
+    response_type: 'code',
+    client_id: 'cid',
+    redirect_uri: 'http://127.0.0.1:5555/callback',
+    state: 'st',
+    code_challenge: 'ch',
+    code_challenge_method: 'S256',
+    resource: 'https://mcp.example/api/mcp',
+    scope: 'a b',
+  });
+  assert.ok(
+    !new URL(
+      o.buildAuthorizationUrl({
+        endpoint: `${AS}/a`,
+        clientId: 'c',
+        redirectUri: 'r',
+        state: 's',
+        challenge: 'c',
+        resource: 'x',
+      }),
+    ).searchParams.has('scope'),
+  );
   const reg = o.registrationBody('http://127.0.0.1:5555/callback');
   assert.deepEqual(reg.redirect_uris, ['http://127.0.0.1:5555/callback']);
   assert.equal(reg.token_endpoint_auth_method, 'none');
   assert.deepEqual(o.parseRegistration({ client_id: 'x', client_secret: 's' }), { clientId: 'x', clientSecret: 's' });
   assert.throws(() => o.parseRegistration({}), /no client_id/);
-  const code = new URLSearchParams(o.tokenRequestBody({ grant: 'authorization_code', code: 'c', redirectUri: 'http://127.0.0.1:1/callback', clientId: 'cid', verifier: 'v', resource: 'r' }));
-  assert.deepEqual(Object.fromEntries(code), { grant_type: 'authorization_code', code: 'c', redirect_uri: 'http://127.0.0.1:1/callback', code_verifier: 'v', client_id: 'cid', resource: 'r' });
-  const ref = new URLSearchParams(o.tokenRequestBody({ grant: 'refresh_token', refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs', resource: 'r' }));
-  assert.deepEqual(Object.fromEntries(ref), { grant_type: 'refresh_token', refresh_token: 'rt', client_id: 'cid', client_secret: 'cs', resource: 'r' });
+  const code = new URLSearchParams(
+    o.tokenRequestBody({
+      grant: 'authorization_code',
+      code: 'c',
+      redirectUri: 'http://127.0.0.1:1/callback',
+      clientId: 'cid',
+      verifier: 'v',
+      resource: 'r',
+    }),
+  );
+  assert.deepEqual(Object.fromEntries(code), {
+    grant_type: 'authorization_code',
+    code: 'c',
+    redirect_uri: 'http://127.0.0.1:1/callback',
+    code_verifier: 'v',
+    client_id: 'cid',
+    resource: 'r',
+  });
+  const ref = new URLSearchParams(
+    o.tokenRequestBody({
+      grant: 'refresh_token',
+      refreshToken: 'rt',
+      clientId: 'cid',
+      clientSecret: 'cs',
+      resource: 'r',
+    }),
+  );
+  assert.deepEqual(Object.fromEntries(ref), {
+    grant_type: 'refresh_token',
+    refresh_token: 'rt',
+    client_id: 'cid',
+    client_secret: 'cs',
+    resource: 'r',
+  });
 });
 
 test('token responses, stored tokens and the refresh policy', () => {
-  assert.deepEqual(o.parseTokenResponse({ access_token: 'at', token_type: 'Bearer', expires_in: 3600, refresh_token: 'rt', scope: 's' }, 1000), { accessToken: 'at', refreshToken: 'rt', expiresAt: 3_601_000, scope: 's' });
+  assert.deepEqual(
+    o.parseTokenResponse(
+      { access_token: 'at', token_type: 'Bearer', expires_in: 3600, refresh_token: 'rt', scope: 's' },
+      1000,
+    ),
+    { accessToken: 'at', refreshToken: 'rt', expiresAt: 3_601_000, scope: 's' },
+  );
   // A refresh response without a refresh token keeps the old one.
-  assert.equal(o.parseTokenResponse({ access_token: 'at2', token_type: 'bearer' }, 0, { refreshToken: 'old' }).refreshToken, 'old');
-  assert.equal(o.parseTokenResponse({ access_token: 'at', token_type: 'bearer', expires_in: '60' }, 0).expiresAt, 60_000);
+  assert.equal(
+    o.parseTokenResponse({ access_token: 'at2', token_type: 'bearer' }, 0, { refreshToken: 'old' }).refreshToken,
+    'old',
+  );
+  assert.equal(
+    o.parseTokenResponse({ access_token: 'at', token_type: 'bearer', expires_in: '60' }, 0).expiresAt,
+    60_000,
+  );
   assert.equal(o.parseTokenResponse({ access_token: 'at', token_type: 'bearer' }, 0).expiresAt, undefined);
   assert.throws(() => o.parseTokenResponse({ access_token: 'at', token_type: 'mac' }, 0), /unsupported token type/);
   assert.throws(() => o.parseTokenResponse({ token_type: 'bearer' }, 0), /no access token/);
@@ -106,7 +269,11 @@ test('token responses, stored tokens and the refresh policy', () => {
   const st = { accessToken: 'a', tokenEndpoint: `${AS}/token`, clientId: 'c', resource: 'r', issuer: AS };
   assert.deepEqual(o.parseStored(JSON.stringify(st)), st);
   assert.equal(o.parseStored('not json'), null);
-  assert.equal(o.parseStored(JSON.stringify({ ...st, tokenEndpoint: 'http://evil.example/token' })), null, 'a tampered insecure token endpoint is not used');
+  assert.equal(
+    o.parseStored(JSON.stringify({ ...st, tokenEndpoint: 'http://evil.example/token' })),
+    null,
+    'a tampered insecure token endpoint is not used',
+  );
   assert.equal(o.parseStored(null), null);
   // Refresh within a minute of expiry; expired without a refresh token needs a new sign-in; unknown expiry is used until a 401.
   assert.equal(o.tokenDecision({ expiresAt: 1_000_000, refreshToken: 'r' }, 0), 'use');
@@ -117,12 +284,19 @@ test('token responses, stored tokens and the refresh policy', () => {
 });
 
 test('config: oauth is validated, never stores tokens, and stale Keychain entries are found', () => {
-  const s = { ...cfg.blankServer('s1', 'http'), name: 'r', url: 'https://mcp.example/mcp', oauth: { clientId: 'cid', scope: 'a' } };
+  const s = {
+    ...cfg.blankServer('s1', 'http'),
+    name: 'r',
+    url: 'https://mcp.example/mcp',
+    oauth: { clientId: 'cid', scope: 'a' },
+  };
   assert.deepEqual(cfg.validateServer(s), []);
   assert.deepEqual(cfg.validateServer({ ...s, oauth: { clientId: 'x'.repeat(600) } }), ['oauth']);
   assert.deepEqual(cfg.validateServer({ ...s, oauth: { scope: 'a\nb' } }), ['oauth']);
   assert.equal(cfg.oauthSecretId('s1'), 'mcp:s1:oauth');
-  const round = cfg.normalizeConfig({ servers: [{ ...s, oauth: { clientId: ' cid ', scope: '', accessToken: 'LEAK' } }] }).servers[0];
+  const round = cfg.normalizeConfig({
+    servers: [{ ...s, oauth: { clientId: ' cid ', scope: '', accessToken: 'LEAK' } }],
+  }).servers[0];
   assert.deepEqual(round.oauth, { clientId: 'cid' });
   assert.deepEqual(cfg.staleSecretIds(s, s), []);
   assert.deepEqual(cfg.staleSecretIds(s, { ...s, oauth: { clientId: 'cid', scope: 'other' } }), []);
@@ -134,16 +308,32 @@ test('config: oauth is validated, never stores tokens, and stale Keychain entrie
 
 // ---- the flow against fakes ----------------------------------------------------------------------------------------
 
-const j = (obj, status = 200, headers = {}) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
+const j = (obj, status = 200, headers = {}) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
 
 /** A fake world: MCP server, authorization server, browser, loopback listener, Keychain and clock. */
 function world(over = {}) {
-  const log = { fetches: [], opened: [], loopbackStates: [], cancelled: [], registered: [], tokenBodies: [], revoked: [] };
+  const log = {
+    fetches: [],
+    opened: [],
+    loopbackStates: [],
+    cancelled: [],
+    registered: [],
+    tokenBodies: [],
+    revoked: [],
+  };
   const store = new Map();
   let clock = 1_000_000;
   let resolveCode;
   const codePromise = new Promise((r) => (resolveCode = r));
-  const meta = { issuer: AS, authorization_endpoint: `${AS}/authorize`, token_endpoint: `${AS}/token`, registration_endpoint: `${AS}/register`, code_challenge_methods_supported: ['S256'], ...over.meta };
+  const meta = {
+    issuer: AS,
+    authorization_endpoint: `${AS}/authorize`,
+    token_endpoint: `${AS}/token`,
+    registration_endpoint: `${AS}/register`,
+    code_challenge_methods_supported: ['S256'],
+    ...over.meta,
+  };
   const fetch = async (url, init) => {
     log.fetches.push({ url, method: init.method });
     if (over.hook) {
@@ -155,8 +345,17 @@ function world(over = {}) {
       log.revoked.push(body);
       return over.revoke ? over.revoke(body) : new Response('', { status: 200 });
     }
-    if (url === SERVER) return over.probe ? over.probe() : new Response('', { status: 401, headers: { 'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp", scope="read"` } });
-    if (url === 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp') return over.prm ? over.prm() : j({ resource: 'https://mcp.example/api/mcp', authorization_servers: [AS] });
+    if (url === SERVER)
+      return over.probe
+        ? over.probe()
+        : new Response('', {
+            status: 401,
+            headers: {
+              'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp", scope="read"`,
+            },
+          });
+    if (url === 'https://mcp.example/.well-known/oauth-protected-resource/api/mcp')
+      return over.prm ? over.prm() : j({ resource: 'https://mcp.example/api/mcp', authorization_servers: [AS] });
     if (url === `${AS}/.well-known/oauth-authorization-server`) return over.asm ? over.asm() : j(meta);
     if (url === `${AS}/register`) {
       const body = JSON.parse(init.body);
@@ -167,7 +366,8 @@ function world(over = {}) {
       const body = Object.fromEntries(new URLSearchParams(init.body));
       log.tokenBodies.push(body);
       if (over.token) return over.token(body);
-      if (body.grant_type === 'authorization_code') return j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'RT1' });
+      if (body.grant_type === 'authorization_code')
+        return j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'RT1' });
       return j({ access_token: 'AT2', token_type: 'Bearer', expires_in: 3600 });
     }
     return new Response('', { status: 404 });
@@ -185,7 +385,11 @@ function world(over = {}) {
       wait: async () => codePromise,
       cancel: async (id) => void log.cancelled.push(id),
     },
-    store: { get: async (id) => store.get(id) ?? null, set: async (id, v) => void store.set(id, v), delete: async (id) => void store.delete(id) },
+    store: {
+      get: async (id) => store.get(id) ?? null,
+      set: async (id, v) => void store.set(id, v),
+      delete: async (id) => void store.delete(id),
+    },
     now: () => clock,
   };
   return { deps, log, store, tick: (ms) => (clock += ms) };
@@ -212,7 +416,16 @@ test('sign-in: discovery, dynamic registration, PKCE authorization URL, code exc
   assert.equal(tb.redirect_uri, q.redirect_uri, 'exact redirect URI on the exchange');
   assert.equal(await o.codeChallenge(tb.code_verifier), q.code_challenge, 'the verifier belongs to the challenge');
   const stored = o.parseStored(w.store.get('mcp:s1:oauth'));
-  assert.deepEqual(stored, { accessToken: 'AT1', refreshToken: 'RT1', expiresAt: 4_600_000, tokenEndpoint: `${AS}/token`, clientId: 'dyn-client', resource: 'https://mcp.example/api/mcp', issuer: AS, scope: 'read' });
+  assert.deepEqual(stored, {
+    accessToken: 'AT1',
+    refreshToken: 'RT1',
+    expiresAt: 4_600_000,
+    tokenEndpoint: `${AS}/token`,
+    clientId: 'dyn-client',
+    resource: 'https://mcp.example/api/mcp',
+    issuer: AS,
+    scope: 'read',
+  });
   assert.deepEqual(w.log.cancelled, [], 'a finished sign-in leaves nothing to cancel');
   assert.equal(await flow.authorizationHeader(w.deps, 'mcp:s1:oauth'), 'Bearer AT1');
   assert.equal(await flow.isSignedIn(w.deps, 'mcp:s1:oauth'), true);
@@ -237,7 +450,10 @@ test('sign-in with a configured client id skips registration; no registration en
 const ORIGIN = 'https://mcp.example';
 const notFound = () => new Response('', { status: 404 });
 /** No RFC 9728 document anywhere (the world's own PRM answers 404 and the challenge carries no hint). */
-const noPrm = { prm: notFound, probe: () => new Response('', { status: 401, headers: { 'www-authenticate': 'Bearer realm="x"' } }) };
+const noPrm = {
+  prm: notFound,
+  probe: () => new Response('', { status: 401, headers: { 'www-authenticate': 'Bearer realm="x"' } }),
+};
 
 test('discovery path 1: protected resource metadata, then the authorization server metadata (2025-06-18)', async () => {
   const w = world();
@@ -248,13 +464,20 @@ test('discovery path 1: protected resource metadata, then the authorization serv
 });
 
 test('discovery path 2: no protected resource metadata, legacy /.well-known/oauth-authorization-server on the server origin (2025-03-26)', async () => {
-  const meta = { issuer: ORIGIN, authorization_endpoint: `${ORIGIN}/oauth/authz`, token_endpoint: `${ORIGIN}/oauth/tok`, registration_endpoint: `${ORIGIN}/oauth/reg`, code_challenge_methods_supported: ['S256'] };
+  const meta = {
+    issuer: ORIGIN,
+    authorization_endpoint: `${ORIGIN}/oauth/authz`,
+    token_endpoint: `${ORIGIN}/oauth/tok`,
+    registration_endpoint: `${ORIGIN}/oauth/reg`,
+    code_challenge_methods_supported: ['S256'],
+  };
   const w = world({
     ...noPrm,
     hook: (url, init) => {
       if (url === `${ORIGIN}/.well-known/oauth-authorization-server`) return j(meta);
       if (url === `${ORIGIN}/oauth/reg`) return j({ client_id: 'legacy-client' }, 201);
-      if (url === `${ORIGIN}/oauth/tok`) return j({ access_token: 'LAT', token_type: 'Bearer', expires_in: 60, refresh_token: 'LRT' });
+      if (url === `${ORIGIN}/oauth/tok`)
+        return j({ access_token: 'LAT', token_type: 'Bearer', expires_in: 60, refresh_token: 'LRT' });
     },
   });
   let via;
@@ -268,9 +491,21 @@ test('discovery path 2: no protected resource metadata, legacy /.well-known/oaut
   assert.equal(q.resource, 'https://mcp.example/api/mcp', 'the resource parameter is unchanged');
   assert.equal(o.parseStored(w.store.get('mcp:s1:oauth')).tokenEndpoint, `${ORIGIN}/oauth/tok`);
   // Found but invalid legacy metadata is an error, never a reason to guess the default endpoints.
-  const bad = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? j({ ...meta, issuer: 'https://evil.example' }) : undefined) });
+  const bad = world({
+    ...noPrm,
+    hook: (url) =>
+      url === `${ORIGIN}/.well-known/oauth-authorization-server`
+        ? j({ ...meta, issuer: 'https://evil.example' })
+        : undefined,
+  });
   await assert.rejects(flow.signIn(bad.deps, opts()), (e) => e.code === 'issuer_mismatch');
-  const nopkce = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? j({ ...meta, code_challenge_methods_supported: undefined }) : undefined) });
+  const nopkce = world({
+    ...noPrm,
+    hook: (url) =>
+      url === `${ORIGIN}/.well-known/oauth-authorization-server`
+        ? j({ ...meta, code_challenge_methods_supported: undefined })
+        : undefined,
+  });
   await assert.rejects(flow.signIn(nopkce.deps, opts()), (e) => e.code === 'no_pkce');
   assert.ok(!nopkce.log.fetches.some((f) => f.url === `${ORIGIN}/register`));
 });
@@ -296,8 +531,16 @@ test('discovery path 3: no metadata at all (every lookup 404), the default /auth
   assert.equal(via, 'default_endpoints');
   assert.deepEqual(phases, ['discovering', 'registering', 'browser', 'exchanging']);
   // Every metadata location was tried before the defaults were used.
-  for (const url of [`${ORIGIN}/.well-known/oauth-protected-resource/api/mcp`, `${ORIGIN}/.well-known/oauth-protected-resource`, `${ORIGIN}/.well-known/oauth-authorization-server`, `${ORIGIN}/.well-known/openid-configuration`])
-    assert.ok(w.log.fetches.some((f) => f.url === url), url);
+  for (const url of [
+    `${ORIGIN}/.well-known/oauth-protected-resource/api/mcp`,
+    `${ORIGIN}/.well-known/oauth-protected-resource`,
+    `${ORIGIN}/.well-known/oauth-authorization-server`,
+    `${ORIGIN}/.well-known/openid-configuration`,
+  ])
+    assert.ok(
+      w.log.fetches.some((f) => f.url === url),
+      url,
+    );
   const u = new URL(w.log.opened[0]);
   assert.equal(u.origin + u.pathname, `${ORIGIN}/authorize`);
   const q = Object.fromEntries(u.searchParams);
@@ -322,15 +565,33 @@ test('discovery path 3: no metadata at all (every lookup 404), the default /auth
 test('discovery path 4: nothing works, clear error codes', async () => {
   // Defaults used but the server has no /register: a message that says what was tried and what to do.
   const w = world({ ...noPrm });
-  await assert.rejects(flow.signIn(w.deps, opts()), (e) => e.code === 'registration_failed' && /no OAuth metadata/.test(e.message) && /https:\/\/mcp\.example\/register/.test(e.message) && /client ID/.test(e.message));
+  await assert.rejects(
+    flow.signIn(w.deps, opts()),
+    (e) =>
+      e.code === 'registration_failed' &&
+      /no OAuth metadata/.test(e.message) &&
+      /https:\/\/mcp\.example\/register/.test(e.message) &&
+      /client ID/.test(e.message),
+  );
   assert.deepEqual(w.log.cancelled, ['lb1']);
   assert.equal(w.store.size, 0);
   // Metadata lookups that fail with something other than 404 end discovery: no guessing endpoints.
-  const flaky = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/oauth-authorization-server` ? new Response('', { status: 503 }) : undefined) });
-  await assert.rejects(flow.signIn(flaky.deps, opts()), (e) => e.code === 'discovery_failed' && /could not be read/.test(e.message));
+  const flaky = world({
+    ...noPrm,
+    hook: (url) =>
+      url === `${ORIGIN}/.well-known/oauth-authorization-server` ? new Response('', { status: 503 }) : undefined,
+  });
+  await assert.rejects(
+    flow.signIn(flaky.deps, opts()),
+    (e) => e.code === 'discovery_failed' && /could not be read/.test(e.message),
+  );
   assert.deepEqual(flaky.log.loopbackStates, [], 'nothing was opened before discovery succeeded');
   assert.ok(!flaky.log.fetches.some((f) => f.url === `${ORIGIN}/register`));
-  const junk = world({ ...noPrm, hook: (url) => (url === `${ORIGIN}/.well-known/openid-configuration` ? new Response('<html>', { status: 200 }) : undefined) });
+  const junk = world({
+    ...noPrm,
+    hook: (url) =>
+      url === `${ORIGIN}/.well-known/openid-configuration` ? new Response('<html>', { status: 200 }) : undefined,
+  });
   await assert.rejects(flow.signIn(junk.deps, opts()), (e) => e.code === 'discovery_failed');
   const down = world({
     ...noPrm,
@@ -344,17 +605,28 @@ test('discovery path 4: nothing works, clear error codes', async () => {
   await assert.rejects(flow.signIn(hinted.deps, opts()), (e) => e.code === 'discovery_failed');
   // A protected resource names an authorization server without metadata: no_metadata, never the defaults of the MCP origin.
   const noAs = world({ asm: notFound });
-  await assert.rejects(flow.signIn(noAs.deps, opts()), (e) => e.code === 'no_metadata' && /publishes no metadata/.test(e.message));
+  await assert.rejects(
+    flow.signIn(noAs.deps, opts()),
+    (e) => e.code === 'no_metadata' && /publishes no metadata/.test(e.message),
+  );
   assert.ok(!noAs.log.fetches.some((f) => f.url === `${ORIGIN}/authorize` || f.url === `${ORIGIN}/register`));
 });
 
 test('discovery fallback never weakens the endpoint rules', async () => {
   // Plain http to a non-loopback server is refused before any request.
   const w = world();
-  await assert.rejects(flow.signIn(w.deps, { serverUrl: 'http://mcp.example/mcp', secretId: 'x' }), (e) => e.code === 'insecure_endpoint');
+  await assert.rejects(
+    flow.signIn(w.deps, { serverUrl: 'http://mcp.example/mcp', secretId: 'x' }),
+    (e) => e.code === 'insecure_endpoint',
+  );
   assert.equal(w.log.fetches.length, 0);
   assert.throws(() => o.defaultAuthServer('http://mcp.example/mcp'), /https/);
-  assert.deepEqual(o.defaultAuthServer('https://mcp.example:8443/a/b?q=1'), { issuer: 'https://mcp.example:8443', authorizationEndpoint: 'https://mcp.example:8443/authorize', tokenEndpoint: 'https://mcp.example:8443/token', registrationEndpoint: 'https://mcp.example:8443/register' });
+  assert.deepEqual(o.defaultAuthServer('https://mcp.example:8443/a/b?q=1'), {
+    issuer: 'https://mcp.example:8443',
+    authorizationEndpoint: 'https://mcp.example:8443/authorize',
+    tokenEndpoint: 'https://mcp.example:8443/token',
+    registrationEndpoint: 'https://mcp.example:8443/register',
+  });
   // A local development server may use http on loopback, defaults included.
   assert.equal(o.defaultAuthServer('http://localhost:3000/mcp').tokenEndpoint, 'http://localhost:3000/token');
 });
@@ -367,7 +639,12 @@ test('a legacy SSE server that answers the probe POST with 405 gets its challeng
     hook: (url, init) => {
       if (url === SERVER && init.method === 'GET') {
         seen.push(init.headers.Accept);
-        return new Response('', { status: 401, headers: { 'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp"` } });
+        return new Response('', {
+          status: 401,
+          headers: {
+            'www-authenticate': `Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource/api/mcp"`,
+          },
+        });
       }
     },
   });
@@ -379,14 +656,40 @@ test('a legacy SSE server that answers the probe POST with 405 gets its challeng
 // ---- revocation (RFC 7009) -----------------------------------------------------------------------------------------
 
 test('revocation endpoint: parsed leniently from the metadata and stored with the tokens', () => {
-  const good = { issuer: AS, authorization_endpoint: `${AS}/authorize`, token_endpoint: `${AS}/token`, code_challenge_methods_supported: ['S256'] };
-  assert.equal(o.parseAuthServerMetadata({ ...good, revocation_endpoint: `${AS}/revoke` }, AS).revocationEndpoint, `${AS}/revoke`);
-  assert.equal(o.parseAuthServerMetadata({ ...good, revocation_endpoint: 'http://auth.example/revoke' }, AS).revocationEndpoint, undefined, 'an insecure revocation endpoint is ignored, not fatal');
+  const good = {
+    issuer: AS,
+    authorization_endpoint: `${AS}/authorize`,
+    token_endpoint: `${AS}/token`,
+    code_challenge_methods_supported: ['S256'],
+  };
+  assert.equal(
+    o.parseAuthServerMetadata({ ...good, revocation_endpoint: `${AS}/revoke` }, AS).revocationEndpoint,
+    `${AS}/revoke`,
+  );
+  assert.equal(
+    o.parseAuthServerMetadata({ ...good, revocation_endpoint: 'http://auth.example/revoke' }, AS).revocationEndpoint,
+    undefined,
+    'an insecure revocation endpoint is ignored, not fatal',
+  );
   assert.equal(o.parseAuthServerMetadata(good, AS).revocationEndpoint, undefined);
-  const st = { accessToken: 'a', tokenEndpoint: `${AS}/token`, clientId: 'c', resource: 'r', issuer: AS, revocationEndpoint: `${AS}/revoke` };
+  const st = {
+    accessToken: 'a',
+    tokenEndpoint: `${AS}/token`,
+    clientId: 'c',
+    resource: 'r',
+    issuer: AS,
+    revocationEndpoint: `${AS}/revoke`,
+  };
   assert.deepEqual(o.parseStored(JSON.stringify(st)), st);
-  assert.equal(o.parseStored(JSON.stringify({ ...st, revocationEndpoint: 'http://evil.example/r' })).revocationEndpoint, undefined, 'a tampered insecure endpoint is dropped');
-  assert.deepEqual(Object.fromEntries(new URLSearchParams(o.revocationRequestBody('T', 'refresh_token', 'cid', 'sec'))), { token: 'T', token_type_hint: 'refresh_token', client_id: 'cid', client_secret: 'sec' });
+  assert.equal(
+    o.parseStored(JSON.stringify({ ...st, revocationEndpoint: 'http://evil.example/r' })).revocationEndpoint,
+    undefined,
+    'a tampered insecure endpoint is dropped',
+  );
+  assert.deepEqual(
+    Object.fromEntries(new URLSearchParams(o.revocationRequestBody('T', 'refresh_token', 'cid', 'sec'))),
+    { token: 'T', token_type_hint: 'refresh_token', client_id: 'cid', client_secret: 'sec' },
+  );
 });
 
 const revMeta = { revocation_endpoint: `${AS}/revoke` };
@@ -432,7 +735,10 @@ test('a failing, hanging or erroring revocation never blocks the local sign-out'
   const hang = await signedIn({ meta: revMeta });
   hang.deps.revokeTimeoutMs = 100;
   const inner2 = hang.deps.fetch;
-  hang.deps.fetch = (url, init) => (url === `${AS}/revoke` ? new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new Error('aborted')))) : inner2(url, init));
+  hang.deps.fetch = (url, init) =>
+    url === `${AS}/revoke`
+      ? new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new Error('aborted'))))
+      : inner2(url, init);
   const t0 = Date.now();
   const r = await flow.signOut(hang.deps, 'mcp:s1:oauth');
   assert.equal(r.revoked, 0);
@@ -450,12 +756,33 @@ test('revocation requests carry no tokens in URLs and use the stored client secr
 });
 
 test('sign-in refuses insecure or inconsistent authorization servers and servers that need no sign-in', async () => {
-  await assert.rejects(flow.signIn(world({ meta: { code_challenge_methods_supported: undefined } }).deps, opts()), /PKCE/);
-  await assert.rejects(flow.signIn(world({ meta: { token_endpoint: 'http://auth.example/token' } }).deps, opts()), /https/);
-  await assert.rejects(flow.signIn(world({ meta: { issuer: 'https://evil.example' } }).deps, opts()), /different issuer/);
-  await assert.rejects(flow.signIn(world({ prm: () => j({ resource: 'https://evil.example', authorization_servers: [AS] }) }).deps, opts()), /does not describe this server/);
-  await assert.rejects(flow.signIn(world({ probe: () => j({ ok: true }) }).deps, opts()), /did not ask for authorization/);
-  const w = world({ meta: { token_endpoint: 'https://auth.example/token' }, token: () => j({ error: 'invalid_grant', error_description: 'nope' }, 400) });
+  await assert.rejects(
+    flow.signIn(world({ meta: { code_challenge_methods_supported: undefined } }).deps, opts()),
+    /PKCE/,
+  );
+  await assert.rejects(
+    flow.signIn(world({ meta: { token_endpoint: 'http://auth.example/token' } }).deps, opts()),
+    /https/,
+  );
+  await assert.rejects(
+    flow.signIn(world({ meta: { issuer: 'https://evil.example' } }).deps, opts()),
+    /different issuer/,
+  );
+  await assert.rejects(
+    flow.signIn(
+      world({ prm: () => j({ resource: 'https://evil.example', authorization_servers: [AS] }) }).deps,
+      opts(),
+    ),
+    /does not describe this server/,
+  );
+  await assert.rejects(
+    flow.signIn(world({ probe: () => j({ ok: true }) }).deps, opts()),
+    /did not ask for authorization/,
+  );
+  const w = world({
+    meta: { token_endpoint: 'https://auth.example/token' },
+    token: () => j({ error: 'invalid_grant', error_description: 'nope' }, 400),
+  });
   await assert.rejects(flow.signIn(w.deps, opts()), /invalid_grant: nope/);
   assert.equal(w.store.size, 0);
 });
@@ -498,23 +825,42 @@ test('refresh: proactive before expiry, rotating tokens kept, concurrent calls s
   const w = await signedIn();
   assert.equal(await flow.authorizationHeader(w.deps, 'mcp:s1:oauth'), 'Bearer AT1');
   w.tick(3_560_000); // 40 s before expiry: inside the 60 s skew
-  const [a, b] = await Promise.all([flow.authorizationHeader(w.deps, 'mcp:s1:oauth'), flow.authorizationHeader(w.deps, 'mcp:s1:oauth')]);
+  const [a, b] = await Promise.all([
+    flow.authorizationHeader(w.deps, 'mcp:s1:oauth'),
+    flow.authorizationHeader(w.deps, 'mcp:s1:oauth'),
+  ]);
   assert.deepEqual([a, b], ['Bearer AT2', 'Bearer AT2']);
   const refreshes = w.log.tokenBodies.filter((t) => t.grant_type === 'refresh_token');
   assert.equal(refreshes.length, 1);
-  assert.deepEqual(refreshes[0], { grant_type: 'refresh_token', refresh_token: 'RT1', scope: 'read', client_id: 'dyn-client', resource: 'https://mcp.example/api/mcp' });
+  assert.deepEqual(refreshes[0], {
+    grant_type: 'refresh_token',
+    refresh_token: 'RT1',
+    scope: 'read',
+    client_id: 'dyn-client',
+    resource: 'https://mcp.example/api/mcp',
+  });
   const stored = o.parseStored(w.store.get('mcp:s1:oauth'));
   assert.equal(stored.refreshToken, 'RT1', 'the old refresh token is kept when the server sends none');
   assert.equal(stored.accessToken, 'AT2');
 });
 
 test('refresh failures: invalid_grant clears the tokens, network errors keep them', async () => {
-  const w = await signedIn({ token: (b) => (b.grant_type === 'authorization_code' ? j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT1' }) : j({ error: 'invalid_grant' }, 400)) });
+  const w = await signedIn({
+    token: (b) =>
+      b.grant_type === 'authorization_code'
+        ? j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT1' })
+        : j({ error: 'invalid_grant' }, 400),
+  });
   w.tick(20_000);
   await assert.rejects(flow.authorizationHeader(w.deps, 'mcp:s1:oauth'), new RegExp(o.SIGN_IN_NEEDED));
   assert.equal(w.store.size, 0);
   assert.equal(await flow.refreshTokens(w.deps, 'mcp:s1:oauth'), false, 'nothing to refresh after sign-out');
-  const w2 = await signedIn({ token: (b) => (b.grant_type === 'authorization_code' ? j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT1' }) : j({ error: 'temporarily_unavailable' }, 503)) });
+  const w2 = await signedIn({
+    token: (b) =>
+      b.grant_type === 'authorization_code'
+        ? j({ access_token: 'AT1', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT1' })
+        : j({ error: 'temporarily_unavailable' }, 503),
+  });
   w2.tick(20_000);
   await assert.rejects(flow.refreshTokens(w2.deps, 'mcp:s1:oauth'), /temporarily_unavailable/);
   assert.equal(w2.store.size, 1, 'tokens survive a transient failure');
@@ -526,7 +872,12 @@ test('refresh failures: invalid_grant clears the tokens, network errors keep the
 });
 
 test('tokens never appear in errors or in anything the flow logs', async () => {
-  const w = await signedIn({ token: (b) => (b.grant_type === 'authorization_code' ? j({ access_token: 'AT-SECRET', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT-SECRET' }) : j({ error: 'invalid_grant', error_description: 'echo RT-SECRET' }, 400)) });
+  const w = await signedIn({
+    token: (b) =>
+      b.grant_type === 'authorization_code'
+        ? j({ access_token: 'AT-SECRET', token_type: 'Bearer', expires_in: 10, refresh_token: 'RT-SECRET' })
+        : j({ error: 'invalid_grant', error_description: 'echo RT-SECRET' }, 400),
+  });
   w.tick(20_000);
   try {
     await flow.authorizationHeader(w.deps, 'mcp:s1:oauth');

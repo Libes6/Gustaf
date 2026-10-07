@@ -26,7 +26,13 @@ export type ExportedChat = {
   messages: ExportedMessage[];
 };
 // `app` names the exporting app; import does not check it (older files carry the previous app name).
-export type ChatBundle = { format: typeof EXPORT_FORMAT; version: number; app: string; exportedAt: string; chats: ExportedChat[] };
+export type ChatBundle = {
+  format: typeof EXPORT_FORMAT;
+  version: number;
+  app: string;
+  exportedAt: string;
+  chats: ExportedChat[];
+};
 
 /** Rows as the app stores them (see `Chat`, `Project` and `StoredMsg` in lib/data.ts). */
 export type ExportSource = {
@@ -64,7 +70,8 @@ const URL_CREDENTIALS = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gi;
 const ASSIGNMENT =
   /((?:api[_-]?key|apikey|secret|token(?!s)|passw(?:or)?d|passwd|authorization|credentials?|private[_-]?key|access[_-]?key)[\w-]*["']?\s*[:=]\s*["']?)(?![\w.$-]*\()((?:(?:Bearer|Basic|Token)\s+)?[^\s"'`,;&)}\]]{6,})/gi;
 const NOT_A_SECRET = /^(?:string|number|boolean|undefined|null|true|false|none|required|optional|any|object|unknown)$/i;
-const SENSITIVE_KEY = /(?:api[_-]?key|secret|token|passw(?:or)?d|passwd|authorization|credentials?|private[_-]?key|access[_-]?key)$/i;
+const SENSITIVE_KEY =
+  /(?:api[_-]?key|secret|token|passw(?:or)?d|passwd|authorization|credentials?|private[_-]?key|access[_-]?key)$/i;
 
 export function redactSecrets(text: string): string {
   let out = text;
@@ -83,7 +90,8 @@ export function redactValue<T>(value: T, depth = 0): T {
   if (Array.isArray(value)) return value.map((x) => redactValue(x, depth + 1)) as T;
   if (rec(value)) {
     const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(value)) if (k !== "__proto__") out[k] = str(v) && v && SENSITIVE_KEY.test(k) ? REDACTED : redactValue(v, depth + 1);
+    for (const [k, v] of Object.entries(value))
+      if (k !== "__proto__") out[k] = str(v) && v && SENSITIVE_KEY.test(k) ? REDACTED : redactValue(v, depth + 1);
     return out as T;
   }
   return value;
@@ -108,7 +116,12 @@ function cleanPart(raw: unknown, o: CleanOptions): Part | null {
       return o.images ? { type: "image", data: raw.data } : { type: "text", text: IMAGE_OMITTED };
     case "tool_call": {
       if (!str(raw.id) || !str(raw.name)) return null;
-      const part: Extract<Part, { type: "tool_call" }> = { type: "tool_call", id: raw.id, name: raw.name, args: v(raw.args ?? {}) };
+      const part: Extract<Part, { type: "tool_call" }> = {
+        type: "tool_call",
+        id: raw.id,
+        name: raw.name,
+        args: v(raw.args ?? {}),
+      };
       if (rec(raw.computer) && Array.isArray(raw.computer.actions)) {
         part.computer = v({
           actions: raw.computer.actions,
@@ -151,7 +164,13 @@ function cleanUsage(raw: unknown): TokenUsage | undefined {
   if (!rec(raw)) return undefined;
   const keys = ["input", "output", "cached", "cacheWrite", "reasoning"] as const;
   if (!keys.every((k) => num(raw[k]) && raw[k] >= 0)) return undefined;
-  return { input: raw.input, output: raw.output, cached: raw.cached, cacheWrite: raw.cacheWrite, reasoning: raw.reasoning };
+  return {
+    input: raw.input,
+    output: raw.output,
+    cached: raw.cached,
+    cacheWrite: raw.cacheWrite,
+    reasoning: raw.reasoning,
+  };
 }
 
 function cleanMeta(raw: unknown): Meta | undefined {
@@ -168,7 +187,12 @@ function cleanMeta(raw: unknown): Meta | undefined {
 }
 
 function cleanMessage(raw: unknown, o: CleanOptions): ExportedMessage | null {
-  if (!rec(raw) || !(raw.role === "user" || raw.role === "assistant" || raw.role === "tool") || !Array.isArray(raw.parts)) return null;
+  if (
+    !rec(raw) ||
+    !(raw.role === "user" || raw.role === "assistant" || raw.role === "tool") ||
+    !Array.isArray(raw.parts)
+  )
+    return null;
   const parts = raw.parts.map((p: unknown) => cleanPart(p, o)).filter((p: Part | null): p is Part => p !== null);
   if (!parts.length) return null;
   const message: ExportedMessage = { role: raw.role, parts };
@@ -183,7 +207,10 @@ function cleanMessage(raw: unknown, o: CleanOptions): ExportedMessage | null {
 // JSON
 
 /** `redact: false` is only for counting what redaction changes (the share dialog); never write such a bundle out. */
-export function buildBundle(sources: ExportSource[], options: { includeImages?: boolean; now?: number; redact?: boolean } = {}): ChatBundle {
+export function buildBundle(
+  sources: ExportSource[],
+  options: { includeImages?: boolean; now?: number; redact?: boolean } = {},
+): ChatBundle {
   const o: CleanOptions = { redact: options.redact !== false, images: options.includeImages === true };
   const s = (x: string) => (o.redact ? redactSecrets(x) : x);
   const chats = sources.map(({ chat, project, messages }): ExportedChat => {
@@ -197,7 +224,13 @@ export function buildBundle(sources: ExportSource[], options: { includeImages?: 
     const updatedAt = ts(chat.updated_at);
     return { ...exported, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {}) };
   });
-  return { format: EXPORT_FORMAT, version: EXPORT_VERSION, app: "Gustaf", exportedAt: new Date(options.now ?? Date.now()).toISOString(), chats };
+  return {
+    format: EXPORT_FORMAT,
+    version: EXPORT_VERSION,
+    app: "Gustaf",
+    exportedAt: new Date(options.now ?? Date.now()).toISOString(),
+    chats,
+  };
 }
 
 export const toJson = (bundle: ChatBundle) => `${JSON.stringify(bundle, null, 2)}\n`;
@@ -224,7 +257,10 @@ function cleanChat(raw: unknown): ExportedChat | null {
     archived: raw.archived === true,
     project:
       rec(raw.project) && str(raw.project.name) && raw.project.name.trim()
-        ? { name: raw.project.name.trim().slice(0, 200), path: str(raw.project.path) && raw.project.path ? raw.project.path : null }
+        ? {
+            name: raw.project.name.trim().slice(0, 200),
+            path: str(raw.project.path) && raw.project.path ? raw.project.path : null,
+          }
         : null,
     messages,
   };
@@ -243,9 +279,17 @@ export function parseBundle(text: string): ChatBundle {
   } catch {
     throw new ImportError("invalid_json");
   }
-  if (!rec(raw) || (raw.format !== EXPORT_FORMAT && raw.format !== LEGACY_EXPORT_FORMAT) || !Number.isInteger(raw.version) || raw.version < 1) throw new ImportError("not_export");
+  if (
+    !rec(raw) ||
+    (raw.format !== EXPORT_FORMAT && raw.format !== LEGACY_EXPORT_FORMAT) ||
+    !Number.isInteger(raw.version) ||
+    raw.version < 1
+  )
+    throw new ImportError("not_export");
   if (raw.version > EXPORT_VERSION) throw new ImportError("unsupported_version");
-  const chats = (Array.isArray(raw.chats) ? raw.chats : []).map(cleanChat).filter((c: ExportedChat | null): c is ExportedChat => c !== null);
+  const chats = (Array.isArray(raw.chats) ? raw.chats : [])
+    .map(cleanChat)
+    .filter((c: ExportedChat | null): c is ExportedChat => c !== null);
   if (!chats.length) throw new ImportError("empty");
   return {
     format: EXPORT_FORMAT,
@@ -308,7 +352,10 @@ export async function importBundle(
     const stamps: { id: number; createdAt?: number }[] = [];
     try {
       for (const m of chat.messages) {
-        stamps.push({ id: await store.addMessage(id, { role: m.role, parts: m.parts, meta: m.meta }), createdAt: m.createdAt });
+        stamps.push({
+          id: await store.addMessage(id, { role: m.role, parts: m.parts, meta: m.meta }),
+          createdAt: m.createdAt,
+        });
       }
       await store.stamp(id, chat, stamps);
     } catch (e) {
@@ -398,11 +445,15 @@ function callBody(args: unknown, computer: Extract<Part, { type: "tool_call" }>[
     return [
       computer.actions
         .map((x: any) =>
-          x.type === "type" ? `- type ${JSON.stringify(String(x.text ?? "").slice(0, 200))}` :
-          x.type === "keypress" ? `- keypress ${Array.isArray(x.keys) ? x.keys.join("+") : ""}` :
-          x.type === "drag" ? `- drag (${Array.isArray(x.path) ? x.path.length : 0} points)` :
-          x.type === "open_app" ? `- open_app ${JSON.stringify(String(x.name ?? "").slice(0, 80))}` :
-          `- ${x.type}${num(x.x) && num(x.y) ? ` ${x.x},${x.y}` : ""}`,
+          x.type === "type"
+            ? `- type ${JSON.stringify(String(x.text ?? "").slice(0, 200))}`
+            : x.type === "keypress"
+              ? `- keypress ${Array.isArray(x.keys) ? x.keys.join("+") : ""}`
+              : x.type === "drag"
+                ? `- drag (${Array.isArray(x.path) ? x.path.length : 0} points)`
+                : x.type === "open_app"
+                  ? `- open_app ${JSON.stringify(String(x.name ?? "").slice(0, 80))}`
+                  : `- ${x.type}${num(x.x) && num(x.y) ? ` ${x.x},${x.y}` : ""}`,
         )
         .join("\n"),
     ];
@@ -478,7 +529,8 @@ function renderChat(chat: ExportedChat, level: number, L: MdLabels): { head: str
   for (const m of chat.messages) {
     // Tool messages continue the assistant turn that requested them, so they get no heading of their own.
     if (m.role === "user") body.push(`${h(level + 1)} ${L.user}`);
-    else if (m.role === "assistant") body.push(`${h(level + 1)} ${L.assistant}${m.meta?.model ? ` (${m.meta.model})` : ""}`);
+    else if (m.role === "assistant")
+      body.push(`${h(level + 1)} ${L.assistant}${m.meta?.model ? ` (${m.meta.model})` : ""}`);
     for (const p of partsInDisplayOrder(m.role, m.parts)) body.push(...renderPart(p, L));
   }
   return { head, body };
@@ -517,6 +569,7 @@ export function exportFileName(format: ExportFormat, titles: string[], now = Dat
       .slice(0, 60)
       .join("")
       .replace(/-+$/, "");
-  const base = titles.length === 1 ? clean(titles[0]) || "chat" : `gustaf-chats-${new Date(now).toISOString().slice(0, 10)}`;
+  const base =
+    titles.length === 1 ? clean(titles[0]) || "chat" : `gustaf-chats-${new Date(now).toISOString().slice(0, 10)}`;
   return `${base}.${ext}`;
 }

@@ -5,7 +5,9 @@ use crate::legacy::{IDENTIFIER as SERVICE, OLD_IDENTIFIER as OLD_SERVICE};
 
 #[cfg(target_os = "macos")]
 mod backend {
-    use security_framework::passwords::{delete_generic_password, get_generic_password, set_generic_password};
+    use security_framework::passwords::{
+        delete_generic_password, get_generic_password, set_generic_password,
+    };
 
     /// errSecItemNotFound (Security.framework).
     const ITEM_NOT_FOUND: i32 = -25300;
@@ -36,7 +38,9 @@ mod backend {
     }
 
     pub fn set(service: &str, id: &str, value: &str) -> Result<(), String> {
-        entry(service, id)?.set_password(value).map_err(|e| e.to_string())
+        entry(service, id)?
+            .set_password(value)
+            .map_err(|e| e.to_string())
     }
 
     pub fn get(service: &str, id: &str) -> Result<Option<String>, String> {
@@ -63,9 +67,15 @@ trait Store {
 
 struct Os;
 impl Store for Os {
-    fn get(&self, service: &str, id: &str) -> Result<Option<String>, String> { backend::get(service, id) }
-    fn set(&self, service: &str, id: &str, value: &str) -> Result<(), String> { backend::set(service, id, value) }
-    fn delete(&self, service: &str, id: &str) { backend::delete(service, id) }
+    fn get(&self, service: &str, id: &str) -> Result<Option<String>, String> {
+        backend::get(service, id)
+    }
+    fn set(&self, service: &str, id: &str, value: &str) -> Result<(), String> {
+        backend::set(service, id, value)
+    }
+    fn delete(&self, service: &str, id: &str) {
+        backend::delete(service, id)
+    }
 }
 
 /// Reads under [`SERVICE`]; a missing item is looked up under [`OLD_SERVICE`] and moved over (the old entry is deleted
@@ -74,10 +84,14 @@ fn get_migrating(store: &impl Store, id: &str) -> Result<Option<String>, String>
     if let Some(v) = store.get(SERVICE, id)? {
         return Ok(Some(v));
     }
-    let Some(v) = store.get(OLD_SERVICE, id)? else { return Ok(None) };
+    let Some(v) = store.get(OLD_SERVICE, id)? else {
+        return Ok(None);
+    };
     match store.set(SERVICE, id, &v) {
         Ok(()) => store.delete(OLD_SERVICE, id),
-        Err(e) => eprintln!("gustaf migration: cannot move secret {id} to the new keychain service: {e}"),
+        Err(e) => {
+            eprintln!("gustaf migration: cannot move secret {id} to the new keychain service: {e}")
+        }
     }
     Ok(Some(v))
 }
@@ -95,13 +109,20 @@ fn delete_everywhere(store: &impl Store, id: &str) {
 struct Cache(std::sync::Mutex<std::collections::HashMap<String, String>>);
 
 impl Cache {
-    fn get(&self, id: &str, read: impl FnOnce(&str) -> Result<Option<String>, String>) -> Result<Option<String>, String> {
+    fn get(
+        &self,
+        id: &str,
+        read: impl FnOnce(&str) -> Result<Option<String>, String>,
+    ) -> Result<Option<String>, String> {
         if let Some(v) = self.0.lock().unwrap_or_else(|e| e.into_inner()).get(id) {
             return Ok(Some(v.clone()));
         }
         let value = read(id)?;
         if let Some(v) = &value {
-            self.0.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), v.clone());
+            self.0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(id.to_string(), v.clone());
         }
         Ok(value)
     }
@@ -153,29 +174,50 @@ mod tests {
 
     /// In-memory store; `fail_set` makes every write fail.
     #[derive(Default)]
-    struct Mem { items: RefCell<HashMap<(String, String), String>>, fail_set: bool }
+    struct Mem {
+        items: RefCell<HashMap<(String, String), String>>,
+        fail_set: bool,
+    }
     impl Mem {
         fn with(service: &str, id: &str, v: &str) -> Self {
             let m = Mem::default();
-            m.items.borrow_mut().insert((service.into(), id.into()), v.into());
+            m.items
+                .borrow_mut()
+                .insert((service.into(), id.into()), v.into());
             m
         }
-        fn has(&self, service: &str, id: &str) -> Option<String> { self.items.borrow().get(&(service.into(), id.into())).cloned() }
+        fn has(&self, service: &str, id: &str) -> Option<String> {
+            self.items
+                .borrow()
+                .get(&(service.into(), id.into()))
+                .cloned()
+        }
     }
     impl Store for Mem {
-        fn get(&self, service: &str, id: &str) -> Result<Option<String>, String> { Ok(self.has(service, id)) }
+        fn get(&self, service: &str, id: &str) -> Result<Option<String>, String> {
+            Ok(self.has(service, id))
+        }
         fn set(&self, service: &str, id: &str, value: &str) -> Result<(), String> {
-            if self.fail_set { return Err("denied".into()); }
-            self.items.borrow_mut().insert((service.into(), id.into()), value.into());
+            if self.fail_set {
+                return Err("denied".into());
+            }
+            self.items
+                .borrow_mut()
+                .insert((service.into(), id.into()), value.into());
             Ok(())
         }
-        fn delete(&self, service: &str, id: &str) { self.items.borrow_mut().remove(&(service.into(), id.into())); }
+        fn delete(&self, service: &str, id: &str) {
+            self.items.borrow_mut().remove(&(service.into(), id.into()));
+        }
     }
 
     #[test]
     fn moves_a_key_from_the_old_service_on_first_read() {
         let store = Mem::with(OLD_SERVICE, "provider:a", "k1");
-        assert_eq!(get_migrating(&store, "provider:a").unwrap().as_deref(), Some("k1"));
+        assert_eq!(
+            get_migrating(&store, "provider:a").unwrap().as_deref(),
+            Some("k1")
+        );
         assert_eq!(store.has(SERVICE, "provider:a").as_deref(), Some("k1"));
         assert_eq!(store.has(OLD_SERVICE, "provider:a"), None);
     }
@@ -183,15 +225,27 @@ mod tests {
     #[test]
     fn the_new_service_wins_and_the_old_entry_is_not_touched() {
         let store = Mem::with(SERVICE, "provider:a", "new");
-        store.items.borrow_mut().insert((OLD_SERVICE.into(), "provider:a".into()), "old".into());
-        assert_eq!(get_migrating(&store, "provider:a").unwrap().as_deref(), Some("new"));
+        store
+            .items
+            .borrow_mut()
+            .insert((OLD_SERVICE.into(), "provider:a".into()), "old".into());
+        assert_eq!(
+            get_migrating(&store, "provider:a").unwrap().as_deref(),
+            Some("new")
+        );
         assert_eq!(store.has(OLD_SERVICE, "provider:a").as_deref(), Some("old"));
     }
 
     #[test]
     fn a_failed_write_keeps_the_old_entry() {
-        let store = Mem { fail_set: true, ..Mem::with(OLD_SERVICE, "provider:a", "k1") };
-        assert_eq!(get_migrating(&store, "provider:a").unwrap().as_deref(), Some("k1"));
+        let store = Mem {
+            fail_set: true,
+            ..Mem::with(OLD_SERVICE, "provider:a", "k1")
+        };
+        assert_eq!(
+            get_migrating(&store, "provider:a").unwrap().as_deref(),
+            Some("k1")
+        );
         assert_eq!(store.has(OLD_SERVICE, "provider:a").as_deref(), Some("k1"));
         assert_eq!(store.has(SERVICE, "provider:a"), None);
     }
@@ -213,14 +267,26 @@ mod tests {
             reads.set(reads.get() + 1);
             Ok(Some("k1".to_string()))
         };
-        assert_eq!(cache.get("provider:a", backend).unwrap().as_deref(), Some("k1"));
-        assert_eq!(cache.get("provider:a", backend).unwrap().as_deref(), Some("k1"));
+        assert_eq!(
+            cache.get("provider:a", backend).unwrap().as_deref(),
+            Some("k1")
+        );
+        assert_eq!(
+            cache.get("provider:a", backend).unwrap().as_deref(),
+            Some("k1")
+        );
         assert_eq!(reads.get(), 1);
         cache.put("provider:a", Some("k2"));
-        assert_eq!(cache.get("provider:a", backend).unwrap().as_deref(), Some("k2"));
+        assert_eq!(
+            cache.get("provider:a", backend).unwrap().as_deref(),
+            Some("k2")
+        );
         assert_eq!(reads.get(), 1);
         cache.put("provider:a", None);
-        assert_eq!(cache.get("provider:a", backend).unwrap().as_deref(), Some("k1"));
+        assert_eq!(
+            cache.get("provider:a", backend).unwrap().as_deref(),
+            Some("k1")
+        );
         assert_eq!(reads.get(), 2);
     }
 
@@ -236,6 +302,12 @@ mod tests {
         assert_eq!(cache.get("x", missing).unwrap(), None);
         assert_eq!(reads.get(), 2);
         assert!(cache.get("y", |_| Err("denied".to_string())).is_err());
-        assert_eq!(cache.get("y", |_| Ok(Some("v".to_string()))).unwrap().as_deref(), Some("v"));
+        assert_eq!(
+            cache
+                .get("y", |_| Ok(Some("v".to_string())))
+                .unwrap()
+                .as_deref(),
+            Some("v")
+        );
     }
 }

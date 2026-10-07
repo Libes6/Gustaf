@@ -5,7 +5,10 @@
 export const DEFAULT_CONCURRENCY = 3;
 export const MAX_CONCURRENCY = 8;
 
-export const clampConcurrency = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.min(MAX_CONCURRENCY, Math.max(1, Math.floor(n))) : DEFAULT_CONCURRENCY);
+export const clampConcurrency = (n: unknown) =>
+  typeof n === "number" && Number.isFinite(n)
+    ? Math.min(MAX_CONCURRENCY, Math.max(1, Math.floor(n)))
+    : DEFAULT_CONCURRENCY;
 
 const abortError = () => new DOMException("Aborted", "AbortError");
 export const isAbortError = (e: unknown) => (e as { name?: string } | null)?.name === "AbortError";

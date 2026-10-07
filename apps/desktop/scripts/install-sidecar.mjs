@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 const sidecar = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../sidecar');
 const modules = path.join(sidecar, 'node_modules');
 let linked = false;
-try { linked = fs.lstatSync(modules).isSymbolicLink(); } catch {}
+try {
+  linked = fs.lstatSync(modules).isSymbolicLink();
+} catch {}
 if (linked) {
   console.log(`sidecar: ${modules} is a symlink, skipping npm ci (using the linked install as is)`);
 } else {

@@ -13,7 +13,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -65,7 +66,14 @@ pub fn clamp_height(requested: f64) -> f64 {
 
 /// Top-left corner (physical px) of a window of `win_w` x `max_h` physical px centered on a monitor. The window keeps
 /// this top edge while it grows, so at its largest size it is exactly centered and while small it sits a bit higher.
-pub fn centered_origin(mon_x: i32, mon_y: i32, mon_w: u32, mon_h: u32, win_w: u32, max_h: u32) -> (i32, i32) {
+pub fn centered_origin(
+    mon_x: i32,
+    mon_y: i32,
+    mon_w: u32,
+    mon_h: u32,
+    win_w: u32,
+    max_h: u32,
+) -> (i32, i32) {
     let x = mon_x + (i64::from(mon_w) - i64::from(win_w)).max(0) as i32 / 2;
     let y = mon_y + (i64::from(mon_h) - i64::from(max_h)).max(0) as i32 / 2;
     (x, y)
@@ -73,9 +81,15 @@ pub fn centered_origin(mon_x: i32, mon_y: i32, mon_w: u32, mon_h: u32, win_w: u3
 
 /// Parses and validates an accelerator: a known key plus at least one modifier (a bare key would steal typing everywhere).
 pub fn parse_accelerator(text: &str) -> Result<Shortcut, String> {
-    let shortcut: Shortcut = text.trim().parse().map_err(|e| err("invalid_shortcut", e))?;
+    let shortcut: Shortcut = text
+        .trim()
+        .parse()
+        .map_err(|e| err("invalid_shortcut", e))?;
     if shortcut.mods.is_empty() {
-        return Err(err("needs_modifier", "a global shortcut needs at least one modifier key"));
+        return Err(err(
+            "needs_modifier",
+            "a global shortcut needs at least one modifier key",
+        ));
     }
     Ok(shortcut)
 }
@@ -94,7 +108,14 @@ fn place(app: &AppHandle, win: &WebviewWindow) {
     match target_monitor(app) {
         Some(m) => {
             let s = m.scale_factor();
-            let (x, y) = centered_origin(m.position().x, m.position().y, m.size().width, m.size().height, (WIDTH * s) as u32, (MAX_HEIGHT * s) as u32);
+            let (x, y) = centered_origin(
+                m.position().x,
+                m.position().y,
+                m.size().width,
+                m.size().height,
+                (WIDTH * s) as u32,
+                (MAX_HEIGHT * s) as u32,
+            );
             let _ = win.set_position(PhysicalPosition::new(x, y));
         }
         None => {
@@ -120,11 +141,12 @@ fn create(app: &AppHandle) -> Result<WebviewWindow, String> {
         let state = handle.state::<QuickAsk>();
         match event {
             WindowEvent::Focused(true) => state.was_focused.store(true, Ordering::SeqCst),
-            WindowEvent::Focused(false) => {
-                if state.was_focused.swap(false, Ordering::SeqCst) && state.hide_on_blur.load(Ordering::SeqCst) {
-                    if let Some(w) = handle.get_webview_window(LABEL) {
-                        let _ = w.hide();
-                    }
+            WindowEvent::Focused(false)
+                if state.was_focused.swap(false, Ordering::SeqCst)
+                    && state.hide_on_blur.load(Ordering::SeqCst) =>
+            {
+                if let Some(w) = handle.get_webview_window(LABEL) {
+                    let _ = w.hide();
                 }
             }
             _ => {}
@@ -144,9 +166,13 @@ pub fn show(app: &AppHandle) -> Result<(), String> {
     match app.get_webview_window(LABEL) {
         Some(win) => reveal(app, &win),
         None => {
-            app.state::<QuickAsk>().pending_show.store(true, Ordering::SeqCst);
+            app.state::<QuickAsk>()
+                .pending_show
+                .store(true, Ordering::SeqCst);
             if let Err(e) = create(app) {
-                app.state::<QuickAsk>().pending_show.store(false, Ordering::SeqCst);
+                app.state::<QuickAsk>()
+                    .pending_show
+                    .store(false, Ordering::SeqCst);
                 return Err(e);
             }
         }
@@ -155,7 +181,9 @@ pub fn show(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn hide(app: &AppHandle) {
-    app.state::<QuickAsk>().pending_show.store(false, Ordering::SeqCst);
+    app.state::<QuickAsk>()
+        .pending_show
+        .store(false, Ordering::SeqCst);
     if let Some(win) = app.get_webview_window(LABEL) {
         let _ = win.hide();
     }
@@ -183,18 +211,32 @@ pub fn on_main_destroyed(app: &AppHandle) {
 /// Turns the feature on or off and (re)registers the global shortcut. Idempotent; the previous registration of this
 /// feature is always released first. On `Err` nothing stays registered and the feature is effectively off.
 #[tauri::command]
-pub async fn quick_ask_configure(app: AppHandle, enabled: bool, accelerator: Option<String>, hide_on_blur: bool) -> Result<(), String> {
+pub async fn quick_ask_configure(
+    app: AppHandle,
+    enabled: bool,
+    accelerator: Option<String>,
+    hide_on_blur: bool,
+) -> Result<(), String> {
     let state = app.state::<QuickAsk>();
     state.hide_on_blur.store(hide_on_blur, Ordering::SeqCst);
     let gs = app.global_shortcut();
-    if let Some(old) = state.shortcut.lock().map_err(|e| err("window_error", e))?.take() {
+    if let Some(old) = state
+        .shortcut
+        .lock()
+        .map_err(|e| err("window_error", e))?
+        .take()
+    {
         let _ = gs.unregister(old);
     }
     if !enabled {
         hide(&app);
         return Ok(());
     }
-    let shortcut = parse_accelerator(accelerator.as_deref().unwrap_or_else(|| default_accelerator()))?;
+    let shortcut = parse_accelerator(
+        accelerator
+            .as_deref()
+            .unwrap_or_else(|| default_accelerator()),
+    )?;
     gs.on_shortcut(shortcut, |app, _shortcut, event| {
         if event.state == ShortcutState::Pressed {
             let app = app.clone();
@@ -228,7 +270,11 @@ pub async fn quick_ask_toggle(app: AppHandle) -> Result<(), String> {
 /// The page finished loading: reveal a window that was created for a pending show.
 #[tauri::command]
 pub async fn quick_ask_ready(app: AppHandle) -> Result<(), String> {
-    if app.state::<QuickAsk>().pending_show.swap(false, Ordering::SeqCst) {
+    if app
+        .state::<QuickAsk>()
+        .pending_show
+        .swap(false, Ordering::SeqCst)
+    {
         if let Some(win) = app.get_webview_window(LABEL) {
             reveal(&app, &win);
         }
@@ -239,15 +285,20 @@ pub async fn quick_ask_ready(app: AppHandle) -> Result<(), String> {
 /// Grows or shrinks the window to the content (logical px, clamped to 160..520).
 #[tauri::command]
 pub async fn quick_ask_resize(app: AppHandle, height: f64) -> Result<(), String> {
-    let win = app.get_webview_window(LABEL).ok_or_else(|| err("window_error", "the quick ask window does not exist"))?;
-    win.set_size(LogicalSize::new(WIDTH, clamp_height(height))).map_err(|e| err("window_error", e))
+    let win = app
+        .get_webview_window(LABEL)
+        .ok_or_else(|| err("window_error", "the quick ask window does not exist"))?;
+    win.set_size(LogicalSize::new(WIDTH, clamp_height(height)))
+        .map_err(|e| err("window_error", e))
 }
 
 /// "Open in Gustaf": hide the quick-ask window and bring the main window to the front.
 #[tauri::command]
 pub async fn quick_ask_open_main(app: AppHandle) -> Result<(), String> {
     hide(&app);
-    let main = app.get_webview_window("main").ok_or_else(|| err("window_error", "the main window is not open"))?;
+    let main = app
+        .get_webview_window("main")
+        .ok_or_else(|| err("window_error", "the main window is not open"))?;
     let _ = main.show();
     let _ = main.unminimize();
     main.set_focus().map_err(|e| err("window_error", e))
@@ -268,7 +319,10 @@ mod tests {
     #[test]
     fn defaults_are_valid_accelerators() {
         for os in ["macos", "windows", "linux"] {
-            assert!(parse_accelerator(default_accelerator_for(os)).is_ok(), "{os}");
+            assert!(
+                parse_accelerator(default_accelerator_for(os)).is_ok(),
+                "{os}"
+            );
         }
         assert!(parse_accelerator(default_accelerator()).is_ok());
     }
@@ -278,11 +332,21 @@ mod tests {
         assert!(parse_accelerator("Control+Alt+Space").is_ok());
         assert!(parse_accelerator("  CommandOrControl+Shift+K ").is_ok());
         assert!(parse_accelerator("Alt+F9").is_ok());
-        assert!(parse_accelerator("Space").unwrap_err().starts_with("needs_modifier:"));
-        assert!(parse_accelerator("Control+Alt").unwrap_err().starts_with("invalid_shortcut:"));
-        assert!(parse_accelerator("").unwrap_err().starts_with("invalid_shortcut:"));
-        assert!(parse_accelerator("Ctrl+Alt+Nonsense").unwrap_err().starts_with("invalid_shortcut:"));
-        assert!(parse_accelerator("Ctrl+A+B").unwrap_err().starts_with("invalid_shortcut:"));
+        assert!(parse_accelerator("Space")
+            .unwrap_err()
+            .starts_with("needs_modifier:"));
+        assert!(parse_accelerator("Control+Alt")
+            .unwrap_err()
+            .starts_with("invalid_shortcut:"));
+        assert!(parse_accelerator("")
+            .unwrap_err()
+            .starts_with("invalid_shortcut:"));
+        assert!(parse_accelerator("Ctrl+Alt+Nonsense")
+            .unwrap_err()
+            .starts_with("invalid_shortcut:"));
+        assert!(parse_accelerator("Ctrl+A+B")
+            .unwrap_err()
+            .starts_with("invalid_shortcut:"));
     }
 
     #[test]
@@ -301,7 +365,10 @@ mod tests {
         // 1920x1080 at the origin: 640 wide, 520 tall at full size
         assert_eq!(centered_origin(0, 0, 1920, 1080, 640, 520), (640, 280));
         // a second monitor to the right and above (negative y)
-        assert_eq!(centered_origin(1920, -1080, 2560, 1440, 640, 520), (1920 + 960, -1080 + 460));
+        assert_eq!(
+            centered_origin(1920, -1080, 2560, 1440, 640, 520),
+            (1920 + 960, -1080 + 460)
+        );
         // retina: physical sizes
         assert_eq!(centered_origin(0, 0, 3024, 1964, 1280, 1040), (872, 462));
     }

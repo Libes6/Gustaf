@@ -8,7 +8,22 @@ import { renderApp } from "./render";
 describe("floating menus", () => {
   function FocusHarness({ selected = false }: { selected?: boolean }) {
     const menu = useMenu();
-    return <><button onKeyDown={menu.onTriggerKeyDown} onClick={e => menu.open(e.currentTarget.getBoundingClientRect(), [{ label: "Usage", onClick() {} }, { label: "Plan", checked: selected, onClick() {} }])}>Account</button>{menu.node}</>;
+    return (
+      <>
+        <button
+          onKeyDown={menu.onTriggerKeyDown}
+          onClick={(e) =>
+            menu.open(e.currentTarget.getBoundingClientRect(), [
+              { label: "Usage", onClick() {} },
+              { label: "Plan", checked: selected, onClick() {} },
+            ])
+          }
+        >
+          Account
+        </button>
+        {menu.node}
+      </>
+    );
   }
   it("mouse opening focuses the container, not Usage, and Escape restores the trigger", async () => {
     renderApp(<FocusHarness />);
@@ -21,7 +36,7 @@ describe("floating menus", () => {
     await userEvent.keyboard("{Escape}");
     expect(trigger).toHaveFocus();
   });
-  it.each(["{Enter}", " ", "{ArrowDown}", "{ArrowUp}"])("keyboard %s focuses the selected item", async key => {
+  it.each(["{Enter}", " ", "{ArrowDown}", "{ArrowUp}"])("keyboard %s focuses the selected item", async (key) => {
     renderApp(<FocusHarness selected />);
     screen.getByRole("button", { name: "Account" }).focus();
     await userEvent.keyboard(key);
@@ -35,8 +50,16 @@ describe("floating menus", () => {
   });
 
   it("flips above an anchor at the bottom and clamps negative positions", () => {
-    const measure = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 220, height: 200 } as DOMRect);
-    renderApp(<Menu at={{ x: -20, y: innerHeight, top: innerHeight - 30 }} items={[{ label: "Settings", onClick() {} }]} onClose={() => {}} />);
+    const measure = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 220, height: 200 } as DOMRect);
+    renderApp(
+      <Menu
+        at={{ x: -20, y: innerHeight, top: innerHeight - 30 }}
+        items={[{ label: "Settings", onClick() {} }]}
+        onClose={() => {}}
+      />,
+    );
     const menu = screen.getByRole("menu");
     expect(menu.parentElement).toBe(document.body);
     expect(menu.style.left).toBe("8px");
@@ -46,7 +69,16 @@ describe("floating menus", () => {
   it("closes outside when opening without focusing the trigger", () => {
     function Harness() {
       const menu = useMenu();
-      return <><button onClick={e => menu.open(e.currentTarget.getBoundingClientRect(), [{ label: "Item", onClick() {} }])}>Open</button>{menu.node}</>;
+      return (
+        <>
+          <button
+            onClick={(e) => menu.open(e.currentTarget.getBoundingClientRect(), [{ label: "Item", onClick() {} }])}
+          >
+            Open
+          </button>
+          {menu.node}
+        </>
+      );
     }
     renderApp(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Open" }));
@@ -58,7 +90,25 @@ describe("floating menus", () => {
     function Harness() {
       const menu = useMenu();
       const [settings, setSettings] = useState(false);
-      return <><button onClick={e => menu.open(e.currentTarget.getBoundingClientRect(), [{ label: "Settings", onClick: () => setSettings(true) }])}>Account</button>{menu.node}{settings && <button onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>Setting field</button>}</>;
+      return (
+        <>
+          <button
+            onClick={(e) =>
+              menu.open(e.currentTarget.getBoundingClientRect(), [
+                { label: "Settings", onClick: () => setSettings(true) },
+              ])
+            }
+          >
+            Account
+          </button>
+          {menu.node}
+          {settings && (
+            <button onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+              Setting field
+            </button>
+          )}
+        </>
+      );
     }
     renderApp(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: "Account" }));

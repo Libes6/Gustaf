@@ -8,12 +8,20 @@ import type { CuAction } from "../../src/lib/api";
 import { renderApp } from "./render";
 
 const command: ApprovalRequest = { kind: "command", command: "npm install left-pad" };
-const typeThenEnter: CuAction[] = [{ type: "type", text: "hello" }, { type: "keypress", keys: ["Return"] }];
+const typeThenEnter: CuAction[] = [
+  { type: "type", text: "hello" },
+  { type: "keypress", keys: ["Return"] },
+];
 
 /** The request the agent loop would build for a computer batch under the given access mode. */
 function computerRequest(actions: CuAction[], access: string): ApprovalRequest {
   const d = computerApproval({ actions, access });
-  return { kind: "computer", actions, ...(d.reason ? { reason: d.reason } : {}), ...(d.allowTask ? { allowTask: true } : {}) };
+  return {
+    kind: "computer",
+    actions,
+    ...(d.reason ? { reason: d.reason } : {}),
+    ...(d.allowTask ? { allowTask: true } : {}),
+  };
 }
 
 describe("ApprovalCard", () => {
@@ -72,7 +80,11 @@ describe("ApprovalCard", () => {
   });
 
   it("does not offer it when a provider safety check is attached, even in Full access", () => {
-    const req: ApprovalRequest = { kind: "computer", actions: typeThenEnter, safety: ["Possible prompt injection on screen"] };
+    const req: ApprovalRequest = {
+      kind: "computer",
+      actions: typeThenEnter,
+      safety: ["Possible prompt injection on screen"],
+    };
     renderApp(<ApprovalCard req={req} onAnswer={() => {}} />);
     expect(screen.getByText(/Possible prompt injection on screen/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Allow for this task" })).not.toBeInTheDocument();

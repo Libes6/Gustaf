@@ -6,17 +6,33 @@ import { chat, makeApp, project, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 const hit = (id: number, over: Partial<SearchHit> = {}): SearchHit => ({
-  messageId: id, chatId: id * 10, chatTitle: `Chat ${id}`, projectId: 1, projectName: "Alpha", archived: false,
-  role: "assistant", model: "m1", createdAt: 1_700_000_000_000, snippet: `about \u0001parser\u0002 number ${id}`, ...over,
+  messageId: id,
+  chatId: id * 10,
+  chatTitle: `Chat ${id}`,
+  projectId: 1,
+  projectName: "Alpha",
+  archived: false,
+  role: "assistant",
+  model: "m1",
+  createdAt: 1_700_000_000_000,
+  snippet: `about \u0001parser\u0002 number ${id}`,
+  ...over,
 });
 
 const page = (hits: SearchHit[], over: Partial<SearchPage> = {}): SearchPage => ({
-  hits, total: hits.length, totalCapped: false, byRecency: false, hasMore: false, ...over,
+  hits,
+  total: hits.length,
+  totalCapped: false,
+  byRecency: false,
+  hasMore: false,
+  ...over,
 });
 
 /** Let the debounce timer fire and the resulting (mocked) invoke promises settle, all under fake timers. */
 const settle = async (ms = 200) => {
-  await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 };
 const input = () => screen.getByPlaceholderText(/Search messages in all chats/);
 const type = (value: string) => fireEvent.change(input(), { target: { value } });
@@ -103,7 +119,7 @@ describe("SearchPalette", () => {
   it("Enter with no results does nothing", async () => {
     mockInvoke({ search_messages: page([]) });
     const { app } = renderApp(<SearchPalette onClose={() => {}} />);
-    type("nothing");
+    type("qzxwvk");
     await settle();
     expect(screen.getByText(/Nothing found for/)).toBeInTheDocument();
     fireEvent.keyDown(input(), { key: "Enter" });
@@ -144,14 +160,23 @@ describe("SearchPalette", () => {
 
   it("only the newest request updates the list when answers arrive out of order", async () => {
     const pending: Record<string, (v: SearchPage) => void> = {};
-    mockInvoke({ search_messages: ({ query }: { query: string }) => new Promise((res) => { pending[query] = res; }) });
+    mockInvoke({
+      search_messages: ({ query }: { query: string }) =>
+        new Promise((res) => {
+          pending[query] = res;
+        }),
+    });
     renderApp(<SearchPalette onClose={() => {}} />);
     type("first");
     await settle();
     type("second");
     await settle();
-    await act(async () => { pending.second(page([hit(2, { chatTitle: "Newest answer" })])); });
-    await act(async () => { pending.first(page([hit(1, { chatTitle: "Stale answer" })])); });
+    await act(async () => {
+      pending.second(page([hit(2, { chatTitle: "Newest answer" })]));
+    });
+    await act(async () => {
+      pending.first(page([hit(1, { chatTitle: "Stale answer" })]));
+    });
     expect(screen.getByText("Newest answer")).toBeInTheDocument();
     expect(screen.queryByText("Stale answer")).not.toBeInTheDocument();
   });
@@ -232,7 +257,9 @@ describe("SearchPalette", () => {
         search_messages: ({ offset }: { offset: number }) => {
           calls.push({ offset });
           if (offset === 0) return page(ids(1, 40), { total: 80, hasMore: true });
-          return new Promise((res) => { release = res; });
+          return new Promise((res) => {
+            release = res;
+          });
         },
       });
       renderApp(<SearchPalette onClose={() => {}} />);
@@ -243,7 +270,9 @@ describe("SearchPalette", () => {
       fireEvent.keyDown(input(), { key: "ArrowDown" });
       expect(calls).toHaveLength(2);
       expect(screen.getByRole("button", { name: "Loading…" })).toBeDisabled();
-      await act(async () => { release(page(ids(41, 80), { total: 80 })); });
+      await act(async () => {
+        release(page(ids(41, 80), { total: 80 }));
+      });
       expect(rows()).toHaveLength(80);
     });
 
@@ -252,7 +281,10 @@ describe("SearchPalette", () => {
       mockInvoke({
         search_messages: ({ query, offset }: { query: string; offset: number }) => {
           if (query === "parser" && offset === 0) return page(ids(1, 40), { total: 80, hasMore: true });
-          if (query === "parser") return new Promise((res) => { release = res; });
+          if (query === "parser")
+            return new Promise((res) => {
+              release = res;
+            });
           return page([hit(500, { chatTitle: "Other query" })]);
         },
       });
@@ -260,15 +292,19 @@ describe("SearchPalette", () => {
       type("parser");
       await settle();
       fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-      type("other");
+      type("unrelated");
       await settle();
-      await act(async () => { release(page(ids(41, 80), { total: 80 })); });
+      await act(async () => {
+        release(page(ids(41, 80), { total: 80 }));
+      });
       expect(rows()).toHaveLength(1);
       expect(screen.getByText("Other query")).toBeInTheDocument();
     });
 
     it("says when the total is capped and when hits are newest first", async () => {
-      mockInvoke({ search_messages: page(ids(1, 40), { total: 1000, totalCapped: true, hasMore: true, byRecency: true }) });
+      mockInvoke({
+        search_messages: page(ids(1, 40), { total: 1000, totalCapped: true, hasMore: true, byRecency: true }),
+      });
       renderApp(<SearchPalette onClose={() => {}} />);
       type("the");
       await settle();
@@ -278,7 +314,10 @@ describe("SearchPalette", () => {
 
     it("offers a current-project toggle that filters by the open project", async () => {
       mockInvoke({ search_messages: page([hit(1)]) });
-      renderApp(<SearchPalette onClose={() => {}} />, makeApp({ draftProject: 7, projects: [project({ id: 7, name: "Gamma" })] }));
+      renderApp(
+        <SearchPalette onClose={() => {}} />,
+        makeApp({ draftProject: 7, projects: [project({ id: 7, name: "Gamma" })] }),
+      );
       type("parser");
       await settle();
       fireEvent.click(screen.getByRole("checkbox", { name: "Only this project" }));
@@ -308,7 +347,7 @@ describe("SearchPalette jumps", () => {
     expect(app.openChat).toHaveBeenCalledWith(12, null);
     expect(onClose).toHaveBeenCalled();
     fireEvent.change(input, { target: { value: "provid" } });
-    expect(screen.getByRole("option", { name: /Model providers/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: /Model providers/ })[0]).toBeInTheDocument();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(app.openSettings).toHaveBeenCalledWith("providers");
   });

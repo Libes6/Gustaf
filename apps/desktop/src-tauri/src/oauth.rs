@@ -70,7 +70,7 @@ fn percent_decode(s: &str) -> String {
     while i < b.len() {
         match b[i] {
             b'+' => out.push(b' '),
-            b'%' if i + 2 < b.len() &&hex(b[i + 1]).is_some() && hex(b[i + 2]).is_some() => {
+            b'%' if i + 2 < b.len() && hex(b[i + 1]).is_some() && hex(b[i + 2]).is_some() => {
                 out.push(hex(b[i + 1]).unwrap() * 16 + hex(b[i + 2]).unwrap());
                 i += 2;
             }
@@ -82,7 +82,11 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn query_param(query: &str, name: &str) -> Option<String> {
-    query.split('&').map(|kv| kv.split_once('=').unwrap_or((kv, ""))).find(|(k, _)| percent_decode(k) == name).map(|(_, v)| percent_decode(v))
+    query
+        .split('&')
+        .map(|kv| kv.split_once('=').unwrap_or((kv, "")))
+        .find(|(k, _)| percent_decode(k) == name)
+        .map(|(_, v)| percent_decode(v))
 }
 
 fn respond(stream: &mut TcpStream, status: &str, body: &str) {
@@ -119,11 +123,22 @@ fn handle(stream: &mut TcpStream, port: u16, expected_state: &str) -> Verdict {
     let head = String::from_utf8_lossy(&buf).into_owned();
     let mut lines = head.split("\r\n");
     let request_line = lines.next().unwrap_or("");
-    let host = lines.find_map(|l| l.split_once(':').filter(|(k, _)| k.eq_ignore_ascii_case("host")).map(|(_, v)| v.trim().to_string()));
+    let host = lines.find_map(|l| {
+        l.split_once(':')
+            .filter(|(k, _)| k.eq_ignore_ascii_case("host"))
+            .map(|(_, v)| v.trim().to_string())
+    });
     let mut parts = request_line.split(' ');
     let (method, target) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
     if method != "GET" || host.as_deref() != Some(&format!("127.0.0.1:{port}")) {
-        respond(stream, "400 Bad Request", &page("Bad request", "This address only receives the sign-in redirect."));
+        respond(
+            stream,
+            "400 Bad Request",
+            &page(
+                "Bad request",
+                "This address only receives the sign-in redirect.",
+            ),
+        );
         return Verdict::Ignore;
     }
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
@@ -133,22 +148,52 @@ fn handle(stream: &mut TcpStream, port: u16, expected_state: &str) -> Verdict {
     }
     // Compare the state before anything else is trusted; a mismatch ends the attempt.
     let state = query_param(query, "state").unwrap_or_default();
-    if state.len() != expected_state.len() || state.bytes().zip(expected_state.bytes()).fold(0u8, |a, (x, y)| a | (x ^ y)) != 0 {
+    if state.len() != expected_state.len()
+        || state
+            .bytes()
+            .zip(expected_state.bytes())
+            .fold(0u8, |a, (x, y)| a | (x ^ y))
+            != 0
+    {
         respond(stream, "400 Bad Request", &page("Sign-in failed", "The response did not match this sign-in attempt. Close this tab and try again from Gustaf."));
-        return Verdict::Done(Err("state mismatch: the redirect did not belong to this sign-in".into()));
+        return Verdict::Done(Err(
+            "state mismatch: the redirect did not belong to this sign-in".into(),
+        ));
     }
     if let Some(err) = query_param(query, "error") {
-        respond(stream, "400 Bad Request", &page("Sign-in was not completed", "You can close this tab and return to Gustaf."));
-        let err: String = err.chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')).take(64).collect();
+        respond(
+            stream,
+            "400 Bad Request",
+            &page(
+                "Sign-in was not completed",
+                "You can close this tab and return to Gustaf.",
+            ),
+        );
+        let err: String = err
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            .take(64)
+            .collect();
         return Verdict::Done(Err(format!("authorization denied: {err}")));
     }
     match query_param(query, "code").filter(|c| !c.is_empty() && c.len() <= 4096) {
         Some(code) => {
-            respond(stream, "200 OK", &page("Signed in", "You can close this tab and return to Gustaf."));
+            respond(
+                stream,
+                "200 OK",
+                &page("Signed in", "You can close this tab and return to Gustaf."),
+            );
             Verdict::Done(Ok(code))
         }
         None => {
-            respond(stream, "400 Bad Request", &page("Sign-in failed", "The redirect carried no authorization code."));
+            respond(
+                stream,
+                "400 Bad Request",
+                &page(
+                    "Sign-in failed",
+                    "The redirect carried no authorization code.",
+                ),
+            );
             Verdict::Done(Err("the redirect carried no authorization code".into()))
         }
     }
@@ -160,10 +205,15 @@ impl Loopback {
         if state.len() < MIN_STATE_LEN || state.len() > 512 || !state.is_ascii() {
             return Err("invalid OAuth state".into());
         }
-        let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| format!("could not open the local redirect listener: {e}"))?;
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .map_err(|e| format!("could not open the local redirect listener: {e}"))?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-        let entry = Arc::new(Entry { result: Mutex::new(None), done: Condvar::new(), cancel: AtomicBool::new(false) });
+        let entry = Arc::new(Entry {
+            result: Mutex::new(None),
+            done: Condvar::new(),
+            cancel: AtomicBool::new(false),
+        });
         let id = {
             let mut entries = lock(&self.entries);
             if entries.len() >= MAX_LISTENERS {
@@ -191,7 +241,9 @@ impl Loopback {
                             break r;
                         }
                     }
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(25)),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(25))
+                    }
                     Err(e) => break Err(format!("redirect listener failed: {e}")),
                 }
             };
@@ -204,7 +256,10 @@ impl Loopback {
 
     /// Blocks until the listener finished and returns the authorization code (or why there is none).
     pub fn wait(&self, id: &str) -> Outcome {
-        let entry = lock(&self.entries).get(id).cloned().ok_or("unknown sign-in")?;
+        let entry = lock(&self.entries)
+            .get(id)
+            .cloned()
+            .ok_or("unknown sign-in")?;
         let mut slot = lock(&entry.result);
         while slot.is_none() {
             slot = entry.done.wait(slot).unwrap_or_else(|e| e.into_inner());
@@ -229,12 +284,21 @@ fn global() -> &'static Loopback {
 
 #[tauri::command]
 pub fn oauth_loopback_start(state: String, timeout_ms: Option<u64>) -> Result<Started, String> {
-    global().start(&state, Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).clamp(1_000, MAX_TIMEOUT_MS)))
+    global().start(
+        &state,
+        Duration::from_millis(
+            timeout_ms
+                .unwrap_or(DEFAULT_TIMEOUT_MS)
+                .clamp(1_000, MAX_TIMEOUT_MS),
+        ),
+    )
 }
 
 #[tauri::command]
 pub async fn oauth_loopback_wait(id: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || global().wait(&id)).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || global().wait(&id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -250,8 +314,14 @@ mod tests {
 
     fn get(port: u16, target: &str, host: Option<&str>) -> String {
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
-        let host = host.map(str::to_string).unwrap_or(format!("127.0.0.1:{port}"));
-        write!(s, "GET {target} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n").unwrap();
+        let host = host
+            .map(str::to_string)
+            .unwrap_or(format!("127.0.0.1:{port}"));
+        write!(
+            s,
+            "GET {target} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
         let mut out = String::new();
         let _ = s.read_to_string(&mut out);
         out
@@ -263,10 +333,22 @@ mod tests {
         let st = lb.start(STATE, Duration::from_secs(10)).unwrap();
         assert!(get(st.port, "/favicon.ico", None).starts_with("HTTP/1.1 404"));
         // A rebinding-style request with a foreign Host header is refused and does not end the attempt.
-        assert!(get(st.port, &format!("/callback?code=evil&state={STATE}"), Some("evil.example")).starts_with("HTTP/1.1 400"));
-        let reply = get(st.port, &format!("/callback?code=a%2Fb+c&state={STATE}"), None);
+        assert!(get(
+            st.port,
+            &format!("/callback?code=evil&state={STATE}"),
+            Some("evil.example")
+        )
+        .starts_with("HTTP/1.1 400"));
+        let reply = get(
+            st.port,
+            &format!("/callback?code=a%2Fb+c&state={STATE}"),
+            None,
+        );
         assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
-        assert!(!reply.contains("a/b"), "the page must not echo request data");
+        assert!(
+            !reply.contains("a/b"),
+            "the page must not echo request data"
+        );
         assert_eq!(lb.wait(&st.id).unwrap(), "a/b c");
         assert!(lb.wait(&st.id).is_err(), "a finished sign-in is forgotten");
     }
@@ -275,7 +357,12 @@ mod tests {
     fn state_mismatch_fails_closed() {
         let lb = Loopback::default();
         let st = lb.start(STATE, Duration::from_secs(10)).unwrap();
-        assert!(get(st.port, "/callback?code=abc&state=other-state-0123456789", None).starts_with("HTTP/1.1 400"));
+        assert!(get(
+            st.port,
+            "/callback?code=abc&state=other-state-0123456789",
+            None
+        )
+        .starts_with("HTTP/1.1 400"));
         let err = lb.wait(&st.id).unwrap_err();
         assert!(err.contains("state mismatch"), "{err}");
         let st2 = lb.start(STATE, Duration::from_secs(10)).unwrap();
@@ -287,11 +374,21 @@ mod tests {
     fn authorization_errors_and_missing_codes() {
         let lb = Loopback::default();
         let st = lb.start(STATE, Duration::from_secs(10)).unwrap();
-        get(st.port, &format!("/callback?error=access_denied&error_description=no&state={STATE}"), None);
-        assert_eq!(lb.wait(&st.id).unwrap_err(), "authorization denied: access_denied");
+        get(
+            st.port,
+            &format!("/callback?error=access_denied&error_description=no&state={STATE}"),
+            None,
+        );
+        assert_eq!(
+            lb.wait(&st.id).unwrap_err(),
+            "authorization denied: access_denied"
+        );
         let st = lb.start(STATE, Duration::from_secs(10)).unwrap();
         get(st.port, &format!("/callback?state={STATE}"), None);
-        assert!(lb.wait(&st.id).unwrap_err().contains("no authorization code"));
+        assert!(lb
+            .wait(&st.id)
+            .unwrap_err()
+            .contains("no authorization code"));
     }
 
     #[test]
