@@ -476,6 +476,14 @@ label.field > span { display: block; color: var(--text-2); margin-bottom: 5px; f
 .card-row .grow { flex: 1; min-width: 0; }
 .card-row .t { font-weight: 500; }
 .card-row .d { color: var(--text-2); font-size: 12.5px; }
+.card-row > .btn-soft, .card-row > .toggle { flex: none; white-space: nowrap; }
+.card-row > label.grow { overflow-wrap: anywhere; }
+.card-row > .input.cleanup-days { width: 110px; flex: none; }
+.card-row.field { flex-direction: column; align-items: stretch; gap: 6px; }
+.card-row.field > .input { width: 100%; }
+.card-row.field .t { font-weight: 500; }
+.card-row.check { gap: 10px; cursor: pointer; }
+.card-row.check > input { flex: none; margin: 0; }
 .settings-inner.wide { max-width: 920px; }
 .page-head { display: flex; align-items: flex-start; gap: 12px; }
 .btn-ghost.small { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: 7px; font-size: 12.5px; white-space: nowrap; }

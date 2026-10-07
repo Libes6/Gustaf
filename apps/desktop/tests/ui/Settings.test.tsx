@@ -53,6 +53,18 @@ describe("Settings", () => {
     expect(screen.queryByRole("switch", { name: /raw CLI/i })).toBeNull();
   });
 
+  it("General has no voice input section; web tools checkbox is separate from the Brave key label", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    const box = await screen.findByRole("checkbox", { name: "Enable web tools" });
+    expect(screen.queryByText("Voice input")).toBeNull();
+    expect(screen.queryByLabelText("Transcription provider")).toBeNull();
+    expect(screen.queryByText("Transcription model")).toBeNull();
+    const key = screen.getByText("Brave API key");
+    expect(box.closest("label")).not.toBe(key.closest("label"));
+    expect(box.closest("label")).not.toContainElement(key);
+  });
+
   it("English is the default UI language even when the system language is Russian", () => {
     const spy = vi.spyOn(navigator, "language", "get").mockReturnValue("ru-RU");
     expect(detectLocale()).toBe("en");

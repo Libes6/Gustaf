@@ -1,7 +1,6 @@
 import { SemanticSettings } from "./SemanticSettings";
 import { KnowledgeSettings } from "./KnowledgeSettings";
 import { BookOpen } from "lucide-react";
-import { VoiceSettings } from "./VoiceSettings";
 import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -85,7 +84,9 @@ function General() {
       </div>
       <AppearanceSettings />
       <CleanupSettings />
-    <VoiceSettings /><WebSettings /><UpdaterPanel /></>
+      <WebSettings />
+      <UpdaterPanel />
+    </>
   );
 }
 

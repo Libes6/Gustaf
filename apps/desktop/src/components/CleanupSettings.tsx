@@ -28,12 +28,12 @@ export function CleanupSettings() {
         </div>
         <div className="card-row">
           <label className="grow" htmlFor="cleanup-days">{t("cleanupAfter")}</label>
-          <select id="cleanup-days" className="input" value={cfg.days} onChange={(e) => change({ ...cfg, days: Number(e.target.value) })}>
+          <select id="cleanup-days" className="input cleanup-days" value={cfg.days} onChange={(e) => change({ ...cfg, days: Number(e.target.value) })}>
             {[...new Set([...CLEANUP_DAYS, cfg.days])].sort((a, b) => a - b).map((d) => <option key={d} value={d}>{t("cleanupDays", { n: d })}</option>)}
           </select>
           <button className="btn-soft" disabled={busy} onClick={() => void now()}>{t("cleanupNow")}</button>
         </div>
-        {note && <div className="d" role="status">{note}</div>}
+        {note && <div className="card-row"><div className="d" role="status">{note}</div></div>}
       </div>
     </>
   );
