@@ -13,7 +13,7 @@ import { useApp } from "../state";
 import { AgentRolesSection } from "./AgentRolesSection";
 import "../styles/agents.css";
 
-// Settings > Usage: models, limits, orchestration default and notifications of background agents (stored as "agentSettings").
+// Settings > Agents & budgets: models, limits, orchestration default and notifications of background agents (stored as "agentSettings").
 
 const TYPE_KEY: Record<AgentType, Key> = { explore: "agentTypeExplore", plan: "agentTypePlan", general: "agentTypeGeneral", review: "agentTypeReview" };
 const FIELDS: { key: keyof Budget; label: Key }[] = [

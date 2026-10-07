@@ -20,7 +20,7 @@ export type SettingEntry = {
 
 /** Labels of the settings pages (same as the navigation). */
 export const PAGE_LABEL: Record<SettingsPage, Key> = {
-  general: "general", storage: "cleanupTitle", web: "webTools", shortcuts: "shortcuts", import: "import", providers: "providers", usage: "usage", memory: "memoryTitle",
+  general: "general", storage: "cleanupTitle", web: "webTools", shortcuts: "shortcuts", import: "import", providers: "providers", usage: "usage", agents: "agentsBudgetsNav", memory: "memoryTitle",
   computer: "computerUse", mcp: "mcp", scheduled: "scheduledNav", knowledge: "knowledgeNav", mobile: "mobileTitle", git: "gitAndCommands", rules: "rules", archive: "archivedChats",
 };
 
@@ -47,17 +47,17 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: "semanticEnable", page: "git", title: "semanticEnable" },
   { id: "verifFixAttempts", page: "git", title: "verifFixAttempts" },
   { id: "updaterCheck", page: "general", title: "updaterTitle", keywords: ["updaterCheck"] },
-  { id: "budgetDayLimit", page: "usage", title: "budgetDayLimit", desc: "budgetDayLimitDesc" },
-  { id: "budgetChatLimit", page: "usage", title: "budgetChatLimit", desc: "budgetChatLimitDesc" },
-  { id: "budgetWarnAt", page: "usage", title: "budgetWarnAt", desc: "budgetWarnAtDesc" },
-  { id: "agentAllowedModels", page: "usage", title: "agentAllowedModels", desc: "agentAllowedModelsDesc" },
-  { id: "agentCheapModel", page: "usage", title: "agentCheapModel", desc: "agentCheapModelDesc" },
-  { id: "agentBudgets", page: "usage", title: "agentBudgets", desc: "agentBudgetsDesc" },
-  { id: "agentStopOnBudget", page: "usage", title: "agentStopOnBudget", desc: "agentStopOnBudgetDesc" },
-  { id: "agentCancelDependents", page: "usage", title: "agentCancelDependents", desc: "agentCancelDependentsDesc" },
-  { id: "agentNotifications", page: "usage", title: "agentNotifications", desc: "agentNotificationsDesc" },
-  { id: "codexSessions", page: "usage", title: "codexSessions", desc: "codexSessionsDesc" },
-  { id: "codexAppServer", page: "usage", title: "codexAppServer", desc: "codexAppServerDesc" },
+  { id: "budgetDayLimit", page: "agents", title: "budgetDayLimit", desc: "budgetDayLimitDesc" },
+  { id: "budgetChatLimit", page: "agents", title: "budgetChatLimit", desc: "budgetChatLimitDesc" },
+  { id: "budgetWarnAt", page: "agents", title: "budgetWarnAt", desc: "budgetWarnAtDesc" },
+  { id: "agentAllowedModels", page: "agents", title: "agentAllowedModels", desc: "agentAllowedModelsDesc" },
+  { id: "agentCheapModel", page: "agents", title: "agentCheapModel", desc: "agentCheapModelDesc" },
+  { id: "agentBudgets", page: "agents", title: "agentBudgets", desc: "agentBudgetsDesc" },
+  { id: "agentStopOnBudget", page: "agents", title: "agentStopOnBudget", desc: "agentStopOnBudgetDesc" },
+  { id: "agentCancelDependents", page: "agents", title: "agentCancelDependents", desc: "agentCancelDependentsDesc" },
+  { id: "agentNotifications", page: "agents", title: "agentNotifications", desc: "agentNotificationsDesc" },
+  { id: "codexSessions", page: "agents", title: "codexSessions", desc: "codexSessionsDesc" },
+  { id: "codexAppServer", page: "agents", title: "codexAppServer", desc: "codexAppServerDesc" },
   { id: "memoryEnabled", page: "memory", title: "memoryEnabled" },
   { id: "memoryApproval", page: "memory", title: "memoryApproval" },
   { id: "memorySuggestAuto", page: "memory", title: "memorySuggestAuto", desc: "memorySuggestAutoHint" },

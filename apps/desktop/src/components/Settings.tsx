@@ -5,7 +5,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
+  Archive, BarChart3, Bot, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -24,6 +24,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { CleanupSettings } from "./CleanupSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
+import { UsageCharts } from "./UsageCharts";
 import { CommandRules } from "./CommandRules";
 import { HooksSettings } from "./HooksSettings";
 import { VerificationSettings } from "./VerificationSettings";
@@ -48,6 +49,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "import", label: "import", icon: Download },
       { id: "providers", label: "providers", icon: Boxes },
       { id: "usage", label: "usage", icon: BarChart3 },
+      { id: "agents", label: "agentsBudgetsNav", icon: Bot },
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
@@ -159,6 +161,15 @@ function ImportPage() {
   );
 }
 
+function AgentsBudgets() {
+  const t = useT();
+  return <>
+    <h1>{t("agentsBudgetsNav")}</h1><p className="lead">{t("agentsBudgetsLead")}</p>
+    <BudgetsSection />
+    <AgentSettingsSection />
+  </>;
+}
+
 function Usage() {
   const t = useT();
   const app = useApp();
@@ -166,8 +177,7 @@ function Usage() {
   const dashboard = (p: ProviderConfig) => p.cli === "claude" ? "https://claude.ai/settings/usage" : p.cli === "codex" ? "https://chatgpt.com/codex/settings/usage" : p.cli === "cursor-agent" || p.kind === "cursor" ? "https://cursor.com/dashboard?tab=usage" : p.kind === "openrouter" ? "https://openrouter.ai/activity" : null;
   return <>
     <h1>{t("usage")}</h1><p className="lead">{t("tokenUsageLead")}</p>
-    <BudgetsSection />
-    <AgentSettingsSection />
+    <UsageCharts />
     <h4 aria-level={2}>{t("providers")}</h4>
     {app.providers.map(p => {
       const stats = Object.values(app.tokenStats).filter(s => s.providerId === p.id);
@@ -321,7 +331,7 @@ function useSettingTarget() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
+  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, agents: AgentsBudgets, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {

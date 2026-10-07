@@ -15,6 +15,7 @@ const PAGES: [SettingsPage, string][] = [
   ["import", "Import"],
   ["providers", "Model providers"],
   ["usage", "Usage"],
+  ["agents", "Agents & budgets"],
   ["computer", "Computer use"],
   ["mcp", "MCP"],
   ["scheduled", "Scheduled"],

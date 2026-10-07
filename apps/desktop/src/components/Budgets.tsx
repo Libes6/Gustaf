@@ -115,7 +115,7 @@ export function BudgetBanner() {
   </div>;
 }
 
-// ---- settings block (shown on the Usage page) ----
+// ---- settings block (shown on the Agents & budgets page) ----
 function describe(t: ReturnType<typeof useT>, scope: string, status: BudgetStatus, totals: UsageTotals | undefined, failed: boolean) {
   if (failed) return t("budgetStatusUnread", { scope });
   if (!totals) return "";
