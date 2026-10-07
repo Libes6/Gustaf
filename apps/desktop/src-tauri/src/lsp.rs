@@ -274,6 +274,7 @@ impl Drop for Process {
     }
 }
 #[cfg(test)]
+#[cfg_attr(windows, allow(dead_code))] // only the unix tests call it
 fn check(root: &str, path: &str, timeout_ms: u64) -> Result<Report, String> {
     check_with_server(root, path, timeout_ms, None, None)
 }

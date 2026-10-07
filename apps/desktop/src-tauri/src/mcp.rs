@@ -14,7 +14,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
+// Only the unix-only output draining below reads from a child pipe through `Read`.
+#[cfg(unix)]
+use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
@@ -350,6 +353,8 @@ fn signal_group(pid: u32, sig: i32) {
 
 /// Closes stdin (already done by the caller), then escalates: wait, SIGTERM, wait, SIGKILL.
 fn terminate(mut child: Child) -> Option<std::process::ExitStatus> {
+    // Used by the unix-only process-group kill; nothing reads it on Windows.
+    #[cfg_attr(windows, allow(unused_variables))]
     let pid = child.id();
     let wait = |child: &mut Child, ms: u64| {
         let end = Instant::now() + Duration::from_millis(ms);

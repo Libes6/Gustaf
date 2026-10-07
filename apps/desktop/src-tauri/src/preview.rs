@@ -36,6 +36,8 @@ struct Session {
     info: Arc<Mutex<Info>>,
     stopped: Arc<AtomicBool>,
     killer: Box<dyn ChildKiller + Send + Sync>,
+    // Held to keep the pty open; only the unix process-group lookup reads it.
+    #[cfg_attr(windows, allow(dead_code))]
     master: Box<dyn MasterPty + Send>,
     #[cfg(unix)]
     pid: Option<u32>,

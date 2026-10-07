@@ -28,6 +28,7 @@ pub fn descendants(table: &[(u32, u32)], root: u32) -> Vec<u32> {
 }
 
 /// Parses the output of `ps -A -o pid=,ppid=`.
+#[cfg_attr(not(unix), allow(dead_code))] // the `ps` parsing is only used by the unix snapshot (tests run everywhere)
 pub fn parse_ps(out: &str) -> Vec<(u32, u32)> {
     out.lines()
         .filter_map(|l| {
@@ -137,9 +138,11 @@ pub struct ProcInfo {
     pub is_app: bool,
 }
 
+#[cfg_attr(not(unix), allow(dead_code))] // the `ps` parsing is only used by the unix snapshot (tests run everywhere)
 const MAX_COMMAND: usize = 400;
 
 /// `[[dd-]hh:]mm:ss` as printed by `ps -o etime`.
+#[cfg_attr(not(unix), allow(dead_code))] // the `ps` parsing is only used by the unix snapshot (tests run everywhere)
 pub fn parse_etime(s: &str) -> u64 {
     let (days, rest) = match s.split_once('-') {
         Some((d, r)) => (d.parse::<u64>().unwrap_or(0), r),
@@ -153,6 +156,7 @@ pub fn parse_etime(s: &str) -> u64 {
 }
 
 /// Parses `ps -A -o pid=,ppid=,pcpu=,rss=,etime=,args=`; the command line is the rest of the line.
+#[cfg_attr(not(unix), allow(dead_code))] // the `ps` parsing is only used by the unix snapshot (tests run everywhere)
 pub fn parse_snapshot(out: &str) -> Vec<ProcInfo> {
     out.lines()
         .filter_map(|l| {

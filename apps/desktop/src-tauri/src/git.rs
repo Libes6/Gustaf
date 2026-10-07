@@ -903,8 +903,10 @@ mod tests {
 
     struct Fixture {
         _tmp: tempfile::TempDir,
+        #[cfg_attr(windows, allow(dead_code))] // read by the unix-only hook tests
         base: PathBuf,
         root: PathBuf,
+        #[cfg_attr(windows, allow(dead_code))]
         hooks: PathBuf,
     }
 
