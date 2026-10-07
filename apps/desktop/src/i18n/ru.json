@@ -575,8 +575,8 @@
   "noModels": "Нет моделей.",
   "noProviders": "Провайдеров пока нет.",
   "notifications": "Уведомления",
-  "onbImportLead": "Выберите проекты Cursor, чтобы перенести их чаты. Импортировать остальное можно позже в настройках.",
-  "onbImportTitle": "Импортируйте проект",
+  "onbImportLead": "Импортируйте чаты из Cursor, Claude Code, Codex или ChatGPT. Остальное можно импортировать позже в настройках.",
+  "onbImportTitle": "Перенесите ваши чаты",
   "onbProviderLead": "Подключите хотя бы одну модель. Ключи хранятся в {store}.",
   "keyStoreMac": "связке ключей macOS",
   "keyStoreWindows": "диспетчере учётных данных Windows",
@@ -1660,5 +1660,7 @@
   "codexAppServerDesc": "Общаться с Codex по протоколу app-server вместо codex exec: субагенты показывают настоящий статус, модель и прогресс. Если app-server не запустился, используется codex exec. Выключите, если запуск Codex ведёт себя странно.",
   "goalNote_idle": "Codex перестал продолжать",
   "goalNote_usage": "достигнут лимит использования",
-  "goalNote_budget": "достигнут бюджет токенов"
+  "goalNote_budget": "достигнут бюджет токенов",
+  "importFrom": "Импорт из",
+  "importCursorSub": "Выберите проекты Cursor, чтобы перенести их чаты."
 }

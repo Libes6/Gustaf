@@ -12,7 +12,7 @@ import { duplicateKeys, importChats } from "../lib/importers/run";
 import { importStore, recordImport } from "../lib/importers/store";
 
 const errorText = (e: unknown) => String(e instanceof Error ? e.message : e);
-const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
+export const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
   { id: "claude-code", label: "Claude Code", icon: Terminal },
   { id: "codex", label: "Codex", icon: Terminal },
   { id: "chatgpt", label: "ChatGPT", icon: MessagesSquare },
@@ -20,10 +20,9 @@ const SOURCES: { id: ImportSource; label: string; icon: typeof Terminal }[] = [
 /** ChatGPT conversations are fetched from the export file this many at a time (each fetch streams through the file once). */
 const CHATGPT_BATCH = 20;
 
-/** Lists sessions of Claude Code and Codex, or conversations of a ChatGPT export, and imports the ticked ones. */
-export function HistoryImport({ onDone }: { onDone: (imported: number) => void }) {
+/** Lists sessions of Claude Code and Codex, or conversations of a ChatGPT export, and imports the ticked ones. The source tab is chosen by ImportPanel. */
+export function HistoryImport({ source, onDone, onBusy }: { source: ImportSource; onDone: (imported: number) => void; onBusy?: (busy: boolean) => void }) {
   const t = useT();
-  const [source, setSource] = useState<ImportSource>("claude-code");
   const [sessions, setSessions] = useState<SourceSession[] | null>(null);
   const [exportPath, setExportPath] = useState("");
   const [known, setKnown] = useState<Set<string>>(new Set());
@@ -137,19 +136,11 @@ export function HistoryImport({ onDone }: { onDone: (imported: number) => void }
     }
   };
 
+  useEffect(() => { onBusy?.(!!progress); }, [progress, onBusy]);
   const Icon = SOURCES.find((s) => s.id === source)!.icon;
   const selectableShown = selectable(shown, known);
   return (
     <div>
-      <h4 aria-level={2}>{t("historyImport")}</h4>
-      <p className="h4-sub">{t("historyImportSub")}</p>
-      <div className="seg" role="group" aria-label={t("historyImport")}>
-        {SOURCES.map((s) => (
-          <button key={s.id} aria-pressed={source === s.id} className={source === s.id ? "active" : ""} disabled={!!progress} onClick={() => setSource(s.id)}>
-            {s.label}
-          </button>
-        ))}
-      </div>
       {source === "chatgpt" && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="card-row">

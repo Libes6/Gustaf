@@ -563,8 +563,8 @@
   "noModels": "No models.",
   "noProviders": "No providers yet.",
   "notifications": "Notifications",
-  "onbImportLead": "Pick Cursor projects to bring their chats. You can import more later in Settings.",
-  "onbImportTitle": "Import a project",
+  "onbImportLead": "Import chats from Cursor, Claude Code, Codex or ChatGPT. You can import more later in Settings.",
+  "onbImportTitle": "Bring your chats",
   "onbProviderLead": "Connect at least one model. Keys are stored in {store}.",
   "keyStoreMac": "the macOS Keychain",
   "keyStoreWindows": "the Windows Credential Manager",
@@ -1624,5 +1624,7 @@
   "codexAppServerDesc": "Talk to Codex over its app-server protocol instead of codex exec: subagents report their real status, model and progress. Falls back to codex exec if the app-server cannot start. Turn off if a Codex run misbehaves.",
   "goalNote_idle": "Codex stopped continuing",
   "goalNote_usage": "usage limit reached",
-  "goalNote_budget": "token budget reached"
+  "goalNote_budget": "token budget reached",
+  "importFrom": "Import from",
+  "importCursorSub": "Pick Cursor projects to bring their chats."
 }

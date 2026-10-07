@@ -36,7 +36,7 @@ export function Onboarding() {
             <>
               <h1>{t("onbImportTitle")}</h1>
               <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbImportLead")}</p>
-              <ImportPanel onDone={async () => (await app.reload(), setStep(1))} />
+              <ImportPanel files={false} onDone={async () => (await app.reload(), setStep(1))} />
               <div className="onb-foot" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
                 <button className="btn-soft" onClick={() => setCreating(true)}>{t("createProject")}</button>
                 <button className="btn btn-ghost" onClick={() => setStep(1)}>{t("skip")}</button>

@@ -1,8 +1,10 @@
 import { message, save } from "@tauri-apps/plugin-dialog";
 import { FileDown, FileUp, Loader2, MousePointer2, Plug } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import type { ImportSource } from "../lib/importers/common";
 import { useT } from "../i18n";
 import { db, fsx } from "../lib/api";
+import { SOURCES } from "./HistoryImport";
 import {
   addMessage, archiveChat, createChat, importFromCursor, listArchived, listChats, listProjects, loadMessages, scanCursor,
   type Chat, type ImportProject,
@@ -212,24 +214,36 @@ export function ChatTransfer() {
   );
 }
 
-/** Cursor history and chat files; the Settings import page and onboarding both render this. */
-export function ImportPanel({ onDone }: { onDone: (imported: number) => void }) {
+/** One import element for every source (Cursor projects, Claude Code, Codex, ChatGPT) and the chat files; the Settings import page and onboarding both render this. */
+export function ImportPanel({ onDone, files = true }: { onDone: (imported: number) => void; /** Chat export/import files; left out of onboarding, where they only add noise. */ files?: boolean }) {
+  const t = useT();
+  const [source, setSource] = useState<"cursor" | ImportSource>("cursor");
+  const [busy, setBusy] = useState(false);
+  const tabs: { id: "cursor" | ImportSource; label: string }[] = [{ id: "cursor", label: "Cursor" }, ...SOURCES.map((s) => ({ id: s.id, label: s.label }))];
   return (
     <>
-      <CursorImport onDone={onDone} />
-      <HistoryImport onDone={onDone} />
-      <ChatTransfer />
+      <div className="seg" role="group" aria-label={t("importFrom")}>
+        {tabs.map((s) => (
+          <button key={s.id} aria-pressed={source === s.id} className={source === s.id ? "active" : ""} disabled={busy} onClick={() => setSource(s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <p className="h4-sub" style={{ margin: "10px 0 12px" }}>{source === "cursor" ? t("importCursorSub") : t("historyImportSub")}</p>
+      {source === "cursor" ? <CursorImport onDone={onDone} onBusy={setBusy} /> : <HistoryImport source={source} onDone={onDone} onBusy={setBusy} />}
+      {files && <ChatTransfer />}
     </>
   );
 }
 
 /** Lists Cursor projects found on disk with checkboxes; imports the selected ones. */
-function CursorImport({ onDone }: { onDone: (imported: number) => void }) {
+function CursorImport({ onDone, onBusy }: { onDone: (imported: number) => void; onBusy?: (busy: boolean) => void }) {
   const t = useT();
   const [scan, setScan] = useState<{ projects: ImportProject[]; mcpServers: string[] } | null>(null);
   const [error, setError] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<[number, number] | null>(null);
+  useEffect(() => { onBusy?.(!!progress); }, [progress, onBusy]);
 
   useEffect(() => {
     scanCursor()
