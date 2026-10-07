@@ -16,7 +16,7 @@ import { effectiveHistory, estimateContext } from "../lib/context";
 import { fsx } from "../lib/api";
 import { loadMessages, type StoredMsg } from "../lib/data";
 import { getAdapter } from "../providers";
-import { levelsOf, textOf, type ModelInfo, type Reasoning } from "../providers/types";
+import { levelsOf, textOf, type ModelInfo, type Part, type Reasoning } from "../providers/types";
 import type { ChatSession } from "../lib/chatSessions";
 import { groupTurns } from "../lib/chatTurns";
 import { editableText, turnMessageIds } from "../lib/messageActions";
@@ -234,6 +234,13 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
   };
 
   const turns = useMemo(() => groupTurns(messages), [messages]);
+  // The last call of the running turn that has no result yet: it names the current action in the status line.
+  const pendingCall = useMemo(() => {
+    if (!running) return undefined;
+    const done = new Set([...messages.flatMap((m) => m.parts), ...toolResults].filter((p) => p.type === "tool_result").map((p: any) => p.id));
+    const calls = messages.slice(-4).flatMap((m) => m.parts).filter((p) => p.type === "tool_call" && !done.has(p.id));
+    return calls[calls.length - 1] as Extract<Part, { type: "tool_call" }> | undefined;
+  }, [running, messages, toolResults]);
   const canvasSources = useMemo(() => messages.filter((m) => m.role === "assistant").map(textOf), [messages]);
 
   return (
@@ -259,10 +266,10 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         <div className="feed" ref={feedRef} role="log" aria-live="off" aria-label={t("conversation")} tabIndex={0} onScroll={(e) => { setAtBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40); rememberScroll(e.currentTarget); }}>
           <div className="feed-inner">
             {turns.map((turn, i) => (
-              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} />
+              <TurnView key={turn.user?.id ?? `t${i}`} turn={turn} liveResults={toolResults} live={running && i === turns.length - 1} onRewind={turn.user ? run.rewind : undefined} focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null} busy={running} isLastTurn={i === turns.length - 1} handlers={turnHandlers} approving={!!approval} />
             ))}
             {blocked && <div className="error-box" role="alert">{blocked}</div>}
-            <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} onRunCommand={turnHandlers.onRunCommand} projectRoot={root ?? undefined} />
+            <LiveStatus activities={activities} stream={stream} approval={approval} retryNotice={run.retryNotice} stats={run.live.current} visible={visible} onRunCommand={turnHandlers.onRunCommand} projectRoot={root ?? undefined} pendingCall={pendingCall} />
             {run.secretRequest && <SecretCard request={run.secretRequest} />}
             {error && <div className="error-box" role="alert">{error}<div><button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>{t("retryRequest")}</button></div></div>}
           </div>

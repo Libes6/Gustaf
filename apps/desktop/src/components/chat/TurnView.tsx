@@ -12,8 +12,10 @@ import { extractPlan, type Plan } from "../../agent/planCore";
 import { Markdown } from "../Markdown";
 import { ImageThumb } from "../ImageViewer";
 import { PlanCard } from "./PlanCard";
-import { renderWithSubagents } from "../SubagentsCard";
+import { isSubagentActivity, renderWithSubagents, SubagentsCard, type SubagentActivity } from "../SubagentsCard";
 import { ToolCard } from "../ToolCard";
+import { ToolGroup } from "../ToolGroup";
+import { groupRuns } from "../../lib/toolLabel";
 import { isVerificationPart, VerificationCard } from "../VerificationCard";
 import "../../styles/messageActions.css";
 
@@ -35,7 +37,7 @@ export type TurnHandlers = {
   onRejectPlan: () => void;
 };
 
-export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg, o: { files: boolean }) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers }) {
+export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewind, focusId, busy, isLastTurn, handlers, approving }: { turn: Turn; live: boolean; liveResults: Extract<Part, { type: "tool_result" }>[]; onRewind?: (m: StoredMsg, o: { files: boolean }) => void; focusId?: number | null; busy: boolean; isLastTurn: boolean; handlers: TurnHandlers; /** An approval card is open: the call that is still running waits for it. */ approving?: boolean }) {
   const t = useT();
   const rewindMenu = useMenu();
   const app = useApp();
@@ -80,6 +82,16 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
   const expanded = open || focusInSteps || (live && !finalIsText);
   const hit = (m: StoredMsg) => (m.id === focusId ? " hit-flash" : "");
 
+  // When each call and its result were stored: the difference is the duration shown on hover.
+  const storedAt = new Map<string, { call?: number; result?: number }>();
+  for (const m of turn.steps) for (const p of m.parts) {
+    if (p.type === "tool_call") storedAt.set(p.id, { ...storedAt.get(p.id), call: m.created_at });
+    else if (p.type === "tool_result") storedAt.set(p.id, { ...storedAt.get(p.id), result: m.created_at });
+  }
+  const durationOf = (id: string) => { const a = storedAt.get(id); return a?.call != null && a.result != null && a.result > a.call ? a.result - a.call : undefined; };
+  const pendingIds = inner.flatMap((m) => m.parts.filter((p) => p.type === "tool_call" && !results.has(p.id)).map((p: any) => p.id as string));
+  const awaitingId = live && approving ? pendingIds[pendingIds.length - 1] : undefined;
+
   const planActionable = isLastTurn && !busy;
   const renderParts = (m: StoredMsg) =>
     renderWithSubagents(m.parts, (p, i) =>
@@ -90,9 +102,46 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
       ) : p.type === "activity" ? (
         <ToolCard key={p.id} call={p} at={m.created_at} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : p.type === "tool_call" ? (
-        <ToolCard key={p.id} call={p} at={m.created_at} result={results.get(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+        <ToolCard key={p.id} call={p} at={m.created_at} result={results.get(p.id)} durationMs={durationOf(p.id)} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
       ) : null,
     );
+
+  // The steps before the final reply: text and cards in order, with consecutive tool calls folded into one group.
+  type Node =
+    | { m: StoredMsg; kind: "tool"; p: Extract<Part, { type: "tool_call" | "activity" }>; i: number }
+    | { m: StoredMsg; kind: "agents"; agents: SubagentActivity[] }
+    | { m: StoredMsg; kind: "other"; p: Part; i: number };
+  const nodes: Node[] = inner.flatMap((m): Node[] => {
+    const agents = m.parts.filter(isSubagentActivity) as SubagentActivity[];
+    let placed = false;
+    return m.parts.flatMap((p, i): Node[] => {
+      if (isSubagentActivity(p)) { if (placed) return []; placed = true; return [{ m, kind: "agents", agents }]; }
+      if (p.type === "tool_result" || (p.type === "text" && !p.text.trim())) return [];
+      if ((p.type === "tool_call" || p.type === "activity") && !isVerificationPart(p)) return [{ m, kind: "tool", p, i }];
+      return [{ m, kind: "other", p, i }];
+    });
+  });
+  const wrap = (m: StoredMsg, key: string, child: React.ReactNode) => <div key={key} data-msg-id={m.id} className={m.id === focusId ? "hit-flash" : undefined}>{child}</div>;
+  const toolRow = (n: Extract<Node, { kind: "tool" }>) => (
+    <ToolCard key={n.p.id} call={n.p} at={n.m.created_at} result={n.p.type === "tool_call" ? results.get(n.p.id) : undefined} durationMs={n.p.type === "tool_call" ? durationOf(n.p.id) : undefined}
+      awaitingApproval={n.p.id === awaitingId} onRunCommand={handlers.onRunCommand} projectRoot={handlers.diagnosticsProjectRoot} />
+  );
+  const renderSteps = () => groupRuns(nodes, (n) => n.kind === "tool").map((g, gi) => {
+    if ("item" in g) {
+      const n = g.item;
+      if (n.kind === "agents") return wrap(n.m, `a${n.m.id}`, <SubagentsCard agents={n.agents} />);
+      if (n.kind === "other") return wrap(n.m, `${n.m.id}:${n.i}`, renderParts({ ...n.m, parts: [n.p] } as StoredMsg));
+      return null;
+    }
+    const tools = g.tools as Extract<Node, { kind: "tool" }>[];
+    if (tools.length === 1) return wrap(tools[0].m, `${tools[0].m.id}:${tools[0].i}`, toolRow(tools[0]));
+    return (
+      <ToolGroup key={`g${gi}${tools[0].p.id}`} projectRoot={handlers.diagnosticsProjectRoot} forceOpen={tools.some((n) => n.m.id === focusId)}
+        items={tools.map((n) => ({ call: n.p, result: n.p.type === "tool_call" ? results.get(n.p.id) : undefined }))}>
+        {tools.map((n) => wrap(n.m, `${n.m.id}:${n.i}`, toolRow(n)))}
+      </ToolGroup>
+    );
+  });
 
   const bodyText = turn.user ? userText(textOf(turn.user)) : null;
   const contextText = turn.user ? userText(userContext.body) : null;
@@ -177,7 +226,7 @@ export const TurnView = memo(function TurnView({ turn, live, liveResults, onRewi
           {duration != null ? t("doneIn", { s: Math.max(1, Math.round(duration / 1000)) }) : t("steps", { count: toolCount })}
         </button>
       )}
-      {expanded && <div className="msg-tools">{inner.map((m) => <div key={m.id} data-msg-id={m.id} className={m.id === focusId ? "hit-flash" : undefined}>{renderParts(m)}</div>)}</div>}
+      {expanded && <div className="msg-tools">{renderSteps()}</div>}
       {finalIsText && (
         <div className={`msg-block${hit(last)}`} data-msg-id={last.id}>
           {renderParts(last)}
