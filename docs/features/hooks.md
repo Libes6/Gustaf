@@ -83,3 +83,13 @@ Both commands must also be allowed by your command rules (or approved when asked
 - Tests: `tests/hooks.test.mjs` (node:test; the command runner is faked in `tests/helpers/apiStub.mjs`), `tests/ui/Hooks.test.tsx` (vitest).
 
 Not covered: nothing has been exercised in the real app against a real hook command beyond the Rust unit tests.
+
+## Manual check (real app, live API provider)
+
+1. Settings > Git and commands > Hooks: add a global `pre_tool` hook, matcher `run_command`, command `echo "no" ; exit 2`. Make sure command rules allow `echo` (or approve the card when asked).
+2. Ask the agent to run `ls`. Expect the call to return `blocked by hook: no`, and an Action log entry with source "hook" (exit 2, success) next to a blocked `run_command`.
+3. Replace it with a `post_edit` hook `echo edited`. Ask the agent to edit a file. Expect `[hook output: echo edited]` appended to the tool result and a hook entry in the Action log.
+4. Add a `stop` hook that exits 2 with a message once. Expect one follow-up turn, not a loop.
+5. Add a hook whose command is on a deny rule (for example `rm -rf x`). Expect it logged as blocked and never run.
+6. Put a `.gustaf/hooks.json` in a project: nothing runs until the project switch is turned on.
+7. Check that CLI providers (Claude Code, Codex, Cursor) do not run Gustaf hooks.
