@@ -412,6 +412,11 @@ button.row, button.section-title { width: 100%; text-align: left; }
 .model-prov { color: var(--text-3); font-size: 12px; display: flex; align-items: center; gap: 5px; margin-top: 1px; }
 .badge-new { font-size: 10px; font-weight: 600; color: var(--badge-fg); border: 1px solid var(--badge-border); background: var(--badge-bg); border-radius: 4px; padding: 0 4px; line-height: 15px; }
 .kbd-chip { font-size: 11px; color: var(--text-3); background: var(--bg-chip); border-radius: 5px; padding: 1px 6px; }
+/* A shortcut's keys are also its edit control (Settings -> Shortcuts): click to record a new combination. */
+.kbd-chip-edit { border: 0; font: inherit; font-size: 11px; cursor: pointer; padding: 3px 8px; }
+.kbd-chip-edit:hover { color: var(--text); }
+.kbd-chip-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.kbd-chip-recording { color: var(--text); outline: 2px solid var(--accent); outline-offset: 1px; }
 .star { color: var(--text-3); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; }
 .star:hover { background: var(--bg-active); }
 .star.on { color: var(--star); }

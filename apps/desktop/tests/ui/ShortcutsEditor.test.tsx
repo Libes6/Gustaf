@@ -23,6 +23,17 @@ describe("shortcut editor", () => {
     expect(within(rowOf("New chat")).queryByRole("button", { name: /Reset/ })).toBeNull();
   });
 
+  it("the keys themselves are the edit control: no separate Change button, fixed keys are plain text", async () => {
+    mockSettings({});
+    renderApp(<ShortcutsSettings />);
+    const chip = within(rowOf("New chat")).getByRole("button", { name: "Change: New chat" });
+    expect(chip).toHaveTextContent("⌘N");
+    expect(within(rowOf("New chat")).queryByText("Change")).toBeNull();
+    await userEvent.click(chip);
+    expect(within(rowOf("New chat")).getByText("Press the new shortcut…")).toBeInTheDocument();
+    expect(within(rowOf("Send")).queryByRole("button")).toBeNull();
+  });
+
   it("explains a conflict and keeps the old binding", async () => {
     mockSettings({});
     renderApp(<ShortcutsSettings />);
@@ -41,7 +52,7 @@ describe("shortcut editor", () => {
     await userEvent.keyboard("{Meta>}v{/Meta}");
     expect(screen.getByRole("alert")).toHaveTextContent(/editing or by the system/);
     await userEvent.keyboard("{Escape}");
-    expect(screen.queryByPlaceholderText("Press the new shortcut…")).toBeNull();
+    expect(screen.queryByText("Press the new shortcut…")).toBeNull();
     expect(shortcut("newChat").combo).toBe("Cmd+N");
   });
 

@@ -56,24 +56,33 @@ export function ShortcutsSettings() {
             <Fragment key={s.id}>
               <SettingRow id={`shortcut-${s.id}`} title={t(s.label)} description={t(`shortcutCtx_${shortcutContext(s)}` as Key)}>
                 {recording === s.id ? (
-                  <input
-                    className="input narrow"
-                    readOnly
+                  <button
+                    type="button"
+                    className="kbd-chip kbd-chip-edit kbd-chip-recording"
                     autoFocus
                     aria-label={t("shortcutRecording")}
-                    placeholder={t("shortcutRecording")}
                     onBlur={() => (setRecording(null), setError(null))}
                     onKeyDown={(e) => record(s.id, e)}
-                  />
+                  >
+                    {t("shortcutRecording")}
+                  </button>
+                ) : editable ? (
+                  <>
+                    <button
+                      type="button"
+                      className="kbd-chip kbd-chip-edit"
+                      aria-label={`${t("shortcutChange")}: ${t(s.label)}`}
+                      title={t("shortcutChange")}
+                      onClick={() => (setError(null), setRecording(s.id))}
+                    >
+                      {shortcutDisplay(s)}
+                    </button>
+                    {isCustomized(s.id) && <button className="btn-soft" aria-label={`${t("shortcutReset")}: ${t(s.label)}`} onClick={() => (setError(null), void saveShortcutBinding(s.id, null).catch(() => {}))}>{t("shortcutReset")}</button>}
+                  </>
                 ) : (
                   <>
                     <span className="kbd-chip">{shortcutDisplay(s)}</span>
-                    {editable ? (
-                      <>
-                        <button className="btn-soft" aria-label={`${t("shortcutChange")}: ${t(s.label)}`} onClick={() => (setError(null), setRecording(s.id))}>{t("shortcutChange")}</button>
-                        {isCustomized(s.id) && <button className="btn-soft" aria-label={`${t("shortcutReset")}: ${t(s.label)}`} onClick={() => (setError(null), void saveShortcutBinding(s.id, null).catch(() => {}))}>{t("shortcutReset")}</button>}
-                      </>
-                    ) : <span className="d">{t("shortcutFixed")}</span>}
+                    <span className="d">{t("shortcutFixed")}</span>
                   </>
                 )}
               </SettingRow>
