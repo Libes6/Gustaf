@@ -1,4 +1,4 @@
-import { cmdKey } from "./shortcuts.ts";
+import { matches } from "./shortcuts.ts";
 // Pure helpers for the Cmd+K search palette (no Tauri/DOM/React imports, so node tests can cover them).
 // The index and the query escaping live in src-tauri/src/db.rs; this file only deals with what comes back.
 
@@ -105,5 +105,5 @@ type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean
  * Ctrl is not accepted on macOS (Ctrl+K is "delete to end of line" in text fields); on Windows and Linux Ctrl is the main key.
  */
 export function isSearchShortcut(e: KeyLike): boolean {
-  return cmdKey(e) && !e.shiftKey && !e.altKey && (e.code === "KeyK" || e.key.toLowerCase() === "k");
+  return matches({ ...e, ctrlKey: !!e.ctrlKey }, "search");
 }

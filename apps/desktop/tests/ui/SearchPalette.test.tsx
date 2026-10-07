@@ -103,7 +103,7 @@ describe("SearchPalette", () => {
   it("Enter with no results does nothing", async () => {
     mockInvoke({ search_messages: page([]) });
     const { app } = renderApp(<SearchPalette onClose={() => {}} />);
-    type("nothing");
+    type("qzxwvk");
     await settle();
     expect(screen.getByText(/Nothing found for/)).toBeInTheDocument();
     fireEvent.keyDown(input(), { key: "Enter" });

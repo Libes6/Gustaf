@@ -15,7 +15,8 @@ export type Model = ModelInfo & { firstSeen: number };
 export const modelKey = (m: { providerId: string; id: string }) => `${m.providerId}\n${m.id}`;
 export type Selection = { providerId: string; model: string };
 export type Section = { id: string; name: string; chatIds: number[] };
-export type SettingsPage = "general" | "shortcuts" | "import" | "providers" | "usage" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile";
+import type { ProviderHealth } from "./lib/providerDiagnostics";
+export type SettingsPage = "general" | "storage" | "web" | "shortcuts" | "import" | "providers" | "usage" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile";
 
 function usePersisted<T>(key: string, initial: T, ready: boolean) {
   const [value, setValue] = useState<T>(initial);
@@ -88,9 +89,9 @@ function useAppState() {
   const newChat = (projectId: number | null = null) => { setSessions(s => openSession(s, null, projectId, crypto.randomUUID())); setView("chat"); };
   const setSessionBusy = (key: string, busy: boolean) => setSessions(s => ({ ...s, items: s.items.map(item => item.key === key ? { ...item, busy } : item) }));
   const promoteChat = (key: string, id: number) => setSessions(s => promoteSession(s, key, id));
-  const [providerHealth, setProviderHealth] = usePersisted<Record<string, { status: "ok" | "auth" | "error"; message: string }>>("providerHealth", {}, true);
+  const [providerHealth, setProviderHealth] = usePersisted<Record<string, ProviderHealth>>("providerHealth", {}, true);
   const [checkingProvider, setCheckingProvider] = useState<string | null>(null);
-  const recordProviderResult = (id: string, message = "") => setProviderHealth(s => ({ ...s, [id]: { status: message ? isAuthError(message) ? "auth" : "error" : "ok", message } }));
+  const recordProviderResult = (id: string, message = "") => setProviderHealth(s => ({ ...s, [id]: { status: message ? isAuthError(message) ? "auth" : "error" : "ok", message, at: Date.now() } }));
   const checkProvider = async (p: ProviderConfig) => {
     if (checkingProvider) return;
     setCheckingProvider(p.id);
@@ -109,6 +110,8 @@ function useAppState() {
   };
   const [view, setView] = useState<"chat" | "settings">("chat");
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
+  /** The setting to scroll to and highlight once its page is shown (settings search); cleared by the settings view. */
+  const [settingTarget, setSettingTarget] = useState<string | null>(null);
   const [sideHidden, setSideHidden] = useState(false);
 
   const reload = useCallback(async () => {
@@ -144,7 +147,8 @@ function useAppState() {
     }).catch(() => {});
   }, []);
 
-  const openSettings = (page: SettingsPage = "general") => {
+  const openSettings = (page: SettingsPage = "general", target: string | null = null) => {
+    setSettingTarget(target);
     setSettingsPage(page);
     setView("settings");
   };
@@ -161,7 +165,7 @@ function useAppState() {
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
-    view, setView, settingsPage, openSettings, sideHidden, setSideHidden,
+    view, setView, settingsPage, openSettings, settingTarget, clearSettingTarget: () => setSettingTarget(null), sideHidden, setSideHidden,
   };
 }
 

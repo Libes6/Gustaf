@@ -9,6 +9,8 @@ import { mockInvoke, mockSettings } from "./tauri";
 
 const PAGES: [SettingsPage, string][] = [
   ["general", "General"],
+  ["storage", "Storage"],
+  ["web", "Web tools"],
   ["shortcuts", "Keyboard shortcuts"],
   ["import", "Import"],
   ["providers", "Model providers"],
@@ -53,16 +55,27 @@ describe("Settings", () => {
     expect(screen.queryByRole("switch", { name: /raw CLI/i })).toBeNull();
   });
 
-  it("General has no voice input section; web tools checkbox is separate from the Brave key label", async () => {
+  it("General has no voice input, storage or web sections (they have their own pages)", async () => {
     mockSettings({});
     renderApp(<Settings />, makeApp({ settingsPage: "general" }));
-    const box = await screen.findByRole("checkbox", { name: "Enable web tools" });
+    await waitFor(() => expect(page()).toHaveTextContent("General"));
     expect(screen.queryByText("Voice input")).toBeNull();
-    expect(screen.queryByLabelText("Transcription provider")).toBeNull();
-    expect(screen.queryByText("Transcription model")).toBeNull();
-    const key = screen.getByText("Brave API key");
-    expect(box.closest("label")).not.toBe(key.closest("label"));
-    expect(box.closest("label")).not.toContainElement(key);
+    expect(screen.queryByText("Web tools for API models")).toBeNull();
+    expect(screen.queryByText("Clean up idle workspaces")).toBeNull();
+  });
+
+  it("the web tools page has a labelled switch and separate labelled fields", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "web" }));
+    expect(await screen.findByRole("switch", { name: "Enable web tools" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByLabelText(/Brave API key/)).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Denied domains")).toBeInTheDocument();
+  });
+
+  it("the storage page holds the workspace clean-up", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "storage" }));
+    expect(await screen.findByRole("switch", { name: "Clean up idle workspaces" })).toBeInTheDocument();
   });
 
   it("English is the default UI language even when the system language is Russian", () => {

@@ -50,7 +50,97 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "pickModel", label: "pickModel", combo: "Cmd+1-9", display: "⌘1–9", scope: "composer" },
 ];
 
-export const shortcut = (id: ShortcutId): Shortcut => SHORTCUTS.find((s) => s.id === id)!;
+/** Shortcuts the user may rebind: the ones App.tsx / ChatView match through `matches()`. The message box keys and the global stop shortcut stay fixed. */
+export const EDITABLE_SHORTCUTS: readonly ShortcutId[] = ["settings", "newChat", "newScratchChat", "chatBack", "chatForward", "turnPrev", "turnNext", "search"];
+
+let overrides: Partial<Record<ShortcutId, string>> = {};
+let version = 0;
+const listeners = new Set<() => void>();
+
+/** The user's bindings by shortcut id (only editable ids with valid combos survive). */
+export const getShortcutOverrides = () => overrides;
+export const shortcutsVersion = () => version;
+export function subscribeShortcuts(fn: () => void) {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
+/** Replaces the user's bindings. Unknown ids, fixed shortcuts and combos that fail `validateBinding` are dropped (a stale or hand-edited setting cannot break the keyboard). */
+export function setShortcutOverrides(raw: unknown) {
+  let next: Partial<Record<ShortcutId, string>> = {};
+  if (raw && typeof raw === "object") {
+    for (const [id, combo] of Object.entries(raw as Record<string, unknown>)) {
+      if (!EDITABLE_SHORTCUTS.includes(id as ShortcutId) || typeof combo !== "string") continue;
+      if (combo !== SHORTCUTS.find((s) => s.id === id)!.combo) next[id as ShortcutId] = combo;
+    }
+    // Each binding is checked against all the others (so swapping two shortcuts stays valid); drop offenders until stable.
+    for (let changed = true; changed;) {
+      changed = false;
+      const applied = SHORTCUTS.map((s) => (next[s.id] ? { ...s, combo: next[s.id]! } : s));
+      for (const id of Object.keys(next) as ShortcutId[]) {
+        if (!validateBinding(id, next[id]!, applied).ok) { const { [id]: _drop, ...rest } = next; next = rest; changed = true; break; }
+      }
+    }
+  }
+  overrides = next;
+  version++;
+  listeners.forEach((fn) => fn());
+}
+
+/** Text of a combo with the macOS symbols (what `Shortcut.display` holds), e.g. `Cmd+Shift+K` -> `⌘⇧K`. */
+export function displayOfCombo(combo: string): string {
+  const p = parseCombo(combo);
+  const names: Record<string, string> = { Escape: "Esc", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Enter: "↵", Backspace: "⌫", Delete: "⌦", Tab: "⇥" };
+  const key = names[p.key] ?? (p.key.length === 1 ? p.key.toUpperCase() : p.key);
+  return `${p.cmd ? "⌘" : ""}${p.ctrl ? "⌃" : ""}${p.shift ? "⇧" : ""}${p.alt ? "⌥" : ""}${key}`;
+}
+
+/** The shortcut as it is bound now (the user's combo replaces the default). */
+function effective(s: Shortcut): Shortcut {
+  const combo = overrides[s.id];
+  return combo ? { ...s, combo, display: displayOfCombo(combo) } : s;
+}
+export const effectiveShortcuts = (): Shortcut[] => SHORTCUTS.map(effective);
+export const shortcut = (id: ShortcutId): Shortcut => effective(SHORTCUTS.find((s) => s.id === id)!);
+export const isCustomized = (id: ShortcutId) => !!overrides[id];
+
+/** Where a shortcut is active, for conflict messages: everywhere in the app, or only in the message box / model picker. */
+export const shortcutContext = (s: Shortcut): "app" | "global" | "composer" => s.scope;
+
+export type BindingError = "needsCmd" | "reserved" | "unsupported" | "conflict";
+export type BindingCheck = { ok: true } | { ok: false; error: BindingError; with?: ShortcutId };
+
+/** System keys the app must not take over (quit, close window, minimize, hide). */
+const RESERVED_SYSTEM_COMBOS: readonly string[] = ["Cmd+Q", "Cmd+W", "Cmd+M", "Cmd+H"];
+
+/**
+ * Whether `combo` may be bound to `id`. App shortcuts must include Cmd (never a bare or Shift-only key, which the message
+ * box needs for typing), must not take the editing keys (copy, paste, undo, ...) or system keys, and must not fire on the
+ * same key press as another shortcut. App and global shortcuts fire everywhere, so they also collide with message-box keys.
+ */
+export function validateBinding(id: ShortcutId, combo: string, list: readonly Shortcut[] = effectiveShortcuts()): BindingCheck {
+  if (!EDITABLE_SHORTCUTS.includes(id)) return { ok: false, error: "unsupported" };
+  const p = parseCombo(combo);
+  if (!p.key || p.key === "1-9" || !p.cmd) return { ok: false, error: p.cmd ? "unsupported" : "needsCmd" };
+  const mine = expand(combo);
+  if ([...RESERVED_EDIT_COMBOS, ...RESERVED_SYSTEM_COMBOS].some((r) => expand(r).some((c) => mine.includes(c)))) return { ok: false, error: "reserved" };
+  const other = list.find((s) => s.id !== id && expand(s.combo).some((c) => mine.includes(c)));
+  return other ? { ok: false, error: "conflict", with: other.id } : { ok: true };
+}
+
+/** Combo string for a key press while recording; null for a lone modifier key (keep waiting), "" for a key that cannot be bound. Letters use the physical key so layouts do not matter. */
+export function comboFromEvent(e: KeyLike, plat: Platform = platform): string | null {
+  if (["Meta", "Control", "Shift", "Alt", "AltGraph", "OS"].includes(e.key)) return null;
+  const mac = plat === "macos";
+  // Cmd is Command on macOS and Ctrl elsewhere; the other modifier of the pair cannot be expressed.
+  if (mac ? e.ctrlKey : e.metaKey) return "";
+  const cmd = mac ? e.metaKey : e.ctrlKey;
+  let key = e.key;
+  if (e.code && /^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
+  else if (key.length === 1) key = key.toUpperCase();
+  if (key === " " || key === "Dead" || key === "Unidentified") return "";
+  return [cmd && "Cmd", e.shiftKey && "Shift", e.altKey && "Alt", key].filter(Boolean).join("+");
+}
 
 /** Text shown for a shortcut: macOS symbols on macOS, `Ctrl+...` elsewhere (Windows reserves Ctrl+Shift+Esc for Task Manager, so the global one differs there). */
 export function shortcutDisplay(s: Shortcut, p: Platform = platform): string {

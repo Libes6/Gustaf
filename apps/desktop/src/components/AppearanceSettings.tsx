@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useT, type Key } from "../i18n";
 import { getThemePrefs, setThemePrefs, subscribeTheme } from "../lib/theme";
+import { SettingRow, SettingsSection } from "./SettingRow";
 import { ACCENT_PRESETS, CHAT_WIDTHS, normalizeHex, THEME_MODES, type ChatWidth, type ThemeMode } from "../lib/themeUtil";
 
 const MODE_LABEL: Record<ThemeMode, Key> = { system: "themeSystem", light: "themeLight", dark: "themeDark" };
@@ -15,28 +16,23 @@ export function AppearanceSettings() {
   const customOk = custom === "" || normalizeHex(custom) !== null;
   const isPreset = ACCENT_PRESETS.includes(prefs.accent);
   return (
-    <>
-      <h4 aria-level={2}>{t("appearance")}</h4>
-      <div className="card">
-        <div className="card-row">
-          <div className="grow"><div className="t">{t("themeLabel")}</div></div>
-          <div className="seg" role="group" aria-label={t("themeLabel")} style={{ margin: 0 }}>
+    <SettingsSection title={t("appearance")}>
+        <SettingRow id="theme" title={t("themeLabel")}>
+          <div className="seg" role="group" aria-label={t("themeLabel")}>
             {THEME_MODES.map((m) => (
               <button key={m} className={prefs.mode === m ? "active" : ""} aria-pressed={prefs.mode === m} onClick={() => setThemePrefs({ mode: m })}>{t(MODE_LABEL[m])}</button>
             ))}
           </div>
-        </div>
-        <div className="card-row">
-          <div className="grow"><div className="t">{t("chatWidth")}</div><div className="d">{t("chatWidthHint")}</div></div>
-          <div className="seg" role="group" aria-label={t("chatWidth")} style={{ margin: 0 }}>
+        </SettingRow>
+        <SettingRow id="chatWidth" title={t("chatWidth")} description={t("chatWidthHint")}>
+          <div className="seg" role="group" aria-label={t("chatWidth")}>
             {CHAT_WIDTHS.map((w) => (
               <button key={w} className={prefs.width === w ? "active" : ""} aria-pressed={prefs.width === w} onClick={() => setThemePrefs({ width: w })}>{t(WIDTH_LABEL[w])}</button>
             ))}
           </div>
-        </div>
-        <div className="card-row">
-          <div className="grow"><div className="t">{t("accentColor")}</div></div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        </SettingRow>
+        <SettingRow id="accent" title={t("accentColor")}>
+          <>
             {ACCENT_PRESETS.map((c) => (
               <button
                 key={c}
@@ -59,9 +55,8 @@ export function AppearanceSettings() {
               }}
               style={{ width: 150, background: "var(--bg-input)", border: `1px solid ${customOk ? "var(--border)" : "var(--red)"}`, borderRadius: 8, padding: "4px 8px", userSelect: "text" }}
             />
-          </div>
-        </div>
-      </div>
-    </>
+          </>
+        </SettingRow>
+    </SettingsSection>
   );
 }
