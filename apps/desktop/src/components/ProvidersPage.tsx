@@ -103,6 +103,9 @@ export function ProvidersPage() {
         <button className="btn-ghost small" onClick={refresh} disabled={busy} title={t("checkNow")}>
           <RefreshCw size={13} className={busy ? "spin" : ""} /> {minutes < 0 ? t("checkNow") : minutes < 1 ? t("provCheckedJustNow") : t("provCheckedMin", { count: minutes })}
         </button>
+        <button className="btn-ghost small" data-setting="providerCheckAll" title={t("providerCheckAllHint")} onClick={() => void app.checkAllProviders()} disabled={!!app.checkingProvider || !app.providers.some((p) => !p.disabled)}>
+          {t(app.checkingProvider ? "providerCheckingAll" : "providerCheckAll")}
+        </button>
         <button className="icon-btn" title={t("addProvider")} aria-label={t("addProvider")} onClick={() => setAdding({})}>
           <Plus size={15} />
         </button>

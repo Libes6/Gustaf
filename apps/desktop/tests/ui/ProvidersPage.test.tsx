@@ -192,6 +192,20 @@ describe("ProvidersPage", () => {
     expect(app.refreshModels).not.toHaveBeenCalled();
     expect(app.checkProvider).not.toHaveBeenCalled();
   });
+  it("Check all re-checks the providers through one action; it is off while a check runs and with nothing enabled", async () => {
+    const app = makeApp({ providers: [openai, router] });
+    const { rerenderApp } = renderApp(<ProvidersPage />, app);
+    await userEvent.click(screen.getByRole("button", { name: "Check all" }));
+    expect(app.checkAllProviders).toHaveBeenCalledTimes(1);
+    app.checkingProvider = "oa";
+    rerenderApp(<ProvidersPage />);
+    expect(screen.getByRole("button", { name: "Checking all…" })).toBeDisabled();
+  });
+
+  it("Check all is disabled when every provider is off", () => {
+    renderApp(<ProvidersPage />, makeApp({ providers: [{ ...openai, disabled: true }] }));
+    expect(screen.getByRole("button", { name: "Check all" })).toBeDisabled();
+  });
 });
 
 describe("ModelPicker", () => {

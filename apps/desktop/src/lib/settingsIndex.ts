@@ -61,6 +61,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: "memoryEnabled", page: "memory", title: "memoryEnabled" },
   { id: "memoryApproval", page: "memory", title: "memoryApproval" },
   { id: "memorySuggestAuto", page: "memory", title: "memorySuggestAuto", desc: "memorySuggestAutoHint" },
+  { id: "providerCheckAll", page: "providers", title: "providerCheckAll", desc: "providerCheckAllHint" },
   { id: "mobileSwitch", page: "mobile", title: "mobileSwitch" },
   { id: "mobilePort", page: "mobile", title: "mobilePort", desc: "mobilePortHint" },
   { id: "quickAskSwitch", page: "shortcuts", title: "quickAskSwitch", desc: "quickAskSwitchDesc" },

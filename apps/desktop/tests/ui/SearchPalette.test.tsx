@@ -308,7 +308,7 @@ describe("SearchPalette jumps", () => {
     expect(app.openChat).toHaveBeenCalledWith(12, null);
     expect(onClose).toHaveBeenCalled();
     fireEvent.change(input, { target: { value: "provid" } });
-    expect(screen.getByRole("option", { name: /Model providers/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: /Model providers/ })[0]).toBeInTheDocument();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(app.openSettings).toHaveBeenCalledWith("providers");
   });
