@@ -23,6 +23,8 @@ Desktop coding-agent app (Tauri 2 + React/TypeScript + Rust backend + Node sidec
 | `apps/mobile` | `npm run check` inside `apps/mobile` (typecheck + node tests) |
 | `scripts/`, version files, release docs | `npm run test:release`, `npm run version:check` |
 
+`npm run check` and `check:quick` also run ESLint and `prettier --check`; run `npm run format` (in `apps/desktop`) before committing TS changes and `cargo fmt` for Rust. Existing ESLint violations are in `apps/desktop/eslint-suppressions.json`: do not add to it, fix new ones.
+
 E2E tests skip without Google Chrome; say so if they were skipped.
 
 ## Definition of done
