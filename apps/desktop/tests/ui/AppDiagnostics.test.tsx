@@ -55,7 +55,7 @@ describe("AppDiagnostics", () => {
   it("shows provider state from the check data and errors from every source", async () => {
     renderApp(<AppDiagnostics />, app());
     await screen.findByText("Gustaf (this app)");
-    expect(screen.getByTestId("diag-provider-p1")).toHaveTextContent("Claude Code · Signed in");
+    expect(screen.getByTestId("diag-provider-p1")).toHaveTextContent("Claude Code · Authenticated");
     expect(screen.getByTestId("diag-provider-p2")).toHaveTextContent("Broken AI · Unavailable");
     const errors = screen.getByTestId("diag-errors");
     expect(errors).toHaveTextContent("Broken AI");

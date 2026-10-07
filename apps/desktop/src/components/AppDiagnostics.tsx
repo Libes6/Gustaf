@@ -32,8 +32,8 @@ function useProcesses() {
       try {
         const [procs, servers] = await Promise.all([invoke<ProcInfo[]>("process_snapshot"), mcpStdio.status().catch(() => [] as McpStatus[])]);
         if (!alive) return;
-        setList(procs);
-        setMcp(servers);
+        setList(Array.isArray(procs) ? procs : []);
+        setMcp(Array.isArray(servers) ? servers : []);
         setUnsupported(false);
       } catch {
         if (alive) setUnsupported(true);
