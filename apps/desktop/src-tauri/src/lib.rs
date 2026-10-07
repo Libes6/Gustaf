@@ -131,6 +131,8 @@ pub fn run() {
             tools::run_command,
             hook_exec::run_hook,
             proc_tree::process_kill_tree,
+            proc_tree::process_snapshot,
+            proc_tree::app_logs_dir,
             git::git,
             git::git_status,
             git::git_commit_context,

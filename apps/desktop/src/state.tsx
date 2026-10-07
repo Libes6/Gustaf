@@ -18,7 +18,7 @@ export const modelKey = (m: { providerId: string; id: string }) => `${m.provider
 export type Selection = { providerId: string; model: string };
 export type Section = { id: string; name: string; chatIds: number[] };
 import type { ProviderHealth } from "./lib/providerDiagnostics";
-export type SettingsPage = "general" | "storage" | "web" | "shortcuts" | "import" | "providers" | "usage" | "agents" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile";
+export type SettingsPage = "general" | "storage" | "web" | "shortcuts" | "import" | "providers" | "usage" | "agents" | "computer" | "mcp" | "scheduled" | "git" | "rules" | "memory" | "archive" | "knowledge" | "mobile" | "diagnostics";
 
 function usePersisted<T>(key: string, initial: T, ready: boolean) {
   const [value, setValue] = useState<T>(initial);
