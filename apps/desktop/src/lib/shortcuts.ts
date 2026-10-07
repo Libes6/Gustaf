@@ -18,12 +18,12 @@ export function setShortcutPlatform(p: Platform) {
 export const cmdKey = (e: { metaKey: boolean; ctrlKey?: boolean }, p: Platform = platform) => (p === "macos" ? e.metaKey : !!e.ctrlKey && !e.metaKey);
 
 export type ShortcutScope = "app" | "global" | "composer";
-export type ShortcutId = "settings" | "newChat" | "newScratchChat" | "chatBack" | "chatForward" | "sendNewChat" | "turnPrev" | "turnNext" | "search" | "closeSettings" | "stopAgent" | "send" | "newLine" | "pickModel";
+export type ShortcutId = "settings" | "newChat" | "newScratchChat" | "chatBack" | "chatForward" | "sendNewChat" | "followUpOpposite" | "turnPrev" | "turnNext" | "search" | "closeSettings" | "stopAgent" | "send" | "newLine" | "pickModel";
 
 export type Shortcut = {
   id: ShortcutId;
   /** Key of the i18n dictionary for the description. */
-  label: "settings" | "newChat" | "newScratchChat" | "chatBack" | "chatForward" | "sendNewChat" | "turnPrev" | "turnNext" | "searchChats" | "closeSettings" | "stopAgent" | "send" | "newLine" | "pickModel";
+  label: "settings" | "newChat" | "newScratchChat" | "chatBack" | "chatForward" | "sendNewChat" | "followUpOpposite" | "turnPrev" | "turnNext" | "searchChats" | "closeSettings" | "stopAgent" | "send" | "newLine" | "pickModel";
   /** `Cmd+Shift+N` style: modifiers (Cmd, Shift, Alt, Ctrl) then a key name as in KeyboardEvent.key. `1-9` is a digit range. */
   combo: string;
   /** Shown in the settings list. */
@@ -42,6 +42,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "turnPrev", label: "turnPrev", combo: "Cmd+Alt+ArrowUp", display: "⌘⌥↑", scope: "app" },
   { id: "turnNext", label: "turnNext", combo: "Cmd+Alt+ArrowDown", display: "⌘⌥↓", scope: "app" },
   { id: "sendNewChat", label: "sendNewChat", combo: "Cmd+Alt+Enter", display: "⌘⌥↵", scope: "composer" },
+  { id: "followUpOpposite", label: "followUpOpposite", combo: "Cmd+Enter", display: "⌘↵", scope: "composer" },
   { id: "search", label: "searchChats", combo: "Cmd+K", display: "⌘K", scope: "app" },
   { id: "closeSettings", label: "closeSettings", combo: "Escape", display: "Esc", scope: "app" },
   { id: "stopAgent", label: "stopAgent", combo: "Cmd+Shift+Escape", display: "⌘⇧Esc", scope: "global", accelerator: "CommandOrControl+Shift+Escape" },
@@ -51,7 +52,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 ];
 
 /** Shortcuts the user may rebind: the ones App.tsx / ChatView match through `matches()`. The message box keys and the global stop shortcut stay fixed. */
-export const EDITABLE_SHORTCUTS: readonly ShortcutId[] = ["settings", "newChat", "newScratchChat", "chatBack", "chatForward", "turnPrev", "turnNext", "search"];
+export const EDITABLE_SHORTCUTS: readonly ShortcutId[] = ["settings", "newChat", "newScratchChat", "chatBack", "chatForward", "turnPrev", "turnNext", "search", "followUpOpposite"];
 
 let overrides: Partial<Record<ShortcutId, string>> = {};
 let version = 0;

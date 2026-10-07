@@ -5,7 +5,9 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
 import { useT } from "../../i18n";
-import { cmdKey } from "../../lib/shortcuts";
+import { cmdKey, matches, shortcutDisplay, shortcut } from "../../lib/shortcuts";
+import { useShortcuts } from "../../lib/shortcutPrefs";
+import type { FollowUpPlan } from "../../lib/followUp";
 import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
@@ -50,7 +52,10 @@ type Props = {
   running: boolean;
   mode: ChatMode;
   onModeChange: (m: ChatMode) => void;
-  onSend: () => void;
+  /** `opposite`: sent with the other-follow-up shortcut (only meaningful while `running`). */
+  onSend: (opposite?: boolean) => void;
+  /** What a message sent now does while a run is going (shown as a hint); absent: no hint. */
+  followUp?: FollowUpPlan;
   /** One prompt to several models, each in its own workspace (shift-click in the model list; new chats of git projects). */
   onFanOut?: (models: ModelInfo[]) => void;
   onStop: () => void;
@@ -115,7 +120,8 @@ export function Composer(p: Props) {
     const k = modelKey(m);
     return base.includes(k) ? base.filter((x) => x !== k) : base.length >= FAN_OUT_MAX ? base : [...base, k];
   });
-  const send = () => (fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend());
+  const send = (opposite = false) => (fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend(opposite));
+  useShortcuts();
   const effortMenu = useMenu();
   // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
   const levels = p.supports.levels?.length ? p.supports.levels : REASONING_LEVELS;
@@ -190,6 +196,7 @@ export function Composer(p: Props) {
       if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), (mentionList[Math.min(mention.hl, mentionList.length - 1)].chat ? void attachChat(mentionList[Math.min(mention.hl, mentionList.length - 1)].chat!) : insertMention(mentionList[Math.min(mention.hl, mentionList.length - 1)].path));
       if (e.key === "Escape") return setMention(null);
     }
+    if (p.running && matches(e.nativeEvent, "followUpOpposite")) return e.preventDefault(), send(true);
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       send();
@@ -420,11 +427,18 @@ export function Composer(p: Props) {
                 <Square size={12} fill="currentColor" />
               </button>
             ) : (
-              <button className="send" disabled={!text.trim() && !images.length} onClick={send} title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")} aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}>
+              <button className="send" disabled={!text.trim() && !images.length} onClick={() => send()} title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")} aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}>
                 <ArrowUp size={16} />
               </button>
             )}
             </div>
+            {p.running && p.followUp && (
+              <div className="followup-hint" role="status" data-testid="followup-hint">
+                {p.followUp.other
+                  ? t(p.followUp.action === "steer" ? "followUpHintSteer" : "followUpHintQueue", { keys: shortcutDisplay(shortcut("followUpOpposite")) })
+                  : t("followUpHintQueueOnly")}
+              </div>
+            )}
           </div>
         </div>
       </div>

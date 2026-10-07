@@ -18,7 +18,8 @@ type Over = {
   supports?: { computer: boolean; reasoning: boolean; levels?: ("low" | "medium" | "high" | "xhigh" | "max")[] };
   selectedModel?: ModelInfo | undefined;
   canCompact?: boolean;
-  onSend?: () => void;
+  onSend?: (opposite?: boolean) => void;
+  followUp?: { action: "queue" | "steer"; other: "queue" | "steer" | null; canSteer: boolean };
   onStop?: () => void;
   onCompact?: () => void;
   onRestore?: () => void;
@@ -38,7 +39,7 @@ function Harness(o: Over) {
       root={o.root ?? null} projectName={undefined} files={o.files ?? []}
       provider={provider()} selectedModel={"selectedModel" in o ? o.selectedModel : model} modelName="Model One"
       supports={o.supports ?? { computer: false, reasoning: false }}
-      running={o.running ?? false} mode={mode} onModeChange={(m) => { setMode(m); o.onModeChange?.(m); }} onSend={o.onSend ?? (() => {})} onStop={o.onStop ?? (() => {})}
+      running={o.running ?? false} followUp={o.followUp} mode={mode} onModeChange={(m) => { setMode(m); o.onModeChange?.(m); }} onSend={o.onSend ?? (() => {})} onStop={o.onStop ?? (() => {})}
       contextTokens={1234} lastInput={900} canCompact={o.canCompact ?? true} canRestore={false}
       onCompact={o.onCompact ?? (() => {})} onRestore={o.onRestore ?? (() => {})}
     />
@@ -500,5 +501,38 @@ it("⌘⌥↵ sends and opens a new chat; a plain Enter only sends", () => {
   fireEvent.keyDown(field, { key: "Enter", metaKey: true, altKey: true });
   expect(onSend).toHaveBeenCalledTimes(2);
   expect(app.newChat).toHaveBeenCalledWith(7);
+});
+
+describe("Composer follow-up while a run is going", () => {
+  type Plan = NonNullable<Over["followUp"]>;
+  const plan = (action: "queue" | "steer", canSteer = true): Plan => ({ action, other: canSteer ? (action === "steer" ? "queue" : "steer") : null, canSteer });
+
+  it("tells before sending whether the message refines the work or becomes the next request", () => {
+    const { rerenderApp } = renderApp(<Harness text="x" running followUp={plan("queue")} />);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(/^Next request, runs after this one\. ⌘↵: refine the current work instead/);
+    rerenderApp(<Harness text="x" running followUp={plan("steer")} />);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(/^Refines the current work\. ⌘↵: queue as the next request instead/);
+  });
+
+  it("a provider without steering shows that only queueing is available", () => {
+    renderApp(<Harness text="x" running followUp={plan("steer", false)} />);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent("cannot take changes mid-run");
+    expect(screen.getByTestId("followup-hint")).not.toHaveTextContent("⌘↵");
+  });
+
+  it("Enter sends with the default action, the opposite shortcut sends the other one", () => {
+    const onSend = vi.fn();
+    renderApp(<Harness text="x" running followUp={plan("queue")} onSend={onSend} />);
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(onSend).toHaveBeenLastCalledWith(false);
+    fireEvent.keyDown(box(), { key: "Enter", metaKey: true });
+    expect(onSend).toHaveBeenLastCalledWith(true);
+    expect(onSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("no hint while idle", () => {
+    renderApp(<Harness text="x" />);
+    expect(screen.queryByTestId("followup-hint")).not.toBeInTheDocument();
+  });
 });
 

@@ -76,6 +76,12 @@ function General() {
         <SettingRow id="onboarding" title={t("onboarding")} description={t("onboardingDesc")}>
           <button className="btn-soft" onClick={() => app.setOnboarded(false)}>{t("runAgain")}</button>
         </SettingRow>
+        <SettingRow id="followUp" title={t("followUpSetting")} description={t("followUpSettingDesc")}>
+          <div className="seg" role="group" aria-label={t("followUpSetting")}>
+            <button className={app.followUp === "queue" ? "active" : ""} aria-pressed={app.followUp === "queue"} onClick={() => app.setFollowUp("queue")}>{t("followUpQueue")}</button>
+            <button className={app.followUp === "steer" ? "active" : ""} aria-pressed={app.followUp === "steer"} onClick={() => app.setFollowUp("steer")}>{t("followUpSteer")}</button>
+          </div>
+        </SettingRow>
       </div>
       <AppearanceSettings />
       <ThemeEditor />

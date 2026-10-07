@@ -16,7 +16,7 @@ export const provider = (over: Partial<ProviderConfig> = {}): ProviderConfig => 
  */
 export function makeApp(over: Record<string, unknown> = {}): AppState {
   const base: Record<string, unknown> = {
-    ready: true, locale: "en", onboarded: true, selection: null, reasoning: "medium", access: "auto", computerUse: false, reviewCopy: false,
+    ready: true, locale: "en", onboarded: true, selection: null, reasoning: "medium", access: "auto", computerUse: false, reviewCopy: false, followUp: "queue",
     favorites: [], hiddenModels: [], checkedAt: 0, allowlist: [], sections: [], usage: {}, tokenStats: {}, limits: {}, loadingLimits: null, limitErrors: {},
     projects: [], chats: [], providers: [], models: [], modelErrors: {}, activeChat: null, draftProject: null,
     sessions: { active: "initial", items: [{ key: "initial", chatId: null, projectId: null }] },

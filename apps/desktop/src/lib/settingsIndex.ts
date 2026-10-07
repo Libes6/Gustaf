@@ -27,6 +27,7 @@ export const PAGE_LABEL: Record<SettingsPage, Key> = {
 export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: "language", page: "general", title: "language" },
   { id: "onboarding", page: "general", title: "onboarding", desc: "onboardingDesc" },
+  { id: "followUp", page: "general", title: "followUpSetting", desc: "followUpSettingDesc" },
   { id: "theme", page: "general", title: "themeLabel", keywords: ["appearance"] },
   { id: "chatWidth", page: "general", title: "chatWidth", desc: "chatWidthHint", keywords: ["appearance"] },
   { id: "accent", page: "general", title: "accentColor", keywords: ["appearance"] },
