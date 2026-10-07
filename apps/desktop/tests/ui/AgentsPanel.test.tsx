@@ -87,7 +87,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
     resetCliAgents();
   });
 
-  it("lists a background shell command with its elapsed time and a Stop button, then keeps it as ended", async () => {
+  it("lists a background shell command with its elapsed time and a Stop button, then shows it as status unknown", async () => {
     resetCliAgents();
     render();
     const stop = vi.fn();
@@ -99,7 +99,7 @@ describe("AgentsPanel: CLI-native subagents", () => {
     expect(stop).toHaveBeenCalledTimes(1);
     act(() => finishCliAgents(1));
     expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument();
-    expect(screen.getByText("Ended")).toBeInTheDocument();
+    expect(screen.getByText("Status unknown")).toBeInTheDocument();
     resetCliAgents();
   });
 

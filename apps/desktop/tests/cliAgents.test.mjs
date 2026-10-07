@@ -136,12 +136,12 @@ test('the completion notice closes the command (not a phantom agent); failure is
   assert.equal(getCliAgents()[0].state, 'failed');
 });
 
-test('a command still running when the run ends is ended; stopping the run marks it stopped', () => {
+test('a command still running when the run ends ends as unknown (no result was reported); stopping the run marks it stopped', () => {
   const stop = () => {};
   trackCliAgents({ chatId: 1, root: '/p', stop }, [launched()], 100);
   assert.equal(getCliAgents()[0].stop, stop);
   finishCliAgents(1, 500);
-  assert.equal(getCliAgents()[0].state, 'ended');
+  assert.equal(getCliAgents()[0].state, 'unknown');
   assert.equal(getCliAgents()[0].stop, undefined);
   resetCliAgents();
   trackCliAgents({ chatId: 1, root: '/p' }, [launched()], 100);
@@ -160,5 +160,5 @@ test('runChatCore feeds background Bash activities into the store', async () => 
   const input = { chatId: 8, root: '/proj', history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }], access: 'readonly', allowlist: [], signal: new AbortController().signal, approve: async () => ({ ok: true }), target: async () => ({ adapter: {}, providerId: 'claude-code', model: 'm', supportsTools: true, computerUse: false }) };
   await runChatCore(input, deps, {});
   assert.deepEqual(live, ['running']);
-  assert.equal(getCliAgents()[0].state, 'ended');
+  assert.equal(getCliAgents()[0].state, 'unknown');
 });
