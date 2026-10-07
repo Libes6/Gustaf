@@ -4,6 +4,8 @@ import { useDialogFocus } from "../lib/useDialogFocus";
 import { getVersion } from "@tauri-apps/api/app";
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useApp } from "../state";
+import { useT, type Key } from "../i18n";
+import { SettingRow, SettingsSection } from "./SettingRow";
 import { configuredUpdateTransport, updateError, UpdateController, type UpdateStatus, type UpdateTransport } from "../lib/updates";
 import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { getRunner, useRunnerVersion } from "../lib/scheduledRuntime";
@@ -103,7 +105,7 @@ function StandaloneUpdater({ transport }: { transport?: UpdateTransport }) {
 }
 function UpdaterContents({ updates: { status, controller, version } }: { updates: ReturnType<typeof useUpdates> }) {
   const app = useApp();
-  const ru = app.locale === "ru";
+  const t = useT();
   const live = useSyncExternalStore(subscribeLiveRuns, getLiveChats);
   useRunnerVersion();
   const active = app.sessions.items.some(session => session.busy) || live.size > 0 || (getRunner()?.running().size ?? 0) > 0;
@@ -114,26 +116,24 @@ function UpdaterContents({ updates: { status, controller, version } }: { updates
     if ((activeRef.current || getLiveChats().size > 0 || (getRunner()?.running().size ?? 0) > 0) && !allowInterrupt) return;
     setConfirming(false); void controller.install();
   };
-  const label = ru ? {
-    disabled: "Обновления недоступны: сборка без ключа подписи или неподдерживаемый формат установки.", idle: "Проверка при запуске и вручную.", checking: "Проверяем…", current: "Доступных обновлений нет.", available: "Доступно обновление", downloading: "Скачивание и проверка подписи…", downloaded: "Подпись проверена. Обновление готово к установке.", installing: "Установка…", error: "Ошибка обновления",
-  } : { disabled: "Updates are unavailable: build unconfigured or installation format unsupported.", idle: "Checks at startup and manually.", checking: "Checking…", current: "No update available.", available: "Update available", downloading: "Downloading and verifying signature…", downloaded: "Signature verified. Ready to install.", installing: "Installing…", error: "Update failed" };
+  const label = (kind: typeof status.kind) => t(`updaterStatus_${kind}` as Key);
   return <>
-    <h4>{ru ? "Обновления приложения" : "Application updates"}</h4>
-    <div className="card"><div className="card-row"><div className="grow">
-      <div className="t">Gustaf {version || (ru ? "— версия недоступна" : "— version unavailable")}</div>
-      <div className="d" role="status">{label[status.kind]} {"version" in status ? status.version : ""}</div>
-    </div><button className="btn-soft" disabled={["disabled", "checking", "downloading", "installing"].includes(status.kind)} onClick={() => void controller.check()}>{ru ? "Проверить" : "Check"}</button></div>
-    {"notes" in status && status.notes && <div className="card-row" style={{ whiteSpace: "pre-wrap" }}>{status.notes}</div>}
-    {status.kind === "available" && <div className="card-row"><button className="btn-soft" onClick={() => void controller.download()}>{ru ? "Скачать" : "Download"}</button></div>}
-    {status.kind === "downloading" && <div className="card-row"><progress aria-label={ru ? "Загрузка обновления" : "Update download"} max={status.total || 1} value={status.total ? Math.min(status.received ?? 0, status.total) : undefined} /> {Math.round((status.received ?? 0) / 1024)} KiB {status.total ? `/ ${Math.round(status.total / 1024)} KiB` : ""}</div>}
-    {status.kind === "downloaded" && <div className="card-row"><button className="btn-soft" onClick={() => { setAllowInterrupt(false); setConfirming(true); }}>{ru ? "Установить и перезапустить" : "Install and restart"}</button></div>}
-    {confirming && status.kind === "downloaded" && <div className="card-row" role="dialog" aria-label={ru ? "Подтвердить установку" : "Confirm installation"}>
-      <div>{ru ? "Установить обновление и перезапустить приложение?" : "Install the update and restart the application?"}</div>
-      {active && <label><input type="checkbox" checked={allowInterrupt} onChange={e => setAllowInterrupt(e.target.checked)} />{ru ? "Разрешаю прервать активную генерацию" : "Allow interrupting active generation"}</label>}
-      <button className="btn-soft" disabled={active && !allowInterrupt} onClick={install}>{ru ? "Подтвердить перезапуск" : "Confirm restart"}</button>
-      <button className="btn-soft" onClick={() => setConfirming(false)}>{ru ? "Отмена" : "Cancel"}</button>
-    </div>}
-    <div className="card-row"><div className="d">{ru ? "Linux: обновление внутри приложения доступно только для AppImage. DEB/RPM обновляйте вручную." : "Linux: in-app updates require AppImage. Update DEB/RPM manually."}</div></div>
-    {status.kind === "error" && <div className="error-box" role="alert">{status.category === "signature" ? (ru ? "Подпись не прошла проверку. Установка заблокирована. " : "Signature verification failed. Installation blocked. ") : status.category === "network" ? (ru ? "Проверьте подключение и повторите проверку. " : "Check your connection and retry. ") : ""}{status.error}</div>}</div>
+    <SettingsSection title={t("updaterTitle")}>
+      <SettingRow id="updaterCheck" title={<>Gustaf {version || t("updaterVersionUnavailable")}</>} description={<span role="status">{label(status.kind)} {"version" in status ? status.version : ""}</span>}>
+        <button className="btn-soft" disabled={["disabled", "checking", "downloading", "installing"].includes(status.kind)} onClick={() => void controller.check()}>{t("updaterCheck")}</button>
+      </SettingRow>
+      {"notes" in status && status.notes && <div className="card-row" style={{ whiteSpace: "pre-wrap" }}>{status.notes}</div>}
+      {status.kind === "available" && <div className="card-row"><button className="btn-soft" onClick={() => void controller.download()}>{t("updaterDownload")}</button></div>}
+      {status.kind === "downloading" && <div className="card-row"><progress aria-label={t("updaterDownloadAria")} max={status.total || 1} value={status.total ? Math.min(status.received ?? 0, status.total) : undefined} /> {Math.round((status.received ?? 0) / 1024)} KiB {status.total ? `/ ${Math.round(status.total / 1024)} KiB` : ""}</div>}
+      {status.kind === "downloaded" && <div className="card-row"><button className="btn-soft" onClick={() => { setAllowInterrupt(false); setConfirming(true); }}>{t("updaterInstall")}</button></div>}
+      {confirming && status.kind === "downloaded" && <div className="card-row" role="dialog" aria-label={t("updaterConfirmAria")}>
+        <div>{t("updaterConfirmText")}</div>
+        {active && <label><input type="checkbox" checked={allowInterrupt} onChange={e => setAllowInterrupt(e.target.checked)} />{t("updaterAllowInterrupt")}</label>}
+        <button className="btn-soft" disabled={active && !allowInterrupt} onClick={install}>{t("updaterConfirmRestart")}</button>
+        <button className="btn-soft" onClick={() => setConfirming(false)}>{t("cancel")}</button>
+      </div>}
+      <SettingRow title={<span className="d">{t("updaterLinuxNote")}</span>} />
+      {status.kind === "error" && <div className="error-box" role="alert">{status.category === "signature" ? t("updaterSignatureFailed") : status.category === "network" ? t("updaterNetworkFailed") : ""}{status.error}</div>}
+    </SettingsSection>
   </>;
 }

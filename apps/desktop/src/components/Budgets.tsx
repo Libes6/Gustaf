@@ -1,4 +1,5 @@
 import { Info, OctagonAlert, TriangleAlert, X } from "lucide-react";
+import { SettingRow } from "./SettingRow";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useT, type Key } from "../i18n";
 import { db, getSetting, setSetting } from "../lib/api";
@@ -134,16 +135,12 @@ const parsePercent = (text: string): { ok: true; value: number } | { ok: false }
   return value === undefined ? { ok: false } : { ok: true, value };
 };
 
-function FieldRow({ title, desc, state, level, error, children }: { title: string; desc: string; state?: string; level?: string; error?: string; children: ReactNode }) {
-  return <div className="card-row">
-    <div className="grow">
-      <div className="t">{title}</div>
-      <div className="d">{desc}</div>
-      {state && <div className={`d budget-state ${level ?? ""}`}>{state}</div>}
-      {error && <div className="budget-error" role="alert">{error}</div>}
-    </div>
-    {children}
-  </div>;
+function FieldRow({ id, title, desc, state, level, error, children }: { id: string; title: string; desc: string; state?: string; level?: string; error?: string; children: ReactNode }) {
+  return <SettingRow id={id} title={title} description={<>
+    {desc}
+    {state && <div className={`d budget-state ${level ?? ""}`}>{state}</div>}
+    {error && <div className="budget-error" role="alert">{error}</div>}
+  </>}>{children}</SettingRow>;
 }
 
 /** Edits as text and commits on blur/Enter; invalid input keeps the stored value and shows an error. */
@@ -185,13 +182,13 @@ export function BudgetsSection() {
     <h4 aria-level={2}>{t("budgets")}</h4>
     <p className="h4-sub">{t("budgetsLead")}</p>
     <div className="card">
-      <FieldRow title={t("budgetDayLimit")} desc={t("budgetDayLimitDesc")} state={describe(t, t("budgetToday"), day, usage.day, usage.failed)} level={levelClass(day)} error={invalid.day ? t("budgetLimitInvalid") : undefined}>
+      <FieldRow id="budgetDayLimit" title={t("budgetDayLimit")} desc={t("budgetDayLimitDesc")} state={describe(t, t("budgetToday"), day, usage.day, usage.failed)} level={levelClass(day)} error={invalid.day ? t("budgetLimitInvalid") : undefined}>
         <TextSetting label={t("budgetDayLimit")} value={settings.dayTokens} parse={parseTokenLimit} placeholder={t("budgetNoLimit")} invalid={flag("day")} onCommit={v => saveBudgets({ ...settings, dayTokens: v })} />
       </FieldRow>
-      <FieldRow title={t("budgetChatLimit")} desc={t("budgetChatLimitDesc")} state={app.activeChat === null ? undefined : describe(t, chatTitle ?? t("budgetThisChat"), chat, usage.chat, usage.failed)} level={levelClass(chat)} error={invalid.chat ? t("budgetLimitInvalid") : undefined}>
+      <FieldRow id="budgetChatLimit" title={t("budgetChatLimit")} desc={t("budgetChatLimitDesc")} state={app.activeChat === null ? undefined : describe(t, chatTitle ?? t("budgetThisChat"), chat, usage.chat, usage.failed)} level={levelClass(chat)} error={invalid.chat ? t("budgetLimitInvalid") : undefined}>
         <TextSetting label={t("budgetChatLimit")} value={settings.chatTokens} parse={parseTokenLimit} placeholder={t("budgetNoLimit")} invalid={flag("chat")} onCommit={v => saveBudgets({ ...settings, chatTokens: v })} />
       </FieldRow>
-      <FieldRow title={t("budgetWarnAt")} desc={t("budgetWarnAtDesc")} error={invalid.percent ? t("budgetPercentInvalid") : undefined}>
+      <FieldRow id="budgetWarnAt" title={t("budgetWarnAt")} desc={t("budgetWarnAtDesc")} error={invalid.percent ? t("budgetPercentInvalid") : undefined}>
         <TextSetting<number> label={t("budgetWarnAt")} value={settings.warnPercent} parse={parsePercent} invalid={flag("percent")} suffix="%" onCommit={v => saveBudgets({ ...settings, warnPercent: v })} />
       </FieldRow>
     </div>

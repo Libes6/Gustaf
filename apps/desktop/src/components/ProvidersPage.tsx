@@ -10,6 +10,7 @@ import { modelKey, useApp } from "../state";
 import { AddProviderDialog, type TileId } from "./AddProviderDialog";
 import { CursorAccounts } from "./CursorAccounts";
 import { ProviderIcon } from "./ProviderIcon";
+import { SettingRow } from "./SettingRow";
 
 type Clis = { id: CliId; version: string }[];
 type Row = { key: string; driver: Driver | null; p?: ProviderConfig };
@@ -180,13 +181,9 @@ function UnsetDriver({ driver, cli, version, busy, onConnectCli, onAdd }: { driv
       <p className="d">{t("provUnsetLead", { name: DRIVER_NAMES[driver] })} {t(`provAbout_${driver}`)}</p>
       {cli && (
         <div className="card">
-          <div className="card-row">
-            <div className="grow">
-              <div className="t">{cliName(cli)} CLI</div>
-              <div className="d">{version ? t("provCliFound", { version }) : t("provCliMissing")}</div>
-            </div>
+          <SettingRow title={`${cliName(cli)} CLI`} description={version ? t("provCliFound", { version }) : t("provCliMissing")}>
             <button className="btn-soft" aria-label={`${t("cliConnect")} ${cliName(cli)} CLI`} disabled={busy || !version} onClick={() => onConnectCli(cli)}>{t("cliConnect")}</button>
-          </div>
+          </SettingRow>
         </div>
       )}
       <div className="dialog-foot" style={{ justifyContent: "flex-start" }}>
@@ -231,73 +228,50 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
         <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), await app.refreshModels({ refresh: "startup" }), onDeleted())}><Trash2 size={14} /></button>
       </div>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("displayName")}</div>
-            <div className="d">{p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}</div>
-          </div>
+        <SettingRow id="providerName" title={t("displayName")} description={p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}>
           <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
-        </div>
+        </SettingRow>
       </div>
       <div className="card" aria-label={t("provDiagnostics")}>
         {p.kind === "cli" && (
-          <div className="card-row" data-testid="prov-version">
-            <div className="grow">
-              <div className="t">{t("provCliVersion")}</div>
-              {cliFound === false && <div className="err">{t("provCliNotFound", { name: cliName(p.cli!) })}</div>}
-            </div>
+          <SettingRow id="providerCliVersion" testId="prov-version" title={t("provCliVersion")} description={cliFound === false ? <div className="err">{t("provCliNotFound", { name: cliName(p.cli!) })}</div> : undefined}>
             <span className="d mono">{version ? `v${version}` : cliFound === false ? t("provNotFoundShort") : "—"}</span>
-          </div>
+          </SettingRow>
         )}
-        <div className="card-row" data-testid="prov-status">
-          <div className="grow">
-            <div className="t">{t(diag.state === "auth" ? "provNotAuthenticated" : diag.state === "ok" ? "provAuthenticated" : diag.state === "error" || diag.state === "cliMissing" ? "provUnavailable" : diag.state === "disabled" ? "providerOff" : "provNotChecked")}</div>
-            <div className="d">{t("providerCheckHint")}</div>
+        <SettingRow id="providerStatus" testId="prov-status" title={t(diag.state === "auth" ? "provNotAuthenticated" : diag.state === "ok" ? "provAuthenticated" : diag.state === "error" || diag.state === "cliMissing" ? "provUnavailable" : diag.state === "disabled" ? "providerOff" : "provNotChecked")} description={<>
+            {t("providerCheckHint")}
             {diag.detail && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{diag.detail}</div>}
-            {diag.state === "auth" && p.kind === "cli" && <div className="d">{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>}
-            <div className="d" data-testid="prov-checked">{diag.checkedAt ? t("provLastChecked", { time: t.date(diag.checkedAt) }) : diag.state === "unchecked" || !health ? t("provNeverChecked") : t("provCheckedUnknown")}</div>
+            {diag.state === "auth" && p.kind === "cli" && <div>{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>}
+            <div data-testid="prov-checked">{diag.checkedAt ? t("provLastChecked", { time: t.date(diag.checkedAt) }) : diag.state === "unchecked" || !health ? t("provNeverChecked") : t("provCheckedUnknown")}</div>
             {diag.stale && <div className="err" role="status">{t("provStale")}</div>}
-          </div>
+          </>}>
           <button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button>
-        </div>
+        </SettingRow>
       </div>
       <h4 aria-level={2}>{t("runtime")}</h4>
       <div className="card">
         {p.kind === "cli" ? (
           <>
-            <div className="card-row">
-              <div className="grow">
-                <div className="t">{t("command")}</div>
-                <div className="d">{t("cliCommandHint")}</div>
-              </div>
+            <SettingRow title={t("command")} description={t("cliCommandHint")}>
               <code className="mono">{p.cli}</code>
-            </div>
+            </SettingRow>
             {p.cliAuth === "key" && (
-              <div className="card-row">
-                <div className="grow">
-                  <div className="t">{t("apiKey")}</div>
-                  <div className="d">{t("cursorCliAccountHint")}</div>
-                </div>
+              <SettingRow id="providerApiKey" title={t("apiKey")} description={t("cursorCliAccountHint")}>
                 <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={(e) => setKey(e.target.value)} />
                 <button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button>
-              </div>
+              </SettingRow>
             )}
           </>
         ) : (
           <>
             {p.kind !== "cursor" && (
-              <div className="card-row">
-                <div className="grow t">Base URL</div>
-                <input aria-label="Base URL" className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
-              </div>
+              <SettingRow id="providerBaseUrl" title={t("baseUrl")}>
+                <input aria-label={t("baseUrl")} className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
+              </SettingRow>
             )}
-            <div className="card-row">
-              <div className="grow">
-                <div className="t">{t("apiKey")}</div>
-                <div className="d">{t("keyUnchanged")}</div>
-              </div>
+            <SettingRow id="providerApiKey" title={t("apiKey")} description={t("keyUnchanged")}>
               <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
-            </div>
+            </SettingRow>
           </>
         )}
       </div>

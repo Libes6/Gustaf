@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useApp } from "../state";
+import { SettingRow } from "./SettingRow";
 import { PROJECT_HOOKS_FILE, type Hook, type HookIssue } from "../agent/hooksCore";
 import { loadGlobalHooksText, loadHooksView, saveGlobalHooksText, setProjectHooksEnabled, type HooksView } from "../agent/hooksStore";
 
@@ -66,10 +67,9 @@ export function HooksSettings() {
       )}
       {root && (
         <div className="card">
-          <label className="card-row">
-            <span className="grow">{t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })}</span>
-            <input type="checkbox" checked={!!view?.enabled} disabled={!view} onChange={(e) => toggle(e.target.checked)} />
-          </label>
+          <SettingRow id="hooksProjectEnable" title={t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })}>
+            <input type="checkbox" aria-label={t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })} checked={!!view?.enabled} disabled={!view} onChange={(e) => toggle(e.target.checked)} />
+          </SettingRow>
           <p className="hint" role="note">{t("hooksWarning")}</p>
           {view && !view.project.exists && <p className="hint">{t("hooksNoFile", { file: PROJECT_HOOKS_FILE })}</p>}
           {view && view.project.exists && !view.enabled && <p className="hint">{t("hooksProjectOff")}</p>}

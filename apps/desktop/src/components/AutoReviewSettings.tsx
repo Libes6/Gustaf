@@ -1,3 +1,4 @@
+import { SettingRow } from "./SettingRow";
 import { useT } from "../i18n";
 import { setProjectOverride, type AutoTrigger } from "../lib/autoReview";
 import { saveAutoReview, useAutoReviewSettings } from "../lib/autoReviewStore";
@@ -15,41 +16,26 @@ export function AutoReviewSettings() {
   return (
     <>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("autoReviewSetting")}</div>
-            <div className="d">{t("autoReviewSettingDesc")}</div>
-            <div className="d">{t("autoReviewCost")}</div>
-          </div>
-          <button role="switch" aria-checked={s.enabled} aria-label={t("autoReviewSetting")} className={`toggle${s.enabled ? " on" : ""}`} onClick={() => saveAutoReview({ ...s, enabled: !s.enabled })} />
-        </div>
-        <div className="card-row">
-          <div className="grow"><div className="t">{t("autoReviewTrigger")}</div></div>
+        <SettingRow id="autoReview" title={t("autoReviewSetting")} description={<>{t("autoReviewSettingDesc")}<div>{t("autoReviewCost")}</div></>}
+          toggle={{ on: s.enabled, onChange: (on) => saveAutoReview({ ...s, enabled: on }) }} />
+        <SettingRow id="autoReviewTrigger" title={t("autoReviewTrigger")}>
           <select className="input" aria-label={t("autoReviewTrigger")} value={s.trigger} onChange={(e) => saveAutoReview({ ...s, trigger: e.target.value as AutoTrigger })}>
             <option value="afterRun">{t("autoReviewTriggerAfterRun")}</option>
             <option value="beforeAccept">{t("autoReviewTriggerBeforeAccept")}</option>
           </select>
-        </div>
-        {projects.length > 0 && (
-          <div className="card-row">
-            <div className="grow">
-              <div className="t">{t("autoReviewProjects")}</div>
-              <div className="d">{t("autoReviewProjectsHint")}</div>
-            </div>
-          </div>
-        )}
+        </SettingRow>
+        {projects.length > 0 && <SettingRow title={t("autoReviewProjects")} description={t("autoReviewProjectsHint")} />}
         {projects.map((p) => {
           const own = Object.prototype.hasOwnProperty.call(s.projects, p.path!) ? (s.projects[p.path!] ? "on" : "off") : "default";
           return (
-            <div className="card-row" key={p.id}>
-              <div className="grow"><div className="t">{p.name}</div></div>
+            <SettingRow key={p.id} title={p.name}>
               <select className="input" aria-label={t("autoReviewProjectLabel", { name: p.name })} value={own}
                 onChange={(e) => saveAutoReview(setProjectOverride(s, p.path!, e.target.value === "default" ? undefined : e.target.value === "on"))}>
                 <option value="default">{t("autoReviewProjectDefault")}</option>
                 <option value="on">{t("autoReviewProjectOn")}</option>
                 <option value="off">{t("autoReviewProjectOff")}</option>
               </select>
-            </div>
+            </SettingRow>
           );
         })}
       </div>

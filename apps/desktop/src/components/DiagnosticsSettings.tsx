@@ -1,3 +1,4 @@
+import { SettingRow } from "./SettingRow";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useApp } from "../state";
@@ -13,7 +14,7 @@ export function DiagnosticsSettings() {
  return <><h4>{t("diagnosticsTitle")}</h4><p className="lead">{t("diagnosticsLead")}</p>{!projects.length?<p>{t("diagnosticsNoProject")}</p>:<>
  <select className="input" aria-label={t("searchProject")} value={root} onChange={e=>setRoot(e.target.value)} disabled={busy}>{projects.map(p=><option key={p.id} value={p.path!}>{p.name}</option>)}</select>
  <label htmlFor="diagnostics-engine">{ru?"Источник диагностики":"Diagnostic source"}</label><select id="diagnostics-engine" className="input" value={config.engine??"command"} onChange={e=>change({...config,engine:e.target.value as "lsp"|"command"})}><option value="command">{ru?"Команда проекта":"Project command"}</option><option value="lsp">{ru?"Языковой сервер (LSP) + резервная команда":"Language server (LSP) + command fallback"}</option></select>
- <div className="card-row"><label className="grow" htmlFor="diagnostics-enabled">{t("diagnosticsAuto")}</label><input id="diagnostics-enabled" type="checkbox" checked={config.enabled} onChange={e=>change({...config,enabled:e.target.checked})}/></div>
+ <SettingRow id="diagnosticsAuto" title={<label htmlFor="diagnostics-enabled">{t("diagnosticsAuto")}</label>}><input id="diagnostics-enabled" type="checkbox" checked={config.enabled} onChange={e=>change({...config,enabled:e.target.checked})}/></SettingRow>
  {config.engine==="lsp"&&<div className="card">
    <p className="hint">{ru?"Используются только уже установленные TypeScript, Rust или Python серверы. Запуск анализа может выполнять скрипты проекта; агент запросит разрешение. Отсутствующий сервер не устанавливается автоматически.":"Uses installed TypeScript, Rust or Python servers only. Analysis can execute project scripts; the agent asks permission before launch. Missing servers are never installed automatically."}</p>
    {!servers.length&&<p className="hint">{ru?"Языковые серверы не найдены. Доступна резервная команда ниже.":"No language servers found. Configure a command fallback below."}</p>}

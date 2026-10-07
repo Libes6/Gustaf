@@ -1,3 +1,4 @@
+import { SettingRow } from "./SettingRow";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useT, type Key } from "../i18n";
@@ -64,10 +65,6 @@ function BudgetCell({ type, field, label, settings, onBad }: { type: AgentType; 
   );
 }
 
-function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
-  return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
-}
-
 /** Reading Codex's rollout files shows its subagents live (providers/codexRollout.ts); on unless switched off. */
 function CodexSessionsRow() {
   const t = useT();
@@ -82,13 +79,7 @@ function CodexSessionsRow() {
     setRolloutEnabled(v).catch(() => setOn(!v));
   };
   return (
-    <div className="card-row">
-      <div className="grow">
-        <div className="t">{t("codexSessions")}</div>
-        <div className="d">{t("codexSessionsDesc")}</div>
-      </div>
-      <Toggle on={on} label={t("codexSessions")} onChange={change} />
-    </div>
+    <SettingRow id="codexSessions" title={t("codexSessions")} description={t("codexSessionsDesc")} toggle={{ on, onChange: change }} />
   );
 }
 
@@ -106,13 +97,7 @@ function CodexAppServerRow() {
     setCodexTransport(v ? "app-server" : "exec").catch(() => setOn(!v));
   };
   return (
-    <div className="card-row">
-      <div className="grow">
-        <div className="t">{t("codexAppServer")}</div>
-        <div className="d">{t("codexAppServerDesc")}</div>
-      </div>
-      <Toggle on={on} label={t("codexAppServer")} onChange={change} />
-    </div>
+    <SettingRow id="codexAppServer" title={t("codexAppServer")} description={t("codexAppServerDesc")} toggle={{ on, onChange: change }} />
   );
 }
 
@@ -154,21 +139,15 @@ export function AgentSettingsSection() {
       <p className="h4-sub">{t("agentSettingsLead")}</p>
       <div className="card">
         {AGENT_TYPES.map((type) => (
-          <div className="card-row" key={type}>
-            <div className="grow">
-              <div className="t">{t("agentModelForType", { type: t(TYPE_KEY[type]) })}</div>
-              {type === "explore" && <div className="d">{t("agentModelForTypeDesc")}</div>}
-            </div>
+          <SettingRow key={type} id={`agentModel-${type}`} title={t("agentModelForType", { type: t(TYPE_KEY[type]) })} description={type === "explore" ? t("agentModelForTypeDesc") : undefined}>
             <select className="input narrow" aria-label={t("agentModelForType", { type: t(TYPE_KEY[type]) })} value={encode(s.models[type])} onChange={(e) => setModel(type, decode(e.target.value))}>
               <option value="">{t("agentModelSameAsChat")}</option>
               {options(agentModels, s.models[type])}
             </select>
-          </div>
+          </SettingRow>
         ))}
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentAllowedModels")}</div>
-            <div className="d">{t("agentAllowedModelsDesc")}</div>
+        <SettingRow id="agentAllowedModels" title={t("agentAllowedModels")} description={<>
+            {t("agentAllowedModelsDesc")}
             {!!s.allowedModels.length && (
               <div className="agent-chips">
                 {s.allowedModels.map((r) => (
@@ -179,29 +158,23 @@ export function AgentSettingsSection() {
                 ))}
               </div>
             )}
-          </div>
+        </>}>
           <select className="input narrow" aria-label={t("agentAllowedAdd")} value="" onChange={(e) => { const r = decode(e.target.value); if (r) saveAgentSettings({ ...s, allowedModels: [...s.allowedModels, r] }); }}>
             <option value="">{t("agentAllowedAdd")}</option>
             {options(agentModels.filter((r) => !s.allowedModels.some((x) => sameRef(x, r))), null)}
           </select>
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentCheapModel")}</div>
-            <div className="d">{t("agentCheapModelDesc")}</div>
-          </div>
+        </SettingRow>
+        <SettingRow id="agentCheapModel" title={t("agentCheapModel")} description={t("agentCheapModelDesc")}>
           <select className="input narrow" aria-label={t("agentCheapModel")} value={encode(s.cheapModel)} onChange={(e) => saveAgentSettings({ ...s, cheapModel: decode(e.target.value) })}>
             <option value="">{t("agentModelSameAsChat")}</option>
             {options(anyModels, s.cheapModel)}
           </select>
-        </div>
+        </SettingRow>
       </div>
 
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentBudgets")}</div>
-            <div className="d">{t("agentBudgetsDesc")}</div>
+        <SettingRow id="agentBudgets" stacked title={t("agentBudgets")} description={<>
+            {t("agentBudgetsDesc")}
             {badCells.size > 0 && <div className="budget-error" role="alert">{t("agentBudgetInvalid")}</div>}
             <table className="agent-budgets">
               <thead>
@@ -218,29 +191,10 @@ export function AgentSettingsSection() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentStopOnBudget")}</div>
-            <div className="d">{t("agentStopOnBudgetDesc")}</div>
-          </div>
-          <Toggle on={s.stopOnBudget} label={t("agentStopOnBudget")} onChange={(v) => saveAgentSettings({ ...s, stopOnBudget: v })} />
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentCancelDependents")}</div>
-            <div className="d">{t("agentCancelDependentsDesc")}</div>
-          </div>
-          <Toggle on={s.cancelDependents} label={t("agentCancelDependents")} onChange={(v) => saveAgentSettings({ ...s, cancelDependents: v })} />
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("agentNotifications")}</div>
-            <div className="d">{t("agentNotificationsDesc")}</div>
-          </div>
-          <Toggle on={s.notifications} label={t("agentNotifications")} onChange={(v) => saveAgentSettings({ ...s, notifications: v })} />
-        </div>
+        </>} />
+        <SettingRow id="agentStopOnBudget" title={t("agentStopOnBudget")} description={t("agentStopOnBudgetDesc")} toggle={{ on: s.stopOnBudget, onChange: (v) => saveAgentSettings({ ...s, stopOnBudget: v }) }} />
+        <SettingRow id="agentCancelDependents" title={t("agentCancelDependents")} description={t("agentCancelDependentsDesc")} toggle={{ on: s.cancelDependents, onChange: (v) => saveAgentSettings({ ...s, cancelDependents: v }) }} />
+        <SettingRow id="agentNotifications" title={t("agentNotifications")} description={t("agentNotificationsDesc")} toggle={{ on: s.notifications, onChange: (v) => saveAgentSettings({ ...s, notifications: v }) }} />
         <CodexAppServerRow />
         <CodexSessionsRow />
       </div>

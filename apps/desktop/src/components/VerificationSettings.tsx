@@ -1,3 +1,4 @@
+import { SettingRow } from "./SettingRow";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useApp } from "../state";
@@ -112,17 +113,15 @@ export function VerificationSettings() {
               <button className="btn-soft" onClick={suggest}>{t("verifSuggest")}</button>
             </div>
           </div>
-          <div className="card-row">
-            <label className="grow" htmlFor="verify-fix">{t("verifFixAttempts")}</label>
+          <SettingRow id="verifFixAttempts" title={<label htmlFor="verify-fix">{t("verifFixAttempts")}</label>}>
             <select id="verify-fix" className="input" style={{ width: "auto" }} value={settings.maxFixAttempts} onChange={(e) => patchSettings({ maxFixAttempts: Number(e.target.value) })}>
               {Array.from({ length: MAX_FIX_ATTEMPTS + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
             </select>
-          </div>
+          </SettingRow>
           <div className="card">
-            <label className="card-row">
-              <span className="grow">{t("verifFileEnable", { file: PROJECT_DONE_FILE })}</span>
-              <input type="checkbox" checked={settings.useProjectFile} onChange={(e) => patchSettings({ useProjectFile: e.target.checked })} />
-            </label>
+            <SettingRow id="verifFileEnable" title={t("verifFileEnable", { file: PROJECT_DONE_FILE })}>
+              <input type="checkbox" aria-label={t("verifFileEnable", { file: PROJECT_DONE_FILE })} checked={settings.useProjectFile} onChange={(e) => patchSettings({ useProjectFile: e.target.checked })} />
+            </SettingRow>
             <p className="hint" role="note">{t("verifFileWarning")}</p>
             {!file && <p className="hint">{t("verifFileNone", { file: PROJECT_DONE_FILE })}</p>}
             {file && !settings.useProjectFile && <p className="hint">{t("verifFileOff")}</p>}
