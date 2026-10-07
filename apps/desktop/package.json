@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "tauri": "node ../../scripts/tauri.mjs",
     "check": "node scripts/check-i18n.mjs && tsc --noEmit && npm test && npm run test:ui && npm run test:e2e && cargo test --manifest-path src-tauri/Cargo.toml",
+    "check:quick": "node scripts/check-i18n.mjs && tsc --noEmit && npm test && npm run test:ui",
     "predev": "node scripts/build-canvas.mjs",
     "prebuild": "node scripts/build-canvas.mjs",
     "test:canvas": "node --test tests/canvas.test.mjs",

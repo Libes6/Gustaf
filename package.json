@@ -11,6 +11,7 @@
     "preview": "npm run preview -w apps/desktop",
     "tauri": "node scripts/tauri.mjs",
     "check": "npm run check -w apps/desktop && npm run check -w packages/protocol",
+    "check:quick": "npm run check:quick -w apps/desktop",
     "test": "npm test -w apps/desktop",
     "test:ui": "npm run test:ui -w apps/desktop",
     "test:e2e": "npm run test:e2e -w apps/desktop",
