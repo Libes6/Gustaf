@@ -508,6 +508,16 @@ label.field > span { display: block; color: var(--text-2); margin-bottom: 5px; f
 .card-row.field { flex-direction: column; align-items: stretch; gap: 6px; }
 .card-row.field > .input { width: 100%; }
 .card-row.field .t { font-weight: 500; }
+/* Shared settings row (components/SettingRow.tsx): text left, control right; the control wraps under the text on a narrow window. */
+.card-row.setting-row { flex-wrap: wrap; row-gap: 8px; }
+.setting-row > .setting-text { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.setting-row > .setting-control { flex: 0 1 auto; max-width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.setting-row > .setting-control .seg { margin: 0; }
+.setting-row.stacked > .setting-control { flex: 1 1 100%; }
+.setting-row.stacked > .setting-control > .input { width: 100%; }
+.setting-row.setting-hit { animation: setting-hit 2.4s ease-out; }
+@keyframes setting-hit { 0%, 60% { background: var(--bg-active); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .setting-row.setting-hit { animation: none; background: var(--bg-active); } }
 .card-row.check { gap: 10px; cursor: pointer; }
 .card-row.check > input { flex: none; margin: 0; }
 .settings-inner.wide { max-width: 920px; }

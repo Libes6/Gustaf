@@ -1664,5 +1664,17 @@
   "goalNote_usage": "usage limit reached",
   "goalNote_budget": "token budget reached",
   "importFrom": "Import from",
-  "importCursorSub": "Pick Cursor projects to bring their chats."
+  "importCursorSub": "Pick Cursor projects to bring their chats.",
+  "storageLead": "Clean-up of old workspace checkouts to free disk space.",
+  "webTools": "Web tools",
+  "webLead": "Search and page reading for API models.",
+  "webToolsTitle": "Web tools for API models",
+  "webToolsDesc": "Brave Search API and public HTTPS pages. Search queries are sent to Brave. Auto mode asks before each action. CLI providers use their own tools.",
+  "webEnable": "Enable web tools",
+  "webBraveKey": "Brave API key",
+  "webAllow": "Allowed domains (empty = all public)",
+  "webDeny": "Denied domains",
+  "webSave": "Save",
+  "webSaved": "Saved",
+  "webRemoveKey": "Remove key"
 }

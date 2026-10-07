@@ -5,7 +5,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
+  Archive, BarChart3, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -35,6 +35,7 @@ import { ModelIcon } from "./ModelIcon";
 import { ProviderIcon } from "./ProviderIcon";
 import { ScheduledPage } from "./ScheduledPromptsSection";
 import { ShortcutsSettings } from "./ShortcutsSettings";
+import { SettingRow } from "./SettingRow";
 
 const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gear }[] }[] = [
   {
@@ -42,20 +43,17 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
     items: [
       { id: "general", label: "general", icon: Gear },
       { id: "shortcuts", label: "shortcuts", icon: Keyboard },
+      { id: "storage", label: "cleanupTitle", icon: HardDrive },
       { id: "import", label: "import", icon: Download },
       { id: "providers", label: "providers", icon: Boxes },
       { id: "usage", label: "usage", icon: BarChart3 },
       { id: "memory", label: "memoryTitle", icon: FileText },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
+  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "web", label: "webTools", icon: Globe }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
   { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
-
-function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
-  return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
-}
 
 function General() {
   const t = useT();
@@ -65,27 +63,40 @@ function General() {
       <h1>{t("general")}</h1>
       <p className="lead">{t("generalLead")}</p>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("language")}</div>
-          </div>
-          <div className="seg" role="group" aria-label={t("language")} style={{ margin: 0 }}>
+        <SettingRow id="language" title={t("language")}>
+          <div className="seg" role="group" aria-label={t("language")}>
             <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" onClick={() => app.setLocale("ru")}>Русский</button>
             <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" onClick={() => app.setLocale("en")}>English</button>
           </div>
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("onboarding")}</div>
-            <div className="d">{t("onboardingDesc")}</div>
-          </div>
+        </SettingRow>
+        <SettingRow id="onboarding" title={t("onboarding")} description={t("onboardingDesc")}>
           <button className="btn-soft" onClick={() => app.setOnboarded(false)}>{t("runAgain")}</button>
-        </div>
+        </SettingRow>
       </div>
       <AppearanceSettings />
-      <CleanupSettings />
-      <WebSettings />
       <UpdaterPanel />
+    </>
+  );
+}
+
+function StoragePage() {
+  const t = useT();
+  return (
+    <>
+      <h1>{t("cleanupTitle")}</h1>
+      <p className="lead">{t("storageLead")}</p>
+      <CleanupSettings />
+    </>
+  );
+}
+
+function WebPage() {
+  const t = useT();
+  return (
+    <>
+      <h1>{t("webTools")}</h1>
+      <p className="lead">{t("webLead")}</p>
+      <WebSettings />
     </>
   );
 }
@@ -185,16 +196,12 @@ function ComputerPage() {
     const i = setInterval(() => check(), 2000);
     return () => clearInterval(i);
   }, []);
-  const row = (ok: boolean | undefined, title: Key, desc: Key, pane: string, request?: boolean) => (
-    <div className="card-row">
-      <div className="grow">
-        <div className="t"><span className="status-dot" style={{ background: ok ? "var(--green)" : "var(--warn)" }} />{t(title)}</div>
-        <div className="d">{t(desc)}</div>
-      </div>
+  const row = (id: string, ok: boolean | undefined, title: Key, desc: Key, pane: string, request?: boolean) => (
+    <SettingRow id={id} title={<><span className="status-dot" style={{ background: ok ? "var(--green)" : "var(--warn)" }} />{t(title)}</>} description={t(desc)}>
       {ok ? <span className="d ok">{t("granted")}</span> : (
         isMac() ? <button className="btn-soft" onClick={() => (request && check(true), openUrl(`x-apple.systempreferences:com.apple.preference.security?${pane}`))}>{t("openSettings")}</button> : <span className="d">{t("computerUnsupportedHere")}</span>
       )}
-    </div>
+    </SettingRow>
   );
   return (
     <>
@@ -202,24 +209,13 @@ function ComputerPage() {
       <p className="lead">{t("computerLead")}</p>
       <h4 aria-level={2}>{t("permissions")}</h4>
       <div className="card">
-        {row(perm?.accessibility, "permAccessibility", "permAccessibilityDesc", "Privacy_Accessibility")}
-        {row(perm?.screen, "permScreen", "permScreenDesc", "Privacy_ScreenCapture", true)}
+        {row("permAccessibility", perm?.accessibility, "permAccessibility", "permAccessibilityDesc", "Privacy_Accessibility")}
+        {row("permScreen", perm?.screen, "permScreen", "permScreenDesc", "Privacy_ScreenCapture", true)}
       </div>
       <h4 aria-level={2}>{t("behavior")}</h4>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("computerEnable")}</div>
-            <div className="d">{t("computerEnableDesc")}</div>
-          </div>
-          <Toggle on={app.computerUse} label={t("computerUse")} onChange={(v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen)} />
-        </div>
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("computerSafety")}</div>
-            <div className="d">{t("computerSafetyDesc", { mod: displayKeys("⌘").replace(/\+$/, ""), stop: shortcutDisplay(shortcut("stopAgent")) })}</div>
-          </div>
-        </div>
+        <SettingRow id="computerEnable" title={t("computerEnable")} description={t("computerEnableDesc")} toggle={{ on: app.computerUse, onChange: (v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen) }} />
+        <SettingRow id="computerSafety" title={t("computerSafety")} description={t("computerSafetyDesc", { mod: displayKeys("⌘").replace(/\+$/, ""), stop: shortcutDisplay(shortcut("stopAgent")) })} />
       </div>
     </>
   );
@@ -233,13 +229,7 @@ function GitPage() {
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("reviewCopySetting")}</div>
-            <div className="d">{t("reviewCopySettingDesc")}</div>
-          </div>
-          <Toggle on={app.reviewCopy === true} label={t("reviewCopySetting")} onChange={app.setReviewCopy} />
-        </div>
+        <SettingRow id="reviewCopy" title={t("reviewCopySetting")} description={t("reviewCopySettingDesc")} toggle={{ on: app.reviewCopy === true, onChange: app.setReviewCopy }} />
       </div>
       <AutoReviewSettings />
       <CommandRules />
@@ -302,7 +292,7 @@ function ArchivePage() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
+  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
 };
 
 export function Settings() {
