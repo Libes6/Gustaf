@@ -21,6 +21,7 @@ import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { ThemeEditor } from "./ThemeEditor";
 import { CleanupSettings } from "./CleanupSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
@@ -75,6 +76,7 @@ function General() {
         </SettingRow>
       </div>
       <AppearanceSettings />
+      <ThemeEditor />
       <UpdaterPanel />
     </>
   );
