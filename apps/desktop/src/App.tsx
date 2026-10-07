@@ -14,6 +14,7 @@ import { Settings } from "./components/Settings";
 import { Rail, Sidebar } from "./components/Sidebar";
 import { I18nProvider } from "./i18n";
 import { isSearchShortcut } from "./lib/searchUtil";
+import { loadShortcutBindings } from "./lib/shortcutPrefs";
 import { useAttentionNotifications, useChatStatusSync } from "./lib/attention";
 import { acceleratorOf, matches } from "./lib/shortcuts";
 import { useQuickAskHost } from "./lib/quickAskHost";
@@ -47,6 +48,8 @@ function Shell({ app }: { app: AppState }) {
     navigating.current = true;
     app.openChat(r.entry.chatId, r.entry.projectId);
   };
+
+  useEffect(() => void loadShortcutBindings(), []);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

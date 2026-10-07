@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { Settings } from "../../src/components/Settings";
 import { SETTING_ENTRIES } from "../../src/lib/settingsIndex";
+import { SHORTCUTS } from "../../src/lib/shortcuts";
 import { makeApp, project, renderApp } from "./render";
 import { mockSettings } from "./tauri";
 
@@ -64,6 +65,7 @@ describe("settings search", () => {
       mockSettings({});
       const { unmount } = renderApp(<Settings />, makeApp({ settingsPage: page, projects: [project()] }));
       await waitFor(() => {
+        for (const id of page === "shortcuts" ? SHORTCUTS.map((s) => `shortcut-${s.id}`) : []) expect(document.querySelector(`[data-setting="${id}"]`), id).not.toBeNull();
         for (const e of SETTING_ENTRIES.filter((x) => x.page === page)) expect(document.querySelector(`[data-setting="${e.id}"]`), `${page}/${e.id}`).not.toBeNull();
       });
       unmount();

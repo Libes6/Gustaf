@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { translate, useT } from "../i18n";
 import { searchSettings, type SettingHit } from "../lib/settingsIndex";
-import { SHORTCUTS } from "../lib/shortcuts";
+import { useShortcuts } from "../lib/shortcutPrefs";
 import { useApp } from "../state";
 
 /** Hits for a query in the current language and English (for the settings search field and the Cmd+K palette). */
@@ -15,9 +15,9 @@ export function useSettingsHits(query: string): SettingHit[] {
   );
 }
 
-// Shortcut list used by the search; replaced by the user's bindings once the shortcut editor exists.
+// Shortcut list used by the search: with the user's bindings.
 function useShortcutList() {
-  return SHORTCUTS;
+  return useShortcuts();
 }
 
 /**
