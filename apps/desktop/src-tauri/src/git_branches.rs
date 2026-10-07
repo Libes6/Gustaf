@@ -354,9 +354,17 @@ mod tests {
         root: PathBuf,
     }
 
+    /// `canonicalize` returns `\\?\C:\...` on Windows, which `git init --bare` and `git worktree add` reject ("Invalid argument").
+    fn plain(p: PathBuf) -> PathBuf {
+        match p.to_str().and_then(|s| s.strip_prefix(r"\\?\")) {
+            Some(rest) => PathBuf::from(rest),
+            None => p,
+        }
+    }
+
     fn fx() -> Fx {
         let tmp = tempfile::tempdir().unwrap();
-        let base = tmp.path().canonicalize().unwrap();
+        let base = plain(tmp.path().canonicalize().unwrap());
         let root = base.join("repo");
         fs::create_dir_all(&root).unwrap();
         g(&root, &["init", "-q"]);
@@ -449,8 +457,11 @@ mod tests {
         let e = switch_branch(&f.root, "other", false, false).unwrap_err();
         assert_eq!(e, "dirty: 2");
         assert_eq!(cur(&f).as_deref(), Some("main"));
+        // git on Windows may restore the stashed file with CRLF line endings.
         assert_eq!(
-            fs::read_to_string(f.root.join("a.txt")).unwrap(),
+            fs::read_to_string(f.root.join("a.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
             "edited\n"
         );
         assert!(f.root.join("new.txt").exists());
