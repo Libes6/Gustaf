@@ -68,6 +68,7 @@ struct Fixture {
     rt: Runtime,
     db_path: PathBuf,
     board: Arc<StatusBoard>,
+    bus: Arc<super::commands::CommandBus>,
 }
 
 struct Reply {
@@ -96,9 +97,10 @@ impl Fixture {
         let conn = crate::db::open(&db_path).unwrap();
         seed(&conn);
         let board = Arc::new(StatusBoard::default());
-        let handle = start(&config(Some(Ipv4Addr::LOCALHOST)), &db_path, dir.path(), board.clone()).unwrap();
+        let bus: Arc<super::commands::CommandBus> = Arc::default();
+        let handle = start(&config(Some(Ipv4Addr::LOCALHOST)), &db_path, dir.path(), board.clone(), bus.clone()).unwrap();
         let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        Fixture { _dir: dir, handle: Some(handle), conn, rt, db_path, board }
+        Fixture { _dir: dir, handle: Some(handle), conn, rt, db_path, board, bus }
     }
 
     fn handle(&self) -> &Handle {
@@ -153,19 +155,19 @@ fn refuses_to_bind_a_non_private_address() {
     let db_path = dir.path().join("app.db");
     crate::db::open(&db_path).unwrap();
     for ip in [Ipv4Addr::UNSPECIFIED, Ipv4Addr::new(8, 8, 8, 8), Ipv4Addr::new(100, 64, 0, 1), Ipv4Addr::new(172, 32, 0, 1)] {
-        let r = start(&config(Some(ip)), &db_path, dir.path(), Arc::default());
+        let r = start(&config(Some(ip)), &db_path, dir.path(), Arc::default(), Arc::default());
         assert!(r.is_err(), "{ip} must be refused");
     }
     // Without the test flag even loopback is refused.
     let strict = Config { allow_loopback: false, ..config(Some(Ipv4Addr::LOCALHOST)) };
-    assert!(start(&strict, &db_path, dir.path(), Arc::default()).is_err());
+    assert!(start(&strict, &db_path, dir.path(), Arc::default(), Arc::default()).is_err());
 }
 
 #[test]
 fn a_busy_port_is_reported_not_taken() {
     let fx = Fixture::new();
     let busy = fx.handle().addr().port();
-    let r = start(&Config { port: busy, ..config(Some(Ipv4Addr::LOCALHOST)) }, &fx.db_path, fx._dir.path(), Arc::default());
+    let r = start(&Config { port: busy, ..config(Some(Ipv4Addr::LOCALHOST)) }, &fx.db_path, fx._dir.path(), Arc::default(), Arc::default());
     assert!(r.err().unwrap().starts_with("port in use"));
 }
 
@@ -281,8 +283,8 @@ fn every_other_endpoint_needs_a_valid_token_and_fails_the_same_way() {
     let r = fx.request_raw("GET", "/v1/info", "Authorization: Basic abc\r\n".into(), None);
     assert_eq!(r.status, 401);
     assert_eq!(fx.request("GET", "/v1/nope", Some(&token), None).status, 404);
-    assert_eq!(fx.request("POST", "/v1/projects", Some(&token), Some("{}")).status, 405, "no write endpoints in this slice");
-    assert_eq!(fx.request("POST", "/v1/chats/1/messages", Some(&token), Some("{}")).status, 405);
+    assert_eq!(fx.request("POST", "/v1/projects", Some(&token), Some("{}")).status, 405, "projects are read-only");
+    assert_eq!(fx.request("POST", "/v1/chats/1/messages", Some(&token), Some("{}")).status, 400, "a message needs text");
 }
 
 #[test]
@@ -485,9 +487,117 @@ fn stopping_the_server_closes_the_port_and_a_new_code_is_needed_after_restart() 
     fx.handle.take().unwrap().stop();
     assert!(std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err(), "nothing listens any more");
     // Restart: same certificate (the fingerprint on the phone stays valid), same paired device, no leftover code.
-    let again = start(&config(Some(Ipv4Addr::LOCALHOST)), &fx.db_path, fx._dir.path(), fx.board.clone()).unwrap();
+    let again = start(&config(Some(Ipv4Addr::LOCALHOST)), &fx.db_path, fx._dir.path(), fx.board.clone(), Arc::default()).unwrap();
     assert_eq!(again.fingerprint(), fp);
     assert!(again.active_code().is_none());
     fx.handle = Some(again);
     assert_eq!(fx.request("GET", "/v1/info", Some(&token), None).status, 200);
+}
+
+// ---- Commands from the phone --------------------------------------------------------------------------------------------
+
+/// Stands in for the webview: records every command and answers with a scripted reply.
+struct FakeWebview {
+    bus: Arc<super::commands::CommandBus>,
+    log: Arc<Mutex<Vec<(String, Value)>>>,
+    answer: super::commands::Reply,
+}
+
+impl super::commands::Sink for FakeWebview {
+    fn emit(&self, id: u64, kind: &str, payload: &Value) {
+        self.log.lock().unwrap().push((kind.to_string(), payload.clone()));
+        let (bus, answer) = (self.bus.clone(), self.answer.clone());
+        tokio::spawn(async move {
+            bus.reply(id, answer);
+        });
+    }
+}
+
+fn answer(ok: bool, code: &str, data: Value) -> super::commands::Reply {
+    super::commands::Reply { ok, code: code.into(), message: String::new(), data }
+}
+
+fn attach(fx: &Fixture, answer: super::commands::Reply) -> Arc<Mutex<Vec<(String, Value)>>> {
+    let log = Arc::new(Mutex::new(Vec::new()));
+    fx.bus.set_sink(Some(Arc::new(FakeWebview { bus: fx.bus.clone(), log: log.clone(), answer })));
+    log
+}
+
+#[test]
+fn sending_a_message_is_forwarded_to_the_webview_and_accepted() {
+    let fx = Fixture::new();
+    let (_, token) = fx.pair("Phone");
+    let log = attach(&fx, answer(true, "", Value::Null));
+    let r = fx.request("POST", "/v1/chats/1/messages", Some(&token), Some(&json!({ "text": "  hello  ", "model": "gpt-x" }).to_string()));
+    assert_eq!(r.status, 202, "{}", r.body);
+    assert_eq!(r.json()["ok"], true);
+    let log = log.lock().unwrap();
+    assert_eq!(log.len(), 1);
+    assert_eq!(log[0].0, "send");
+    assert_eq!(log[0].1["chatId"], 1);
+    assert_eq!(log[0].1["text"], "hello", "the text is trimmed");
+    assert_eq!(log[0].1["model"], "gpt-x");
+    assert!(log[0].1["providerId"].is_null());
+}
+
+#[test]
+fn bad_sends_are_rejected_before_the_webview_hears_about_them() {
+    let fx = Fixture::new();
+    let (_, token) = fx.pair("Phone");
+    let log = attach(&fx, answer(true, "", Value::Null));
+    let post = |path: &str, body: &str| fx.request("POST", path, Some(&token), Some(body));
+    assert_eq!(post("/v1/chats/1/messages", r#"{"text":"   "}"#).status, 400);
+    assert_eq!(post("/v1/chats/1/messages", r#"{"nope":1}"#).status, 400);
+    assert_eq!(post("/v1/chats/1/messages", "not json").status, 400);
+    assert_eq!(post("/v1/chats/1/messages", &json!({ "text": "x".repeat(20_001) }).to_string()).status, 400);
+    assert_eq!(post("/v1/chats/9999/messages", r#"{"text":"hi"}"#).status, 404, "no such chat");
+    assert_eq!(post("/v1/chats/abc/messages", r#"{"text":"hi"}"#).status, 404);
+    assert_eq!(post("/v1/chats/9999/stop", "").status, 404);
+    assert!(log.lock().unwrap().is_empty());
+    // Not allowed: reading a stop, writing a project.
+    assert_eq!(fx.request("GET", "/v1/chats/1/stop", Some(&token), None).status, 405);
+    assert_eq!(fx.request("POST", "/v1/projects", Some(&token), Some("{}")).status, 405);
+}
+
+#[test]
+fn write_endpoints_need_the_token_like_everything_else() {
+    let fx = Fixture::new();
+    let log = attach(&fx, answer(true, "", Value::Null));
+    for (m, p) in [("POST", "/v1/chats/1/messages"), ("POST", "/v1/chats/1/stop"), ("POST", "/v1/chats")] {
+        assert_eq!(fx.request(m, p, None, Some(r#"{"text":"hi","projectId":1}"#)).status, 401, "{p}");
+        assert_eq!(fx.request(m, p, Some("not-a-token"), Some(r#"{"text":"hi","projectId":1}"#)).status, 401, "{p}");
+    }
+    assert!(log.lock().unwrap().is_empty());
+}
+
+#[test]
+fn the_webviews_refusals_become_the_matching_status() {
+    let fx = Fixture::new();
+    let (_, token) = fx.pair("Phone");
+    attach(&fx, answer(false, "busy", Value::Null));
+    assert_eq!(fx.request("POST", "/v1/chats/1/messages", Some(&token), Some(r#"{"text":"hi"}"#)).status, 409);
+    attach(&fx, answer(false, "failed", Value::Null));
+    assert_eq!(fx.request("POST", "/v1/chats/1/messages", Some(&token), Some(r#"{"text":"hi"}"#)).status, 500);
+    fx.bus.set_sink(None);
+    assert_eq!(fx.request("POST", "/v1/chats/1/messages", Some(&token), Some(r#"{"text":"hi"}"#)).status, 503, "no webview attached");
+}
+
+#[test]
+fn stop_and_new_chat_are_forwarded() {
+    let fx = Fixture::new();
+    let (_, token) = fx.pair("Phone");
+    let log = attach(&fx, answer(true, "", json!({ "chatId": 42 })));
+    let r = fx.request("POST", "/v1/chats/1/stop", Some(&token), None);
+    assert_eq!(r.status, 202, "{}", r.body);
+    let projects = fx.request("GET", "/v1/projects", Some(&token), None).json();
+    let project = projects[0]["id"].as_i64().unwrap();
+    assert_eq!(fx.request("POST", "/v1/chats", Some(&token), Some(&json!({ "projectId": 987654, "text": "hi" }).to_string())).status, 404, "unknown project");
+    let r = fx.request("POST", "/v1/chats", Some(&token), Some(&json!({ "projectId": project, "text": "start here", "title": " My chat " }).to_string()));
+    assert_eq!(r.status, 202, "{}", r.body);
+    assert_eq!(r.json()["chatId"], 42, "the webview's data comes back");
+    let log = log.lock().unwrap();
+    assert_eq!(log[0].0, "stop");
+    assert_eq!(log[0].1["chatId"], 1);
+    assert_eq!(log[1].0, "newChat");
+    assert_eq!(log[1].1["title"], "My chat");
 }

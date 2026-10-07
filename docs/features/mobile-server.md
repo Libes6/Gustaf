@@ -1,8 +1,8 @@
-# Mobile companion server (slice 1: read-only)
+# Mobile companion server (slice 2: read and send)
 
 A local HTTPS + WebSocket server inside the Tauri backend (`src-tauri/src/mobile_server.rs` and `src-tauri/src/mobile_server/`) that the phone app (`apps/mobile`) talks to over the LAN. **Off by default**; Settings > Mobile (`src/components/MobileSettings.tsx`) turns it on. The wire types are `@gustaf/protocol` (`PROTOCOL_VERSION` 1, routes under `/v1`).
 
-This slice is **read-only**: no endpoint changes anything except pairing (which creates a device row).
+Slice 1 was read-only. Slice 2 adds three write commands (send a message, stop a run, start a chat); everything else is still read-only, and pairing is the only thing that writes to the database directly.
 
 ## Lifecycle
 
@@ -64,11 +64,23 @@ The server opens `app.db` itself with two SQLite connections (WAL mode, so the w
 | Secrets in chats | Redaction, no tool output, no images, no paths | Redaction is pattern based; a secret in plain prose can pass |
 | Resource exhaustion | Connection, socket, body, time and result limits | A determined LAN host can still occupy connection slots |
 
+## Write API (slice 2)
+
+| Route | Body | Result |
+| --- | --- | --- |
+| `POST /v1/chats/:id/messages` | `{text, providerId?, model?}` | `202 {ok:true}` once the desktop accepted the run |
+| `POST /v1/chats/:id/stop` | none | `202` when a phone-started or live run was stopped, `404` when there was nothing to stop |
+| `POST /v1/chats` | `{projectId, text, title?}` | `202 {ok:true, chatId}` (chat created, first message running) |
+
+The agent loop lives in the webview, so the server cannot run anything itself. It validates the request (text 1..20,000 characters, body at most 96 KiB, the chat or project must exist), then forwards it to the webview as the Tauri event `mobile-command` and waits up to 10 s for `mobile_command_reply` (`mobile_server/commands.rs`; `lib/mobileCommands.ts` answers). `409` the chat is busy on the desktop, `404` unknown chat/project, `500` the desktop could not run it, `503`/`504` no webview / no answer (the window must be open). The run then continues on the desktop by itself, so a request returns as soon as it was accepted; the phone follows the result through the event socket (new messages arrive as they are stored, the status goes `running` to `done`).
+
+The run (`lib/mobileRun.ts`) uses the same core as an interactive send, with the whole chat history, and the rules of an unattended run: access is never above "auto", no Computer Use, no subagents, CLI agents that run their own tools (Codex, Claude Code, Cursor Agent) get read-only access, the model is the one that answered last in the chat (else the desktop's selection, or the one the phone names), and an approval request is shown on the desktop and never answered for the user (after the timeout the run stops as "needs attention"). Chats that run in their own workspace are refused. The chat is live on the desktop while the run goes on.
+
 ## Not covered / next
 
-- **Write endpoints**: send message, stop a run, resolve an approval (`POST /v1/chats/:id/messages`, `/stop`, `POST /v1/approvals/:id`), message streaming deltas and tool updates, approval events. This is the next task.
+- Resolving approvals from the phone, streaming text deltas and tool updates over the socket (today the phone sees messages when they are stored).
 - Relay or tunnel for use outside the LAN, mDNS discovery, IPv6, several interfaces at once.
-- The mobile client still uses unprefixed paths (`/pair`, `/projects`, `/events`) and no certificate pinning; it must move to `/v1` and the pinned transport.
+- The mobile client speaks `/v1` and pins the certificate through a native module (Android OkHttp, iOS URLSession; `apps/mobile/modules/gustaf-pinned`).
 - Not exercised on a real phone or a real LAN, only on loopback.
 
 ## Dependencies added (`src-tauri/Cargo.toml`, `apps/desktop/package.json`)

@@ -191,6 +191,7 @@ pub fn run() {
             mobile_server::mobile_devices,
             mobile_server::mobile_device_revoke,
             mobile_server::mobile_report_status,
+            mobile_server::mobile_command_reply,
             quick_ask::quick_ask_configure,
             quick_ask::quick_ask_show,
             quick_ask::quick_ask_hide,

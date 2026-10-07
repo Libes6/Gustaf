@@ -17,6 +17,7 @@ use super::{
     data::{self, Store, DEFAULT_CHATS, DEFAULT_MESSAGES, MAX_ACTIVE_DEVICES, MAX_CHATS, MAX_MESSAGES},
     events::{self, Detector, StatusBoard},
     net,
+    commands::{BusError, CommandBus},
     pairing::{self, PairError, PairingState, RateLimiter},
     PROTOCOL_VERSION,
 };
@@ -61,6 +62,11 @@ const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(15);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_PAIR_BODY: usize = 4 * 1024;
+/// A message from the phone: text up to `MAX_SEND_CHARS` characters, so up to 4 bytes each plus the JSON around it.
+const MAX_COMMAND_BODY: usize = 96 * 1024;
+const MAX_SEND_CHARS: usize = 20_000;
+/// How long a command waits for the webview to accept it (the run itself continues afterwards).
+const COMMAND_WAIT: Duration = Duration::from_secs(10);
 const MAX_SOCKETS: usize = 32;
 const MAX_SOCKETS_PER_DEVICE: usize = 4;
 /// Keep-alive ping interval; a socket that sent nothing (not even a pong) for `SOCKET_IDLE` is dropped.
@@ -73,6 +79,7 @@ const TOUCH_EVERY: Duration = Duration::from_secs(15);
 pub struct Ctx {
     pub store: Arc<Store>,
     pub board: Arc<StatusBoard>,
+    pub bus: Arc<CommandBus>,
     pub pairing: Mutex<PairingState>,
     /// Failed bearer-token checks per address (a token is 256 random bits, so this only stops pointless hammering).
     auth_limiter: Mutex<RateLimiter>,
@@ -89,10 +96,11 @@ pub struct Ctx {
 }
 
 impl Ctx {
-    pub fn new(store: Arc<Store>, board: Arc<StatusBoard>, shutdown: watch::Receiver<bool>, desktop_name: String, app_version: String, allow_loopback: bool) -> Ctx {
+    pub fn new(store: Arc<Store>, board: Arc<StatusBoard>, bus: Arc<CommandBus>, shutdown: watch::Receiver<bool>, desktop_name: String, app_version: String, allow_loopback: bool) -> Ctx {
         Ctx {
             store,
             board,
+            bus,
             pairing: Mutex::new(PairingState::default()),
             auth_limiter: Mutex::new(RateLimiter::new(20, Duration::from_secs(60), Duration::from_secs(60))),
             events: broadcast::channel(256).0,
@@ -256,7 +264,13 @@ async fn dispatch(ctx: Arc<Ctx>, peer: IpAddr, req: Request<Incoming>) -> Resp {
         (["v1", "chats"], true) => list_chats(&ctx, req.uri().query()).await,
         (["v1", "chats", id, "messages"], true) => list_messages(&ctx, id, req.uri().query()).await,
         (["v1", "events"], true) => events_socket(ctx, device, req),
-        (["v1", "info" | "projects" | "chats" | "events"], false) | (["v1", "chats", _, "messages"], false) => method_not_allowed("GET"),
+        (["v1", "chats"], false) if req.method() == Method::POST => new_chat(&ctx, req).await,
+        (["v1", "chats", id, "messages"], false) if req.method() == Method::POST => send_message(&ctx, id, req).await,
+        (["v1", "chats", id, "stop"], false) if req.method() == Method::POST => stop_chat(&ctx, id).await,
+        (["v1", "chats", _, "messages"], false) => method_not_allowed("GET, POST"),
+        (["v1", "chats", _, "stop"], _) => method_not_allowed("POST"),
+        (["v1", "chats"], false) => method_not_allowed("GET, POST"),
+        (["v1", "info" | "projects" | "events"], false) => method_not_allowed("GET"),
         _ => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
     }
 }
@@ -331,6 +345,119 @@ async fn list_messages(ctx: &Arc<Ctx>, id: &str, q: Option<&str>) -> Resp {
         Ok(None) => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
         Err(res) => res,
     }
+}
+
+// ---- Commands (phone to desktop) ---------------------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SendBody {
+    text: String,
+    provider_id: Option<String>,
+    model: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NewChatBody {
+    project_id: i64,
+    text: String,
+    title: Option<String>,
+}
+
+async fn read_body<T: serde::de::DeserializeOwned>(req: Request<Incoming>) -> Result<T, Resp> {
+    let body = match Limited::new(req.into_body(), MAX_COMMAND_BODY).collect().await {
+        Ok(b) => b.to_bytes(),
+        Err(_) => return Err(bad_request("Request body too large or unreadable")),
+    };
+    serde_json::from_slice::<T>(&body).map_err(|_| bad_request("Invalid JSON body"))
+}
+
+fn clean_text(raw: &str) -> Result<String, Resp> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return Err(bad_request("text must not be empty"));
+    }
+    if text.chars().count() > MAX_SEND_CHARS {
+        return Err(bad_request("text is too long"));
+    }
+    Ok(text.to_string())
+}
+
+/// Forwards a command to the webview and shapes its answer: accepted (202), or the webview's refusal.
+async fn forward(ctx: &Arc<Ctx>, kind: &str, payload: Value) -> Resp {
+    match ctx.bus.request(kind, payload, COMMAND_WAIT).await {
+        Ok(reply) if reply.ok => {
+            let mut body = match reply.data {
+                Value::Object(m) => m,
+                _ => serde_json::Map::new(),
+            };
+            body.insert("ok".into(), Value::Bool(true));
+            json(StatusCode::ACCEPTED, &Value::Object(body))
+        }
+        Ok(reply) => {
+            let message = data::clip_chars(&reply.message, 200);
+            match reply.code.as_str() {
+                "busy" => error(StatusCode::CONFLICT, "bad_request", if message.is_empty() { "The chat is busy" } else { &message }),
+                "not_found" => error(StatusCode::NOT_FOUND, "not_found", "Not found"),
+                "bad_request" => bad_request(if message.is_empty() { "Rejected" } else { &message }),
+                _ => error(StatusCode::INTERNAL_SERVER_ERROR, "internal", if message.is_empty() { "The desktop could not run this" } else { &message }),
+            }
+        }
+        Err(BusError::Timeout) => error(StatusCode::GATEWAY_TIMEOUT, "internal", "The desktop app did not answer. Is its window open?"),
+        Err(BusError::Unavailable) => error(StatusCode::SERVICE_UNAVAILABLE, "internal", "The desktop app is not ready"),
+    }
+}
+
+async fn chat_exists(ctx: &Arc<Ctx>, id: i64) -> Result<(), Resp> {
+    let store = ctx.store.clone();
+    if blocking(move || store.chat_exists(id)).await? { Ok(()) } else { Err(error(StatusCode::NOT_FOUND, "not_found", "Not found")) }
+}
+
+async fn send_message(ctx: &Arc<Ctx>, id: &str, req: Request<Incoming>) -> Resp {
+    let Some(chat_id) = number(id) else { return error(StatusCode::NOT_FOUND, "not_found", "Not found") };
+    let body: SendBody = match read_body(req).await {
+        Ok(b) => b,
+        Err(res) => return res,
+    };
+    let text = match clean_text(&body.text) {
+        Ok(t) => t,
+        Err(res) => return res,
+    };
+    if let Err(res) = chat_exists(ctx, chat_id).await {
+        return res;
+    }
+    let clip = |v: Option<String>| v.map(|s| data::clip_chars(s.trim(), 200)).filter(|s| !s.is_empty());
+    forward(ctx, "send", serde_json::json!({ "chatId": chat_id, "text": text, "providerId": clip(body.provider_id), "model": clip(body.model) })).await
+}
+
+async fn stop_chat(ctx: &Arc<Ctx>, id: &str) -> Resp {
+    let Some(chat_id) = number(id) else { return error(StatusCode::NOT_FOUND, "not_found", "Not found") };
+    if let Err(res) = chat_exists(ctx, chat_id).await {
+        return res;
+    }
+    forward(ctx, "stop", serde_json::json!({ "chatId": chat_id })).await
+}
+
+async fn new_chat(ctx: &Arc<Ctx>, req: Request<Incoming>) -> Resp {
+    let body: NewChatBody = match read_body(req).await {
+        Ok(b) => b,
+        Err(res) => return res,
+    };
+    let text = match clean_text(&body.text) {
+        Ok(t) => t,
+        Err(res) => return res,
+    };
+    let store = ctx.store.clone();
+    let projects = match blocking(move || store.projects()).await {
+        Ok(p) => p,
+        Err(res) => return res,
+    };
+    if !projects.iter().any(|p| p.id == body.project_id) {
+        return error(StatusCode::NOT_FOUND, "not_found", "Not found");
+    }
+    let title = body.title.map(|t| data::clip_chars(t.trim(), 200)).filter(|t| !t.is_empty());
+    forward(ctx, "newChat", serde_json::json!({ "projectId": body.project_id, "text": text, "title": title })).await
 }
 
 // ---- Pairing ----------------------------------------------------------------------------------------------------------

@@ -11,6 +11,7 @@
 //!
 //! This file is the lifecycle (`start`, `Handle`) and the Tauri commands the Settings page uses.
 
+mod commands;
 mod data;
 mod events;
 mod http;
@@ -75,7 +76,7 @@ fn io_err(what: &str, e: std::io::Error) -> String {
 }
 
 /// Starts the server. Errors (not private, port busy, no LAN address, files unusable) come back as messages.
-pub fn start(cfg: &Config, db_path: &Path, data_dir: &Path, board: Arc<StatusBoard>) -> Result<Handle, String> {
+pub fn start(cfg: &Config, db_path: &Path, data_dir: &Path, board: Arc<StatusBoard>, bus: Arc<commands::CommandBus>) -> Result<Handle, String> {
     let ip = match cfg.bind {
         Some(ip) => net::validate_bind(IpAddr::V4(ip), cfg.allow_loopback)?,
         None => net::detect_lan_ip().ok_or("no private LAN address found; connect to a Wi-Fi or Ethernet network first")?,
@@ -89,7 +90,7 @@ pub fn start(cfg: &Config, db_path: &Path, data_dir: &Path, board: Arc<StatusBoa
 
     let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("mobile-server").enable_all().build().map_err(|e| io_err("runtime", e))?;
     let (shutdown, shutdown_rx) = watch::channel(false);
-    let ctx = Arc::new(Ctx::new(store, board, shutdown_rx, cfg.desktop_name.clone(), cfg.app_version.clone(), cfg.allow_loopback));
+    let ctx = Arc::new(Ctx::new(store, board, bus, shutdown_rx, cfg.desktop_name.clone(), cfg.app_version.clone(), cfg.allow_loopback));
     {
         let _enter = runtime.enter();
         let listener = tokio::net::TcpListener::from_std(std_listener).map_err(|e| io_err("listener", e))?;
@@ -168,7 +169,18 @@ fn expiry_ms(expires: Instant) -> i64 {
 pub struct MobileServer {
     handle: Mutex<Option<Handle>>,
     board: Arc<StatusBoard>,
+    bus: Arc<commands::CommandBus>,
     last_error: Mutex<Option<String>>,
+}
+
+/// Delivers phone commands to the webview as the `mobile-command` event (lib/mobileCommands.ts answers with `mobile_command_reply`).
+struct TauriSink(AppHandle);
+
+impl commands::Sink for TauriSink {
+    fn emit(&self, id: u64, kind: &str, payload: &serde_json::Value) {
+        use tauri::Emitter;
+        let _ = self.0.emit("mobile-command", serde_json::json!({ "id": id, "kind": kind, "payload": payload }));
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -286,10 +298,12 @@ fn count_devices(db: &Db) -> usize {
 fn start_with(app: &AppHandle, server: &MobileServer, db: &Db, port: u16, explicit: bool) -> Result<(), String> {
     let dir = data_dir(app)?;
     let board = server.board.clone();
+    let bus = server.bus.clone();
+    bus.set_sink(Some(Arc::new(TauriSink(app.clone()))));
     let mk = |port: u16| Config { bind: None, port, allow_loopback: false, desktop_name: desktop_name(), app_version: app.package_info().version.to_string() };
-    let handle = match start(&mk(port), &dir.join("app.db"), &dir, board.clone()) {
+    let handle = match start(&mk(port), &dir.join("app.db"), &dir, board.clone(), bus.clone()) {
         // A remembered port that is taken now is not an error: pick another and remember that one.
-        Err(e) if !explicit && port != 0 && e.starts_with("port in use") => start(&mk(0), &dir.join("app.db"), &dir, board)?,
+        Err(e) if !explicit && port != 0 && e.starts_with("port in use") => start(&mk(0), &dir.join("app.db"), &dir, board, bus)?,
         other => other?,
     };
     let _ = db; // saved by the caller once the actual port is known
@@ -398,6 +412,12 @@ pub struct StatusReport {
 #[tauri::command]
 pub fn mobile_report_status(server: State<MobileServer>, statuses: Vec<StatusReport>) {
     server.board.replace(statuses.into_iter().map(|s| (s.chat_id, s.status)));
+}
+
+/// The webview's answer to a `mobile-command` event; ignored when the request already timed out.
+#[tauri::command]
+pub fn mobile_command_reply(server: State<MobileServer>, id: u64, ok: bool, code: Option<String>, message: Option<String>, data: Option<serde_json::Value>) {
+    server.bus.reply(id, commands::Reply { ok, code: code.unwrap_or_default(), message: message.unwrap_or_default(), data: data.unwrap_or(serde_json::Value::Null) });
 }
 
 /// Called once at startup: when the switch was left on, the server comes back up.

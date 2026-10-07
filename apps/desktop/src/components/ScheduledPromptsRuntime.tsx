@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useT } from "../i18n";
 import { answerScheduledApproval, useScheduledApprovals } from "../lib/scheduledApprovals";
 import { loadScheduled } from "../lib/scheduledPromptsStore";
+import { startMobileCommands } from "../lib/mobileCommands";
 import { startScheduledRuntime } from "../lib/scheduledRuntime";
 import { startWebhooks } from "../lib/webhooks";
 import { useApp } from "../state";
@@ -25,14 +26,17 @@ export function ScheduledPromptsRuntime() {
     let stop: (() => void) | undefined;
     let cancelled = false;
     let stopHooks: (() => void) | undefined;
+    let stopMobile: (() => void) | undefined;
     void loadScheduled().then(() => {
       if (cancelled) return;
       stop = startScheduledRuntime(() => appRef.current);
       stopHooks = startWebhooks();
+      stopMobile = startMobileCommands(() => appRef.current);
     });
     return () => {
       cancelled = true;
       stopHooks?.();
+      stopMobile?.();
       stop?.();
     };
   }, [ready]);
