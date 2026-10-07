@@ -5,7 +5,7 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Archive, BarChart3, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
+  Activity, Archive, BarChart3, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -18,6 +18,7 @@ import { SOURCE_LABELS } from "../lib/importers/common";
 import type { ProviderConfig } from "../providers/types";
 import { useApp, type SettingsPage } from "../state";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { AppDiagnostics } from "./AppDiagnostics";
 import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -49,6 +50,7 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "providers", label: "providers", icon: Boxes },
       { id: "usage", label: "usage", icon: BarChart3 },
       { id: "memory", label: "memoryTitle", icon: FileText },
+      { id: "diagnostics", label: "appDiagNav", icon: Activity },
     ],
   },
   { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "web", label: "webTools", icon: Globe }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
@@ -321,7 +323,7 @@ function useSettingTarget() {
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings,
+  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, mobile: MobileSettings, diagnostics: AppDiagnostics,
 };
 
 export function Settings() {

@@ -107,6 +107,99 @@ pub fn kill_tree_below(app: u32, pid: u32) -> Result<Vec<u32>, String> {
     if out.status.success() { Ok(vec![pid]) } else { Err(String::from_utf8_lossy(&out.stderr).trim().to_string()) }
 }
 
+/// One process of this app's tree, for Settings, Diagnostics. Read-only: nothing here can signal or change a process.
+#[derive(serde::Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcInfo {
+    pub pid: u32,
+    pub ppid: u32,
+    /// `ps` CPU percentage (a decaying average on macOS, lifetime average on Linux): good enough to spot a runaway.
+    pub cpu: f32,
+    pub rss_kb: u64,
+    pub elapsed_secs: u64,
+    /// The command line, cut to `MAX_COMMAND` characters. The UI scrubs secrets before showing it; the environment is never read.
+    pub command: String,
+    /// True for the app's own process.
+    pub is_app: bool,
+}
+
+const MAX_COMMAND: usize = 400;
+
+/// `[[dd-]hh:]mm:ss` as printed by `ps -o etime`.
+pub fn parse_etime(s: &str) -> u64 {
+    let (days, rest) = match s.split_once('-') {
+        Some((d, r)) => (d.parse::<u64>().unwrap_or(0), r),
+        None => (0, s),
+    };
+    let mut secs = 0u64;
+    for part in rest.split(':') {
+        secs = secs * 60 + part.parse::<u64>().unwrap_or(0);
+    }
+    days * 86_400 + secs
+}
+
+/// Parses `ps -A -o pid=,ppid=,pcpu=,rss=,etime=,args=`; the command line is the rest of the line.
+pub fn parse_snapshot(out: &str) -> Vec<ProcInfo> {
+    out.lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let pid = it.next()?.parse().ok()?;
+            let ppid = it.next()?.parse().ok()?;
+            let cpu = it.next()?.replace(',', ".").parse().ok()?;
+            let rss_kb = it.next()?.parse().ok()?;
+            let elapsed_secs = parse_etime(it.next()?);
+            let command: String = it.collect::<Vec<_>>().join(" ").chars().take(MAX_COMMAND).collect();
+            Some(ProcInfo { pid, ppid, cpu, rss_kb, elapsed_secs, command, is_app: false })
+        })
+        .collect()
+}
+
+/// Keeps only the app process and its descendants (marking the app), so nothing else on the machine is ever returned.
+pub fn own_processes(all: Vec<ProcInfo>, app: u32) -> Vec<ProcInfo> {
+    let table: Vec<(u32, u32)> = all.iter().map(|p| (p.pid, p.ppid)).collect();
+    let mut keep = descendants(&table, app);
+    keep.push(app);
+    let mut out: Vec<ProcInfo> = all
+        .into_iter()
+        .filter(|p| keep.contains(&p.pid))
+        .map(|mut p| {
+            p.is_app = p.pid == app;
+            p
+        })
+        .collect();
+    out.sort_by_key(|p| (!p.is_app, p.pid));
+    out
+}
+
+#[cfg(unix)]
+fn snapshot() -> Result<Vec<ProcInfo>, String> {
+    let out = std::process::Command::new("ps").args(["-A", "-o", "pid=,ppid=,pcpu=,rss=,etime=,args="]).output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err("ps failed".into());
+    }
+    Ok(parse_snapshot(&String::from_utf8_lossy(&out.stdout)))
+}
+
+#[cfg(not(unix))]
+fn snapshot() -> Result<Vec<ProcInfo>, String> {
+    Err("unsupported".into())
+}
+
+/// The app process and everything it started (agent CLIs, MCP servers, the sidecar, shells), with CPU and memory.
+#[tauri::command]
+pub async fn process_snapshot() -> Result<Vec<ProcInfo>, String> {
+    crate::git::blocking(|| Ok(own_processes(snapshot()?, std::process::id()))).await
+}
+
+/// The folder for application logs (created on demand) so "Open logs folder" always has something to open.
+#[tauri::command]
+pub fn app_logs_dir(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// Stops a CLI subagent's process and all of its children (SIGKILL on Unix, `taskkill /T /F` on Windows).
 #[tauri::command]
 pub async fn process_kill_tree(pid: u32) -> Result<Vec<u32>, String> {
@@ -134,6 +227,37 @@ mod tests {
         let table = [(2, 3), (3, 2), (5, 2)];
         let d = descendants(&table, 2);
         assert!(d.contains(&3) && d.contains(&5));
+    }
+
+    #[test]
+    fn parses_a_snapshot_line_with_a_long_command_and_etime_forms() {
+        let out = " 42  1  3.5  20480  01:02:03 /usr/bin/node --token=abc def\n 43 42 0.0 10 2-00:00:01 sh\nbad\n";
+        let p = parse_snapshot(out);
+        assert_eq!(p.len(), 2);
+        assert_eq!((p[0].pid, p[0].ppid, p[0].rss_kb, p[0].elapsed_secs), (42, 1, 20480, 3723));
+        assert_eq!(p[0].command, "/usr/bin/node --token=abc def");
+        assert_eq!(p[1].elapsed_secs, 172_801);
+        assert_eq!(parse_etime("05:09"), 309);
+    }
+
+    #[test]
+    fn the_snapshot_keeps_only_the_app_and_its_descendants() {
+        let mk = |pid, ppid| ProcInfo { pid, ppid, cpu: 0.0, rss_kb: 1, elapsed_secs: 1, command: String::new(), is_app: false };
+        // 10 is the app: 10 -> 11 -> 12; 20 -> 21 belongs to somebody else; 1 is init.
+        let all = vec![mk(21, 20), mk(12, 11), mk(1, 0), mk(10, 1), mk(11, 10), mk(20, 1)];
+        let own = own_processes(all, 10);
+        assert_eq!(own.iter().map(|p| p.pid).collect::<Vec<_>>(), vec![10, 11, 12]);
+        assert!(own[0].is_app && !own[1].is_app);
+        assert!(own_processes(vec![mk(20, 1)], 10).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_live_snapshot_starts_with_this_process() {
+        let me = std::process::id();
+        let own = own_processes(snapshot().unwrap(), me);
+        assert_eq!(own[0].pid, me);
+        assert_eq!(own.iter().filter(|p| p.is_app).count(), 1);
     }
 
     #[test]

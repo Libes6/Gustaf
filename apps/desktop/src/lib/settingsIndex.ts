@@ -21,7 +21,7 @@ export type SettingEntry = {
 /** Labels of the settings pages (same as the navigation). */
 export const PAGE_LABEL: Record<SettingsPage, Key> = {
   general: "general", storage: "cleanupTitle", web: "webTools", shortcuts: "shortcuts", import: "import", providers: "providers", usage: "usage", memory: "memoryTitle",
-  computer: "computerUse", mcp: "mcp", scheduled: "scheduledNav", knowledge: "knowledgeNav", mobile: "mobileTitle", git: "gitAndCommands", rules: "rules", archive: "archivedChats",
+  computer: "computerUse", mcp: "mcp", scheduled: "scheduledNav", knowledge: "knowledgeNav", mobile: "mobileTitle", git: "gitAndCommands", rules: "rules", archive: "archivedChats", diagnostics: "appDiagNav",
 };
 
 export const SETTING_ENTRIES: readonly SettingEntry[] = [
@@ -32,6 +32,10 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: "accent", page: "general", title: "accentColor", keywords: ["appearance"] },
   { id: "cleanupAuto", page: "storage", title: "cleanupAuto", desc: "cleanupDesc" },
   { id: "cleanupAfter", page: "storage", title: "cleanupAfter" },
+  { id: "diagProcesses", page: "diagnostics", title: "appDiagProcesses", desc: "appDiagProcessesDesc" },
+  { id: "diagProviders", page: "diagnostics", title: "appDiagProviders", desc: "appDiagProvidersDesc" },
+  { id: "diagErrors", page: "diagnostics", title: "appDiagErrors", desc: "appDiagErrorsDesc" },
+  { id: "diagLogs", page: "diagnostics", title: "appDiagOpenLogs", desc: "appDiagLogsDesc" },
   { id: "webEnable", page: "web", title: "webEnable", desc: "webToolsDesc" },
   { id: "webBraveKey", page: "web", title: "webBraveKey" },
   { id: "webAllow", page: "web", title: "webAllow" },

@@ -21,6 +21,7 @@ const PAGES: [SettingsPage, string][] = [
   ["git", "Git & commands"],
   ["rules", "Rules"],
   ["archive", "Archived chats"],
+  ["diagnostics", "Diagnostics"],
 ];
 
 const page = () => screen.getByRole("heading", { level: 1 });
