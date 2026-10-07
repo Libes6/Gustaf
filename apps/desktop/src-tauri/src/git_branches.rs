@@ -478,7 +478,9 @@ mod tests {
         assert!(r.stashed && r.restored);
         assert_eq!(cur(&f).as_deref(), Some("other"));
         assert_eq!(
-            fs::read_to_string(f.root.join("a.txt")).unwrap(),
+            fs::read_to_string(f.root.join("a.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
             "edited\n"
         );
         assert!(f.root.join("new.txt").exists());
