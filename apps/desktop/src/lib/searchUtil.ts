@@ -105,5 +105,6 @@ type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean
  * Ctrl is not accepted on macOS (Ctrl+K is "delete to end of line" in text fields); on Windows and Linux Ctrl is the main key.
  */
 export function isSearchShortcut(e: KeyLike): boolean {
-  return matches({ ...e, ctrlKey: !!e.ctrlKey }, "search");
+  // Read the fields one by one: a real KeyboardEvent keeps them as prototype getters, so spreading it would copy nothing.
+  return matches({ key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: !!e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey }, "search");
 }
