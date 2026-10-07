@@ -89,9 +89,10 @@ export function SemanticSettings() {
               onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
             />
           </SettingRow>
-          <label>{ru ? "Провайдер" : "Provider"}</label>
+          <label htmlFor="semantic-provider">{ru ? "Провайдер" : "Provider"}</label>
           <select
             className="input"
+            id="semantic-provider"
             value={config.kind}
             disabled={busy}
             onChange={(e) =>
