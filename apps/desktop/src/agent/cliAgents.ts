@@ -6,7 +6,7 @@ import type { Part, SubagentInfo } from "../providers/types";
 // chat run is active and kept for this session only (nothing is written to SQLite). Stopping one stops the whole CLI run.
 
 type Activity = Extract<Part, { type: "activity" }>;
-export type CliAgentState = SubagentInfo["state"] | "ended";
+export type CliAgentState = SubagentInfo["state"] | "unknown";
 
 export type CliAgent = {
   key: string;
@@ -145,14 +145,14 @@ export function trackCliAgents(ctx: { chatId: number; root: string | null; stop?
 
 /**
  * The chat run ended: whatever was still running is over. `stopped`: the user stopped the run, so those agents are
- * "stopped" (as Codex reports an interrupted turn); otherwise "ended" (the CLI never reported their result).
+ * "stopped" (as Codex reports an interrupted turn); otherwise "unknown" (no result was reported).
  */
 export function finishCliAgents(chatId: number, now = Date.now(), stopped = false) {
   if (!entries.some((e) => e.chatId === chatId && isCliAgentActive(e))) return;
   entries = entries.map((e) => {
     if (e.chatId !== chatId) return e;
     const { stop: _stop, ...rest } = e;
-    return isCliAgentActive(e) ? { ...rest, state: stopped ? ("stopped" as const) : ("ended" as const), endedAt: now } : rest;
+    return isCliAgentActive(e) ? { ...rest, state: stopped ? ("stopped" as const) : ("unknown" as const), endedAt: now } : rest;
   });
   emit();
 }

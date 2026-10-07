@@ -43,7 +43,7 @@ test('finishing a run marks running agents ended, drops their stop handle and cl
   assert.equal(getCliAgents().find((e) => e.key === '1:a').stop, stop);
   finishCliAgents(1, 500);
   const [a, b] = ['1:a', '1:b'].map((k) => getCliAgents().find((e) => e.key === k));
-  assert.equal(a.state, 'ended');
+  assert.equal(a.state, 'unknown');
   assert.equal(a.endedAt, 500);
   assert.equal(a.stop, undefined);
   assert.equal(b.state, 'completed');
@@ -52,7 +52,7 @@ test('finishing a run marks running agents ended, drops their stop handle and cl
   assert.deepEqual(getCliAgents().map((e) => e.key), ['2:c']);
 });
 
-test('agents still running when the user stopped the chat run are "stopped", not "ended"', () => {
+test('agents still running when the user stopped the chat run are "stopped", not "unknown"', () => {
   trackCliAgents({ chatId: 3, root: '/p', stop: () => {} }, [act('s', 'running'), act('t', 'completed')], 100);
   finishCliAgents(3, 600, true);
   const [s, t] = ['3:s', '3:t'].map((k) => getCliAgents().find((e) => e.key === k));
@@ -83,11 +83,21 @@ test('runChatCore feeds the store while the run is live and finishes it afterwar
   assert.deepEqual(seenLive.filter((x) => typeof x[0] === 'string').pop(), ['a', 'b']);
   assert.deepEqual(seenLive.find((x) => Array.isArray(x[0]))?.sort(), [['9:a', 'completed'], ['9:b', 'running']]);
   const after = Object.fromEntries(getCliAgents().map((e) => [e.key, e.state]));
-  assert.deepEqual(after, { '9:a': 'completed', '9:b': 'ended' });
+  assert.deepEqual(after, { '9:a': 'completed', '9:b': 'unknown' });
   resetCliAgents();
   const long = Array.from({ length: 6 }, () => ({ role: 'user', parts: [{ type: 'text', text: 'x' }] }));
   await assert.rejects(runChatCore(input(long), deps, ui), /boom/);
-  assert.equal(getCliAgents().find((e) => e.key === '9:b').state, 'ended');
+  assert.equal(getCliAgents().find((e) => e.key === '9:b').state, 'unknown');
+});
+
+test('a provider-reported "unknown" agent is not active, has an end time and can still be replaced by a real report', () => {
+  trackCliAgents({ chatId: 4, root: '/p' }, [act('u', 'running')], 100);
+  trackCliAgents({ chatId: 4, root: '/p' }, [act('u', 'unknown')], 200);
+  const u = () => getCliAgents().find((e) => e.key === '4:u');
+  assert.equal(u().state, 'unknown');
+  assert.equal(u().endedAt, 200);
+  trackCliAgents({ chatId: 4, root: '/p' }, [act('u', 'completed')], 300);
+  assert.equal(u().state, 'completed');
 });
 
 // Background shell commands (Claude Code `Bash` with `run_in_background`): they used to be dropped because only

@@ -56,10 +56,10 @@ describe("SubagentsCard", () => {
     expect(within(rows[0]).getByText(/42 files\s+in total/)).toBeInTheDocument();
   });
 
-  it("an agent still running when the turn ended reads as Ended; unnamed agents show a short id", () => {
+  it("an agent still running when the turn ended reads as Status unknown; unnamed agents show a short id", () => {
     mockInvoke({});
     renderApp(<SubagentsCard agents={[agent("x", { title: "", agentId: "019a-abcdef" }, { status: "unknown" })]} />);
-    expect(screen.getByText("Ended")).toBeInTheDocument();
+    expect(screen.getByText("Status unknown")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent abcdef/ })).toBeInTheDocument();
   });
 

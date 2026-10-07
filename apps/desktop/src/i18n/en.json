@@ -110,7 +110,7 @@
   "subagentWaiting": "Waiting",
   "subagentDone": "Done",
   "subagentFailed": "Failed",
-  "subagentEnded": "Ended",
+  "subagentUnknown": "Status unknown",
   "subagentTask": "Task",
   "subagentWaits": "waited ×{count}",
   "subagentNoResult": "No result reported yet.",

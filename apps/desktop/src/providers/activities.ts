@@ -24,16 +24,16 @@ function resultText(content: unknown): string | undefined {
 // ---- CLI-native subagents ----
 
 const sub = (s: Partial<SubagentInfo> & Pick<SubagentInfo, 'provider' | 'agentId' | 'action' | 'state'>): SubagentInfo => ({ title: '', ...s });
-const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : state === 'stopped' ? 'unknown' : 'running';
+const statusOf = (state: SubagentState): Activity['status'] => state === 'completed' ? 'success' : state === 'failed' ? 'error' : state === 'stopped' || state === 'unknown' ? 'unknown' : 'running';
 const isTerminal = (s?: SubagentState) => s === 'completed' || s === 'failed' || s === 'stopped';
 
 /** Codex `CollabAgentStatus` (pendingInit, running, interrupted, completed, errored, shutdown, notFound) to our state. */
 function agentState(status: unknown): SubagentState | undefined {
   switch (norm(status)) {
     case 'pendinginit': case 'running': return 'running';
-    case 'completed': case 'shutdown': return 'completed';
+    case 'completed': return 'completed';
     case 'errored': case 'notfound': return 'failed';
-    case 'interrupted': return 'stopped';
+    case 'interrupted': case 'shutdown': return 'stopped';
     default: return undefined;
   }
 }
@@ -173,7 +173,7 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     action: progress && p ? p.action : patch.action,
     state,
     ...(patch.action === 'send' && !isTerminal(state) ? { turnStartedAt: Date.now() } : {}),
-    ...(isTerminal(state) ? { endedAt: patch.endedAt ?? p?.endedAt ?? Date.now() } : patch.action === 'send' ? { endedAt: undefined, durationMs: undefined } : {}),
+    ...(isTerminal(state) || state === 'unknown' ? { endedAt: patch.endedAt ?? p?.endedAt ?? Date.now() } : patch.action === 'send' ? { endedAt: undefined, durationMs: undefined } : {}),
     prompt: p?.prompt ?? patch.prompt,
     result: patch.result ?? p?.result,
     ...((p?.waits ?? 0) + (patch.waits ?? 0) ? { waits: (p?.waits ?? 0) + (patch.waits ?? 0) } : {}),
