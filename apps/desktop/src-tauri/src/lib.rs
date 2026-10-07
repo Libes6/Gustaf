@@ -175,6 +175,7 @@ pub fn run() {
             rawlog::raw_log_append,
             rawlog::raw_log_clear,
             rawlog::raw_log_info,
+            rawlog::raw_log_prune,
             codex_agents::codex_agents_scan,
             mcp::mcp_start,
             mcp::mcp_request,
