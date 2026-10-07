@@ -23,10 +23,10 @@ test("finds by description words and by page name", () => {
 });
 
 test("title matches rank above description matches", () => {
-  const hits = searchSettings("workspace", inEn);
+  const hits = searchSettings("web", inEn);
   assert.ok(hits.length > 1);
-  const titleIdx = hits.findIndex((h) => /workspace/i.test(h.title));
-  const descOnly = hits.findIndex((h) => !/workspace/i.test(h.title));
+  const titleIdx = hits.findIndex((h) => /web/i.test(h.title));
+  const descOnly = hits.findIndex((h) => !/web/i.test(h.title));
   if (descOnly >= 0) assert.ok(titleIdx < descOnly);
 });
 
