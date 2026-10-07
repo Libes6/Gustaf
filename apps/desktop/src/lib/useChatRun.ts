@@ -68,6 +68,8 @@ type Options = {
   newWorkspace?: boolean;
   /** The option was used (or the send failed before using it): the composer switches it off again. */
   onWorkspaceUsed?: () => void;
+  /** Asked before a user stop; resolves false to keep the run going (background agents are running, see lib/stopGuard.tsx). */
+  confirmStop?: () => boolean | Promise<boolean>;
 };
 
 /** Sends this text/images on top of `base` instead of the composer content (edit and resend, regenerate). */
@@ -147,6 +149,14 @@ export function useChatRun(o: Options) {
     secretRequest?.resolve(null);
     external?.abort();
   };
+  // A stop asked for by the user: confirmed first when it would also kill running background agents.
+  const requestStopRef = useRef<() => void>(() => {});
+  requestStopRef.current = () => {
+    const ok = o.confirmStop?.() ?? true;
+    if (ok === true) stop();
+    else if (ok !== false) void ok.then((yes) => { if (yes) stop(); });
+  };
+  const requestStop = () => requestStopRef.current();
 
   // The chat is busy as long as a scheduled run writes to it (the sidebar and the session flags read this).
   useEffect(() => {
@@ -173,8 +183,8 @@ export function useChatRun(o: Options) {
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
   useEffect(() => {
-    const stopKey = (e: KeyboardEvent) => { if (o.visible && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Escape") { e.preventDefault(); stop(); } };
-    const stopGlobal = () => { if (o.visible) stop(); };
+    const stopKey = (e: KeyboardEvent) => { if (o.visible && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Escape") { e.preventDefault(); requestStopRef.current(); } };
+    const stopGlobal = () => { if (o.visible) requestStopRef.current(); };
     addEventListener("gustaf-stop", stopGlobal);
     addEventListener("keydown", stopKey);
     return () => { removeEventListener("keydown", stopKey); removeEventListener("gustaf-stop", stopGlobal); };
@@ -608,5 +618,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest,stop, compact, restoreContext, restartSession, rewind };
+  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest, stop, requestStop, compact, restoreContext, restartSession, rewind };
 }

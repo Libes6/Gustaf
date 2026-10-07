@@ -1712,5 +1712,20 @@
   "goalNote_usage": "достигнут лимит использования",
   "goalNote_budget": "достигнут бюджет токенов",
   "importFrom": "Импорт из",
-  "importCursorSub": "Выберите проекты Cursor, чтобы перенести их чаты."
+  "importCursorSub": "Выберите проекты Cursor, чтобы перенести их чаты.",
+  "interruptedTitle": "Прерванная работа агентов",
+  "interruptedHint": "Рабочие копии с незакоммиченными изменениями или неслитыми коммитами, не привязанные к чату.",
+  "interruptedCommits": "Неслитых коммитов: {count}",
+  "interruptedCommitsSome": "есть неслитые коммиты",
+  "interruptedFiles": "Незакоммиченных файлов: {count}",
+  "interruptedOpen": "Открыть",
+  "interruptedDiscard": "Отбросить",
+  "interruptedDiscardTitle": "Отбросить {branch}?",
+  "interruptedDiscardBody": "Будут удалены папка и ветка {branch}, включая незакоммиченных файлов: {files}; коммиты: {commits}. Отменить нельзя.",
+  "interruptedDiscardConfirm": "Отбросить работу",
+  "agentsInterruptedNote": "Остановлен до завершения. Незаконченные изменения смотрите в разделе «Прерванная работа агентов».",
+  "stopAgentsTitle": "Работающих агентов: {count}. Остановить их?",
+  "stopAgentsBody": "Остановка запуска остановит и фоновых агентов. Их незавершённая работа останется в их рабочих копиях.",
+  "stopAgentsConfirm": "Остановить агентов",
+  "stopAgentsKeep": "Пусть работают"
 }

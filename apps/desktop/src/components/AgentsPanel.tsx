@@ -7,6 +7,8 @@ import { clearFinishedCliAgents, isCliAgentActive, useCliAgents, type CliAgent }
 import { elapsed, formatTokens, isActiveStatus, type AgentRun, type TranscriptStep } from "../agent/agentRunsModel";
 import { canContinue, continueRequest } from "../agent/agentTranscript";
 import { useDialogFocus } from "../lib/useDialogFocus";
+import type { InterruptedWork } from "../lib/interruptedWork";
+import { InterruptedWorkSection } from "./InterruptedWork";
 import type { BackgroundTasks } from "../lib/useBackgroundTasks";
 import "../styles/agents.css";
 
@@ -179,6 +181,8 @@ function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onO
   const t = useT();
   const active = isActiveStatus(run.status);
   const time = elapsed(run, now, t);
+  // Stopped by the user or the app: it may have left uncommitted work in its worktree.
+  const stoppedEarly = run.status === "interrupted" || run.status === "cancelled";
   const step = active ? (run.status === "queued" ? t("agentsWaiting") : run.currentStep || t("agentsThinking")) : run.summary ? run.summary.replace(/\s+/g, " ").trim() : undefined;
   return (
     <Card
@@ -192,8 +196,9 @@ function Row({ run, now, onOpen, onContinue }: { run: AgentRun; now: number; onO
       onOpen={onOpen}
       onContinue={onContinue && canContinue(run.status) ? onContinue : undefined}
       stop={{ onClick: () => stopRun(run.id), title: t("stop"), label: t("stop") }}
-      extra={(run.changed?.length || run.warnings?.length) ? (
+      extra={(run.changed?.length || run.warnings?.length || stoppedEarly) ? (
         <>
+          {stoppedEarly && <div className="agent-warn">{t("agentsInterruptedNote")}</div>}
           {run.changed?.length ? <div className="agent-card-note">{t("agentsChanged", { count: run.changed.length })}</div> : null}
           {run.warnings?.map((w, i) => <div key={i} className="agent-warn">{w}</div>)}
         </>
@@ -220,6 +225,7 @@ function CliRow({ agent, now, onOpen }: { agent: CliAgent; now: number; onOpen: 
       active={active}
       onOpen={onOpen}
       stop={agent.stop ? { onClick: agent.stop, title: t("agentsStopCli", { provider }), label: t("agentsStopCliLabel", { provider }) } : undefined}
+      extra={agent.state === "stopped" ? <div className="agent-warn">{t("agentsInterruptedNote")}</div> : undefined}
     />
   );
 }
@@ -243,7 +249,7 @@ export function AgentsToggle({ tasks, buttonRef }: { tasks: BackgroundTasks; but
  * message that asks the main agent to continue a finished run (the chat puts it in the composer). The header has an
  * expand button (the column covers the chat area) and a close button; Escape closes it too.
  */
-export function AgentsColumn({ root, tasks, onContinue, toggleRef }: { root: string | null; tasks: BackgroundTasks; onContinue?: (message: string) => void; toggleRef?: RefObject<HTMLButtonElement | null> }) {
+export function AgentsColumn({ root, projectRoot, interrupted = [], tasks, onContinue, toggleRef }: { root: string | null; /** The project folder that owns the worktrees (`root` is the checkout for a workspace chat). */ projectRoot?: string | null; interrupted?: readonly InterruptedWork[]; tasks: BackgroundTasks; onContinue?: (message: string) => void; toggleRef?: RefObject<HTMLButtonElement | null> }) {
   const t = useT();
   const runs = useAgentRuns(root);
   const cli = useCliAgents(root);
@@ -279,7 +285,8 @@ export function AgentsColumn({ root, tasks, onContinue, toggleRef }: { root: str
         <button className="icon-btn" title={t("agentsClose")} aria-label={t("agentsClose")} onClick={close}><X size={15} /></button>
       </header>
       <div className="tasks-body">
-        {running === 0 && finished === 0 && <div className="hint">{t("agentsEmpty")}</div>}
+        {running === 0 && finished === 0 && interrupted.length === 0 && <div className="hint">{t("agentsEmpty")}</div>}
+        {(projectRoot ?? root) && <InterruptedWorkSection root={(projectRoot ?? root)!} items={interrupted} />}
         {running > 0 && (
           <section aria-label={t("agentsRunning")}>
             <h3 className="agents-group">{t("agentsRunning")}</h3>
