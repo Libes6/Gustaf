@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
 register('./helpers/hooks.mjs', import.meta.url);
-await import('./helpers/apiStub.mjs');
+const { setSetting } = await import('./helpers/apiStub.mjs');
 const { nativeActivities, applyActivity } = await import('../src/providers/activities.ts');
-const { createRawLogger, rawLogLine, dayOf, MAX_ENTRY_CHARS } = await import('../src/lib/rawCliLog.ts');
+const { createRawLogger, rawLogLine, dayOf, rawLogEnabled, MAX_ENTRY_CHARS } = await import('../src/lib/rawCliLog.ts');
 
 const ev = (type, item) => ({ type, item });
 const run = (event) => {
@@ -137,4 +137,9 @@ test('a disabled logger writes nothing; an enabled one batches per day, adds the
   const broken = createRawLogger(true, 'claude', 1, async () => { throw new Error('disk full'); });
   broken.raw('{"a":1}');
   await broken.flush();
+});
+
+test('raw CLI capture is off: an old saved recordRawCliEvents flag is ignored', async () => {
+  await setSetting('recordRawCliEvents', true);
+  assert.equal(await rawLogEnabled(), false);
 });

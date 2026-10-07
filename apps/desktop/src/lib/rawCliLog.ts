@@ -1,16 +1,18 @@
-import { getSetting, rawLog } from "./api";
+import { rawLog } from "./api";
 import { redactSecrets, redactValue } from "./exportChats";
 
-// Debugging aid, deliberately without a UI switch (it is only turned on by writing the `recordRawCliEvents` setting): every stdout line of codex / claude / cursor-agent
-// is appended, before any parsing, to a bounded file under the app data folder (src-tauri/src/rawlog.rs keeps one file
-// per day and at most 5 MB in total). Entries are scrubbed with the chat export's secret scrubber first.
+// Debugging aid, switched OFF: the app no longer collects raw CLI events and has no UI for it, and a `recordRawCliEvents`
+// value saved by an earlier build is ignored (see `rawLogEnabled`). The logger itself stays for a future debug switch: it
+// appends every stdout line of codex / claude / cursor-agent, before any parsing, to a bounded file under the app data
+// folder (src-tauri/src/rawlog.rs keeps one file per day and at most 5 MB in total), scrubbed with the chat export's secret scrubber.
 
 export const RAW_LOG_SETTING = "recordRawCliEvents";
 /** One entry is clipped to this many characters (the rest of a huge line is of no use for debugging). */
 export const MAX_ENTRY_CHARS = 64 * 1024;
 const FLUSH_MS = 400;
 
-export const rawLogEnabled = () => getSetting<boolean>(RAW_LOG_SETTING, false).catch(() => false);
+/** Always false for now: nothing is recorded, whatever an old build saved under `RAW_LOG_SETTING`. */
+export const rawLogEnabled = (): Promise<boolean> => Promise.resolve(false);
 
 const two = (n: number) => String(n).padStart(2, "0");
 /** Local calendar day, the name of the day's file. */
