@@ -268,10 +268,13 @@ export const computer = {
 
 /** Opt-in capture of raw CLI event lines under the app data folder (src-tauri/src/rawlog.rs, src/lib/rawCliLog.ts). */
 export type RawLogInfo = { dir: string; bytes: number; files: number; latest: string | null };
+export type RawLogPrune = { files: string[]; bytes: number; dry_run: boolean };
 export const rawLog = {
   append: (day: string, lines: string) => invoke<void>("raw_log_append", { day, lines }),
   clear: () => invoke<void>("raw_log_clear"),
   info: () => invoke<RawLogInfo>("raw_log_info"),
+  /** Day files older than `keepDays` before `today` (local `YYYY-MM-DD`); today's file is never touched. */
+  prune: (today: string, keepDays: number, dryRun: boolean) => invoke<RawLogPrune>("raw_log_prune", { today, keepDays, dryRun }).then((r) => ({ files: r.files, bytes: r.bytes })),
 };
 
 /** One Codex subagent as src-tauri/src/codex_agents.rs reads it from the rollout files (field names as the Rust side serializes them). */
