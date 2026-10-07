@@ -73,7 +73,7 @@ export function BranchSwitcher({ root, running, worktree, visible = true, onChan
 
   const locked = lockReason({ worktree, running, reviewPending, inProgress: status.inProgress });
   const lockText = locked === "worktree" ? t("gitLockedWorktree") : locked === "running" ? t("gitLockedRunning") : locked === "review" ? t("gitLockedReview") : locked === "op" ? t("gitLockedOp", { op: status.inProgress ?? "" }) : "";
-  const label = status.branch ?? t("gitDetached", { head: status.head ?? "?" });
+  const label = status.branch ?? t("gitBarDetached", { head: status.head ?? "?" });
   const changes = status.total;
 
   const openPicker = () => {
@@ -170,7 +170,7 @@ export function BranchSwitcher({ root, running, worktree, visible = true, onChan
                 {local.length > 0 && <ul aria-label={t("gitLocalBranches")}>{local.map(row)}</ul>}
                 {remote.length > 0 && <><div className="branch-group">{t("gitRemoteBranches")}</div><ul aria-label={t("gitRemoteBranches")}>{remote.map(row)}</ul></>}
                 {list && shown.length === 0 && <div className="hint branch-empty">{t("gitNoBranches")}</div>}
-                {list?.truncated && <div className="hint branch-empty">{t("gitTruncated")}</div>}
+                {list?.truncated && <div className="hint branch-empty">{t("gitBarTruncated")}</div>}
               </div>
               {makeName && (
                 <div className="branch-create">
