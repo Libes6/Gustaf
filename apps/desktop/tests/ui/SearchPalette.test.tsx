@@ -260,7 +260,7 @@ describe("SearchPalette", () => {
       type("parser");
       await settle();
       fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-      type("other");
+      type("unrelated");
       await settle();
       await act(async () => { release(page(ids(41, 80), { total: 80 })); });
       expect(rows()).toHaveLength(1);
