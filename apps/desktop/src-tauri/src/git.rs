@@ -21,12 +21,21 @@ static LOCKS: OnceLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new(
 fn shadow_dir(app: &AppHandle, root: &str) -> Result<PathBuf, String> {
     let mut h = DefaultHasher::new();
     root.hash(&mut h);
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("shadow").join(format!("{:x}", h.finish()));
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("shadow")
+        .join(format!("{:x}", h.finish()));
     if !dir.join("HEAD").exists() {
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         run(Command::new("git").args(["init", "-q", "--bare"]).arg(&dir))?;
         fs::create_dir_all(dir.join("info")).map_err(|e| e.to_string())?;
-        fs::write(dir.join("info/exclude"), ".git/\nnode_modules\ntarget/\ndist/\n.DS_Store\n").map_err(|e| e.to_string())?;
+        fs::write(
+            dir.join("info/exclude"),
+            ".git/\nnode_modules\ntarget/\ndist/\n.DS_Store\n",
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(dir)
 }
@@ -48,14 +57,28 @@ fn run(cmd: &mut Command) -> Result<String, String> {
 
 /// Runs git in `root`; with `shadow` it targets the app's checkpoint repo instead of the project's own `.git`.
 #[tauri::command]
-pub async fn git(app: AppHandle, root: String, args: Vec<String>, shadow: bool) -> Result<String, String> {
-    let key = PathBuf::from(&root).canonicalize().map_err(|e| e.to_string())?;
-    let lock = LOCKS.get_or_init(Default::default).lock().map_err(|e| e.to_string())?.entry(key).or_default().clone();
+pub async fn git(
+    app: AppHandle,
+    root: String,
+    args: Vec<String>,
+    shadow: bool,
+) -> Result<String, String> {
+    let key = PathBuf::from(&root)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let lock = LOCKS
+        .get_or_init(Default::default)
+        .lock()
+        .map_err(|e| e.to_string())?
+        .entry(key)
+        .or_default()
+        .clone();
     let _guard = lock.lock().map_err(|e| e.to_string())?;
     let mut cmd = Command::new("git");
     cmd.current_dir(&root);
     if shadow {
-        cmd.arg(format!("--git-dir={}", shadow_dir(&app, &root)?.display())).arg(format!("--work-tree={root}"));
+        cmd.arg(format!("--git-dir={}", shadow_dir(&app, &root)?.display()))
+            .arg(format!("--work-tree={root}"));
     }
     run(cmd.args(&args))
 }
@@ -145,7 +168,9 @@ pub struct CommitResult {
 }
 
 pub(crate) fn canonical_root(root: &str) -> Result<PathBuf, String> {
-    let base = Path::new(root).canonicalize().map_err(|e| format!("project root: {e}"))?;
+    let base = Path::new(root)
+        .canonicalize()
+        .map_err(|e| format!("project root: {e}"))?;
     if !base.is_dir() {
         return Err(format!("project root is not a directory: {root}"));
     }
@@ -153,7 +178,10 @@ pub(crate) fn canonical_root(root: &str) -> Result<PathBuf, String> {
 }
 
 fn repo_lock(key: &Path) -> Arc<Mutex<()>> {
-    let mut map = REPO_LOCKS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = REPO_LOCKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     map.entry(key.to_path_buf()).or_default().clone()
 }
 
@@ -171,10 +199,22 @@ pub(crate) fn repo_command(root: &Path) -> Command {
     cmd.current_dir(root)
         // Read-only calls must not take index.lock behind the user's back; repo-configured
         // fsmonitor hooks are commands and must not run just because we looked at the status.
-        .args(["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.quotepath=off"])
+        .args([
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.quotepath=off",
+        ])
         .stdin(Stdio::null())
         .env("GIT_TERMINAL_PROMPT", "0");
-    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"] {
+    for var in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_PREFIX",
+    ] {
         cmd.env_remove(var);
     }
     cmd
@@ -185,13 +225,19 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    repo_command(root).args(args).output().map_err(|e| format!("git: {e}"))
+    repo_command(root)
+        .args(args)
+        .output()
+        .map_err(|e| format!("git: {e}"))
 }
 
 pub(crate) fn failure_text(out: &Output) -> String {
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let parts: Vec<&str> = [stderr.trim(), stdout.trim()].into_iter().filter(|s| !s.is_empty()).collect();
+    let parts: Vec<&str> = [stderr.trim(), stdout.trim()]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect();
     if parts.is_empty() {
         return format!("git exited with {}", out.status);
     }
@@ -213,12 +259,22 @@ where
 
 /// Runs git and keeps at most `cap` bytes of its output: when there is more, git is killed and the flag is
 /// set. Succeeds when git exits with one of `ok_codes` (or was cut off), otherwise returns its error text.
-pub(crate) fn run_git_capped<I, S>(root: &Path, args: I, cap: usize, ok_codes: &[i32]) -> Result<(String, bool), String>
+pub(crate) fn run_git_capped<I, S>(
+    root: &Path,
+    args: I,
+    cap: usize,
+    ok_codes: &[i32],
+) -> Result<(String, bool), String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let mut child = repo_command(root).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|e| format!("git: {e}"))?;
+    let mut child = repo_command(root)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("git: {e}"))?;
     let mut stdout = child.stdout.take().ok_or("git: no output pipe")?;
     let mut buf = Vec::new();
     let read = stdout.by_ref().take(cap as u64 + 1).read_to_end(&mut buf);
@@ -243,7 +299,17 @@ struct RepoInfo {
 }
 
 fn repo_info(root: &Path) -> Option<RepoInfo> {
-    let out = run_git(root, ["rev-parse", "--is-inside-work-tree", "--show-toplevel", "--show-prefix", "--absolute-git-dir"]).ok()?;
+    let out = run_git(
+        root,
+        [
+            "rev-parse",
+            "--is-inside-work-tree",
+            "--show-toplevel",
+            "--show-prefix",
+            "--absolute-git-dir",
+        ],
+    )
+    .ok()?;
     let mut lines = out.split('\n');
     if lines.next()? != "true" {
         return None;
@@ -251,22 +317,38 @@ fn repo_info(root: &Path) -> Option<RepoInfo> {
     let toplevel = lines.next()?.to_string();
     let prefix = lines.next()?.to_string();
     let git_dir = PathBuf::from(lines.next()?);
-    Some(RepoInfo { toplevel, prefix, git_dir })
+    Some(RepoInfo {
+        toplevel,
+        prefix,
+        git_dir,
+    })
 }
 
 pub(crate) fn current_branch(root: &Path) -> Option<String> {
-    run_git(root, ["symbolic-ref", "--short", "-q", "HEAD"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    run_git(root, ["symbolic-ref", "--short", "-q", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn head_short(root: &Path) -> Option<String> {
-    run_git(root, ["rev-parse", "--short", "--verify", "-q", "HEAD"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    run_git(root, ["rev-parse", "--short", "--verify", "-q", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn unfinished_operation(git_dir: &Path) -> Option<&'static str> {
-    [("MERGE_HEAD", "merge"), ("CHERRY_PICK_HEAD", "cherry-pick"), ("REVERT_HEAD", "revert"), ("rebase-merge", "rebase"), ("rebase-apply", "rebase")]
-        .into_iter()
-        .find(|(marker, _)| git_dir.join(marker).exists())
-        .map(|(_, name)| name)
+    [
+        ("MERGE_HEAD", "merge"),
+        ("CHERRY_PICK_HEAD", "cherry-pick"),
+        ("REVERT_HEAD", "revert"),
+        ("rebase-merge", "rebase"),
+        ("rebase-apply", "rebase"),
+    ]
+    .into_iter()
+    .find(|(marker, _)| git_dir.join(marker).exists())
+    .map(|(_, name)| name)
 }
 
 fn classify(x: u8, y: u8) -> Kind {
@@ -288,25 +370,43 @@ fn parse_porcelain(raw: &str, prefix: &str, cap: usize) -> (Vec<GitFile>, usize)
     let mut files = Vec::new();
     let mut total = 0;
     for entry in raw.split('\0') {
-        let (Some(xy), Some(path)) = (entry.get(..2), entry.get(3..)) else { continue };
+        let (Some(xy), Some(path)) = (entry.get(..2), entry.get(3..)) else {
+            continue;
+        };
         if entry.as_bytes()[2] != b' ' {
             continue;
         }
-        let Some(path) = path.strip_prefix(prefix) else { continue };
+        let Some(path) = path.strip_prefix(prefix) else {
+            continue;
+        };
         if path.is_empty() {
             continue;
         }
         total += 1;
         if files.len() < cap {
             let (x, y) = (xy.as_bytes()[0], xy.as_bytes()[1]);
-            files.push(GitFile { path: path.to_string(), kind: classify(x, y), staged: x != b' ' && x != b'?' });
+            files.push(GitFile {
+                path: path.to_string(),
+                kind: classify(x, y),
+                staged: x != b' ' && x != b'?',
+            });
         }
     }
     (files, total)
 }
 
 fn not_a_repo() -> GitStatus {
-    GitStatus { repo: false, toplevel: String::new(), prefix: String::new(), branch: None, detached: false, head: None, files: Vec::new(), total: 0, in_progress: None }
+    GitStatus {
+        repo: false,
+        toplevel: String::new(),
+        prefix: String::new(),
+        branch: None,
+        detached: false,
+        head: None,
+        files: Vec::new(),
+        total: 0,
+        in_progress: None,
+    }
 }
 
 /// Branch, HEAD and the changed files under `root` (at most `MAX_FILES` listed; `total` counts them all).
@@ -318,8 +418,21 @@ pub fn status(root: &Path) -> Result<GitStatus, String> {
 /// Like `status`, listing up to `cap` files. Commit paths are checked against the full list (`usize::MAX`),
 /// so a file beyond the display cap can still be committed.
 fn status_capped(root: &Path, cap: usize) -> Result<GitStatus, String> {
-    let Some(info) = repo_info(root) else { return Ok(not_a_repo()) };
-    let raw = run_git(root, ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", "."])?;
+    let Some(info) = repo_info(root) else {
+        return Ok(not_a_repo());
+    };
+    let raw = run_git(
+        root,
+        [
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--no-renames",
+            "--untracked-files=all",
+            "--",
+            ".",
+        ],
+    )?;
     let (files, total) = parse_porcelain(&raw, &info.prefix, cap);
     let branch = current_branch(root);
     Ok(GitStatus {
@@ -358,8 +471,14 @@ fn validate_paths(root: &Path, paths: &[String]) -> Result<Vec<String>, String> 
         for (i, comp) in path.components().enumerate() {
             match comp {
                 Component::CurDir if i == 0 => {}
-                Component::Normal(n) if n.eq_ignore_ascii_case(".git") => return Err(format!("Refusing to touch .git: {raw}")),
-                Component::Normal(n) => parts.push(n.to_str().ok_or_else(|| format!("Non-UTF8 file path: {raw}"))?.to_string()),
+                Component::Normal(n) if n.eq_ignore_ascii_case(".git") => {
+                    return Err(format!("Refusing to touch .git: {raw}"))
+                }
+                Component::Normal(n) => parts.push(
+                    n.to_str()
+                        .ok_or_else(|| format!("Non-UTF8 file path: {raw}"))?
+                        .to_string(),
+                ),
                 _ => return Err(format!("path escapes project: {raw}")),
             }
         }
@@ -390,7 +509,11 @@ fn cut_at_line(text: &str, max: usize) -> String {
         cut -= 1;
     }
     let head = &text[..cut];
-    let end = head.rfind('\n').map(|i| i + 1).filter(|&i| i > 0).unwrap_or(cut);
+    let end = head
+        .rfind('\n')
+        .map(|i| i + 1)
+        .filter(|&i| i > 0)
+        .unwrap_or(cut);
     let mut out = head[..end].to_string();
     if !out.ends_with('\n') {
         out.push('\n');
@@ -427,35 +550,75 @@ fn budget_sections(sections: &[String], max: usize) -> (String, bool) {
 }
 
 /// Bounded, hook-free summary of the selected changes, for generating a commit message.
-pub fn commit_context(root: &Path, paths: &[String], max_bytes: usize) -> Result<CommitContext, String> {
+pub fn commit_context(
+    root: &Path,
+    paths: &[String],
+    max_bytes: usize,
+) -> Result<CommitContext, String> {
     let wanted = validate_paths(root, paths)?;
     let st = status_capped(root, usize::MAX)?;
     if !st.repo {
         return Err("This project is not a git repository".into());
     }
-    let selected: Vec<&GitFile> = st.files.iter().filter(|f| f.kind != Kind::Conflicted && wanted.contains(&f.path)).collect();
+    let selected: Vec<&GitFile> = st
+        .files
+        .iter()
+        .filter(|f| f.kind != Kind::Conflicted && wanted.contains(&f.path))
+        .collect();
     if selected.is_empty() {
         return Err("No changes in the selected files".into());
     }
     let max = max_bytes.clamp(2_000, 200_000);
-    let tracked: Vec<String> = selected.iter().filter(|f| f.kind != Kind::Untracked).map(|f| f.path.clone()).collect();
-    let untracked: Vec<String> = selected.iter().filter(|f| f.kind == Kind::Untracked).map(|f| f.path.clone()).collect();
+    let tracked: Vec<String> = selected
+        .iter()
+        .filter(|f| f.kind != Kind::Untracked)
+        .map(|f| f.path.clone())
+        .collect();
+    let untracked: Vec<String> = selected
+        .iter()
+        .filter(|f| f.kind == Kind::Untracked)
+        .map(|f| f.path.clone())
+        .collect();
 
     let mut stat = String::new();
     let mut sections = Vec::new();
     let mut truncated = tracked.len() > MAX_TRACKED_DIFFS || untracked.len() > MAX_UNTRACKED_DIFFS;
     if !tracked.is_empty() {
         // textconv and external diff drivers are commands configured by the repository; never run them.
-        let base = if st.head.is_some() { "HEAD".to_string() } else { run_git(root, ["hash-object", "-t", "tree", "--stdin"])?.trim().to_string() };
+        let base = if st.head.is_some() {
+            "HEAD".to_string()
+        } else {
+            run_git(root, ["hash-object", "-t", "tree", "--stdin"])?
+                .trim()
+                .to_string()
+        };
         let diff_cmd = |extra: &[&str], paths: &[String]| -> Vec<String> {
-            let head = ["-c", BIG_FILE, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames"];
-            head.iter().chain(extra).map(|s| s.to_string()).chain([base.clone(), "--".to_string()]).chain(literals(paths)).collect()
+            let head = [
+                "-c",
+                BIG_FILE,
+                "diff",
+                "--no-color",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-renames",
+            ];
+            head.iter()
+                .chain(extra)
+                .map(|s| s.to_string())
+                .chain([base.clone(), "--".to_string()])
+                .chain(literals(paths))
+                .collect()
         };
         stat.push_str(&run_git(root, diff_cmd(&["--stat=100,60,40"], &tracked))?);
         // One bounded call per file: a huge diff of one file (a lockfile) is cut at `max` bytes while the
         // others still arrive, and git's output never has to fit in memory in full.
         for path in tracked.iter().take(MAX_TRACKED_DIFFS) {
-            let (text, cut) = run_git_capped(root, diff_cmd(&["--unified=2"], std::slice::from_ref(path)), max, &[0])?;
+            let (text, cut) = run_git_capped(
+                root,
+                diff_cmd(&["--unified=2"], std::slice::from_ref(path)),
+                max,
+                &[0],
+            )?;
             truncated |= cut;
             sections.push(text);
         }
@@ -464,7 +627,19 @@ pub fn commit_context(root: &Path, paths: &[String], max_bytes: usize) -> Result
         stat.push_str(&format!(" {path} | new file\n"));
     }
     for path in untracked.iter().take(MAX_UNTRACKED_DIFFS) {
-        let args = ["-c", BIG_FILE, "diff", "--no-index", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=2", "--", "/dev/null", path.as_str()];
+        let args = [
+            "-c",
+            BIG_FILE,
+            "diff",
+            "--no-index",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--unified=2",
+            "--",
+            "/dev/null",
+            path.as_str(),
+        ];
         // --no-index exits 1 when the files differ, which is the normal case here.
         let (text, cut) = run_git_capped(root, args, max, &[0, 1])?;
         truncated |= cut;
@@ -473,22 +648,54 @@ pub fn commit_context(root: &Path, paths: &[String], max_bytes: usize) -> Result
     let (diff, cut) = budget_sections(&sections, max);
     truncated |= cut;
     let recent = if st.head.is_some() {
-        run_git(root, ["log", "-n", &RECENT_SUBJECTS.to_string(), "--format=%s", "--no-color", "--no-show-signature"])
-            .map(|out| out.lines().map(|l| l.chars().take(200).collect::<String>()).filter(|l| !l.trim().is_empty()).collect())
-            .unwrap_or_default()
+        run_git(
+            root,
+            [
+                "log",
+                "-n",
+                &RECENT_SUBJECTS.to_string(),
+                "--format=%s",
+                "--no-color",
+                "--no-show-signature",
+            ],
+        )
+        .map(|out| {
+            out.lines()
+                .map(|l| l.chars().take(200).collect::<String>())
+                .filter(|l| !l.trim().is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
     } else {
         Vec::new()
     };
-    Ok(CommitContext { files: selected.iter().map(|f| f.path.clone()).collect(), stat, diff, truncated, recent })
+    Ok(CommitContext {
+        files: selected.iter().map(|f| f.path.clone()).collect(),
+        stat,
+        diff,
+        truncated,
+        recent,
+    })
 }
 
 fn validate_branch_name(root: &Path, name: &str) -> Result<(), String> {
     let invalid = || format!("Invalid branch name: {name}");
-    if name.is_empty() || name.len() > 200 || name.starts_with('-') || name == "HEAD" || name == "@" || name.chars().any(|c| c.is_control() || c.is_whitespace()) {
+    if name.is_empty()
+        || name.len() > 200
+        || name.starts_with('-')
+        || name == "HEAD"
+        || name == "@"
+        || name.chars().any(|c| c.is_control() || c.is_whitespace())
+    {
         return Err(invalid());
     }
     run_git(root, ["check-ref-format", &format!("refs/heads/{name}")]).map_err(|_| invalid())?;
-    if run_git(root, ["rev-parse", "--verify", "-q", &format!("refs/heads/{name}")]).is_ok() {
+    if run_git(
+        root,
+        ["rev-parse", "--verify", "-q", &format!("refs/heads/{name}")],
+    )
+    .is_ok()
+    {
         return Err(format!("Branch already exists: {name}"));
     }
     Ok(())
@@ -498,7 +705,10 @@ fn validate_branch_name(root: &Path, name: &str) -> Result<(), String> {
 /// literal pathspecs after `--`, `--only` leaves anything else in the index out of the commit, and
 /// there is intentionally no `--no-verify`, `--no-gpg-sign`, `--amend` or `--allow-empty`.
 fn commit_args(message: &str, paths: &[String]) -> Vec<String> {
-    let mut args: Vec<String> = ["commit", "-q", "--only", "-m"].iter().map(|s| s.to_string()).collect();
+    let mut args: Vec<String> = ["commit", "-q", "--only", "-m"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     args.push(message.to_string());
     args.push("--".to_string());
     args.extend(literals(paths));
@@ -516,21 +726,42 @@ fn undo_branch(root: &Path, origin: &Origin, created: &str, created_at: Option<&
     match origin {
         Origin::Branch(b) => drop(run_git(root, ["checkout", "-q", b.as_str(), "--"])),
         Origin::Detached(sha) => drop(run_git(root, ["checkout", "-q", "--detach", sha.as_str()])),
-        Origin::Unborn(b) => drop(run_git(root, ["symbolic-ref", "HEAD", &format!("refs/heads/{b}")])),
+        Origin::Unborn(b) => drop(run_git(
+            root,
+            ["symbolic-ref", "HEAD", &format!("refs/heads/{b}")],
+        )),
     }
     // Only drop the branch if it still points where we created it, i.e. nothing was committed on it.
-    let tip = run_git(root, ["rev-parse", "--verify", "-q", &format!("refs/heads/{created}")]).ok().map(|s| s.trim().to_string());
+    let tip = run_git(
+        root,
+        [
+            "rev-parse",
+            "--verify",
+            "-q",
+            &format!("refs/heads/{created}"),
+        ],
+    )
+    .ok()
+    .map(|s| s.trim().to_string());
     if tip.is_some() && tip.as_deref() == created_at {
         let _ = run_git(root, ["branch", "-D", created]);
     }
 }
 
 fn with_paths(head: &[&str], paths: &[String]) -> Vec<String> {
-    head.iter().map(|s| s.to_string()).chain(literals(paths)).collect()
+    head.iter()
+        .map(|s| s.to_string())
+        .chain(literals(paths))
+        .collect()
 }
 
 /// Commits exactly `paths` (never the rest of the index or working tree), optionally on a new branch.
-pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&str>) -> Result<CommitResult, String> {
+pub fn commit(
+    root: &Path,
+    message: &str,
+    paths: &[String],
+    new_branch: Option<&str>,
+) -> Result<CommitResult, String> {
     let message = message.trim();
     if message.is_empty() {
         return Err("Commit message is empty".into());
@@ -541,15 +772,23 @@ pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&
     let wanted = validate_paths(root, paths)?;
     let new_branch = new_branch.map(str::trim).filter(|b| !b.is_empty());
 
-    let Some(info) = repo_info(root) else { return Err("This project is not a git repository".into()) };
+    let Some(info) = repo_info(root) else {
+        return Err("This project is not a git repository".into());
+    };
     let lock = repo_lock(Path::new(&info.toplevel));
     let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
 
     let st = status_capped(root, usize::MAX)?;
     if let Some(op) = &st.in_progress {
-        return Err(format!("A {op} is in progress. Finish it before committing."));
+        return Err(format!(
+            "A {op} is in progress. Finish it before committing."
+        ));
     }
-    let selected: Vec<&GitFile> = st.files.iter().filter(|f| wanted.contains(&f.path)).collect();
+    let selected: Vec<&GitFile> = st
+        .files
+        .iter()
+        .filter(|f| wanted.contains(&f.path))
+        .collect();
     if let Some(f) = selected.iter().find(|f| f.kind == Kind::Conflicted) {
         return Err(format!("{} has unresolved conflicts", f.path));
     }
@@ -557,7 +796,11 @@ pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&
         return Err("No changes to commit in the selected files".into());
     }
     let files: Vec<String> = selected.iter().map(|f| f.path.clone()).collect();
-    let newly_staged: Vec<String> = selected.iter().filter(|f| !f.staged).map(|f| f.path.clone()).collect();
+    let newly_staged: Vec<String> = selected
+        .iter()
+        .filter(|f| !f.staged)
+        .map(|f| f.path.clone())
+        .collect();
 
     let mut created: Option<(Origin, String, Option<String>)> = None;
     if let Some(name) = new_branch {
@@ -565,14 +808,21 @@ pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&
         let origin = match (&st.branch, &st.head) {
             (Some(b), Some(_)) => Origin::Branch(b.clone()),
             (Some(b), None) => Origin::Unborn(b.clone()),
-            (None, _) => Origin::Detached(run_git(root, ["rev-parse", "--verify", "HEAD"])?.trim().to_string()),
+            (None, _) => Origin::Detached(
+                run_git(root, ["rev-parse", "--verify", "HEAD"])?
+                    .trim()
+                    .to_string(),
+            ),
         };
         run_git(root, ["checkout", "-q", "-b", name])?;
-        let at = run_git(root, ["rev-parse", "--verify", "-q", "HEAD"]).ok().map(|s| s.trim().to_string());
+        let at = run_git(root, ["rev-parse", "--verify", "-q", "HEAD"])
+            .ok()
+            .map(|s| s.trim().to_string());
         created = Some((origin, name.to_string(), at));
     }
 
-    let result = run_git(root, with_paths(&["add", "--"], &files)).and_then(|_| run_git(root, commit_args(message, &files)));
+    let result = run_git(root, with_paths(&["add", "--"], &files))
+        .and_then(|_| run_git(root, commit_args(message, &files)));
     if let Err(e) = result {
         if !newly_staged.is_empty() {
             let _ = run_git(root, with_paths(&["reset", "-q", "--"], &newly_staged));
@@ -582,13 +832,27 @@ pub fn commit(root: &Path, message: &str, paths: &[String], new_branch: Option<&
         }
         return Err(e);
     }
-    let sha = run_git(root, ["rev-parse", "--verify", "HEAD"])?.trim().to_string();
-    let short = run_git(root, ["rev-parse", "--short", "HEAD"])?.trim().to_string();
-    Ok(CommitResult { sha, short, branch: current_branch(root), files, created_branch: created.is_some() })
+    let sha = run_git(root, ["rev-parse", "--verify", "HEAD"])?
+        .trim()
+        .to_string();
+    let short = run_git(root, ["rev-parse", "--short", "HEAD"])?
+        .trim()
+        .to_string();
+    Ok(CommitResult {
+        sha,
+        short,
+        branch: current_branch(root),
+        files,
+        created_branch: created.is_some(),
+    })
 }
 
-pub(crate) async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+pub(crate) async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Branch, HEAD and changed files of the project's repository (`repo: false` when there is none).
@@ -599,14 +863,38 @@ pub async fn git_status(root: String) -> Result<GitStatus, String> {
 
 /// Bounded diff, stat and recent subjects of the given changed files, to generate a commit message from.
 #[tauri::command]
-pub async fn git_commit_context(root: String, paths: Vec<String>, max_bytes: Option<usize>) -> Result<CommitContext, String> {
-    blocking(move || commit_context(&canonical_root(&root)?, &paths, max_bytes.unwrap_or(DEFAULT_DIFF_BYTES))).await
+pub async fn git_commit_context(
+    root: String,
+    paths: Vec<String>,
+    max_bytes: Option<usize>,
+) -> Result<CommitContext, String> {
+    blocking(move || {
+        commit_context(
+            &canonical_root(&root)?,
+            &paths,
+            max_bytes.unwrap_or(DEFAULT_DIFF_BYTES),
+        )
+    })
+    .await
 }
 
 /// Commits only `paths`, optionally on a new branch created from the current HEAD. Hooks run; no push.
 #[tauri::command]
-pub async fn git_commit(root: String, message: String, paths: Vec<String>, new_branch: Option<String>) -> Result<CommitResult, String> {
-    blocking(move || commit(&canonical_root(&root)?, &message, &paths, new_branch.as_deref())).await
+pub async fn git_commit(
+    root: String,
+    message: String,
+    paths: Vec<String>,
+    new_branch: Option<String>,
+) -> Result<CommitResult, String> {
+    blocking(move || {
+        commit(
+            &canonical_root(&root)?,
+            &message,
+            &paths,
+            new_branch.as_deref(),
+        )
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -621,13 +909,27 @@ mod tests {
     }
 
     fn git_ok(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git").current_dir(dir).args(args).output().unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {}", String::from_utf8_lossy(&out.stderr));
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8_lossy(&out.stdout).into_owned()
     }
 
     fn git_succeeds(dir: &Path, args: &[&str]) -> bool {
-        Command::new("git").current_dir(dir).args(args).output().unwrap().status.success()
+        Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap()
+            .status
+            .success()
     }
 
     /// A throwaway repository on `main`, isolated from the developer's global hooks and signing config.
@@ -639,10 +941,20 @@ mod tests {
         fs::create_dir_all(&hooks).unwrap();
         git_ok(&root, &["init", "-q"]);
         git_ok(&root, &["symbolic-ref", "HEAD", "refs/heads/main"]);
-        for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com"), ("commit.gpgsign", "false"), ("core.hooksPath", hooks.to_str().unwrap())] {
+        for (key, value) in [
+            ("user.name", "Test"),
+            ("user.email", "test@example.com"),
+            ("commit.gpgsign", "false"),
+            ("core.hooksPath", hooks.to_str().unwrap()),
+        ] {
             git_ok(&root, &["config", key, value]);
         }
-        Fixture { _tmp: tmp, base, root, hooks }
+        Fixture {
+            _tmp: tmp,
+            base,
+            root,
+            hooks,
+        }
     }
 
     fn write(root: &Path, rel: &str, text: &str) {
@@ -664,7 +976,10 @@ mod tests {
     }
 
     fn head_files(root: &Path) -> Vec<String> {
-        let mut files: Vec<String> = git_ok(root, &["show", "--name-only", "--format=", "HEAD"]).lines().map(String::from).collect();
+        let mut files: Vec<String> = git_ok(root, &["show", "--name-only", "--format=", "HEAD"])
+            .lines()
+            .map(String::from)
+            .collect();
         files.sort();
         files
     }
@@ -694,8 +1009,14 @@ mod tests {
         assert!(st.repo && !st.detached && st.head.is_none() && st.in_progress.is_none());
         assert_eq!(st.branch.as_deref(), Some("main"));
         // Untracked directories are expanded to their files.
-        assert_eq!(st.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt", "dir/b.txt"]);
-        assert!(st.files.iter().all(|f| f.kind == Kind::Untracked && !f.staged));
+        assert_eq!(
+            st.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            ["a.txt", "dir/b.txt"]
+        );
+        assert!(st
+            .files
+            .iter()
+            .all(|f| f.kind == Kind::Untracked && !f.staged));
 
         git_ok(r, &["add", "-A"]);
         git_ok(r, &["commit", "-qm", "init"]);
@@ -708,9 +1029,21 @@ mod tests {
         assert_eq!(
             st.files,
             vec![
-                GitFile { path: "a.txt".into(), kind: Kind::Modified, staged: false },
-                GitFile { path: "c.txt".into(), kind: Kind::Added, staged: true },
-                GitFile { path: "dir/b.txt".into(), kind: Kind::Deleted, staged: false },
+                GitFile {
+                    path: "a.txt".into(),
+                    kind: Kind::Modified,
+                    staged: false
+                },
+                GitFile {
+                    path: "c.txt".into(),
+                    kind: Kind::Added,
+                    staged: true
+                },
+                GitFile {
+                    path: "dir/b.txt".into(),
+                    kind: Kind::Deleted,
+                    staged: false
+                },
             ]
         );
         git_ok(r, &["checkout", "-q", "--detach"]);
@@ -727,14 +1060,32 @@ mod tests {
         assert_eq!(classify(b' ', b'D'), Kind::Deleted);
         assert_eq!(classify(b'A', b' '), Kind::Added);
         assert_eq!(classify(b'M', b'M'), Kind::Modified);
-        let (files, total) = parse_porcelain(" M app/a.txt\0?? app/dir/b.txt\0A  other/c.txt\0MM app/with space.txt\0", "app/", 100);
+        let (files, total) = parse_porcelain(
+            " M app/a.txt\0?? app/dir/b.txt\0A  other/c.txt\0MM app/with space.txt\0",
+            "app/",
+            100,
+        );
         assert_eq!(total, 3);
-        assert_eq!(files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt", "dir/b.txt", "with space.txt"]);
-        assert_eq!(files[2], GitFile { path: "with space.txt".into(), kind: Kind::Modified, staged: true });
+        assert_eq!(
+            files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            ["a.txt", "dir/b.txt", "with space.txt"]
+        );
+        assert_eq!(
+            files[2],
+            GitFile {
+                path: "with space.txt".into(),
+                kind: Kind::Modified,
+                staged: true
+            }
+        );
         assert!(parse_porcelain("", "", 100).0.is_empty());
         assert!(parse_porcelain("garbage", "", 100).0.is_empty());
         let (capped, total) = parse_porcelain(" M a\0 M b\0 M c\0", "", 2);
-        assert_eq!((capped.len(), total), (2, 3), "the list is capped, the total is not");
+        assert_eq!(
+            (capped.len(), total),
+            (2, 3),
+            "the list is capped, the total is not"
+        );
     }
 
     #[test]
@@ -747,18 +1098,35 @@ mod tests {
         write(r, "new.txt", "n\n");
         write(r, "other_new.txt", "o\n");
         git_ok(r, &["add", "b.txt"]); // staged by the user, must stay out of our commit
-        let res = commit(r, "  Update a, add new  \n", &s(&["a.txt", "./new.txt", "a.txt"]), None).unwrap();
+        let res = commit(
+            r,
+            "  Update a, add new  \n",
+            &s(&["a.txt", "./new.txt", "a.txt"]),
+            None,
+        )
+        .unwrap();
         assert_eq!(res.files, ["a.txt", "new.txt"]);
         assert!(!res.created_branch);
         assert_eq!(res.branch.as_deref(), Some("main"));
         assert_eq!(head_files(r), ["a.txt", "new.txt"]);
-        assert_eq!(git_ok(r, &["log", "-1", "--format=%s"]).trim(), "Update a, add new");
+        assert_eq!(
+            git_ok(r, &["log", "-1", "--format=%s"]).trim(),
+            "Update a, add new"
+        );
         assert_eq!(git_ok(r, &["rev-parse", "HEAD"]).trim(), res.sha);
         assert_eq!(
             status(r).unwrap().files,
             vec![
-                GitFile { path: "b.txt".into(), kind: Kind::Modified, staged: true },
-                GitFile { path: "other_new.txt".into(), kind: Kind::Untracked, staged: false },
+                GitFile {
+                    path: "b.txt".into(),
+                    kind: Kind::Modified,
+                    staged: true
+                },
+                GitFile {
+                    path: "other_new.txt".into(),
+                    kind: Kind::Untracked,
+                    staged: false
+                },
             ]
         );
     }
@@ -770,7 +1138,10 @@ mod tests {
         init_commit(r, &["a.txt", "b.txt"]);
         fs::remove_file(r.join("a.txt")).unwrap();
         commit(r, "Remove a", &s(&["a.txt"]), None).unwrap();
-        assert_eq!(git_ok(r, &["show", "--name-status", "--format=", "HEAD"]).trim(), "D\ta.txt");
+        assert_eq!(
+            git_ok(r, &["show", "--name-status", "--format=", "HEAD"]).trim(),
+            "D\ta.txt"
+        );
         assert!(status(r).unwrap().files.is_empty());
     }
 
@@ -783,7 +1154,14 @@ mod tests {
         let res = commit(r, "Initial", &s(&["a.txt"]), None).unwrap();
         assert_eq!(head_files(r), ["a.txt"]);
         assert_eq!(res.branch.as_deref(), Some("main"));
-        assert_eq!(status(r).unwrap().files, vec![GitFile { path: "b.txt".into(), kind: Kind::Untracked, staged: false }]);
+        assert_eq!(
+            status(r).unwrap().files,
+            vec![GitFile {
+                path: "b.txt".into(),
+                kind: Kind::Untracked,
+                staged: false
+            }]
+        );
     }
 
     #[test]
@@ -796,7 +1174,11 @@ mod tests {
         let res = commit(r, "Change a", &s(&["a.txt"]), Some(" feature/x ")).unwrap();
         assert!(res.created_branch);
         assert_eq!(res.branch.as_deref(), Some("feature/x"));
-        assert_eq!(git_ok(r, &["rev-parse", "main"]).trim(), before, "the original branch must not move");
+        assert_eq!(
+            git_ok(r, &["rev-parse", "main"]).trim(),
+            before,
+            "the original branch must not move"
+        );
         assert_eq!(git_ok(r, &["rev-parse", "feature/x"]).trim(), res.sha);
         assert_eq!(git_ok(r, &["rev-parse", "HEAD~1"]).trim(), before);
     }
@@ -823,9 +1205,34 @@ mod tests {
         git_ok(r, &["branch", "taken"]);
         write(r, "a.txt", "2\n");
         let before = git_ok(r, &["rev-parse", "HEAD"]);
-        for bad in ["a b", "-x", "--detach", "a..b", "a~1", "a^", "a:b", "x.lock", "/x", "x/", "a//b", "@{u}", "@", "HEAD", "main", "taken", "bad\nname", "a*b", "a[b", "a\\b", "-"] {
+        for bad in [
+            "a b",
+            "-x",
+            "--detach",
+            "a..b",
+            "a~1",
+            "a^",
+            "a:b",
+            "x.lock",
+            "/x",
+            "x/",
+            "a//b",
+            "@{u}",
+            "@",
+            "HEAD",
+            "main",
+            "taken",
+            "bad\nname",
+            "a*b",
+            "a[b",
+            "a\\b",
+            "-",
+        ] {
             let err = commit(r, "msg", &s(&["a.txt"]), Some(bad)).unwrap_err();
-            assert!(err.contains("branch") || err.contains("Branch"), "{bad:?}: {err}");
+            assert!(
+                err.contains("branch") || err.contains("Branch"),
+                "{bad:?}: {err}"
+            );
         }
         assert_eq!(git_ok(r, &["rev-parse", "HEAD"]), before);
         assert_eq!(status(r).unwrap().branch.as_deref(), Some("main"));
@@ -849,11 +1256,29 @@ mod tests {
         let f = fixture();
         let r = &f.root;
         init_commit(r, &["a.txt"]);
-        for bad in ["../x", "/etc/passwd", "a/../../x", "sub/../../x", ".git/config", ".GIT/hooks/pre-commit", "sub/.git/x", "", ".", "./", "nul\0byte"] {
-            assert!(validate_paths(r, &s(&[bad])).is_err(), "{bad:?} must be rejected");
+        for bad in [
+            "../x",
+            "/etc/passwd",
+            "a/../../x",
+            "sub/../../x",
+            ".git/config",
+            ".GIT/hooks/pre-commit",
+            "sub/.git/x",
+            "",
+            ".",
+            "./",
+            "nul\0byte",
+        ] {
+            assert!(
+                validate_paths(r, &s(&[bad])).is_err(),
+                "{bad:?} must be rejected"
+            );
         }
         assert!(validate_paths(r, &[]).is_err());
-        assert_eq!(validate_paths(r, &s(&["./a//b.txt", "a/b.txt", "new/dir/file"])).unwrap(), ["a/b.txt", "new/dir/file"]);
+        assert_eq!(
+            validate_paths(r, &s(&["./a//b.txt", "a/b.txt", "new/dir/file"])).unwrap(),
+            ["a/b.txt", "new/dir/file"]
+        );
         assert!(commit(r, "msg", &s(&["../x"]), None).is_err());
     }
 
@@ -905,11 +1330,22 @@ mod tests {
         let st = status(&app).unwrap();
         assert_eq!(st.prefix, "app/");
         assert_eq!(st.total, 2);
-        assert_eq!(st.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt", "sub/new.txt"]);
+        assert_eq!(
+            st.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            ["a.txt", "sub/new.txt"]
+        );
         assert!(commit(&app, "msg", &s(&["../other/b.txt"]), None).is_err());
         commit(&app, "Change app", &s(&["a.txt", "sub/new.txt"]), None).unwrap();
         assert_eq!(head_files(r), ["app/a.txt", "app/sub/new.txt"]);
-        assert_eq!(status(r).unwrap().files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["other/b.txt"]);
+        assert_eq!(
+            status(r)
+                .unwrap()
+                .files
+                .iter()
+                .map(|f| f.path.as_str())
+                .collect::<Vec<_>>(),
+            ["other/b.txt"]
+        );
     }
 
     #[test]
@@ -959,17 +1395,35 @@ mod tests {
         let before = git_ok(r, &["rev-parse", "HEAD"]);
         install_hook(&f, "pre-commit", "echo 'lint failed: fix it' >&2\nexit 1");
         let err = commit(r, "msg", &s(&["a.txt", "new.txt"]), Some("feature/y")).unwrap_err();
-        assert!(err.contains("lint failed"), "hook output must reach the caller: {err}");
+        assert!(
+            err.contains("lint failed"),
+            "hook output must reach the caller: {err}"
+        );
         assert_eq!(git_ok(r, &["rev-parse", "HEAD"]), before);
         let st = status(r).unwrap();
         assert_eq!(st.branch.as_deref(), Some("main"));
-        assert!(!git_succeeds(r, &["rev-parse", "--verify", "-q", "refs/heads/feature/y"]), "the new branch must be removed again");
+        assert!(
+            !git_succeeds(r, &["rev-parse", "--verify", "-q", "refs/heads/feature/y"]),
+            "the new branch must be removed again"
+        );
         assert_eq!(
             st.files,
             vec![
-                GitFile { path: "a.txt".into(), kind: Kind::Modified, staged: false },
-                GitFile { path: "b.txt".into(), kind: Kind::Modified, staged: true },
-                GitFile { path: "new.txt".into(), kind: Kind::Untracked, staged: false },
+                GitFile {
+                    path: "a.txt".into(),
+                    kind: Kind::Modified,
+                    staged: false
+                },
+                GitFile {
+                    path: "b.txt".into(),
+                    kind: Kind::Modified,
+                    staged: true
+                },
+                GitFile {
+                    path: "new.txt".into(),
+                    kind: Kind::Untracked,
+                    staged: false
+                },
             ]
         );
 
@@ -991,17 +1445,38 @@ mod tests {
         let st = status(r).unwrap();
         assert_eq!(st.branch.as_deref(), Some("main"));
         assert!(st.head.is_none());
-        assert_eq!(st.files, vec![GitFile { path: "a.txt".into(), kind: Kind::Untracked, staged: false }]);
+        assert_eq!(
+            st.files,
+            vec![GitFile {
+                path: "a.txt".into(),
+                kind: Kind::Untracked,
+                staged: false
+            }]
+        );
     }
 
     #[test]
     fn commit_args_never_bypass_hooks_signing_or_rewrite_history() {
         let args = commit_args("-n --no-verify", &s(&["a b.txt", "--amend", "-n"]));
         assert_eq!(&args[..4], ["commit", "-q", "--only", "-m"]);
-        assert_eq!(args[4], "-n --no-verify", "the message is the value of -m, never a flag");
+        assert_eq!(
+            args[4], "-n --no-verify",
+            "the message is the value of -m, never a flag"
+        );
         assert_eq!(args[5], "--");
-        assert_eq!(&args[6..], [":(literal)a b.txt", ":(literal)--amend", ":(literal)-n"]);
-        for bad in ["--no-verify", "-n", "--no-gpg-sign", "--amend", "--allow-empty", "--force", "-f"] {
+        assert_eq!(
+            &args[6..],
+            [":(literal)a b.txt", ":(literal)--amend", ":(literal)-n"]
+        );
+        for bad in [
+            "--no-verify",
+            "-n",
+            "--no-gpg-sign",
+            "--amend",
+            "--allow-empty",
+            "--force",
+            "-f",
+        ] {
             assert!(!args[..4].iter().any(|a| a == bad), "{bad}");
         }
     }
@@ -1010,8 +1485,19 @@ mod tests {
     fn production_code_never_pushes_forces_or_bypasses_hooks() {
         let source = include_str!("git.rs");
         let production = source.split("#[cfg(test)]").next().unwrap();
-        for forbidden in ["\"push\"", "\"--force\"", "\"--force-with-lease\"", "\"--no-verify\"", "\"--no-gpg-sign\"", "\"--amend\"", "\"reset\", \"--hard\""] {
-            assert!(!production.contains(forbidden), "git.rs must not contain {forbidden}");
+        for forbidden in [
+            "\"push\"",
+            "\"--force\"",
+            "\"--force-with-lease\"",
+            "\"--no-verify\"",
+            "\"--no-gpg-sign\"",
+            "\"--amend\"",
+            "\"reset\", \"--hard\"",
+        ] {
+            assert!(
+                !production.contains(forbidden),
+                "git.rs must not contain {forbidden}"
+            );
         }
     }
 
@@ -1028,11 +1514,19 @@ mod tests {
         fs::write(r.join("bin.dat"), [0u8, 159, 146, 150, 0]).unwrap();
         let ctx = commit_context(r, &s(&["a.txt", "n.txt", "bin.dat"]), 24_000).unwrap();
         assert_eq!(ctx.files, ["a.txt", "bin.dat", "n.txt"]);
-        assert!(ctx.diff.contains("+changed line") && ctx.diff.contains("-1"), "{}", ctx.diff);
+        assert!(
+            ctx.diff.contains("+changed line") && ctx.diff.contains("-1"),
+            "{}",
+            ctx.diff
+        );
         assert!(ctx.diff.contains("+hello new file"), "{}", ctx.diff);
         assert!(ctx.diff.contains("Binary files"), "{}", ctx.diff);
         assert!(!ctx.diff.contains("untouched by selection"));
-        assert!(ctx.stat.contains("a.txt") && ctx.stat.contains("n.txt | new file"), "{}", ctx.stat);
+        assert!(
+            ctx.stat.contains("a.txt") && ctx.stat.contains("n.txt | new file"),
+            "{}",
+            ctx.stat
+        );
         assert!(!ctx.truncated);
         assert_eq!(ctx.recent, ["Second subject", "init"]);
     }
@@ -1045,7 +1539,11 @@ mod tests {
         write(r, "b.txt", "untracked new\n");
         git_ok(r, &["add", "a.txt"]);
         let ctx = commit_context(r, &s(&["a.txt", "b.txt"]), 24_000).unwrap();
-        assert!(ctx.diff.contains("+staged new") && ctx.diff.contains("+untracked new"), "{}", ctx.diff);
+        assert!(
+            ctx.diff.contains("+staged new") && ctx.diff.contains("+untracked new"),
+            "{}",
+            ctx.diff
+        );
         assert!(ctx.recent.is_empty());
     }
 
@@ -1060,7 +1558,10 @@ mod tests {
         let ctx = commit_context(r, &s(&["big.lock", "small.txt"]), 3_000).unwrap();
         assert!(ctx.truncated);
         assert!(ctx.diff.len() < 3_300, "{} bytes", ctx.diff.len());
-        assert!(ctx.diff.contains("+tiny change"), "the small file must survive the big one");
+        assert!(
+            ctx.diff.contains("+tiny change"),
+            "the small file must survive the big one"
+        );
         assert!(ctx.diff.contains("[... diff truncated ...]"));
         assert!(commit_context(r, &s(&["small.txt"]), 3_000).is_ok());
         assert!(commit_context(r, &s(&["nothing.txt"]), 3_000).is_err());
@@ -1078,10 +1579,18 @@ mod tests {
         write(r, "huge.txt", &"0123456789abcdef\n".repeat(400_000)); // ~6 MB untracked
         write(r, "new_small.txt", "tiny new file\n");
         let started = std::time::Instant::now();
-        let ctx = commit_context(r, &s(&["a.txt", "small.txt", "huge.txt", "new_small.txt"]), 24_000).unwrap();
+        let ctx = commit_context(
+            r,
+            &s(&["a.txt", "small.txt", "huge.txt", "new_small.txt"]),
+            24_000,
+        )
+        .unwrap();
         assert!(ctx.truncated);
         assert!(ctx.diff.len() <= 24_000 + 200, "{} bytes", ctx.diff.len());
-        assert!(ctx.diff.contains("+tiny change") && ctx.diff.contains("+tiny new file"), "small files must survive");
+        assert!(
+            ctx.diff.contains("+tiny change") && ctx.diff.contains("+tiny new file"),
+            "small files must survive"
+        );
         assert!(ctx.diff.matches("[... diff truncated ...]").count() >= 1);
         assert!(started.elapsed().as_secs() < 20);
     }
@@ -1095,8 +1604,16 @@ mod tests {
         assert!(!cut && (text.trim().len() == 40 || text.trim().len() == 64));
         let (text, cut) = run_git_capped(r, ["log", "--format=%H"], 10, &[0]).unwrap();
         assert!(cut && text.len() == 10);
-        assert!(run_git_capped(r, ["rev-parse", "--verify", "nonexistent-ref"], 100, &[0]).is_err());
-        let (_, cut) = run_git_capped(r, ["rev-parse", "--verify", "-q", "nonexistent-ref"], 100, &[0, 1]).unwrap();
+        assert!(
+            run_git_capped(r, ["rev-parse", "--verify", "nonexistent-ref"], 100, &[0]).is_err()
+        );
+        let (_, cut) = run_git_capped(
+            r,
+            ["rev-parse", "--verify", "-q", "nonexistent-ref"],
+            100,
+            &[0, 1],
+        )
+        .unwrap();
         assert!(!cut);
     }
 
@@ -1121,7 +1638,11 @@ mod tests {
         let small = "diff --git a/s b/s\n+s\n".to_string();
         let huge = format!("diff --git a/h b/h\n{}", "+héllo wörld\n".repeat(500));
         let (text, cut) = budget_sections(&[small.clone(), huge.clone()], 400);
-        assert!(cut && text.starts_with(&small) && text.len() < 480 && text.contains("[... diff truncated ...]"));
+        assert!(
+            cut && text.starts_with(&small)
+                && text.len() < 480
+                && text.contains("[... diff truncated ...]")
+        );
         let (all, cut) = budget_sections(&[small.clone(), huge.clone()], 1_000_000);
         assert!(!cut && all == format!("{small}{huge}"));
         let (multibyte, _) = budget_sections(&["é".repeat(300)], 101);

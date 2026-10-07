@@ -2,7 +2,9 @@
 //! project semantic search (`semantic.rs`: provider config, `embed`, cosine). Everything lives in app data:
 //! `<app data>/knowledge/<collection id>/{manifest.json,index.json}`; nothing is written to the picked folders.
 //! Indexing is opt-in per collection (the first run needs `confirm`), because it sends text to the embeddings endpoint.
-use crate::semantic::{cosine, embed, endpoint, excluded, index_lock, split as split_lines, Config};
+use crate::semantic::{
+    cosine, embed, endpoint, excluded, index_lock, split as split_lines, Config,
+};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
@@ -35,7 +37,13 @@ const PDF_TIMEOUT: Duration = Duration::from_secs(30);
 const PDF_OUTPUT_CAP: u64 = 20_000_000;
 const HIT_TEXT_CHARS: usize = 1500;
 
-pub const DEFAULT_INCLUDE: &[&str] = &["**/*.md", "**/*.markdown", "**/*.txt", "**/*.rst", "**/*.pdf"];
+pub const DEFAULT_INCLUDE: &[&str] = &[
+    "**/*.md",
+    "**/*.markdown",
+    "**/*.txt",
+    "**/*.rst",
+    "**/*.pdf",
+];
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +56,13 @@ pub struct Caps {
 }
 impl Default for Caps {
     fn default() -> Self {
-        Caps { max_files: 2000, max_file_bytes: 5_000_000, max_total_bytes: 200_000_000, max_pdf_bytes: 25_000_000, max_chunks: 20_000 }
+        Caps {
+            max_files: 2000,
+            max_file_bytes: 5_000_000,
+            max_total_bytes: 200_000_000,
+            max_pdf_bytes: 25_000_000,
+            max_chunks: 20_000,
+        }
     }
 }
 
@@ -183,7 +197,10 @@ pub type PdfExtractor = fn(&Path) -> Result<Vec<String>, String>;
 // Small helpers
 
 fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 /// Stable 64-bit FNV-1a (unlike `DefaultHasher` it does not change between Rust versions, so cached vectors stay valid).
 fn fnv(bytes: &[u8]) -> String {
@@ -209,14 +226,16 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
     }
     let temp = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     std::fs::write(&temp, bytes).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| e.to_string())?;
     }
     std::fs::rename(&temp, path).map_err(|e| {
         let _ = std::fs::remove_file(&temp);
@@ -224,7 +243,11 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     })
 }
 fn mtime_nanos(meta: &std::fs::Metadata) -> u64 {
-    meta.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_nanos() as u64).unwrap_or(0)
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0)
 }
 fn with_lock<T>(path: &Path, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
     let lock = index_lock(path)?;
@@ -245,7 +268,12 @@ fn globs(patterns: &[String]) -> Result<GlobSet, String> {
         if p.is_empty() || p.len() > 200 {
             return Err("Include patterns must be 1-200 characters".into());
         }
-        builder.add(GlobBuilder::new(p).case_insensitive(true).build().map_err(|e| format!("Invalid pattern {p}: {e}"))?);
+        builder.add(
+            GlobBuilder::new(p)
+                .case_insensitive(true)
+                .build()
+                .map_err(|e| format!("Invalid pattern {p}: {e}"))?,
+        );
     }
     builder.build().map_err(|e| e.to_string())
 }
@@ -260,14 +288,21 @@ fn index_path(dir: &Path) -> PathBuf {
     dir.join("index.json")
 }
 fn read_manifest(dir: &Path) -> Result<Collection, String> {
-    let bytes = std::fs::read(manifest_path(dir)).map_err(|_| "Collection not found".to_string())?;
+    let bytes =
+        std::fs::read(manifest_path(dir)).map_err(|_| "Collection not found".to_string())?;
     serde_json::from_slice(&bytes).map_err(|e| format!("Collection manifest is damaged: {e}"))
 }
 fn write_manifest(dir: &Path, c: &Collection) -> Result<(), String> {
-    write_private(&manifest_path(dir), &serde_json::to_vec_pretty(c).map_err(|e| e.to_string())?)
+    write_private(
+        &manifest_path(dir),
+        &serde_json::to_vec_pretty(c).map_err(|e| e.to_string())?,
+    )
 }
 /// Read-modify-write of the manifest under its own lock, so a status update from an index run cannot lose a rename.
-fn update_manifest(dir: &Path, f: impl FnOnce(&mut Collection) -> Result<(), String>) -> Result<Collection, String> {
+fn update_manifest(
+    dir: &Path,
+    f: impl FnOnce(&mut Collection) -> Result<(), String>,
+) -> Result<Collection, String> {
     with_lock(&dir.join("manifest-lock"), || {
         let mut c = read_manifest(dir)?;
         f(&mut c)?;
@@ -288,10 +323,17 @@ fn mark_stale(c: &mut Collection) {
     }
 }
 
-pub fn create(store: &Path, name: &str, config: Config, include: Option<Vec<String>>) -> Result<Collection, String> {
+pub fn create(
+    store: &Path,
+    name: &str,
+    config: Config,
+    include: Option<Vec<String>>,
+) -> Result<Collection, String> {
     let name = clean_name(name)?;
     endpoint(&config)?;
-    let include = include.filter(|v| !v.is_empty()).unwrap_or_else(|| DEFAULT_INCLUDE.iter().map(|s| s.to_string()).collect());
+    let include = include
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| DEFAULT_INCLUDE.iter().map(|s| s.to_string()).collect());
     globs(&include)?;
     if list(store)?.len() >= MAX_COLLECTIONS {
         return Err(format!("At most {MAX_COLLECTIONS} collections"));
@@ -305,7 +347,10 @@ pub fn create(store: &Path, name: &str, config: Config, include: Option<Vec<Stri
         config,
         created_at: now(),
         consented_at: None,
-        status: Status { state: "new".into(), ..Default::default() },
+        status: Status {
+            state: "new".into(),
+            ..Default::default()
+        },
         indexing: false,
     };
     write_manifest(&coll_dir(store, &c.id)?, &c)?;
@@ -314,7 +359,9 @@ pub fn create(store: &Path, name: &str, config: Config, include: Option<Vec<Stri
 
 pub fn list(store: &Path) -> Result<Vec<Collection>, String> {
     let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(store) else { return Ok(out) };
+    let Ok(entries) = std::fs::read_dir(store) else {
+        return Ok(out);
+    };
     for entry in entries.flatten() {
         if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
@@ -323,7 +370,11 @@ pub fn list(store: &Path) -> Result<Vec<Collection>, String> {
             out.push(c);
         }
     }
-    out.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.name.cmp(&b.name)));
+    out.sort_by(|a, b| {
+        a.created_at
+            .cmp(&b.created_at)
+            .then_with(|| a.name.cmp(&b.name))
+    });
     Ok(out)
 }
 
@@ -347,14 +398,23 @@ pub fn delete(store: &Path, id: &str) -> Result<(), String> {
 
 /// A user-picked source must exist, must not be a filesystem root, the home folder itself, or our own storage.
 fn resolve_source(store: &Path, path: &str) -> Result<Source, String> {
-    let real = Path::new(path).canonicalize().map_err(|e| format!("Cannot open {path}: {e}"))?;
+    let real = Path::new(path)
+        .canonicalize()
+        .map_err(|e| format!("Cannot open {path}: {e}"))?;
     if real.parent().is_none() {
         return Err("Pick a folder or file, not the filesystem root".into());
     }
-    if dirs::home_dir().and_then(|h| h.canonicalize().ok()).is_some_and(|h| h == real) {
+    if dirs::home_dir()
+        .and_then(|h| h.canonicalize().ok())
+        .is_some_and(|h| h == real)
+    {
         return Err("Pick a folder inside your home folder, not the home folder itself".into());
     }
-    if store.canonicalize().map(|s| real.starts_with(&s)).unwrap_or(false) {
+    if store
+        .canonicalize()
+        .map(|s| real.starts_with(&s))
+        .unwrap_or(false)
+    {
         return Err("The knowledge base storage cannot be indexed".into());
     }
     let meta = std::fs::metadata(&real).map_err(|e| e.to_string())?;
@@ -365,10 +425,18 @@ fn resolve_source(store: &Path, path: &str) -> Result<Source, String> {
     } else {
         return Err("Only folders and regular files can be added".into());
     };
-    if kind == "file" && real.file_name().and_then(|s| s.to_str()).is_some_and(|n| excluded(Path::new(n))) {
+    if kind == "file"
+        && real
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|n| excluded(Path::new(n)))
+    {
         return Err("This file looks like a secret or generated file and is never indexed".into());
     }
-    Ok(Source { path: real.to_string_lossy().into_owned(), kind: kind.into() })
+    Ok(Source {
+        path: real.to_string_lossy().into_owned(),
+        kind: kind.into(),
+    })
 }
 
 pub fn add_source(store: &Path, id: &str, path: &str) -> Result<Collection, String> {
@@ -389,10 +457,14 @@ pub fn add_source(store: &Path, id: &str, path: &str) -> Result<Collection, Stri
 pub fn remove_source(store: &Path, id: &str, path: &str) -> Result<Collection, String> {
     let dir = coll_dir(store, id)?;
     let requested = path.to_string();
-    let real = Path::new(path).canonicalize().ok().map(|p| p.to_string_lossy().into_owned());
+    let real = Path::new(path)
+        .canonicalize()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned());
     let removed = update_manifest(&dir, |c| {
         let before = c.sources.len();
-        c.sources.retain(|s| s.path != requested && Some(&s.path) != real.as_ref());
+        c.sources
+            .retain(|s| s.path != requested && Some(&s.path) != real.as_ref());
         if c.sources.len() == before {
             return Err("Source not found in this collection".into());
         }
@@ -436,7 +508,11 @@ pub fn set_config(store: &Path, id: &str, config: Config) -> Result<Collection, 
         if c.config != config {
             c.config = config;
             c.consented_at = None;
-            c.status.state = if c.status.indexed_at.is_some() { "stale".into() } else { "new".into() };
+            c.status.state = if c.status.indexed_at.is_some() {
+                "stale".into()
+            } else {
+                "new".into()
+            };
         }
         Ok(())
     })
@@ -454,7 +530,10 @@ fn read_index(dir: &Path) -> Option<Index> {
     (index.version == INDEX_VERSION).then_some(index)
 }
 fn save_index(dir: &Path, index: &Index) -> Result<(), String> {
-    write_private(&index_path(dir), &serde_json::to_vec(index).map_err(|e| e.to_string())?)
+    write_private(
+        &index_path(dir),
+        &serde_json::to_vec(index).map_err(|e| e.to_string())?,
+    )
 }
 
 type CacheEntry = (SystemTime, u64, Arc<Index>);
@@ -497,11 +576,16 @@ struct Discovery {
 }
 
 fn is_pdf(path: &Path) -> bool {
-    path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
 }
 fn push_issue(issues: &mut Vec<Issue>, path: impl Into<String>, reason: impl Into<String>) {
     if issues.len() < MAX_ISSUES {
-        issues.push(Issue { path: path.into(), reason: reason.into() });
+        issues.push(Issue {
+            path: path.into(),
+            reason: reason.into(),
+        });
     }
 }
 fn mb(bytes: u64) -> String {
@@ -510,7 +594,12 @@ fn mb(bytes: u64) -> String {
 
 fn discover(c: &Collection) -> Result<Discovery, String> {
     let include = globs(&c.include)?;
-    let mut d = Discovery { files: vec![], issues: vec![], warnings: vec![], missing_sources: HashSet::new() };
+    let mut d = Discovery {
+        files: vec![],
+        issues: vec![],
+        warnings: vec![],
+        missing_sources: HashSet::new(),
+    };
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut total = 0u64;
     'sources: for source in &c.sources {
@@ -518,11 +607,19 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
             Ok(r) => r,
             Err(_) => {
                 d.missing_sources.insert(source.path.clone());
-                push_issue(&mut d.issues, &source.path, "Source not found (kept as indexed earlier)");
+                push_issue(
+                    &mut d.issues,
+                    &source.path,
+                    "Source not found (kept as indexed earlier)",
+                );
                 continue;
             }
         };
-        let root_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("source").to_string();
+        let root_name = root
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("source")
+            .to_string();
         // Candidate list for this source: (absolute path, citation path).
         let mut candidates: Vec<(PathBuf, String)> = vec![];
         if source.kind == "file" {
@@ -543,7 +640,9 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
                 .follow_links(false)
                 .require_git(false)
                 .sort_by_file_path(|a, b| a.cmp(b))
-                .filter_entry(move |e| e.depth() == 0 || e.path().strip_prefix(&base).is_ok_and(|p| !excluded(p)))
+                .filter_entry(move |e| {
+                    e.depth() == 0 || e.path().strip_prefix(&base).is_ok_and(|p| !excluded(p))
+                })
                 .build();
             for (visited, entry) in walk.enumerate() {
                 if visited >= WALK_ENTRY_CAP {
@@ -551,14 +650,20 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
                     break;
                 }
                 let Ok(entry) = entry else { continue };
-                let Ok(rel) = entry.path().strip_prefix(&root) else { continue };
+                let Ok(rel) = entry.path().strip_prefix(&root) else {
+                    continue;
+                };
                 if rel.as_os_str().is_empty() {
                     continue;
                 }
                 let rel_str = rel.to_string_lossy().replace('\\', "/");
                 if entry.path_is_symlink() {
                     if include.is_match(&rel_str) {
-                        push_issue(&mut d.issues, format!("{root_name}/{rel_str}"), "Symbolic link not followed");
+                        push_issue(
+                            &mut d.issues,
+                            format!("{root_name}/{rel_str}"),
+                            "Symbolic link not followed",
+                        );
                     }
                     continue;
                 }
@@ -567,8 +672,14 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
                 }
                 // Belt and braces: whatever the walker yielded must still resolve inside the picked folder.
                 match entry.path().canonicalize() {
-                    Ok(real) if real.starts_with(&root) => candidates.push((real, format!("{root_name}/{rel_str}"))),
-                    _ => push_issue(&mut d.issues, format!("{root_name}/{rel_str}"), "Resolves outside the picked folder"),
+                    Ok(real) if real.starts_with(&root) => {
+                        candidates.push((real, format!("{root_name}/{rel_str}")))
+                    }
+                    _ => push_issue(
+                        &mut d.issues,
+                        format!("{root_name}/{rel_str}"),
+                        "Resolves outside the picked folder",
+                    ),
                 }
             }
         }
@@ -581,21 +692,46 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
                 continue;
             };
             let pdf = is_pdf(&abs);
-            let cap = if pdf { c.caps.max_pdf_bytes } else { c.caps.max_file_bytes };
+            let cap = if pdf {
+                c.caps.max_pdf_bytes
+            } else {
+                c.caps.max_file_bytes
+            };
             if meta.len() > cap {
-                push_issue(&mut d.issues, &display, format!("Larger than {} (limit for {})", mb(cap), if pdf { "PDF files" } else { "a file" }));
+                push_issue(
+                    &mut d.issues,
+                    &display,
+                    format!(
+                        "Larger than {} (limit for {})",
+                        mb(cap),
+                        if pdf { "PDF files" } else { "a file" }
+                    ),
+                );
                 continue;
             }
             if d.files.len() >= c.caps.max_files {
-                d.warnings.push(format!("File limit reached ({} files); the remaining files were not indexed", c.caps.max_files));
+                d.warnings.push(format!(
+                    "File limit reached ({} files); the remaining files were not indexed",
+                    c.caps.max_files
+                ));
                 break 'sources;
             }
             if total + meta.len() > c.caps.max_total_bytes {
-                d.warnings.push(format!("Size limit reached ({}); the remaining files were not indexed", mb(c.caps.max_total_bytes)));
+                d.warnings.push(format!(
+                    "Size limit reached ({}); the remaining files were not indexed",
+                    mb(c.caps.max_total_bytes)
+                ));
                 break 'sources;
             }
             total += meta.len();
-            d.files.push(Found { abs, source: source.path.clone(), display, size: meta.len(), mtime: mtime_nanos(&meta), pdf });
+            d.files.push(Found {
+                abs,
+                source: source.path.clone(),
+                display,
+                size: meta.len(),
+                mtime: mtime_nanos(&meta),
+                pdf,
+            });
         }
     }
     Ok(d)
@@ -604,7 +740,13 @@ fn discover(c: &Collection) -> Result<Discovery, String> {
 pub fn estimate(store: &Path, id: &str) -> Result<Estimate, String> {
     let c = read_manifest(&coll_dir(store, id)?)?;
     let d = discover(&c)?;
-    Ok(Estimate { files: d.files.len(), pdfs: d.files.iter().filter(|f| f.pdf).count(), bytes: d.files.iter().map(|f| f.size).sum(), skipped: d.issues.len(), warnings: d.warnings })
+    Ok(Estimate {
+        files: d.files.len(),
+        pdfs: d.files.iter().filter(|f| f.pdf).count(),
+        bytes: d.files.iter().map(|f| f.size).sum(),
+        skipped: d.issues.len(),
+        warnings: d.warnings,
+    })
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -660,10 +802,20 @@ fn pack(lines: &[(usize, &str)], heading: &Option<String>, out: &mut Vec<Raw>) {
             if previous.is_some() {
                 text.push_str("\n\n");
             }
-            text.push_str(&p.iter().map(|(_, l)| l.as_str()).collect::<Vec<_>>().join("\n"));
+            text.push_str(
+                &p.iter()
+                    .map(|(_, l)| l.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
             previous = Some(p.last().unwrap().0);
         }
-        out.push(Raw { start, end, heading: heading.clone(), text });
+        out.push(Raw {
+            start,
+            end,
+            heading: heading.clone(),
+            text,
+        });
         group.clear();
     };
     for p in &paragraphs {
@@ -704,7 +856,10 @@ fn chunk_markdown(text: &str) -> Vec<Raw> {
     let mut fence: Option<String> = None;
     let finish = |section: &mut Vec<(usize, &str)>, path: &Option<String>, out: &mut Vec<Raw>| {
         // A heading with nothing under it is not worth a chunk.
-        let body = section.iter().skip(if path.is_some() { 1 } else { 0 }).any(|(_, l)| !l.trim().is_empty());
+        let body = section
+            .iter()
+            .skip(if path.is_some() { 1 } else { 0 })
+            .any(|(_, l)| !l.trim().is_empty());
         if body {
             pack(section, path, out);
         }
@@ -724,7 +879,16 @@ fn chunk_markdown(text: &str) -> Vec<Raw> {
                 stack.pop();
             }
             stack.push((level, title));
-            path = Some(stack.iter().map(|(_, t)| t.as_str()).collect::<Vec<_>>().join(" > ").chars().take(300).collect());
+            path = Some(
+                stack
+                    .iter()
+                    .map(|(_, t)| t.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" > ")
+                    .chars()
+                    .take(300)
+                    .collect(),
+            );
         }
         section.push((i + 1, line));
     }
@@ -749,12 +913,24 @@ fn chunk_pdf(pages: &[String]) -> Vec<Raw> {
 }
 
 fn chunk_file(display: &str, text: &str) -> Vec<Raw> {
-    let ext = Path::new(display).extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).unwrap_or_default();
+    let ext = Path::new(display)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
     match ext.as_str() {
         "md" | "markdown" => chunk_markdown(text),
         "txt" | "rst" | "text" => chunk_plain(text),
         // Source code and everything else: fixed line windows like the project index.
-        _ => split_lines(display, text).into_iter().map(|c| Raw { start: c.start, end: c.end, heading: None, text: c.text }).collect(),
+        _ => split_lines(display, text)
+            .into_iter()
+            .map(|c| Raw {
+                start: c.start,
+                end: c.end,
+                heading: None,
+                text: c.text,
+            })
+            .collect(),
     }
 }
 
@@ -813,13 +989,24 @@ pub fn extract_pdf_with_exe(exe: &Path, path: &Path) -> Result<Vec<String>, Stri
         }
     };
     let result = (|| {
-        let Some(status) = finished else { return Err(format!("PDF extraction timed out after {} s", PDF_TIMEOUT.as_secs())) };
+        let Some(status) = finished else {
+            return Err(format!(
+                "PDF extraction timed out after {} s",
+                PDF_TIMEOUT.as_secs()
+            ));
+        };
         let mut bytes = Vec::new();
         match std::fs::File::open(&out) {
             Ok(f) => {
-                f.take(PDF_OUTPUT_CAP + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+                f.take(PDF_OUTPUT_CAP + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(|e| e.to_string())?;
             }
-            Err(_) => return Err(format!("PDF extraction crashed ({status}); the file is probably malformed")),
+            Err(_) => {
+                return Err(format!(
+                    "PDF extraction crashed ({status}); the file is probably malformed"
+                ))
+            }
         }
         if bytes.len() as u64 > PDF_OUTPUT_CAP {
             return Err("PDF text is larger than 20 MB".into());
@@ -828,7 +1015,8 @@ pub fn extract_pdf_with_exe(exe: &Path, path: &Path) -> Result<Vec<String>, Stri
         if let Some(e) = value.get("error").and_then(|v| v.as_str()) {
             return Err(e.to_string());
         }
-        serde_json::from_value(value.get("pages").cloned().unwrap_or_default()).map_err(|e| e.to_string())
+        serde_json::from_value(value.get("pages").cloned().unwrap_or_default())
+            .map_err(|e| e.to_string())
     })();
     let _ = std::fs::remove_file(&out);
     result
@@ -856,19 +1044,32 @@ fn read_text(path: &Path) -> Result<(String, String), String> {
 pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats, String> {
     let dir = coll_dir(store, id)?;
     let lock = index_lock(&dir)?;
-    let _guard = lock.try_lock().map_err(|_| "This collection is already being indexed".to_string())?;
+    let _guard = lock
+        .try_lock()
+        .map_err(|_| "This collection is already being indexed".to_string())?;
     let mut c = read_manifest(&dir)?;
     endpoint(&c.config)?;
     if c.consented_at.is_none() {
         if !confirm {
-            return Err("Confirm first: indexing sends the text of these files to the embeddings provider".into());
+            return Err(
+                "Confirm first: indexing sends the text of these files to the embeddings provider"
+                    .into(),
+            );
         }
         c = update_manifest(&dir, |c| {
             c.consented_at = Some(now());
             Ok(())
         })?;
     }
-    let event = |phase: &str, done: usize, total: usize, file: Option<String>| (run.progress)(&Progress { id: id.to_string(), phase: phase.into(), done, total, file });
+    let event = |phase: &str, done: usize, total: usize, file: Option<String>| {
+        (run.progress)(&Progress {
+            id: id.to_string(),
+            phase: phase.into(),
+            done,
+            total,
+            file,
+        })
+    };
 
     let previous = read_index(&dir).filter(|i| i.config == c.config);
     // Vectors are reused per chunk (same text, same heading and file name), so moved text or renamed files cost nothing extra.
@@ -877,7 +1078,9 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
         for f in p.files.values() {
             for ch in &f.chunks {
                 if !ch.vector.is_empty() {
-                    vectors.entry(ch.hash.clone()).or_insert_with(|| ch.vector.clone());
+                    vectors
+                        .entry(ch.hash.clone())
+                        .or_insert_with(|| ch.vector.clone());
                 }
             }
         }
@@ -906,7 +1109,10 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
         ($key:expr, $entry:expr) => {{
             let entry: FileEntry = $entry;
             if chunk_total + entry.chunks.len() > c.caps.max_chunks {
-                warnings.push(format!("Chunk limit reached ({} chunks); the remaining files were not indexed", c.caps.max_chunks));
+                warnings.push(format!(
+                    "Chunk limit reached ({} chunks); the remaining files were not indexed",
+                    c.caps.max_chunks
+                ));
                 break;
             }
             chunk_total += entry.chunks.len();
@@ -924,7 +1130,12 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
         let key = file.abs.to_string_lossy().into_owned();
         let old = old_files.remove(&key);
         if let Some(o) = &old {
-            if o.mtime == file.mtime && o.size == file.size && o.embedded() && o.display == file.display && o.source == file.source {
+            if o.mtime == file.mtime
+                && o.size == file.size
+                && o.embedded()
+                && o.display == file.display
+                && o.source == file.source
+            {
                 keep!(key, o.clone());
             }
         }
@@ -948,13 +1159,21 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
                 Ok(pages) => {
                     let raw = chunk_pdf(&pages);
                     if raw.is_empty() {
-                        push_issue(&mut issues, &file.display, "No extractable text (scanned PDF? OCR is not supported)");
+                        push_issue(
+                            &mut issues,
+                            &file.display,
+                            "No extractable text (scanned PDF? OCR is not supported)",
+                        );
                         continue;
                     }
                     (raw, bytes_hash)
                 }
                 Err(e) => {
-                    push_issue(&mut issues, &file.display, format!("PDF extraction failed: {e}"));
+                    push_issue(
+                        &mut issues,
+                        &file.display,
+                        format!("PDF extraction failed: {e}"),
+                    );
                     continue;
                 }
             }
@@ -978,7 +1197,10 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
             }
         };
         if chunk_total + raw.len() > c.caps.max_chunks {
-            warnings.push(format!("Chunk limit reached ({} chunks); the remaining files were not indexed", c.caps.max_chunks));
+            warnings.push(format!(
+                "Chunk limit reached ({} chunks); the remaining files were not indexed",
+                c.caps.max_chunks
+            ));
             break;
         }
         chunk_total += raw.len();
@@ -990,10 +1212,27 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
                 if !vector.is_empty() {
                     reused += 1;
                 }
-                KChunk { start: r.start, end: r.end, heading: r.heading, text: r.text, hash: h, vector }
+                KChunk {
+                    start: r.start,
+                    end: r.end,
+                    heading: r.heading,
+                    text: r.text,
+                    hash: h,
+                    vector,
+                }
             })
             .collect();
-        files.insert(key, FileEntry { source: file.source.clone(), display: file.display.clone(), mtime: file.mtime, size: file.size, hash, chunks });
+        files.insert(
+            key,
+            FileEntry {
+                source: file.source.clone(),
+                display: file.display.clone(),
+                mtime: file.mtime,
+                size: file.size,
+                hash,
+                chunks,
+            },
+        );
     }
 
     if cancelled {
@@ -1004,7 +1243,16 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
     }
 
     // Embed whatever still has no vector, batch by batch; a cancel or an error keeps what was already embedded.
-    let pending: Vec<(String, usize)> = files.iter().flat_map(|(k, f)| f.chunks.iter().enumerate().filter(|(_, c)| c.vector.is_empty()).map(move |(i, _)| (k.clone(), i))).collect();
+    let pending: Vec<(String, usize)> = files
+        .iter()
+        .flat_map(|(k, f)| {
+            f.chunks
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.vector.is_empty())
+                .map(move |(i, _)| (k.clone(), i))
+        })
+        .collect();
     let mut embedded = 0usize;
     let mut failure: Option<String> = None;
     if !cancelled {
@@ -1014,7 +1262,20 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
                 cancelled = true;
                 break;
             }
-            let input: Vec<String> = batch.iter().map(|(k, i)| embed_input(&files[k].display, &Raw { start: 0, end: 0, heading: files[k].chunks[*i].heading.clone(), text: files[k].chunks[*i].text.clone() })).collect();
+            let input: Vec<String> = batch
+                .iter()
+                .map(|(k, i)| {
+                    embed_input(
+                        &files[k].display,
+                        &Raw {
+                            start: 0,
+                            end: 0,
+                            heading: files[k].chunks[*i].heading.clone(),
+                            text: files[k].chunks[*i].text.clone(),
+                        },
+                    )
+                })
+                .collect();
             match embed(&c.config, &input) {
                 Ok(vs) => {
                     for ((k, i), v) in batch.iter().zip(vs) {
@@ -1030,7 +1291,12 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
         }
     }
     if failure.is_none() {
-        let dims: HashSet<usize> = files.values().flat_map(|f| f.chunks.iter()).filter(|c| !c.vector.is_empty()).map(|c| c.vector.len()).collect();
+        let dims: HashSet<usize> = files
+            .values()
+            .flat_map(|f| f.chunks.iter())
+            .filter(|c| !c.vector.is_empty())
+            .map(|c| c.vector.len())
+            .collect();
         if dims.len() > 1 {
             failure = Some("Model embedding dimensions changed; create the collection again with the new model".into());
         }
@@ -1039,15 +1305,39 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
     if failure.as_deref().is_some_and(|e| e.contains("dimensions")) {
         // Do not persist a mixed-dimension index.
     } else {
-        save_index(&dir, &Index { version: INDEX_VERSION, config: c.config.clone(), files: files.clone() })?;
+        save_index(
+            &dir,
+            &Index {
+                version: INDEX_VERSION,
+                config: c.config.clone(),
+                files: files.clone(),
+            },
+        )?;
     }
-    let chunks: usize = files.values().map(|f| f.chunks.iter().filter(|c| !c.vector.is_empty()).count()).sum();
+    let chunks: usize = files
+        .values()
+        .map(|f| f.chunks.iter().filter(|c| !c.vector.is_empty()).count())
+        .sum();
     let bytes: u64 = files.values().map(|f| f.size).sum();
-    let stats = Stats { files: files.len(), chunks, embedded, reused, unchanged_files: unchanged, skipped: issues.len(), cancelled, issues: issues.clone(), warnings: warnings.clone() };
+    let stats = Stats {
+        files: files.len(),
+        chunks,
+        embedded,
+        reused,
+        unchanged_files: unchanged,
+        skipped: issues.len(),
+        cancelled,
+        issues: issues.clone(),
+        warnings: warnings.clone(),
+    };
     let last_error = failure.clone();
     update_manifest(&dir, |m| {
         m.status = Status {
-            state: if complete { "ready".into() } else { "partial".into() },
+            state: if complete {
+                "ready".into()
+            } else {
+                "partial".into()
+            },
             files: stats.files,
             chunks,
             bytes,
@@ -1058,7 +1348,18 @@ pub fn reindex(store: &Path, id: &str, confirm: bool, run: &Run) -> Result<Stats
         };
         Ok(())
     })?;
-    event(if cancelled { "cancelled" } else if failure.is_some() { "error" } else { "done" }, embedded, pending.len(), None);
+    event(
+        if cancelled {
+            "cancelled"
+        } else if failure.is_some() {
+            "error"
+        } else {
+            "done"
+        },
+        embedded,
+        pending.len(),
+        None,
+    );
     match failure {
         Some(e) => Err(e),
         None => Ok(stats),
@@ -1083,7 +1384,8 @@ pub fn search(store: &Path, ids: &[String], query: &str, limit: usize) -> Result
             continue;
         }
         let dir = coll_dir(store, id)?;
-        let c = read_manifest(&dir).map_err(|_| format!("Knowledge collection {id} no longer exists"))?;
+        let c = read_manifest(&dir)
+            .map_err(|_| format!("Knowledge collection {id} no longer exists"))?;
         if let Some(index) = cached_index(&dir) {
             if index.config == c.config {
                 loaded.push((c, index));
@@ -1096,20 +1398,29 @@ pub fn search(store: &Path, ids: &[String], query: &str, limit: usize) -> Result
     for (c, index) in &loaded {
         let key = serde_json::to_string(&c.config).map_err(|e| e.to_string())?;
         if !queries.contains_key(&key) {
-            if !index.files.values().any(|f| f.chunks.iter().any(|ch| !ch.vector.is_empty())) {
+            if !index
+                .files
+                .values()
+                .any(|f| f.chunks.iter().any(|ch| !ch.vector.is_empty()))
+            {
                 continue;
             }
             let v = embed(&c.config, &[query.to_string()])?.remove(0);
             queries.insert(key.clone(), v);
         }
-        let Some(vector) = queries.get(&key) else { continue };
+        let Some(vector) = queries.get(&key) else {
+            continue;
+        };
         for (path, f) in &index.files {
             for ch in &f.chunks {
                 if ch.vector.is_empty() {
                     continue;
                 }
                 if ch.vector.len() != vector.len() {
-                    return Err(format!("Query dimensions differ from the index of \"{}\"; re-index the collection", c.name));
+                    return Err(format!(
+                        "Query dimensions differ from the index of \"{}\"; re-index the collection",
+                        c.name
+                    ));
                 }
                 hits.push(Hit {
                     collection_id: c.id.clone(),
@@ -1125,7 +1436,12 @@ pub fn search(store: &Path, ids: &[String], query: &str, limit: usize) -> Result
             }
         }
     }
-    hits.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.source.cmp(&b.source)).then_with(|| a.start.cmp(&b.start)));
+    hits.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| a.source.cmp(&b.source))
+            .then_with(|| a.start.cmp(&b.start))
+    });
     hits.truncate(limit.clamp(1, 20));
     Ok(hits)
 }
@@ -1138,10 +1454,18 @@ fn running() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
     RUNNING.get_or_init(|| Mutex::new(HashMap::new()))
 }
 fn store_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("knowledge"))
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("knowledge"))
 }
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1158,12 +1482,21 @@ pub async fn knowledge_list(app: AppHandle) -> Result<Vec<Collection>, String> {
     .await
 }
 #[tauri::command]
-pub async fn knowledge_create(app: AppHandle, name: String, config: Config, include: Option<Vec<String>>) -> Result<Collection, String> {
+pub async fn knowledge_create(
+    app: AppHandle,
+    name: String,
+    config: Config,
+    include: Option<Vec<String>>,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || create(&store, &name, config, include)).await
 }
 #[tauri::command]
-pub async fn knowledge_rename(app: AppHandle, id: String, name: String) -> Result<Collection, String> {
+pub async fn knowledge_rename(
+    app: AppHandle,
+    id: String,
+    name: String,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || rename(&store, &id, &name)).await
 }
@@ -1176,22 +1509,38 @@ pub async fn knowledge_delete(app: AppHandle, id: String) -> Result<(), String> 
     blocking(move || delete(&store, &id)).await
 }
 #[tauri::command]
-pub async fn knowledge_add_source(app: AppHandle, id: String, path: String) -> Result<Collection, String> {
+pub async fn knowledge_add_source(
+    app: AppHandle,
+    id: String,
+    path: String,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || add_source(&store, &id, &path)).await
 }
 #[tauri::command]
-pub async fn knowledge_remove_source(app: AppHandle, id: String, path: String) -> Result<Collection, String> {
+pub async fn knowledge_remove_source(
+    app: AppHandle,
+    id: String,
+    path: String,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || remove_source(&store, &id, &path)).await
 }
 #[tauri::command]
-pub async fn knowledge_set_include(app: AppHandle, id: String, include: Vec<String>) -> Result<Collection, String> {
+pub async fn knowledge_set_include(
+    app: AppHandle,
+    id: String,
+    include: Vec<String>,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || set_include(&store, &id, include)).await
 }
 #[tauri::command]
-pub async fn knowledge_set_config(app: AppHandle, id: String, config: Config) -> Result<Collection, String> {
+pub async fn knowledge_set_config(
+    app: AppHandle,
+    id: String,
+    config: Config,
+) -> Result<Collection, String> {
     let store = store_dir(&app)?;
     blocking(move || set_config(&store, &id, config)).await
 }
@@ -1218,7 +1567,16 @@ pub async fn knowledge_reindex(app: AppHandle, id: String, confirm: bool) -> Res
         let progress = move |p: &Progress| {
             let _ = emitter.emit("knowledge-progress", p.clone());
         };
-        reindex(&store, &id, confirm, &Run { pdf: extract_pdf_subprocess, progress: &progress, cancel: &flag })
+        reindex(
+            &store,
+            &id,
+            confirm,
+            &Run {
+                pdf: extract_pdf_subprocess,
+                progress: &progress,
+                cancel: &flag,
+            },
+        )
     })
     .await;
     if let Ok(mut active) = running().lock() {
@@ -1234,7 +1592,12 @@ pub fn knowledge_cancel(id: String) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-pub async fn knowledge_search(app: AppHandle, ids: Vec<String>, query: String, limit: Option<usize>) -> Result<Vec<Hit>, String> {
+pub async fn knowledge_search(
+    app: AppHandle,
+    ids: Vec<String>,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<Hit>, String> {
     let store = store_dir(&app)?;
     blocking(move || search(&store, &ids, &query, limit.unwrap_or(8))).await
 }

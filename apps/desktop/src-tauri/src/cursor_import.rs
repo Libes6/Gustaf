@@ -26,13 +26,17 @@ fn global_db_in(config_dir: &Path) -> PathBuf {
 }
 
 fn global_db() -> PathBuf {
-    let config = dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".config"));
+    let config =
+        dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".config"));
     global_db_in(&config)
 }
 
 fn open_ro(path: &Path) -> Result<Connection, String> {
-    Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
-        .map_err(|e| format!("Cursor database not available: {e}"))
+    Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| format!("Cursor database not available: {e}"))
 }
 
 pub fn scan(path: &Path) -> Result<Vec<CursorChat>, String> {
@@ -59,7 +63,10 @@ pub fn scan(path: &Path) -> Result<Vec<CursorChat>, String> {
             })
         })
         .map_err(|e| e.to_string())?;
-    let mut chats: Vec<CursorChat> = rows.filter_map(Result::ok).filter(|c| c.message_count > 0).collect();
+    let mut chats: Vec<CursorChat> = rows
+        .filter_map(Result::ok)
+        .filter(|c| c.message_count > 0)
+        .collect();
     chats.sort_by_key(|c| -c.updated_at);
     Ok(chats)
 }
@@ -78,10 +85,16 @@ pub fn messages(path: &Path, chat_id: &str) -> Result<Vec<CursorMessage>, String
     let rows = stmt
         .query_map([chat_id], |r| {
             let kind: i64 = r.get(0)?;
-            Ok(CursorMessage { role: if kind == 1 { "user" } else { "assistant" }.into(), text: r.get(1)? })
+            Ok(CursorMessage {
+                role: if kind == 1 { "user" } else { "assistant" }.into(),
+                text: r.get(1)?,
+            })
         })
         .map_err(|e| e.to_string())?;
-    Ok(rows.filter_map(Result::ok).filter(|m| !m.text.trim().is_empty()).collect())
+    Ok(rows
+        .filter_map(Result::ok)
+        .filter(|m| !m.text.trim().is_empty())
+        .collect())
 }
 
 #[tauri::command]
@@ -101,7 +114,13 @@ mod tests {
     #[test]
     fn database_lives_under_the_config_dir() {
         let base = Path::new("cfg");
-        assert_eq!(global_db_in(base), base.join("Cursor").join("User").join("globalStorage").join("state.vscdb"));
+        assert_eq!(
+            global_db_in(base),
+            base.join("Cursor")
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb")
+        );
     }
 
     #[test]
@@ -129,7 +148,10 @@ mod tests {
         assert_eq!(chats[0].updated_at, 20);
 
         let msgs = messages(&path, "c1").unwrap();
-        let got: Vec<_> = msgs.iter().map(|m| (m.role.as_str(), m.text.as_str())).collect();
+        let got: Vec<_> = msgs
+            .iter()
+            .map(|m| (m.role.as_str(), m.text.as_str()))
+            .collect();
         assert_eq!(got, [("user", "hi"), ("assistant", "hello")]);
     }
 }

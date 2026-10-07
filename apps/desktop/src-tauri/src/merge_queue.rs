@@ -18,7 +18,10 @@
 //! `target_not_checked_out`, `already_queued`, `queue_busy`, `invalid_strategy`, `invalid_request`, `invalid_state`,
 //! `state_error`.
 use crate::git::{blocking, current_branch, repo_command, run_git, tail_chars};
-use crate::worktree::{err, local_branch_exists, now, open_repo, read_meta, ref_exists, safe_existing_dir, store, Meta, Repo};
+use crate::worktree::{
+    err, local_branch_exists, now, open_repo, read_meta, ref_exists, safe_existing_dir, store,
+    Meta, Repo,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -103,7 +106,10 @@ impl Strategy {
             "merge" => Ok(Self::Merge),
             "fast_forward" => Ok(Self::FastForward),
             "squash" => Ok(Self::Squash),
-            other => Err(err("invalid_strategy", format!("'{other}' is not one of merge, fast_forward, squash"))),
+            other => Err(err(
+                "invalid_strategy",
+                format!("'{other}' is not one of merge, fast_forward, squash"),
+            )),
         }
     }
 }
@@ -165,7 +171,12 @@ pub struct QueueState {
 
 impl Default for QueueState {
     fn default() -> Self {
-        Self { version: STATE_VERSION, halted: false, items: Vec::new(), updated_at: 0 }
+        Self {
+            version: STATE_VERSION,
+            halted: false,
+            items: Vec::new(),
+            updated_at: 0,
+        }
     }
 }
 
@@ -216,7 +227,9 @@ struct Ran {
 }
 
 fn read_capped<R: Read>(reader: Option<R>, cap: usize) -> (Vec<u8>, bool) {
-    let Some(mut reader) = reader else { return (Vec::new(), false) };
+    let Some(mut reader) = reader else {
+        return (Vec::new(), false);
+    };
     let mut buf = Vec::new();
     let _ = (&mut reader).take(cap as u64 + 1).read_to_end(&mut buf);
     let cut = buf.len() > cap;
@@ -235,7 +248,9 @@ fn run_timed(dir: &Path, args: &[&str], timeout: Duration, cap: usize) -> Result
         .env("GIT_MERGE_AUTOEDIT", "no")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| err("git_error", format!("git: {e}")))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| err("git_error", format!("git: {e}")))?;
     let out_reader = child.stdout.take();
     let err_reader = child.stderr.take();
     let out_thread = thread::spawn(move || read_capped(out_reader, cap));
@@ -256,23 +271,47 @@ fn run_timed(dir: &Path, args: &[&str], timeout: Duration, cap: usize) -> Result
     };
     let Some(status) = status else {
         // Do not join the readers: a hung hook may still hold the pipes open.
-        return Err(err("git_error", format!("git {} timed out after {}s", args.first().copied().unwrap_or(""), timeout.as_secs())));
+        return Err(err(
+            "git_error",
+            format!(
+                "git {} timed out after {}s",
+                args.first().copied().unwrap_or(""),
+                timeout.as_secs()
+            ),
+        ));
     };
     let (stdout, truncated) = out_thread.join().unwrap_or_default();
     let (stderr, _) = err_thread.join().unwrap_or_default();
-    Ok(Ran { code: status.code(), stdout, stderr: String::from_utf8_lossy(&stderr).into_owned(), truncated })
+    Ok(Ran {
+        code: status.code(),
+        stdout,
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        truncated,
+    })
 }
 
 fn ran_error(ran: &Ran) -> String {
     let stderr = ran.stderr.trim();
     let stdout = String::from_utf8_lossy(&ran.stdout);
-    let text = if stderr.is_empty() { stdout.trim().to_string() } else { stderr.to_string() };
-    if text.is_empty() { format!("git exited with code {:?}", ran.code) } else { tail_chars(&text, MAX_ERROR_CHARS) }
+    let text = if stderr.is_empty() {
+        stdout.trim().to_string()
+    } else {
+        stderr.to_string()
+    };
+    if text.is_empty() {
+        format!("git exited with code {:?}", ran.code)
+    } else {
+        tail_chars(&text, MAX_ERROR_CHARS)
+    }
 }
 
 /// `git version 2.50.1 (Apple Git-155)` -> `(2, 50)`.
 pub fn parse_git_version(text: &str) -> Option<(u32, u32)> {
-    let version = text.trim().strip_prefix("git version ")?.split_whitespace().next()?;
+    let version = text
+        .trim()
+        .strip_prefix("git version ")?
+        .split_whitespace()
+        .next()?;
     let mut parts = version.split('.');
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;
@@ -310,8 +349,12 @@ fn parse_conflicts(text: &str) -> (Vec<ConflictEntry>, bool) {
         if seg.is_empty() {
             break;
         }
-        let Some((head, path)) = seg.split_once('\t') else { continue };
-        let Some(stage) = head.rsplit(' ').next().and_then(|s| s.parse::<u8>().ok()) else { continue };
+        let Some((head, path)) = seg.split_once('\t') else {
+            continue;
+        };
+        let Some(stage) = head.rsplit(' ').next().and_then(|s| s.parse::<u8>().ok()) else {
+            continue;
+        };
         stages.entry(path.to_string()).or_default().insert(stage);
     }
     let truncated = stages.len() > MAX_CONFLICTS;
@@ -325,7 +368,10 @@ fn parse_conflicts(text: &str) -> (Vec<ConflictEntry>, bool) {
                 (true, true, false) | (true, false, true) => "modify_delete",
                 _ => "other",
             };
-            ConflictEntry { path, kind: kind.into() }
+            ConflictEntry {
+                path,
+                kind: kind.into(),
+            }
         })
         .collect();
     (entries, truncated)
@@ -340,7 +386,10 @@ fn branch_ref(branch: &str) -> String {
 }
 
 fn status_count(dir: &Path) -> Result<usize, String> {
-    Ok(git_in(dir, &["status", "--porcelain"])?.lines().filter(|l| !l.is_empty()).count())
+    Ok(git_in(dir, &["status", "--porcelain"])?
+        .lines()
+        .filter(|l| !l.is_empty())
+        .count())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -369,14 +418,33 @@ fn target_rev(repo: &Repo, meta: &Meta) -> Result<(String, String), String> {
 fn workspace_branch(repo: &Repo, task_id: &str) -> Result<(Meta, String), String> {
     let meta = read_meta(repo, task_id)?;
     if !safe_name(&meta.branch) || !local_branch_exists(&repo.top, &meta.branch) {
-        return Err(err("not_found", format!("the branch of task {task_id} no longer exists")));
+        return Err(err(
+            "not_found",
+            format!("the branch of task {task_id} no longer exists"),
+        ));
     }
     let branch = meta.branch.clone();
     Ok((meta, branch))
 }
 
-fn merge_tree(dir: &Path, ours: &str, theirs: &str) -> Result<(bool, Vec<ConflictEntry>, bool), String> {
-    let ran = run_timed(dir, &["merge-tree", "--write-tree", "-z", "--no-messages", ours, theirs], MERGE_TREE_TIMEOUT, MERGE_TREE_CAP_BYTES)?;
+fn merge_tree(
+    dir: &Path,
+    ours: &str,
+    theirs: &str,
+) -> Result<(bool, Vec<ConflictEntry>, bool), String> {
+    let ran = run_timed(
+        dir,
+        &[
+            "merge-tree",
+            "--write-tree",
+            "-z",
+            "--no-messages",
+            ours,
+            theirs,
+        ],
+        MERGE_TREE_TIMEOUT,
+        MERGE_TREE_CAP_BYTES,
+    )?;
     let text = String::from_utf8_lossy(&ran.stdout).into_owned();
     match ran.code {
         Some(0) if !ran.truncated => Ok((true, Vec::new(), false)),
@@ -388,10 +456,18 @@ fn merge_tree(dir: &Path, ours: &str, theirs: &str) -> Result<(bool, Vec<Conflic
     }
 }
 
-pub fn check_conflicts(store: &Path, root: &str, task_id: &str, against: &[String]) -> Result<ConflictsReport, String> {
+pub fn check_conflicts(
+    store: &Path,
+    root: &str,
+    task_id: &str,
+    against: &[String],
+) -> Result<ConflictsReport, String> {
     let repo = open_repo(store, root)?;
     if against.len() > MAX_AGAINST {
-        return Err(err("invalid_request", format!("at most {MAX_AGAINST} workspaces can be compared at once")));
+        return Err(err(
+            "invalid_request",
+            format!("at most {MAX_AGAINST} workspaces can be compared at once"),
+        ));
     }
     let (meta, branch) = workspace_branch(&repo, task_id)?;
     require_merge_tree(&repo.top)?;
@@ -399,20 +475,42 @@ pub fn check_conflicts(store: &Path, root: &str, task_id: &str, against: &[Strin
     let (target, label) = target_rev(&repo, &meta)?;
     let mut checks = Vec::new();
     let (clean, conflicts, truncated) = merge_tree(&repo.top, &target, &mine)?;
-    checks.push(ConflictCheck { clean, conflicts, truncated, against_task_id: None, against: label.clone() });
+    checks.push(ConflictCheck {
+        clean,
+        conflicts,
+        truncated,
+        against_task_id: None,
+        against: label.clone(),
+    });
     let mut seen = BTreeSet::new();
     for other_id in against {
         if other_id == task_id {
-            return Err(err("invalid_request", "a workspace cannot be compared with itself"));
+            return Err(err(
+                "invalid_request",
+                "a workspace cannot be compared with itself",
+            ));
         }
         if !seen.insert(other_id.clone()) {
             continue;
         }
         let (_, other_branch) = workspace_branch(&repo, other_id)?;
-        let (clean, conflicts, truncated) = merge_tree(&repo.top, &mine, &branch_ref(&other_branch))?;
-        checks.push(ConflictCheck { clean, conflicts, truncated, against_task_id: Some(other_id.clone()), against: other_branch });
+        let (clean, conflicts, truncated) =
+            merge_tree(&repo.top, &mine, &branch_ref(&other_branch))?;
+        checks.push(ConflictCheck {
+            clean,
+            conflicts,
+            truncated,
+            against_task_id: Some(other_id.clone()),
+            against: other_branch,
+        });
     }
-    Ok(ConflictsReport { task_id: task_id.into(), branch, target: label, clean: checks.iter().all(|c| c.clean), checks })
+    Ok(ConflictsReport {
+        task_id: task_id.into(),
+        branch,
+        target: label,
+        clean: checks.iter().all(|c| c.clean),
+        checks,
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -428,9 +526,16 @@ fn load(repo: &Repo) -> Result<QueueState, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(QueueState::default()),
         Err(e) => return Err(err("state_error", format!("merge queue state: {e}"))),
     };
-    let state: QueueState = serde_json::from_str(&text).map_err(|e| err("state_error", format!("unreadable merge queue state: {e}")))?;
+    let state: QueueState = serde_json::from_str(&text)
+        .map_err(|e| err("state_error", format!("unreadable merge queue state: {e}")))?;
     if state.version > STATE_VERSION {
-        return Err(err("state_error", format!("merge queue state version {} is newer than this app understands", state.version)));
+        return Err(err(
+            "state_error",
+            format!(
+                "merge queue state version {} is newer than this app understands",
+                state.version
+            ),
+        ));
     }
     Ok(state)
 }
@@ -439,7 +544,11 @@ fn save(repo: &Repo, state: &mut QueueState) -> Result<(), String> {
     state.version = STATE_VERSION;
     state.updated_at = now();
     // Bound the history: keep every active item and the most recent finished ones.
-    let finished = state.items.iter().filter(|i| i.status.is_terminal()).count();
+    let finished = state
+        .items
+        .iter()
+        .filter(|i| i.status.is_terminal())
+        .count();
     if finished > MAX_HISTORY {
         let mut drop_n = finished - MAX_HISTORY;
         state.items.retain(|i| {
@@ -451,7 +560,8 @@ fn save(repo: &Repo, state: &mut QueueState) -> Result<(), String> {
             }
         });
     }
-    fs::create_dir_all(&repo.managed).map_err(|e| err("state_error", format!("merge queue state: {e}")))?;
+    fs::create_dir_all(&repo.managed)
+        .map_err(|e| err("state_error", format!("merge queue state: {e}")))?;
     let path = state_path(repo);
     let tmp = repo.managed.join(format!("{STATE_FILE}.tmp"));
     let text = serde_json::to_string_pretty(state).map_err(|e| err("state_error", e))?;
@@ -487,13 +597,20 @@ fn pid_alive(_pid: u32) -> bool {
 }
 
 fn lock_is_stale(path: &Path) -> bool {
-    let Ok(text) = fs::read_to_string(path) else { return false };
+    let Ok(text) = fs::read_to_string(path) else {
+        return false;
+    };
     let mut lines = text.lines();
     let pid = lines.next().and_then(|l| l.trim().parse::<u32>().ok());
     let since = lines.next().and_then(|l| l.trim().parse::<u64>().ok());
     let (Some(pid), Some(since)) = (pid, since) else {
         // Unreadable content: only stale once the file itself is old (it may just be being written).
-        let age = fs::metadata(path).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).map(|d| d.as_secs()).unwrap_or(0);
+        let age = fs::metadata(path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         return age > 60;
     };
     now().saturating_sub(since) > STALE_LOCK_SECS || !pid_alive(pid)
@@ -501,11 +618,16 @@ fn lock_is_stale(path: &Path) -> bool {
 
 impl QueueLock {
     fn acquire(repo: &Repo) -> Result<Self, String> {
-        fs::create_dir_all(&repo.managed).map_err(|e| err("state_error", format!("merge queue lock: {e}")))?;
+        fs::create_dir_all(&repo.managed)
+            .map_err(|e| err("state_error", format!("merge queue lock: {e}")))?;
         let path = repo.managed.join(LOCK_FILE);
         let _guard = ACQUIRE.lock().unwrap_or_else(|e| e.into_inner());
         for _ in 0..2 {
-            match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
                 Ok(mut file) => {
                     let _ = write!(file, "{}\n{}\n", std::process::id(), now());
                     return Ok(Self { path });
@@ -515,12 +637,18 @@ impl QueueLock {
                         let _ = fs::remove_file(&path);
                         continue;
                     }
-                    return Err(err("queue_busy", "another merge queue run is in progress for this repository"));
+                    return Err(err(
+                        "queue_busy",
+                        "another merge queue run is in progress for this repository",
+                    ));
                 }
                 Err(e) => return Err(err("state_error", format!("merge queue lock: {e}"))),
             }
         }
-        Err(err("queue_busy", "another merge queue run is in progress for this repository"))
+        Err(err(
+            "queue_busy",
+            "another merge queue run is in progress for this repository",
+        ))
     }
 }
 
@@ -536,50 +664,95 @@ impl Drop for QueueLock {
 /// The local branch of the main checkout a workspace merges into: its recorded base branch when that is a local
 /// branch, otherwise the branch currently checked out in the main checkout.
 fn target_branch(repo: &Repo, meta: &Meta) -> Result<String, String> {
-    if let Some(base) = meta.base_branch.as_deref().filter(|b| safe_name(b) && local_branch_exists(&repo.top, b)) {
+    if let Some(base) = meta
+        .base_branch
+        .as_deref()
+        .filter(|b| safe_name(b) && local_branch_exists(&repo.top, b))
+    {
         return Ok(base.to_string());
     }
-    current_branch(&repo.top).ok_or_else(|| err("target_not_checked_out", "the main checkout is not on a branch, so there is no target to merge into"))
+    current_branch(&repo.top).ok_or_else(|| {
+        err(
+            "target_not_checked_out",
+            "the main checkout is not on a branch, so there is no target to merge into",
+        )
+    })
 }
 
 fn workspace_head_branch(dir: &Path) -> Result<String, String> {
-    let out = git_in(dir, &["symbolic-ref", "--short", "-q", "HEAD"]).map_err(|_| err("git_error", "the workspace HEAD is detached"))?;
+    let out = git_in(dir, &["symbolic-ref", "--short", "-q", "HEAD"])
+        .map_err(|_| err("git_error", "the workspace HEAD is detached"))?;
     let branch = out.trim().to_string();
-    if safe_name(&branch) { Ok(branch) } else { Err(err("git_error", "the workspace HEAD is detached")) }
+    if safe_name(&branch) {
+        Ok(branch)
+    } else {
+        Err(err("git_error", "the workspace HEAD is detached"))
+    }
 }
 
 fn normalise_command(command: Option<String>) -> Result<Option<String>, String> {
-    let Some(command) = command.map(|c| c.trim().to_string()).filter(|c| !c.is_empty()) else { return Ok(None) };
+    let Some(command) = command
+        .map(|c| c.trim().to_string())
+        .filter(|c| !c.is_empty())
+    else {
+        return Ok(None);
+    };
     if command.chars().count() > MAX_TEST_COMMAND_CHARS || command.contains('\0') {
-        return Err(err("invalid_request", "the test command is too long or contains a NUL byte"));
+        return Err(err(
+            "invalid_request",
+            "the test command is too long or contains a NUL byte",
+        ));
     }
     Ok(Some(command))
 }
 
-pub fn enqueue(store: &Path, root: &str, task_ids: &[String], strategy: Strategy, test_command: Option<String>) -> Result<QueueState, String> {
+pub fn enqueue(
+    store: &Path,
+    root: &str,
+    task_ids: &[String],
+    strategy: Strategy,
+    test_command: Option<String>,
+) -> Result<QueueState, String> {
     let repo = open_repo(store, root)?;
     if task_ids.is_empty() || task_ids.len() > MAX_ENQUEUE {
-        return Err(err("invalid_request", format!("enqueue 1-{MAX_ENQUEUE} tasks at a time")));
+        return Err(err(
+            "invalid_request",
+            format!("enqueue 1-{MAX_ENQUEUE} tasks at a time"),
+        ));
     }
     let test_command = normalise_command(test_command)?;
     let _lock = QueueLock::acquire(&repo)?;
     let mut state = load(&repo)?;
-    let active: BTreeSet<&str> = state.items.iter().filter(|i| !i.status.is_terminal()).map(|i| i.task_id.as_str()).collect();
+    let active: BTreeSet<&str> = state
+        .items
+        .iter()
+        .filter(|i| !i.status.is_terminal())
+        .map(|i| i.task_id.as_str())
+        .collect();
     let mut seen = BTreeSet::new();
     let mut fresh = Vec::new();
     // Validate everything first: either all tasks are queued or none.
     for id in task_ids {
         let meta = read_meta(&repo, id)?;
         if active.contains(id.as_str()) || !seen.insert(id.clone()) {
-            return Err(err("already_queued", format!("task {id} is already in the merge queue")));
+            return Err(err(
+                "already_queued",
+                format!("task {id} is already in the merge queue"),
+            ));
         }
         let Some(dir) = safe_existing_dir(&repo, id)? else {
-            return Err(err("not_found", format!("the workspace directory of task {id} is gone (prune it)")));
+            return Err(err(
+                "not_found",
+                format!("the workspace directory of task {id} is gone (prune it)"),
+            ));
         };
         let branch = workspace_head_branch(&dir)?;
         let changes = status_count(&dir)?;
         if changes > 0 {
-            return Err(err("dirty", format!("task {id} has {changes} uncommitted change(s); commit them first")));
+            return Err(err(
+                "dirty",
+                format!("task {id} has {changes} uncommitted change(s); commit them first"),
+            ));
         }
         let target = target_branch(&repo, &meta)?;
         fresh.push(QueueItem {
@@ -600,7 +773,9 @@ pub fn enqueue(store: &Path, root: &str, task_ids: &[String], strategy: Strategy
         state.halted = false;
     }
     // A finished entry for the same task is replaced by the new one.
-    state.items.retain(|i| !(i.status.is_terminal() && seen.contains(&i.task_id)));
+    state
+        .items
+        .retain(|i| !(i.status.is_terminal() && seen.contains(&i.task_id)));
     state.items.extend(fresh);
     save(&repo, &mut state)?;
     Ok(state)
@@ -638,8 +813,18 @@ pub fn resume(store: &Path, root: &str) -> Result<QueueState, String> {
     Ok(state)
 }
 
-fn result(outcome: Outcome, task_id: Option<&str>, needs_test: Option<NeedsTest>, state: QueueState) -> RunResult {
-    RunResult { outcome, task_id: task_id.map(str::to_string), needs_test, state }
+fn result(
+    outcome: Outcome,
+    task_id: Option<&str>,
+    needs_test: Option<NeedsTest>,
+    state: QueueState,
+) -> RunResult {
+    RunResult {
+        outcome,
+        task_id: task_id.map(str::to_string),
+        needs_test,
+        state,
+    }
 }
 
 fn mark_failed(state: &mut QueueState, idx: usize, message: String, conflicts: Vec<ConflictEntry>) {
@@ -667,18 +852,27 @@ fn check_target(repo: &Repo, target: &str) -> Result<(), String> {
     }
     let changes = status_count(&repo.top)?;
     if changes > 0 {
-        return Err(err("target_dirty", format!("the main checkout has {changes} uncommitted change(s); commit or stash them first")));
+        return Err(err(
+            "target_dirty",
+            format!(
+                "the main checkout has {changes} uncommitted change(s); commit or stash them first"
+            ),
+        ));
     }
     Ok(())
 }
 
 fn git_dir_of(dir: &Path) -> Option<PathBuf> {
-    run_git(dir, ["rev-parse", "--absolute-git-dir"]).ok().map(|s| PathBuf::from(s.trim()))
+    run_git(dir, ["rev-parse", "--absolute-git-dir"])
+        .ok()
+        .map(|s| PathBuf::from(s.trim()))
 }
 
 /// Aborts an operation a crashed earlier run may have left in a workspace.
 fn abort_leftovers(dir: &Path) {
-    let Some(git_dir) = git_dir_of(dir) else { return };
+    let Some(git_dir) = git_dir_of(dir) else {
+        return;
+    };
     if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
         let _ = run_git(dir, ["rebase", "--abort"]);
     }
@@ -699,24 +893,49 @@ fn integrate(dir: &Path, item: &QueueItem) -> Result<(), Integrate> {
     let merging = item.strategy == Strategy::Merge;
     let message = format!("Merge {} into {}", item.target_branch, item.branch);
     let ran = if merging {
-        run_timed(dir, &["merge", "--no-edit", "-m", &message, &target], GIT_OP_TIMEOUT, 64 * 1024)
+        run_timed(
+            dir,
+            &["merge", "--no-edit", "-m", &message, &target],
+            GIT_OP_TIMEOUT,
+            64 * 1024,
+        )
     } else {
         run_timed(dir, &["rebase", &target], GIT_OP_TIMEOUT, 64 * 1024)
     };
-    let ran = ran.map_err(|e| Integrate { message: e, conflicts: Vec::new() })?;
+    let ran = ran.map_err(|e| Integrate {
+        message: e,
+        conflicts: Vec::new(),
+    })?;
     if ran.code == Some(0) {
         return Ok(());
     }
-    let conflicts = run_git(dir, ["ls-files", "-u", "-z"]).map(|t| parse_conflicts(&t).0).unwrap_or_default();
+    let conflicts = run_git(dir, ["ls-files", "-u", "-z"])
+        .map(|t| parse_conflicts(&t).0)
+        .unwrap_or_default();
     let detail = ran_error(&ran);
-    let aborted = if merging { run_git(dir, ["merge", "--abort"]) } else { run_git(dir, ["rebase", "--abort"]) };
-    let mut message = if conflicts.is_empty() {
-        format!("git_error: {} failed: {detail}", if merging { "merge" } else { "rebase" })
+    let aborted = if merging {
+        run_git(dir, ["merge", "--abort"])
     } else {
-        format!("conflict: {} conflicting file(s) when {} onto '{}'", conflicts.len(), if merging { "merging" } else { "rebasing" }, item.target_branch)
+        run_git(dir, ["rebase", "--abort"])
+    };
+    let mut message = if conflicts.is_empty() {
+        format!(
+            "git_error: {} failed: {detail}",
+            if merging { "merge" } else { "rebase" }
+        )
+    } else {
+        format!(
+            "conflict: {} conflicting file(s) when {} onto '{}'",
+            conflicts.len(),
+            if merging { "merging" } else { "rebasing" },
+            item.target_branch
+        )
     };
     if let Err(e) = aborted {
-        message.push_str(&format!("; aborting the {} also failed: {e}", if merging { "merge" } else { "rebase" }));
+        message.push_str(&format!(
+            "; aborting the {} also failed: {e}",
+            if merging { "merge" } else { "rebase" }
+        ));
     }
     Err(Integrate { message, conflicts })
 }
@@ -729,16 +948,28 @@ fn merge_into_target(repo: &Repo, item: &QueueItem) -> Result<bool, String> {
     let text = format!("Merge workspace {} (task {})", item.branch, item.task_id);
     let run = |args: &[&str]| -> Result<(), String> {
         let ran = run_timed(top, args, GIT_OP_TIMEOUT, 64 * 1024)?;
-        if ran.code == Some(0) { Ok(()) } else { Err(ran_error(&ran)) }
+        if ran.code == Some(0) {
+            Ok(())
+        } else {
+            Err(ran_error(&ran))
+        }
     };
     let outcome = match item.strategy {
         Strategy::FastForward => run(&["merge", "--ff-only", &branch]).map(|_| true),
-        Strategy::Merge => run(&["merge", "--no-ff", "--no-edit", "-m", &text, &branch]).map(|_| true),
+        Strategy::Merge => {
+            run(&["merge", "--no-ff", "--no-edit", "-m", &text, &branch]).map(|_| true)
+        }
         Strategy::Squash => run(&["merge", "--squash", &branch]).and_then(|_| {
             if run_git(top, ["diff", "--cached", "--quiet"]).is_ok() {
                 return Ok(false); // no net changes
             }
-            run(&["commit", "-q", "-m", &format!("Squash {} (task {})", item.branch, item.task_id)]).map(|_| true)
+            run(&[
+                "commit",
+                "-q",
+                "-m",
+                &format!("Squash {} (task {})", item.branch, item.task_id),
+            ])
+            .map(|_| true)
         }),
     };
     match outcome {
@@ -786,7 +1017,12 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
     let dir = match safe_existing_dir(&repo, &id) {
         Ok(Some(dir)) => dir,
         Ok(None) => {
-            mark_failed(&mut state, idx, format!("not_found: the workspace directory of task {id} is gone"), Vec::new());
+            mark_failed(
+                &mut state,
+                idx,
+                format!("not_found: the workspace directory of task {id} is gone"),
+                Vec::new(),
+            );
             save(&repo, &mut state)?;
             return Ok(result(Outcome::Failed, Some(&id), None, state));
         }
@@ -797,14 +1033,27 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
         }
     };
     let target_ref = branch_ref(&item.target_branch);
-    let branch_ok = local_branch_exists(&repo.top, &item.branch) && local_branch_exists(&repo.top, &item.target_branch);
+    let branch_ok = local_branch_exists(&repo.top, &item.branch)
+        && local_branch_exists(&repo.top, &item.target_branch);
     if !branch_ok {
-        mark_failed(&mut state, idx, format!("not_found: branch '{}' or target '{}' no longer exists", item.branch, item.target_branch), Vec::new());
+        mark_failed(
+            &mut state,
+            idx,
+            format!(
+                "not_found: branch '{}' or target '{}' no longer exists",
+                item.branch, item.target_branch
+            ),
+            Vec::new(),
+        );
         save(&repo, &mut state)?;
         return Ok(result(Outcome::Failed, Some(&id), None, state));
     }
     if is_ancestor(&repo.top, &item.branch, &target_ref) {
-        mark_skipped(&mut state, idx, format!("already contained in '{}'", item.target_branch));
+        mark_skipped(
+            &mut state,
+            idx,
+            format!("already contained in '{}'", item.target_branch),
+        );
         save(&repo, &mut state)?;
         return Ok(result(Outcome::Skipped, Some(&id), None, state));
     }
@@ -813,7 +1062,16 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
     let up_to_date = is_ancestor(&repo.top, &target_ref, &branch_ref(&item.branch));
     if item.status != Status::Merging || !up_to_date {
         abort_leftovers(&dir);
-        match workspace_head_branch(&dir).and_then(|b| if b == item.branch { Ok(()) } else { Err(err("git_error", format!("the workspace is on '{b}', expected '{}'", item.branch))) }) {
+        match workspace_head_branch(&dir).and_then(|b| {
+            if b == item.branch {
+                Ok(())
+            } else {
+                Err(err(
+                    "git_error",
+                    format!("the workspace is on '{b}', expected '{}'", item.branch),
+                ))
+            }
+        }) {
             Ok(()) => {}
             Err(e) => {
                 mark_failed(&mut state, idx, e, Vec::new());
@@ -824,7 +1082,12 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
         match status_count(&dir) {
             Ok(0) => {}
             Ok(n) => {
-                mark_failed(&mut state, idx, format!("dirty: the workspace has {n} uncommitted change(s)"), Vec::new());
+                mark_failed(
+                    &mut state,
+                    idx,
+                    format!("dirty: the workspace has {n} uncommitted change(s)"),
+                    Vec::new(),
+                );
                 save(&repo, &mut state)?;
                 return Ok(result(Outcome::Failed, Some(&id), None, state));
             }
@@ -873,12 +1136,24 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
             Ok(result(Outcome::Merged, Some(&id), None, state))
         }
         Ok(false) => {
-            mark_skipped(&mut state, idx, format!("no net changes to merge into '{}'", item.target_branch));
+            mark_skipped(
+                &mut state,
+                idx,
+                format!("no net changes to merge into '{}'", item.target_branch),
+            );
             save(&repo, &mut state)?;
             Ok(result(Outcome::Skipped, Some(&id), None, state))
         }
         Err(e) => {
-            mark_failed(&mut state, idx, format!("git_error: merging into '{}' failed: {e}", item.target_branch), Vec::new());
+            mark_failed(
+                &mut state,
+                idx,
+                format!(
+                    "git_error: merging into '{}' failed: {e}",
+                    item.target_branch
+                ),
+                Vec::new(),
+            );
             save(&repo, &mut state)?;
             Ok(result(Outcome::Failed, Some(&id), None, state))
         }
@@ -886,28 +1161,63 @@ pub fn run_next(store: &Path, root: &str) -> Result<RunResult, String> {
 }
 
 fn needs_test(repo: &Repo, item: &QueueItem) -> Result<NeedsTest, String> {
-    let command = item.test_command.clone().ok_or_else(|| err("invalid_state", "the item has no test command"))?;
-    let dir = safe_existing_dir(repo, &item.task_id)?.ok_or_else(|| err("not_found", format!("the workspace directory of task {} is gone", item.task_id)))?;
-    Ok(NeedsTest { task_id: item.task_id.clone(), worktree_path: dir.to_string_lossy().into_owned(), command })
+    let command = item
+        .test_command
+        .clone()
+        .ok_or_else(|| err("invalid_state", "the item has no test command"))?;
+    let dir = safe_existing_dir(repo, &item.task_id)?.ok_or_else(|| {
+        err(
+            "not_found",
+            format!("the workspace directory of task {} is gone", item.task_id),
+        )
+    })?;
+    Ok(NeedsTest {
+        task_id: item.task_id.clone(),
+        worktree_path: dir.to_string_lossy().into_owned(),
+        command,
+    })
 }
 
 /// Records the result of the test command the caller ran for a `testing` item. A pass moves the item to `merging`
 /// (the next `run_next` merges it); a failure fails the item and halts the queue. Nothing is merged here.
-pub fn report_test(store: &Path, root: &str, task_id: &str, ok: bool, output: &str) -> Result<QueueState, String> {
+pub fn report_test(
+    store: &Path,
+    root: &str,
+    task_id: &str,
+    ok: bool,
+    output: &str,
+) -> Result<QueueState, String> {
     let repo = open_repo(store, root)?;
     let _lock = QueueLock::acquire(&repo)?;
     let mut state = load(&repo)?;
-    let Some(idx) = state.items.iter().position(|i| i.task_id == task_id && !i.status.is_terminal()) else {
-        return Err(err("not_found", format!("task {task_id} is not in the merge queue")));
+    let Some(idx) = state
+        .items
+        .iter()
+        .position(|i| i.task_id == task_id && !i.status.is_terminal())
+    else {
+        return Err(err(
+            "not_found",
+            format!("task {task_id} is not in the merge queue"),
+        ));
     };
     if state.items[idx].status != Status::Testing {
-        return Err(err("invalid_state", format!("task {task_id} is not waiting for a test result")));
+        return Err(err(
+            "invalid_state",
+            format!("task {task_id} is not waiting for a test result"),
+        ));
     }
     if ok {
         state.items[idx].status = Status::Merging;
     } else {
         let output = output.trim();
-        let message = if output.is_empty() { "tests failed".to_string() } else { format!("tests failed:\n{}", tail_chars(output, MAX_ERROR_CHARS - 20)) };
+        let message = if output.is_empty() {
+            "tests failed".to_string()
+        } else {
+            format!(
+                "tests failed:\n{}",
+                tail_chars(output, MAX_ERROR_CHARS - 20)
+            )
+        };
         mark_failed(&mut state, idx, message, Vec::new());
     }
     save(&repo, &mut state)?;
@@ -918,13 +1228,24 @@ pub fn report_test(store: &Path, root: &str, task_id: &str, ok: bool, output: &s
 // Commands
 
 #[tauri::command]
-pub async fn conflicts_check(app: AppHandle, root: String, task_id: String, against: Option<Vec<String>>) -> Result<ConflictsReport, String> {
+pub async fn conflicts_check(
+    app: AppHandle,
+    root: String,
+    task_id: String,
+    against: Option<Vec<String>>,
+) -> Result<ConflictsReport, String> {
     let store = store(&app)?;
     blocking(move || check_conflicts(&store, &root, &task_id, &against.unwrap_or_default())).await
 }
 
 #[tauri::command]
-pub async fn queue_enqueue(app: AppHandle, root: String, task_ids: Vec<String>, strategy: String, test_command: Option<String>) -> Result<QueueState, String> {
+pub async fn queue_enqueue(
+    app: AppHandle,
+    root: String,
+    task_ids: Vec<String>,
+    strategy: String,
+    test_command: Option<String>,
+) -> Result<QueueState, String> {
     let store = store(&app)?;
     let strategy = Strategy::parse(&strategy)?;
     blocking(move || enqueue(&store, &root, &task_ids, strategy, test_command)).await
@@ -955,9 +1276,16 @@ pub async fn queue_run_next(app: AppHandle, root: String) -> Result<RunResult, S
 }
 
 #[tauri::command]
-pub async fn queue_report_test(app: AppHandle, root: String, task_id: String, ok: bool, output: Option<String>) -> Result<QueueState, String> {
+pub async fn queue_report_test(
+    app: AppHandle,
+    root: String,
+    task_id: String,
+    ok: bool,
+    output: Option<String>,
+) -> Result<QueueState, String> {
     let store = store(&app)?;
-    blocking(move || report_test(&store, &root, &task_id, ok, output.as_deref().unwrap_or(""))).await
+    blocking(move || report_test(&store, &root, &task_id, ok, output.as_deref().unwrap_or("")))
+        .await
 }
 
 #[cfg(test)]
@@ -973,8 +1301,16 @@ mod tests {
     }
 
     fn g(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git").current_dir(dir).args(args).output().unwrap();
-        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8_lossy(&out.stdout).into_owned()
     }
 
@@ -984,13 +1320,22 @@ mod tests {
         let (root, store) = (base.join("repo"), base.join("store"));
         fs::create_dir_all(&root).unwrap();
         g(&root, &["init", "-q", "-b", "main"]);
-        for (k, v) in [("user.name", "T"), ("user.email", "t@e.com"), ("commit.gpgsign", "false"), ("core.hooksPath", base.join("nohooks").to_str().unwrap())] {
+        for (k, v) in [
+            ("user.name", "T"),
+            ("user.email", "t@e.com"),
+            ("commit.gpgsign", "false"),
+            ("core.hooksPath", base.join("nohooks").to_str().unwrap()),
+        ] {
             g(&root, &["config", k, v]);
         }
         fs::write(root.join("a.txt"), "1\n2\n3\n").unwrap();
         g(&root, &["add", "."]);
         g(&root, &["commit", "-q", "-m", "init"]);
-        Fx { _tmp: tmp, root, store }
+        Fx {
+            _tmp: tmp,
+            root,
+            store,
+        }
     }
 
     fn rs(f: &Fx) -> &str {
@@ -998,7 +1343,11 @@ mod tests {
     }
 
     fn mk(f: &Fx, slug: &str, id: &str) -> PathBuf {
-        PathBuf::from(worktree::create(&f.store, rs(f), None, slug, id, None, None).unwrap().path)
+        PathBuf::from(
+            worktree::create(&f.store, rs(f), None, slug, id, None, None)
+                .unwrap()
+                .path,
+        )
     }
 
     fn commit_file(dir: &Path, name: &str, content: &str, msg: &str) {
@@ -1016,11 +1365,22 @@ mod tests {
     }
 
     fn item<'a>(state: &'a QueueState, id: &str) -> &'a QueueItem {
-        state.items.iter().find(|i| i.task_id == id).unwrap_or_else(|| panic!("{id} in {state:?}"))
+        state
+            .items
+            .iter()
+            .find(|i| i.task_id == id)
+            .unwrap_or_else(|| panic!("{id} in {state:?}"))
     }
 
     fn enq(f: &Fx, list: &[&str], strategy: Strategy, test: Option<&str>) -> QueueState {
-        enqueue(&f.store, rs(f), &ids(list), strategy, test.map(str::to_string)).unwrap()
+        enqueue(
+            &f.store,
+            rs(f),
+            &ids(list),
+            strategy,
+            test.map(str::to_string),
+        )
+        .unwrap()
     }
 
     fn next(f: &Fx) -> RunResult {
@@ -1033,9 +1393,15 @@ mod tests {
 
     #[test]
     fn git_versions_are_parsed_and_old_ones_refused() {
-        assert_eq!(parse_git_version("git version 2.50.1 (Apple Git-155)\n"), Some((2, 50)));
+        assert_eq!(
+            parse_git_version("git version 2.50.1 (Apple Git-155)\n"),
+            Some((2, 50))
+        );
         assert_eq!(parse_git_version("git version 2.38.0"), Some((2, 38)));
-        assert_eq!(parse_git_version("git version 2.43.0.windows.1"), Some((2, 43)));
+        assert_eq!(
+            parse_git_version("git version 2.43.0.windows.1"),
+            Some((2, 43))
+        );
         assert_eq!(parse_git_version("something else"), None);
         assert!(check_git_version("git version 2.38.0").is_ok());
         assert!(check_git_version("git version 3.0.1").is_ok());
@@ -1050,8 +1416,14 @@ mod tests {
         let text = "tree\0100644 aaa 1\ta\0100644 bbb 2\ta\0100644 ccc 3\ta\0100644 ddd 1\td\0100644 eee 2\td\0100644 fff 2\tn\0100644 ggg 3\tn\0\0ignored message\0";
         let (list, cut) = parse_conflicts(text);
         assert!(!cut);
-        let kinds: Vec<(&str, &str)> = list.iter().map(|c| (c.path.as_str(), c.kind.as_str())).collect();
-        assert_eq!(kinds, vec![("a", "content"), ("d", "modify_delete"), ("n", "add_add")]);
+        let kinds: Vec<(&str, &str)> = list
+            .iter()
+            .map(|c| (c.path.as_str(), c.kind.as_str()))
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![("a", "content"), ("d", "modify_delete"), ("n", "add_add")]
+        );
     }
 
     #[test]
@@ -1060,14 +1432,28 @@ mod tests {
         let w = mk(&f, "feat", "t1");
         commit_file(&w, "b.txt", "b\n", "b");
         commit_file(&f.root, "c.txt", "c\n", "c");
-        let snapshot = |dir: &Path| (g(dir, &["status", "--porcelain"]), g(dir, &["rev-parse", "HEAD"]), g(dir, &["ls-files", "-s"]), fs::read_dir(dir).unwrap().count());
+        let snapshot = |dir: &Path| {
+            (
+                g(dir, &["status", "--porcelain"]),
+                g(dir, &["rev-parse", "HEAD"]),
+                g(dir, &["ls-files", "-s"]),
+                fs::read_dir(dir).unwrap().count(),
+            )
+        };
         let before = (snapshot(&f.root), snapshot(&w));
         let index_before = fs::read(f.root.join(".git/index")).unwrap();
         let report = check_conflicts(&f.store, rs(&f), "t1", &[]).unwrap();
         assert!(report.clean, "{report:?}");
-        assert_eq!((report.target.as_str(), report.branch.as_str()), ("main", "gustaf/feat"));
+        assert_eq!(
+            (report.target.as_str(), report.branch.as_str()),
+            ("main", "gustaf/feat")
+        );
         assert_eq!(report.checks.len(), 1);
-        assert!(report.checks[0].clean && report.checks[0].conflicts.is_empty() && report.checks[0].against_task_id.is_none());
+        assert!(
+            report.checks[0].clean
+                && report.checks[0].conflicts.is_empty()
+                && report.checks[0].against_task_id.is_none()
+        );
         assert_eq!(before, (snapshot(&f.root), snapshot(&w)));
         assert_eq!(index_before, fs::read(f.root.join(".git/index")).unwrap());
         assert!(!f.root.join("b.txt").exists() && !w.join("c.txt").exists());
@@ -1090,8 +1476,19 @@ mod tests {
         g(&f.root, &["commit", "-q", "-m", "main edits"]);
         let report = check_conflicts(&f.store, rs(&f), "t1", &[]).unwrap();
         assert!(!report.clean);
-        let got: Vec<(&str, &str)> = report.checks[0].conflicts.iter().map(|c| (c.path.as_str(), c.kind.as_str())).collect();
-        assert_eq!(got, vec![("a.txt", "content"), ("both.txt", "add_add"), ("gone.txt", "modify_delete")]);
+        let got: Vec<(&str, &str)> = report.checks[0]
+            .conflicts
+            .iter()
+            .map(|c| (c.path.as_str(), c.kind.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("a.txt", "content"),
+                ("both.txt", "add_add"),
+                ("gone.txt", "modify_delete")
+            ]
+        );
         // Still read-only: nothing is left behind in either checkout.
         assert_eq!(g(&f.root, &["status", "--porcelain"]), "");
         assert_eq!(g(&w, &["status", "--porcelain"]), "");
@@ -1110,12 +1507,31 @@ mod tests {
         commit_file(&w3, "other.txt", "o\n", "three");
         let report = check_conflicts(&f.store, rs(&f), "t1", &ids(&["t2", "t3", "t2"])).unwrap();
         assert!(!report.clean);
-        assert_eq!(report.checks.len(), 3, "duplicates are compared once: {report:?}");
+        assert_eq!(
+            report.checks.len(),
+            3,
+            "duplicates are compared once: {report:?}"
+        );
         assert!(report.checks[0].clean, "clean against main");
         let c2 = &report.checks[1];
-        assert_eq!((c2.against_task_id.as_deref(), c2.clean), (Some("t2"), false));
-        assert_eq!(c2.conflicts, vec![ConflictEntry { path: "a.txt".into(), kind: "content".into() }]);
-        assert_eq!((report.checks[2].against_task_id.as_deref(), report.checks[2].clean), (Some("t3"), true));
+        assert_eq!(
+            (c2.against_task_id.as_deref(), c2.clean),
+            (Some("t2"), false)
+        );
+        assert_eq!(
+            c2.conflicts,
+            vec![ConflictEntry {
+                path: "a.txt".into(),
+                kind: "content".into()
+            }]
+        );
+        assert_eq!(
+            (
+                report.checks[2].against_task_id.as_deref(),
+                report.checks[2].clean
+            ),
+            (Some("t3"), true)
+        );
         let e = check_conflicts(&f.store, rs(&f), "t1", &ids(&["t1"])).unwrap_err();
         assert_eq!(code(&e), "invalid_request");
         let e = check_conflicts(&f.store, rs(&f), "t1", &ids(&["nope"])).unwrap_err();
@@ -1136,26 +1552,54 @@ mod tests {
         commit_file(&w2, "two.txt", "2\n", "two");
         commit_file(&w3, "three.txt", "3\n", "three");
         let s = enq(&f, &["t1", "t2", "t3"], Strategy::FastForward, None);
-        assert!(s.items.iter().all(|i| i.status == Status::Queued && i.target_branch == "main" && i.started_at.is_none()));
+        assert!(s.items.iter().all(|i| i.status == Status::Queued
+            && i.target_branch == "main"
+            && i.started_at.is_none()));
         let old_t2 = g(&w2, &["rev-parse", "HEAD"]);
 
         let r = next(&f);
-        assert_eq!((r.outcome, r.task_id.as_deref()), (Outcome::Merged, Some("t1")));
-        assert_eq!(item(&r.state, "t2").status, Status::Queued, "one item per call");
+        assert_eq!(
+            (r.outcome, r.task_id.as_deref()),
+            (Outcome::Merged, Some("t1"))
+        );
+        assert_eq!(
+            item(&r.state, "t2").status,
+            Status::Queued,
+            "one item per call"
+        );
         assert!(f.root.join("one.txt").exists() && !f.root.join("two.txt").exists());
         let r = next(&f);
-        assert_eq!((r.outcome, r.task_id.as_deref()), (Outcome::Merged, Some("t2")));
+        assert_eq!(
+            (r.outcome, r.task_id.as_deref()),
+            (Outcome::Merged, Some("t2"))
+        );
         // t2 was rebased onto the new main (t1's commit), not merged as-is.
         assert_ne!(g(&w2, &["rev-parse", "HEAD"]), old_t2);
-        assert_eq!(g(&w2, &["rev-parse", "HEAD^"]).trim(), g(&w1, &["rev-parse", "HEAD"]).trim());
+        assert_eq!(
+            g(&w2, &["rev-parse", "HEAD^"]).trim(),
+            g(&w1, &["rev-parse", "HEAD"]).trim()
+        );
         let r = next(&f);
-        assert_eq!((r.outcome, r.task_id.as_deref()), (Outcome::Merged, Some("t3")));
-        assert!(r.state.items.iter().all(|i| i.status == Status::Merged && i.started_at.is_some() && i.finished_at.is_some() && i.error.is_none()));
+        assert_eq!(
+            (r.outcome, r.task_id.as_deref()),
+            (Outcome::Merged, Some("t3"))
+        );
+        assert!(r.state.items.iter().all(|i| i.status == Status::Merged
+            && i.started_at.is_some()
+            && i.finished_at.is_some()
+            && i.error.is_none()));
         assert_eq!(next(&f).outcome, Outcome::Idle);
         let log = g(&f.root, &["log", "--format=%s"]);
-        assert_eq!(log.lines().collect::<Vec<_>>(), vec!["three", "two", "one", "init"], "linear history in queue order");
+        assert_eq!(
+            log.lines().collect::<Vec<_>>(),
+            vec!["three", "two", "one", "init"],
+            "linear history in queue order"
+        );
         assert_eq!(g(&f.root, &["status", "--porcelain"]), "");
-        assert_eq!(g(&f.root, &["rev-parse", "main"]), g(&w3, &["rev-parse", "HEAD"]));
+        assert_eq!(
+            g(&f.root, &["rev-parse", "main"]),
+            g(&w3, &["rev-parse", "HEAD"])
+        );
     }
 
     #[test]
@@ -1171,13 +1615,21 @@ mod tests {
         assert_eq!(next(&f).outcome, Outcome::Merged);
         let log = g(&f.root, &["log", "--format=%s", "-n", "2"]);
         assert!(log.starts_with("Squash gustaf/one (task t1)"), "{log}");
-        assert_eq!(g(&f.root, &["rev-list", "--count", "main"]).trim(), "3", "init + main moves + one squash commit");
+        assert_eq!(
+            g(&f.root, &["rev-list", "--count", "main"]).trim(),
+            "3",
+            "init + main moves + one squash commit"
+        );
         assert!(f.root.join("one.txt").exists() && f.root.join("one2.txt").exists());
 
         enq(&f, &["t2"], Strategy::Merge, None);
         assert_eq!(next(&f).outcome, Outcome::Merged);
         let parents = g(&f.root, &["log", "-1", "--format=%p"]);
-        assert_eq!(parents.split_whitespace().count(), 2, "a merge commit: {parents}");
+        assert_eq!(
+            parents.split_whitespace().count(),
+            2,
+            "a merge commit: {parents}"
+        );
         assert!(f.root.join("two.txt").exists());
         assert_eq!(g(&f.root, &["status", "--porcelain"]), "");
     }
@@ -1200,14 +1652,31 @@ mod tests {
         assert_eq!(r.outcome, Outcome::Failed);
         let t1 = item(&r.state, "t1");
         assert_eq!(t1.status, Status::Failed);
-        assert_eq!(t1.conflicts, vec![ConflictEntry { path: "a.txt".into(), kind: "content".into() }]);
-        assert!(t1.error.as_deref().unwrap().starts_with("conflict:"), "{:?}", t1.error);
+        assert_eq!(
+            t1.conflicts,
+            vec![ConflictEntry {
+                path: "a.txt".into(),
+                kind: "content".into()
+            }]
+        );
+        assert!(
+            t1.error.as_deref().unwrap().starts_with("conflict:"),
+            "{:?}",
+            t1.error
+        );
         assert!(r.state.halted);
-        assert_eq!(item(&r.state, "t2").status, Status::Queued, "later items stay queued");
+        assert_eq!(
+            item(&r.state, "t2").status,
+            Status::Queued,
+            "later items stay queued"
+        );
         // The workspace and the target are untouched.
         assert_eq!(g(&w1, &["status", "--porcelain"]), "");
         assert_eq!(g(&w1, &["rev-parse", "HEAD"]), w1_head);
-        assert!(!git_dir_of(&w1).unwrap().join("rebase-merge").exists() && !git_dir_of(&w1).unwrap().join("rebase-apply").exists());
+        assert!(
+            !git_dir_of(&w1).unwrap().join("rebase-merge").exists()
+                && !git_dir_of(&w1).unwrap().join("rebase-apply").exists()
+        );
         assert_eq!(g(&f.root, &["rev-parse", "HEAD"]), main_head);
         // Stopped: more calls do nothing until resumed.
         let r = next(&f);
@@ -1215,7 +1684,10 @@ mod tests {
         assert_eq!(item(&r.state, "t2").status, Status::Queued);
         resume(&f.store, rs(&f)).unwrap();
         let r = next(&f);
-        assert_eq!((r.outcome, r.task_id.as_deref()), (Outcome::Merged, Some("t2")));
+        assert_eq!(
+            (r.outcome, r.task_id.as_deref()),
+            (Outcome::Merged, Some("t2"))
+        );
         // A failed item can be queued again, replacing its entry.
         let s = enq(&f, &["t1"], Strategy::FastForward, None);
         assert_eq!(s.items.iter().filter(|i| i.task_id == "t1").count(), 1);
@@ -1247,20 +1719,40 @@ mod tests {
         commit_file(&w1, "one.txt", "1\n", "one");
         commit_file(&w2, "two.txt", "2\n", "two");
         let main_head = g(&f.root, &["rev-parse", "HEAD"]);
-        enq(&f, &["t1", "t2"], Strategy::FastForward, Some("  npm test  "));
+        enq(
+            &f,
+            &["t1", "t2"],
+            Strategy::FastForward,
+            Some("  npm test  "),
+        );
         let r = next(&f);
         assert_eq!(r.outcome, Outcome::NeedsTest);
         let needs = r.needs_test.clone().unwrap();
-        assert_eq!((needs.task_id.as_str(), needs.command.as_str()), ("t1", "npm test"));
-        assert_eq!(PathBuf::from(&needs.worktree_path).canonicalize().unwrap(), w1.canonicalize().unwrap());
+        assert_eq!(
+            (needs.task_id.as_str(), needs.command.as_str()),
+            ("t1", "npm test")
+        );
+        assert_eq!(
+            PathBuf::from(&needs.worktree_path).canonicalize().unwrap(),
+            w1.canonicalize().unwrap()
+        );
         assert_eq!(item(&r.state, "t1").status, Status::Testing);
         // Asking again is idempotent and merges nothing.
         let again = next(&f);
-        assert_eq!((again.outcome, again.needs_test), (Outcome::NeedsTest, r.needs_test));
+        assert_eq!(
+            (again.outcome, again.needs_test),
+            (Outcome::NeedsTest, r.needs_test)
+        );
         assert_eq!(g(&f.root, &["rev-parse", "HEAD"]), main_head);
         // Reporting for an item that is not testing is refused.
-        assert_eq!(code(&report_test(&f.store, rs(&f), "t2", true, "").unwrap_err()), "invalid_state");
-        assert_eq!(code(&report_test(&f.store, rs(&f), "nope", true, "").unwrap_err()), "not_found");
+        assert_eq!(
+            code(&report_test(&f.store, rs(&f), "t2", true, "").unwrap_err()),
+            "invalid_state"
+        );
+        assert_eq!(
+            code(&report_test(&f.store, rs(&f), "nope", true, "").unwrap_err()),
+            "not_found"
+        );
 
         let s = report_test(&f.store, rs(&f), "t1", false, "1 failing\nFAIL some test").unwrap();
         let t1 = item(&s, "t1");
@@ -1268,7 +1760,11 @@ mod tests {
         assert!(t1.error.as_deref().unwrap().contains("FAIL some test"));
         assert!(s.halted);
         assert_eq!(item(&s, "t2").status, Status::Queued);
-        assert_eq!(g(&f.root, &["rev-parse", "HEAD"]), main_head, "nothing merged");
+        assert_eq!(
+            g(&f.root, &["rev-parse", "HEAD"]),
+            main_head,
+            "nothing merged"
+        );
         assert!(!f.root.join("one.txt").exists());
         assert_eq!(next(&f).outcome, Outcome::Halted);
     }
@@ -1302,7 +1798,12 @@ mod tests {
         assert_eq!(r.outcome, Outcome::NeedsTest);
         report_test(&f.store, rs(&f), "t1", true, "").unwrap();
         assert_eq!(next(&f).outcome, Outcome::Merged);
-        assert_eq!(g(&f.root, &["log", "--format=%s", "-n", "2"]).lines().collect::<Vec<_>>(), vec!["one", "late commit on main"]);
+        assert_eq!(
+            g(&f.root, &["log", "--format=%s", "-n", "2"])
+                .lines()
+                .collect::<Vec<_>>(),
+            vec!["one", "late commit on main"]
+        );
     }
 
     #[test]
@@ -1314,13 +1815,19 @@ mod tests {
         fs::write(f.root.join("a.txt"), "dirty\n").unwrap();
         let e = run_next(&f.store, rs(&f)).unwrap_err();
         assert_eq!(code(&e), "target_dirty", "{e}");
-        assert_eq!(item(&status(&f.store, rs(&f)).unwrap(), "t1").status, Status::Queued);
+        assert_eq!(
+            item(&status(&f.store, rs(&f)).unwrap(), "t1").status,
+            Status::Queued
+        );
         g(&f.root, &["checkout", "-q", "--", "a.txt"]);
         g(&f.root, &["checkout", "-q", "-b", "other"]);
         let e = run_next(&f.store, rs(&f)).unwrap_err();
         assert_eq!(code(&e), "target_not_checked_out", "{e}");
         g(&f.root, &["checkout", "-q", "--detach"]);
-        assert_eq!(code(&run_next(&f.store, rs(&f)).unwrap_err()), "target_not_checked_out");
+        assert_eq!(
+            code(&run_next(&f.store, rs(&f)).unwrap_err()),
+            "target_not_checked_out"
+        );
         assert!(!f.root.join("one.txt").exists());
         g(&f.root, &["checkout", "-q", "main"]);
         assert_eq!(next(&f).outcome, Outcome::Merged);
@@ -1332,8 +1839,14 @@ mod tests {
         assert_eq!(next(&f).outcome, Outcome::NeedsTest);
         report_test(&f.store, rs(&f), "t2", true, "").unwrap();
         fs::write(f.root.join("a.txt"), "dirty again\n").unwrap();
-        assert_eq!(code(&run_next(&f.store, rs(&f)).unwrap_err()), "target_dirty");
-        assert_eq!(item(&status(&f.store, rs(&f)).unwrap(), "t2").status, Status::Merging);
+        assert_eq!(
+            code(&run_next(&f.store, rs(&f)).unwrap_err()),
+            "target_dirty"
+        );
+        assert_eq!(
+            item(&status(&f.store, rs(&f)).unwrap(), "t2").status,
+            Status::Merging
+        );
         g(&f.root, &["checkout", "-q", "--", "a.txt"]);
         assert_eq!(next(&f).outcome, Outcome::Merged);
     }
@@ -1344,25 +1857,68 @@ mod tests {
         let w1 = mk(&f, "one", "t1");
         let w2 = mk(&f, "two", "t2");
         commit_file(&w1, "one.txt", "1\n", "one");
-        let e = enqueue(&f.store, rs(&f), &ids(&["t1", "nope"]), Strategy::Merge, None).unwrap_err();
+        let e = enqueue(
+            &f.store,
+            rs(&f),
+            &ids(&["t1", "nope"]),
+            Strategy::Merge,
+            None,
+        )
+        .unwrap_err();
         assert_eq!(code(&e), "not_found", "{e}");
-        assert!(status(&f.store, rs(&f)).unwrap().items.is_empty(), "all or nothing");
+        assert!(
+            status(&f.store, rs(&f)).unwrap().items.is_empty(),
+            "all or nothing"
+        );
         fs::write(w2.join("scratch.txt"), "wip").unwrap();
         let e = enqueue(&f.store, rs(&f), &ids(&["t1", "t2"]), Strategy::Merge, None).unwrap_err();
         assert_eq!(code(&e), "dirty", "{e}");
         assert!(status(&f.store, rs(&f)).unwrap().items.is_empty());
-        assert_eq!(code(&enqueue(&f.store, rs(&f), &[], Strategy::Merge, None).unwrap_err()), "invalid_request");
-        assert_eq!(code(&enqueue(&f.store, rs(&f), &ids(&["../x"]), Strategy::Merge, None).unwrap_err()), "invalid_task_id");
-        assert_eq!(code(&enqueue(&f.store, rs(&f), &ids(&["t1", "t1"]), Strategy::Merge, None).unwrap_err()), "already_queued");
-        assert_eq!(code(&Strategy::parse("rebase").unwrap_err()), "invalid_strategy");
-        assert_eq!(code(&enqueue(&f.store, rs(&f), &ids(&["t1"]), Strategy::Merge, Some("a\0b".into())).unwrap_err()), "invalid_request");
+        assert_eq!(
+            code(&enqueue(&f.store, rs(&f), &[], Strategy::Merge, None).unwrap_err()),
+            "invalid_request"
+        );
+        assert_eq!(
+            code(&enqueue(&f.store, rs(&f), &ids(&["../x"]), Strategy::Merge, None).unwrap_err()),
+            "invalid_task_id"
+        );
+        assert_eq!(
+            code(
+                &enqueue(&f.store, rs(&f), &ids(&["t1", "t1"]), Strategy::Merge, None).unwrap_err()
+            ),
+            "already_queued"
+        );
+        assert_eq!(
+            code(&Strategy::parse("rebase").unwrap_err()),
+            "invalid_strategy"
+        );
+        assert_eq!(
+            code(
+                &enqueue(
+                    &f.store,
+                    rs(&f),
+                    &ids(&["t1"]),
+                    Strategy::Merge,
+                    Some("a\0b".into())
+                )
+                .unwrap_err()
+            ),
+            "invalid_request"
+        );
         let s = enq(&f, &["t1"], Strategy::Merge, Some("   "));
-        assert_eq!(item(&s, "t1").test_command, None, "a blank command means no test");
+        assert_eq!(
+            item(&s, "t1").test_command,
+            None,
+            "a blank command means no test"
+        );
         let e = enqueue(&f.store, rs(&f), &ids(&["t1"]), Strategy::Merge, None).unwrap_err();
         assert_eq!(code(&e), "already_queued", "{e}");
         // The branch of a missing workspace directory cannot be queued.
         fs::remove_dir_all(&w2).unwrap();
-        assert_eq!(code(&enqueue(&f.store, rs(&f), &ids(&["t2"]), Strategy::Merge, None).unwrap_err()), "not_found");
+        assert_eq!(
+            code(&enqueue(&f.store, rs(&f), &ids(&["t2"]), Strategy::Merge, None).unwrap_err()),
+            "not_found"
+        );
     }
 
     #[test]
@@ -1375,7 +1931,11 @@ mod tests {
         fs::write(w1.join("wip.txt"), "wip").unwrap();
         let r = next(&f);
         assert_eq!(r.outcome, Outcome::Failed);
-        assert!(item(&r.state, "t1").error.as_deref().unwrap().starts_with("dirty:"));
+        assert!(item(&r.state, "t1")
+            .error
+            .as_deref()
+            .unwrap()
+            .starts_with("dirty:"));
     }
 
     #[test]
@@ -1400,10 +1960,17 @@ mod tests {
         commit_file(&w1, "one.txt", "1\n", "one");
         commit_file(&w2, "two.txt", "2\n", "two");
         commit_file(&w3, "three.txt", "3\n", "three");
-        enq(&f, &["t1", "t2", "t3"], Strategy::FastForward, Some("npm test"));
+        enq(
+            &f,
+            &["t1", "t2", "t3"],
+            Strategy::FastForward,
+            Some("npm test"),
+        );
         assert_eq!(next(&f).outcome, Outcome::NeedsTest);
         let s = cancel(&f.store, rs(&f)).unwrap();
-        assert!(s.items.iter().all(|i| i.status == Status::Skipped && i.error.as_deref() == Some("cancelled") && i.finished_at.is_some()));
+        assert!(s.items.iter().all(|i| i.status == Status::Skipped
+            && i.error.as_deref() == Some("cancelled")
+            && i.finished_at.is_some()));
         assert_eq!(next(&f).outcome, Outcome::Idle);
         assert!(!f.root.join("one.txt").exists());
         // Merged items keep their status when the rest is cancelled.
@@ -1413,7 +1980,10 @@ mod tests {
         let s = cancel(&f.store, rs(&f)).unwrap();
         assert_eq!(item(&s, "t1").status, Status::Merged);
         assert_eq!(item(&s, "t2").status, Status::Skipped);
-        assert!(cancel(&f.store, rs(&f)).is_ok(), "cancelling an empty queue is fine");
+        assert!(
+            cancel(&f.store, rs(&f)).is_ok(),
+            "cancelling an empty queue is fine"
+        );
     }
 
     #[test]
@@ -1425,13 +1995,25 @@ mod tests {
         let lock = lock_path(&f);
         // Held by this live process, fresh: concurrent runs are refused.
         fs::write(&lock, format!("{}\n{}\n", std::process::id(), now())).unwrap();
-        for e in [run_next(&f.store, rs(&f)).unwrap_err(), cancel(&f.store, rs(&f)).unwrap_err(), report_test(&f.store, rs(&f), "t1", true, "").unwrap_err(), enqueue(&f.store, rs(&f), &ids(&["t1"]), Strategy::Merge, None).unwrap_err()] {
+        for e in [
+            run_next(&f.store, rs(&f)).unwrap_err(),
+            cancel(&f.store, rs(&f)).unwrap_err(),
+            report_test(&f.store, rs(&f), "t1", true, "").unwrap_err(),
+            enqueue(&f.store, rs(&f), &ids(&["t1"]), Strategy::Merge, None).unwrap_err(),
+        ] {
             assert_eq!(code(&e), "queue_busy", "{e}");
         }
         assert!(lock.exists(), "a live lock is left alone");
-        assert!(status(&f.store, rs(&f)).is_ok(), "status never needs the lock");
+        assert!(
+            status(&f.store, rs(&f)).is_ok(),
+            "status never needs the lock"
+        );
         // Old lock (even with a live pid): stale.
-        fs::write(&lock, format!("{}\n{}\n", std::process::id(), now() - STALE_LOCK_SECS - 5)).unwrap();
+        fs::write(
+            &lock,
+            format!("{}\n{}\n", std::process::id(), now() - STALE_LOCK_SECS - 5),
+        )
+        .unwrap();
         assert_eq!(next(&f).outcome, Outcome::Merged);
         assert!(!lock.exists(), "the lock is released after a run");
     }
@@ -1443,7 +2025,11 @@ mod tests {
         let w1 = mk(&f, "one", "t1");
         commit_file(&w1, "one.txt", "1\n", "one");
         enq(&f, &["t1"], Strategy::FastForward, None);
-        let mut child = Command::new("git").arg("--version").stdout(Stdio::null()).spawn().unwrap();
+        let mut child = Command::new("git")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
         let dead = child.id();
         child.wait().unwrap();
         assert!(!pid_alive(dead));
@@ -1469,21 +2055,35 @@ mod tests {
         let after = status(&f.store, rs(&f)).unwrap();
         assert_eq!(before.items, after.items);
         let repo = open_repo(&f.store, rs(&f)).unwrap();
-        let on_disk: QueueState = serde_json::from_str(&fs::read_to_string(state_path(&repo)).unwrap()).unwrap();
+        let on_disk: QueueState =
+            serde_json::from_str(&fs::read_to_string(state_path(&repo)).unwrap()).unwrap();
         assert_eq!(on_disk, after);
-        assert!(!repo.managed.join(format!("{STATE_FILE}.tmp")).exists(), "atomic write leaves no temp file");
+        assert!(
+            !repo.managed.join(format!("{STATE_FILE}.tmp")).exists(),
+            "atomic write leaves no temp file"
+        );
         assert!(!repo.managed.join(LOCK_FILE).exists());
         let r = next(&f);
-        assert_eq!(r.outcome, Outcome::NeedsTest, "resumes the item that was waiting for its test");
+        assert_eq!(
+            r.outcome,
+            Outcome::NeedsTest,
+            "resumes the item that was waiting for its test"
+        );
         report_test(&f.store, rs(&f), "t1", true, "").unwrap();
         assert_eq!(next(&f).outcome, Outcome::Merged);
         let r = next(&f);
-        assert_eq!((r.outcome, r.task_id.as_deref()), (Outcome::NeedsTest, Some("t2")));
+        assert_eq!(
+            (r.outcome, r.task_id.as_deref()),
+            (Outcome::NeedsTest, Some("t2"))
+        );
         // The queue files never look like workspaces.
         assert_eq!(worktree::list(&f.store, rs(&f)).unwrap().len(), 2);
         fs::write(state_path(&repo), "{ not json").unwrap();
         assert_eq!(code(&status(&f.store, rs(&f)).unwrap_err()), "state_error");
-        assert_eq!(code(&run_next(&f.store, rs(&f)).unwrap_err()), "state_error");
+        assert_eq!(
+            code(&run_next(&f.store, rs(&f)).unwrap_err()),
+            "state_error"
+        );
     }
 
     #[test]
@@ -1526,7 +2126,11 @@ mod tests {
         save(&repo, &mut state).unwrap();
         let loaded = load(&repo).unwrap();
         assert_eq!(loaded.items.len(), MAX_HISTORY);
-        assert_eq!(loaded.items.first().unwrap().task_id, "t10", "the oldest finished items are dropped");
+        assert_eq!(
+            loaded.items.first().unwrap().task_id,
+            "t10",
+            "the oldest finished items are dropped"
+        );
     }
 
     #[test]
@@ -1548,7 +2152,8 @@ mod tests {
         assert_eq!(r["outcome"], "needs_test");
         assert_eq!(r["needsTest"]["command"], "npm test");
         assert!(r["needsTest"]["worktreePath"].is_string());
-        let c = serde_json::to_value(check_conflicts(&f.store, rs(&f), "t1", &[]).unwrap()).unwrap();
+        let c =
+            serde_json::to_value(check_conflicts(&f.store, rs(&f), "t1", &[]).unwrap()).unwrap();
         assert_eq!(c["checks"][0]["againstTaskId"], serde_json::Value::Null);
         assert_eq!(c["clean"], true);
     }

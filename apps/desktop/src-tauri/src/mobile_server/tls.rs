@@ -33,7 +33,10 @@ pub fn fingerprint(cert_der: &[u8]) -> String {
 
 fn civil_year(now: SystemTime) -> i32 {
     // Days since 1970-01-01 to a calendar year (Howard Hinnant's civil_from_days).
-    let days = now.duration_since(UNIX_EPOCH).map(|d| (d.as_secs() / 86_400) as i64).unwrap_or(0);
+    let days = now
+        .duration_since(UNIX_EPOCH)
+        .map(|d| (d.as_secs() / 86_400) as i64)
+        .unwrap_or(0);
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
@@ -46,7 +49,8 @@ fn civil_year(now: SystemTime) -> i32 {
 
 fn generate() -> Result<(Vec<u8>, Vec<u8>), String> {
     let key = KeyPair::generate().map_err(|e| format!("certificate key: {e}"))?;
-    let mut params = CertificateParams::new(vec!["gustaf.local".to_string()]).map_err(|e| format!("certificate parameters: {e}"))?;
+    let mut params = CertificateParams::new(vec!["gustaf.local".to_string()])
+        .map_err(|e| format!("certificate parameters: {e}"))?;
     let mut name = DistinguishedName::new();
     name.push(DnType::CommonName, "Gustaf desktop");
     name.push(DnType::OrganizationName, "Gustaf");
@@ -58,7 +62,9 @@ fn generate() -> Result<(Vec<u8>, Vec<u8>), String> {
     let year = civil_year(SystemTime::now());
     params.not_before = rcgen::date_time_ymd(year - 1, 1, 1);
     params.not_after = rcgen::date_time_ymd(year + 10, 1, 1);
-    let cert = params.self_signed(&key).map_err(|e| format!("certificate: {e}"))?;
+    let cert = params
+        .self_signed(&key)
+        .map_err(|e| format!("certificate: {e}"))?;
     Ok((cert.der().to_vec(), key.serialize_der()))
 }
 
@@ -71,8 +77,12 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
         use std::os::unix::fs::OpenOptionsExt;
         opts.mode(0o600);
     }
-    let mut file = opts.open(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    file.write_all(bytes).and_then(|_| file.sync_all()).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    let mut file = opts
+        .open(&tmp)
+        .map_err(|e| format!("{}: {e}", tmp.display()))?;
+    file.write_all(bytes)
+        .and_then(|_| file.sync_all())
+        .map_err(|e| format!("{}: {e}", tmp.display()))?;
     drop(file);
     fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
 }
@@ -88,7 +98,11 @@ pub fn load_or_create(data_dir: &Path) -> Result<Identity, String> {
     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let (cert_path, key_path) = (dir.join(CERT_FILE), dir.join(KEY_FILE));
     if let (Ok(cert_der), Ok(key_der)) = (fs::read(&cert_path), fs::read(&key_path)) {
-        let id = Identity { fingerprint: fingerprint(&cert_der), cert_der, key_der };
+        let id = Identity {
+            fingerprint: fingerprint(&cert_der),
+            cert_der,
+            key_der,
+        };
         if server_config(&id).is_ok() {
             return Ok(id);
         }
@@ -96,7 +110,11 @@ pub fn load_or_create(data_dir: &Path) -> Result<Identity, String> {
     let (cert_der, key_der) = generate()?;
     write_private(&key_path, &key_der)?;
     write_private(&cert_path, &cert_der)?;
-    Ok(Identity { fingerprint: fingerprint(&cert_der), cert_der, key_der })
+    Ok(Identity {
+        fingerprint: fingerprint(&cert_der),
+        cert_der,
+        key_der,
+    })
 }
 
 /// TLS 1.2/1.3 server configuration (ring provider), HTTP/1.1 only, no client certificates.
@@ -121,9 +139,18 @@ mod tests {
     #[test]
     fn year_conversion() {
         assert_eq!(civil_year(UNIX_EPOCH), 1970);
-        assert_eq!(civil_year(UNIX_EPOCH + std::time::Duration::from_secs(1_767_225_600)), 2026); // 2026-01-01
-        assert_eq!(civil_year(UNIX_EPOCH + std::time::Duration::from_secs(1_767_225_599)), 2025);
-        assert_eq!(civil_year(UNIX_EPOCH + std::time::Duration::from_secs(951_782_400)), 2000); // 2000-02-29
+        assert_eq!(
+            civil_year(UNIX_EPOCH + std::time::Duration::from_secs(1_767_225_600)),
+            2026
+        ); // 2026-01-01
+        assert_eq!(
+            civil_year(UNIX_EPOCH + std::time::Duration::from_secs(1_767_225_599)),
+            2025
+        );
+        assert_eq!(
+            civil_year(UNIX_EPOCH + std::time::Duration::from_secs(951_782_400)),
+            2000
+        ); // 2000-02-29
     }
 
     #[test]
@@ -131,10 +158,16 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let a = load_or_create(dir.path()).unwrap();
         assert_eq!(a.fingerprint.len(), 64);
-        assert!(a.fingerprint.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+        assert!(a
+            .fingerprint
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
         assert_eq!(a.fingerprint, fingerprint(&a.cert_der));
         let b = load_or_create(dir.path()).unwrap();
-        assert_eq!(a.fingerprint, b.fingerprint, "same certificate on the next start");
+        assert_eq!(
+            a.fingerprint, b.fingerprint,
+            "same certificate on the next start"
+        );
         assert!(server_config(&b).is_ok());
     }
 
@@ -149,7 +182,11 @@ mod tests {
         // Key of another certificate.
         let other = tempfile::tempdir().unwrap();
         let c = load_or_create(other.path()).unwrap();
-        fs::write(d.join(KEY_FILE), fs::read(identity_dir(other.path()).join(KEY_FILE)).unwrap()).unwrap();
+        fs::write(
+            d.join(KEY_FILE),
+            fs::read(identity_dir(other.path()).join(KEY_FILE)).unwrap(),
+        )
+        .unwrap();
         let e = load_or_create(dir.path()).unwrap();
         assert_ne!(e.fingerprint, c.fingerprint);
         assert_ne!(e.fingerprint, b.fingerprint);
@@ -161,7 +198,11 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         load_or_create(dir.path()).unwrap();
-        let mode = fs::metadata(identity_dir(dir.path()).join(KEY_FILE)).unwrap().permissions().mode() & 0o777;
+        let mode = fs::metadata(identity_dir(dir.path()).join(KEY_FILE))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(mode, 0o600);
     }
 }

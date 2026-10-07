@@ -34,7 +34,11 @@ fn known(status: &str) -> Option<&'static str> {
 impl StatusBoard {
     /// Replaces the whole picture; unknown statuses and anything past the bound are dropped. `true` when it changed.
     pub fn replace(&self, items: impl IntoIterator<Item = (i64, String)>) -> bool {
-        let next: HashMap<i64, &'static str> = items.into_iter().filter_map(|(id, s)| known(&s).map(|s| (id, s))).take(MAX_STATUS_ENTRIES).collect();
+        let next: HashMap<i64, &'static str> = items
+            .into_iter()
+            .filter_map(|(id, s)| known(&s).map(|s| (id, s)))
+            .take(MAX_STATUS_ENTRIES)
+            .collect();
         let mut map = self.map.lock().unwrap_or_else(|p| p.into_inner());
         let changed = *map != next;
         *map = next;
@@ -42,7 +46,11 @@ impl StatusBoard {
     }
 
     pub fn get(&self, chat_id: i64) -> Option<&'static str> {
-        self.map.lock().unwrap_or_else(|p| p.into_inner()).get(&chat_id).copied()
+        self.map
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(&chat_id)
+            .copied()
     }
 }
 
@@ -59,8 +67,15 @@ pub struct Detector {
 impl Detector {
     /// Starts from the current state: nothing is announced for what already exists.
     pub fn baseline(store: &Store, board: &StatusBoard) -> Result<Detector, String> {
-        let chats = store.all_chats()?.iter().map(|r| (r.id, chat_summary(r, board.get(r.id)))).collect();
-        Ok(Detector { chats, last_message: store.max_message_id()? })
+        let chats = store
+            .all_chats()?
+            .iter()
+            .map(|r| (r.id, chat_summary(r, board.get(r.id))))
+            .collect();
+        Ok(Detector {
+            chats,
+            last_message: store.max_message_id()?,
+        })
     }
 
     /// JSON frames (`ServerEvent`) for everything that changed since the last call.
@@ -68,11 +83,14 @@ impl Detector {
         let mut frames = Vec::new();
         for _ in 0..5 {
             let rows = store.messages_after(self.last_message, 200)?;
-            let Some(last) = rows.last().map(|r| r.id) else { break };
+            let Some(last) = rows.last().map(|r| r.id) else {
+                break;
+            };
             let results = tool_results(&rows);
             for row in &rows {
                 if let Some(message) = shape_message(row, &results) {
-                    frames.push(json!({ "type": "message.created", "message": message }).to_string());
+                    frames
+                        .push(json!({ "type": "message.created", "message": message }).to_string());
                 }
             }
             self.last_message = last;
@@ -89,9 +107,16 @@ impl Detector {
                     continue;
                 }
                 if before.running && !now.running {
-                    let outcome = if now.status == "failed" { "error" } else { "done" };
+                    let outcome = if now.status == "failed" {
+                        "error"
+                    } else {
+                        "done"
+                    };
                     frames.push(json!({ "type": "chat.updated", "chat": now }).to_string());
-                    frames.push(json!({ "type": "run.finished", "chatId": row.id, "outcome": outcome }).to_string());
+                    frames.push(
+                        json!({ "type": "run.finished", "chatId": row.id, "outcome": outcome })
+                            .to_string(),
+                    );
                     seen.insert(row.id, now);
                     continue;
                 }
@@ -120,15 +145,28 @@ mod tests {
     }
 
     fn parse(frames: &[String]) -> Vec<Value> {
-        frames.iter().map(|f| serde_json::from_str(f).unwrap()).collect()
+        frames
+            .iter()
+            .map(|f| serde_json::from_str(f).unwrap())
+            .collect()
     }
 
     #[test]
     fn the_board_keeps_only_known_statuses_and_reports_changes() {
         let b = StatusBoard::default();
-        assert!(b.replace([(1, "running".to_string()), (2, "nonsense".to_string()), (3, "done".to_string())]));
-        assert_eq!((b.get(1), b.get(2), b.get(3)), (Some("running"), None, Some("done")));
-        assert!(!b.replace([(1, "running".to_string()), (3, "done".to_string())]), "same picture, no change");
+        assert!(b.replace([
+            (1, "running".to_string()),
+            (2, "nonsense".to_string()),
+            (3, "done".to_string())
+        ]));
+        assert_eq!(
+            (b.get(1), b.get(2), b.get(3)),
+            (Some("running"), None, Some("done"))
+        );
+        assert!(
+            !b.replace([(1, "running".to_string()), (3, "done".to_string())]),
+            "same picture, no change"
+        );
         assert!(b.replace([]));
         assert_eq!(b.get(1), None);
         let many = (0..(MAX_STATUS_ENTRIES as i64 + 50)).map(|i| (i, "done".to_string()));
@@ -138,7 +176,10 @@ mod tests {
 
     #[test]
     fn hello_carries_the_protocol_version() {
-        assert_eq!(serde_json::from_str::<Value>(&hello(1)).unwrap(), json!({ "type": "hello", "protocol": 1 }));
+        assert_eq!(
+            serde_json::from_str::<Value>(&hello(1)).unwrap(),
+            json!({ "type": "hello", "protocol": 1 })
+        );
     }
 
     #[test]
@@ -155,8 +196,15 @@ mod tests {
         let board = StatusBoard::default();
         let mut det = Detector::baseline(&store, &board).unwrap();
         let id = msg(&conn, 1, "assistant", vec![text("new reply")], json!({}));
-        msg(&conn, 1, "tool", vec![json!({ "type": "tool_result", "id": "x", "name": "n", "output": "o" })], json!({}));
-        conn.execute("update chats set updated_at = 999 where id = 1", []).unwrap();
+        msg(
+            &conn,
+            1,
+            "tool",
+            vec![json!({ "type": "tool_result", "id": "x", "name": "n", "output": "o" })],
+            json!({}),
+        );
+        conn.execute("update chats set updated_at = 999 where id = 1", [])
+            .unwrap();
         let events = parse(&det.poll(&store, &board).unwrap());
         assert_eq!(events.len(), 2, "tool results are not messages: {events:?}");
         assert_eq!(events[0]["type"], "message.created");
@@ -164,10 +212,16 @@ mod tests {
         assert_eq!(events[0]["message"]["text"], "new reply");
         assert_eq!(events[1]["type"], "chat.updated");
         assert_eq!(events[1]["chat"]["updatedAt"], 999);
-        assert!(det.poll(&store, &board).unwrap().is_empty(), "announced once");
+        assert!(
+            det.poll(&store, &board).unwrap().is_empty(),
+            "announced once"
+        );
         conn.execute("insert into chats(id, project_id, title, created_at, updated_at) values(10, 2, 'brand new', 1, 1000)", []).unwrap();
         let events = parse(&det.poll(&store, &board).unwrap());
-        assert_eq!((events[0]["type"].as_str(), events[0]["chat"]["id"].as_i64()), (Some("chat.updated"), Some(10)));
+        assert_eq!(
+            (events[0]["type"].as_str(), events[0]["chat"]["id"].as_i64()),
+            (Some("chat.updated"), Some(10))
+        );
     }
 
     #[test]
@@ -175,7 +229,15 @@ mod tests {
         let (_d, store, conn) = setup();
         let board = StatusBoard::default();
         let mut det = Detector::baseline(&store, &board).unwrap();
-        msg(&conn, 1, "assistant", vec![text("token sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789")], json!({}));
+        msg(
+            &conn,
+            1,
+            "assistant",
+            vec![text(
+                "token sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789",
+            )],
+            json!({}),
+        );
         let frames = det.poll(&store, &board).unwrap();
         assert!(!frames.concat().contains("sk-ant"));
     }
@@ -188,18 +250,34 @@ mod tests {
         board.replace([(1, "running".to_string())]);
         let events = parse(&det.poll(&store, &board).unwrap());
         assert_eq!(events.len(), 1);
-        assert_eq!((events[0]["chat"]["status"].as_str(), events[0]["chat"]["running"].as_bool()), (Some("running"), Some(true)));
+        assert_eq!(
+            (
+                events[0]["chat"]["status"].as_str(),
+                events[0]["chat"]["running"].as_bool()
+            ),
+            (Some("running"), Some(true))
+        );
         board.replace([(1, "waiting".to_string())]);
         let events = parse(&det.poll(&store, &board).unwrap());
-        assert_eq!((events.len(), events[0]["chat"]["status"].as_str()), (1, Some("waiting")), "still running: no run.finished");
+        assert_eq!(
+            (events.len(), events[0]["chat"]["status"].as_str()),
+            (1, Some("waiting")),
+            "still running: no run.finished"
+        );
         board.replace([(1, "done".to_string())]);
         let events = parse(&det.poll(&store, &board).unwrap());
         assert_eq!(events.len(), 2);
-        assert_eq!(events[1], json!({ "type": "run.finished", "chatId": 1, "outcome": "done" }));
+        assert_eq!(
+            events[1],
+            json!({ "type": "run.finished", "chatId": 1, "outcome": "done" })
+        );
         board.replace([(1, "running".to_string())]);
         det.poll(&store, &board).unwrap();
         board.replace([(1, "failed".to_string())]);
         let events = parse(&det.poll(&store, &board).unwrap());
-        assert_eq!(events[1], json!({ "type": "run.finished", "chatId": 1, "outcome": "error" }));
+        assert_eq!(
+            events[1],
+            json!({ "type": "run.finished", "chatId": 1, "outcome": "error" })
+        );
     }
 }

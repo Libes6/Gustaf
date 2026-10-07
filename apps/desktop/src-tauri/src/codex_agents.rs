@@ -37,9 +37,30 @@ const REPORT_CHARS: usize = 4000;
 const STEP_CHARS: usize = 120;
 
 /// Lines that cannot matter are not parsed (messages, world state, turn context make most of a rollout).
-const RELEVANT: [&str; 9] = ["session_meta", "task_started", "task_complete", "token_count", "custom_tool_call", "function_call", "turn_aborted", "\"error\"", "shutdown"];
+const RELEVANT: [&str; 9] = [
+    "session_meta",
+    "task_started",
+    "task_complete",
+    "token_count",
+    "custom_tool_call",
+    "function_call",
+    "turn_aborted",
+    "\"error\"",
+    "shutdown",
+];
 /// Model-facing tools that steer agents; they are not the agent's own work.
-const CONTROL_TOOLS: [&str; 10] = ["spawn_agent", "wait_agent", "send_input", "send_message", "followup_task", "resume_agent", "close_agent", "interrupt_agent", "list_agents", "update_plan"];
+const CONTROL_TOOLS: [&str; 10] = [
+    "spawn_agent",
+    "wait_agent",
+    "send_input",
+    "send_message",
+    "followup_task",
+    "resume_agent",
+    "close_agent",
+    "interrupt_agent",
+    "list_agents",
+    "update_plan",
+];
 
 #[derive(Serialize, Debug, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -172,11 +193,24 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 /// `2026-10-03T15:49:41.123Z` to Unix milliseconds (UTC; an offset other than Z is not expected and reads as None).
 fn parse_iso_ms(s: &str) -> Option<i64> {
     let b = s.as_bytes();
-    if b.len() < 20 || b[4] != b'-' || b[7] != b'-' || (b[10] != b'T' && b[10] != b' ') || b[13] != b':' || b[16] != b':' {
+    if b.len() < 20
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || (b[10] != b'T' && b[10] != b' ')
+        || b[13] != b':'
+        || b[16] != b':'
+    {
         return None;
     }
     let num = |a: usize, z: usize| s.get(a..z)?.parse::<i64>().ok();
-    let (y, mo, d, h, mi, se) = (num(0, 4)?, num(5, 7)?, num(8, 10)?, num(11, 13)?, num(14, 16)?, num(17, 19)?);
+    let (y, mo, d, h, mi, se) = (
+        num(0, 4)?,
+        num(5, 7)?,
+        num(8, 10)?,
+        num(11, 13)?,
+        num(14, 16)?,
+        num(17, 19)?,
+    );
     if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || se > 60 {
         return None;
     }
@@ -216,7 +250,9 @@ fn day_dirs(start_ms: i64, now_ms: i64) -> Vec<(i64, i64, i64)> {
 /// `text(await tools.exec_command({cmd:"ls -la", ...}))`; anything else reads as its own text.
 fn exec_text(input: &str) -> String {
     let find = |key: &str| input.find(key).map(|i| i + key.len());
-    let start = find("cmd:").or_else(|| find("\"cmd\":")).or_else(|| find("cmd :"));
+    let start = find("cmd:")
+        .or_else(|| find("\"cmd\":"))
+        .or_else(|| find("cmd :"));
     if let Some(mut i) = start {
         let b = input.as_bytes();
         while i < b.len() && b[i].is_ascii_whitespace() {
@@ -247,7 +283,11 @@ fn exec_text(input: &str) -> String {
 
 /// What an agent is doing, for one line: the command (secrets removed) or the tool name.
 fn describe_step(name: &str, input: &str) -> String {
-    let text = if name == "exec" { exec_text(input) } else { name.to_string() };
+    let text = if name == "exec" {
+        exec_text(input)
+    } else {
+        name.to_string()
+    };
     clip(&redact(&text), STEP_CHARS)
 }
 
@@ -293,7 +333,13 @@ impl Life {
 }
 
 #[derive(Debug, Clone)]
-struct Control { call_id: String, target: String, name: String, life: Option<Life>, ts: Option<i64> }
+struct Control {
+    call_id: String,
+    target: String,
+    name: String,
+    life: Option<Life>,
+    ts: Option<i64>,
+}
 
 #[derive(Debug, Default)]
 struct FileState {
@@ -326,7 +372,8 @@ fn s(v: &Value) -> Option<String> {
 
 /// Unix seconds (or milliseconds) to milliseconds.
 fn secs_to_ms(v: &Value) -> Option<i64> {
-    v.as_i64().map(|n| if n > 100_000_000_000 { n } else { n * 1000 })
+    v.as_i64()
+        .map(|n| if n > 100_000_000_000 { n } else { n * 1000 })
 }
 
 fn parse_meta(p: &Value) -> Option<Meta> {
@@ -335,7 +382,9 @@ fn parse_meta(p: &Value) -> Option<Meta> {
     if !is_id(&id) {
         return None;
     }
-    let parent = s(&p["parent_thread_id"]).or_else(|| s(&spawn["parent_thread_id"])).filter(|x| is_id(x));
+    let parent = s(&p["parent_thread_id"])
+        .or_else(|| s(&spawn["parent_thread_id"]))
+        .filter(|x| is_id(x));
     Some(Meta {
         id,
         parent,
@@ -351,7 +400,11 @@ fn parse_meta(p: &Value) -> Option<Meta> {
 fn output_text(v: &Value) -> String {
     match v {
         Value::String(t) => t.clone(),
-        Value::Array(a) => a.iter().filter_map(|x| x["text"].as_str()).collect::<Vec<_>>().join("\n"),
+        Value::Array(a) => a
+            .iter()
+            .filter_map(|x| x["text"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
         _ => String::new(),
     }
 }
@@ -411,7 +464,14 @@ fn ingest(st: &mut FileState, line: &str) {
         ("event_msg", "error") => {
             st.life = Life::Error;
             st.ended_ms = ts;
-            st.error = Some(clip(&redact(&s(&p["message"]).or_else(|| s(&p["reason"])).unwrap_or_else(|| pty.to_string())), SUMMARY_CHARS));
+            st.error = Some(clip(
+                &redact(
+                    &s(&p["message"])
+                        .or_else(|| s(&p["reason"]))
+                        .unwrap_or_else(|| pty.to_string()),
+                ),
+                SUMMARY_CHARS,
+            ));
         }
         ("event_msg", "shutdown_complete") => {
             st.life = Life::Shutdown;
@@ -421,7 +481,13 @@ fn ingest(st: &mut FileState, line: &str) {
             let u = &p["info"]["total_token_usage"];
             if u.is_object() {
                 let n = |k: &str| u[k].as_u64().unwrap_or(0);
-                st.tokens = Tokens { input: n("input_tokens"), output: n("output_tokens"), cached: n("cached_input_tokens"), reasoning: n("reasoning_output_tokens"), total: n("total_tokens") };
+                st.tokens = Tokens {
+                    input: n("input_tokens"),
+                    output: n("output_tokens"),
+                    cached: n("cached_input_tokens"),
+                    reasoning: n("reasoning_output_tokens"),
+                    total: n("total_tokens"),
+                };
             }
         }
         ("response_item", "custom_tool_call") => {
@@ -430,21 +496,53 @@ fn ingest(st: &mut FileState, line: &str) {
             st.step = Some(describe_step(name, p["input"].as_str().unwrap_or("")));
         }
         ("response_item", "function_call") => {
-            let name = p["name"].as_str().unwrap_or("").rsplit(['.', ':']).next().unwrap_or("");
-            if ["interrupt_agent", "close_agent", "followup_task", "resume_agent", "send_input"].contains(&name) {
-                let a: Value = p["arguments"].as_str().and_then(|x| serde_json::from_str(x).ok()).unwrap_or(Value::Null);
+            let name = p["name"]
+                .as_str()
+                .unwrap_or("")
+                .rsplit(['.', ':'])
+                .next()
+                .unwrap_or("");
+            if [
+                "interrupt_agent",
+                "close_agent",
+                "followup_task",
+                "resume_agent",
+                "send_input",
+            ]
+            .contains(&name)
+            {
+                let a: Value = p["arguments"]
+                    .as_str()
+                    .and_then(|x| serde_json::from_str(x).ok())
+                    .unwrap_or(Value::Null);
                 if let Some(target) = s(&a["target"]).or_else(|| s(&a["id"])) {
-                    st.controls.push(Control { call_id: p["call_id"].as_str().unwrap_or("").into(), target, name: name.into(), life: None, ts });
+                    st.controls.push(Control {
+                        call_id: p["call_id"].as_str().unwrap_or("").into(),
+                        target,
+                        name: name.into(),
+                        life: None,
+                        ts,
+                    });
                 }
             }
             if name == "spawn_agent" {
-                let a: Value = p["arguments"].as_str().and_then(|x| serde_json::from_str(x).ok()).unwrap_or(Value::Null);
+                let a: Value = p["arguments"]
+                    .as_str()
+                    .and_then(|x| serde_json::from_str(x).ok())
+                    .unwrap_or(Value::Null);
                 if let Some(task_name) = s(&a["task_name"]).or_else(|| s(&a["name"])) {
                     st.spawns.push(Spawn {
                         call_id: p["call_id"].as_str().unwrap_or("").to_string(),
                         key_task: task_name.clone(),
                         task_name,
-                        message: clip(&redact(&s(&a["message"]).or_else(|| s(&a["prompt"])).unwrap_or_default()), SUMMARY_CHARS),
+                        message: clip(
+                            &redact(
+                                &s(&a["message"])
+                                    .or_else(|| s(&a["prompt"]))
+                                    .unwrap_or_default(),
+                            ),
+                            SUMMARY_CHARS,
+                        ),
                         ts,
                     });
                 }
@@ -456,26 +554,47 @@ fn ingest(st: &mut FileState, line: &str) {
         ("response_item", "function_call_output") => {
             // The call's own answer names the task it created (it wins over the arguments).
             let call = p["call_id"].as_str().unwrap_or("");
-            if let Some(c) = st.controls.iter_mut().find(|x| !x.call_id.is_empty() && x.call_id == call) {
+            if let Some(c) = st
+                .controls
+                .iter_mut()
+                .find(|x| !x.call_id.is_empty() && x.call_id == call)
+            {
                 let text = output_text(&p["output"]);
                 if let Ok(o) = serde_json::from_str::<Value>(&text) {
-                    if !o["error"].is_null() || o["is_error"].as_bool() == Some(true) { return; }
+                    if !o["error"].is_null() || o["is_error"].as_bool() == Some(true) {
+                        return;
+                    }
                     // Interrupt returns the PREVIOUS status: only an active turn was actually interrupted.
                     let previous = &o["previous_status"];
-                    let status = previous.as_str().or_else(|| previous.as_object().and_then(|m| m.keys().next().map(String::as_str)));
+                    let status = previous.as_str().or_else(|| {
+                        previous
+                            .as_object()
+                            .and_then(|m| m.keys().next().map(String::as_str))
+                    });
                     c.life = match status {
                         Some("completed") => Some(Life::Complete),
                         Some("errored" | "failed") => Some(Life::Error),
                         Some("interrupted" | "shutdown") => Some(Life::Aborted),
-                        Some("running" | "pendingInit" | "pending_init") if c.name == "interrupt_agent" || c.name == "close_agent" => Some(Life::Aborted),
+                        Some("running" | "pendingInit" | "pending_init")
+                            if c.name == "interrupt_agent" || c.name == "close_agent" =>
+                        {
+                            Some(Life::Aborted)
+                        }
                         _ => None,
                     };
                     c.ts = ts.or(c.ts);
                 }
             }
-            if let Some(sp) = st.spawns.iter_mut().find(|x| !x.call_id.is_empty() && x.call_id == call) {
+            if let Some(sp) = st
+                .spawns
+                .iter_mut()
+                .find(|x| !x.call_id.is_empty() && x.call_id == call)
+            {
                 let text = output_text(&p["output"]);
-                if let Some(t) = serde_json::from_str::<Value>(&text).ok().and_then(|o| s(&o["task_name"])) {
+                if let Some(t) = serde_json::from_str::<Value>(&text)
+                    .ok()
+                    .and_then(|o| s(&o["task_name"]))
+                {
                     sp.task_name = t;
                 }
             }
@@ -508,13 +627,20 @@ fn refresh(path: &Path, st: &mut FileState, head_only: bool) {
     let len = md.len();
     if len < st.offset {
         let used = st.last_used;
-        *st = FileState { last_used: used, ..Default::default() };
+        *st = FileState {
+            last_used: used,
+            ..Default::default()
+        };
     }
     if len == st.offset {
         return;
     }
-    let Ok(mut f) = open_nofollow(path) else { return };
-    if !f.metadata().map(|m| m.is_file()).unwrap_or(false) || f.seek(SeekFrom::Start(st.offset)).is_err() {
+    let Ok(mut f) = open_nofollow(path) else {
+        return;
+    };
+    if !f.metadata().map(|m| m.is_file()).unwrap_or(false)
+        || f.seek(SeekFrom::Start(st.offset)).is_err()
+    {
         return;
     }
     let mut buf = Vec::new();
@@ -554,43 +680,78 @@ fn refresh(path: &Path, st: &mut FileState, head_only: bool) {
 type Cache = HashMap<PathBuf, FileState>;
 
 fn real_dir(p: &Path) -> bool {
-    std::fs::symlink_metadata(p).map(|m| m.is_dir() && !m.file_type().is_symlink()).unwrap_or(false)
+    std::fs::symlink_metadata(p)
+        .map(|m| m.is_dir() && !m.file_type().is_symlink())
+        .unwrap_or(false)
 }
 
 fn rollout_name(n: &str) -> bool {
-    n.starts_with("rollout-") && n.ends_with(".jsonl") && n.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+    n.starts_with("rollout-")
+        && n.ends_with(".jsonl")
+        && n.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
 }
 
 fn mtime_ms(m: &std::fs::Metadata) -> i64 {
-    m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0)
+    m.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// Rollout files of the given day folders, newest name first, bounded per folder; symlinks are ignored.
 fn candidates(root: &Path, days: &[(i64, i64, i64)], min_mtime: Option<i64>) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for (y, m, d) in days {
-        let dir = root.join(format!("{y:04}")).join(format!("{m:02}")).join(format!("{d:02}"));
-        if !real_dir(root) || !real_dir(&root.join(format!("{y:04}"))) || !real_dir(&root.join(format!("{y:04}")).join(format!("{m:02}"))) || !real_dir(&dir) {
+        let dir = root
+            .join(format!("{y:04}"))
+            .join(format!("{m:02}"))
+            .join(format!("{d:02}"));
+        if !real_dir(root)
+            || !real_dir(&root.join(format!("{y:04}")))
+            || !real_dir(&root.join(format!("{y:04}")).join(format!("{m:02}")))
+            || !real_dir(&dir)
+        {
             continue;
         }
-        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         let mut names: Vec<(String, std::fs::Metadata)> = rd
             .flatten()
             .filter_map(|e| {
                 let name = e.file_name().into_string().ok()?;
                 let md = std::fs::symlink_metadata(e.path()).ok()?;
-                (rollout_name(&name) && md.is_file() && !md.file_type().is_symlink()).then_some((name, md))
+                (rollout_name(&name) && md.is_file() && !md.file_type().is_symlink())
+                    .then_some((name, md))
             })
             .collect();
         names.sort_by(|a, b| b.0.cmp(&a.0));
         names.truncate(MAX_DAY_FILES);
-        out.extend(names.into_iter().filter(|(_, md)| min_mtime.is_none_or(|t| mtime_ms(md) >= t)).map(|(n, _)| dir.join(n)));
+        out.extend(
+            names
+                .into_iter()
+                .filter(|(_, md)| min_mtime.is_none_or(|t| mtime_ms(md) >= t))
+                .map(|(n, _)| dir.join(n)),
+        );
     }
     out
 }
 
 fn short(path: &Path) -> String {
-    path.file_name().map(|n| n.to_string_lossy().chars().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect()).unwrap_or_default()
+    path.file_name()
+        .map(|n| {
+            n.to_string_lossy()
+                .chars()
+                .rev()
+                .take(20)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn task_matches(path: &str, task: &str) -> bool {
@@ -598,7 +759,14 @@ fn task_matches(path: &str, task: &str) -> bool {
 }
 
 /// Scans one run: `thread_id` is the thread id of the run's `thread.started`, `start_ms` when the run began.
-fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cache: &mut Cache, tick: u64) -> Result<ScanResult, String> {
+fn scan_in(
+    root: &Path,
+    thread_id: &str,
+    start_ms: Option<i64>,
+    now_ms: i64,
+    cache: &mut Cache,
+    tick: u64,
+) -> Result<ScanResult, String> {
     if !is_id(thread_id) {
         return Err("invalid thread id".into());
     }
@@ -611,9 +779,19 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         }
     };
     let start = start_ms.unwrap_or(now_ms - 3_600_000);
-    let files = candidates(&root, &day_dirs(start, now_ms), start_ms.map(|t| t - SLACK_MS));
+    let files = candidates(
+        &root,
+        &day_dirs(start, now_ms),
+        start_ms.map(|t| t - SLACK_MS),
+    );
     let suffix = format!("-{thread_id}.jsonl");
-    let parent_path = files.iter().find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().ends_with(&suffix))).cloned();
+    let parent_path = files
+        .iter()
+        .find(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().ends_with(&suffix))
+        })
+        .cloned();
     let note = |res: &mut ScanResult, t: String| {
         if res.notes.len() < MAX_NOTES && !res.notes.contains(&t) {
             res.notes.push(t);
@@ -629,7 +807,10 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         let known = cache.get(p).is_some_and(|s| s.head_done);
         if !known {
             if heads >= MAX_HEADS_PER_SCAN {
-                note(&mut res, "too many new rollout files; some were not checked".into());
+                note(
+                    &mut res,
+                    "too many new rollout files; some were not checked".into(),
+                );
                 break;
             }
             heads += 1;
@@ -667,7 +848,10 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         st.last_used = tick;
         refresh(p, st, false);
         if st.meta.is_none() {
-            note(&mut res, format!("{}: no session_meta (rollout format changed?)", short(p)));
+            note(
+                &mut res,
+                format!("{}: no session_meta (rollout format changed?)", short(p)),
+            );
         }
         res.parent_found = true;
         node_of.insert(thread_id.to_string(), p.clone());
@@ -701,25 +885,46 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
     let mut agents: Vec<(i64, Agent)> = Vec::new();
     let mut claimed: HashSet<(String, usize)> = HashSet::new();
     let mut order: Vec<&PathBuf> = kids.iter().collect();
-    order.sort_by_key(|p| cache.get(*p).and_then(|s| s.meta.as_ref()).and_then(|m| m.created_ms).unwrap_or(0));
+    order.sort_by_key(|p| {
+        cache
+            .get(*p)
+            .and_then(|s| s.meta.as_ref())
+            .and_then(|m| m.created_ms)
+            .unwrap_or(0)
+    });
     for p in order {
         let st = &cache[p];
         let Some(m) = &st.meta else { continue };
         let parent = m.parent.clone().unwrap_or_default();
         let mut spawn: Option<&Spawn> = None;
-        if let (Some(path), Some(pst)) = (&m.agent_path, node_of.get(&parent).and_then(|pp| cache.get(pp))) {
-            if let Some((i, sp)) = pst.spawns.iter().enumerate().find(|(i, sp)| !claimed.contains(&(parent.clone(), *i)) && task_matches(path, &sp.task_name)) {
+        if let (Some(path), Some(pst)) = (
+            &m.agent_path,
+            node_of.get(&parent).and_then(|pp| cache.get(pp)),
+        ) {
+            if let Some((i, sp)) = pst.spawns.iter().enumerate().find(|(i, sp)| {
+                !claimed.contains(&(parent.clone(), *i)) && task_matches(path, &sp.task_name)
+            }) {
                 claimed.insert((parent.clone(), i));
                 spawn = Some(sp);
             }
         }
         // An agent that never wrote an end is over when the parent's turn is (Codex interrupts its children then, usually a
         // second later and not always at all), and when nothing was written since before this run began (an earlier turn's).
-        let control = node_of.get(&parent).and_then(|pp| cache.get(pp)).and_then(|pst| pst.controls.iter().rev().find(|c| {
-            c.life.is_some() && (c.target == m.id || m.agent_path.as_deref() == Some(c.target.as_str()) || spawn.is_some_and(|sp| task_matches(&c.target, &sp.task_name)))
-                && c.ts.zip(st.turn_started_ms).is_none_or(|(at, start)| at >= start)
-                && c.ts.zip(st.ended_ms).is_none_or(|(at, end)| at >= end)
-        }));
+        let control = node_of
+            .get(&parent)
+            .and_then(|pp| cache.get(pp))
+            .and_then(|pst| {
+                pst.controls.iter().rev().find(|c| {
+                    c.life.is_some()
+                        && (c.target == m.id
+                            || m.agent_path.as_deref() == Some(c.target.as_str())
+                            || spawn.is_some_and(|sp| task_matches(&c.target, &sp.task_name)))
+                        && c.ts
+                            .zip(st.turn_started_ms)
+                            .is_none_or(|(at, start)| at >= start)
+                        && c.ts.zip(st.ended_ms).is_none_or(|(at, end)| at >= end)
+                })
+            });
         let (life, ended_ms) = if let Some(c) = control {
             (c.life.unwrap_or(st.life), c.ts)
         } else if !st.life.open() {
@@ -727,7 +932,11 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         } else if let (true, Some(end)) = (parent_over && parent == thread_id, parent_end_ms) {
             (Life::Aborted, Some(end))
         } else if let (Some(before), Some(last)) = (stale_before, st.last_ms.or(m.created_ms)) {
-            if last < before { (Life::Aborted, Some(last)) } else { (st.life, st.ended_ms) }
+            if last < before {
+                (Life::Aborted, Some(last))
+            } else {
+                (st.life, st.ended_ms)
+            }
         } else {
             (st.life, st.ended_ms)
         };
@@ -739,12 +948,17 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
             Life::Aborted => "stopped",
             Life::Shutdown => "shutdown",
         };
-        let started = st.first_started_ms.or(m.created_ms).or(spawn.and_then(|x| x.ts));
+        let started = st
+            .first_started_ms
+            .or(m.created_ms)
+            .or(spawn.and_then(|x| x.ts));
         agents.push((
             started.unwrap_or(0),
             Agent {
                 id: m.id.clone(),
-                key: spawn.map(|x| format!("{parent}:{}", x.key_task)).unwrap_or_else(|| m.id.clone()),
+                key: spawn
+                    .map(|x| format!("{parent}:{}", x.key_task))
+                    .unwrap_or_else(|| m.id.clone()),
                 thread_id: Some(m.id.clone()),
                 parent_thread_id: parent,
                 depth: m.depth,
@@ -778,7 +992,11 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                 continue;
             }
             let over = parent_over && owner == thread_id;
-            let control = cache[p].controls.iter().rev().find(|c| c.life.is_some() && task_matches(&c.target, &sp.task_name));
+            let control = cache[p]
+                .controls
+                .iter()
+                .rev()
+                .find(|c| c.life.is_some() && task_matches(&c.target, &sp.task_name));
             agents.push((
                 sp.ts.unwrap_or(i64::MAX),
                 Agent {
@@ -792,10 +1010,21 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
                     task_name: Some(sp.task_name.clone()),
                     role: None,
                     message: Some(sp.message.clone()).filter(|x| !x.is_empty()),
-                    state: match control.and_then(|c| c.life) { Some(Life::Complete) => "completed", Some(Life::Error) => "failed", Some(Life::Aborted) => "stopped", _ if over => "stopped", _ => "starting" }.into(),
+                    state: match control.and_then(|c| c.life) {
+                        Some(Life::Complete) => "completed",
+                        Some(Life::Error) => "failed",
+                        Some(Life::Aborted) => "stopped",
+                        _ if over => "stopped",
+                        _ => "starting",
+                    }
+                    .into(),
                     started_at_ms: sp.ts,
                     turn_started_at_ms: None,
-                    ended_at_ms: control.and_then(|c| c.ts).or(if over { parent_end_ms } else { None }),
+                    ended_at_ms: control.and_then(|c| c.ts).or(if over {
+                        parent_end_ms
+                    } else {
+                        None
+                    }),
                     duration_ms: None,
                     last_message: None,
                     error: None,
@@ -811,7 +1040,9 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
     let mut groups: HashMap<(String, String), (i64, Option<String>)> = HashMap::new();
     for (t, a) in &agents {
         if let Some(path) = &a.agent_path {
-            let e = groups.entry((a.parent_thread_id.clone(), path.clone())).or_insert((*t, None));
+            let e = groups
+                .entry((a.parent_thread_id.clone(), path.clone()))
+                .or_insert((*t, None));
             e.0 = e.0.max(*t);
             if a.key != a.id && e.1.is_none() {
                 e.1 = Some(a.key.clone());
@@ -827,17 +1058,29 @@ fn scan_in(root: &Path, thread_id: &str, start_ms: Option<i64>, now_ms: i64, cac
         None => true,
     });
     for (_, a) in agents.iter_mut() {
-        if let Some(key) = a.agent_path.as_ref().and_then(|p| groups.get(&(a.parent_thread_id.clone(), p.clone()))).and_then(|g| g.1.clone()) {
+        if let Some(key) = a
+            .agent_path
+            .as_ref()
+            .and_then(|p| groups.get(&(a.parent_thread_id.clone(), p.clone())))
+            .and_then(|g| g.1.clone())
+        {
             a.key = key;
         }
     }
     agents.sort_by_key(|(t, _)| *t);
     res.truncated = agents.len() > MAX_AGENTS;
-    res.agents = agents.into_iter().take(MAX_AGENTS).map(|(_, a)| a).collect();
+    res.agents = agents
+        .into_iter()
+        .take(MAX_AGENTS)
+        .map(|(_, a)| a)
+        .collect();
 
     // Forget files that were not looked at for a long time.
     if cache.len() > MAX_CACHE {
-        let mut by_use: Vec<(u64, PathBuf)> = cache.iter().map(|(p, s)| (s.last_used, p.clone())).collect();
+        let mut by_use: Vec<(u64, PathBuf)> = cache
+            .iter()
+            .map(|(p, s)| (s.last_used, p.clone()))
+            .collect();
         by_use.sort();
         for (_, p) in by_use.into_iter().take(cache.len() - MAX_CACHE / 2) {
             cache.remove(&p);
@@ -861,10 +1104,16 @@ fn global() -> &'static Mutex<(Cache, u64)> {
 /// Subagents of the Codex run with this thread id (`thread.started`), from its rollout files. `started_at` is when the run
 /// began (Unix ms), which limits the day folders and files that are looked at.
 #[tauri::command]
-pub async fn codex_agents_scan(thread_id: String, started_at: Option<i64>) -> Result<ScanResult, String> {
+pub async fn codex_agents_scan(
+    thread_id: String,
+    started_at: Option<i64>,
+) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let root = sessions_root().ok_or_else(|| "no home folder".to_string())?;
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
         let mut g = global().lock().map_err(|e| e.to_string())?;
         g.1 += 1;
         let tick = g.1;
@@ -914,27 +1163,40 @@ mod tests {
         )
     }
     fn parent_meta() -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:00:00.000Z","ordinal":0,"type":"session_meta","payload":{{"id":"{PARENT}","timestamp":"2026-01-05T10:00:00.000Z","cwd":"/tmp/x"}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:00:00.000Z","ordinal":0,"type":"session_meta","payload":{{"id":"{PARENT}","timestamp":"2026-01-05T10:00:00.000Z","cwd":"/tmp/x"}}}}"#
+        )
     }
     fn spawn(call: &str, task: &str, msg: &str, ord: i64) -> Vec<String> {
-        let args = serde_json::json!({"task_name": task, "message": msg, "fork_turns": "none"}).to_string();
+        let args = serde_json::json!({"task_name": task, "message": msg, "fork_turns": "none"})
+            .to_string();
         vec![
             serde_json::json!({"timestamp":"2026-01-05T10:00:02.000Z","ordinal":ord,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","arguments":args,"call_id":call}}).to_string(),
             serde_json::json!({"timestamp":"2026-01-05T10:00:03.000Z","ordinal":ord+1,"type":"response_item","payload":{"type":"function_call_output","call_id":call,"output":serde_json::json!({"task_name":task}).to_string()}}).to_string(),
         ]
     }
     fn started(ord: i64, at: i64) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:00:05.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_started","started_at":{at}}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:00:05.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_started","started_at":{at}}}}}"#
+        )
     }
     fn complete(ord: i64, msg: &str) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:01:00.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_complete","last_agent_message":"{msg}","completed_at":1767607260,"duration_ms":55000}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:01:00.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_complete","last_agent_message":"{msg}","completed_at":1767607260,"duration_ms":55000}}}}"#
+        )
     }
     fn exec(ord: i64, cmd: &str) -> String {
-        let input = format!(r#"text(await tools.exec_command({{cmd:{},"workdir":"/tmp"}}))"#, serde_json::to_string(cmd).unwrap());
+        let input = format!(
+            r#"text(await tools.exec_command({{cmd:{},"workdir":"/tmp"}}))"#,
+            serde_json::to_string(cmd).unwrap()
+        );
         serde_json::json!({"timestamp":"2026-01-05T10:00:10.000Z","ordinal":ord,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"c","input":input}}).to_string()
     }
     fn tokens(ord: i64, input: u64, output: u64) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:00:11.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"token_count","info":{{"total_token_usage":{{"input_tokens":{input},"cached_input_tokens":10,"output_tokens":{output},"reasoning_output_tokens":2,"total_tokens":{}}}}}}}}}"#, input + output)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:00:11.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"token_count","info":{{"total_token_usage":{{"input_tokens":{input},"cached_input_tokens":10,"output_tokens":{output},"reasoning_output_tokens":2,"total_tokens":{}}}}}}}}}"#,
+            input + output
+        )
     }
 
     fn scan(root: &Path, cache: &mut Cache) -> ScanResult {
@@ -944,12 +1206,37 @@ mod tests {
     /// Parent with three spawn calls and three children (completed, running, failed).
     fn fixture(root: &Path) {
         let mut lines = vec![parent_meta()];
-        lines.extend(spawn("call-1", "alpha_task", "Inspect the alpha module and report", 1));
+        lines.extend(spawn(
+            "call-1",
+            "alpha_task",
+            "Inspect the alpha module and report",
+            1,
+        ));
         lines.extend(spawn("call-2", "beta_task", "Run the beta checks", 3));
         lines.extend(spawn("call-3", "gamma_task", "Check gamma", 5));
         put(root, PARENT, &lines);
-        put(root, C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), exec(2, "ls -la /tmp"), tokens(3, 1000, 50), complete(4, "alpha done")]);
-        put(root, C2, &[meta(C2, PARENT, "Bo", "/root/beta_task", 2, 0), started(1, 1767607206), exec(2, "cargo test --all API_TOKEN=abc123secret"), exec(3, "git status"), tokens(4, 2000, 70)]);
+        put(
+            root,
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+                exec(2, "ls -la /tmp"),
+                tokens(3, 1000, 50),
+                complete(4, "alpha done"),
+            ],
+        );
+        put(
+            root,
+            C2,
+            &[
+                meta(C2, PARENT, "Bo", "/root/beta_task", 2, 0),
+                started(1, 1767607206),
+                exec(2, "cargo test --all API_TOKEN=abc123secret"),
+                exec(3, "git status"),
+                tokens(4, 2000, 70),
+            ],
+        );
         put(root, C3, &[meta(C3, PARENT, "Cy", "/root/gamma_task", 3, 0), started(1, 1767607207), r#"{"timestamp":"2026-01-05T10:00:30.000Z","ordinal":2,"type":"event_msg","payload":{"type":"error","message":"stream failed"}}"#.into()]);
     }
 
@@ -960,20 +1247,49 @@ mod tests {
         let r = scan(dir.path(), &mut Cache::new());
         assert!(r.parent_found);
         assert_eq!(r.agents.len(), 3, "{:?}", r.notes);
-        let by = |n: &str| r.agents.iter().find(|a| a.nickname.as_deref() == Some(n)).unwrap();
+        let by = |n: &str| {
+            r.agents
+                .iter()
+                .find(|a| a.nickname.as_deref() == Some(n))
+                .unwrap()
+        };
         let (a, b, c) = (by("Ada"), by("Bo"), by("Cy"));
-        assert_eq!((a.state.as_str(), b.state.as_str(), c.state.as_str()), ("completed", "running", "failed"));
+        assert_eq!(
+            (a.state.as_str(), b.state.as_str(), c.state.as_str()),
+            ("completed", "running", "failed")
+        );
         assert_eq!(a.task_name.as_deref(), Some("alpha_task"));
         assert_eq!(a.key, format!("{PARENT}:alpha_task"));
-        assert_eq!(a.message.as_deref(), Some("Inspect the alpha module and report"));
-        assert_eq!((a.last_message.as_deref(), a.duration_ms, a.tool_uses), (Some("alpha done"), Some(55000), 1));
-        assert_eq!(a.tokens, Tokens { input: 1000, output: 50, cached: 10, reasoning: 2, total: 1050 });
+        assert_eq!(
+            a.message.as_deref(),
+            Some("Inspect the alpha module and report")
+        );
+        assert_eq!(
+            (a.last_message.as_deref(), a.duration_ms, a.tool_uses),
+            (Some("alpha done"), Some(55000), 1)
+        );
+        assert_eq!(
+            a.tokens,
+            Tokens {
+                input: 1000,
+                output: 50,
+                cached: 10,
+                reasoning: 2,
+                total: 1050
+            }
+        );
         assert_eq!(a.thread_id.as_deref(), Some(C1));
         assert_eq!(b.tool_uses, 2);
         assert_eq!(b.step.as_deref(), Some("git status"));
         assert_eq!(c.error.as_deref(), Some("stream failed"));
         // Ordered by start time.
-        assert_eq!(r.agents.iter().map(|x| x.nickname.clone().unwrap()).collect::<Vec<_>>(), ["Ada", "Bo", "Cy"]);
+        assert_eq!(
+            r.agents
+                .iter()
+                .map(|x| x.nickname.clone().unwrap())
+                .collect::<Vec<_>>(),
+            ["Ada", "Bo", "Cy"]
+        );
     }
 
     #[test]
@@ -985,12 +1301,25 @@ mod tests {
         let mut cache = Cache::new();
         let r = scan(dir.path(), &mut cache);
         assert_eq!(r.agents.len(), 1);
-        assert_eq!((r.agents[0].state.as_str(), r.agents[0].thread_id.clone()), ("starting", None));
+        assert_eq!(
+            (r.agents[0].state.as_str(), r.agents[0].thread_id.clone()),
+            ("starting", None)
+        );
         let key = r.agents[0].key.clone();
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205)]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+            ],
+        );
         let r = scan(dir.path(), &mut cache);
         assert_eq!(r.agents.len(), 1);
-        assert_eq!((r.agents[0].state.as_str(), r.agents[0].key.clone()), ("running", key));
+        assert_eq!(
+            (r.agents[0].state.as_str(), r.agents[0].key.clone()),
+            ("running", key)
+        );
     }
 
     #[test]
@@ -1012,7 +1341,13 @@ mod tests {
         append(&p2, &[r#"lete","last_agent_message":"beta ok","completed_at":1767607320,"duration_ms":1}}"#.into()]);
         let last = scan(dir.path(), &mut cache);
         assert_eq!(first.agents[1].state, "running");
-        assert_eq!((last.agents[1].state.as_str(), last.agents[1].last_message.as_deref()), ("completed", Some("beta ok")));
+        assert_eq!(
+            (
+                last.agents[1].state.as_str(),
+                last.agents[1].last_message.as_deref()
+            ),
+            ("completed", Some("beta ok"))
+        );
     }
 
     #[test]
@@ -1022,15 +1357,42 @@ mod tests {
         let long = "echo ".to_string() + &"x".repeat(400);
         let p = day_dir(dir.path()).join(format!("rollout-2026-01-05T10-00-00-{C2}.jsonl"));
         let r = scan(dir.path(), &mut Cache::new());
-        let bo = r.agents.iter().find(|a| a.nickname.as_deref() == Some("Bo")).unwrap();
+        let bo = r
+            .agents
+            .iter()
+            .find(|a| a.nickname.as_deref() == Some("Bo"))
+            .unwrap();
         assert!(!format!("{bo:?}").contains("abc123secret"));
-        append(&p, &[exec(9, &long), exec(10, "curl -H 'Authorization: Bearer sk-abcdefghijklmnop1234' https://x.test")]);
+        append(
+            &p,
+            &[
+                exec(9, &long),
+                exec(
+                    10,
+                    "curl -H 'Authorization: Bearer sk-abcdefghijklmnop1234' https://x.test",
+                ),
+            ],
+        );
         let mut cache = Cache::new();
         let r = scan(dir.path(), &mut cache);
         let step = r.agents[1].step.clone().unwrap();
-        assert!(!step.contains("sk-abcdefghijklmnop1234") && step.contains("***"), "{step}");
+        assert!(
+            !step.contains("sk-abcdefghijklmnop1234") && step.contains("***"),
+            "{step}"
+        );
         // The long command, parsed on its own, is clipped.
-        assert!(describe_step("exec", &format!("text(await tools.exec_command({{cmd:{}}}))", serde_json::to_string(&long).unwrap())).chars().count() <= STEP_CHARS);
+        assert!(
+            describe_step(
+                "exec",
+                &format!(
+                    "text(await tools.exec_command({{cmd:{}}}))",
+                    serde_json::to_string(&long).unwrap()
+                )
+            )
+            .chars()
+            .count()
+                <= STEP_CHARS
+        );
     }
 
     #[test]
@@ -1038,16 +1400,54 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fixture(dir.path());
         let p = day_dir(dir.path()).join(format!("rollout-2026-01-05T10-00-00-{C1}.jsonl"));
-        append(&p, &["not json at all task_started".into(), r#"{"type":"event_msg","payload":"#.into(), "{}".into()]);
+        append(
+            &p,
+            &[
+                "not json at all task_started".into(),
+                r#"{"type":"event_msg","payload":"#.into(),
+                "{}".into(),
+            ],
+        );
         // A child of some other run, a file with garbage, and an empty one.
-        put(dir.path(), OTHER, &[meta(OTHER, "01a1ffff-0000-7c80-9a67-a9392614a2aa", "Zed", "/root/zed", 4, 0), started(1, 1767607205)]);
-        fs::write(day_dir(dir.path()).join("rollout-2026-01-05T10-00-00-01a1aaaa-0000-0000-0000-000000000001.jsonl"), "garbage\n\n").unwrap();
-        fs::write(day_dir(dir.path()).join("rollout-2026-01-05T10-00-00-01a1aaaa-0000-0000-0000-000000000002.jsonl"), "").unwrap();
+        put(
+            dir.path(),
+            OTHER,
+            &[
+                meta(
+                    OTHER,
+                    "01a1ffff-0000-7c80-9a67-a9392614a2aa",
+                    "Zed",
+                    "/root/zed",
+                    4,
+                    0,
+                ),
+                started(1, 1767607205),
+            ],
+        );
+        fs::write(
+            day_dir(dir.path())
+                .join("rollout-2026-01-05T10-00-00-01a1aaaa-0000-0000-0000-000000000001.jsonl"),
+            "garbage\n\n",
+        )
+        .unwrap();
+        fs::write(
+            day_dir(dir.path())
+                .join("rollout-2026-01-05T10-00-00-01a1aaaa-0000-0000-0000-000000000002.jsonl"),
+            "",
+        )
+        .unwrap();
         fs::write(day_dir(dir.path()).join("notes.txt"), "x").unwrap();
         let r = scan(dir.path(), &mut Cache::new());
         assert_eq!(r.agents.len(), 3);
-        assert!(r.agents.iter().all(|a| a.nickname.as_deref() != Some("Zed")));
-        assert!(r.notes.iter().any(|n| n.contains("unreadable")), "{:?}", r.notes);
+        assert!(r
+            .agents
+            .iter()
+            .all(|a| a.nickname.as_deref() != Some("Zed")));
+        assert!(
+            r.notes.iter().any(|n| n.contains("unreadable")),
+            "{:?}",
+            r.notes
+        );
     }
 
     #[test]
@@ -1055,10 +1455,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fixture(dir.path());
         let g = "01a100f4-0009-7c80-9a67-a9392614a259";
-        put(dir.path(), g, &[meta(g, C1, "Gus", "/root/alpha_task/deep", 5, 0), started(1, 1767607208)]);
+        put(
+            dir.path(),
+            g,
+            &[
+                meta(g, C1, "Gus", "/root/alpha_task/deep", 5, 0),
+                started(1, 1767607208),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         assert_eq!(r.agents.len(), 4);
-        assert_eq!(r.agents.iter().find(|a| a.nickname.as_deref() == Some("Gus")).unwrap().parent_thread_id, C1);
+        assert_eq!(
+            r.agents
+                .iter()
+                .find(|a| a.nickname.as_deref() == Some("Gus"))
+                .unwrap()
+                .parent_thread_id,
+            C1
+        );
     }
 
     #[test]
@@ -1066,10 +1480,29 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         put(dir.path(), PARENT, &[parent_meta()]);
         // Ordinals below the history start belong to the parent: its task_started/exec must not leak in.
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/a", 1, 5), started(2, 1767607200), exec(3, "echo inherited"), complete(4, "inherited"), started(6, 1767607300), exec(7, "echo own")]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/a", 1, 5),
+                started(2, 1767607200),
+                exec(3, "echo inherited"),
+                complete(4, "inherited"),
+                started(6, 1767607300),
+                exec(7, "echo own"),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         let a = &r.agents[0];
-        assert_eq!((a.state.as_str(), a.tool_uses, a.step.as_deref(), a.last_message.clone()), ("running", 1, Some("echo own"), None));
+        assert_eq!(
+            (
+                a.state.as_str(),
+                a.tool_uses,
+                a.step.as_deref(),
+                a.last_message.clone()
+            ),
+            ("running", 1, Some("echo own"), None)
+        );
     }
 
     #[test]
@@ -1079,18 +1512,44 @@ mod tests {
         fixture(dir.path());
         // A rollout name that links outside of the sessions folder, and a linked day folder.
         let secret = outside.path().join("elsewhere.jsonl");
-        fs::write(&secret, meta(OTHER, PARENT, "Evil", "/root/evil", 6, 0) + "\n").unwrap();
+        fs::write(
+            &secret,
+            meta(OTHER, PARENT, "Evil", "/root/evil", 6, 0) + "\n",
+        )
+        .unwrap();
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(&secret, day_dir(dir.path()).join(format!("rollout-2026-01-05T10-00-00-{OTHER}.jsonl"))).unwrap();
+            std::os::unix::fs::symlink(
+                &secret,
+                day_dir(dir.path()).join(format!("rollout-2026-01-05T10-00-00-{OTHER}.jsonl")),
+            )
+            .unwrap();
             let linked = dir.path().join("2026/01/06");
             fs::create_dir_all(outside.path().join("day")).unwrap();
-            fs::write(outside.path().join("day").join(format!("rollout-2026-01-06T10-00-00-{OTHER}.jsonl")), meta(OTHER, PARENT, "Evil", "/root/evil", 6, 0) + "\n").unwrap();
+            fs::write(
+                outside
+                    .path()
+                    .join("day")
+                    .join(format!("rollout-2026-01-06T10-00-00-{OTHER}.jsonl")),
+                meta(OTHER, PARENT, "Evil", "/root/evil", 6, 0) + "\n",
+            )
+            .unwrap();
             std::os::unix::fs::symlink(outside.path().join("day"), &linked).unwrap();
         }
-        let r = scan_in(dir.path(), PARENT, Some(start()), parse_iso_ms("2026-01-06T10:00:00.000Z").unwrap(), &mut Cache::new(), 1).unwrap();
+        let r = scan_in(
+            dir.path(),
+            PARENT,
+            Some(start()),
+            parse_iso_ms("2026-01-06T10:00:00.000Z").unwrap(),
+            &mut Cache::new(),
+            1,
+        )
+        .unwrap();
         assert_eq!(r.agents.len(), 3);
-        assert!(r.agents.iter().all(|a| a.nickname.as_deref() != Some("Evil")));
+        assert!(r
+            .agents
+            .iter()
+            .all(|a| a.nickname.as_deref() != Some("Evil")));
     }
 
     #[test]
@@ -1099,9 +1558,20 @@ mod tests {
         fixture(dir.path());
         // The run started days later: the day folder with the files is out of range.
         let late = parse_iso_ms("2026-01-20T10:00:00.000Z").unwrap();
-        let r = scan_in(dir.path(), PARENT, Some(late), late + 1000, &mut Cache::new(), 1).unwrap();
+        let r = scan_in(
+            dir.path(),
+            PARENT,
+            Some(late),
+            late + 1000,
+            &mut Cache::new(),
+            1,
+        )
+        .unwrap();
         assert!(!r.parent_found && r.agents.is_empty());
-        assert!(r.notes.iter().any(|n| n.contains("parent rollout not found")));
+        assert!(r
+            .notes
+            .iter()
+            .any(|n| n.contains("parent rollout not found")));
     }
 
     #[test]
@@ -1110,12 +1580,25 @@ mod tests {
         assert!(scan_in(dir.path(), "../etc", None, now(), &mut Cache::new(), 1).is_err());
         assert!(scan_in(dir.path(), "", None, now(), &mut Cache::new(), 1).is_err());
         // Missing sessions folder is a note, not an error.
-        let r = scan_in(&dir.path().join("none"), PARENT, None, now(), &mut Cache::new(), 1).unwrap();
+        let r = scan_in(
+            &dir.path().join("none"),
+            PARENT,
+            None,
+            now(),
+            &mut Cache::new(),
+            1,
+        )
+        .unwrap();
         assert!(r.agents.is_empty() && !r.notes.is_empty());
         // More than 50 spawns are cut.
         let mut lines = vec![parent_meta()];
         for i in 0..60 {
-            lines.extend(spawn(&format!("call-{i}"), &format!("task_{i}"), "m", i * 2 + 1));
+            lines.extend(spawn(
+                &format!("call-{i}"),
+                &format!("task_{i}"),
+                "m",
+                i * 2 + 1,
+            ));
         }
         put(dir.path(), PARENT, &lines);
         let r = scan(dir.path(), &mut Cache::new());
@@ -1129,8 +1612,19 @@ mod tests {
         let mut lines = vec![parent_meta()];
         lines.extend(spawn("call-1", "alpha_task", "x", 1));
         put(dir.path(), PARENT, &lines);
-        let huge = format!(r#"{{"ordinal":9,"type":"event_msg","payload":{{"type":"task_started","pad":"{}"}}}}"#, "a".repeat(MAX_LINE + 10));
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), huge, exec(10, "echo after")]);
+        let huge = format!(
+            r#"{{"ordinal":9,"type":"event_msg","payload":{{"type":"task_started","pad":"{}"}}}}"#,
+            "a".repeat(MAX_LINE + 10)
+        );
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                huge,
+                exec(10, "echo after"),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         let a = &r.agents[0];
         // The huge task_started was skipped (state stays "starting"), the next line is read.
@@ -1142,27 +1636,42 @@ mod tests {
         assert_eq!(parse_iso_ms("1970-01-01T00:00:01.5Z"), Some(1500));
         assert_eq!(parse_iso_ms("2026-01-05T10:00:00Z"), Some(1767607200000));
         assert_eq!(parse_iso_ms("nonsense"), None);
-        assert_eq!(civil_from_days(days_from_civil(2026, 2, 28) + 1), (2026, 3, 1));
+        assert_eq!(
+            civil_from_days(days_from_civil(2026, 2, 28) + 1),
+            (2026, 3, 1)
+        );
         let d = day_dirs(start(), now());
         assert_eq!(d.first(), Some(&(2026, 1, 6)));
         assert_eq!(d.last(), Some(&(2026, 1, 4)));
-        assert_eq!(exec_text(r#"text(await tools.exec_command({cmd:"ls \"a b\"\nwc","workdir":"/x"}))"#), "ls \"a b\" wc");
+        assert_eq!(
+            exec_text(r#"text(await tools.exec_command({cmd:"ls \"a b\"\nwc","workdir":"/x"}))"#),
+            "ls \"a b\" wc"
+        );
         assert_eq!(exec_text("plain text"), "plain text");
     }
 
     // ---- lifecycle fixes (docs/subagents-audit.md) ----
 
     fn aborted(ord: i64) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:01:30.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"turn_aborted","reason":"interrupted","completed_at":1767607290,"duration_ms":85000}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:01:30.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"turn_aborted","reason":"interrupted","completed_at":1767607290,"duration_ms":85000}}}}"#
+        )
     }
     fn parent_started(ord: i64) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:00:01.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_started","started_at":1767607201}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:00:01.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_started","started_at":1767607201}}}}"#
+        )
     }
     fn parent_complete(ord: i64) -> String {
-        format!(r#"{{"timestamp":"2026-01-05T10:02:00.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_complete","completed_at":1767607320,"duration_ms":119000}}}}"#)
+        format!(
+            r#"{{"timestamp":"2026-01-05T10:02:00.000Z","ordinal":{ord},"type":"event_msg","payload":{{"type":"task_complete","completed_at":1767607320,"duration_ms":119000}}}}"#
+        )
     }
     fn by_nick<'a>(r: &'a ScanResult, n: &str) -> &'a Agent {
-        r.agents.iter().find(|a| a.nickname.as_deref() == Some(n)).unwrap()
+        r.agents
+            .iter()
+            .find(|a| a.nickname.as_deref() == Some(n))
+            .unwrap()
     }
 
     #[test]
@@ -1171,10 +1680,21 @@ mod tests {
         let mut lines = vec![parent_meta()];
         lines.extend(spawn("call-1", "alpha_task", "Do alpha", 1));
         put(dir.path(), PARENT, &lines);
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), aborted(2)]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+                aborted(2),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         let a = &r.agents[0];
-        assert_eq!((a.state.as_str(), a.error.clone(), a.ended_at_ms), ("stopped", None, Some(1767607290000)));
+        assert_eq!(
+            (a.state.as_str(), a.error.clone(), a.ended_at_ms),
+            ("stopped", None, Some(1767607290000))
+        );
         assert_eq!(a.duration_ms, Some(85000));
     }
 
@@ -1182,9 +1702,21 @@ mod tests {
     fn a_followup_turn_revives_a_stopped_agent() {
         let dir = tempfile::tempdir().unwrap();
         put(dir.path(), PARENT, &[parent_meta()]);
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/a", 1, 0), started(1, 1767607205), aborted(2), started(3, 1767607300)]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/a", 1, 0),
+                started(1, 1767607205),
+                aborted(2),
+                started(3, 1767607300),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
-        assert_eq!((r.agents[0].state.as_str(), r.agents[0].ended_at_ms), ("running", None));
+        assert_eq!(
+            (r.agents[0].state.as_str(), r.agents[0].ended_at_ms),
+            ("running", None)
+        );
     }
 
     #[test]
@@ -1196,15 +1728,44 @@ mod tests {
         lines.push(parent_complete(7));
         put(dir.path(), PARENT, &lines);
         // Alpha never wrote a terminal event; beta has no file yet; gamma finished by itself.
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), exec(2, "ls")]);
-        put(dir.path(), C3, &[meta(C3, PARENT, "Cy", "/root/gamma_task", 3, 0), started(1, 1767607207), complete(2, "done")]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+                exec(2, "ls"),
+            ],
+        );
+        put(
+            dir.path(),
+            C3,
+            &[
+                meta(C3, PARENT, "Cy", "/root/gamma_task", 3, 0),
+                started(1, 1767607207),
+                complete(2, "done"),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         let ada = by_nick(&r, "Ada");
-        assert_eq!((ada.state.as_str(), ada.ended_at_ms), ("stopped", Some(1767607320000)));
+        assert_eq!(
+            (ada.state.as_str(), ada.ended_at_ms),
+            ("stopped", Some(1767607320000))
+        );
         assert_eq!(by_nick(&r, "Cy").state, "completed");
-        let beta = r.agents.iter().find(|a| a.task_name.as_deref() == Some("beta_task")).unwrap();
-        assert_eq!((beta.state.as_str(), beta.thread_id.clone()), ("stopped", None));
-        assert!(r.agents.iter().all(|a| a.state != "running" && a.state != "starting"));
+        let beta = r
+            .agents
+            .iter()
+            .find(|a| a.task_name.as_deref() == Some("beta_task"))
+            .unwrap();
+        assert_eq!(
+            (beta.state.as_str(), beta.thread_id.clone()),
+            ("stopped", None)
+        );
+        assert!(r
+            .agents
+            .iter()
+            .all(|a| a.state != "running" && a.state != "starting"));
     }
 
     #[test]
@@ -1213,8 +1774,18 @@ mod tests {
         let mut lines = vec![parent_meta(), parent_started(1)];
         lines.extend(spawn("call-1", "alpha_task", "Do alpha", 2));
         put(dir.path(), PARENT, &lines);
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205)]);
-        assert_eq!(scan(dir.path(), &mut Cache::new()).agents[0].state, "running");
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+            ],
+        );
+        assert_eq!(
+            scan(dir.path(), &mut Cache::new()).agents[0].state,
+            "running"
+        );
     }
 
     #[test]
@@ -1227,7 +1798,11 @@ mod tests {
         put(dir.path(), PARENT, &lines);
         let late = parse_iso_ms("2026-01-05T10:03:00.000Z").unwrap();
         let r = scan_in(dir.path(), PARENT, Some(late), now(), &mut Cache::new(), 1).unwrap();
-        let names: Vec<_> = r.agents.iter().map(|a| a.task_name.clone().unwrap()).collect();
+        let names: Vec<_> = r
+            .agents
+            .iter()
+            .map(|a| a.task_name.clone().unwrap())
+            .collect();
         assert_eq!(names, ["beta_task"], "{:?}", r.agents);
         assert_eq!(r.agents[0].state, "starting");
     }
@@ -1238,7 +1813,14 @@ mod tests {
         let mut lines = vec![parent_meta(), parent_started(1)];
         lines.extend(spawn("call-1", "alpha_task", "Do alpha", 2));
         put(dir.path(), PARENT, &lines);
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205)]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+            ],
+        );
         // The file is in the window, but nothing was written to it since before this turn began.
         let late = parse_iso_ms("2026-01-05T10:00:12.000Z").unwrap();
         let r = scan_in(dir.path(), PARENT, Some(late), now(), &mut Cache::new(), 1).unwrap();
@@ -1259,11 +1841,29 @@ mod tests {
         let mut lines = vec![parent_meta()];
         lines.extend(spawn("call-1", "alpha_task", "Do alpha", 1));
         put(dir.path(), PARENT, &lines);
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0), started(1, 1767607205), complete(2, "old")]);
-        put(dir.path(), C2, &[meta(C2, PARENT, "Bo", "/root/alpha_task", 2, 0), started(1, 1767607250)]);
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/alpha_task", 1, 0),
+                started(1, 1767607205),
+                complete(2, "old"),
+            ],
+        );
+        put(
+            dir.path(),
+            C2,
+            &[
+                meta(C2, PARENT, "Bo", "/root/alpha_task", 2, 0),
+                started(1, 1767607250),
+            ],
+        );
         let r = scan(dir.path(), &mut Cache::new());
         assert_eq!(r.agents.len(), 1, "{:?}", r.agents);
-        assert_eq!((r.agents[0].nickname.as_deref(), r.agents[0].state.as_str()), (Some("Bo"), "running"));
+        assert_eq!(
+            (r.agents[0].nickname.as_deref(), r.agents[0].state.as_str()),
+            (Some("Bo"), "running")
+        );
         // The card of the spawn call goes on with the newer thread.
         assert_eq!(r.agents[0].key, format!("{PARENT}:alpha_task"));
     }
@@ -1282,26 +1882,59 @@ mod tests {
         lines.extend(spawn("s2", "branching", "original", 4));
         lines.extend(spawn("s3", "queue", "original", 6));
         put(dir.path(), PARENT, &lines);
-        let child = put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/context", 1, 0), started(1, 1767607205), exec(2, "ls"), tokens(3, 1000, 50)]);
+        let child = put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/context", 1, 0),
+                started(1, 1767607205),
+                exec(2, "ls"),
+                tokens(3, 1000, 50),
+            ],
+        );
         let mut cache = Cache::new();
-        assert!(scan(dir.path(), &mut cache).agents.iter().all(|a| a.state == "running" || a.state == "starting"));
+        assert!(scan(dir.path(), &mut cache)
+            .agents
+            .iter()
+            .all(|a| a.state == "running" || a.state == "starting"));
         for (i, task) in ["context", "branching", "queue"].iter().enumerate() {
-            lines.extend(interrupt(&format!("i{i}"), &format!("/root/{task}"), Value::String("running".into()), 8 + i as i64 * 2));
-            lines.extend(spawn(&format!("r{i}"), &format!("{task}_resume"), "replacement", 20 + i as i64 * 2));
+            lines.extend(interrupt(
+                &format!("i{i}"),
+                &format!("/root/{task}"),
+                Value::String("running".into()),
+                8 + i as i64 * 2,
+            ));
+            lines.extend(spawn(
+                &format!("r{i}"),
+                &format!("{task}_resume"),
+                "replacement",
+                20 + i as i64 * 2,
+            ));
         }
         put(dir.path(), PARENT, &lines);
         let r = scan(dir.path(), &mut cache);
         assert_eq!(r.agents.len(), 6);
         assert_eq!(r.agents.iter().filter(|a| a.state == "stopped").count(), 3);
         assert_eq!(r.agents.iter().filter(|a| a.state == "starting").count(), 3);
-        let a = r.agents.iter().find(|a| a.thread_id.as_deref() == Some(C1)).unwrap();
+        let a = r
+            .agents
+            .iter()
+            .find(|a| a.thread_id.as_deref() == Some(C1))
+            .unwrap();
         assert_eq!((a.tool_uses, a.tokens.total), (1, 1050));
         assert_eq!(a.ended_at_ms, Some(1767607261000));
         // An unchanged child's file does not undo the parent's interruption.
         assert_eq!(scan(dir.path(), &mut cache), r);
         append(&child, &[started(4, 1767607300)]);
         let r = scan(dir.path(), &mut cache);
-        assert_eq!(r.agents.iter().find(|a| a.thread_id.as_deref() == Some(C1)).unwrap().state, "running");
+        assert_eq!(
+            r.agents
+                .iter()
+                .find(|a| a.thread_id.as_deref() == Some(C1))
+                .unwrap()
+                .state,
+            "running"
+        );
     }
 
     #[test]
@@ -1315,13 +1948,33 @@ mod tests {
         let key = scan(dir.path(), &mut cache).agents[0].key.clone();
         append(&parent, &[serde_json::json!({"timestamp":"2026-01-05T10:00:03.000Z","ordinal":3,"type":"response_item","payload":{"type":"function_call_output","call_id":"s1","output":serde_json::json!({"task_name":"/root/context"}).to_string()}}).to_string()]);
         assert_eq!(scan(dir.path(), &mut cache).agents[0].key, key);
-        append(&parent, &interrupt("i1", "/root/context", serde_json::json!({"completed":"already finished"}), 4));
+        append(
+            &parent,
+            &interrupt(
+                "i1",
+                "/root/context",
+                serde_json::json!({"completed":"already finished"}),
+                4,
+            ),
+        );
         let a = &scan(dir.path(), &mut cache).agents[0];
-        assert_eq!((a.key.as_str(), a.state.as_str()), (key.as_str(), "completed"));
-        put(dir.path(), C1, &[meta(C1, PARENT, "Ada", "/root/context", 1, 0), started(1, 1767607205)]);
+        assert_eq!(
+            (a.key.as_str(), a.state.as_str()),
+            (key.as_str(), "completed")
+        );
+        put(
+            dir.path(),
+            C1,
+            &[
+                meta(C1, PARENT, "Ada", "/root/context", 1, 0),
+                started(1, 1767607205),
+            ],
+        );
         let r = scan(dir.path(), &mut cache);
         assert_eq!(r.agents.len(), 1);
-        assert_eq!((r.agents[0].key.as_str(), r.agents[0].state.as_str()), (key.as_str(), "completed"));
+        assert_eq!(
+            (r.agents[0].key.as_str(), r.agents[0].state.as_str()),
+            (key.as_str(), "completed")
+        );
     }
-
 }

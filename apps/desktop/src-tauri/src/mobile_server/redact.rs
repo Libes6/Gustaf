@@ -63,8 +63,14 @@ pub fn redact_secrets(text: &str) -> String {
     for re in &p.tokens {
         out = re.replace_all(&out, REDACTED).into_owned();
     }
-    out = p.bearer.replace_all(&out, |c: &Captures| format!("{}{}{REDACTED}", &c[1], &c[2])).into_owned();
-    out = p.url_credentials.replace_all(&out, |c: &Captures| format!("{}{REDACTED}@", &c[1])).into_owned();
+    out = p
+        .bearer
+        .replace_all(&out, |c: &Captures| format!("{}{}{REDACTED}", &c[1], &c[2]))
+        .into_owned();
+    out = p
+        .url_credentials
+        .replace_all(&out, |c: &Captures| format!("{}{REDACTED}@", &c[1]))
+        .into_owned();
     p.assignment
         .replace_all(&out, |c: &Captures| {
             let (whole, head, value) = (&c[0], &c[1], &c[2]);
@@ -106,26 +112,54 @@ mod tests {
     fn private_key_blocks_are_cut_even_when_unterminated() {
         let out = redact_secrets("before\n-----BEGIN RSA PRIVATE KEY-----\nMIIabc\ndef\n-----END RSA PRIVATE KEY-----\nafter");
         assert_eq!(out, format!("before\n{REDACTED}\nafter"));
-        assert_eq!(redact_secrets("x\n-----BEGIN PRIVATE KEY-----\nMIIabc"), format!("x\n{REDACTED}"));
+        assert_eq!(
+            redact_secrets("x\n-----BEGIN PRIVATE KEY-----\nMIIabc"),
+            format!("x\n{REDACTED}")
+        );
     }
 
     #[test]
     fn bearer_and_url_credentials() {
-        assert_eq!(redact_secrets("Authorization: Bearer abcdefghijklmnopqrstu"), format!("Authorization: Bearer {REDACTED}"));
-        assert_eq!(redact_secrets("curl https://user:hunter2pw@example.com/x"), format!("curl https://user:{REDACTED}@example.com/x"));
+        assert_eq!(
+            redact_secrets("Authorization: Bearer abcdefghijklmnopqrstu"),
+            format!("Authorization: Bearer {REDACTED}")
+        );
+        assert_eq!(
+            redact_secrets("curl https://user:hunter2pw@example.com/x"),
+            format!("curl https://user:{REDACTED}@example.com/x")
+        );
     }
 
     #[test]
     fn assignments_are_blanked_unless_they_are_placeholders_or_calls() {
-        assert_eq!(redact_secrets("API_KEY=abcdef123456"), format!("API_KEY={REDACTED}"));
-        assert_eq!(redact_secrets("password: hunter2hunter"), format!("password: {REDACTED}"));
-        assert_eq!(redact_secrets(r#""apiKey": "abcdef123456""#), format!(r#""apiKey": "{REDACTED}""#));
-        assert_eq!(redact_secrets("const token = getToken();"), "const token = getToken();");
+        assert_eq!(
+            redact_secrets("API_KEY=abcdef123456"),
+            format!("API_KEY={REDACTED}")
+        );
+        assert_eq!(
+            redact_secrets("password: hunter2hunter"),
+            format!("password: {REDACTED}")
+        );
+        assert_eq!(
+            redact_secrets(r#""apiKey": "abcdef123456""#),
+            format!(r#""apiKey": "{REDACTED}""#)
+        );
+        assert_eq!(
+            redact_secrets("const token = getToken();"),
+            "const token = getToken();"
+        );
         assert_eq!(redact_secrets("secret: string;"), "secret: string;");
         assert_eq!(redact_secrets("token=$TOKEN_VALUE"), "token=$TOKEN_VALUE");
         assert_eq!(redact_secrets("tokens: 123456789"), "tokens: 123456789");
-        assert_eq!(redact_secrets("password=shorter"), format!("password={REDACTED}"));
-        assert_eq!(redact_secrets("password=abc"), "password=abc", "values under six characters are left alone");
+        assert_eq!(
+            redact_secrets("password=shorter"),
+            format!("password={REDACTED}")
+        );
+        assert_eq!(
+            redact_secrets("password=abc"),
+            "password=abc",
+            "values under six characters are left alone"
+        );
     }
 
     #[test]

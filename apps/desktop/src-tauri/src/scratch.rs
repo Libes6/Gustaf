@@ -18,7 +18,11 @@ fn clean(name: &str) -> String {
         }
     }
     let out = out.trim_matches('-').to_string();
-    if out.is_empty() { "chat".into() } else { out }
+    if out.is_empty() {
+        "chat".into()
+    } else {
+        out
+    }
 }
 
 /// The folder of chat `chat_id` under `base`: an existing `*-<id>` folder is reused, otherwise `<name>-<id>` is created.
@@ -31,7 +35,9 @@ fn scratch_in(base: &Path, chat_id: i64, name: &str) -> Result<PathBuf, String> 
     if let Ok(entries) = fs::read_dir(base) {
         for entry in entries.flatten() {
             let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name.ends_with(&suffix) && entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            if file_name.ends_with(&suffix)
+                && entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
+            {
                 return Ok(entry.path());
             }
         }
@@ -43,7 +49,11 @@ fn scratch_in(base: &Path, chat_id: i64, name: &str) -> Result<PathBuf, String> 
 
 #[tauri::command]
 pub fn scratch_dir(app: AppHandle, chat_id: i64, name: String) -> Result<String, String> {
-    let base = app.path().app_data_dir().map_err(|e| e.to_string())?.join("scratch");
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("scratch");
     scratch_in(&base, chat_id, &name).map(|p| p.to_string_lossy().to_string())
 }
 
@@ -53,13 +63,20 @@ mod tests {
 
     #[test]
     fn names_are_cleaned_and_folders_reused_per_chat() {
-        assert_eq!(clean("2026-10-06 Fix: the Parser!!"), "2026-10-06-fix-the-parser");
+        assert_eq!(
+            clean("2026-10-06 Fix: the Parser!!"),
+            "2026-10-06-fix-the-parser"
+        );
         assert_eq!(clean("../../etc"), "etc");
         assert_eq!(clean("Привет"), "chat");
         let tmp = tempfile::tempdir().unwrap();
         let a = scratch_in(tmp.path(), 7, "2026-10-06 notes").unwrap();
         assert!(a.ends_with("2026-10-06-notes-7") && a.is_dir());
-        assert_eq!(scratch_in(tmp.path(), 7, "other name").unwrap(), a, "same chat, same folder");
+        assert_eq!(
+            scratch_in(tmp.path(), 7, "other name").unwrap(),
+            a,
+            "same chat, same folder"
+        );
         assert_ne!(scratch_in(tmp.path(), 17, "x").unwrap(), a, "-17 is not -7");
         assert!(scratch_in(tmp.path(), 0, "x").is_err());
     }

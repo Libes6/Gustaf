@@ -22,18 +22,47 @@ pub struct Point {
 #[derive(Deserialize, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Action {
-    Click { x: i32, y: i32, #[serde(default)] button: Option<String> },
-    DoubleClick { x: i32, y: i32 },
-    Drag { path: Vec<Point> },
-    Move { x: i32, y: i32 },
+    Click {
+        x: i32,
+        y: i32,
+        #[serde(default)]
+        button: Option<String>,
+    },
+    DoubleClick {
+        x: i32,
+        y: i32,
+    },
+    Drag {
+        path: Vec<Point>,
+    },
+    Move {
+        x: i32,
+        y: i32,
+    },
     MouseDown,
     MouseUp,
-    Scroll { x: i32, y: i32, #[serde(default)] scroll_x: i32, #[serde(default)] scroll_y: i32 },
-    Keypress { keys: Vec<String> },
-    Type { text: String },
-    Wait { #[serde(default)] ms: Option<u64> },
+    Scroll {
+        x: i32,
+        y: i32,
+        #[serde(default)]
+        scroll_x: i32,
+        #[serde(default)]
+        scroll_y: i32,
+    },
+    Keypress {
+        keys: Vec<String>,
+    },
+    Type {
+        text: String,
+    },
+    Wait {
+        #[serde(default)]
+        ms: Option<u64>,
+    },
     /// Launches or activates an application by name (`open -a <name>`).
-    OpenApp { name: String },
+    OpenApp {
+        name: String,
+    },
     Screenshot,
 }
 
@@ -84,7 +113,10 @@ struct AccessibleElement {
 pub fn map_coords(x: i32, y: i32, shot: (u32, u32), display: (u32, u32)) -> (i32, i32) {
     let sx = display.0 as f64 / shot.0 as f64;
     let sy = display.1 as f64 / shot.1 as f64;
-    ((x as f64 * sx).round() as i32, (y as f64 * sy).round() as i32)
+    (
+        (x as f64 * sx).round() as i32,
+        (y as f64 * sy).round() as i32,
+    )
 }
 
 /// Maps display points back to screenshot pixels (inverse of `map_coords`).
@@ -110,18 +142,28 @@ fn primary() -> Result<Monitor, String> {
 }
 
 fn display_size(m: &Monitor) -> Result<(u32, u32), String> {
-    Ok((m.width().map_err(|e| e.to_string())?, m.height().map_err(|e| e.to_string())?))
+    Ok((
+        m.width().map_err(|e| e.to_string())?,
+        m.height().map_err(|e| e.to_string())?,
+    ))
 }
 
 fn grab(m: &Monitor) -> Result<RgbaImage, String> {
-    m.capture_image().map_err(|e| format!("screen capture failed (Screen Recording permission?): {e}"))
+    m.capture_image()
+        .map_err(|e| format!("screen capture failed (Screen Recording permission?): {e}"))
 }
 
 fn encode(raw: &RgbaImage, (w, h): (u32, u32)) -> Result<Shot, String> {
     let img = image::imageops::resize(raw, w, h, image::imageops::FilterType::Triangle);
     let mut png = Vec::new();
-    img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).map_err(|e| e.to_string())?;
-    Ok(Shot { png: STANDARD.encode(png), width: w, height: h, ..Default::default() })
+    img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(Shot {
+        png: STANDARD.encode(png),
+        width: w,
+        height: h,
+        ..Default::default()
+    })
 }
 
 /// Size of the grid a screen is reduced to for change detection.
@@ -148,7 +190,10 @@ pub fn thumb(width: usize, height: usize, rgba: &[u8]) -> Vec<u8> {
             count[cy * THUMB_W + cx] += 1;
         }
     }
-    sum.iter().zip(&count).map(|(s, c)| if *c == 0 { 0 } else { (s / c) as u8 }).collect()
+    sum.iter()
+        .zip(&count)
+        .map(|(s, c)| if *c == 0 { 0 } else { (s / c) as u8 })
+        .collect()
 }
 
 fn thumb_of(img: &RgbaImage) -> Vec<u8> {
@@ -207,7 +252,9 @@ pub fn valid_app_name(name: &str) -> Result<&str, String> {
         || n.contains(['/', '\\', ':'])
         || n.chars().any(char::is_control);
     if bad {
-        return Err(format!("invalid application name {name:?}: use the app's name, not a path or option"));
+        return Err(format!(
+            "invalid application name {name:?}: use the app's name, not a path or option"
+        ));
     }
     Ok(n)
 }
@@ -254,7 +301,11 @@ fn open_app(name: &str) -> Result<(), String> {
                     let _ = s.read_to_string(&mut err);
                 }
                 let err = err.trim();
-                return Err(if err.is_empty() { format!("could not open application {name:?}") } else { format!("could not open application {name:?}: {err}") });
+                return Err(if err.is_empty() {
+                    format!("could not open application {name:?}")
+                } else {
+                    format!("could not open application {name:?}: {err}")
+                });
             }
             None if Instant::now() > deadline => {
                 let _ = child.kill();
@@ -268,7 +319,9 @@ fn open_app(name: &str) -> Result<(), String> {
 /// The active application and the title of its frontmost window, from the on-screen window list (front to back).
 /// Bounded to the first 60 windows; titles need Screen Recording permission, like the screenshot itself.
 fn front_window() -> (Option<String>, Option<String>) {
-    let Ok(windows) = Window::all() else { return (None, None) };
+    let Ok(windows) = Window::all() else {
+        return (None, None);
+    };
     let mut app = None;
     for w in windows.iter().take(60) {
         if !w.is_focused().unwrap_or(false) {
@@ -303,14 +356,29 @@ fn key_of(name: &str) -> Key {
         "pageup" => Key::PageUp,
         "pagedown" => Key::PageDown,
         // "cmd" is the model's name for the main shortcut modifier: Command on macOS, Ctrl elsewhere.
-        "cmd" | "command" => if cfg!(target_os = "macos") { Key::Meta } else { Key::Control },
+        "cmd" | "command" => {
+            if cfg!(target_os = "macos") {
+                Key::Meta
+            } else {
+                Key::Control
+            }
+        }
         "meta" | "super" | "win" => Key::Meta,
         "ctrl" | "control" => Key::Control,
         "alt" | "option" => Key::Alt,
         "shift" => Key::Shift,
-        "f1" => Key::F1, "f2" => Key::F2, "f3" => Key::F3, "f4" => Key::F4,
-        "f5" => Key::F5, "f6" => Key::F6, "f7" => Key::F7, "f8" => Key::F8,
-        "f9" => Key::F9, "f10" => Key::F10, "f11" => Key::F11, "f12" => Key::F12,
+        "f1" => Key::F1,
+        "f2" => Key::F2,
+        "f3" => Key::F3,
+        "f4" => Key::F4,
+        "f5" => Key::F5,
+        "f6" => Key::F6,
+        "f7" => Key::F7,
+        "f8" => Key::F8,
+        "f9" => Key::F9,
+        "f10" => Key::F10,
+        "f11" => Key::F11,
+        "f12" => Key::F12,
         other => Key::Unicode(other.chars().next().unwrap_or(' ')),
     }
 }
@@ -323,13 +391,21 @@ fn scroll_lines(px: i32) -> i32 {
 /// Input is created on first use, so a batch with only `open_app`/`wait` does not need Accessibility permission.
 fn input(en: &mut Option<Enigo>) -> Result<&mut Enigo, String> {
     if en.is_none() {
-        *en = Some(Enigo::new(&Settings::default()).map_err(|e| format!("input unavailable (Accessibility permission?): {e}"))?);
+        *en = Some(
+            Enigo::new(&Settings::default())
+                .map_err(|e| format!("input unavailable (Accessibility permission?): {e}"))?,
+        );
     }
     Ok(en.as_mut().expect("just set"))
 }
 
 /// Performs the actions in order and stops at the first failure, returning its index and error.
-fn perform(actions: &[Action], shot: (u32, u32), display: (u32, u32), en: &mut Option<Enigo>) -> Result<(), (usize, String)> {
+fn perform(
+    actions: &[Action],
+    shot: (u32, u32),
+    display: (u32, u32),
+    en: &mut Option<Enigo>,
+) -> Result<(), (usize, String)> {
     for (i, a) in actions.iter().enumerate() {
         perform_one(a, shot, display, en).map_err(|e| (i, e))?;
         if i + 1 < actions.len() && !matches!(a, Action::Screenshot | Action::Wait { .. }) {
@@ -339,7 +415,12 @@ fn perform(actions: &[Action], shot: (u32, u32), display: (u32, u32), en: &mut O
     Ok(())
 }
 
-fn perform_one(a: &Action, shot: (u32, u32), display: (u32, u32), en: &mut Option<Enigo>) -> Result<(), String> {
+fn perform_one(
+    a: &Action,
+    shot: (u32, u32),
+    display: (u32, u32),
+    en: &mut Option<Enigo>,
+) -> Result<(), String> {
     match a {
         Action::Screenshot => return Ok(()),
         Action::Wait { ms } => {
@@ -383,7 +464,12 @@ fn perform_one(a: &Action, shot: (u32, u32), display: (u32, u32), en: &mut Optio
         Action::Move { x, y } => e(to(en, *x, *y))?,
         Action::MouseDown => e(en.button(Button::Left, Direction::Press))?,
         Action::MouseUp => e(en.button(Button::Left, Direction::Release))?,
-        Action::Scroll { x, y, scroll_x, scroll_y } => {
+        Action::Scroll {
+            x,
+            y,
+            scroll_x,
+            scroll_y,
+        } => {
             e(to(en, *x, *y))?;
             if *scroll_y != 0 {
                 e(en.scroll(scroll_lines(*scroll_y), Axis::Vertical))?;
@@ -422,17 +508,18 @@ pub async fn cu_execute(app: AppHandle, actions: Vec<Action>) -> Result<Shot, St
     let result = tauri::async_runtime::spawn_blocking(move || {
         sleep(Duration::from_millis(300));
         execute_batch(&actions)
-    }).await.map_err(|e| format!("desktop worker failed: {e}")).and_then(|v| v);
+    })
+    .await
+    .map_err(|e| format!("desktop worker failed: {e}"))
+    .and_then(|v| v);
     if let Some(w) = &win {
         restore_without_focus(w);
-
     }
     result.map(|mut shot| {
         shot.timings.total_ms = command_started.elapsed().as_millis() as u64;
         shot
     })
 }
-
 
 /// Tao's macOS `show()` calls makeKeyAndOrderFront, which steals focus even without set_focus.
 /// Restore visibility with NSWindow orderFront: on the main thread instead.
@@ -448,13 +535,20 @@ fn restore_without_focus(window: &tauri::WebviewWindow) {
                 fn objc_msgSend();
             }
             if let Ok(native) = w.ns_window() {
-                let send: unsafe extern "C" fn(*mut c_void, *const c_void, *const c_void) = std::mem::transmute(objc_msgSend as *const ());
-                send(native, sel_registerName(b"orderFront:\0".as_ptr().cast()), std::ptr::null());
+                let send: unsafe extern "C" fn(*mut c_void, *const c_void, *const c_void) =
+                    std::mem::transmute(objc_msgSend as *const ());
+                send(
+                    native,
+                    sel_registerName(b"orderFront:\0".as_ptr().cast()),
+                    std::ptr::null(),
+                );
             }
         });
     }
     #[cfg(not(target_os = "macos"))]
-    { let _ = window.show(); }
+    {
+        let _ = window.show();
+    }
 }
 
 fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
@@ -480,9 +574,18 @@ fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
         let settle_started = Instant::now();
         let opened = actions.iter().any(|a| matches!(a, Action::OpenApp { .. }));
         sleep(Duration::from_millis(if opened { 400 } else { 120 }));
-        let cfg = Settle { poll_ms: 60, stable_ms: 250, max_ms: if opened { 4000 } else { 2000 } };
+        let cfg = Settle {
+            poll_ms: 60,
+            stable_ms: 250,
+            max_ms: if opened { 4000 } else { 2000 },
+        };
         let t0 = Instant::now();
-        let waited = settle(&cfg, || grab(&m).map(|r| (thumb_of(&r), r)), || t0.elapsed().as_millis() as u64, |ms| sleep(Duration::from_millis(ms)));
+        let waited = settle(
+            &cfg,
+            || grab(&m).map(|r| (thumb_of(&r), r)),
+            || t0.elapsed().as_millis() as u64,
+            |ms| sleep(Duration::from_millis(ms)),
+        );
         let (raw, after, ok) = match waited {
             Ok(v) => v,
             // A capture failed while polling: fall back to a fixed wait; a second failure is the command's error.
@@ -508,7 +611,10 @@ fn execute_batch(actions: &[Action]) -> Result<Shot, String> {
     let (front_app, window_title) = front_window();
     shot.front_app = front_app;
     shot.window_title = window_title;
-    shot.cursor = input(&mut en).ok().and_then(|en| en.location().ok()).map(|(x, y)| unmap_coords(x, y, size, display));
+    shot.cursor = input(&mut en)
+        .ok()
+        .and_then(|en| en.location().ok())
+        .map(|(x, y)| unmap_coords(x, y, size, display));
     let ax_started = Instant::now();
     shot.elements = accessible_elements();
     timings.accessibility_ms = ax_started.elapsed().as_millis() as u64;
@@ -548,7 +654,11 @@ pub struct Permissions {
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 fn other_os_permissions(os: &str, wayland_display: bool, x11_display: bool) -> Permissions {
     let supported = os != "linux" || x11_display || !wayland_display;
-    Permissions { accessibility: supported, screen: supported, supported }
+    Permissions {
+        accessibility: supported,
+        screen: supported,
+        supported,
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -558,7 +668,11 @@ pub fn cu_permissions(request: bool) -> Permissions {
         if request && !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess();
         }
-        Permissions { accessibility: AXIsProcessTrusted(), screen: CGPreflightScreenCaptureAccess(), supported: true }
+        Permissions {
+            accessibility: AXIsProcessTrusted(),
+            screen: CGPreflightScreenCaptureAccess(),
+            supported: true,
+        }
     }
 }
 
@@ -652,7 +766,11 @@ mod tests {
 
     #[test]
     fn settle_waits_until_the_screen_is_stable() {
-        let cfg = || Settle { poll_ms: 60, stable_ms: 250, max_ms: 2000 };
+        let cfg = || Settle {
+            poll_ms: 60,
+            stable_ms: 250,
+            max_ms: 2000,
+        };
         // Already still: settles after ~250 ms with a handful of captures.
         let (n, ok, t) = run_settle(&[100], cfg());
         assert!(ok);
@@ -671,8 +789,17 @@ mod tests {
 
     #[test]
     fn settle_propagates_capture_errors() {
-        let cfg = Settle { poll_ms: 10, stable_ms: 50, max_ms: 100 };
-        let r = settle(&cfg, || Err::<(Vec<u8>, ()), _>("no permission".to_string()), || 0, |_| {});
+        let cfg = Settle {
+            poll_ms: 10,
+            stable_ms: 50,
+            max_ms: 100,
+        };
+        let r = settle(
+            &cfg,
+            || Err::<(Vec<u8>, ()), _>("no permission".to_string()),
+            || 0,
+            |_| {},
+        );
         assert_eq!(r.unwrap_err(), "no permission");
     }
 
@@ -681,7 +808,10 @@ mod tests {
         let p = other_os_permissions("windows", false, false);
         assert!(p.accessibility && p.screen && p.supported);
         assert!(other_os_permissions("linux", false, true).supported);
-        assert!(other_os_permissions("linux", true, true).supported, "XWayland session");
+        assert!(
+            other_os_permissions("linux", true, true).supported,
+            "XWayland session"
+        );
         let w = other_os_permissions("linux", true, false);
         assert!(!w.supported && !w.screen && !w.accessibility);
     }
@@ -692,7 +822,20 @@ mod tests {
         assert_eq!(valid_app_name("System Settings"), Ok("System Settings"));
         assert_eq!(valid_app_name("Safari.app"), Ok("Safari.app"));
         assert_eq!(valid_app_name("Почта"), Ok("Почта"));
-        for bad in ["", "  ", "-a", "--args", "/Applications/Safari.app", "../x", "~/Apps/x", ".hidden", "a\\b", "x:y", "a\nb", &"x".repeat(81)] {
+        for bad in [
+            "",
+            "  ",
+            "-a",
+            "--args",
+            "/Applications/Safari.app",
+            "../x",
+            "~/Apps/x",
+            ".hidden",
+            "a\\b",
+            "x:y",
+            "a\nb",
+            &"x".repeat(81),
+        ] {
             assert!(valid_app_name(bad).is_err(), "{bad:?} accepted");
         }
     }
@@ -704,11 +847,36 @@ mod tests {
                 {"type":"type","text":"hi"},{"type":"wait"},{"type":"scroll","x":3,"y":4,"scroll_y":-120},{"type":"screenshot"}]"#,
         )
         .unwrap();
-        assert_eq!(a[0], Action::OpenApp { name: "Telegram".into() });
-        assert_eq!(a[1], Action::Click { x: 1, y: 2, button: None });
-        assert_eq!(a[2], Action::Keypress { keys: vec!["cmd".into(), "f".into()] });
+        assert_eq!(
+            a[0],
+            Action::OpenApp {
+                name: "Telegram".into()
+            }
+        );
+        assert_eq!(
+            a[1],
+            Action::Click {
+                x: 1,
+                y: 2,
+                button: None
+            }
+        );
+        assert_eq!(
+            a[2],
+            Action::Keypress {
+                keys: vec!["cmd".into(), "f".into()]
+            }
+        );
         assert_eq!(a[4], Action::Wait { ms: None });
-        assert_eq!(a[5], Action::Scroll { x: 3, y: 4, scroll_x: 0, scroll_y: -120 });
+        assert_eq!(
+            a[5],
+            Action::Scroll {
+                x: 3,
+                y: 4,
+                scroll_x: 0,
+                scroll_y: -120
+            }
+        );
         assert_eq!(a[6], Action::Screenshot);
         assert!(serde_json::from_str::<Action>(r#"{"type":"open_app"}"#).is_err());
         assert!(serde_json::from_str::<Action>(r#"{"type":"shell","command":"rm"}"#).is_err());
@@ -716,7 +884,15 @@ mod tests {
 
     #[test]
     fn shot_serializes_camel_case_facts() {
-        let s = Shot { png: "x".into(), width: 2, height: 1, front_app: Some("Telegram".into()), cursor: Some((3, 4)), failed_step: Some(1), ..Default::default() };
+        let s = Shot {
+            png: "x".into(),
+            width: 2,
+            height: 1,
+            front_app: Some("Telegram".into()),
+            cursor: Some((3, 4)),
+            failed_step: Some(1),
+            ..Default::default()
+        };
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["frontApp"], "Telegram");
         assert_eq!(v["cursor"], serde_json::json!([3, 4]));
@@ -725,9 +901,10 @@ mod tests {
     }
 }
 
-
 #[cfg(not(target_os = "macos"))]
-fn accessible_elements() -> Vec<AccessibleElement> { Vec::new() }
+fn accessible_elements() -> Vec<AccessibleElement> {
+    Vec::new()
+}
 
 /// Read-only AX inspection. Never reads text-field values or performs actions. No permission prompt.
 #[cfg(target_os = "macos")]
@@ -757,47 +934,88 @@ fn accessible_elements() -> Vec<AccessibleElement> {
         let mut value = std::ptr::null();
         let status = AXUIElementCopyAttributeValue(element, key, &mut value);
         CFRelease(key);
-        if status == 0 { value } else { std::ptr::null() }
+        if status == 0 {
+            value
+        } else {
+            std::ptr::null()
+        }
     }
     unsafe fn string(element: Ref, name: &str) -> String {
         let value = attr(element, name);
-        if value.is_null() { return String::new(); }
+        if value.is_null() {
+            return String::new();
+        }
         let mut buf = [0i8; 1024];
-        let out = if CFGetTypeID(value) == CFStringGetTypeID() && CFStringGetCString(value, buf.as_mut_ptr(), buf.len() as isize, 0x08000100) {
-            std::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned()
-        } else { String::new() };
+        let out = if CFGetTypeID(value) == CFStringGetTypeID()
+            && CFStringGetCString(value, buf.as_mut_ptr(), buf.len() as isize, 0x08000100)
+        {
+            std::ffi::CStr::from_ptr(buf.as_ptr())
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            String::new()
+        };
         CFRelease(value);
         out
     }
-    unsafe fn walk(element: Ref, depth: usize, visited: &mut usize, deadline: Instant, out: &mut Vec<AccessibleElement>) {
-        if depth > 8 || *visited >= 100 || Instant::now() >= deadline { return; }
+    unsafe fn walk(
+        element: Ref,
+        depth: usize,
+        visited: &mut usize,
+        deadline: Instant,
+        out: &mut Vec<AccessibleElement>,
+    ) {
+        if depth > 8 || *visited >= 100 || Instant::now() >= deadline {
+            return;
+        }
         *visited += 1;
         AXUIElementSetMessagingTimeout(element, 0.05);
         let role = string(element, "AXRole");
         let mut label = string(element, "AXTitle");
-        if label.is_empty() { label = string(element, "AXDescription"); }
+        if label.is_empty() {
+            label = string(element, "AXDescription");
+        }
         if !label.is_empty() && role != "AXSecureTextField" && out.len() < 40 {
-            out.push(AccessibleElement { role, label: label.chars().take(120).collect() });
+            out.push(AccessibleElement {
+                role,
+                label: label.chars().take(120).collect(),
+            });
         }
         let children = attr(element, "AXChildren");
         if !children.is_null() {
             if CFGetTypeID(children) == CFArrayGetTypeID() {
                 for i in 0..CFArrayGetCount(children).min(100) {
-                    walk(CFArrayGetValueAtIndex(children, i), depth + 1, visited, deadline, out);
-                    if *visited >= 100 || Instant::now() >= deadline { break; }
+                    walk(
+                        CFArrayGetValueAtIndex(children, i),
+                        depth + 1,
+                        visited,
+                        deadline,
+                        out,
+                    );
+                    if *visited >= 100 || Instant::now() >= deadline {
+                        break;
+                    }
                 }
             }
             CFRelease(children);
         }
     }
     unsafe {
-        if !AXIsProcessTrusted() { return Vec::new(); }
+        if !AXIsProcessTrusted() {
+            return Vec::new();
+        }
         let system = AXUIElementCreateSystemWide();
         AXUIElementSetMessagingTimeout(system, 0.05);
         let app = attr(system, "AXFocusedApplication");
         let mut out = Vec::new();
         if !app.is_null() {
-            walk(app, 0, &mut 0, Instant::now() + Duration::from_millis(250), &mut out);
+            walk(
+                app,
+                0,
+                &mut 0,
+                Instant::now() + Duration::from_millis(250),
+                &mut out,
+            );
             CFRelease(app);
         }
         CFRelease(system);

@@ -24,7 +24,9 @@ pub enum Outcome {
     NewHasData,
     Renamed,
     /// Copied; `old_removed` is false when deleting the old folder afterwards failed (the copy is complete either way).
-    Copied { old_removed: bool },
+    Copied {
+        old_removed: bool,
+    },
     /// Nothing changed in the old folder.
     Failed(String),
 }
@@ -85,7 +87,11 @@ pub fn migrate_dir(old: &Path, new: &Path) -> Outcome {
 }
 
 /// [`migrate_dir`] with the first move attempt injectable (tests force the copy fallback with it).
-fn migrate_dir_with(old: &Path, new: &Path, rename: impl Fn(&Path, &Path) -> io::Result<()>) -> Outcome {
+fn migrate_dir_with(
+    old: &Path,
+    new: &Path,
+    rename: impl Fn(&Path, &Path) -> io::Result<()>,
+) -> Outcome {
     match fs::symlink_metadata(old) {
         Ok(m) if m.is_dir() => {}
         Ok(_) => return Outcome::Failed(format!("{} is not a folder", old.display())),
@@ -112,13 +118,18 @@ fn migrate_dir_with(old: &Path, new: &Path, rename: impl Fn(&Path, &Path) -> io:
         return Outcome::Renamed;
     }
     // Rename failed (another volume, permissions): copy into a temporary sibling, then put it in place.
-    let partial = new.with_file_name(format!("{}.migrating", new.file_name().and_then(|n| n.to_str()).unwrap_or("data")));
+    let partial = new.with_file_name(format!(
+        "{}.migrating",
+        new.file_name().and_then(|n| n.to_str()).unwrap_or("data")
+    ));
     let _ = fs::remove_dir_all(&partial);
     if let Err(e) = copy_tree(old, &partial).and_then(|_| fs::rename(&partial, new)) {
         let _ = fs::remove_dir_all(&partial);
         return Outcome::Failed(format!("copy failed: {e}"));
     }
-    Outcome::Copied { old_removed: fs::remove_dir_all(old).is_ok() }
+    Outcome::Copied {
+        old_removed: fs::remove_dir_all(old).is_ok(),
+    }
 }
 
 /// The folder an old build used next to `new` (Tauri puts every app folder at `<platform dir>/<identifier>`).
@@ -133,14 +144,20 @@ fn repair_worktrees(data: &Path) {
         if depth > 3 {
             return;
         }
-        let Ok(entries) = fs::read_dir(dir) else { return };
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
         for e in entries.flatten() {
             let path = e.path();
             if !e.file_type().is_ok_and(|t| t.is_dir()) {
                 continue;
             }
             if path.join(".git").is_file() {
-                let _ = std::process::Command::new("git").arg("-C").arg(&path).args(["worktree", "repair"]).output();
+                let _ = std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(&path)
+                    .args(["worktree", "repair"])
+                    .output();
             } else {
                 walk(&path, depth + 1);
             }
@@ -154,7 +171,11 @@ fn log(data: Option<&Path>, line: &str) {
     if let Some(dir) = data {
         use std::io::Write;
         if fs::create_dir_all(dir).is_ok() {
-            if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(dir.join("migration.log")) {
+            if let Ok(mut f) = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("migration.log"))
+            {
                 let _ = writeln!(f, "{line}");
             }
         }
@@ -164,7 +185,10 @@ fn log(data: Option<&Path>, line: &str) {
 /// The app folders Tauri resolves on desktop (`app_data_dir`, `app_local_data_dir`, `app_config_dir`), deduplicated.
 fn app_dirs() -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = Vec::new();
-    for base in [dirs::data_dir(), dirs::data_local_dir(), dirs::config_dir()].into_iter().flatten() {
+    for base in [dirs::data_dir(), dirs::data_local_dir(), dirs::config_dir()]
+        .into_iter()
+        .flatten()
+    {
         let dir = base.join(IDENTIFIER);
         if !out.contains(&dir) {
             out.push(dir);
@@ -177,15 +201,22 @@ fn app_dirs() -> Vec<PathBuf> {
 pub fn migrate_app_dirs() {
     let data = dirs::data_dir().map(|d| d.join(IDENTIFIER));
     for new in app_dirs() {
-        let Some(old) = old_dir_for(&new) else { continue };
+        let Some(old) = old_dir_for(&new) else {
+            continue;
+        };
         let outcome = migrate_dir(&old, &new);
         match &outcome {
             Outcome::NothingToMigrate => continue,
             Outcome::NewHasData => continue,
             _ => {}
         }
-        log(data.as_deref(), &format!("{} -> {}: {outcome:?}", old.display(), new.display()));
-        if matches!(outcome, Outcome::Renamed | Outcome::Copied { .. }) && data.as_deref() == Some(new.as_path()) {
+        log(
+            data.as_deref(),
+            &format!("{} -> {}: {outcome:?}", old.display(), new.display()),
+        );
+        if matches!(outcome, Outcome::Renamed | Outcome::Copied { .. })
+            && data.as_deref() == Some(new.as_path())
+        {
             repair_worktrees(&new);
         }
     }
@@ -202,7 +233,8 @@ mod tests {
 
     #[test]
     fn identifier_matches_the_tauri_config() {
-        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         assert_eq!(conf["identifier"], IDENTIFIER);
         assert_ne!(IDENTIFIER, OLD_IDENTIFIER);
     }
@@ -210,7 +242,10 @@ mod tests {
     #[test]
     fn old_dir_sits_next_to_the_new_one() {
         let new = Path::new("/base/support").join(IDENTIFIER);
-        assert_eq!(old_dir_for(&new), Some(Path::new("/base/support").join(OLD_IDENTIFIER)));
+        assert_eq!(
+            old_dir_for(&new),
+            Some(Path::new("/base/support").join(OLD_IDENTIFIER))
+        );
         assert_eq!(old_dir_for(Path::new("/base/other")), None);
     }
 
@@ -223,7 +258,10 @@ mod tests {
         assert_eq!(migrate_dir(&old, &new), Outcome::Renamed);
         assert!(!old.exists());
         assert_eq!(fs::read_to_string(new.join("app.db")).unwrap(), "db");
-        assert_eq!(fs::read_to_string(new.join("worktrees/a/b/file")).unwrap(), "x");
+        assert_eq!(
+            fs::read_to_string(new.join("worktrees/a/b/file")).unwrap(),
+            "x"
+        );
         // A second start finds nothing to do.
         assert_eq!(migrate_dir(&old, &new), Outcome::NothingToMigrate);
     }
@@ -276,7 +314,10 @@ mod tests {
         std::os::unix::fs::symlink("/nonexistent/target", from.join("dir/link")).unwrap();
         copy_tree(&from, &to).unwrap();
         assert_eq!(fs::read_to_string(to.join("dir/file")).unwrap(), "x");
-        assert_eq!(fs::read_link(to.join("dir/link")).unwrap(), Path::new("/nonexistent/target"));
+        assert_eq!(
+            fs::read_link(to.join("dir/link")).unwrap(),
+            Path::new("/nonexistent/target")
+        );
         assert!(from.join("dir/file").exists());
     }
 
@@ -287,10 +328,16 @@ mod tests {
         write(&old.join("app.db"), "db");
         write(&old.join("knowledge/k/index"), "i");
         let refuse = |_: &Path, _: &Path| Err(io::Error::other("cross-device"));
-        assert_eq!(migrate_dir_with(&old, &new, refuse), Outcome::Copied { old_removed: true });
+        assert_eq!(
+            migrate_dir_with(&old, &new, refuse),
+            Outcome::Copied { old_removed: true }
+        );
         assert!(!old.exists());
         assert_eq!(fs::read_to_string(new.join("app.db")).unwrap(), "db");
-        assert_eq!(fs::read_to_string(new.join("knowledge/k/index")).unwrap(), "i");
+        assert_eq!(
+            fs::read_to_string(new.join("knowledge/k/index")).unwrap(),
+            "i"
+        );
         assert!(!tmp.path().join(format!("{IDENTIFIER}.migrating")).exists());
     }
 

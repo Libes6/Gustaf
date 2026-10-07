@@ -39,7 +39,10 @@ pub fn parse_ps(out: &str) -> Vec<(u32, u32)> {
 
 #[cfg(unix)]
 fn process_table() -> Result<Vec<(u32, u32)>, String> {
-    let out = std::process::Command::new("ps").args(["-A", "-o", "pid=,ppid="]).output().map_err(|e| e.to_string())?;
+    let out = std::process::Command::new("ps")
+        .args(["-A", "-o", "pid=,ppid="])
+        .output()
+        .map_err(|e| e.to_string())?;
     if !out.status.success() {
         return Err("ps failed".into());
     }
@@ -72,7 +75,11 @@ pub fn kill_tree_below(app: u32, pid: u32) -> Result<Vec<u32>, String> {
     let mut table = table;
     for round in 0..5 {
         // Parents first: `descendants` lists children before parents, so walk it backwards.
-        let fresh: Vec<u32> = descendants(&table, pid).into_iter().rev().filter(|p| !frozen.contains(p)).collect();
+        let fresh: Vec<u32> = descendants(&table, pid)
+            .into_iter()
+            .rev()
+            .filter(|p| !frozen.contains(p))
+            .collect();
         if fresh.is_empty() {
             break;
         }
@@ -103,8 +110,15 @@ pub fn kill_tree_below(app: u32, pid: u32) -> Result<Vec<u32>, String> {
     if pid <= 4 || pid == app {
         return Err("refusing to kill that process".into());
     }
-    let out = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).output().map_err(|e| e.to_string())?;
-    if out.status.success() { Ok(vec![pid]) } else { Err(String::from_utf8_lossy(&out.stderr).trim().to_string()) }
+    let out = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(vec![pid])
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 /// One process of this app's tree, for Settings, Diagnostics. Read-only: nothing here can signal or change a process.
@@ -148,8 +162,21 @@ pub fn parse_snapshot(out: &str) -> Vec<ProcInfo> {
             let cpu = it.next()?.replace(',', ".").parse().ok()?;
             let rss_kb = it.next()?.parse().ok()?;
             let elapsed_secs = parse_etime(it.next()?);
-            let command: String = it.collect::<Vec<_>>().join(" ").chars().take(MAX_COMMAND).collect();
-            Some(ProcInfo { pid, ppid, cpu, rss_kb, elapsed_secs, command, is_app: false })
+            let command: String = it
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(MAX_COMMAND)
+                .collect();
+            Some(ProcInfo {
+                pid,
+                ppid,
+                cpu,
+                rss_kb,
+                elapsed_secs,
+                command,
+                is_app: false,
+            })
         })
         .collect()
 }
@@ -173,7 +200,10 @@ pub fn own_processes(all: Vec<ProcInfo>, app: u32) -> Vec<ProcInfo> {
 
 #[cfg(unix)]
 fn snapshot() -> Result<Vec<ProcInfo>, String> {
-    let out = std::process::Command::new("ps").args(["-A", "-o", "pid=,ppid=,pcpu=,rss=,etime=,args="]).output().map_err(|e| e.to_string())?;
+    let out = std::process::Command::new("ps")
+        .args(["-A", "-o", "pid=,ppid=,pcpu=,rss=,etime=,args="])
+        .output()
+        .map_err(|e| e.to_string())?;
     if !out.status.success() {
         return Err("ps failed".into());
     }
@@ -213,12 +243,24 @@ mod tests {
     #[test]
     fn descendants_are_deepest_first_and_exclude_the_root() {
         // 10 -> 11 -> 12 -> 13, 10 -> 14, 20 -> 21 (unrelated)
-        let table = [(1, 0), (10, 1), (11, 10), (12, 11), (13, 12), (14, 10), (20, 1), (21, 20)];
+        let table = [
+            (1, 0),
+            (10, 1),
+            (11, 10),
+            (12, 11),
+            (13, 12),
+            (14, 10),
+            (20, 1),
+            (21, 20),
+        ];
         let d = descendants(&table, 10);
         assert_eq!(d.len(), 4);
         assert!(!d.contains(&10) && !d.contains(&20) && !d.contains(&21));
         let pos = |p: u32| d.iter().position(|&x| x == p).unwrap();
-        assert!(pos(13) < pos(12) && pos(12) < pos(11), "children before parents: {d:?}");
+        assert!(
+            pos(13) < pos(12) && pos(12) < pos(11),
+            "children before parents: {d:?}"
+        );
         assert!(descendants(&table, 99).is_empty());
     }
 
@@ -234,7 +276,10 @@ mod tests {
         let out = " 42  1  3.5  20480  01:02:03 /usr/bin/node --token=abc def\n 43 42 0.0 10 2-00:00:01 sh\nbad\n";
         let p = parse_snapshot(out);
         assert_eq!(p.len(), 2);
-        assert_eq!((p[0].pid, p[0].ppid, p[0].rss_kb, p[0].elapsed_secs), (42, 1, 20480, 3723));
+        assert_eq!(
+            (p[0].pid, p[0].ppid, p[0].rss_kb, p[0].elapsed_secs),
+            (42, 1, 20480, 3723)
+        );
         assert_eq!(p[0].command, "/usr/bin/node --token=abc def");
         assert_eq!(p[1].elapsed_secs, 172_801);
         assert_eq!(parse_etime("05:09"), 309);
@@ -242,11 +287,29 @@ mod tests {
 
     #[test]
     fn the_snapshot_keeps_only_the_app_and_its_descendants() {
-        let mk = |pid, ppid| ProcInfo { pid, ppid, cpu: 0.0, rss_kb: 1, elapsed_secs: 1, command: String::new(), is_app: false };
+        let mk = |pid, ppid| ProcInfo {
+            pid,
+            ppid,
+            cpu: 0.0,
+            rss_kb: 1,
+            elapsed_secs: 1,
+            command: String::new(),
+            is_app: false,
+        };
         // 10 is the app: 10 -> 11 -> 12; 20 -> 21 belongs to somebody else; 1 is init.
-        let all = vec![mk(21, 20), mk(12, 11), mk(1, 0), mk(10, 1), mk(11, 10), mk(20, 1)];
+        let all = vec![
+            mk(21, 20),
+            mk(12, 11),
+            mk(1, 0),
+            mk(10, 1),
+            mk(11, 10),
+            mk(20, 1),
+        ];
         let own = own_processes(all, 10);
-        assert_eq!(own.iter().map(|p| p.pid).collect::<Vec<_>>(), vec![10, 11, 12]);
+        assert_eq!(
+            own.iter().map(|p| p.pid).collect::<Vec<_>>(),
+            vec![10, 11, 12]
+        );
         assert!(own[0].is_app && !own[1].is_app);
         assert!(own_processes(vec![mk(20, 1)], 10).is_empty());
     }
@@ -262,7 +325,10 @@ mod tests {
 
     #[test]
     fn parses_ps_output() {
-        assert_eq!(parse_ps("  1     0\n 42     1\nbad line\n"), vec![(1, 0), (42, 1)]);
+        assert_eq!(
+            parse_ps("  1     0\n 42     1\nbad line\n"),
+            vec![(1, 0), (42, 1)]
+        );
     }
 
     #[cfg(unix)]
@@ -276,7 +342,11 @@ mod tests {
         use std::process::{Command, Stdio};
         use std::time::{Duration, Instant};
         // sh runs two background sleeps (its children) and waits for them.
-        let mut child = Command::new("sh").args(["-c", "sleep 60 & sleep 60 & wait"]).stdout(Stdio::null()).spawn().unwrap();
+        let mut child = Command::new("sh")
+            .args(["-c", "sleep 60 & sleep 60 & wait"])
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
         let pid = child.id();
         let me = std::process::id();
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -287,18 +357,31 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(20));
         };
-        assert!(grandchildren.len() >= 2, "the shell should have started two sleeps");
+        assert!(
+            grandchildren.len() >= 2,
+            "the shell should have started two sleeps"
+        );
         assert!(kill_tree_below(me, 1).is_err(), "pid 1 is refused");
-        assert!(kill_tree_below(me, me).is_err(), "the app itself is refused");
+        assert!(
+            kill_tree_below(me, me).is_err(),
+            "the app itself is refused"
+        );
         let killed = kill_tree_below(me, pid).unwrap();
         assert!(killed.contains(&pid) && grandchildren.iter().all(|g| killed.contains(g)));
         child.wait().unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
-        while grandchildren.iter().any(|&g| alive(g) && !is_zombie(g)) && Instant::now() < deadline {
+        while grandchildren.iter().any(|&g| alive(g) && !is_zombie(g)) && Instant::now() < deadline
+        {
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert!(grandchildren.iter().all(|&g| !alive(g) || is_zombie(g)), "grandchildren are gone");
-        assert!(kill_tree_below(me, pid).is_err(), "a finished process is not ours any more");
+        assert!(
+            grandchildren.iter().all(|&g| !alive(g) || is_zombie(g)),
+            "grandchildren are gone"
+        );
+        assert!(
+            kill_tree_below(me, pid).is_err(),
+            "a finished process is not ours any more"
+        );
     }
 
     #[cfg(unix)]
@@ -308,7 +391,11 @@ mod tests {
         use std::time::{Duration, Instant};
         // A loop that starts a new sleep as soon as the old one dies: killed child-first it could respawn one.
         let marker = format!("{}.{}", 600 + std::process::id() % 100, 4242);
-        let mut child = Command::new("sh").args(["-c", &format!("while :; do sleep {marker}; done")]).stdout(Stdio::null()).spawn().unwrap();
+        let mut child = Command::new("sh")
+            .args(["-c", &format!("while :; do sleep {marker}; done")])
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
         let pid = child.id();
         let deadline = Instant::now() + Duration::from_secs(5);
         while descendants(&process_table().unwrap(), pid).is_empty() && Instant::now() < deadline {
@@ -317,15 +404,25 @@ mod tests {
         kill_tree_below(std::process::id(), pid).unwrap();
         child.wait().unwrap();
         std::thread::sleep(Duration::from_millis(200));
-        let out = Command::new("pgrep").args(["-f", &format!("sleep {marker}")]).output().unwrap();
-        let left: Vec<u32> = String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.trim().parse().ok()).filter(|&p| !is_zombie(p)).collect();
+        let out = Command::new("pgrep")
+            .args(["-f", &format!("sleep {marker}")])
+            .output()
+            .unwrap();
+        let left: Vec<u32> = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|l| l.trim().parse().ok())
+            .filter(|&p| !is_zombie(p))
+            .collect();
         assert!(left.is_empty(), "no sleep survives: {left:?}");
     }
 
     /// A killed grandchild stays a zombie until init reaps it; it is dead for our purposes.
     #[cfg(unix)]
     fn is_zombie(pid: u32) -> bool {
-        let out = std::process::Command::new("ps").args(["-o", "stat=", "-p", &pid.to_string()]).output().unwrap();
+        let out = std::process::Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output()
+            .unwrap();
         let s = String::from_utf8_lossy(&out.stdout);
         s.trim().is_empty() || s.trim().starts_with('Z')
     }

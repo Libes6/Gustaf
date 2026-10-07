@@ -22,7 +22,10 @@ impl Shell {
     }
 
     pub fn current() -> Shell {
-        Shell::pick(std::env::consts::OS, std::path::Path::new("/bin/bash").exists())
+        Shell::pick(
+            std::env::consts::OS,
+            std::path::Path::new("/bin/bash").exists(),
+        )
     }
 
     pub fn program(self) -> &'static str {

@@ -52,7 +52,12 @@ impl CommandBus {
     }
 
     /// Sends a command and waits for the answer.
-    pub async fn request(&self, kind: &str, payload: Value, wait: Duration) -> Result<Reply, BusError> {
+    pub async fn request(
+        &self,
+        kind: &str,
+        payload: Value,
+        wait: Duration,
+    ) -> Result<Reply, BusError> {
         let sink = lock(&self.sink).clone().ok_or(BusError::Unavailable)?;
         let id = self.next.fetch_add(1, Ordering::SeqCst) + 1;
         let (tx, rx) = oneshot::channel();
@@ -88,7 +93,15 @@ mod tests {
             let ok = kind != "fail";
             let data = payload.clone();
             tokio::spawn(async move {
-                bus.reply(id, Reply { ok, code: if ok { String::new() } else { "busy".into() }, message: String::new(), data });
+                bus.reply(
+                    id,
+                    Reply {
+                        ok,
+                        code: if ok { String::new() } else { "busy".into() },
+                        message: String::new(),
+                        data,
+                    },
+                );
             });
         }
     }
@@ -101,10 +114,20 @@ mod tests {
     async fn answers_reach_the_waiting_request() {
         let bus = Arc::new(CommandBus::default());
         bus.set_sink(Some(Arc::new(Echo(bus.clone()))));
-        let r = bus.request("send", serde_json::json!({"chatId": 3}), Duration::from_secs(2)).await.unwrap();
+        let r = bus
+            .request(
+                "send",
+                serde_json::json!({"chatId": 3}),
+                Duration::from_secs(2),
+            )
+            .await
+            .unwrap();
         assert!(r.ok);
         assert_eq!(r.data["chatId"], 3);
-        let r = bus.request("fail", Value::Null, Duration::from_secs(2)).await.unwrap();
+        let r = bus
+            .request("fail", Value::Null, Duration::from_secs(2))
+            .await
+            .unwrap();
         assert!(!r.ok);
         assert_eq!(r.code, "busy");
     }
@@ -112,10 +135,28 @@ mod tests {
     #[tokio::test]
     async fn no_webview_and_no_answer_are_distinct_errors() {
         let bus = Arc::new(CommandBus::default());
-        assert_eq!(bus.request("send", Value::Null, Duration::from_millis(50)).await.unwrap_err(), BusError::Unavailable);
+        assert_eq!(
+            bus.request("send", Value::Null, Duration::from_millis(50))
+                .await
+                .unwrap_err(),
+            BusError::Unavailable
+        );
         bus.set_sink(Some(Arc::new(Silent)));
-        assert_eq!(bus.request("send", Value::Null, Duration::from_millis(50)).await.unwrap_err(), BusError::Timeout);
+        assert_eq!(
+            bus.request("send", Value::Null, Duration::from_millis(50))
+                .await
+                .unwrap_err(),
+            BusError::Timeout
+        );
         // A late answer is ignored, not delivered to a later request.
-        assert!(!bus.reply(1, Reply { ok: true, code: String::new(), message: String::new(), data: Value::Null }));
+        assert!(!bus.reply(
+            1,
+            Reply {
+                ok: true,
+                code: String::new(),
+                message: String::new(),
+                data: Value::Null
+            }
+        ));
     }
 }
