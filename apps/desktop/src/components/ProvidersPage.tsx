@@ -5,6 +5,7 @@ import { deleteProvider, PRESETS, saveProvider } from "../providers";
 import { cliName, detectClis } from "../providers/cli";
 import { driverOf, DRIVER_NAMES, orderProviders, PINNED, type Driver } from "../providers/drivers";
 import type { CliId, ProviderConfig, ProviderKind } from "../providers/types";
+import { diagnose } from "../lib/providerDiagnostics";
 import { modelKey, useApp } from "../state";
 import { AddProviderDialog, type TileId } from "./AddProviderDialog";
 import { CursorAccounts } from "./CursorAccounts";
@@ -50,11 +51,12 @@ export function ProvidersPage() {
   const app = useApp();
   const status = useStatus();
   const [clis, setClis] = useState<Clis>([]);
+  const [clisLoaded, setClisLoaded] = useState(false);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState<{ tile?: TileId } | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => void detectClis().then(setClis, () => {}), []);
+  useEffect(() => void detectClis().then((c) => (setClis(c), setClisLoaded(true)), () => {}), []);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -125,6 +127,7 @@ export function ProvidersPage() {
             const p = r.p;
             const s = status(p);
             const v = p.kind === "cli" ? version(p.cli) : undefined;
+            const outdated = !p.disabled && diagnose({ health: app.providerHealth[p.id], now }).stale;
             return (
               <div key={r.key} role="listitem" className={`split-item${active ? " active" : ""}`} data-tone={s.tone}>
                 <button className="split-main" aria-current={active ? "true" : undefined} onClick={() => setSel(r.key)}>
@@ -133,7 +136,7 @@ export function ProvidersPage() {
                     <div className="t">{p.name} {v && <span className="mono d">v{v}</span>}</div>
                     <div className={`sub ${s.tone === "err" || s.tone === "warn" ? "err" : "d"}`} title={s.detail || undefined}>
                       <span className="status-dot" style={{ background: s.color }} />
-                      {s.label}{s.detail ? ` · ${s.detail.slice(0, 80)}` : ""}
+                      {s.label}{s.detail ? ` · ${s.detail.slice(0, 80)}` : ""}{outdated ? ` · ${t("provStaleShort")}` : ""}
                     </div>
                   </div>
                 </button>
@@ -144,7 +147,7 @@ export function ProvidersPage() {
         </div>
         <div className="split-detail">
           {current.p ? (
-            <ProviderDetail key={current.p.id} p={current.p} version={current.p.kind === "cli" ? version(current.p.cli) : undefined} update={update}
+            <ProviderDetail key={current.p.id} p={current.p} now={now} version={current.p.kind === "cli" ? version(current.p.cli) : undefined} cliFound={current.p.kind === "cli" && clisLoaded ? clis.some((c) => c.id === current.p!.cli) : undefined} update={update}
               onDuplicate={async (copy) => (await update(copy), setSel(copy.id))}
               onDeleted={() => setSel(null)} />
           ) : (
@@ -193,7 +196,7 @@ function UnsetDriver({ driver, cli, version, busy, onConnectCli, onAdd }: { driv
   );
 }
 
-function ProviderDetail({ p, version, update, onDuplicate, onDeleted }: { p: ProviderConfig; version?: string; update: (p: ProviderConfig, key?: string | null) => Promise<unknown>; onDuplicate: (copy: ProviderConfig) => void; onDeleted: () => void }) {
+function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDeleted }: { p: ProviderConfig; version?: string; now: number; cliFound?: boolean; update: (p: ProviderConfig, key?: string | null) => Promise<unknown>; onDuplicate: (copy: ProviderConfig) => void; onDeleted: () => void }) {
   const t = useT();
   const app = useApp();
   const [name, setName] = useState(p.name);
@@ -207,6 +210,7 @@ function ProviderDetail({ p, version, update, onDuplicate, onDeleted }: { p: Pro
   const allHidden = keys.length > 0 && keys.every((k) => app.hiddenModels.includes(k));
   const toggle = (list: string[], k: string, on: boolean) => (on ? [...list, k] : list.filter((x) => x !== k));
   const health = app.providerHealth[p.id];
+  const diag = diagnose({ disabled: p.disabled, health, listError: app.modelErrors[p.id], cliFound, now });
   const driver = driverOf(p);
   // The copy gets a new id and no key (copying would mean reading the Keychain); a browser-login Cursor account owns its profile folder, so it is not duplicated.
   const duplicate = () => {
@@ -235,13 +239,24 @@ function ProviderDetail({ p, version, update, onDuplicate, onDeleted }: { p: Pro
           <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
         </div>
       </div>
-      <div className="card">
-        <div className="card-row">
+      <div className="card" aria-label={t("provDiagnostics")}>
+        {p.kind === "cli" && (
+          <div className="card-row" data-testid="prov-version">
+            <div className="grow">
+              <div className="t">{t("provCliVersion")}</div>
+              {cliFound === false && <div className="err">{t("provCliNotFound", { name: cliName(p.cli!) })}</div>}
+            </div>
+            <span className="d mono">{version ? `v${version}` : cliFound === false ? t("provNotFoundShort") : "—"}</span>
+          </div>
+        )}
+        <div className="card-row" data-testid="prov-status">
           <div className="grow">
-            <div className="t">{t(health?.status === "auth" ? "provNotAuthenticated" : health?.status === "ok" ? "provAuthenticated" : health?.status === "error" ? "provUnavailable" : "provNotChecked")}</div>
+            <div className="t">{t(diag.state === "auth" ? "provNotAuthenticated" : diag.state === "ok" ? "provAuthenticated" : diag.state === "error" || diag.state === "cliMissing" ? "provUnavailable" : diag.state === "disabled" ? "providerOff" : "provNotChecked")}</div>
             <div className="d">{t("providerCheckHint")}</div>
-            {health?.message && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{health.message}</div>}
-            {health?.status === "auth" && p.kind === "cli" && <div className="d">{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>}
+            {diag.detail && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{diag.detail}</div>}
+            {diag.state === "auth" && p.kind === "cli" && <div className="d">{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>}
+            <div className="d" data-testid="prov-checked">{diag.checkedAt ? t("provLastChecked", { time: t.date(diag.checkedAt) }) : diag.state === "unchecked" || !health ? t("provNeverChecked") : t("provCheckedUnknown")}</div>
+            {diag.stale && <div className="err" role="status">{t("provStale")}</div>}
           </div>
           <button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button>
         </div>

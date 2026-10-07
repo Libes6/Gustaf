@@ -1741,5 +1741,14 @@
   "shortcutErrReserved": "Эта клавиша нужна для редактирования текста или системе, её нельзя занять.",
   "shortcutErrUnsupported": "Эту клавишу нельзя использовать.",
   "shortcutErrConflict": "Уже занято: «{name}» ({where}). Сначала измените его.",
-  "shortcutsNoMatch": "Нет сочетаний по запросу «{query}»."
+  "shortcutsNoMatch": "Нет сочетаний по запросу «{query}».",
+  "provDiagnostics": "Диагностика подключения",
+  "provCliVersion": "Версия CLI",
+  "provCliNotFound": "CLI {name} не найден на этом компьютере. Установите его и проверьте снова.",
+  "provLastChecked": "Последняя проверка: {time}",
+  "provNeverChecked": "Ещё не проверялось.",
+  "provCheckedUnknown": "Время последней проверки неизвестно.",
+  "provStale": "Статус мог устареть. Проверьте снова, чтобы убедиться.",
+  "provStaleShort": "устарело",
+  "provNotFoundShort": "Не найден"
 }

@@ -89,6 +89,30 @@ describe("ProvidersPage", () => {
     expect(within(row("OpenAI")).getByRole("switch")).toHaveAttribute("aria-checked", "true");
   });
 
+  it("detail shows when the status was last checked, marks an old one as outdated, and rechecks on demand", async () => {
+    const now = Date.now();
+    const app = makeApp({ providers: [openai, router], providerHealth: { [openai.id]: { status: "ok", message: "", at: now - 3 * 24 * 3600_000 }, [router.id]: { status: "error", message: "HTTP 503 from upstream", at: now - 60_000 } } });
+    renderApp(<ProvidersPage />, app);
+    expect(screen.getByTestId("prov-checked")).toHaveTextContent(/Last checked: /);
+    expect(screen.getByText(/may be outdated/)).toBeInTheDocument();
+    expect(row("OpenAI")).toHaveTextContent("outdated");
+    await userEvent.click(screen.getByRole("button", { name: "Check sign-in" }));
+    expect(app.checkProvider).toHaveBeenCalledWith(openai);
+    // one provider failing does not hide the others: the failure reason is on its own row and detail
+    expect(row("OpenRouter")).toHaveTextContent("Unavailable · HTTP 503 from upstream");
+    expect(row("OpenRouter")).not.toHaveTextContent("outdated");
+    await userEvent.click(within(row("OpenRouter")).getByRole("button"));
+    expect(screen.getByTestId("prov-status")).toHaveTextContent("HTTP 503 from upstream");
+    expect(screen.queryByText(/may be outdated/)).toBeNull();
+    expect(row("OpenAI")).toHaveTextContent("Authenticated");
+  });
+
+  it("a provider that was never checked says so", () => {
+    renderApp(<ProvidersPage />, makeApp({ providers: [openai] }));
+    expect(screen.getByTestId("prov-checked")).toHaveTextContent("Not checked yet.");
+    expect(screen.queryByText(/may be outdated/)).toBeNull();
+  });
+
   it("selecting a row shows that provider's details", async () => {
     renderApp(<ProvidersPage />, makeApp({ providers: [openai, router], models: [{ id: "or/model-x", name: "Model X", providerId: router.id, created: 0, firstSeen: 0 }] }));
     // The first configured provider is selected at first.

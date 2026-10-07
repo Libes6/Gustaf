@@ -1693,5 +1693,14 @@
   "shortcutErrReserved": "This key is used for text editing or by the system and cannot be taken over.",
   "shortcutErrUnsupported": "This key cannot be used.",
   "shortcutErrConflict": "Already used by “{name}” ({where}). Change that one first.",
-  "shortcutsNoMatch": "No shortcuts match “{query}”."
+  "shortcutsNoMatch": "No shortcuts match “{query}”.",
+  "provDiagnostics": "Connection diagnostics",
+  "provCliVersion": "CLI version",
+  "provCliNotFound": "The {name} CLI was not found on this computer. Install it, then check again.",
+  "provLastChecked": "Last checked: {time}",
+  "provNeverChecked": "Not checked yet.",
+  "provCheckedUnknown": "Time of the last check is unknown.",
+  "provStale": "This status may be outdated. Check again to be sure.",
+  "provStaleShort": "outdated",
+  "provNotFoundShort": "Not found"
 }
