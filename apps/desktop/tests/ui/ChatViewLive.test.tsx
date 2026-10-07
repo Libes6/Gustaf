@@ -118,7 +118,7 @@ describe("ChatView interactive send (shared run core)", () => {
     await waitFor(() => expect(app.setSessionBusy).toHaveBeenLastCalledWith("k", false));
     expect(app.setSessionBusy).toHaveBeenCalledWith("k", true);
     expect(inserted()).toEqual(["user", "assistant"]);
-    expect(app.recordTokens).toHaveBeenCalledWith("p1", "m1", usage);
+    expect(app.recordTokens).toHaveBeenCalledWith("p1", "m1", usage, undefined); // no effort level: the test model has none
     expect(app.bumpUsage).toHaveBeenCalledWith("p1");
     expect(app.recordProviderResult).toHaveBeenCalledWith("p1");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
