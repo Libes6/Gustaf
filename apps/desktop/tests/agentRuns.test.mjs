@@ -83,6 +83,17 @@ test('elapsed time and token formatting', () => {
   assert.equal(m.elapsed({ status: 'running', startedAt: 1000 }, 16_000, t), '15 s');
   assert.equal(m.elapsed({ status: 'completed', startedAt: 0 + 1, endedAt: 3_700_001 }, 9e9, t), '1 h 1 min');
   assert.equal(m.elapsed({ status: 'queued', startedAt: 0 }, 5000, t), '');
+  // A running timer keeps ticking past the hour mark; agents started at different times differ.
+  const at = (s0, now) => m.elapsed({ status: 'running', startedAt: s0 }, now, t);
+  assert.equal(at(1, 59_001), '59 s');
+  assert.equal(at(1, 60_001), '1 min 0 s');
+  assert.equal(at(1, 3_599_001), '59 min 59 s');
+  assert.equal(at(1, 3_600_001), '1 h 0 min 0 s');
+  assert.equal(at(1, 3_612_001), '1 h 0 min 12 s');
+  assert.equal(at(1, 3_613_001), '1 h 0 min 13 s');
+  assert.equal(at(1, 3 * 3_600_000 + 61_000), '3 h 1 min 0 s');
+  assert.notEqual(at(1, 3_700_000), at(30_001, 3_700_000));
+  assert.equal(m.elapsed({ status: 'completed', startedAt: 1, endedAt: 3_612_001 }, 9e9, t), '1 h 0 min');
   assert.equal(m.formatTokens(999), '999');
   assert.equal(m.formatTokens(1500), '1.5k');
   assert.equal(m.formatTokens(25_000), '25k');

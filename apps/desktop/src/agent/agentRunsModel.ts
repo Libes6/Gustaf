@@ -168,7 +168,8 @@ export const runTokens = (u?: { input: number; output: number }) => (u ? Math.ma
 /** Elapsed time of a run as `45 s` / `2 min 42 s` / `1 h 30 min` (see lib/formatDuration); queued runs show nothing. */
 export function elapsed(run: Pick<AgentRun, "status" | "startedAt" | "endedAt">, now: number, t: DurationT): string {
   if (run.status === "queued" || !run.startedAt) return "";
-  return formatDuration(((run.endedAt ?? now) - run.startedAt) / 1000, t);
+  // A running run keeps its seconds past the hour mark (`1 h 0 min 12 s`) so the timer never looks frozen.
+  return formatDuration(((run.endedAt ?? now) - run.startedAt) / 1000, t, { seconds: run.endedAt === undefined });
 }
 
 export const formatTokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n));
