@@ -44,6 +44,15 @@ describe("Settings", () => {
     unmount();
   });
 
+  it("General has no raw CLI events recorder (no developer block, no switch)", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    await waitFor(() => expect(page()).toHaveTextContent("General"));
+    expect(screen.queryByText("Developer")).toBeNull();
+    expect(screen.queryByText(/raw CLI events/i)).toBeNull();
+    expect(screen.queryByRole("switch", { name: /raw CLI/i })).toBeNull();
+  });
+
   it("English is the default UI language even when the system language is Russian", () => {
     const spy = vi.spyOn(navigator, "language", "get").mockReturnValue("ru-RU");
     expect(detectLocale()).toBe("en");

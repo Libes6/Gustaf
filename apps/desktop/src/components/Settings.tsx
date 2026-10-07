@@ -22,7 +22,6 @@ import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { AutoReviewSettings } from "./AutoReviewSettings";
 import { MemorySettings } from "./MemorySettings";
 import { AppearanceSettings } from "./AppearanceSettings";
-import { DeveloperSettings } from "./DeveloperSettings";
 import { CleanupSettings } from "./CleanupSettings";
 import { BudgetsSection } from "./Budgets";
 import { AgentSettingsSection } from "./AgentSettingsSection";
@@ -86,7 +85,6 @@ function General() {
       </div>
       <AppearanceSettings />
       <CleanupSettings />
-      <DeveloperSettings />
     <VoiceSettings /><WebSettings /><UpdaterPanel /></>
   );
 }
