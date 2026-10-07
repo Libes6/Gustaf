@@ -5,6 +5,7 @@ import { resumePoint, runScript, spawnLines } from "./cli";
 import { sidecarFailure, withImagePaths } from "./cliArgs";
 import { attachments } from "../lib/api";
 import type { Adapter, ProviderConfig, TurnInput } from "./types";
+import { pickLevel, reportedEffort, sdkEffort, specLevels } from "./reasoning";
 
 declare const __SIDECAR__: string;
 
@@ -28,17 +29,18 @@ async function call(req: object, onEvent: (e: any) => void, signal?: AbortSignal
 export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
   return {
     supportsComputer: false,
-    supportsReasoning: () => false,
+    supportsReasoning: (model) => specLevels(reportedEffort(cfg.id, model)).length > 0,
+    reasoningLevels: (model) => specLevels(reportedEffort(cfg.id, model)),
 
     async listModels() {
-      let list: { id: string; name: string }[] = [];
+      let list: { id: string; name: string; parameters?: unknown }[] = [];
       let error = "";
       await call({ type: "models", apiKey: await resolveKey(key) }, (e) => {
         if (e.type === "models") list = e.list;
         if (e.type === "error") error = e.message;
       });
       if (error) throw new Error(error);
-      return list.map((m) => ({ id: m.id, name: m.name, providerId: cfg.id, created: 0, tools: true, images: false }));
+      return list.map((m) => ({ id: m.id, name: m.name, providerId: cfg.id, created: 0, tools: true, images: false, effort: sdkEffort(m.parameters) }));
     },
 
     async turn(t: TurnInput) {
@@ -51,12 +53,16 @@ export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
       let text = "";
       const activities = new Map<string, Activity>();
       let error = "";
+      // The effort parameter the model reported, set to the chosen level (the nearest one the model offers).
+      const spec = reportedEffort(cfg.id, t.model);
+      const level = pickLevel(t.reasoning, specLevels(spec));
+      const params = spec && level ? [{ id: spec.param, value: spec.values[level]! }] : undefined;
       const emit = (s: string) => {
         text += s;
         t.onText(s);
       };
       await call(
-        { type: "send", apiKey: await resolveKey(key), model: t.model, cwd: t.cwd, agentId, prompt },
+        { type: "send", apiKey: await resolveKey(key), model: t.model, params, cwd: t.cwd, agentId, prompt },
         (e) => {
           if (e.type === "agent") agentId = e.agentId;
           else if (e.type === "text") emit(e.text);

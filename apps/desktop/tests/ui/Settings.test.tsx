@@ -112,4 +112,15 @@ describe("Settings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Русский" }));
     expect(app.setLocale).toHaveBeenCalledWith("ru");
   });
+
+  it("the usage page shows the effort level of a model's latest turn, and none for a model without one", async () => {
+    mockSettings({});
+    const stat = (model: string, level?: string) => ({ providerId: "p1", model, turns: 2, input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0, ...(level ? { level } : {}) });
+    const tokenStats = { "p1\nm1": stat("m1", "high"), "p1\nm2": stat("m2") } as never;
+    renderApp(<Settings />, makeApp({ settingsPage: "usage", providers: [provider()], tokenStats }));
+    const withLevel = (await screen.findByText("m1")).closest(".card-row") as HTMLElement;
+    expect(within(withLevel).getByTitle("Reasoning effort")).toHaveTextContent("High");
+    const without = screen.getByText("m2").closest(".card-row") as HTMLElement;
+    expect(within(without).queryByTitle("Reasoning effort")).not.toBeInTheDocument();
+  });
 });

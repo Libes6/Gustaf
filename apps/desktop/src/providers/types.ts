@@ -75,7 +75,9 @@ export type Msg = {
 export type ProviderKind = "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
 export type CliId = "claude" | "cursor-agent" | "codex";
 export type ProviderConfig = { id: string; kind: ProviderKind; name: string; baseUrl: string; cli?: CliId; cliAuth?: "key"; /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string; /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string; disabled?: boolean };
-export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean };
+/** How a model takes an effort level when its provider reports that per model (Cursor SDK parameters, OpenRouter `reasoning`): level -> provider value. */
+export type EffortSpec = { param: string; values: Partial<Record<Reasoning, string>> };
+export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean; effort?: EffortSpec };
 export type ToolDef = { name: string; description: string; parameters: Record<string, unknown> };
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max";
 /** Levels of an adapter that only says it supports reasoning (no `reasoningLevels`), weakest first. */

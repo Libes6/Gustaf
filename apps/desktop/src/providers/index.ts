@@ -6,6 +6,7 @@ import { cliAdapter } from "./cli";
 import { cursorAgent } from "./cursor";
 import { openaiCompatible } from "./openaiCompatible";
 import { openaiResponses } from "./openaiResponses";
+import { rememberEfforts } from "./reasoning";
 import type { Adapter, ModelInfo, ProviderConfig, ProviderKind } from "./types";
 
 export const PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean; keyUrl?: string }> = {
@@ -195,6 +196,7 @@ export async function listAllModels(all: ProviderConfig[], refresh: ModelRefresh
     const e = modelErrors.get(p.id);
     if (e) errors[p.id] = e;
   }
+  rememberEfforts(models);
   return { models, errors };
 }
 

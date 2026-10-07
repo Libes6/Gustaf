@@ -9,7 +9,7 @@ import { build } from 'esbuild';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const bundle = await build({
   stdin: {
-    contents: "export { anthropic } from './src/providers/anthropic.ts'; export { openaiCompatible } from './src/providers/openaiCompatible.ts'; export { openaiResponses } from './src/providers/openaiResponses.ts';",
+    contents: "export { anthropic } from './src/providers/anthropic.ts'; export { openaiCompatible } from './src/providers/openaiCompatible.ts'; export { openaiResponses } from './src/providers/openaiResponses.ts'; export { rememberEfforts } from './src/providers/reasoning.ts';",
     resolveDir: root, loader: 'ts',
   },
   bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
@@ -24,7 +24,7 @@ const bundle = await build({
     },
   }],
 });
-const { anthropic, openaiCompatible, openaiResponses } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const { anthropic, openaiCompatible, openaiResponses, rememberEfforts } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 
 const enc = new TextEncoder();
 const stream = (events, { failWith } = {}) => {
@@ -249,4 +249,33 @@ test('openaiResponses: levels above high are sent as high', async () => {
   const calls = mockFetch(ok(p.hello()));
   await p.make().turn(turnInput({ model: 'gpt-6', reasoning: 'max' }).input);
   assert.deepEqual(JSON.parse(calls[0].init.body).reasoning, { effort: 'high' });
+});
+
+test('openrouter: only models that list `reasoning` get a level, sent as reasoning.effort', async () => {
+  const p = providers.openaiCompatible;
+  const list = { data: [
+    { id: 'think', name: 'Think', supported_parameters: ['tools', 'reasoning'] },
+    { id: 'plain', name: 'Plain', supported_parameters: ['tools'] },
+    { id: 'bare', name: 'Bare' },
+  ] };
+  mockFetch(() => new Response(JSON.stringify(list), { status: 200 }));
+  const adapter = p.make();
+  rememberEfforts(await adapter.listModels());
+  assert.deepEqual(adapter.reasoningLevels('think'), ['low', 'medium', 'high']);
+  assert.equal(adapter.supportsReasoning('think'), true);
+  for (const id of ['plain', 'bare', 'unknown']) assert.deepEqual(adapter.reasoningLevels(id), [], id);
+  const bodyFor = async (model, reasoning) => {
+    const calls = mockFetch(ok(p.hello()));
+    await adapter.turn(turnInput({ model, reasoning }).input);
+    return JSON.parse(calls[0].init.body);
+  };
+  assert.deepEqual((await bodyFor('think', 'high')).reasoning, { effort: 'high' });
+  assert.deepEqual((await bodyFor('think', 'max')).reasoning, { effort: 'high' }, 'snapped to the model levels');
+  assert.equal((await bodyFor('plain', 'high')).reasoning, undefined, 'a model without effort gets no field');
+  assert.equal((await bodyFor('think', undefined)).reasoning, undefined);
+  // Another kind of OpenAI-compatible endpoint (Ollama...) never reports effort.
+  mockFetch(() => new Response(JSON.stringify(list), { status: 200 }));
+  const local = openaiCompatible({ id: 'local', kind: 'ollama', name: 'L', baseUrl: 'http://localhost:11434/v1' }, '');
+  rememberEfforts(await local.listModels());
+  assert.deepEqual(local.reasoningLevels('think'), []);
 });
