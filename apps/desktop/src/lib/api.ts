@@ -181,6 +181,9 @@ export type PublishInfo = {
   repo: boolean; branch: string | null; hasCommits: boolean; remotes: GitRemote[]; upstream: string | null;
   ahead: number | null; behind: number | null; remoteBranches: string[]; defaultBase: string | null; protected: boolean;
 };
+export type BranchEntry = { name: string; remote: boolean; current: boolean; checkedOutAt: string | null };
+export type BranchList = { repo: boolean; current: string | null; detached: boolean; head: string | null; branches: BranchEntry[]; truncated: boolean };
+export type SwitchResult = { branch: string | null; stashed: boolean; restored: boolean };
 export type PushResult = { remote: string; branch: string; output: string; info: PublishInfo };
 export type GhStatus = { installed: boolean; authenticated: boolean; detail: string };
 
@@ -195,6 +198,10 @@ export const gitRepo = {
   /** Pushes the current branch (never forced) to an existing remote; protected branches need `confirmProtected`. */
   push: (a: { root: string; remote: string; branch: string; setUpstream: boolean; confirmProtected: boolean }) => invoke<PushResult>("git_push", a),
   createBranch: (root: string, name: string) => invoke<string>("git_create_branch", { root, name }),
+  /** Local and remote branches (src-tauri/src/git_branches.rs). */
+  branches: (root: string) => invoke<BranchList>("git_branches", { root }),
+  /** Never forced. A dirty tree rejects with `dirty: <count>` unless `stash` (stash, switch, restore). */
+  switchBranch: (root: string, name: string, remote: boolean, stash: boolean) => invoke<SwitchResult>("git_switch_branch", { root, name, remote, stash }),
   ghStatus: (root: string) => invoke<GhStatus>("gh_status", { root }),
   /** Diff, stat and commit subjects of the branch against a remote-tracking base such as `origin/main`. */
   prContext: (root: string, baseRef: string, maxBytes?: number) => invoke<CommitContext>("git_pr_context", { root, baseRef, maxBytes }),

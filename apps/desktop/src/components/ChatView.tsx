@@ -40,6 +40,7 @@ import { chatWorkspace, resolveChatRoot } from "../lib/workspaces";
 import { useIsGitProject, usePrefix, useWorkspaces } from "../lib/workspaceStore";
 import { resolveReviewCopy } from "../lib/reviewCopy";
 import { Composer } from "./chat/Composer";
+import { BranchSwitcher } from "./chat/BranchSwitcher";
 import { BranchPicker } from "./chat/BranchPicker";
 import { BranchBar } from "./chat/BranchBar";
 import { LiveStatus } from "./chat/LiveStatus";
@@ -312,6 +313,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
         canRestore={messages.some(m => m.meta?.compacted)}
         onCompact={run.compact} onRestore={run.restoreContext}
       />
+      {project && root && <BranchSwitcher root={root} running={running} worktree={!!workspace} visible={visible} onChanged={run.bumpTick} />}
       {autoMemory.found && chat && autoMemory.found.chatId === chat.id && <MemorySuggestDialog chat={chat} project={project ?? null} initial={autoMemory.found.suggestions} onClose={autoMemory.dismiss} />}
     </main>
     </CanvasWorkspace>
