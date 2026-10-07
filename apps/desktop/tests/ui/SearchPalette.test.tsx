@@ -260,7 +260,7 @@ describe("SearchPalette", () => {
       type("parser");
       await settle();
       fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-      type("other");
+      type("unrelated");
       await settle();
       await act(async () => { release(page(ids(41, 80), { total: 80 })); });
       expect(rows()).toHaveLength(1);
@@ -308,7 +308,7 @@ describe("SearchPalette jumps", () => {
     expect(app.openChat).toHaveBeenCalledWith(12, null);
     expect(onClose).toHaveBeenCalled();
     fireEvent.change(input, { target: { value: "provid" } });
-    expect(screen.getByRole("option", { name: /Model providers/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: /Model providers/ })[0]).toBeInTheDocument();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(app.openSettings).toHaveBeenCalledWith("providers");
   });

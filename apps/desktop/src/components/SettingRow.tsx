@@ -5,7 +5,7 @@ import { useId, type ReactNode } from "react";
  * the control wraps under the text (flex-wrap, see `.setting-row` in theme.css). `id` makes the row a target of settings
  * search (`data-setting`, see lib/settingsIndex.ts). `toggle` renders the standard switch labelled by the title.
  */
-export function SettingRow({ id, title, description, toggle, children, stacked, className }: {
+export function SettingRow({ id, title, description, toggle, children, stacked, className, testId }: {
   id?: string;
   title: ReactNode;
   description?: ReactNode;
@@ -14,10 +14,11 @@ export function SettingRow({ id, title, description, toggle, children, stacked, 
   children?: ReactNode;
   stacked?: boolean;
   className?: string;
+  testId?: string;
 }) {
   const labelId = useId();
   return (
-    <div className={`card-row setting-row${stacked ? " stacked" : ""}${className ? ` ${className}` : ""}`} data-setting={id}>
+    <div className={`card-row setting-row${stacked ? " stacked" : ""}${className ? ` ${className}` : ""}`} data-setting={id} data-testid={testId}>
       <div className="grow setting-text">
         <div className="t" id={labelId}>{title}</div>
         {description ? <div className="d">{description}</div> : null}

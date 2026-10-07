@@ -3,6 +3,7 @@ import { openSession, promoteSession, isAuthError, type Sessions } from "./lib/c
 import type { Jump } from "./lib/searchUtil";
 import type { Access } from "./agent/agent";
 import { detectLocale, translate, type Locale } from "./i18n";
+import { checkProviders, runProviderCheck } from "./lib/providerCheck";
 import { getSetting, setSetting } from "./lib/api";
 import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
@@ -92,21 +93,23 @@ function useAppState() {
   const [providerHealth, setProviderHealth] = usePersisted<Record<string, ProviderHealth>>("providerHealth", {}, true);
   const [checkingProvider, setCheckingProvider] = useState<string | null>(null);
   const recordProviderResult = (id: string, message = "") => setProviderHealth(s => ({ ...s, [id]: { status: message ? isAuthError(message) ? "auth" : "error" : "ok", message, at: Date.now() } }));
+  // The check itself: a tiny turn on the provider; never throws, returns the text to record ("" = works).
+  const runCheck = (p: ProviderConfig) => runProviderCheck(async signal => {
+    const adapter = await getAdapter(p);
+    const model = selection?.providerId === p.id ? selection.model : models.find(m => m.providerId === p.id)?.id ?? "default";
+    bumpUsage(p.id);
+    const out = await adapter.turn({ system: "Reply OK. Do not use tools or access files.", messages: [{ role: "user", parts: [{ type: "text", text: "Reply OK" }] }], model, tools: [], access: "readonly", signal, onText: () => {}, onLimits: windows => recordLimits(p.id, windows) });
+    recordTokens(p.id, model, out.usage);
+  }, translate(locale, "providerCheckTimeout"));
   const checkProvider = async (p: ProviderConfig) => {
     if (checkingProvider) return;
     setCheckingProvider(p.id);
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 30000);
-    try {
-      const adapter = await getAdapter(p);
-      const model = selection?.providerId === p.id ? selection.model : models.find(m => m.providerId === p.id)?.id ?? "default";
-      bumpUsage(p.id);
-      const out = await adapter.turn({ system: "Reply OK. Do not use tools or access files.", messages: [{ role: "user", parts: [{ type: "text", text: "Reply OK" }] }], model, tools: [], access: "readonly", signal: ctl.signal, onText: () => {}, onLimits: windows => recordLimits(p.id, windows) });
-      recordTokens(p.id, model, out.usage);
-      if (ctl.signal.aborted) throw new Error("Проверка превысила 30 секунд");
-      recordProviderResult(p.id);
-    } catch (e) { recordProviderResult(p.id, ctl.signal.aborted ? "Проверка превысила 30 секунд" : String(e instanceof Error ? e.message : e)); }
-    finally { clearTimeout(timer); setCheckingProvider(null); }
+    try { recordProviderResult(p.id, await runCheck(p)); } finally { setCheckingProvider(null); }
+  };
+  /** Re-checks every enabled provider; each result is recorded on its own provider. */
+  const checkAllProviders = async () => {
+    if (checkingProvider) return;
+    await checkProviders(providers.filter(p => !p.disabled), runCheck, recordProviderResult, setCheckingProvider);
   };
   const [view, setView] = useState<"chat" | "settings">("chat");
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
@@ -164,7 +167,7 @@ function useAppState() {
     selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
-    activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkingProvider,
+    activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkAllProviders, checkingProvider,
     view, setView, settingsPage, openSettings, settingTarget, clearSettingTarget: () => setSettingTarget(null), sideHidden, setSideHidden,
   };
 }

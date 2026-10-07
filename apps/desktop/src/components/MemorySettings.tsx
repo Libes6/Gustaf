@@ -4,6 +4,7 @@ import { useApp } from "../state";
 import { getSetting, setSetting } from "../lib/api";
 import { editMemory, forget, listMemories, remember, type MemoryEntry, MEMORY_CAP } from "../agent/memory";
 import { MemoryExportDialog } from "./MemoryExportDialog";
+import { SettingRow } from "./SettingRow";
 
 /**
  * The list/add/edit/delete part of memory, shared by Settings -> Memory and the project menu's "Memory…" dialog. `root` is the
@@ -51,9 +52,11 @@ export function MemorySettings() {
   const toggle = async (key: string, value: boolean, set: (v: boolean) => void) => { setError(""); try { await setSetting(key, value); set(value); } catch (e) { setError(String(e)); } };
   const project = app.projects.find(p => p.path === root);
   return <><h1>{t("memoryTitle")}</h1><p className="lead">{t("memoryLead")}</p>
-    <div className="card"><div className="card-row"><span className="grow">{t("memoryEnabled")}</span><button className={`toggle${enabled ? " on" : ""}`} role="switch" aria-checked={enabled} aria-label={t("memoryEnabled")} onClick={() => toggle("memoryEnabled", !enabled, setEnabled)} /></div>
-    <div className="card-row"><span className="grow">{t("memoryApproval")}</span><button className={`toggle${approval ? " on" : ""}`} role="switch" aria-checked={approval} aria-label={t("memoryApproval")} onClick={() => toggle("memoryApproval", !approval, setApproval)} /></div>
-    <div className="card-row"><span className="grow">{t("memorySuggestAuto")}<div className="muted">{t("memorySuggestAutoHint")}</div></span><button className={`toggle${auto ? " on" : ""}`} role="switch" aria-checked={auto} aria-label={t("memorySuggestAuto")} onClick={() => toggle("memorySuggestAuto", !auto, setAuto)} /></div></div>
+    <div className="card">
+      <SettingRow id="memoryEnabled" title={t("memoryEnabled")} toggle={{ on: enabled, onChange: (v) => void toggle("memoryEnabled", v, setEnabled) }} />
+      <SettingRow id="memoryApproval" title={t("memoryApproval")} toggle={{ on: approval, onChange: (v) => void toggle("memoryApproval", v, setApproval) }} />
+      <SettingRow id="memorySuggestAuto" title={t("memorySuggestAuto")} description={t("memorySuggestAutoHint")} toggle={{ on: auto, onChange: (v) => void toggle("memorySuggestAuto", v, setAuto) }} />
+    </div>
     {error && <div className="error-box" role="alert">{error}</div>}
     <label htmlFor="memory-scope">{t("memoryScope")}</label><select id="memory-scope" className="input" value={root ?? ""} onChange={e => setRoot(e.target.value || null)}><option value="">{t("memoryGlobal")}</option>{app.projects.filter(p => p.path).map(p => <option key={p.id} value={p.path!}>{p.name}</option>)}</select>
     <MemoryEditor root={root} name={project?.name} />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { buildPairingUri, countdown, formatCode, groupFingerprint, qrMatrix, qrPath } from "../lib/mobilePairing";
+import { SettingRow } from "./SettingRow";
 import { mobileServer, type MobileDevice, type MobileStatus } from "../lib/mobileServer";
 
 const POLL_MS = 2000;
@@ -77,28 +78,12 @@ export function MobileSettings() {
       <h1>{t("mobileTitle")}</h1>
       <p className="lead">{t("mobileLead")}</p>
       <div className="card">
-        <div className="card-row">
-          <div className="grow">
-            <div className="t">{t("mobileSwitch")}</div>
-            <div className="d">{running ? t("mobileListening", { host: status?.host ?? "", port: status?.port ?? 0 }) : t("mobileOff")}</div>
-          </div>
-          <button
-            role="switch"
-            aria-checked={running}
-            aria-label={t("mobileSwitch")}
-            className={`toggle${running ? " on" : ""}`}
-            disabled={busy || !status || portInvalid}
-            onClick={() => void run(() => (running ? mobileServer.stop() : mobileServer.start(portNumber)))}
-          />
-        </div>
+        <SettingRow id="mobileSwitch" title={t("mobileSwitch")} description={running ? t("mobileListening", { host: status?.host ?? "", port: status?.port ?? 0 }) : t("mobileOff")}
+          toggle={{ on: running, disabled: busy || !status || portInvalid, onChange: () => void run(() => (running ? mobileServer.stop() : mobileServer.start(portNumber))) }} />
         <div className="card-row">
           <div className="grow d" role="note">{t("mobileWarning")}</div>
         </div>
-        <div className="card-row">
-          <label className="grow" htmlFor="mobile-port">
-            <div className="t">{t("mobilePort")}</div>
-            <div className="d">{t("mobilePortHint")}</div>
-          </label>
+        <SettingRow id="mobilePort" title={<label htmlFor="mobile-port">{t("mobilePort")}</label>} description={t("mobilePortHint")}>
           <input
             id="mobile-port"
             className="input"
@@ -110,14 +95,9 @@ export function MobileSettings() {
             aria-invalid={portInvalid}
             onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))}
           />
-        </div>
+        </SettingRow>
         {running && status?.fingerprint && (
-          <div className="card-row">
-            <div className="grow">
-              <div className="t">{t("mobileFingerprint")}</div>
-              <div className="d" style={{ fontFamily: "var(--mono, monospace)", wordBreak: "break-all" }}>{groupFingerprint(status.fingerprint)}</div>
-            </div>
-          </div>
+          <SettingRow id="mobileFingerprint" title={t("mobileFingerprint")} description={<span style={{ fontFamily: "var(--mono, monospace)", wordBreak: "break-all" }}>{groupFingerprint(status.fingerprint)}</span>} />
         )}
       </div>
       {error && <div className="error-box" role="alert">{error}</div>}
@@ -143,10 +123,9 @@ export function MobileSettings() {
                 </div>
               </div>
             ) : (
-              <div className="card-row">
-                <div className="grow d">{expired ? t("mobileCodeExpired") : t("mobileNoCode")}</div>
+              <SettingRow id="mobileShowQr" title={t("mobileShowQr")} description={expired ? t("mobileCodeExpired") : t("mobileNoCode")}>
                 <button className="btn-soft" disabled={busy} onClick={() => void run(() => mobileServer.pairingStart())}>{t("mobileShowQr")}</button>
-              </div>
+              </SettingRow>
             )}
           </div>
         </>
@@ -156,17 +135,11 @@ export function MobileSettings() {
       <div className="card">
         {!devices.length && <div className="card-row d">{t("mobileNoDevices")}</div>}
         {devices.map((d) => (
-          <div key={d.id} className="card-row">
-            <div className="grow">
-              <div className="t">{d.name}</div>
-              <div className="d">
-                {t("mobileDevicePaired", { date: t.date(d.createdAt) })} · {d.lastSeenAt ? t("mobileDeviceSeen", { date: t.date(d.lastSeenAt) }) : t("mobileDeviceNeverSeen")}
-              </div>
-            </div>
+          <SettingRow key={d.id} title={d.name} description={<>{t("mobileDevicePaired", { date: t.date(d.createdAt) })} · {d.lastSeenAt ? t("mobileDeviceSeen", { date: t.date(d.lastSeenAt) }) : t("mobileDeviceNeverSeen")}</>}>
             <button className="btn-soft" disabled={busy} aria-label={t("mobileRevokeLabel", { name: d.name })} onClick={() => void run(async () => { await mobileServer.revoke(d.id); })}>
               {t("mobileRevoke")}
             </button>
-          </div>
+          </SettingRow>
         ))}
       </div>
     </>

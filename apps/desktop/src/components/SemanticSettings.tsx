@@ -1,3 +1,4 @@
+import { SettingRow } from "./SettingRow";
 import { useEffect, useState } from "react";
 import { useApp } from "../state";
 import { useT } from "../i18n";
@@ -14,7 +15,7 @@ export function SemanticSettings() {
  return <><h4>{ru?"Поиск по смыслу в проекте":"Semantic project search"}</h4><p className="lead">{ru?"Выключен по умолчанию. При включении исходники отправляются выбранному endpoint для embeddings. Ollama работает локально; облачный endpoint может тарифицировать запросы. Игнорируемые и скрытые файлы, .env, ключи и бинарные файлы не индексируются. Не скачивает модель автоматически.":"Disabled by default. Source chunks are sent to your selected embeddings endpoint. Ollama runs locally; cloud providers may bill requests. Ignored/hidden files, .env, keys and binaries are excluded. Models are not downloaded automatically."}</p>
  {!projects.length?<p>{ru?"Сначала добавьте проект":"Add a project first"}</p>:<>
  <select className="input" aria-label={ru?"Проект для поиска":"Search project"} value={root} disabled={busy} onChange={e=>setRoot(e.target.value)}>{projects.map(p=><option key={p.id} value={p.path!}>{p.name}</option>)}</select>
- <label className="card-row"><span className="grow">{ru?"Разрешить embeddings для проекта":"Enable embeddings for this project"}</span><input type="checkbox" checked={config.enabled} disabled={busy} onChange={e=>setConfig({...config,enabled:e.target.checked})}/></label>
+ <SettingRow id="semanticEnable" title={t("semanticEnable")}><input type="checkbox" aria-label={t("semanticEnable")} checked={config.enabled} disabled={busy} onChange={e=>setConfig({...config,enabled:e.target.checked})}/></SettingRow>
  <label>{ru?"Провайдер":"Provider"}</label><select className="input" value={config.kind} disabled={busy} onChange={e=>setConfig({...config,kind:e.target.value as "ollama"|"openai",endpoint:e.target.value==="ollama"?"http://127.0.0.1:11434":"https://api.openai.com/v1",model:e.target.value==="ollama"?"embeddinggemma":"text-embedding-3-small"})}><option value="ollama">Ollama (local)</option><option value="openai">OpenAI-compatible</option></select>
  <label htmlFor="semantic-endpoint">Endpoint</label><input className="input" id="semantic-endpoint" value={config.endpoint} disabled={busy} onChange={e=>setConfig({...config,endpoint:e.target.value})}/>
  <label htmlFor="semantic-model">{ru?"Модель embeddings":"Embeddings model"}</label><input className="input" id="semantic-model" value={config.model} disabled={busy} onChange={e=>setConfig({...config,model:e.target.value})}/>
