@@ -3,6 +3,7 @@ import { afterTurn, fromNativeStatus, goalPrompt, isContinuation, newGoal, newNa
 import { getGoal, loadGoal, setGoal, subscribeGoals } from "./goalStore";
 import { parseWatchCommand, startPrWatch } from "./prWatch";
 import { getQueue, loadQueue, subscribeQueue, updateQueue } from "./chatQueue";
+import { followUpPlan, leadingClarifications, nextQueued, resolveFollowUp } from "./followUp";
 import { claimChat, chatBusy, subscribeChatCoordinator } from "./chatCoordinator";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatMode } from "../agent/planCore";
@@ -126,16 +127,18 @@ export function useChatRun(o: Options) {
   const scopeLatest = useRef(session.key); scopeLatest.current = session.key;
   useEffect(() => { if (session.chatId) void loadQueue(session.chatId).catch(e => setError(String(e))); }, [session.chatId]);
   useEffect(() => {
-    if (!session.chatId || !queue || queue.paused || running || coordinatorBusy || draining.current || abortRef.current || !loaded || !queue.items.length) return;
+    const item = nextQueued(queue, { running, coordinatorBusy, draining: draining.current, aborting: !!abortRef.current, loaded });
+    if (!session.chatId || !item) return;
     const queueChatId = session.chatId; const queueScope = session.key;
     draining.current = true;
-    const item = queue.items[0];
     void (async () => {
       const base = await loadMessages(queueChatId);
       if (scopeLatest.current !== queueScope) return;
       await sendLatest.current(false, { text: item.text, images: item.images, base, queuedId: item.id });
     })().catch(e => setError(String(e))).finally(() => { draining.current = false; });
   }, [queue, running, coordinatorBusy, loaded]);
+  // A running turn can take a clarification only for providers whose agent loop reads them (not the CLI or Cursor agents) and tool-capable models.
+  const canClarify = ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor";
   async function enqueue(clarify = false) {
     if (!session.chatId || (!text.trim() && !images.length)) return;
     try { await updateQueue(session.chatId, q => ({ ...q, items: [...q.items, { id: crypto.randomUUID(), text, images: [...images], clarify }], paused: q.interrupted && !running ? true : q.items.length ? q.paused : false })); } catch (e) { setError(String(e)); return; }
@@ -190,11 +193,12 @@ export function useChatRun(o: Options) {
     return () => { removeEventListener("keydown", stopKey); removeEventListener("gustaf-stop", stopGlobal); };
   }, [o.visible, approval, external]);
 
-  async function send(retry = false, edit?: Edit) {
+  /** `opposite`: the other-action shortcut was used (the message steers instead of queueing, or the reverse). Only matters while a run is going. */
+  async function send(retry = false, edit?: Edit, opposite = false) {
     const body = (edit?.text ?? text).trim();
     const imgs = edit?.images ?? images;
     const prior = edit?.base ?? messages;
-    if (!edit && (running || coordinatorBusy)) return enqueue();
+    if (!edit && (running || coordinatorBusy)) return enqueue(resolveFollowUp(app.followUp, opposite, canClarify) === "steer");
     if ((!retry && !body && !imgs.length) || ownRunning || !loaded || abortRef.current) return;
     if (external) return setError(busyError.current = t("scheduledChatBusy", { title: external.title }));
     if (!provider || !app.selection) return app.openSettings("providers");
@@ -342,7 +346,7 @@ export function useChatRun(o: Options) {
           const q = getQueue(cid);
           if (!q || q.paused) return [];
           // Preserve FIFO: only a leading clarification may join this run.
-          const pending: NonNullable<ReturnType<typeof getQueue>>["items"] = []; for (const item of q.items) { if (!item.clarify) break; pending.push(item); }
+          const pending = leadingClarifications(q.items);
           steeringIds = pending.map(i => i.id);
           return Promise.all(pending.map(async i => ({ role: "user" as const, parts: [{ type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) }, ...i.images.map(data => ({ type: "image" as const, data }))] })));
         } : undefined,
@@ -618,5 +622,5 @@ export function useChatRun(o: Options) {
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  return { canClarify: ownRunning && o.mode === "agent" && selectedModel?.tools !== false && !provider?.cli && provider?.kind !== "cli" && provider?.kind !== "cursor", queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest, stop, requestStop, compact, restoreContext, restartSession, rewind };
+  return { canClarify, followUp: followUpPlan(app.followUp, canClarify), queue, enqueue, changeQueue, resendFrom, removeMessages, branchFrom, stream, error, setError, running, ownRunning, approval, secretRequest, toolResults, activities, retryNotice, live, tick, bumpTick, send, retryRequest, stop, requestStop, compact, restoreContext, restartSession, rewind };
 }

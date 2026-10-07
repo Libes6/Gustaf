@@ -843,3 +843,4 @@ button:disabled { cursor:default; opacity:.45; }
 .file-row .viewed-box { flex: none; margin: 0 6px 0 2px; accent-color: var(--accent); }
 .file-row.viewed .path { color: var(--text-3); }
 .chat-muted-mark { flex: none; color: var(--text-3); margin-right: 2px; }
+.composer-bar .followup-hint { flex: 1 1 100%; text-align: right; font-size: 11px; color: var(--text-3); }

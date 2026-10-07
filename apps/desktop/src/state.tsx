@@ -10,6 +10,7 @@ import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./p
 import { readSubscriptionLimits } from "./providers/limits";
 import { worktrees } from "./lib/worktrees";
 import { removeLegacyReviewOverrides } from "./lib/reviewCopy";
+import { DEFAULT_FOLLOW_UP, normalizeFollowUp, type FollowUpAction } from "./lib/followUp";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
 
 export type Model = ModelInfo & { firstSeen: number };
@@ -49,6 +50,8 @@ function useAppState() {
   const [access, setAccess] = usePersisted<Access>("access", "auto", true);
   const [computerUse, setComputerUse] = usePersisted("computerUse", false, true);
   const [reviewCopy, setReviewCopy] = usePersisted<boolean>("reviewCopy", false, true);
+  const [followUp, setFollowUpRaw] = usePersisted<FollowUpAction>("followUpMode", DEFAULT_FOLLOW_UP, true);
+  const setFollowUp = (v: FollowUpAction) => setFollowUpRaw(normalizeFollowUp(v));
   const [favorites, setFavorites] = usePersisted<string[]>("favorites", [], true);
   const [hiddenModels, setHiddenModels] = usePersisted<string[]>("hiddenModels", [], true);
   const [checkedAt, setCheckedAt] = useState(0);
@@ -164,7 +167,7 @@ function useAppState() {
   return {
     ready: localeLoaded && onboardedLoaded,
     locale, setLocale, onboarded, setOnboarded,
-    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy,
+    selection, setSelection, reasoning, setReasoning, access, setAccess, computerUse, setComputerUse, reviewCopy, setReviewCopy, followUp: normalizeFollowUp(followUp), setFollowUp,
     favorites, setFavorites, hiddenModels, setHiddenModels, checkedAt, allowlist, setAllowlist, sections, setSections, usage, bumpUsage, tokenStats, recordTokens, limits, recordLimits, refreshLimits, loadingLimits, limitErrors,
     projects, chats, reload, providers, models: shownModels, modelErrors, refreshModels, ensureModels,
     activeChat, draftProject, sessions, setSessionBusy, openChat, openChatAt, jump, clearJump, newChat, promoteChat, providerHealth, recordProviderResult, checkProvider, checkAllProviders, checkingProvider,

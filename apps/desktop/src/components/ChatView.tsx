@@ -307,7 +307,7 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
           linkedBranch: resolved.state === "workspace" ? resolved.info.branch : workspace?.branch ?? undefined,
         }}
         provider={provider} selectedModel={selectedModel} modelName={modelName} supports={supports}
-        running={running} mode={mode} onModeChange={setMode} onSend={() => run.send()} onFanOut={startFanOut} onStop={run.requestStop}
+        running={running} mode={mode} onModeChange={setMode} onSend={(opposite) => run.send(false, undefined, opposite === true)} followUp={run.followUp} onFanOut={startFanOut} onStop={run.requestStop}
         contextTokens={contextTokens} lastInput={lastInput}
         canCompact={!(running || !loaded || messages.length < 4 || !provider)}
         canRestore={messages.some(m => m.meta?.compacted)}
