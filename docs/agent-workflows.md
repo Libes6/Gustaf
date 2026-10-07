@@ -15,9 +15,7 @@ Computer Use result data includes time spent in actions, settling, capture, enco
 Release provisioning and platform checks: [release.md](release.md).
 
 
-## Voice, screenshots, search and preview
-
-Settings → General → Voice selects an existing OpenAI-compatible provider and transcription model. Record with the microphone button, stop, then choose transcription or discard. Recording is limited to 60 seconds/16 MB. Transcription goes to the displayed provider and is appended to the draft; it never sends a chat message automatically. macOS asks for microphone access. CLI subscriptions do not supply a transcription endpoint.
+## Screenshots, search and preview
 
 Paste an image into the composer or choose Take screenshot from the plus menu. Captures become ordinary attachments, with model image support checked before sending.
 

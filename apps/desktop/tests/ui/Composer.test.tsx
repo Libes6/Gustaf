@@ -318,9 +318,9 @@ describe("Composer", () => {
     );
     const bar = container.querySelector(".composer-bar")!;
     expect(bar.querySelector(".composer-mode")).toHaveTextContent("Agent");
-    // Keyboard (DOM) order: attach menu, access, context ring, model, voice input, send.
+    // Keyboard (DOM) order: attach menu, access, context ring, model, send.
     expect(within(bar as HTMLElement).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
-      "Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Voice input", "Send",
+      "Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Send",
     ]);
     expect(screen.queryByText(/Computer use/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Review copy/i)).not.toBeInTheDocument();

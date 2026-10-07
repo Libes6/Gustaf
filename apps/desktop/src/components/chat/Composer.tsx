@@ -1,6 +1,5 @@
 import { freezeChat, shortenChat, splitComposerText, joinComposerText, isLargePaste, pasteStats, CHAT_REFERENCE_LIMIT, type ChatReference, type PastedText } from "../../lib/chatContext";
 import { loadMessages, type Chat } from "../../lib/data";
-import { VoiceInput } from "../VoiceInput";
 import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
@@ -416,7 +415,6 @@ export function Composer(p: Props) {
               {effortMenu.node}
             </div>
             <div className="composer-actions">
-            <VoiceInput key={p.scopeKey ?? root ?? "global"} disabled={p.running || !p.visible} onText={value => setText((taRef.current?.value || "") + ((taRef.current?.value || "").trim() ? " " : "") + value)} />
             {p.running ? (
               <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
                 <Square size={12} fill="currentColor" />
