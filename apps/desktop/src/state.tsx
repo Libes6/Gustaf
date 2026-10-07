@@ -52,14 +52,14 @@ function useAppState() {
   const [checkedAt, setCheckedAt] = useState(0);
   const [allowlist, setAllowlist] = usePersisted<string[]>("cmdAllowlist", ["git status", "git diff", "ls", "npm test", "npm run build"], true);
   const [sections, setSections] = usePersisted<Section[]>("sections", [], true);
-  const [tokenStats, setTokenStats] = usePersisted<Record<string, TokenUsage & { providerId: string; model: string; turns: number }>>("tokenStats", {}, true);
+  const [tokenStats, setTokenStats] = usePersisted<Record<string, TokenUsage & { providerId: string; model: string; turns: number; /** Effort level of the latest turn that had one. */ level?: Reasoning }>>("tokenStats", {}, true);
   const [limits, setLimits] = usePersisted<Record<string, { windows: LimitWindow[]; checkedAt: number }>>("subscriptionLimits", {}, true);
   const [limitErrors, setLimitErrors] = useState<Record<string, string>>({});
   const [loadingLimits, setLoadingLimits] = useState<string | null>(null);
-  const recordTokens = (providerId: string, model: string, usage?: TokenUsage) => {
+  const recordTokens = (providerId: string, model: string, usage?: TokenUsage, level?: Reasoning) => {
     if (!usage) return;
     const key = modelKey({ providerId, id: model });
-    setTokenStats(stats => { const old = stats[key]; return { ...stats, [key]: { providerId, model, turns: (old?.turns ?? 0) + 1, input: (old?.input ?? 0) + usage.input, output: (old?.output ?? 0) + usage.output, cached: (old?.cached ?? 0) + usage.cached, cacheWrite: (old?.cacheWrite ?? 0) + usage.cacheWrite, reasoning: (old?.reasoning ?? 0) + usage.reasoning } }; });
+    setTokenStats(stats => { const old = stats[key]; return { ...stats, [key]: { providerId, model, turns: (old?.turns ?? 0) + 1, input: (old?.input ?? 0) + usage.input, output: (old?.output ?? 0) + usage.output, cached: (old?.cached ?? 0) + usage.cached, cacheWrite: (old?.cacheWrite ?? 0) + usage.cacheWrite, reasoning: (old?.reasoning ?? 0) + usage.reasoning, ...((level ?? old?.level) ? { level: level ?? old?.level } : {}) } }; });
   };
   const recordLimits = (id: string, windows: LimitWindow[]) => setLimits(all => ({ ...all, [id]: { windows: [...(all[id]?.windows ?? []).filter(w => !windows.some(next => next.id === w.id)), ...windows], checkedAt: Date.now() } }));
   const refreshLimits = async (p: ProviderConfig) => {

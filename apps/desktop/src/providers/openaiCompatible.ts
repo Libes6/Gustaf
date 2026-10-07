@@ -1,6 +1,7 @@
 import { resolveKey, type KeySource } from "../lib/keys";
 import { modelMetadata } from "../lib/context";
 import { tokenUsage } from "./usage";
+import { openRouterEffort, pickLevel, reportedEffort, specLevels } from "./reasoning";
 import { request, sse } from "./http";
 import { streamError, withRetry } from "./retry";
 import { flattenMsg, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
@@ -49,16 +50,20 @@ export function openaiCompatible(cfg: ProviderConfig, key: KeySource): Adapter {
 
   return {
     supportsComputer: false,
-    supportsReasoning: () => false,
+    // Only OpenRouter reports per-model support (`supported_parameters`); other endpoints get no effort field.
+    supportsReasoning: (model) => specLevels(reportedEffort(cfg.id, model)).length > 0,
+    reasoningLevels: (model) => specLevels(reportedEffort(cfg.id, model)),
 
     async listModels() {
       const res = await request(`${base}/models`, { headers: await authHeaders() });
       const j = await res.json();
-      return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.name ?? m.id, providerId: cfg.id, created: (m.created ?? 0) * 1000, ...modelMetadata(m) }));
+      return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.name ?? m.id, providerId: cfg.id, created: (m.created ?? 0) * 1000, ...modelMetadata(m), ...(cfg.kind === "openrouter" ? { effort: openRouterEffort(m.supported_parameters) } : {}) }));
     },
 
     async turn(t: TurnInput) {
       const body: any = { model: t.model, messages: toChat(t.system, t.messages, cfg.id), stream: true, stream_options: { include_usage: true } };
+      const effort = pickLevel(t.reasoning, specLevels(reportedEffort(cfg.id, t.model)));
+      if (effort) body.reasoning = { effort };
       if (t.tools.length)
         body.tools = t.tools.map((d) => ({ type: "function", function: { name: d.name, description: d.description, parameters: d.parameters } }));
       const { text, calls, usage } = await withRetry(

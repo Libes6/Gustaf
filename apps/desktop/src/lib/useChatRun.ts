@@ -240,9 +240,9 @@ export function useChatRun(o: Options) {
         return { review: made.review, error };
       },
       finishReview: id => review.finish(id),
-      recordUsage: (providerId, model, usage) => {
+      recordUsage: (providerId, model, usage, level) => {
         if (usage) runTokens += (usage.input ?? 0) + (usage.output ?? 0);
-        app.recordTokens(providerId, model, usage);
+        app.recordTokens(providerId, model, usage, level);
       },
       bumpUsage: app.bumpUsage,
       recordResult: app.recordProviderResult,

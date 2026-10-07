@@ -30,7 +30,7 @@ function harness({ script = [say('hi')], prepare } = {}) {
     checkpoint: async () => 'cp1',
     prepareReview: prepare && (async (dir, approve) => prepare(dir, approve, log)),
     finishReview: async (id) => void log.finished.push(id),
-    recordUsage: (p, m, u) => log.usage.push({ p, m, u }),
+    recordUsage: (p, m, u, level) => log.usage.push({ p, m, u, level }),
     bumpUsage: (p) => log.bumped.push(p),
     recordResult: (p, e) => log.results.push({ p, e }),
   };
@@ -285,4 +285,14 @@ test('clarification queued during final response continues the run at the next b
  await runChatCore(h.input({ takeClarifications: async () => pending.splice(0) }), h.deps, h.ui);
  assert.equal(h.seen.turns.length, 2);
  assert.equal(h.seen.turns[1].messages.at(-1).parts[0].text, 'One more detail');
+});
+
+test('usage is recorded with the effort level the model really got (none for a model without effort)', async () => {
+  for (const [levels, asked, want] of [[['low', 'medium', 'high'], 'max', 'high'], [['low', 'medium', 'high'], 'low', 'low'], [[], 'high', undefined]]) {
+    const h = harness({ script: [say('x')] });
+    const base = h.input().target;
+    const target = async () => ({ ...(await base()), reasoning: asked, adapter: { ...(await base()).adapter, supportsReasoning: () => levels.length > 0, reasoningLevels: () => levels } });
+    await runChatCore(h.input({ target }), h.deps, h.ui);
+    assert.equal(h.log.usage[0].level, want, `${levels} / ${asked}`);
+  }
 });

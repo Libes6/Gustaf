@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { anthropicLevels, claudeCliLevels, codexLevels, cursorLevels, cursorModel, defaultLevel, pickLevel } from '../src/providers/reasoning.ts';
+import { anthropicLevels, claudeCliLevels, codexLevels, cursorLevels, cursorModel, defaultLevel, openRouterEffort, pickLevel, rememberEfforts, reportedEffort, sdkEffort, specLevels } from '../src/providers/reasoning.ts';
 
 const ALL = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -46,4 +46,35 @@ test('pickLevel snaps to the nearest offered level, ties going lower', () => {
   assert.equal(pickLevel(undefined, ALL), undefined);
   assert.equal(defaultLevel(ALL), 'medium');
   assert.equal(defaultLevel(['high', 'max']), 'high');
+});
+
+const param = (id, ...values) => ({ id, values: values.map((value) => ({ value })) });
+
+test('Cursor SDK: the effort parameter of a model becomes its level list', () => {
+  const spec = sdkEffort([param('fast', 'true', 'false'), param('reasoning_effort', 'low', 'medium', 'high', 'extra-high', 'bogus')]);
+  assert.deepEqual(spec, { param: 'reasoning_effort', values: { low: 'low', medium: 'medium', high: 'high', xhigh: 'extra-high' } });
+  assert.deepEqual(specLevels(spec), ['low', 'medium', 'high', 'xhigh']);
+  assert.deepEqual(specLevels(sdkEffort([param('effort', 'max', 'low')])), ['low', 'max'], 'always weakest first');
+});
+
+test('Cursor SDK: no effort parameter, or fewer than two usable stops, means no level', () => {
+  for (const bad of [undefined, null, 'x', [], [param('fast', 'true', 'false')], [param('effort', 'high')], [param('effort', 'on', 'off')], [{ id: 'effort' }], [null]]) assert.equal(sdkEffort(bad), undefined, JSON.stringify(bad));
+  assert.deepEqual(specLevels(undefined), []);
+});
+
+test('OpenRouter: only a model listing `reasoning` offers low/medium/high', () => {
+  assert.deepEqual(specLevels(openRouterEffort(['tools', 'reasoning'])), ['low', 'medium', 'high']);
+  for (const bad of [['tools'], ['include_reasoning'], undefined, 'reasoning']) assert.equal(openRouterEffort(bad), undefined);
+});
+
+test('reported efforts are remembered per provider and replaced by the next list', () => {
+  const spec = { param: 'effort', values: { low: 'low', high: 'high' } };
+  const info = (providerId, id, effort) => ({ id, name: id, providerId, created: 0, effort });
+  rememberEfforts([info('a', 'm1', spec), info('a', 'm2'), info('b', 'm1', spec)]);
+  assert.deepEqual(reportedEffort('a', 'm1'), spec);
+  assert.equal(reportedEffort('a', 'm2'), undefined);
+  rememberEfforts([info('a', 'm1')]);
+  assert.equal(reportedEffort('a', 'm1'), undefined, 'a newer list of provider a replaces the old one');
+  assert.deepEqual(reportedEffort('b', 'm1'), spec, 'other providers keep theirs');
+  rememberEfforts([]);
 });

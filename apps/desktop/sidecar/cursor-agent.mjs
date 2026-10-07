@@ -9,10 +9,10 @@ const req = JSON.parse(line);
 try {
   if (req.type === "models") {
     const list = await Cursor.models.list({ apiKey: req.apiKey });
-    out({ type: "models", list: list.map((m) => ({ id: m.id, name: m.displayName })) });
+    out({ type: "models", list: list.map((m) => ({ id: m.id, name: m.displayName, parameters: m.parameters })) });
   } else {
     // settingSources "all": reuse the user's Cursor MCP servers and rules, same as in the IDE.
-    const opts = { apiKey: req.apiKey, model: { id: req.model }, local: { cwd: req.cwd, settingSources: ["all"] } };
+    const opts = { apiKey: req.apiKey, model: { id: req.model, ...(req.params?.length ? { params: req.params } : {}) }, local: { cwd: req.cwd, settingSources: ["all"] } };
     await using agent = req.agentId ? await Agent.resume(req.agentId, opts) : await Agent.create(opts);
     out({ type: "agent", agentId: agent.agentId });
     const run = await agent.send(req.prompt);

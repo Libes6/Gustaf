@@ -1,6 +1,7 @@
 import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions, type RunOutcome } from "../agent/agent";
 import { finishCliAgents, trackCliAgents } from "../agent/cliAgents";
-import type { Adapter, LimitWindow, Msg, Part, Reasoning, TokenUsage } from "../providers/types";
+import { levelsOf, type Adapter, type LimitWindow, type Msg, type Part, type Reasoning, type TokenUsage } from "../providers/types";
+import { pickLevel } from "../providers/reasoning";
 
 // The part of "run the agent in a chat" that interactive sends (lib/useChatRun.ts) and scheduled runs
 // (lib/scheduledRun.ts) share, without React or any app state: store the user message with its checkpoint, make the
@@ -8,6 +9,12 @@ import type { Adapter, LimitWindow, Msg, Part, Reasoning, TokenUsage } from "../
 // activities so an interrupted run still leaves its tool cards, record the provider result and finish the copy.
 // Everything that differs (streaming into React state or into the live-run store, how an approval is shown, limits
 // of unattended runs, error text) is injected through `ChatRunDeps` and `ChatRunUi`. Tested in tests/chatRunCore.test.mjs.
+
+/** The level the adapter really sends for this target: the requested one snapped to the model's levels; none for a model without effort. */
+export function effortOf(tg: Pick<RunTarget, "adapter" | "model" | "reasoning">): Reasoning | undefined {
+  if (typeof tg.adapter?.supportsReasoning !== "function") return undefined;
+  return pickLevel(tg.reasoning, levelsOf(tg.adapter, tg.model));
+}
 
 export type ReviewCopy = { id: string; workspace: string; root?: string; /** Directories symlinked into the copy; never applied. */ linked?: string[] };
 export type RunTarget = {
@@ -30,7 +37,8 @@ export type ChatRunDeps = {
   prepareReview?(root: string, approve: (command: string) => Promise<boolean>): Promise<{ review: ReviewCopy | null; error?: string }>;
   /** Removes the copy when nothing changed in it, otherwise it stays for the review panel. */
   finishReview?(id: string): Promise<void>;
-  recordUsage(providerId: string, model: string, usage?: TokenUsage): void;
+  /** `level`: the effort level the turn ran with (absent when the model has none). */
+  recordUsage(providerId: string, model: string, usage?: TokenUsage, level?: Reasoning): void;
   bumpUsage(providerId: string): void;
   recordResult(providerId: string, error?: string): void;
   onLimits?(providerId: string, windows: LimitWindow[]): void;
@@ -156,7 +164,7 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       onMessage: async (m) => {
         // After a stop only the results of tools that already ran are kept, so every stored call has its result.
         if (i.signal.aborted && !m.parts.some((p) => p.type === "tool_result")) return;
-        deps.recordUsage(tg.providerId, tg.model, m.meta?.usage);
+        deps.recordUsage(tg.providerId, tg.model, m.meta?.usage, effortOf(tg));
         ui.onAccepted?.(m);
         const id = await deps.addMessage(i.chatId, m);
         activities = [];
