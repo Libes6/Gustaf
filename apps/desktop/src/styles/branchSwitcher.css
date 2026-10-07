@@ -1,0 +1,23 @@
+/* Branch bar under the composer: location, branch chip and the switch/create popover. */
+.branch-switch { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 24px 10px; font-size: 12px; color: var(--text-2); }
+.branch-loc { display: inline-flex; align-items: center; gap: 5px; color: var(--text-3); }
+.branch-trigger { max-width: 260px; min-width: 0; }
+.branch-trigger .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch-trigger[aria-disabled="true"] { opacity: 0.6; cursor: default; }
+.branch-changes { color: var(--accent-soft); }
+.branch-pop { position: absolute; left: 24px; bottom: calc(100% - 4px); z-index: 30; width: 340px; max-width: calc(100vw - 48px); display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-elev); box-shadow: var(--shadow-sm); }
+.branch-search { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-chip); color: var(--text); font: inherit; }
+.branch-scroll { max-height: 260px; overflow-y: auto; }
+.branch-scroll ul { list-style: none; margin: 0; padding: 0; }
+.branch-group { padding: 6px 8px 2px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.branch-row { display: flex; align-items: center; gap: 7px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.branch-row:hover:not(:disabled), .branch-row:focus-visible { background: var(--bg-chip); }
+.branch-row:disabled { opacity: 0.5; cursor: default; }
+.branch-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch-row .tag { font-size: 10px; color: var(--text-3); border: 1px solid var(--border); border-radius: 6px; padding: 0 4px; }
+.branch-row.current { color: var(--accent-soft); }
+.branch-empty { padding: 6px 8px; }
+.branch-create { border-top: 1px solid var(--border); padding-top: 4px; }
+.branch-dirty { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+.branch-dirty p { margin: 0; color: var(--text-2); }
+.branch-actions { display: flex; justify-content: flex-end; gap: 8px; }
