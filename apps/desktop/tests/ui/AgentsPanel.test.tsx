@@ -87,6 +87,22 @@ describe("AgentsPanel: CLI-native subagents", () => {
     resetCliAgents();
   });
 
+  it("lists a background shell command with its elapsed time and a Stop button, then keeps it as ended", async () => {
+    resetCliAgents();
+    render();
+    const stop = vi.fn();
+    const call = { type: "activity" as const, id: "tu7", name: "Bash", args: { command: "npm run tauri -- build", run_in_background: true }, status: "success" as const, output: "Command running in background with ID: bx9y8z" };
+    act(() => trackCliAgents({ chatId: 1, root: "/work/alpha", stop }, [call], Date.now() - 65_000));
+    expect(await screen.findByText("Command · Claude Code")).toBeInTheDocument();
+    expect(screen.getAllByText("npm run tauri -- build").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Stop the whole Claude Code run" }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    act(() => finishCliAgents(1));
+    expect(screen.getByRole("button", { name: "Finished 1" })).toBeInTheDocument();
+    expect(screen.getByText("Ended")).toBeInTheDocument();
+    resetCliAgents();
+  });
+
   it("shows three Codex cards from a mocked rollout scan (through the real tracker and the invoke command), then a finished one after the last scan", async () => {
     resetCliAgents();
     const rollout = (nick: string, state: string, over: Record<string, unknown> = {}) => ({
