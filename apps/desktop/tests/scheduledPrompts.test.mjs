@@ -7,12 +7,26 @@ import { register } from 'node:module';
 register('./helpers/hooks.mjs', import.meta.url);
 const sp = await import('../src/lib/scheduledPrompts.ts');
 
-const tz = (zone) => { process.env.TZ = zone; };
+const tz = (zone) => {
+  process.env.TZ = zone;
+};
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi, 0, 0).getTime();
-const hhmm = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const hhmm = (ms) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 const HOUR = 3_600_000;
 
-const draft = (over = {}) => ({ title: 'Nightly', prompt: 'Summarize the changes', projectId: 1, providerId: 'p', model: 'm', access: 'auto', schedule: { kind: 'daily', time: '09:00' }, ...over });
+const draft = (over = {}) => ({
+  title: 'Nightly',
+  prompt: 'Summarize the changes',
+  projectId: 1,
+  providerId: 'p',
+  model: 'm',
+  access: 'auto',
+  schedule: { kind: 'daily', time: '09:00' },
+  ...over,
+});
 const item = (over = {}) => ({ ...sp.createSchedule(draft(), over.id ?? 's1', 0), ...over });
 const live = (over = {}) => ({ ...item(over), enabled: true, confirmedAt: 1 });
 
@@ -88,7 +102,11 @@ test('once: in the future runs at its time, in the past never', () => {
   assert.equal(sp.nextRunAfter({ kind: 'once', at: now + HOUR }, now), now + HOUR);
   assert.equal(sp.nextRunAfter({ kind: 'once', at: now }, now), null);
   assert.equal(sp.nextRunAfter({ kind: 'once', at: now - HOUR }, now), null);
-  assert.equal(sp.setEnabled(item({ schedule: { kind: 'once', at: now - HOUR } }), true, now), null, 'cannot be switched on');
+  assert.equal(
+    sp.setEnabled(item({ schedule: { kind: 'once', at: now - HOUR } }), true, now),
+    null,
+    'cannot be switched on',
+  );
   assert.equal(sp.setEnabled(item({ schedule: { kind: 'once', at: now + HOUR } }), true, now).nextRunAt, now + HOUR);
 });
 
@@ -105,7 +123,11 @@ test('nothing happens before the schedule is due, or while disabled / unconfirme
   const none = new Set();
   assert.deepEqual(sp.planTick([live({ nextRunAt: now + 1 })], now, none).start, []);
   assert.deepEqual(sp.planTick([item({ ...due })], now, none).start, [], 'disabled');
-  assert.deepEqual(sp.planTick([{ ...live(due), confirmedAt: undefined }], now, none).start, [], 'enabled flag without confirmation');
+  assert.deepEqual(
+    sp.planTick([{ ...live(due), confirmedAt: undefined }], now, none).start,
+    [],
+    'enabled flag without confirmation',
+  );
   assert.deepEqual(sp.planTick([live(due)], now, none).start, ['s1']);
 });
 
@@ -258,7 +280,10 @@ test('a new schedule is off; enabling is explicit and recorded', () => {
 });
 
 test('stored "enabled" without a confirmation loads as disabled', () => {
-  const raw = [{ ...item(), enabled: true }, { ...item({ id: 's2' }), enabled: true, confirmedAt: 5 }];
+  const raw = [
+    { ...item(), enabled: true },
+    { ...item({ id: 's2' }), enabled: true, confirmedAt: 5 },
+  ];
   const [a, b] = sp.normalizeScheduled(raw);
   assert.equal(a.enabled, false);
   assert.equal(b.enabled, true);
@@ -267,7 +292,14 @@ test('stored "enabled" without a confirmation loads as disabled', () => {
 test('editing what runs or when switches the schedule off; editing the title does not', () => {
   const on = live({ nextRunAt: 100 });
   assert.equal(sp.editSchedule(on, draft({ title: 'Renamed' })).enabled, true);
-  for (const change of [{ prompt: 'Do something else' }, { projectId: 2 }, { model: 'other' }, { providerId: 'q' }, { access: 'readonly' }, { schedule: { kind: 'daily', time: '10:00' } }]) {
+  for (const change of [
+    { prompt: 'Do something else' },
+    { projectId: 2 },
+    { model: 'other' },
+    { providerId: 'q' },
+    { access: 'readonly' },
+    { schedule: { kind: 'daily', time: '10:00' } },
+  ]) {
     const out = sp.editSchedule(on, draft(change));
     assert.equal(out.enabled, false, JSON.stringify(change));
     assert.equal(out.confirmedAt, undefined);
@@ -307,7 +339,10 @@ test('normalizing stored data: clamps intervals, drops garbage, caps the count',
     { ...item({ id: 'd' }), schedule: { kind: 'daily', time: '7:05' }, lastStatus: 'weird', projectId: 'nope' },
   ];
   const out = sp.normalizeScheduled(raw);
-  assert.deepEqual(out.map((s) => s.id), ['a', 'd']);
+  assert.deepEqual(
+    out.map((s) => s.id),
+    ['a', 'd'],
+  );
   assert.equal(out[0].schedule.everyMinutes, sp.MIN_INTERVAL_MINUTES);
   assert.equal(out[1].schedule.time, '07:05');
   assert.equal(out[1].lastStatus, undefined);

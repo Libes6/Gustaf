@@ -45,13 +45,27 @@ test('search shortcut follows the default (macOS) platform in tests', () => {
 
 test('the search shortcut works on a real event whose fields are prototype getters (not own properties)', () => {
   class FakeKeyboardEvent {
-    constructor(init) { this._i = init; }
-    get key() { return this._i.key; }
-    get code() { return this._i.code; }
-    get metaKey() { return !!this._i.metaKey; }
-    get ctrlKey() { return !!this._i.ctrlKey; }
-    get shiftKey() { return !!this._i.shiftKey; }
-    get altKey() { return !!this._i.altKey; }
+    constructor(init) {
+      this._i = init;
+    }
+    get key() {
+      return this._i.key;
+    }
+    get code() {
+      return this._i.code;
+    }
+    get metaKey() {
+      return !!this._i.metaKey;
+    }
+    get ctrlKey() {
+      return !!this._i.ctrlKey;
+    }
+    get shiftKey() {
+      return !!this._i.shiftKey;
+    }
+    get altKey() {
+      return !!this._i.altKey;
+    }
   }
   assert.ok(isSearchShortcut(new FakeKeyboardEvent({ key: 'k', code: 'KeyK', metaKey: true })));
   assert.ok(!isSearchShortcut(new FakeKeyboardEvent({ key: 'k', code: 'KeyK' })));

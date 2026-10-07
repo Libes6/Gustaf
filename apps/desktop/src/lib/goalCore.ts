@@ -20,12 +20,18 @@ export type Goal = {
 /** A Codex thread goal status as ours. Usage and budget limits are pauses the user can resume. */
 export function fromNativeStatus(s: string): { status: GoalStatus; note?: string } {
   switch (s) {
-    case "complete": return { status: "done" };
-    case "blocked": return { status: "blocked" };
-    case "paused": return { status: "paused" };
-    case "usageLimited": return { status: "paused", note: "usage" };
-    case "budgetLimited": return { status: "paused", note: "budget" };
-    default: return { status: "active" };
+    case "complete":
+      return { status: "done" };
+    case "blocked":
+      return { status: "blocked" };
+    case "paused":
+      return { status: "paused" };
+    case "usageLimited":
+      return { status: "paused", note: "usage" };
+    case "budgetLimited":
+      return { status: "paused", note: "budget" };
+    default:
+      return { status: "active" };
   }
 }
 
@@ -72,14 +78,18 @@ export function goalReport(text: string): { kind: "done" | "blocked"; note: stri
  * What happens after a goal turn ends. `outcome` is the run's end ("stopped" = the user pressed Stop), `lastText` the
  * last assistant text of the turn. Returns the updated goal and whether to queue a continuation.
  */
-export function afterTurn(g: Goal, o: { outcome: "ok" | "failed" | "stopped"; lastText: string; tokens: number }): { goal: Goal; continueWith: string | null } {
+export function afterTurn(
+  g: Goal,
+  o: { outcome: "ok" | "failed" | "stopped"; lastText: string; tokens: number },
+): { goal: Goal; continueWith: string | null } {
   // Paused or cleared while the turn ran: count it, never continue.
   const counted: Goal = { ...g, turns: g.turns + 1, tokens: g.tokens + Math.max(0, o.tokens) };
   if (g.status !== "active") return { goal: counted, continueWith: null };
   if (o.outcome !== "ok") return { goal: { ...counted, status: "paused", note: o.outcome }, continueWith: null };
   const report = goalReport(o.lastText);
   if (report) return { goal: { ...counted, status: report.kind, note: report.note || undefined }, continueWith: null };
-  if (counted.turns >= counted.maxTurns) return { goal: { ...counted, status: "paused", note: "limit" }, continueWith: null };
+  if (counted.turns >= counted.maxTurns)
+    return { goal: { ...counted, status: "paused", note: "limit" }, continueWith: null };
   return { goal: counted, continueWith: continuePrompt(counted) };
 }
 

@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseAppearance, appearanceVars, sanitizeFontName, fontStack, isDefaultAppearance, DEFAULT_APPEARANCE,
+  parseAppearance,
+  appearanceVars,
+  sanitizeFontName,
+  fontStack,
+  isDefaultAppearance,
+  DEFAULT_APPEARANCE,
 } from '../src/lib/appearanceUtil.ts';
 
 test('parseAppearance falls back on garbage and clamps sizes', () => {
@@ -19,7 +24,8 @@ test('parseAppearance falls back on garbage and clamps sizes', () => {
 test('custom font names are sanitized, unsafe ones rejected', () => {
   assert.equal(sanitizeFontName('  Fira   Code '), 'Fira Code');
   assert.equal(sanitizeFontName('Inter-Var_2.0'), 'Inter-Var_2.0');
-  for (const bad of ['', 'a;b', 'a"b', "a'b", 'a{b}', 'url(x)', 'x'.repeat(61), 5, null]) assert.equal(sanitizeFontName(bad), null, String(bad));
+  for (const bad of ['', 'a;b', 'a"b', "a'b", 'a{b}', 'url(x)', 'x'.repeat(61), 5, null])
+    assert.equal(sanitizeFontName(bad), null, String(bad));
   assert.equal(parseAppearance({ codeFont: { preset: 'custom', custom: 'a;b' } }).codeFont.preset, 'default');
   assert.equal(fontStack({ preset: 'custom', custom: 'Fira Code' }, 'code').startsWith('"Fira Code", '), true);
 });

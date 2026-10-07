@@ -27,7 +27,11 @@ test('a live run exposes streamed text, activities, tool results and the retry n
   h.retry('retrying in 3 s');
   const s = live.getLiveRun(11);
   assert.equal(s.activities.length, 1);
-  assert.deepEqual(s.toolResults.map((r) => r.output), ['o2'], 'a result replaces the earlier one with the same id');
+  assert.deepEqual(
+    s.toolResults.map((r) => r.output),
+    ['o2'],
+    'a result replaces the earlier one with the same id',
+  );
   assert.equal(s.retryNotice, 'retrying in 3 s');
   h.text('x');
   assert.equal(live.getLiveRun(11).retryNotice, '', 'output clears the notice');

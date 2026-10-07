@@ -8,10 +8,25 @@
 
 export const MERGE_QUEUE_ERROR_CODES = [
   // as in worktrees.ts
-  "not_a_git_repo", "bare_repo", "no_commits", "invalid_task_id", "not_found", "dirty", "unsafe_path", "invalid_root", "git_error",
+  "not_a_git_repo",
+  "bare_repo",
+  "no_commits",
+  "invalid_task_id",
+  "not_found",
+  "dirty",
+  "unsafe_path",
+  "invalid_root",
+  "git_error",
   // merge queue
-  "git_too_old", "target_dirty", "target_not_checked_out", "already_queued", "queue_busy", "invalid_strategy",
-  "invalid_request", "invalid_state", "state_error",
+  "git_too_old",
+  "target_dirty",
+  "target_not_checked_out",
+  "already_queued",
+  "queue_busy",
+  "invalid_strategy",
+  "invalid_request",
+  "invalid_state",
+  "state_error",
 ] as const;
 export type MergeQueueErrorCode = (typeof MERGE_QUEUE_ERROR_CODES)[number];
 
@@ -21,14 +36,18 @@ export type ConflictKind = "content" | "add_add" | "modify_delete" | "other";
 
 export type ConflictEntry = { path: string; kind: ConflictKind };
 export type ConflictCheck = {
-  clean: boolean; conflicts: ConflictEntry[]; truncated: boolean;
+  clean: boolean;
+  conflicts: ConflictEntry[];
+  truncated: boolean;
   /** The other workspace's task id; null for the check against the target branch. */
   againstTaskId: string | null;
   /** The target branch name, or the other workspace's branch. */
   against: string;
 };
 export type ConflictsReport = {
-  taskId: string; branch: string; target: string;
+  taskId: string;
+  branch: string;
+  target: string;
   /** True when every check is clean. */
   clean: boolean;
   /** First entry: the target branch; then one per task id passed as `against`. */
@@ -36,9 +55,17 @@ export type ConflictsReport = {
 };
 
 export type QueueItem = {
-  taskId: string; branch: string; status: QueueItemStatus; error: string | null; conflicts: ConflictEntry[];
-  strategy: MergeStrategy; testCommand: string | null; targetBranch: string;
-  enqueuedAt: number; startedAt: number | null; finishedAt: number | null;
+  taskId: string;
+  branch: string;
+  status: QueueItemStatus;
+  error: string | null;
+  conflicts: ConflictEntry[];
+  strategy: MergeStrategy;
+  testCommand: string | null;
+  targetBranch: string;
+  enqueuedAt: number;
+  startedAt: number | null;
+  finishedAt: number | null;
 };
 export type QueueState = {
   version: number;
@@ -66,7 +93,8 @@ export function parseMergeQueueError(raw: unknown): MergeQueueError {
   if (raw instanceof MergeQueueError) return raw;
   const text = typeof raw === "string" ? raw : raw instanceof Error ? raw.message : String(raw);
   const m = /^([a-z_]+): ([\s\S]*)$/.exec(text);
-  if (m && (MERGE_QUEUE_ERROR_CODES as readonly string[]).includes(m[1])) return new MergeQueueError(m[1] as MergeQueueErrorCode, m[2]);
+  if (m && (MERGE_QUEUE_ERROR_CODES as readonly string[]).includes(m[1]))
+    return new MergeQueueError(m[1] as MergeQueueErrorCode, m[2]);
   return new MergeQueueError("git_error", text);
 }
 
@@ -79,7 +107,8 @@ export const isRetryableTargetError = (e: unknown): boolean => {
 export const isTerminalStatus = (s: QueueItemStatus): boolean => s === "merged" || s === "failed" || s === "skipped";
 
 /** The item `runNext` would work on next, or null when the queue is empty or finished. */
-export const nextQueueItem = (state: QueueState): QueueItem | null => state.items.find((i) => !isTerminalStatus(i.status)) ?? null;
+export const nextQueueItem = (state: QueueState): QueueItem | null =>
+  state.items.find((i) => !isTerminalStatus(i.status)) ?? null;
 
 async function call<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -99,7 +128,12 @@ export const mergeQueue = {
     call<ConflictsReport>("conflicts_check", { root, taskId, against: against ?? null }),
   /** Queues workspaces (all or none). Rejects "dirty", "not_found", "already_queued", "invalid_strategy". */
   enqueue: (a: { root: string; taskIds: string[]; strategy: MergeStrategy; testCommand?: string | null }) =>
-    call<QueueState>("queue_enqueue", { root: a.root, taskIds: a.taskIds, strategy: a.strategy, testCommand: a.testCommand ?? null }),
+    call<QueueState>("queue_enqueue", {
+      root: a.root,
+      taskIds: a.taskIds,
+      strategy: a.strategy,
+      testCommand: a.testCommand ?? null,
+    }),
   status: (root: string) => call<QueueState>("queue_status", { root }),
   /** Skips every unfinished item and clears the halt. Rejects "queue_busy" while a run is active. */
   cancel: (root: string) => call<QueueState>("queue_cancel", { root }),

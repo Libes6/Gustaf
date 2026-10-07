@@ -6,7 +6,8 @@ import { register } from 'node:module';
 
 register('./helpers/hooks.mjs', import.meta.url);
 const { state } = await import('./helpers/apiStub.mjs');
-const { resolveReviewCopy, REVIEW_COPY_DEFAULT, LEGACY_OVERRIDES_KEY, removeLegacyReviewOverrides } = await import('../src/lib/reviewCopy.ts');
+const { resolveReviewCopy, REVIEW_COPY_DEFAULT, LEGACY_OVERRIDES_KEY, removeLegacyReviewOverrides } =
+  await import('../src/lib/reviewCopy.ts');
 
 test('the default is off for new and existing installs (no stored value)', () => {
   assert.equal(REVIEW_COPY_DEFAULT, false);

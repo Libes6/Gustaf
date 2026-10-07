@@ -53,7 +53,9 @@ export function normalizeReviewSetup(raw: unknown): ReviewSetupConfig {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const cmd = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, MAX_COMMAND_LENGTH) : "");
   return {
-    linkDirs: Array.isArray(o.linkDirs) ? parseLinkDirs(o.linkDirs.filter((d): d is string => typeof d === "string").join("\n")) : [],
+    linkDirs: Array.isArray(o.linkDirs)
+      ? parseLinkDirs(o.linkDirs.filter((d): d is string => typeof d === "string").join("\n"))
+      : [],
     setupCommand: cmd(o.setupCommand),
     testCommand: cmd(o.testCommand),
   };
@@ -72,6 +74,15 @@ export function clipOutput(output: string, limit = OUTPUT_LIMIT): string {
   return "…\n" + (nl >= 0 && nl < limit / 2 ? tail.slice(nl + 1) : tail);
 }
 
-export function summarizeRun(command: string, r: { code: number | null; output: string; timed_out: boolean }): RunSummary {
-  return { command, code: r.code, timedOut: r.timed_out, output: clipOutput(r.output), ok: !r.timed_out && r.code === 0 };
+export function summarizeRun(
+  command: string,
+  r: { code: number | null; output: string; timed_out: boolean },
+): RunSummary {
+  return {
+    command,
+    code: r.code,
+    timedOut: r.timed_out,
+    output: clipOutput(r.output),
+    ok: !r.timed_out && r.code === 0,
+  };
 }

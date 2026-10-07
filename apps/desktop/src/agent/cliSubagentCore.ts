@@ -26,7 +26,11 @@ export function cliSubagentSupport(p: { kind: string; cli?: string; name?: strin
       ? { ok: true, cli: p.cli as CliId }
       : { ok: false, reason: `${name} cannot run non-interactively, so it cannot be used for subagents.` };
   }
-  if (p.kind === "cursor") return { ok: false, reason: `${name} (the Cursor SDK) cannot run non-interactively with a read-only or sandboxed access level, so it cannot be used for subagents; use a Cursor Agent CLI account.` };
+  if (p.kind === "cursor")
+    return {
+      ok: false,
+      reason: `${name} (the Cursor SDK) cannot run non-interactively with a read-only or sandboxed access level, so it cannot be used for subagents; use a Cursor Agent CLI account.`,
+    };
   return null;
 }
 
@@ -35,7 +39,8 @@ export function cliSubagentSupport(p: { kind: string; cli?: string; name?: strin
  * (edits inside the worktree; Codex `workspace-write`, Claude `acceptEdits`, Cursor without `--force`). Never "full":
  * that would bypass the sandbox and the approvals nobody can answer.
  */
-export const cliAccess = (type: AgentType, parent: "readonly" | "auto" | "full" | undefined): "readonly" | "auto" => (isReadOnlyType(type) || parent === "readonly" ? "readonly" : "auto");
+export const cliAccess = (type: AgentType, parent: "readonly" | "auto" | "full" | undefined): "readonly" | "auto" =>
+  isReadOnlyType(type) || parent === "readonly" ? "readonly" : "auto";
 
 // ---- worktrees ----
 
@@ -49,11 +54,21 @@ export type SubagentWorkspace = {
   path: string;
   baseCommit: string;
 };
-export type WorktreeSetup = { access: "readonly" | "auto" | "full"; allowlist: string[]; approve: (command: string) => Promise<boolean> };
+export type WorktreeSetup = {
+  access: "readonly" | "auto" | "full";
+  allowlist: string[];
+  approve: (command: string) => Promise<boolean>;
+};
 /** What the runtime needs from git worktrees; lib/subagentWorktrees.ts implements it, tests pass a fake. */
 export type SubagentWorktrees = {
   /** Null when the project is not a usable git repository (the task then runs in a shadow copy). Rejects for other failures. */
-  create(a: { projectRoot: string; title: string; providerId: string; model: string; setup: WorktreeSetup }): Promise<SubagentWorkspace | null>;
+  create(a: {
+    projectRoot: string;
+    title: string;
+    providerId: string;
+    model: string;
+    setup: WorktreeSetup;
+  }): Promise<SubagentWorkspace | null>;
   /** Net change of the checkout against its base: the changed files, and whether anything happened at all (edits or commits). */
   inspect(projectRoot: string, taskId: string): Promise<{ files: string[]; touched: boolean }>;
   /** Removes the checkout and its branch; false when it could not be removed (nothing is forced). */
@@ -63,11 +78,23 @@ export type SubagentWorktrees = {
 // ---- failures ----
 
 export type CliFailureKind = "quota" | "rate_limit" | "auth" | "other";
-export type CliFailure = { kind: CliFailureKind; quota?: Quota; /** One short sentence for the report. */ reason: string };
+export type CliFailure = {
+  kind: CliFailureKind;
+  quota?: Quota;
+  /** One short sentence for the report. */ reason: string;
+};
 
-const AUTH = /\b401\b|unauthori[sz]ed|authenticat|not logged in|not signed in|invalid api key|api key (?:is )?(?:missing|invalid|required)|(?:claude auth|cursor-agent|codex) login|please (?:log ?in|sign ?in)/i;
+const AUTH =
+  /\b401\b|unauthori[sz]ed|authenticat|not logged in|not signed in|invalid api key|api key (?:is )?(?:missing|invalid|required)|(?:claude auth|cursor-agent|codex) login|please (?:log ?in|sign ?in)/i;
 const RATE = /rate[ -]?limit|too many requests|\b429\b|overloaded/i;
-const firstLine = (s: string) => clip(s.trim().split("\n").find((l) => l.trim()) ?? "", 200);
+const firstLine = (s: string) =>
+  clip(
+    s
+      .trim()
+      .split("\n")
+      .find((l) => l.trim()) ?? "",
+    200,
+  );
 
 /** What kind of failure a CLI run's error message is. Quota detection is the Cursor pool's (providers/cursorAccounts.ts), applied to every CLI. */
 export function classifyCliFailure(message: string, now = Date.now()): CliFailure {
@@ -105,7 +132,10 @@ export function createCliCollector() {
     /** Text segments not handed out yet (the open one only with `all`), for the persisted transcript. */
     flush(all = false): string[] {
       const end = all ? segments.length : segments.length - 1;
-      const out = segments.slice(flushed, end).map((s) => s.trim()).filter(Boolean);
+      const out = segments
+        .slice(flushed, end)
+        .map((s) => s.trim())
+        .filter(Boolean);
       flushed = Math.max(flushed, end);
       return out;
     },
@@ -133,7 +163,17 @@ const MAX_DESC = 160;
 /** What a call did, in one line: the command, path, pattern or query of its arguments. */
 export function describeActivity(a: Pick<Activity, "name" | "args">): string {
   const args = (a.args ?? {}) as Record<string, unknown>;
-  const pick = [args.command, args.file_path, args.path, args.pattern, args.query, args.url, args.description, args.prompt, args.tool].find((v) => v !== undefined && v !== null && v !== "");
+  const pick = [
+    args.command,
+    args.file_path,
+    args.path,
+    args.pattern,
+    args.query,
+    args.url,
+    args.description,
+    args.prompt,
+    args.tool,
+  ].find((v) => v !== undefined && v !== null && v !== "");
   const text = typeof pick === "string" ? pick : pick === undefined ? "" : JSON.stringify(pick);
   return clip(text.replace(/\s+/g, " ").trim(), MAX_DESC);
 }
@@ -152,17 +192,21 @@ export function activityStep(a: Activity, at: number): TranscriptStep {
 }
 
 /** The short "current step" shown while a call runs. */
-export const activityLabel = (a: Pick<Activity, "name" | "args">) => `${a.name || "tool"} ${describeActivity(a)}`.trim();
+export const activityLabel = (a: Pick<Activity, "name" | "args">) =>
+  `${a.name || "tool"} ${describeActivity(a)}`.trim();
 
 // ---- prompts ----
 
 const COMMON =
   "You are a subagent started by the main Gustaf agent for one task. You run non-interactively: you cannot ask the user questions, cannot see the main conversation and nobody can approve anything, so never wait for input or permission. Your final message is your report: the main agent receives only that, so put the results in it, concisely (under 400 words), with project-relative file paths.";
 const TYPE_PROMPT: Record<AgentType, string> = {
-  explore: "You are read-only: investigate the code and report what you found (paths and line numbers). Do not modify files and do not run commands that change anything.",
+  explore:
+    "You are read-only: investigate the code and report what you found (paths and line numbers). Do not modify files and do not run commands that change anything.",
   plan: "You are read-only: study the code and return a concrete, ordered implementation plan (files to change, what to change, risks). Do not modify files.",
-  review: "You are read-only: review the code or changes named in the task for bugs, regressions and missing tests. List findings by severity with file and line. Say so if you found nothing. Do not modify files.",
-  general: "You may edit files, but only inside your working directory: it is your own git worktree on its own branch. Do not commit, switch branches, merge or push, and do not touch anything outside the working directory. Finish by listing what you changed and what you could not verify.",
+  review:
+    "You are read-only: review the code or changes named in the task for bugs, regressions and missing tests. List findings by severity with file and line. Say so if you found nothing. Do not modify files.",
+  general:
+    "You may edit files, but only inside your working directory: it is your own git worktree on its own branch. Do not commit, switch branches, merge or push, and do not touch anything outside the working directory. Finish by listing what you changed and what you could not verify.",
 };
 /** System text of a CLI subagent (CLIs get it in front of the task prompt). Keeps the phrase "You are a subagent" that marks subagent turns. */
 export function cliSubagentSystem(type: AgentType, files: readonly string[]): string {

@@ -24,21 +24,49 @@ const { clearActionLog, getActionLog } = await import('../src/agent/actionLogSto
 // ---- resources (pure) ----------------------------------------------------------------------------------------------
 
 test('resources/list pages are validated, unique and bounded', () => {
-  const list = res.normalizeResources({ resources: [{ uri: 'file:///a', name: 'a', mimeType: 'text/plain', size: 12.7 }, { uri: 'file:///a', name: 'dup' }, { name: 'no uri' }, null, { uri: 'x://b', description: 'd'.repeat(900) }, { uri: 'u'.repeat(3000) }] });
-  assert.deepEqual(list.map((r) => r.uri), ['file:///a', 'x://b']);
+  const list = res.normalizeResources({
+    resources: [
+      { uri: 'file:///a', name: 'a', mimeType: 'text/plain', size: 12.7 },
+      { uri: 'file:///a', name: 'dup' },
+      { name: 'no uri' },
+      null,
+      { uri: 'x://b', description: 'd'.repeat(900) },
+      { uri: 'u'.repeat(3000) },
+    ],
+  });
+  assert.deepEqual(
+    list.map((r) => r.uri),
+    ['file:///a', 'x://b'],
+  );
   assert.equal(list[0].size, 12);
   assert.equal(list[1].name, 'x://b');
   assert.equal(list[1].description.length, 500);
-  assert.equal(res.normalizeResources({ resources: Array.from({ length: 500 }, (_, i) => ({ uri: `r://${i}` })) }).length, res.MAX_RESOURCES);
+  assert.equal(
+    res.normalizeResources({ resources: Array.from({ length: 500 }, (_, i) => ({ uri: `r://${i}` })) }).length,
+    res.MAX_RESOURCES,
+  );
   assert.deepEqual(res.normalizeResources(null), []);
   assert.match(res.formatResourceList(list), /^file:\/\/\/a \| a \| text\/plain \| 12 bytes$/m);
-  assert.match(res.formatResourceList(Array.from({ length: 50 }, (_, i) => ({ uri: `r://${i}`, name: 'n' })), 100), /list truncated: \d+ more resources/);
+  assert.match(
+    res.formatResourceList(
+      Array.from({ length: 50 }, (_, i) => ({ uri: `r://${i}`, name: 'n' })),
+      100,
+    ),
+    /list truncated: \d+ more resources/,
+  );
   assert.equal(res.formatResourceList([]), '(this server offers no resources)');
 });
 
 test('resources/read: text is capped, blobs are described, one PNG is attached', () => {
   const PNG = 'iVBORw0KGgoAAAANSUhEUg==';
-  const r = res.mapReadResult({ contents: [{ uri: 'f://1', mimeType: 'text/plain', text: 'hello' }, { uri: 'f://2', mimeType: 'image/png', blob: PNG }, { uri: 'f://3', mimeType: 'image/png', blob: PNG }, { uri: 'f://4', mimeType: 'application/zip', blob: 'AAAA'.repeat(10) }] });
+  const r = res.mapReadResult({
+    contents: [
+      { uri: 'f://1', mimeType: 'text/plain', text: 'hello' },
+      { uri: 'f://2', mimeType: 'image/png', blob: PNG },
+      { uri: 'f://3', mimeType: 'image/png', blob: PNG },
+      { uri: 'f://4', mimeType: 'application/zip', blob: 'AAAA'.repeat(10) },
+    ],
+  });
   assert.equal(r.image, PNG);
   assert.match(r.output, /\[resource f:\/\/1 \(text\/plain\)\]\nhello/);
   assert.match(r.output, /f:\/\/3 \(image\/png\)\] \[binary content omitted: \d+ bytes\]/);
@@ -47,8 +75,13 @@ test('resources/read: text is capped, blobs are described, one PNG is attached',
   const big = res.mapReadResult({ contents: [{ uri: 'f://x', text: 'x'.repeat(60_000) }] });
   assert.ok(big.output.length < 50_200);
   assert.match(big.output, /output truncated: \d+ more characters/);
-  assert.match(res.mapReadResult({ contents: [{ uri: 'f://x', text: 'abcdef' }] }, 3).output, /^\[re\n\[output truncated: \d+ more characters\]$/);
-  const huge = res.mapReadResult({ contents: [{ uri: 'f://p', mimeType: 'image/png', blob: PNG + 'A'.repeat(res.MAX_RESOURCE_IMAGE_BASE64) }] });
+  assert.match(
+    res.mapReadResult({ contents: [{ uri: 'f://x', text: 'abcdef' }] }, 3).output,
+    /^\[re\n\[output truncated: \d+ more characters\]$/,
+  );
+  const huge = res.mapReadResult({
+    contents: [{ uri: 'f://p', mimeType: 'image/png', blob: PNG + 'A'.repeat(res.MAX_RESOURCE_IMAGE_BASE64) }],
+  });
   assert.equal(huge.image, undefined);
   assert.match(huge.output, /too large/);
   assert.equal(res.mapReadResult({ nope: 1 }).isError, true);
@@ -57,20 +90,47 @@ test('resources/read: text is capped, blobs are described, one PNG is attached',
 
 test('read_resource argument validation and tool definitions', () => {
   assert.equal(res.readResourceUri({ uri: 'file:///x' }), 'file:///x');
-  for (const bad of [undefined, null, {}, { uri: '' }, { uri: 5 }, { uri: 'a\0b' }, { uri: 'u'.repeat(3000) }]) assert.throws(() => res.readResourceUri(bad));
+  for (const bad of [undefined, null, {}, { uri: '' }, { uri: 5 }, { uri: 'a\0b' }, { uri: 'u'.repeat(3000) }])
+    assert.throws(() => res.readResourceUri(bad));
   const defs = res.resourceToolDefs('gh', { list: 'mcp__gh__mcp_list_resources', read: 'mcp__gh__mcp_read_resource' });
-  assert.deepEqual(defs.map((d) => d.name), ['mcp__gh__mcp_list_resources', 'mcp__gh__mcp_read_resource']);
+  assert.deepEqual(
+    defs.map((d) => d.name),
+    ['mcp__gh__mcp_list_resources', 'mcp__gh__mcp_read_resource'],
+  );
   assert.deepEqual(Object.keys(defs[1].parameters.properties), ['uri', 'template', 'arguments']);
-  assert.deepEqual(res.resourceToolDefs('gh', { list: 'a', read: 'b' }, { list: false, read: true }).map((d) => d.name), ['b']);
+  assert.deepEqual(
+    res.resourceToolDefs('gh', { list: 'a', read: 'b' }, { list: false, read: true }).map((d) => d.name),
+    ['b'],
+  );
 });
 
 test('namespaceTools adds the resource tools, with collision handling and policy keys', () => {
-  const { defs, route } = ts.namespaceTools([{ server: { id: 's1', name: 'gh' }, tools: [{ name: 'mcp_read_resource', description: 'real tool', inputSchema: {} }], resources: { list: true, read: true } }]);
+  const { defs, route } = ts.namespaceTools([
+    {
+      server: { id: 's1', name: 'gh' },
+      tools: [{ name: 'mcp_read_resource', description: 'real tool', inputSchema: {} }],
+      resources: { list: true, read: true },
+    },
+  ]);
   const names = defs.map((d) => d.name);
-  assert.deepEqual(names, ['mcp__gh__mcp_read_resource', 'mcp__gh__mcp_list_resources', 'mcp__gh__mcp_read_resource_2']);
+  assert.deepEqual(names, [
+    'mcp__gh__mcp_read_resource',
+    'mcp__gh__mcp_list_resources',
+    'mcp__gh__mcp_read_resource_2',
+  ]);
   assert.equal(route.get('mcp__gh__mcp_read_resource').kind, undefined);
-  assert.deepEqual(route.get('mcp__gh__mcp_list_resources'), { serverId: 's1', server: 'gh', tool: 'mcp_list_resources', kind: 'list_resources' });
-  assert.deepEqual(route.get('mcp__gh__mcp_read_resource_2'), { serverId: 's1', server: 'gh', tool: 'mcp_read_resource', kind: 'read_resource' });
+  assert.deepEqual(route.get('mcp__gh__mcp_list_resources'), {
+    serverId: 's1',
+    server: 'gh',
+    tool: 'mcp_list_resources',
+    kind: 'list_resources',
+  });
+  assert.deepEqual(route.get('mcp__gh__mcp_read_resource_2'), {
+    serverId: 's1',
+    server: 'gh',
+    tool: 'mcp_read_resource',
+    kind: 'read_resource',
+  });
   // Read-only mode offers only what the user marked read-only: the policy keys are the built-in names.
   const p = { alwaysAllow: false, allowedTools: [], readOnlyTools: ['mcp_read_resource'] };
   assert.equal(ts.decideMcp(p, 'mcp_read_resource', 'readonly').action, 'ask');
@@ -80,16 +140,42 @@ test('namespaceTools adds the resource tools, with collision handling and policy
 // ---- resource templates (pure) -------------------------------------------------------------------------------------
 
 test('resources/templates/list pages are validated, unique and bounded', () => {
-  const list = res.normalizeResourceTemplates({ resourceTemplates: [{ uriTemplate: 'file:///{+path}', name: 'files', mimeType: 'text/plain', description: 'd'.repeat(900) }, { uriTemplate: 'file:///{+path}', name: 'dup' }, { name: 'no template' }, null, { uriTemplate: 'u'.repeat(3000) }, { uriTemplate: 'repo://{owner}/{repo}', title: 'Repo' }] });
-  assert.deepEqual(list.map((t) => t.uriTemplate), ['file:///{+path}', 'repo://{owner}/{repo}']);
+  const list = res.normalizeResourceTemplates({
+    resourceTemplates: [
+      { uriTemplate: 'file:///{+path}', name: 'files', mimeType: 'text/plain', description: 'd'.repeat(900) },
+      { uriTemplate: 'file:///{+path}', name: 'dup' },
+      { name: 'no template' },
+      null,
+      { uriTemplate: 'u'.repeat(3000) },
+      { uriTemplate: 'repo://{owner}/{repo}', title: 'Repo' },
+    ],
+  });
+  assert.deepEqual(
+    list.map((t) => t.uriTemplate),
+    ['file:///{+path}', 'repo://{owner}/{repo}'],
+  );
   assert.equal(list[0].description.length, 500);
   assert.equal(list[1].name, 'repo://{owner}/{repo}');
   assert.deepEqual(res.normalizeResourceTemplates(null), []);
-  assert.equal(res.normalizeResourceTemplates({ resourceTemplates: Array.from({ length: 500 }, (_, i) => ({ uriTemplate: `r://{x}/${i}` })) }).length, res.MAX_TEMPLATES);
+  assert.equal(
+    res.normalizeResourceTemplates({
+      resourceTemplates: Array.from({ length: 500 }, (_, i) => ({ uriTemplate: `r://{x}/${i}` })),
+    }).length,
+    res.MAX_TEMPLATES,
+  );
   assert.equal(res.formatTemplateList([]), '(this server offers no resource templates)');
-  assert.equal(res.formatTemplateList(list).split('\n')[0], 'file:///{+path} | files | text/plain | variables: path | ' + 'd'.repeat(499) + '…');
+  assert.equal(
+    res.formatTemplateList(list).split('\n')[0],
+    'file:///{+path} | files | text/plain | variables: path | ' + 'd'.repeat(499) + '…',
+  );
   assert.match(res.formatTemplateList([{ uriTemplate: 'https://h/{?q}', name: 'q' }]), /unsupported template syntax/);
-  assert.match(res.formatTemplateList(Array.from({ length: 50 }, (_, i) => ({ uriTemplate: `r://{x}/${i}`, name: 'n' })), 120), /list truncated: \d+ more templates/);
+  assert.match(
+    res.formatTemplateList(
+      Array.from({ length: 50 }, (_, i) => ({ uriTemplate: `r://{x}/${i}`, name: 'n' })),
+      120,
+    ),
+    /list truncated: \d+ more templates/,
+  );
 });
 
 test('URI templates: only RFC 6570 levels 1-2 with a literal scheme, nothing that can reach the host', () => {
@@ -99,7 +185,28 @@ test('URI templates: only RFC 6570 levels 1-2 with a literal scheme, nothing tha
   assert.equal(ut.parseUriTemplate('https://api.example.com/{+path}').authority, 'api.example.com');
   assert.equal(ut.parseUriTemplate('users://{id}/profile').authority, null);
   assert.equal(ut.parseUriTemplate('urn:{x}').authority, null);
-  for (const bad of ['', 'x', 'file:///{/p}', 'file:///{?q}', 'file:///{.x}', 'file:///{;x}', 'file:///{&x}', 'file:///{x*}', 'file:///{x:3}', 'file:///{a,b}', 'file:///{}', 'file:///{', 'file:///}x', '{base}/x', '{+base}/x', 'https://{+host}/x', 'https://h{#x}', 'https://user@{+h}.example/x', 'file:///{=x}', 'x'.repeat(3000)])
+  for (const bad of [
+    '',
+    'x',
+    'file:///{/p}',
+    'file:///{?q}',
+    'file:///{.x}',
+    'file:///{;x}',
+    'file:///{&x}',
+    'file:///{x*}',
+    'file:///{x:3}',
+    'file:///{a,b}',
+    'file:///{}',
+    'file:///{',
+    'file:///}x',
+    '{base}/x',
+    '{+base}/x',
+    'https://{+host}/x',
+    'https://h{#x}',
+    'https://user@{+h}.example/x',
+    'file:///{=x}',
+    'x'.repeat(3000),
+  ])
     assert.throws(() => ut.parseUriTemplate(bad), undefined, bad);
 });
 
@@ -127,14 +234,32 @@ test('URI template expansion: encoding, argument validation, scheme/host pinning
   assert.throws(() => ex('repo://{owner}', { owner: 'a\0b' }), /control/);
   assert.throws(() => ex('repo://{owner}', { owner: 'x'.repeat(3000) }), /too long/);
   // Path traversal in every spelling.
-  for (const bad of ['..', '../etc/passwd', 'a/../b', 'a/./b', '.', '..\\windows', '%2e%2e/x', '%2E%2E%2Fetc', '%252e%252e/x', 'a/%2e%2e/b', '%2e/x'])
+  for (const bad of [
+    '..',
+    '../etc/passwd',
+    'a/../b',
+    'a/./b',
+    '.',
+    '..\\windows',
+    '%2e%2e/x',
+    '%2E%2E%2Fetc',
+    '%252e%252e/x',
+    'a/%2e%2e/b',
+    '%2e/x',
+  ])
     assert.throws(() => ex('file:///{+path}', { path: bad }), /traversal/, bad);
   assert.throws(() => ex('repo://{owner}/x', { owner: '..' }), /traversal/);
   // ...but names that merely contain dots are fine.
   assert.equal(ex('file:///{+path}', { path: 'a/.hidden/b..c/..d' }), 'file:///a/.hidden/b..c/..d');
   // The scheme and a literal host cannot be changed by any value.
-  assert.equal(ex('https://api.example.com/{+path}', { path: '@evil.example/x' }), 'https://api.example.com/@evil.example/x');
-  assert.equal(ex('https://api.example.com/{+path}', { path: '/evil.example/x' }), 'https://api.example.com//evil.example/x');
+  assert.equal(
+    ex('https://api.example.com/{+path}', { path: '@evil.example/x' }),
+    'https://api.example.com/@evil.example/x',
+  );
+  assert.equal(
+    ex('https://api.example.com/{+path}', { path: '/evil.example/x' }),
+    'https://api.example.com//evil.example/x',
+  );
   assert.equal(new URL(ex('https://api.example.com/{+path}', { path: '@evil.example/x' })).hostname, 'api.example.com');
   assert.equal(ex('users://{id}/profile', { id: 'evil.example#' }), 'users://evil.example%23/profile');
   assert.equal(ex('users://{id}/profile', { id: 'a@b:80' }), 'users://a%40b%3A80/profile');
@@ -144,25 +269,62 @@ test('URI template expansion: encoding, argument validation, scheme/host pinning
 
 test('read_resource targets: a uri, or a template with arguments, never both', () => {
   assert.deepEqual(res.readResourceTarget({ uri: 'f://x' }), { uri: 'f://x' });
-  assert.deepEqual(res.readResourceTarget({ template: 'file:///{+p}', arguments: { p: 'a' } }), { template: 'file:///{+p}', arguments: { p: 'a' } });
-  assert.deepEqual(res.readResourceTarget({ uri: '', template: 'file:///{+p}' }), { template: 'file:///{+p}', arguments: undefined });
+  assert.deepEqual(res.readResourceTarget({ template: 'file:///{+p}', arguments: { p: 'a' } }), {
+    template: 'file:///{+p}',
+    arguments: { p: 'a' },
+  });
+  assert.deepEqual(res.readResourceTarget({ uri: '', template: 'file:///{+p}' }), {
+    template: 'file:///{+p}',
+    arguments: undefined,
+  });
   assert.throws(() => res.readResourceTarget({ uri: 'f://x', template: 'file:///{+p}' }), /not both/);
-  assert.throws(() => res.readResourceTarget({ uri: 'f://x', arguments: { a: 'b' } }), /only used together with a template/);
+  assert.throws(
+    () => res.readResourceTarget({ uri: 'f://x', arguments: { a: 'b' } }),
+    /only used together with a template/,
+  );
   assert.throws(() => res.readResourceTarget({ template: 5 }), /invalid resource template/);
   assert.throws(() => res.readResourceTarget({}), /needs a uri/);
   const templates = [{ uriTemplate: 'file:///{+p}', name: 'f' }];
   assert.equal(res.resolveTemplateUri(templates, 'file:///{+p}', { p: 'a b' }), 'file:///a%20b');
   assert.throws(() => res.resolveTemplateUri(templates, 'file:///{p}', { p: 'a' }), /unknown resource template/);
-  assert.throws(() => res.resolveTemplateUri(templates, 'https://evil.example/{+p}', { p: 'a' }), /unknown resource template/);
-  const defs = res.resourceToolDefs('gh', { list: 'l', read: 'r', templates: 't' }, { list: true, read: true, templates: true });
-  assert.deepEqual(defs.map((d) => d.name), ['l', 'r', 't']);
+  assert.throws(
+    () => res.resolveTemplateUri(templates, 'https://evil.example/{+p}', { p: 'a' }),
+    /unknown resource template/,
+  );
+  const defs = res.resourceToolDefs(
+    'gh',
+    { list: 'l', read: 'r', templates: 't' },
+    { list: true, read: true, templates: true },
+  );
+  assert.deepEqual(
+    defs.map((d) => d.name),
+    ['l', 'r', 't'],
+  );
   assert.deepEqual(Object.keys(defs[1].parameters.properties), ['uri', 'template', 'arguments']);
   assert.equal(defs[1].parameters.required, undefined);
-  assert.deepEqual(res.resourceToolDefs('gh', { list: 'l', read: 'r' }).map((d) => d.name), ['l', 'r']);
-  const { defs: all, route } = ts.namespaceTools([{ server: { id: 's1', name: 'gh' }, tools: [], resources: { list: true, read: true, templates: true } }]);
-  assert.deepEqual(all.map((d) => d.name), ['mcp__gh__mcp_list_resources', 'mcp__gh__mcp_read_resource', 'mcp__gh__mcp_list_resource_templates']);
-  assert.deepEqual(route.get('mcp__gh__mcp_list_resource_templates'), { serverId: 's1', server: 'gh', tool: 'mcp_list_resource_templates', kind: 'list_resource_templates' });
-  assert.deepEqual(route.get('mcp__gh__mcp_read_resource'), { serverId: 's1', server: 'gh', tool: 'mcp_read_resource', kind: 'read_resource' });
+  assert.deepEqual(
+    res.resourceToolDefs('gh', { list: 'l', read: 'r' }).map((d) => d.name),
+    ['l', 'r'],
+  );
+  const { defs: all, route } = ts.namespaceTools([
+    { server: { id: 's1', name: 'gh' }, tools: [], resources: { list: true, read: true, templates: true } },
+  ]);
+  assert.deepEqual(
+    all.map((d) => d.name),
+    ['mcp__gh__mcp_list_resources', 'mcp__gh__mcp_read_resource', 'mcp__gh__mcp_list_resource_templates'],
+  );
+  assert.deepEqual(route.get('mcp__gh__mcp_list_resource_templates'), {
+    serverId: 's1',
+    server: 'gh',
+    tool: 'mcp_list_resource_templates',
+    kind: 'list_resource_templates',
+  });
+  assert.deepEqual(route.get('mcp__gh__mcp_read_resource'), {
+    serverId: 's1',
+    server: 'gh',
+    tool: 'mcp_read_resource',
+    kind: 'read_resource',
+  });
   assert.equal(res.isResourceTool('mcp_list_resource_templates'), true);
   // Read-only mode: the template list needs its own read-only mark.
   const p = { alwaysAllow: false, allowedTools: [], readOnlyTools: ['mcp_list_resources'] };
@@ -172,25 +334,71 @@ test('read_resource targets: a uri, or a template with arguments, never both', (
 // ---- prompts (pure) ------------------------------------------------------------------------------------------------
 
 test('prompts: validation, argument handling and rendering', () => {
-  const list = prm.normalizePrompts({ prompts: [{ name: 'review', title: 'Review', description: 'Review code', arguments: [{ name: 'code', required: true, description: 'The code' }, { name: 'style' }, { name: 'code' }, { nope: 1 }] }, { name: 'review' }, { name: '' }, null, { name: 'plain' }] });
-  assert.deepEqual(list.map((p) => p.name), ['review', 'plain']);
-  assert.deepEqual(list[0].arguments, [{ name: 'code', description: 'The code', required: true }, { name: 'style', description: '', required: false }]);
+  const list = prm.normalizePrompts({
+    prompts: [
+      {
+        name: 'review',
+        title: 'Review',
+        description: 'Review code',
+        arguments: [
+          { name: 'code', required: true, description: 'The code' },
+          { name: 'style' },
+          { name: 'code' },
+          { nope: 1 },
+        ],
+      },
+      { name: 'review' },
+      { name: '' },
+      null,
+      { name: 'plain' },
+    ],
+  });
+  assert.deepEqual(
+    list.map((p) => p.name),
+    ['review', 'plain'],
+  );
+  assert.deepEqual(list[0].arguments, [
+    { name: 'code', description: 'The code', required: true },
+    { name: 'style', description: '', required: false },
+  ]);
   assert.deepEqual(prm.missingPromptArgs(list[0], { code: '  ' }), ['code']);
   assert.deepEqual(prm.missingPromptArgs(list[0], { code: 'x' }), []);
   assert.deepEqual(prm.buildPromptArguments(list[0], { code: 'x', style: '', extra: 'dropped' }), { code: 'x' });
   assert.equal(prm.buildPromptArguments(list[0], { code: 'x'.repeat(20_000) }).code.length, prm.MAX_ARG_VALUE);
   // A single user message is inserted bare; anything else keeps the roles.
-  assert.deepEqual(prm.renderPromptMessages({ messages: [{ role: 'user', content: { type: 'text', text: 'Review this' } }] }), { text: 'Review this', truncated: false });
-  const multi = prm.renderPromptMessages({ messages: [{ role: 'user', content: { type: 'text', text: 'Q' } }, { role: 'assistant', content: { type: 'text', text: 'A' } }, { role: 'user', content: { type: 'resource', resource: { uri: 'f://x', text: 'body' } } }, { role: 'user', content: { type: 'image', data: 'xx' } }] });
+  assert.deepEqual(
+    prm.renderPromptMessages({ messages: [{ role: 'user', content: { type: 'text', text: 'Review this' } }] }),
+    { text: 'Review this', truncated: false },
+  );
+  const multi = prm.renderPromptMessages({
+    messages: [
+      { role: 'user', content: { type: 'text', text: 'Q' } },
+      { role: 'assistant', content: { type: 'text', text: 'A' } },
+      { role: 'user', content: { type: 'resource', resource: { uri: 'f://x', text: 'body' } } },
+      { role: 'user', content: { type: 'image', data: 'xx' } },
+    ],
+  });
   assert.equal(multi.text, 'User: Q\n\nAssistant: A\n\nUser: [resource f://x]\nbody\n\nUser: [image omitted]');
-  assert.deepEqual(prm.renderPromptMessages({ messages: [{ role: 'user', content: { type: 'text', text: 'x'.repeat(30) } }] }, 10), { text: 'x'.repeat(10), truncated: true });
+  assert.deepEqual(
+    prm.renderPromptMessages({ messages: [{ role: 'user', content: { type: 'text', text: 'x'.repeat(30) } }] }, 10),
+    { text: 'x'.repeat(10), truncated: true },
+  );
   assert.deepEqual(prm.renderPromptMessages({}), { text: '', truncated: false });
 });
 
 // ---- HTTP client: cancellation, list_changed, OAuth hooks ----------------------------------------------------------
 
-const json = (obj, headers = {}, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
-const initResult = (id, caps = { tools: {} }) => json({ jsonrpc: '2.0', id, result: { protocolVersion: '2025-06-18', capabilities: caps, serverInfo: { name: 'remote' } } }, { 'mcp-session-id': 's1' });
+const json = (obj, headers = {}, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
+const initResult = (id, caps = { tools: {} }) =>
+  json(
+    {
+      jsonrpc: '2.0',
+      id,
+      result: { protocolVersion: '2025-06-18', capabilities: caps, serverInfo: { name: 'remote' } },
+    },
+    { 'mcp-session-id': 's1' },
+  );
 
 test('HTTP: aborting returns at once, tells the server, and never reads the late answer', async () => {
   const calls = [];
@@ -214,7 +422,10 @@ test('HTTP: aborting returns at once, tells the server, and never reads the late
   assert.ok(Date.now() - t < 200);
   await new Promise((r) => setTimeout(r, 20));
   const cancel = calls.find((b) => b?.method === 'notifications/cancelled');
-  assert.deepEqual(cancel.params, { requestId: calls.find((b) => b?.method === 'tools/call').id, reason: 'cancelled by the user' });
+  assert.deepEqual(cancel.params, {
+    requestId: calls.find((b) => b?.method === 'tools/call').id,
+    reason: 'cancelled by the user',
+  });
   release(); // the late response arrives and is dropped without effect
   await new Promise((r) => setTimeout(r, 20));
   // Already-aborted signals do not even start the call.
@@ -230,7 +441,14 @@ test('HTTP: resources and prompts list_changed bump their own epochs', async () 
     const body = init.body ? JSON.parse(init.body) : null;
     if (body?.method === 'initialize') return initResult(body.id);
     if (!body || body.method?.startsWith('notifications/')) return new Response(null, { status: 202 });
-    const sse = ['notifications/resources/list_changed', 'notifications/prompts/list_changed', 'notifications/prompts/list_changed'].map((method) => `data: ${JSON.stringify({ jsonrpc: '2.0', method })}\n\n`).join('') + `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} })}\n\n`;
+    const sse =
+      [
+        'notifications/resources/list_changed',
+        'notifications/prompts/list_changed',
+        'notifications/prompts/list_changed',
+      ]
+        .map((method) => `data: ${JSON.stringify({ jsonrpc: '2.0', method })}\n\n`)
+        .join('') + `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} })}\n\n`;
     return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
   };
   const c = new McpHttpClient({ url: 'https://x.dev/mcp', headers: {}, fetch });
@@ -251,15 +469,33 @@ test('HTTP OAuth hooks: bearer header, one refresh and retry after 401, then sig
     return json({ jsonrpc: '2.0', id: body.id, result: { ok: true } });
   };
   const auth = { header: async () => `Bearer ${token}`, refresh: async () => (refreshes++, (token = 'new'), true) };
-  const c = new McpHttpClient({ url: 'https://x.dev/mcp', headers: { Authorization: 'Bearer configured' }, fetch, auth });
+  const c = new McpHttpClient({
+    url: 'https://x.dev/mcp',
+    headers: { Authorization: 'Bearer configured' },
+    fetch,
+    auth,
+  });
   assert.deepEqual(await c.request('ping', {}), { ok: true });
   assert.equal(refreshes, 1);
   assert.deepEqual(seen.slice(0, 2), ['Bearer old', 'Bearer new']);
-  assert.ok(seen.every((h) => h !== 'Bearer configured'), 'the OAuth token replaces a configured Authorization header');
+  assert.ok(
+    seen.every((h) => h !== 'Bearer configured'),
+    'the OAuth token replaces a configured Authorization header',
+  );
   // A refresh that fails (or tokens that stay rejected) end in the sign-in message, not in a retry loop.
-  const bad = new McpHttpClient({ url: 'https://x.dev/mcp', headers: {}, fetch, auth: { header: async () => 'Bearer nope', refresh: async () => false } });
+  const bad = new McpHttpClient({
+    url: 'https://x.dev/mcp',
+    headers: {},
+    fetch,
+    auth: { header: async () => 'Bearer nope', refresh: async () => false },
+  });
   await assert.rejects(bad.request('ping', {}), new RegExp(SIGN_IN_NEEDED));
-  const stuck = new McpHttpClient({ url: 'https://x.dev/mcp', headers: {}, fetch, auth: { header: async () => 'Bearer nope', refresh: async () => true } });
+  const stuck = new McpHttpClient({
+    url: 'https://x.dev/mcp',
+    headers: {},
+    fetch,
+    auth: { header: async () => 'Bearer nope', refresh: async () => true },
+  });
   await assert.rejects(stuck.request('ping', {}), new RegExp(SIGN_IN_NEEDED));
   // Without OAuth a 401 stays the plain HTTP error.
   const plain = new McpHttpClient({ url: 'https://x.dev/mcp', headers: {}, fetch });
@@ -271,14 +507,25 @@ test('HTTP OAuth hooks: bearer header, one refresh and retry after 401, then sig
 let seq = 0;
 async function addServer(over = {}) {
   const id = `ex${++seq}`;
-  const server = { ...blankServer(id, 'stdio'), name: over.name ?? 'docs', command: 'node', args: ['s.js'], ...over.config };
+  const server = {
+    ...blankServer(id, 'stdio'),
+    name: over.name ?? 'docs',
+    command: 'node',
+    args: ['s.js'],
+    ...over.config,
+  };
   state.mcp.servers[id] = {
-    tools: [{ name: 'search', description: 'Search', inputSchema: { type: 'object' } }, { name: 'slow', description: 'Hangs', inputSchema: { type: 'object' } }],
+    tools: [
+      { name: 'search', description: 'Search', inputSchema: { type: 'object' } },
+      { name: 'slow', description: 'Hangs', inputSchema: { type: 'object' } },
+    ],
     call: (name) => ({ content: [{ type: 'text', text: `${name} ok` }] }),
     resources: [{ uri: 'doc://readme', name: 'README', mimeType: 'text/markdown', size: 42 }],
     read: (uri) => ({ contents: [{ uri, mimeType: 'text/markdown', text: '# Title\n' + 'x'.repeat(60_000) }] }),
     prompts: [{ name: 'review', description: 'Review code', arguments: [{ name: 'code', required: true }] }],
-    getPrompt: (name, args) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Please review: ${args.code}` } }] }),
+    getPrompt: (name, args) => ({
+      messages: [{ role: 'user', content: { type: 'text', text: `Please review: ${args.code}` } }],
+    }),
     ...over.fake,
   };
   await rt.saveMcpServer(server);
@@ -302,7 +549,7 @@ async function run(script, o = {}) {
       turn: async (input) => {
         offered.push(input.tools.map((t) => t.name));
         const next = script[i++];
-        return typeof next === 'function' ? next() : next ?? { parts: [{ type: 'text', text: 'done' }] };
+        return typeof next === 'function' ? next() : (next ?? { parts: [{ type: 'text', text: 'done' }] });
       },
     },
     providerId: 'p',
@@ -313,7 +560,10 @@ async function run(script, o = {}) {
     signal,
     onText: () => {},
     onMessage: async (m) => {
-      if (m.role === 'tool') outputs.push(...m.parts.map((p) => ({ output: p.output, isError: !!p.isError, ...(p.image ? { image: p.image } : {}) })));
+      if (m.role === 'tool')
+        outputs.push(
+          ...m.parts.map((p) => ({ output: p.output, isError: !!p.isError, ...(p.image ? { image: p.image } : {}) })),
+        );
     },
     approve: async (req) => (approvals.push(req), o.approve ? o.approve(req) : true),
   });
@@ -326,9 +576,20 @@ const call = (name, args = {}) => ({ parts: [{ type: 'tool_call', id: `c${Math.r
 test('servers with resources get list/read tools; calls ask like tool calls; output is capped', async () => {
   state.reset();
   const id = await addServer();
-  const r = await run([call('mcp__docs__mcp_list_resources'), call('mcp__docs__mcp_read_resource', { uri: 'doc://readme' })]);
-  assert.ok(r.offered[0].includes('mcp__docs__mcp_list_resources') && r.offered[0].includes('mcp__docs__mcp_read_resource'));
-  assert.deepEqual(r.approvals.map((a) => [a.kind, a.tool, a.args]), [['mcp', 'mcp_list_resources', {}], ['mcp', 'mcp_read_resource', { uri: 'doc://readme' }]]);
+  const r = await run([
+    call('mcp__docs__mcp_list_resources'),
+    call('mcp__docs__mcp_read_resource', { uri: 'doc://readme' }),
+  ]);
+  assert.ok(
+    r.offered[0].includes('mcp__docs__mcp_list_resources') && r.offered[0].includes('mcp__docs__mcp_read_resource'),
+  );
+  assert.deepEqual(
+    r.approvals.map((a) => [a.kind, a.tool, a.args]),
+    [
+      ['mcp', 'mcp_list_resources', {}],
+      ['mcp', 'mcp_read_resource', { uri: 'doc://readme' }],
+    ],
+  );
   assert.match(r.outputs[0].output, /^doc:\/\/readme \| README \| text\/markdown \| 42 bytes$/);
   assert.match(r.outputs[1].output, /^\[resource doc:\/\/readme \(text\/markdown\)\]\n# Title/);
   assert.match(r.outputs[1].output, /output truncated/);
@@ -353,7 +614,9 @@ test('resource tools: read-only mode needs the read-only mark; servers without r
   assert.ok(!r.offered[0].some((n) => n.includes('resource')));
   await rt.patchMcpServer(id, { readOnlyTools: ['mcp_list_resources'] });
   r = await run([], { access: 'readonly' });
-  assert.ok(r.offered[0].includes('mcp__docs__mcp_list_resources') && !r.offered[0].includes('mcp__docs__mcp_read_resource'));
+  assert.ok(
+    r.offered[0].includes('mcp__docs__mcp_list_resources') && !r.offered[0].includes('mcp__docs__mcp_read_resource'),
+  );
   state.reset();
   await addServer({ fake: { resources: undefined, prompts: undefined } });
   r = await run([]);
@@ -369,7 +632,10 @@ test('resources/list is cached until resources/list_changed', async () => {
   await rt.listMcpResources(server);
   assert.equal(count(), 1);
   state.mcp.servers[id].resourcesEpoch = 1;
-  state.mcp.servers[id].resources = [{ uri: 'doc://a', name: 'a' }, { uri: 'doc://b', name: 'b' }];
+  state.mcp.servers[id].resources = [
+    { uri: 'doc://a', name: 'a' },
+    { uri: 'doc://b', name: 'b' },
+  ];
   assert.equal((await rt.listMcpResources(server)).length, 2);
   assert.equal(count(), 2);
 });
@@ -383,15 +649,31 @@ const reads = () => state.mcp.requests.filter((q) => q.method === 'resources/rea
 
 test('resource templates: listed by a built-in tool, read with template + arguments, approvals as for resources', async () => {
   state.reset();
-  const id = await addServer({ fake: { resourceTemplates: TEMPLATES, read: (uri) => ({ contents: [{ uri, mimeType: 'text/plain', text: `content of ${uri}` }] }) } });
+  const id = await addServer({
+    fake: {
+      resourceTemplates: TEMPLATES,
+      read: (uri) => ({ contents: [{ uri, mimeType: 'text/plain', text: `content of ${uri}` }] }),
+    },
+  });
   const r = await run([
     call('mcp__docs__mcp_list_resource_templates'),
     call('mcp__docs__mcp_read_resource', { template: 'doc://files/{+path}', arguments: { path: 'src/a b.txt' } }),
     call('mcp__docs__mcp_read_resource', { template: 'doc://users/{id}', arguments: { id: 'a/b' } }),
   ]);
   assert.ok(r.offered[0].includes('mcp__docs__mcp_list_resource_templates'));
-  assert.deepEqual(r.approvals.map((a) => [a.kind, a.tool]), [['mcp', 'mcp_list_resource_templates'], ['mcp', 'mcp_read_resource'], ['mcp', 'mcp_read_resource']]);
-  assert.deepEqual(r.approvals[1].args, { template: 'doc://files/{+path}', arguments: { path: 'src/a b.txt' } }, 'the approval card shows what the model asked for');
+  assert.deepEqual(
+    r.approvals.map((a) => [a.kind, a.tool]),
+    [
+      ['mcp', 'mcp_list_resource_templates'],
+      ['mcp', 'mcp_read_resource'],
+      ['mcp', 'mcp_read_resource'],
+    ],
+  );
+  assert.deepEqual(
+    r.approvals[1].args,
+    { template: 'doc://files/{+path}', arguments: { path: 'src/a b.txt' } },
+    'the approval card shows what the model asked for',
+  );
   const lines = r.outputs[0].output.split('\n');
   assert.equal(lines[0], 'doc://files/{+path} | Files | text/plain | variables: path');
   assert.equal(lines[1], 'doc://users/{id} | User | variables: id | by id');
@@ -401,7 +683,10 @@ test('resource templates: listed by a built-in tool, read with template + argume
   assert.equal(r.log.at(-1).tool, 'mcp__docs__mcp_read_resource');
   // "Always allow" by the built-in name skips the question, like for resources.
   await rt.patchMcpServer(id, { allowedTools: ['mcp_list_resource_templates', 'mcp_read_resource'] });
-  const r2 = await run([call('mcp__docs__mcp_list_resource_templates'), call('mcp__docs__mcp_read_resource', { template: 'doc://users/{id}', arguments: { id: 'u1' } })]);
+  const r2 = await run([
+    call('mcp__docs__mcp_list_resource_templates'),
+    call('mcp__docs__mcp_read_resource', { template: 'doc://users/{id}', arguments: { id: 'u1' } }),
+  ]);
   assert.equal(r2.approvals.length, 0);
   assert.equal(r2.log.at(-1).rule, 'always allow MCP tool docs/mcp_read_resource');
   assert.equal(reads().at(-1), 'doc://users/u1');
@@ -423,7 +708,10 @@ test('resource templates: unknown templates, bad arguments and traversal are too
   ];
   const r = await run(bad.map((a) => call('mcp__docs__mcp_read_resource', a)));
   assert.equal(r.outputs.length, bad.length);
-  assert.ok(r.outputs.every((o) => o.isError), JSON.stringify(r.outputs));
+  assert.ok(
+    r.outputs.every((o) => o.isError),
+    JSON.stringify(r.outputs),
+  );
   assert.match(r.outputs[0].output, /unknown resource template/);
   assert.match(r.outputs[1].output, /"path" is missing/);
   assert.match(r.outputs[2].output, /traversal/);
@@ -438,7 +726,13 @@ test('resource templates: unknown templates, bad arguments and traversal are too
 test('resource templates: servers without the method list none, caching follows list_changed, capability is required', async () => {
   state.reset();
   const id = await addServer();
-  let r = await run([call('mcp__docs__mcp_list_resource_templates'), call('mcp__docs__mcp_read_resource', { template: 'doc://files/{+path}', arguments: { path: 'a' } })], { approve: () => true });
+  let r = await run(
+    [
+      call('mcp__docs__mcp_list_resource_templates'),
+      call('mcp__docs__mcp_read_resource', { template: 'doc://files/{+path}', arguments: { path: 'a' } }),
+    ],
+    { approve: () => true },
+  );
   assert.equal(r.outputs[0].isError, false);
   assert.equal(r.outputs[0].output, '(this server offers no resource templates)');
   assert.match(r.outputs[1].output, /unknown resource template/);
@@ -457,7 +751,10 @@ test('resource templates: servers without the method list none, caching follows 
   assert.equal(count(), 2);
   // A template the cache does not know is looked up once more before it is refused.
   state.mcp.servers[id2].resourceTemplates = [TEMPLATES[0], TEMPLATES[1]];
-  assert.equal((await rt.readMcpResourceTarget(server, { template: 'doc://users/{id}', arguments: { id: '7' } })).isError, false);
+  assert.equal(
+    (await rt.readMcpResourceTarget(server, { template: 'doc://users/{id}', arguments: { id: '7' } })).isError,
+    false,
+  );
   assert.equal(reads().at(-1), 'doc://users/7');
   // No resources capability: neither tool nor listing.
   state.reset();
@@ -501,12 +798,18 @@ test('prompts are listed for the picker and fetched only when the user asks', as
   await addServer({ name: 'bare', fake: { prompts: undefined } });
   const groups = await rt.listPromptsForPicker(null);
   const docs = groups.find((g) => g.server.name === 'docs');
-  assert.deepEqual(docs.prompts.map((p) => p.name), ['review']);
+  assert.deepEqual(
+    docs.prompts.map((p) => p.name),
+    ['review'],
+  );
   assert.deepEqual(groups.find((g) => g.server.name === 'bare').prompts, []);
   assert.ok(!state.mcp.requests.some((q) => q.method === 'prompts/get'), 'listing never renders a prompt');
   const out = await rt.getMcpPrompt(docs.server, docs.prompts[0], { code: 'fn()', ignored: 'x' });
   assert.equal(out.text, 'Please review: fn()');
-  assert.deepEqual(state.mcp.requests.find((q) => q.method === 'prompts/get').params, { name: 'review', arguments: { code: 'fn()' } });
+  assert.deepEqual(state.mcp.requests.find((q) => q.method === 'prompts/get').params, {
+    name: 'review',
+    arguments: { code: 'fn()' },
+  });
   // Prompts are not offered to the model as tools.
   const r = await run([]);
   assert.ok(!r.offered[0].some((n) => n.includes('review') || n.includes('prompt')));

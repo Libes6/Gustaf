@@ -67,7 +67,8 @@ export function mergeHits<T extends { messageId: number }>(shown: readonly T[], 
  * arrives); otherwise it moves like `moveHighlight` (wrapping at the ends, also when everything is loaded).
  */
 export function arrowDown(current: number, count: number, hasMore: boolean): { next: number; loadMore: boolean } {
-  if (hasMore && count > 0 && current >= count - 1) return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
+  if (hasMore && count > 0 && current >= count - 1)
+    return { next: Math.max(0, Math.min(current, count - 1)), loadMore: true };
   return { next: moveHighlight(current, 1, count), loadMore: false };
 }
 
@@ -106,5 +107,8 @@ type KeyLike = { key: string; code?: string; metaKey: boolean; ctrlKey?: boolean
  */
 export function isSearchShortcut(e: KeyLike): boolean {
   // Read the fields one by one: a real KeyboardEvent keeps them as prototype getters, so spreading it would copy nothing.
-  return matches({ key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: !!e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey }, "search");
+  return matches(
+    { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: !!e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey },
+    "search",
+  );
 }

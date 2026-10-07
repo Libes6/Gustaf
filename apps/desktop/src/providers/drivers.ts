@@ -5,7 +5,12 @@ import type { ProviderConfig } from "./types";
 
 export type Driver = "claude" | "codex" | "cursor" | "grok";
 export const PINNED: Driver[] = ["claude", "codex", "cursor", "grok"];
-export const DRIVER_NAMES: Record<Driver, string> = { claude: "Claude", codex: "GPT / Codex", cursor: "Cursor", grok: "Grok" };
+export const DRIVER_NAMES: Record<Driver, string> = {
+  claude: "Claude",
+  codex: "GPT / Codex",
+  cursor: "Cursor",
+  grok: "Grok",
+};
 
 const XAI = /^https:\/\/api\.x\.ai(?:\/|$)/i;
 
@@ -25,5 +30,8 @@ export function orderProviders<T extends Pick<ProviderConfig, "kind" | "cli" | "
     const d = driverOf(p);
     return d ? PINNED.indexOf(d) : PINNED.length;
   };
-  return list.map((p, i) => ({ p, i, r: rank(p) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.p);
+  return list
+    .map((p, i) => ({ p, i, r: rank(p) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.p);
 }

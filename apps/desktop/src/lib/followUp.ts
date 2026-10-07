@@ -29,12 +29,18 @@ export function followUpPlan(mode: FollowUpAction, canSteer: boolean): FollowUpP
 /** Preserve FIFO: only the clarifications at the head of the queue may join the running turn; the first normal message stops the scan. */
 export function leadingClarifications(items: readonly PendingMessage[]): PendingMessage[] {
   const out: PendingMessage[] = [];
-  for (const item of items) { if (!item.clarify) break; out.push(item); }
+  for (const item of items) {
+    if (!item.clarify) break;
+    out.push(item);
+  }
   return out;
 }
 
 /** The queued message to start next, or null. Never while the chat has a run (or a pending start), so a chat never has two runs. */
-export function nextQueued(q: QueueState | undefined, s: { running: boolean; coordinatorBusy: boolean; draining: boolean; aborting: boolean; loaded: boolean }): PendingMessage | null {
+export function nextQueued(
+  q: QueueState | undefined,
+  s: { running: boolean; coordinatorBusy: boolean; draining: boolean; aborting: boolean; loaded: boolean },
+): PendingMessage | null {
   if (!q || q.paused || s.running || s.coordinatorBusy || s.draining || s.aborting || !s.loaded) return null;
   return q.items[0] ?? null;
 }

@@ -15,8 +15,15 @@ function useFileNames(root: string, taskId: string, enabled: boolean): string[] 
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    worktrees.diff(root, taskId).then((d) => { if (alive) setNames(d.files.map((f) => f.path)); }, () => {});
-    return () => { alive = false; };
+    worktrees.diff(root, taskId).then(
+      (d) => {
+        if (alive) setNames(d.files.map((f) => f.path));
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
   }, [root, taskId, enabled]);
   return names;
 }
@@ -28,7 +35,9 @@ function Entry({ root, w, onDiscard }: { root: string; w: InterruptedWork; onDis
   return (
     <article className="agent-card" aria-label={w.branch}>
       <div className="agent-card-body">
-        <div className="agent-card-title"><strong title={w.branch}>{w.branch}</strong></div>
+        <div className="agent-card-title">
+          <strong title={w.branch}>{w.branch}</strong>
+        </div>
         <div className="agent-card-meta">
           <span>{commits}</span>
           <span>{t("interruptedFiles", { count: w.files })}</span>
@@ -36,12 +45,17 @@ function Entry({ root, w, onDiscard }: { root: string; w: InterruptedWork; onDis
         </div>
         {names.length > 0 && (
           <div className="agent-card-note" title={names.join("\n")}>
-            {names.slice(0, SHOWN_FILES).join(", ")}{names.length > SHOWN_FILES ? `, +${names.length - SHOWN_FILES}` : ""}
+            {names.slice(0, SHOWN_FILES).join(", ")}
+            {names.length > SHOWN_FILES ? `, +${names.length - SHOWN_FILES}` : ""}
           </div>
         )}
         <div className="agent-card-actions">
-          <button className="btn-soft" onClick={() => void Promise.resolve(revealItemInDir(w.path)).catch(() => {})}><FolderOpen size={11} /> {t("interruptedOpen")}</button>
-          <button className="btn-soft" onClick={onDiscard}><Trash2 size={11} /> {t("interruptedDiscard")}</button>
+          <button className="btn-soft" onClick={() => void Promise.resolve(revealItemInDir(w.path)).catch(() => {})}>
+            <FolderOpen size={11} /> {t("interruptedOpen")}
+          </button>
+          <button className="btn-soft" onClick={onDiscard}>
+            <Trash2 size={11} /> {t("interruptedDiscard")}
+          </button>
         </div>
       </div>
     </article>
@@ -76,7 +90,17 @@ export function InterruptedWorkSection({ root, items }: { root: string; items: r
     <section aria-label={t("interruptedTitle")}>
       <h3 className="agents-group">{t("interruptedTitle")}</h3>
       <div className="hint">{t("interruptedHint")}</div>
-      {items.map((w) => <Entry key={w.taskId} root={root} w={w} onDiscard={() => { setError(""); setAsking(w); }} />)}
+      {items.map((w) => (
+        <Entry
+          key={w.taskId}
+          root={root}
+          w={w}
+          onDiscard={() => {
+            setError("");
+            setAsking(w);
+          }}
+        />
+      ))}
       {asking && (
         <ConfirmDialog
           title={t("interruptedDiscardTitle", { branch: asking.branch })}
@@ -84,10 +108,25 @@ export function InterruptedWorkSection({ root, items }: { root: string; items: r
           danger
           busy={busy}
           onConfirm={() => void discard()}
-          onCancel={() => { if (!busy) setAsking(null); }}
+          onCancel={() => {
+            if (!busy) setAsking(null);
+          }}
         >
-          <p>{t("interruptedDiscardBody", { branch: asking.branch, files: asking.files, commits: asking.commits === null ? t("interruptedCommitsSome") : t("interruptedCommits", { count: asking.commits }) })}</p>
-          {error && <div className="error-box" role="alert">{error}</div>}
+          <p>
+            {t("interruptedDiscardBody", {
+              branch: asking.branch,
+              files: asking.files,
+              commits:
+                asking.commits === null
+                  ? t("interruptedCommitsSome")
+                  : t("interruptedCommits", { count: asking.commits }),
+            })}
+          </p>
+          {error && (
+            <div className="error-box" role="alert">
+              {error}
+            </div>
+          )}
         </ConfirmDialog>
       )}
     </section>

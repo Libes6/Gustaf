@@ -10,7 +10,17 @@
 import type { Part } from "../../providers/types.ts";
 import { IMAGE_OMITTED } from "../exportChats.ts";
 import {
-  LIMITS, capMessages, cleanArgs, cleanText, pairTools, rec, str, titleFrom, toMs, type ImportedChat, type ImportedMessage,
+  LIMITS,
+  capMessages,
+  cleanArgs,
+  cleanText,
+  pairTools,
+  rec,
+  str,
+  titleFrom,
+  toMs,
+  type ImportedChat,
+  type ImportedMessage,
 } from "./common.ts";
 
 type Node = { id?: unknown; parent?: unknown; children?: unknown; message?: unknown };
@@ -22,7 +32,8 @@ const MAX_WALK = 200_000;
 /** Node ids from the root to the shown leaf. */
 export function threadPath(mapping: Record<string, Node>, currentNode: unknown): string[] {
   // Own keys only: an id like "constructor" must not resolve to something on Object.prototype.
-  const has = (k: unknown): k is string => str(k) && Object.prototype.hasOwnProperty.call(mapping, k) && rec(mapping[k]);
+  const has = (k: unknown): k is string =>
+    str(k) && Object.prototype.hasOwnProperty.call(mapping, k) && rec(mapping[k]);
   const path: string[] = [];
   const seen = new Set<string>();
   let id: string | undefined = has(currentNode) ? currentNode : undefined;
@@ -52,7 +63,8 @@ type Content = { text: string; code: boolean };
 function contentOf(c: unknown): Content | null {
   if (!rec(c)) return null;
   const type = str(c.content_type) ? c.content_type : "";
-  if (["thoughts", "reasoning_recap", "user_editable_context", "model_editable_context", "system_error"].includes(type)) return null;
+  if (["thoughts", "reasoning_recap", "user_editable_context", "model_editable_context", "system_error"].includes(type))
+    return null;
   if (type === "code") return str(c.text) ? { text: c.text, code: true } : null;
   if (Array.isArray(c.parts)) {
     const pieces = c.parts.map((p: unknown) => {
@@ -85,7 +97,12 @@ export function parseChatGptConversation(input: unknown, fallbackId = ""): Impor
   }
   if (!rec(conv) || !rec(conv.mapping)) return null;
   const mapping = conv.mapping as Record<string, Node>;
-  const id = str(conv.id) && conv.id ? conv.id : str(conv.conversation_id) && conv.conversation_id ? conv.conversation_id : fallbackId;
+  const id =
+    str(conv.id) && conv.id
+      ? conv.id
+      : str(conv.conversation_id) && conv.conversation_id
+        ? conv.conversation_id
+        : fallbackId;
   if (!id) return null;
 
   const messages: ImportedMessage[] = [];
@@ -106,7 +123,12 @@ export function parseChatGptConversation(input: unknown, fallbackId = ""): Impor
     if (role === "user") {
       pending.length = 0;
       if (!firstUser) firstUser = text;
-      messages.push({ role: "user", parts: [{ type: "text", text: cleanText(text) }], createdAt: at, meta: { imported: "chatgpt" } });
+      messages.push({
+        role: "user",
+        parts: [{ type: "text", text: cleanText(text) }],
+        createdAt: at,
+        meta: { imported: "chatgpt" },
+      });
     } else if (role === "assistant") {
       const recipient = str(m.recipient) && m.recipient !== "all" ? m.recipient : "";
       const parts: Part[] = [];
@@ -120,7 +142,13 @@ export function parseChatGptConversation(input: unknown, fallbackId = ""): Impor
       const last = messages[messages.length - 1];
       // Consecutive assistant messages (a call and the text around it) form one turn.
       if (last?.role === "assistant") last.parts.push(...parts);
-      else messages.push({ role: "assistant", parts, createdAt: at, meta: { imported: "chatgpt", ...(model ? { model } : {}) } });
+      else
+        messages.push({
+          role: "assistant",
+          parts,
+          createdAt: at,
+          meta: { imported: "chatgpt", ...(model ? { model } : {}) },
+        });
     } else if (role === "tool") {
       const call = pending.shift();
       if (!call) continue;
@@ -134,7 +162,8 @@ export function parseChatGptConversation(input: unknown, fallbackId = ""): Impor
   const { messages: kept, clipped } = capMessages(pairTools(messages));
   if (!kept.some((m) => m.role === "user" || m.role === "assistant")) return null;
   const created = toMs(conv.create_time, "seconds") ?? kept.find((m) => m.createdAt)?.createdAt;
-  const updated = toMs(conv.update_time, "seconds") ?? [...kept].reverse().find((m) => m.createdAt)?.createdAt ?? created;
+  const updated =
+    toMs(conv.update_time, "seconds") ?? [...kept].reverse().find((m) => m.createdAt)?.createdAt ?? created;
   return {
     source: "chatgpt",
     sourceId: id,

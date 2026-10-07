@@ -5,7 +5,11 @@ import type { WorktreeInfo } from "./worktrees";
 
 /** The link stored on a chat (`chats.workspace_*`). */
 export type ChatWorkspace = { taskId: string; branch: string | null; base: string | null };
-type LinkFields = { workspace_task_id?: string | null; workspace_branch?: string | null; workspace_base?: string | null };
+type LinkFields = {
+  workspace_task_id?: string | null;
+  workspace_branch?: string | null;
+  workspace_base?: string | null;
+};
 
 /** The workspace a chat is linked to, or null for an ordinary chat. */
 export function chatWorkspace(chat: LinkFields | null | undefined): ChatWorkspace | null {
@@ -22,7 +26,10 @@ const SLUG_CHARS = 40;
  * ascii letter or digit (for example Cyrillic) gives "task"; the backend sanitizes again and makes branches unique.
  */
 export function slugFromText(text: string, maxWords = SLUG_WORDS): string {
-  const words = String(text ?? "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const words =
+    String(text ?? "")
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) ?? [];
   const slug = words.slice(0, maxWords).join("-").slice(0, SLUG_CHARS).replace(/-+$/, "");
   return slug || "task";
 }
@@ -32,7 +39,9 @@ export function newTaskId(taken: Iterable<string> = [], now = Date.now(), random
   const used = new Set(taken);
   const stem = `w${now.toString(36)}`;
   for (let i = 0; i < 1000; i++) {
-    const id = `${stem}-${Math.floor(random() * 36 ** 4).toString(36).padStart(4, "0")}`;
+    const id = `${stem}-${Math.floor(random() * 36 ** 4)
+      .toString(36)
+      .padStart(4, "0")}`;
     if (!used.has(id)) return id;
   }
   // Practically unreachable; stays unique anyway.
@@ -61,7 +70,12 @@ export type ChatRoot =
  * uses that workspace's checkout (and nothing else): while it cannot be resolved the result has no root.
  * `known` is the project's workspace list, or undefined while it is loading.
  */
-export function resolveChatRoot(o: { projectPath: string | null; workspace: ChatWorkspace | null; known: readonly WorktreeInfo[] | undefined; prefix?: string | null }): ChatRoot {
+export function resolveChatRoot(o: {
+  projectPath: string | null;
+  workspace: ChatWorkspace | null;
+  known: readonly WorktreeInfo[] | undefined;
+  prefix?: string | null;
+}): ChatRoot {
   if (!o.workspace) return { state: "project", root: o.projectPath };
   if (!o.known) return { state: "pending", root: null };
   const info = o.known.find((w) => w.taskId === o.workspace!.taskId);
@@ -88,7 +102,11 @@ export type WorkspaceRow = {
 };
 
 /** View model of one sidebar row: the chat joined with the live info of its workspace (when the list has it). */
-export function workspaceRow(chat: { id: number; title: string } & LinkFields, info: WorktreeInfo | undefined, listed: boolean): WorkspaceRow | null {
+export function workspaceRow(
+  chat: { id: number; title: string } & LinkFields,
+  info: WorktreeInfo | undefined,
+  listed: boolean,
+): WorkspaceRow | null {
   const ws = chatWorkspace(chat);
   if (!ws) return null;
   const active = !!info && info.existsOnDisk;
@@ -121,7 +139,10 @@ export function splitWorkspaceChats<T extends LinkFields>(chats: readonly T[]): 
 
 /** Archive options for a workspace given its live info: deleting the branch is offered only when nothing would be lost. */
 export function archiveChoices(info: WorktreeInfo | undefined): { canArchive: boolean; offerDeleteBranch: boolean } {
-  return { canArchive: !!info && info.existsOnDisk, offerDeleteBranch: !!info && info.existsOnDisk && info.ahead === 0 && !info.dirty };
+  return {
+    canArchive: !!info && info.existsOnDisk,
+    offerDeleteBranch: !!info && info.existsOnDisk && info.ahead === 0 && !info.dirty,
+  };
 }
 
 /** `worktrees.list` is not re-read more often than this unless forced, and polled at most this often while a project is open. */

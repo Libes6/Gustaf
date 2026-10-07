@@ -54,12 +54,16 @@ export const state = {
 };
 
 const confine = (root, rel) => {
-  const parts = String(rel).split('/').filter((p) => p && p !== '.');
-  if (String(rel).startsWith('/') || parts.includes('..') || !parts.length && rel !== '.') throw new Error(`path escapes project: ${rel}`);
+  const parts = String(rel)
+    .split('/')
+    .filter((p) => p && p !== '.');
+  if (String(rel).startsWith('/') || parts.includes('..') || (!parts.length && rel !== '.'))
+    throw new Error(`path escapes project: ${rel}`);
   return join(root, ...parts);
 };
 
-export const getSetting = async (key, fallback) => (state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback);
+export const getSetting = async (key, fallback) =>
+  state.settings.has(key) ? JSON.parse(state.settings.get(key)) : fallback;
 export const setSetting = async (key, value) => void state.settings.set(key, JSON.stringify(value));
 export const deleteSetting = async (key) => void state.settings.delete(key);
 // SQL bridge: a real in-memory SQLite (node:sqlite) holding only the agent_runs / agent_messages tables, created from the
@@ -76,10 +80,32 @@ function sqlite() {
   }
   return agentDb;
 }
-const dbFail = (e) => { if (!/no such table/.test(String(e?.message))) state.dbErrors.push(String(e?.message ?? e)); };
+const dbFail = (e) => {
+  if (!/no such table/.test(String(e?.message))) state.dbErrors.push(String(e?.message ?? e));
+};
 export const db = {
-  select: async (sql, params = []) => { try { return sqlite().prepare(sql).all(...params).map((r) => ({ ...r })); } catch (e) { dbFail(e); return []; } },
-  exec: async (sql, params = []) => { try { const r = sqlite().prepare(sql).run(...params); return { changes: Number(r.changes), lastId: Number(r.lastInsertRowid) }; } catch (e) { dbFail(e); return { changes: 0, lastId: 0 }; } },
+  select: async (sql, params = []) => {
+    try {
+      return sqlite()
+        .prepare(sql)
+        .all(...params)
+        .map((r) => ({ ...r }));
+    } catch (e) {
+      dbFail(e);
+      return [];
+    }
+  },
+  exec: async (sql, params = []) => {
+    try {
+      const r = sqlite()
+        .prepare(sql)
+        .run(...params);
+      return { changes: Number(r.changes), lastId: Number(r.lastInsertRowid) };
+    } catch (e) {
+      dbFail(e);
+      return { changes: 0, lastId: 0 };
+    }
+  },
   /** Test access to the stand-in database. */
   raw: () => sqlite(),
 };
@@ -87,11 +113,17 @@ export const db = {
 export const rawLog = {
   append: async (day, lines) => void state.rawLog.push([day, lines]),
   clear: async () => void (state.rawLog.length = 0),
-  info: async () => ({ dir: '/stub/raw-cli', bytes: state.rawLog.reduce((n, [, l]) => n + l.length, 0), files: state.rawLog.length ? 1 : 0, latest: state.rawLog.length ? '/stub/raw-cli/day.jsonl' : null }),
+  info: async () => ({
+    dir: '/stub/raw-cli',
+    bytes: state.rawLog.reduce((n, [, l]) => n + l.length, 0),
+    files: state.rawLog.length ? 1 : 0,
+    latest: state.rawLog.length ? '/stub/raw-cli/day.jsonl' : null,
+  }),
 };
 /** Codex rollout scan (src-tauri/src/codex_agents.rs): nothing found unless a test sets `state.codexScan`. */
 export const codexAgents = {
-  scan: async (threadId, startedAt) => (state.codexScan ?? (() => ({ parentFound: false, agents: [], truncated: false, notes: [] })))(threadId, startedAt),
+  scan: async (threadId, startedAt) =>
+    (state.codexScan ?? (() => ({ parentFound: false, agents: [], truncated: false, notes: [] })))(threadId, startedAt),
 };
 export const secrets = {
   set: async (id, value) => void state.secrets.set(id, value),
@@ -107,7 +139,17 @@ const fakeMcp = (id) => {
 const mcpStatus = (id) => {
   const s = state.mcp.servers[id];
   const capabilities = { ...(s?.resources ? { resources: {} } : {}), ...(s?.prompts ? { prompts: {} } : {}) };
-  return { id, state: 'running', error: null, pid: 1, restarts: 0, toolsEpoch: s?.epoch ?? 0, resourcesEpoch: s?.resourcesEpoch ?? 0, promptsEpoch: s?.promptsEpoch ?? 0, init: { protocolVersion: '2025-06-18', capabilities, serverInfo: { name: id } } };
+  return {
+    id,
+    state: 'running',
+    error: null,
+    pid: 1,
+    restarts: 0,
+    toolsEpoch: s?.epoch ?? 0,
+    resourcesEpoch: s?.resourcesEpoch ?? 0,
+    promptsEpoch: s?.promptsEpoch ?? 0,
+    init: { protocolVersion: '2025-06-18', capabilities, serverInfo: { name: id } },
+  };
 };
 export const mcpStdio = {
   start: async (id, spec) => {
@@ -122,7 +164,10 @@ export const mcpStdio = {
     const s = fakeMcp(id);
     if (method === 'tools/list') return { tools: s.tools };
     if (method === 'tools/call') {
-      if (s.hang?.(params.name, params.arguments)) return new Promise((_, reject) => state.mcp.waiting.set(requestKey, () => reject(new Error('MCP request cancelled'))));
+      if (s.hang?.(params.name, params.arguments))
+        return new Promise((_, reject) =>
+          state.mcp.waiting.set(requestKey, () => reject(new Error('MCP request cancelled'))),
+        );
       return s.call(params.name, params.arguments);
     }
     if (method === 'resources/list') return { resources: s.resources };
@@ -152,9 +197,16 @@ export const cursor = { scan: async () => [], messages: async () => [] };
 export const fsx = {
   read: async (root, path) => {
     const text = readFileSync(confine(root, path), 'utf8');
-    return text.split('\n').map((l, i) => `${String(i + 1).padStart(6)}|${l}\n`).join('');
+    return text
+      .split('\n')
+      .map((l, i) => `${String(i + 1).padStart(6)}|${l}\n`)
+      .join('');
   },
-  list: async (root, path) => readdirSync(confine(root, path || '.'), { withFileTypes: true }).map((d) => d.name + (d.isDirectory() ? '/' : '')).sort().join('\n'),
+  list: async (root, path) =>
+    readdirSync(confine(root, path || '.'), { withFileTypes: true })
+      .map((d) => d.name + (d.isDirectory() ? '/' : ''))
+      .sort()
+      .join('\n'),
   files: async () => [],
   search: async () => 'no matches',
   edit: async (root, path, oldString, newString) => {
@@ -163,7 +215,10 @@ export const fsx = {
     const n = text.split(oldString).length - 1;
     if (n === 0) throw new Error('old_string not found');
     if (n > 1) throw new Error(`old_string is not unique (${n} matches); include more context`);
-    writeFileSync(p, text.replace(oldString, () => newString));
+    writeFileSync(
+      p,
+      text.replace(oldString, () => newString),
+    );
     return 'ok';
   },
   write: async (root, path, content) => {
@@ -173,7 +228,8 @@ export const fsx = {
     return 'ok';
   },
   /** Instruction files the test put in `state.instructionFiles` ({ name, text }). */
-  instructions: async () => state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
+  instructions: async () =>
+    state.instructionFiles.map((f) => ({ bytes: new TextEncoder().encode(f.text).length, ...f })),
   homeFile: async () => null,
   run: async (root, command, timeoutMs, env) => {
     state.runs.push(env && Object.keys(env).length ? { root, command, env } : { root, command });
@@ -205,10 +261,19 @@ export const git = async (root, args, shadow) => {
 };
 
 /** Git repository info (src-tauri/src/git.rs): not available in tests; only imported by the workspace store. */
-export const gitRepo = new Proxy({}, { get: () => async () => { throw new Error('gitRepo is not available in tests'); } });
+export const gitRepo = new Proxy(
+  {},
+  {
+    get: () => async () => {
+      throw new Error('gitRepo is not available in tests');
+    },
+  },
+);
 
 export const review = {
-  prepare: async () => { throw new Error('not in tests'); },
+  prepare: async () => {
+    throw new Error('not in tests');
+  },
   list: async () => [],
   diff: async (id, path) => state.reviewDiff(id, path),
   decide: async () => {},

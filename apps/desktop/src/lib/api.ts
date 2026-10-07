@@ -28,14 +28,25 @@ export const secrets = {
 };
 
 /** A stdio MCP server as src-tauri/src/mcp.rs reports it. `init` is the server's `initialize` result. */
-export type McpStatus = { id: string; state: "stopped" | "starting" | "running" | "restarting" | "error"; error: string | null; pid: number | null; restarts: number; toolsEpoch: number; resourcesEpoch: number; promptsEpoch: number; init: unknown };
+export type McpStatus = {
+  id: string;
+  state: "stopped" | "starting" | "running" | "restarting" | "error";
+  error: string | null;
+  pid: number | null;
+  restarts: number;
+  toolsEpoch: number;
+  resourcesEpoch: number;
+  promptsEpoch: number;
+  init: unknown;
+};
 export type McpSpec = { command: string; args: string[]; env: Record<string, string>; cwd?: string };
 
 /** Stdio MCP servers (src-tauri/src/mcp.rs): started on demand, JSON-RPC requests with a timeout, bounded stderr log. */
 export const mcpStdio = {
   start: (id: string, spec: McpSpec) => invoke<McpStatus>("mcp_start", { id, spec }),
   /** `requestKey` lets `cancel` end this call at once (and tell the server with notifications/cancelled). */
-  request: (id: string, method: string, params?: unknown, timeoutMs?: number, requestKey?: string) => invoke<unknown>("mcp_request", { id, method, params: params ?? null, timeoutMs, requestKey }),
+  request: (id: string, method: string, params?: unknown, timeoutMs?: number, requestKey?: string) =>
+    invoke<unknown>("mcp_request", { id, method, params: params ?? null, timeoutMs, requestKey }),
   cancel: (id: string, requestKey: string) => invoke<void>("mcp_cancel", { id, requestKey }),
   stop: (id: string, forget = false) => invoke<void>("mcp_stop", { id, forget }),
   status: () => invoke<McpStatus[]>("mcp_status"),
@@ -44,7 +55,8 @@ export const mcpStdio = {
 
 /** Loopback redirect receiver for the MCP OAuth sign-in (src-tauri/src/oauth.rs). `wait` resolves with the authorization code. */
 export const oauthLoopback = {
-  start: (state: string, timeoutMs?: number) => invoke<{ id: string; port: number }>("oauth_loopback_start", { state, timeoutMs }),
+  start: (state: string, timeoutMs?: number) =>
+    invoke<{ id: string; port: number }>("oauth_loopback_start", { state, timeoutMs }),
   wait: (id: string) => invoke<string>("oauth_loopback_wait", { id }),
   cancel: (id: string) => invoke<void>("oauth_loopback_cancel", { id }),
 };
@@ -76,8 +88,17 @@ export type SearchPage = {
 
 export const chatSearch = {
   /** One page of the best matches; `offset` continues a previous page. The query is escaped on the Rust side, so any user input is safe. */
-  messages: (query: string, opts: { projectId?: number | null; model?: string | null; limit?: number; offset?: number } = {}) =>
-    invoke<SearchPage>("search_messages", { query, projectId: opts.projectId ?? null, model: opts.model ?? null, limit: opts.limit, offset: opts.offset ?? 0 }),
+  messages: (
+    query: string,
+    opts: { projectId?: number | null; model?: string | null; limit?: number; offset?: number } = {},
+  ) =>
+    invoke<SearchPage>("search_messages", {
+      query,
+      projectId: opts.projectId ?? null,
+      model: opts.model ?? null,
+      limit: opts.limit,
+      offset: opts.offset ?? 0,
+    }),
   /** Models that have indexed messages, for the filter. */
   models: () => invoke<string[]>("search_models"),
 };
@@ -124,7 +145,8 @@ export const importSources = {
   readSession: (source: "claude" | "codex", path: string) =>
     invoke<{ text: string; truncated: boolean }>("import_read_session", { source, path }),
   chatgptScan: (path: string) => invoke<SourceSession[]>("import_chatgpt_scan", { path }),
-  chatgptRead: (path: string, ids: string[]) => invoke<{ conversations: string[]; skipped: string[] }>("import_chatgpt_read", { path, ids }),
+  chatgptRead: (path: string, ids: string[]) =>
+    invoke<{ conversations: string[]; skipped: string[] }>("import_chatgpt_read", { path, ids }),
 };
 
 export const fsx = {
@@ -137,17 +159,29 @@ export const fsx = {
     invoke<string>("fs_edit", { root, path, oldString, newString }),
   write: (root: string, path: string, content: string) => invoke<string>("fs_write", { root, path, content }),
   /** AGENTS.md, CLAUDE.md, .cursorrules and always-apply Cursor rules found inside the project root. */
-  instructions: (root: string) => invoke<{ name: string; bytes: number; text: string }[]>("read_instructions", { root }),
+  instructions: (root: string) =>
+    invoke<{ name: string; bytes: number; text: string }[]>("read_instructions", { root }),
   homeFile: (rel: string) => invoke<string | null>("read_home_file", { rel }),
   /** `env`: extra variables for this command only (secrets from `request_secret`, see agent/secretRefs.ts). */
   run: (root: string, command: string, timeoutMs?: number, env?: Record<string, string>) =>
-    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", { root, command, timeoutMs, ...(env && Object.keys(env).length ? { env } : {}) }),
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_command", {
+      root,
+      command,
+      timeoutMs,
+      ...(env && Object.keys(env).length ? { env } : {}),
+    }),
 };
 
 /** Runs a hook command (src-tauri/src/hook_exec.rs): JSON on stdin, scrubbed environment plus `env` (GUSTAF_* only), hard timeout, process tree killed on timeout. */
 export const hookRunner = {
   run: (root: string, command: string, timeoutMs: number, stdin: string, env: Record<string, string>) =>
-    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_hook", { root, command, timeoutMs, stdin, env: Object.entries(env) }),
+    invoke<{ code: number | null; output: string; timed_out: boolean }>("run_hook", {
+      root,
+      command,
+      timeoutMs,
+      stdin,
+      env: Object.entries(env),
+    }),
 };
 
 export const git = (root: string, args: string[], shadow = false) => invoke<string>("git", { root, args, shadow });
@@ -174,15 +208,36 @@ export type GitStatus = {
   inProgress: string | null;
 };
 export type CommitContext = { files: string[]; stat: string; diff: string; truncated: boolean; recent: string[] };
-export type CommitResult = { sha: string; short: string; branch: string | null; files: string[]; createdBranch: boolean };
+export type CommitResult = {
+  sha: string;
+  short: string;
+  branch: string | null;
+  files: string[];
+  createdBranch: boolean;
+};
 
 export type GitRemote = { name: string; url: string };
 export type PublishInfo = {
-  repo: boolean; branch: string | null; hasCommits: boolean; remotes: GitRemote[]; upstream: string | null;
-  ahead: number | null; behind: number | null; remoteBranches: string[]; defaultBase: string | null; protected: boolean;
+  repo: boolean;
+  branch: string | null;
+  hasCommits: boolean;
+  remotes: GitRemote[];
+  upstream: string | null;
+  ahead: number | null;
+  behind: number | null;
+  remoteBranches: string[];
+  defaultBase: string | null;
+  protected: boolean;
 };
 export type BranchEntry = { name: string; remote: boolean; current: boolean; checkedOutAt: string | null };
-export type BranchList = { repo: boolean; current: string | null; detached: boolean; head: string | null; branches: BranchEntry[]; truncated: boolean };
+export type BranchList = {
+  repo: boolean;
+  current: string | null;
+  detached: boolean;
+  head: string | null;
+  branches: BranchEntry[];
+  truncated: boolean;
+};
 export type SwitchResult = { branch: string | null; stashed: boolean; restored: boolean };
 export type PushResult = { remote: string; branch: string; output: string; info: PublishInfo };
 export type GhStatus = { installed: boolean; authenticated: boolean; detail: string };
@@ -190,27 +245,46 @@ export type GhStatus = { installed: boolean; authenticated: boolean; detail: str
 export const gitRepo = {
   status: (root: string) => invoke<GitStatus>("git_status", { root }),
   /** Bounded diff of the given changed files, used to generate a commit message. */
-  commitContext: (root: string, paths: string[], maxBytes?: number) => invoke<CommitContext>("git_commit_context", { root, paths, maxBytes }),
+  commitContext: (root: string, paths: string[], maxBytes?: number) =>
+    invoke<CommitContext>("git_commit_context", { root, paths, maxBytes }),
   /** Commits only `paths` (hooks run, nothing is pushed); with `newBranch` it first creates and switches to it. */
-  commit: (root: string, message: string, paths: string[], newBranch?: string | null) => invoke<CommitResult>("git_commit", { root, message, paths, newBranch }),
+  commit: (root: string, message: string, paths: string[], newBranch?: string | null) =>
+    invoke<CommitResult>("git_commit", { root, message, paths, newBranch }),
   /** Remotes, upstream, ahead/behind and remote branches (read-only; the calls below are explicit user actions). */
   publishInfo: (root: string) => invoke<PublishInfo>("git_publish_info", { root }),
   /** Pushes the current branch (never forced) to an existing remote; protected branches need `confirmProtected`. */
-  push: (a: { root: string; remote: string; branch: string; setUpstream: boolean; confirmProtected: boolean }) => invoke<PushResult>("git_push", a),
+  push: (a: { root: string; remote: string; branch: string; setUpstream: boolean; confirmProtected: boolean }) =>
+    invoke<PushResult>("git_push", a),
   createBranch: (root: string, name: string) => invoke<string>("git_create_branch", { root, name }),
   /** Local and remote branches (src-tauri/src/git_branches.rs). */
   branches: (root: string) => invoke<BranchList>("git_branches", { root }),
   /** Never forced. A dirty tree rejects with `dirty: <count>` unless `stash` (stash, switch, restore). */
-  switchBranch: (root: string, name: string, remote: boolean, stash: boolean) => invoke<SwitchResult>("git_switch_branch", { root, name, remote, stash }),
+  switchBranch: (root: string, name: string, remote: boolean, stash: boolean) =>
+    invoke<SwitchResult>("git_switch_branch", { root, name, remote, stash }),
   ghStatus: (root: string) => invoke<GhStatus>("gh_status", { root }),
   /** Diff, stat and commit subjects of the branch against a remote-tracking base such as `origin/main`. */
-  prContext: (root: string, baseRef: string, maxBytes?: number) => invoke<CommitContext>("git_pr_context", { root, baseRef, maxBytes }),
-  createPr: (root: string, title: string, body: string, base: string, draft: boolean) => invoke<{ url: string }>("git_create_pr", { root, title, body, base, draft }),
+  prContext: (root: string, baseRef: string, maxBytes?: number) =>
+    invoke<CommitContext>("git_pr_context", { root, baseRef, maxBytes }),
+  createPr: (root: string, title: string, body: string, base: string, draft: boolean) =>
+    invoke<{ url: string }>("git_create_pr", { root, title, body, base, draft }),
 };
 
-export type Review = { id: string; root: string; workspace: string; /** Dependency directories symlinked into the shadow copy; never applied. */ linked?: string[] };
+export type Review = {
+  id: string;
+  root: string;
+  workspace: string;
+  /** Dependency directories symlinked into the shadow copy; never applied. */ linked?: string[];
+};
 export type HunkLine = { kind: " " | "-" | "+"; text: string };
-export type Hunk = { id: string; header: string; old_start: number; old_lines: number; new_start: number; new_lines: number; lines: HunkLine[] };
+export type Hunk = {
+  id: string;
+  header: string;
+  old_start: number;
+  old_lines: number;
+  new_start: number;
+  new_lines: number;
+  lines: HunkLine[];
+};
 export type ReviewChange = { path: string; binary: boolean };
 export const review = {
   prepare: (root: string, linkDirs?: string[]) => invoke<Review>("review_prepare", { root, linkDirs }),
@@ -220,7 +294,8 @@ export const review = {
   /** Hunks of a text file present in both versions; empty for new, deleted and binary files. */
   hunks: (id: string, path: string) => invoke<Hunk[]>("review_hunks", { id, path }),
   /** Accepts (applies to the project, baseline-checked) or rejects (reverts in the copy) only the given hunks. */
-  decideHunks: (id: string, path: string, hunkIds: string[], accept: boolean) => invoke<void>("review_decide_hunks", { id, path, hunkIds, accept }),
+  decideHunks: (id: string, path: string, hunkIds: string[], accept: boolean) =>
+    invoke<void>("review_decide_hunks", { id, path, hunkIds, accept }),
   list: (root: string) => invoke<[Review, ReviewChange[]][]>("review_list", { root }),
   diff: (id: string, path: string) => invoke<string>("review_diff", { id, path }),
   decide: (id: string, path: string, accept: boolean) => invoke<void>("review_decide", { id, path, accept }),
@@ -229,7 +304,14 @@ export const review = {
 
 /** Result of `cu_execute` (src-tauri/src/computer.rs): the screenshot after the batch plus facts about the desktop. */
 export type Shot = {
-  timings?: { actionsMs: number; settleMs: number; captureMs: number; encodeMs: number; accessibilityMs: number; totalMs: number };
+  timings?: {
+    actionsMs: number;
+    settleMs: number;
+    captureMs: number;
+    encodeMs: number;
+    accessibilityMs: number;
+    totalMs: number;
+  };
   elements?: { role: string; label: string }[];
   png: string;
   width: number;
@@ -274,7 +356,8 @@ export const rawLog = {
   clear: () => invoke<void>("raw_log_clear"),
   info: () => invoke<RawLogInfo>("raw_log_info"),
   /** Day files older than `keepDays` before `today` (local `YYYY-MM-DD`); today's file is never touched. */
-  prune: (today: string, keepDays: number, dryRun: boolean) => invoke<RawLogPrune>("raw_log_prune", { today, keepDays, dryRun }).then((r) => ({ files: r.files, bytes: r.bytes })),
+  prune: (today: string, keepDays: number, dryRun: boolean) =>
+    invoke<RawLogPrune>("raw_log_prune", { today, keepDays, dryRun }).then((r) => ({ files: r.files, bytes: r.bytes })),
 };
 
 /** One Codex subagent as src-tauri/src/codex_agents.rs reads it from the rollout files (field names as the Rust side serializes them). */
@@ -305,11 +388,13 @@ export type RolloutAgent = {
 export type RolloutScan = { parentFound: boolean; agents: RolloutAgent[]; truncated: boolean; notes: string[] };
 /** Read-only view of the rollout files Codex writes for a run (providers/codexRollout.ts polls it). */
 export const codexAgents = {
-  scan: (threadId: string, startedAt?: number) => invoke<RolloutScan>("codex_agents_scan", { threadId, startedAt: startedAt ?? null }),
+  scan: (threadId: string, startedAt?: number) =>
+    invoke<RolloutScan>("codex_agents_scan", { threadId, startedAt: startedAt ?? null }),
 };
 
 /** Image attachments for CLI providers, stored under the app data folder (src-tauri/src/attachments.rs). */
 export const attachments = {
-  save: (chatId: number, images: string[]) => invoke<{ dir: string; files: string[] }>("attachments_save", { chatId, images }),
+  save: (chatId: number, images: string[]) =>
+    invoke<{ dir: string; files: string[] }>("attachments_save", { chatId, images }),
   clear: (chatId: number) => invoke<void>("attachments_clear", { chatId }),
 };

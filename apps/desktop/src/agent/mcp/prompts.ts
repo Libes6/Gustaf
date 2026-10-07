@@ -13,7 +13,8 @@ export const MAX_PROMPT_TEXT = 20_000;
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 export function normalizePrompts(raw: unknown): McpPrompt[] {
-  const list = raw && typeof raw === "object" && Array.isArray((raw as any).prompts) ? ((raw as any).prompts as unknown[]) : [];
+  const list =
+    raw && typeof raw === "object" && Array.isArray((raw as any).prompts) ? ((raw as any).prompts as unknown[]) : [];
   const seen = new Set<string>();
   const out: McpPrompt[] = [];
   for (const p of list.slice(0, 1000)) {
@@ -23,8 +24,20 @@ export function normalizePrompts(raw: unknown): McpPrompt[] {
     seen.add(x.name);
     const args: McpPromptArg[] = [];
     for (const a of Array.isArray(x.arguments) ? x.arguments.slice(0, MAX_PROMPT_ARGS) : []) {
-      if (!a || typeof a !== "object" || typeof a.name !== "string" || !a.name || a.name.length > 128 || args.some((y) => y.name === a.name)) continue;
-      args.push({ name: a.name, description: typeof a.description === "string" ? clip(a.description, 300) : "", required: a.required === true });
+      if (
+        !a ||
+        typeof a !== "object" ||
+        typeof a.name !== "string" ||
+        !a.name ||
+        a.name.length > 128 ||
+        args.some((y) => y.name === a.name)
+      )
+        continue;
+      args.push({
+        name: a.name,
+        description: typeof a.description === "string" ? clip(a.description, 300) : "",
+        required: a.required === true,
+      });
     }
     out.push({
       name: x.name,
@@ -57,7 +70,10 @@ export function buildPromptArguments(prompt: McpPrompt, values: Record<string, s
  * assistant turn each is prefixed with its role. Capped at `max` characters.
  */
 export function renderPromptMessages(raw: unknown, max = MAX_PROMPT_TEXT): { text: string; truncated: boolean } {
-  const messages = raw && typeof raw === "object" && Array.isArray((raw as any).messages) ? ((raw as any).messages as unknown[]).slice(0, 50) : [];
+  const messages =
+    raw && typeof raw === "object" && Array.isArray((raw as any).messages)
+      ? ((raw as any).messages as unknown[]).slice(0, 50)
+      : [];
   const parts: { role: string; text: string }[] = [];
   for (const m of messages) {
     if (!m || typeof m !== "object") continue;
@@ -69,15 +85,22 @@ export function renderPromptMessages(raw: unknown, max = MAX_PROMPT_TEXT): { tex
       if (c.type === "text" && typeof c.text === "string") texts.push(c.text);
       else if (c.type === "resource" && c.resource && typeof c.resource === "object") {
         const uri = typeof c.resource.uri === "string" ? clip(c.resource.uri, 500) : "";
-        texts.push(typeof c.resource.text === "string" ? `[resource ${uri}]\n${c.resource.text}` : `[binary resource ${uri} omitted]`);
-      } else if (c.type === "resource_link" && typeof c.uri === "string") texts.push(`[resource link ${clip(c.uri, 500)}]`);
+        texts.push(
+          typeof c.resource.text === "string"
+            ? `[resource ${uri}]\n${c.resource.text}`
+            : `[binary resource ${uri} omitted]`,
+        );
+      } else if (c.type === "resource_link" && typeof c.uri === "string")
+        texts.push(`[resource link ${clip(c.uri, 500)}]`);
       else texts.push(`[${clip(String(c.type ?? "content"), 30)} omitted]`);
     }
     const text = texts.join("\n").trim();
     if (text) parts.push({ role: x.role === "assistant" ? "assistant" : "user", text });
   }
   const plain = parts.length === 1 && parts[0].role === "user";
-  let text = plain ? parts[0].text : parts.map((p) => `${p.role === "assistant" ? "Assistant" : "User"}: ${p.text}`).join("\n\n");
+  let text = plain
+    ? parts[0].text
+    : parts.map((p) => `${p.role === "assistant" ? "Assistant" : "User"}: ${p.text}`).join("\n\n");
   const truncated = text.length > max;
   if (truncated) text = text.slice(0, max);
   return { text, truncated };

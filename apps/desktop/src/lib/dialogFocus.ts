@@ -20,10 +20,15 @@ export function trapTarget(count: number, current: number, shift: boolean): numb
 export function rovingTarget(key: string, count: number, current: number): number | null {
   if (count <= 0) return null;
   switch (key) {
-    case "ArrowDown": return current < 0 ? 0 : (current + 1) % count;
-    case "ArrowUp": return current < 0 ? count - 1 : (current - 1 + count) % count;
-    case "Home": return 0;
-    case "End": return count - 1;
-    default: return null;
+    case "ArrowDown":
+      return current < 0 ? 0 : (current + 1) % count;
+    case "ArrowUp":
+      return current < 0 ? count - 1 : (current - 1 + count) % count;
+    case "Home":
+      return 0;
+    case "End":
+      return count - 1;
+    default:
+      return null;
   }
 }

@@ -6,8 +6,12 @@ export type FontPreset = (typeof FONT_PRESETS)[number];
 export const MOTION_SPEEDS = ["off", "fast", "normal", "slow"] as const;
 export type MotionSpeed = (typeof MOTION_SPEEDS)[number];
 
-export const UI_SIZE_DEFAULT = 13, UI_SIZE_MIN = 11, UI_SIZE_MAX = 18;
-export const CODE_SIZE_DEFAULT = 12, CODE_SIZE_MIN = 10, CODE_SIZE_MAX = 18;
+export const UI_SIZE_DEFAULT = 13,
+  UI_SIZE_MIN = 11,
+  UI_SIZE_MAX = 18;
+export const CODE_SIZE_DEFAULT = 12,
+  CODE_SIZE_MIN = 10,
+  CODE_SIZE_MAX = 18;
 export const FONT_NAME_MAX = 60;
 
 export type FontChoice = { preset: FontPreset; custom: string };
@@ -30,12 +34,20 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
 };
 
 /** Same stacks as `--font` / `--mono` in theme.css. */
-const SYSTEM_UI = 'system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Ubuntu, Cantarell, sans-serif';
-const SYSTEM_MONO = 'ui-monospace, "SF Mono", Menlo, "Cascadia Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace';
+const SYSTEM_UI =
+  'system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Ubuntu, Cantarell, sans-serif';
+const SYSTEM_MONO =
+  'ui-monospace, "SF Mono", Menlo, "Cascadia Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace';
 const STACKS: Record<Exclude<FontPreset, "custom">, { ui: string; code: string }> = {
   default: { ui: SYSTEM_UI, code: SYSTEM_MONO },
-  sans: { ui: '"Helvetica Neue", Arial, "Noto Sans", sans-serif', code: '"SF Pro Text", "Segoe UI", Arial, sans-serif' },
-  serif: { ui: 'Charter, "Iowan Old Style", Georgia, "Times New Roman", serif', code: 'Georgia, "Times New Roman", serif' },
+  sans: {
+    ui: '"Helvetica Neue", Arial, "Noto Sans", sans-serif',
+    code: '"SF Pro Text", "Segoe UI", Arial, sans-serif',
+  },
+  serif: {
+    ui: 'Charter, "Iowan Old Style", Georgia, "Times New Roman", serif',
+    code: 'Georgia, "Times New Roman", serif',
+  },
   mono: { ui: SYSTEM_MONO, code: SYSTEM_MONO },
 };
 

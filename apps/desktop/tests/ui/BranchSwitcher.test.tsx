@@ -6,14 +6,46 @@ import { branchErrorCode, canCreateBranch, filterBranches, lockReason } from "..
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
-const status = (over: Record<string, unknown> = {}) => ({ repo: true, toplevel: "/work/alpha", prefix: "", branch: "main", detached: false, head: "abc1234", files: [], total: 0, inProgress: null, ...over });
-const entry = (name: string, over: Record<string, unknown> = {}) => ({ name, remote: false, current: false, checkedOutAt: null, ...over });
-const branches = (list = [entry("main", { current: true }), entry("feature/x"), entry("origin/remote-only", { remote: true }), entry("wt-branch", { checkedOutAt: "/wt/1" })]) => ({ repo: true, current: "main", detached: false, head: "abc1234", branches: list, truncated: false });
+const status = (over: Record<string, unknown> = {}) => ({
+  repo: true,
+  toplevel: "/work/alpha",
+  prefix: "",
+  branch: "main",
+  detached: false,
+  head: "abc1234",
+  files: [],
+  total: 0,
+  inProgress: null,
+  ...over,
+});
+const entry = (name: string, over: Record<string, unknown> = {}) => ({
+  name,
+  remote: false,
+  current: false,
+  checkedOutAt: null,
+  ...over,
+});
+const branches = (
+  list = [
+    entry("main", { current: true }),
+    entry("feature/x"),
+    entry("origin/remote-only", { remote: true }),
+    entry("wt-branch", { checkedOutAt: "/wt/1" }),
+  ],
+) => ({ repo: true, current: "main", detached: false, head: "abc1234", branches: list, truncated: false });
 
 function backend(over: Record<string, unknown> = {}) {
-  mockInvoke({ git_status: status(), review_list: [], git_branches: branches(), git_switch_branch: { branch: "feature/x", stashed: false, restored: false }, git_create_branch: (a: { name: string }) => a.name, ...over });
+  mockInvoke({
+    git_status: status(),
+    review_list: [],
+    git_branches: branches(),
+    git_switch_branch: { branch: "feature/x", stashed: false, restored: false },
+    git_create_branch: (a: { name: string }) => a.name,
+    ...over,
+  });
 }
-const show = (props: Partial<Parameters<typeof BranchSwitcher>[0]> = {}) => renderApp(<BranchSwitcher root="/work/alpha" running={false} worktree={false} {...props} />);
+const show = (props: Partial<Parameters<typeof BranchSwitcher>[0]> = {}) =>
+  renderApp(<BranchSwitcher root="/work/alpha" running={false} worktree={false} {...props} />);
 const chip = () => screen.findByRole("button", { name: /main|feature|Detached/ });
 
 describe("BranchSwitcher", () => {
@@ -46,7 +78,9 @@ describe("BranchSwitcher", () => {
     await userEvent.type(screen.getByRole("textbox"), "feat");
     expect(screen.queryByRole("button", { name: /origin\/remote-only/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /feature\/x/ }));
-    expect(callsOf("git_switch_branch")).toEqual([{ root: "/work/alpha", name: "feature/x", remote: false, stash: false }]);
+    expect(callsOf("git_switch_branch")).toEqual([
+      { root: "/work/alpha", name: "feature/x", remote: false, stash: false },
+    ]);
     expect(await screen.findByRole("status")).toHaveTextContent("Switched to feature/x.");
   });
 
@@ -67,7 +101,14 @@ describe("BranchSwitcher", () => {
 
   it("a dirty tree asks first; cancel keeps everything, stash retries with stash", async () => {
     let calls = 0;
-    backend({ git_status: status({ total: 2 }), git_switch_branch: (a: { stash: boolean }) => { calls++; if (!a.stash) throw "dirty: 2"; return { branch: "feature/x", stashed: true, restored: true }; } });
+    backend({
+      git_status: status({ total: 2 }),
+      git_switch_branch: (a: { stash: boolean }) => {
+        calls++;
+        if (!a.stash) throw "dirty: 2";
+        return { branch: "feature/x", stashed: true, restored: true };
+      },
+    });
     show();
     await userEvent.click(await chip());
     await userEvent.click(await screen.findByRole("button", { name: /feature\/x/ }));
@@ -91,11 +132,17 @@ describe("BranchSwitcher", () => {
   });
 
   it("shows git's refusal and leaves the picker open", async () => {
-    backend({ git_switch_branch: () => { throw "git_error: error: Your local changes would be overwritten"; } });
+    backend({
+      git_switch_branch: () => {
+        throw "git_error: error: Your local changes would be overwritten";
+      },
+    });
     show();
     await userEvent.click(await chip());
     await userEvent.click(await screen.findByRole("button", { name: /feature\/x/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not switch: error: Your local changes would be overwritten");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not switch: error: Your local changes would be overwritten",
+    );
   });
 
   it("creates a branch from the current one", async () => {
@@ -132,7 +179,9 @@ describe("BranchSwitcher", () => {
   });
 
   it("is locked while review changes are pending", async () => {
-    backend({ review_list: [[{ id: "r1", root: "/work/alpha", workspace: "/tmp/r1" }, [{ path: "a.ts", kind: "modified" }]]] });
+    backend({
+      review_list: [[{ id: "r1", root: "/work/alpha", workspace: "/tmp/r1" }, [{ path: "a.ts", kind: "modified" }]]],
+    });
     show();
     await screen.findByText(/pending review changes/);
     await userEvent.click(await chip());
@@ -161,7 +210,9 @@ describe("BranchSwitcher", () => {
     show();
     expect(await chip()).toHaveTextContent("main");
     branch = "elsewhere";
-    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
     expect(await screen.findByRole("button", { name: /elsewhere/ })).toBeInTheDocument();
   });
 });
@@ -184,6 +235,7 @@ describe("branch helpers", () => {
     expect(filterBranches(list, "feat").map((b) => b.name)).toEqual(["Feature/X"]);
     expect(canCreateBranch("main", list)).toBeNull();
     expect(canCreateBranch("y", list)).toBe("y");
-    for (const bad of ["", "-x", "a b", "a..b", "a~1", "x/", "x.lock", "/x", "a@{b", "a//b"]) expect(canCreateBranch(bad, list), bad).toBeNull();
+    for (const bad of ["", "-x", "a b", "a..b", "a~1", "x/", "x.lock", "/x", "a@{b", "a//b"])
+      expect(canCreateBranch(bad, list), bad).toBeNull();
   });
 });

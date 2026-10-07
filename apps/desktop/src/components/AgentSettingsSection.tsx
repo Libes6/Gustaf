@@ -15,7 +15,12 @@ import "../styles/agents.css";
 
 // Settings > Agents & budgets: models, limits, orchestration default and notifications of background agents (stored as "agentSettings").
 
-const TYPE_KEY: Record<AgentType, Key> = { explore: "agentTypeExplore", plan: "agentTypePlan", general: "agentTypeGeneral", review: "agentTypeReview" };
+const TYPE_KEY: Record<AgentType, Key> = {
+  explore: "agentTypeExplore",
+  plan: "agentTypePlan",
+  general: "agentTypeGeneral",
+  review: "agentTypeReview",
+};
 const FIELDS: { key: keyof Budget; label: Key }[] = [
   { key: "maxSteps", label: "agentBudgetSteps" },
   { key: "maxToolCalls", label: "agentBudgetToolCalls" },
@@ -30,7 +35,8 @@ const decode = (v: string): ModelRef | null => {
 };
 
 /** Shown value of a budget field: minutes for the wall time, the raw number otherwise. */
-const show = (k: keyof Budget, v: number | undefined) => (v === undefined ? "" : k === "maxMs" ? String(Math.round((v / 60_000) * 10) / 10) : String(v));
+const show = (k: keyof Budget, v: number | undefined) =>
+  v === undefined ? "" : k === "maxMs" ? String(Math.round((v / 60_000) * 10) / 10) : String(v);
 function parseField(k: keyof Budget, text: string): { ok: true; value: number | undefined } | { ok: false } {
   const s = text.trim();
   if (!s) return { ok: true, value: undefined };
@@ -44,7 +50,19 @@ function parseField(k: keyof Budget, text: string): { ok: true; value: number | 
   return Number.isInteger(n) ? { ok: true, value: n } : { ok: false };
 }
 
-function BudgetCell({ type, field, label, settings, onBad }: { type: AgentType; field: keyof Budget; label: string; settings: AgentSettings; onBad: (bad: boolean) => void }) {
+function BudgetCell({
+  type,
+  field,
+  label,
+  settings,
+  onBad,
+}: {
+  type: AgentType;
+  field: keyof Budget;
+  label: string;
+  settings: AgentSettings;
+  onBad: (bad: boolean) => void;
+}) {
   const value = settings.budgets[type]?.[field];
   const [text, setText] = useState(show(field, value));
   const [bad, setBad] = useState(false);
@@ -60,8 +78,19 @@ function BudgetCell({ type, field, label, settings, onBad }: { type: AgentType; 
     saveAgentSettings({ ...settings, budgets: { ...settings.budgets, [type]: next } });
   };
   return (
-    <input className="input agent-budget-input" aria-label={label} aria-invalid={bad} inputMode="numeric" placeholder={show(field, DEFAULT_BUDGETS[type][field])} value={text}
-      onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
+    <input
+      className="input agent-budget-input"
+      aria-label={label}
+      aria-invalid={bad}
+      inputMode="numeric"
+      placeholder={show(field, DEFAULT_BUDGETS[type][field])}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
   );
 }
 
@@ -71,15 +100,24 @@ function CodexSessionsRow() {
   const [on, setOn] = useState(true);
   useEffect(() => {
     let alive = true;
-    void rolloutEnabled().then((v) => { if (alive) setOn(v); });
-    return () => { alive = false; };
+    void rolloutEnabled().then((v) => {
+      if (alive) setOn(v);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
   const change = (v: boolean) => {
     setOn(v);
     setRolloutEnabled(v).catch(() => setOn(!v));
   };
   return (
-    <SettingRow id="codexSessions" title={t("codexSessions")} description={t("codexSessionsDesc")} toggle={{ on, onChange: change }} />
+    <SettingRow
+      id="codexSessions"
+      title={t("codexSessions")}
+      description={t("codexSessionsDesc")}
+      toggle={{ on, onChange: change }}
+    />
   );
 }
 
@@ -89,15 +127,24 @@ function CodexAppServerRow() {
   const [on, setOn] = useState(true);
   useEffect(() => {
     let alive = true;
-    void codexTransport().then((v) => { if (alive) setOn(v === "app-server"); });
-    return () => { alive = false; };
+    void codexTransport().then((v) => {
+      if (alive) setOn(v === "app-server");
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
   const change = (v: boolean) => {
     setOn(v);
     setCodexTransport(v ? "app-server" : "exec").catch(() => setOn(!v));
   };
   return (
-    <SettingRow id="codexAppServer" title={t("codexAppServer")} description={t("codexAppServerDesc")} toggle={{ on, onChange: change }} />
+    <SettingRow
+      id="codexAppServer"
+      title={t("codexAppServer")}
+      description={t("codexAppServerDesc")}
+      toggle={{ on, onChange: change }}
+    />
   );
 }
 
@@ -113,11 +160,19 @@ export function AgentSettingsSection() {
     return `${p?.name ?? r.providerId} · ${m?.name ?? r.model}`;
   };
   // Subagents need our own tool loop: API providers whose model supports tools.
-  const agentModels = app.models.filter((m) => m.tools !== false && enabled.some((p) => p.id === m.providerId && !runsOwnTools(p))).map((m) => ({ providerId: m.providerId, model: m.id }));
-  const anyModels = app.models.filter((m) => enabled.some((p) => p.id === m.providerId)).map((m) => ({ providerId: m.providerId, model: m.id }));
+  const agentModels = app.models
+    .filter((m) => m.tools !== false && enabled.some((p) => p.id === m.providerId && !runsOwnTools(p)))
+    .map((m) => ({ providerId: m.providerId, model: m.id }));
+  const anyModels = app.models
+    .filter((m) => enabled.some((p) => p.id === m.providerId))
+    .map((m) => ({ providerId: m.providerId, model: m.id }));
   const options = (list: ModelRef[], current: ModelRef | null | undefined) => {
     const all = current && !list.some((r) => sameRef(r, current)) ? [current, ...list] : list;
-    return all.map((r) => <option key={refKey(r)} value={encode(r)}>{label(r)}</option>);
+    return all.map((r) => (
+      <option key={refKey(r)} value={encode(r)}>
+        {label(r)}
+      </option>
+    ));
   };
   const setModel = (type: AgentType, ref: ModelRef | null) => {
     const models = { ...s.models };
@@ -125,13 +180,14 @@ export function AgentSettingsSection() {
     else delete models[type];
     saveAgentSettings({ ...s, models });
   };
-  const flag = (id: string) => (bad: boolean) => setBadCells((prev) => {
-    if (prev.has(id) === bad) return prev;
-    const next = new Set(prev);
-    if (bad) next.add(id);
-    else next.delete(id);
-    return next;
-  });
+  const flag = (id: string) => (bad: boolean) =>
+    setBadCells((prev) => {
+      if (prev.has(id) === bad) return prev;
+      const next = new Set(prev);
+      if (bad) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   return (
     <>
@@ -139,33 +195,74 @@ export function AgentSettingsSection() {
       <p className="h4-sub">{t("agentSettingsLead")}</p>
       <div className="card">
         {AGENT_TYPES.map((type) => (
-          <SettingRow key={type} id={`agentModel-${type}`} title={t("agentModelForType", { type: t(TYPE_KEY[type]) })} description={type === "explore" ? t("agentModelForTypeDesc") : undefined}>
-            <select className="input narrow" aria-label={t("agentModelForType", { type: t(TYPE_KEY[type]) })} value={encode(s.models[type])} onChange={(e) => setModel(type, decode(e.target.value))}>
+          <SettingRow
+            key={type}
+            id={`agentModel-${type}`}
+            title={t("agentModelForType", { type: t(TYPE_KEY[type]) })}
+            description={type === "explore" ? t("agentModelForTypeDesc") : undefined}
+          >
+            <select
+              className="input narrow"
+              aria-label={t("agentModelForType", { type: t(TYPE_KEY[type]) })}
+              value={encode(s.models[type])}
+              onChange={(e) => setModel(type, decode(e.target.value))}
+            >
               <option value="">{t("agentModelSameAsChat")}</option>
               {options(agentModels, s.models[type])}
             </select>
           </SettingRow>
         ))}
-        <SettingRow id="agentAllowedModels" title={t("agentAllowedModels")} description={<>
-            {t("agentAllowedModelsDesc")}
-            {!!s.allowedModels.length && (
-              <div className="agent-chips">
-                {s.allowedModels.map((r) => (
-                  <span className="agent-chip" key={refKey(r)}>
-                    {label(r)}
-                    <button className="icon-btn" aria-label={t("agentAllowedRemove", { model: label(r) })} title={t("agentAllowedRemove", { model: label(r) })} onClick={() => saveAgentSettings({ ...s, allowedModels: s.allowedModels.filter((x) => !sameRef(x, r)) })}><X size={12} /></button>
-                  </span>
-                ))}
-              </div>
-            )}
-        </>}>
-          <select className="input narrow" aria-label={t("agentAllowedAdd")} value="" onChange={(e) => { const r = decode(e.target.value); if (r) saveAgentSettings({ ...s, allowedModels: [...s.allowedModels, r] }); }}>
+        <SettingRow
+          id="agentAllowedModels"
+          title={t("agentAllowedModels")}
+          description={
+            <>
+              {t("agentAllowedModelsDesc")}
+              {!!s.allowedModels.length && (
+                <div className="agent-chips">
+                  {s.allowedModels.map((r) => (
+                    <span className="agent-chip" key={refKey(r)}>
+                      {label(r)}
+                      <button
+                        className="icon-btn"
+                        aria-label={t("agentAllowedRemove", { model: label(r) })}
+                        title={t("agentAllowedRemove", { model: label(r) })}
+                        onClick={() =>
+                          saveAgentSettings({ ...s, allowedModels: s.allowedModels.filter((x) => !sameRef(x, r)) })
+                        }
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          }
+        >
+          <select
+            className="input narrow"
+            aria-label={t("agentAllowedAdd")}
+            value=""
+            onChange={(e) => {
+              const r = decode(e.target.value);
+              if (r) saveAgentSettings({ ...s, allowedModels: [...s.allowedModels, r] });
+            }}
+          >
             <option value="">{t("agentAllowedAdd")}</option>
-            {options(agentModels.filter((r) => !s.allowedModels.some((x) => sameRef(x, r))), null)}
+            {options(
+              agentModels.filter((r) => !s.allowedModels.some((x) => sameRef(x, r))),
+              null,
+            )}
           </select>
         </SettingRow>
         <SettingRow id="agentCheapModel" title={t("agentCheapModel")} description={t("agentCheapModelDesc")}>
-          <select className="input narrow" aria-label={t("agentCheapModel")} value={encode(s.cheapModel)} onChange={(e) => saveAgentSettings({ ...s, cheapModel: decode(e.target.value) })}>
+          <select
+            className="input narrow"
+            aria-label={t("agentCheapModel")}
+            value={encode(s.cheapModel)}
+            onChange={(e) => saveAgentSettings({ ...s, cheapModel: decode(e.target.value) })}
+          >
             <option value="">{t("agentModelSameAsChat")}</option>
             {options(anyModels, s.cheapModel)}
           </select>
@@ -173,28 +270,69 @@ export function AgentSettingsSection() {
       </div>
 
       <div className="card">
-        <SettingRow id="agentBudgets" stacked title={t("agentBudgets")} description={<>
-            {t("agentBudgetsDesc")}
-            {badCells.size > 0 && <div className="budget-error" role="alert">{t("agentBudgetInvalid")}</div>}
-            <table className="agent-budgets">
-              <thead>
-                <tr><th />{FIELDS.map((f) => <th key={f.key} scope="col">{t(f.label)}</th>)}</tr>
-              </thead>
-              <tbody>
-                {AGENT_TYPES.map((type) => (
-                  <tr key={type}>
-                    <th scope="row">{t(TYPE_KEY[type])}</th>
+        <SettingRow
+          id="agentBudgets"
+          stacked
+          title={t("agentBudgets")}
+          description={
+            <>
+              {t("agentBudgetsDesc")}
+              {badCells.size > 0 && (
+                <div className="budget-error" role="alert">
+                  {t("agentBudgetInvalid")}
+                </div>
+              )}
+              <table className="agent-budgets">
+                <thead>
+                  <tr>
+                    <th />
                     {FIELDS.map((f) => (
-                      <td key={f.key}><BudgetCell type={type} field={f.key} label={`${t(TYPE_KEY[type])}: ${t(f.label)}`} settings={s} onBad={flag(`${type}.${f.key}`)} /></td>
+                      <th key={f.key} scope="col">
+                        {t(f.label)}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-        </>} />
-        <SettingRow id="agentStopOnBudget" title={t("agentStopOnBudget")} description={t("agentStopOnBudgetDesc")} toggle={{ on: s.stopOnBudget, onChange: (v) => saveAgentSettings({ ...s, stopOnBudget: v }) }} />
-        <SettingRow id="agentCancelDependents" title={t("agentCancelDependents")} description={t("agentCancelDependentsDesc")} toggle={{ on: s.cancelDependents, onChange: (v) => saveAgentSettings({ ...s, cancelDependents: v }) }} />
-        <SettingRow id="agentNotifications" title={t("agentNotifications")} description={t("agentNotificationsDesc")} toggle={{ on: s.notifications, onChange: (v) => saveAgentSettings({ ...s, notifications: v }) }} />
+                </thead>
+                <tbody>
+                  {AGENT_TYPES.map((type) => (
+                    <tr key={type}>
+                      <th scope="row">{t(TYPE_KEY[type])}</th>
+                      {FIELDS.map((f) => (
+                        <td key={f.key}>
+                          <BudgetCell
+                            type={type}
+                            field={f.key}
+                            label={`${t(TYPE_KEY[type])}: ${t(f.label)}`}
+                            settings={s}
+                            onBad={flag(`${type}.${f.key}`)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          }
+        />
+        <SettingRow
+          id="agentStopOnBudget"
+          title={t("agentStopOnBudget")}
+          description={t("agentStopOnBudgetDesc")}
+          toggle={{ on: s.stopOnBudget, onChange: (v) => saveAgentSettings({ ...s, stopOnBudget: v }) }}
+        />
+        <SettingRow
+          id="agentCancelDependents"
+          title={t("agentCancelDependents")}
+          description={t("agentCancelDependentsDesc")}
+          toggle={{ on: s.cancelDependents, onChange: (v) => saveAgentSettings({ ...s, cancelDependents: v }) }}
+        />
+        <SettingRow
+          id="agentNotifications"
+          title={t("agentNotifications")}
+          description={t("agentNotificationsDesc")}
+          toggle={{ on: s.notifications, onChange: (v) => saveAgentSettings({ ...s, notifications: v }) }}
+        />
         <CodexAppServerRow />
         <CodexSessionsRow />
       </div>

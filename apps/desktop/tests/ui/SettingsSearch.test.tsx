@@ -65,8 +65,10 @@ describe("settings search", () => {
       mockSettings({});
       const { unmount } = renderApp(<Settings />, makeApp({ settingsPage: page, projects: [project()] }));
       await waitFor(() => {
-        for (const id of page === "shortcuts" ? SHORTCUTS.map((s) => `shortcut-${s.id}`) : []) expect(document.querySelector(`[data-setting="${id}"]`), id).not.toBeNull();
-        for (const e of SETTING_ENTRIES.filter((x) => x.page === page)) expect(document.querySelector(`[data-setting="${e.id}"]`), `${page}/${e.id}`).not.toBeNull();
+        for (const id of page === "shortcuts" ? SHORTCUTS.map((s) => `shortcut-${s.id}`) : [])
+          expect(document.querySelector(`[data-setting="${id}"]`), id).not.toBeNull();
+        for (const e of SETTING_ENTRIES.filter((x) => x.page === page))
+          expect(document.querySelector(`[data-setting="${e.id}"]`), `${page}/${e.id}`).not.toBeNull();
       });
       unmount();
     }

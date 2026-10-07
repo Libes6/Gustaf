@@ -7,8 +7,21 @@
 import type { Part } from "../../providers/types.ts";
 import { IMAGE_OMITTED } from "../exportChats.ts";
 import {
-  LIMITS, capMessages, cleanArgs, cleanText, eachLine, outputText, pairTools, parseLine, projectOf, rec, str, titleFrom, toMs,
-  type ImportedChat, type ImportedMessage,
+  LIMITS,
+  capMessages,
+  cleanArgs,
+  cleanText,
+  eachLine,
+  outputText,
+  pairTools,
+  parseLine,
+  projectOf,
+  rec,
+  str,
+  titleFrom,
+  toMs,
+  type ImportedChat,
+  type ImportedMessage,
 } from "./common.ts";
 
 /** `<command-name>/x</command-name>` wrappers become the slash command text; other harness wrappers disappear. */
@@ -63,7 +76,13 @@ export function parseClaudeSession(text: string, fallbackId = ""): ImportedChat 
       default:
         return;
     }
-    if (o.isSidechain === true || o.isMeta === true || o.isCompactSummary === true || o.isVisibleInTranscriptOnly === true) return;
+    if (
+      o.isSidechain === true ||
+      o.isMeta === true ||
+      o.isCompactSummary === true ||
+      o.isVisibleInTranscriptOnly === true
+    )
+      return;
     if (!rec(o.message)) return;
     if (!sessionId && str(o.sessionId) && o.sessionId) sessionId = o.sessionId;
     if (cwd === undefined && str(o.cwd) && o.cwd) cwd = o.cwd;
@@ -73,7 +92,11 @@ export function parseClaudeSession(text: string, fallbackId = ""): ImportedChat 
       updatedAt = Math.max(updatedAt ?? at, at);
     }
     const content: unknown = o.message.content;
-    const blocks: Block[] = Array.isArray(content) ? content.filter(rec) : str(content) ? [{ type: "text", text: content }] : [];
+    const blocks: Block[] = Array.isArray(content)
+      ? content.filter(rec)
+      : str(content)
+        ? [{ type: "text", text: content }]
+        : [];
 
     if (o.type === "assistant") {
       const parts: Part[] = [];
@@ -90,8 +113,14 @@ export function parseClaudeSession(text: string, fallbackId = ""): ImportedChat 
         lastAssistant.msg.parts.push(...parts);
         return;
       }
-      const model = str(o.message.model) && !o.message.model.startsWith("<") ? o.message.model.slice(0, 200) : undefined;
-      const msg: ImportedMessage = { role: "assistant", parts, createdAt: at, meta: { imported: "claude-code", ...(model ? { model } : {}) } };
+      const model =
+        str(o.message.model) && !o.message.model.startsWith("<") ? o.message.model.slice(0, 200) : undefined;
+      const msg: ImportedMessage = {
+        role: "assistant",
+        parts,
+        createdAt: at,
+        meta: { imported: "claude-code", ...(model ? { model } : {}) },
+      };
       messages.push(msg);
       lastAssistant = { id: mid, msg };
       return;

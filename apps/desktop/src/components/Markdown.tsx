@@ -55,7 +55,9 @@ const components: Components = {
     return <CodeBlock lang={lang}>{children}</CodeBlock>;
   },
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer">{children}</a>
+    <a href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
   ),
 };
 
@@ -63,16 +65,22 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
   const segments = useMemo(() => parseArtifacts(text), [text]);
   return (
     <div className="md">
-      {segments.map((segment, i) => segment.type === "canvas" ? <CanvasCard key={i} artifact={segment.artifact} /> : segment.type === "page" ? <HtmlPageCard key={i} page={segment.page} /> : (
-      <ReactMarkdown
-        key={i}
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
-        components={components}
-      >
-        {segment.text}
-      </ReactMarkdown>
-      ))}
+      {segments.map((segment, i) =>
+        segment.type === "canvas" ? (
+          <CanvasCard key={i} artifact={segment.artifact} />
+        ) : segment.type === "page" ? (
+          <HtmlPageCard key={i} page={segment.page} />
+        ) : (
+          <ReactMarkdown
+            key={i}
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
+            components={components}
+          >
+            {segment.text}
+          </ReactMarkdown>
+        ),
+      )}
     </div>
   );
 });

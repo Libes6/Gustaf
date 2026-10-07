@@ -1,6 +1,11 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "./api";
-import { normalizeScheduled, recoverInterrupted, SCHEDULED_PROMPTS_SETTING, type ScheduledPrompt } from "./scheduledPrompts";
+import {
+  normalizeScheduled,
+  recoverInterrupted,
+  SCHEDULED_PROMPTS_SETTING,
+  type ScheduledPrompt,
+} from "./scheduledPrompts";
 
 // The list of schedules, shared in memory (the runner patches it from background runs while the settings page edits it)
 // and saved to the `settings` table after every change. Loading marks runs that were active at shutdown as interrupted.

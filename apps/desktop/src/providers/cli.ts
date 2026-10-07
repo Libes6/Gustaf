@@ -32,7 +32,7 @@ const findScript = (id: CliName, verify = false) => findCliScript(currentPlatfor
 
 let codexPath: Promise<string> | undefined;
 export function codexExecutable() {
-  return codexPath ??= (async () => {
+  return (codexPath ??= (async () => {
     const probe = await shellCommand(findScript("codex", true)).execute();
     if (probe.code !== 0 || !probe.stdout.trim()) throw new Error("Codex CLI is unavailable");
     return probe.stdout.trim();
@@ -40,18 +40,19 @@ export function codexExecutable() {
     // Not remembered: Codex installed (or logged in) after a failed probe must work without restarting the app.
     codexPath = undefined;
     throw e;
-  });
+  }));
 }
 
 export async function cursorExecutable() {
   const probe = await shellCommand(findScript("cursor-agent")).execute();
-  if (probe.code || !probe.stdout.trim()) throw new Error('Cursor CLI is unavailable.');
+  if (probe.code || !probe.stdout.trim()) throw new Error("Cursor CLI is unavailable.");
   return probe.stdout.trim();
 }
 
 async function claudeExecutable() {
   const probe = await shellCommand(findScript("claude")).execute();
-  if (!probe.stdout.trim()) throw new Error('Claude CLI is unavailable. Install Claude Code and run claude auth login.');
+  if (!probe.stdout.trim())
+    throw new Error("Claude CLI is unavailable. Install Claude Code and run claude auth login.");
   return probe.stdout.trim();
 }
 
@@ -60,14 +61,23 @@ async function killProcessTree(pid: number) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("process_kill_tree", { pid });
-  } catch { /* the plain kill that follows still ends the process itself */ }
+  } catch {
+    /* the plain kill that follows still ends the process itself */
+  }
 }
 
 /** Runs a login-shell script and feeds each stdout JSON line to onLine; non-JSON lines are skipped. */
 export async function spawnLines(
   script: string,
   onLine: (e: any) => void,
-  o: { signal?: AbortSignal; cwd?: string; stdin?: string; env?: Record<string, string>; /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void; /** On abort kill the whole process tree, not only the child. */ killTree?: boolean } = {},
+  o: {
+    signal?: AbortSignal;
+    cwd?: string;
+    stdin?: string;
+    env?: Record<string, string>;
+    /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void;
+    /** On abort kill the whole process tree, not only the child. */ killTree?: boolean;
+  } = {},
 ) {
   if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
@@ -76,7 +86,11 @@ export async function spawnLines(
   const line = (s: string) => {
     s = s.trim();
     if (!s) return;
-    try { o.onRaw?.(s); } catch { /* debugging aid only */ }
+    try {
+      o.onRaw?.(s);
+    } catch {
+      /* debugging aid only */
+    }
     try {
       onLine(JSON.parse(s));
     } catch {
@@ -94,19 +108,31 @@ export async function spawnLines(
   });
   cmd.stderr.on("data", (s: string) => (stderr += s));
   const child = await cmd.spawn();
-  const kill = () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); };
+  const kill = () => {
+    void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
+  };
   o.signal?.addEventListener("abort", kill, { once: true });
   if (o.signal?.aborted) kill();
   if (o.stdin != null) await child.write(o.stdin);
   let code: number | null;
-  try { code = await done; } finally { o.signal?.removeEventListener("abort", kill); }
+  try {
+    code = await done;
+  } finally {
+    o.signal?.removeEventListener("abort", kill);
+  }
   line(buf);
   return { code, stderr };
 }
 
 /** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
-async function openAppServer(executable: string, o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void }): Promise<Connection> {
-  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
+async function openAppServer(
+  executable: string,
+  o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void },
+): Promise<Connection> {
+  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), {
+    cwd: o.cwd,
+    ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}),
+  });
   let listener: ((m: Record<string, unknown>) => void) | undefined;
   const queued: Record<string, unknown>[] = [];
   let buf = "";
@@ -114,25 +140,47 @@ async function openAppServer(executable: string, o: { cwd?: string; env?: Record
   const line = (raw: string) => {
     raw = raw.trim();
     if (!raw) return;
-    try { o.onRaw?.(raw); } catch { /* debugging aid only */ }
+    try {
+      o.onRaw?.(raw);
+    } catch {
+      /* debugging aid only */
+    }
     try {
       const m = JSON.parse(raw);
-      if (m && typeof m === "object") (listener ? listener(m) : queued.push(m));
-    } catch { /* banners and warnings */ }
+      if (m && typeof m === "object") listener ? listener(m) : queued.push(m);
+    } catch {
+      /* banners and warnings */
+    }
   };
-  const closed = new Promise<number | null>((resolve) => cmd.on("close", (e) => { line(buf); buf = ""; resolve(e.code); }));
+  const closed = new Promise<number | null>((resolve) =>
+    cmd.on("close", (e) => {
+      line(buf);
+      buf = "";
+      resolve(e.code);
+    }),
+  );
   cmd.stdout.on("data", (chunk: string) => {
     buf += chunk;
     let i;
-    while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); }
+    while ((i = buf.indexOf("\n")) >= 0) {
+      line(buf.slice(0, i));
+      buf = buf.slice(i + 1);
+    }
   });
-  cmd.stderr.on("data", (s: string) => { stderr = (stderr + s).slice(-4000); });
+  cmd.stderr.on("data", (s: string) => {
+    stderr = (stderr + s).slice(-4000);
+  });
   const child = await cmd.spawn();
   return {
     write: (l) => child.write(l + "\n"),
-    onMessage(cb) { listener = cb; for (const m of queued.splice(0)) cb(m); },
+    onMessage(cb) {
+      listener = cb;
+      for (const m of queued.splice(0)) cb(m);
+    },
     closed,
-    kill: () => { void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {}); },
+    kill: () => {
+      void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
+    },
     stderr: () => stderr,
   };
 }
@@ -140,16 +188,21 @@ async function openAppServer(executable: string, o: { cwd?: string; env?: Record
 export { resumePoint } from "./cliArgs";
 
 async function listCodexModels() {
-  const script = import.meta.env.DEV ? __SIDECAR__.replace(/cursor-agent\.mjs$/, 'codex-limits.mjs') : await resolveResource('sidecar/codex-limits.mjs');
+  const script = import.meta.env.DEV
+    ? __SIDECAR__.replace(/cursor-agent\.mjs$/, "codex-limits.mjs")
+    : await resolveResource("sidecar/codex-limits.mjs");
   const executable = await codexExecutable();
   let models: { id: string; name: string }[] = [];
-  let error = '';
-  const result = await spawnLines(runScript({ executable: "node", args: [script, "--models"], env: { GUSTAF_CODEX_BINARY: executable } }), e => {
-    if (e.type === 'models') models = e.result;
-    if (e.type === 'error') error = e.message;
-  });
-  if (error || result.code || !models.length) throw new Error(error || 'Codex did not return available models.');
-  return [{ id: 'default', name: 'Default' }, ...models.filter(m => m.id !== 'default')];
+  let error = "";
+  const result = await spawnLines(
+    runScript({ executable: "node", args: [script, "--models"], env: { GUSTAF_CODEX_BINARY: executable } }),
+    (e) => {
+      if (e.type === "models") models = e.result;
+      if (e.type === "error") error = e.message;
+    },
+  );
+  if (error || result.code || !models.length) throw new Error(error || "Codex did not return available models.");
+  return [{ id: "default", name: "Default" }, ...models.filter((m) => m.id !== "default")];
 }
 
 type Ev = { text?: string; session?: string; final?: string; error?: string };
@@ -157,7 +210,15 @@ type Spec = {
   name: string;
   models: string[] | (() => Promise<{ id: string; name: string }[]>);
   /** `images`: absolute attachment paths for this turn; `attachDir`: the folder holding them. */
-  args(o: { model?: string; session?: string; access: TurnInput["access"]; mode?: TurnInput["mode"]; images?: string[]; attachDir?: string; reasoning?: Reasoning }): string[];
+  args(o: {
+    model?: string;
+    session?: string;
+    access: TurnInput["access"];
+    mode?: TurnInput["mode"];
+    images?: string[];
+    attachDir?: string;
+    reasoning?: Reasoning;
+  }): string[];
   /** Effort levels the CLI can pass for this model (providers/reasoning.ts); `listed`: ids of the provider's model list. */
   levels(model: string, listed?: readonly string[]): readonly Reasoning[];
   /** True when the CLI takes images as flags; otherwise the paths go into the prompt. */
@@ -192,8 +253,10 @@ const SPECS: Record<CliId, Spec> = {
     levels: cursorLevels,
     parse: (e) => {
       // With --stream-partial-output the deltas carry timestamp_ms; the aggregate repeats without it.
-      if (e.type === "assistant" && e.timestamp_ms) return { text: (e.message?.content ?? []).map((c: any) => c.text ?? "").join(""), session: e.session_id };
-      if (e.type === "result") return { session: e.session_id, final: e.result, error: e.is_error ? String(e.result) : undefined };
+      if (e.type === "assistant" && e.timestamp_ms)
+        return { text: (e.message?.content ?? []).map((c: any) => c.text ?? "").join(""), session: e.session_id };
+      if (e.type === "result")
+        return { session: e.session_id, final: e.result, error: e.is_error ? String(e.result) : undefined };
       return { session: e.session_id };
     },
     loginHint: "cursor-agent login",
@@ -247,19 +310,27 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
     nativeGoal: async () => id === "codex" && (await codexTransport()) === "app-server",
 
     async listModels() {
-      if (id === 'cursor-agent') {
+      if (id === "cursor-agent") {
         const executable = await cursorExecutable();
-        const env = cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined);
-        const cmd = await shellCommand(runScript({ executable, args: ["--list-models"] }), Object.keys(env).length ? { env } : {}).execute();
-        const models = cmd.stdout.split('\n').flatMap(l => {
+        const env = cursorAccountEnv(
+          cfg,
+          await accountKey(),
+          cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined,
+        );
+        const cmd = await shellCommand(
+          runScript({ executable, args: ["--list-models"] }),
+          Object.keys(env).length ? { env } : {},
+        ).execute();
+        const models = cmd.stdout.split("\n").flatMap((l) => {
           const m = /^(\S+) - (.+?)(?: \((?:current|default)\))?$/.exec(l.trim());
           return m ? [{ id: m[1], name: m[2], providerId: cfg.id, created: 0, tools: true, images: true }] : [];
         });
-        if (cmd.code || !models.length) throw new Error(cmd.stderr || 'Cursor did not return models.');
+        if (cmd.code || !models.length) throw new Error(cmd.stderr || "Cursor did not return models.");
         listed = models.map((m) => m.id);
         return models;
       }
-      const list = typeof spec.models === "function" ? await spec.models() : spec.models.map((id) => ({ id, name: id }));
+      const list =
+        typeof spec.models === "function" ? await spec.models() : spec.models.map((id) => ({ id, name: id }));
       return list.map((m) => ({ ...m, providerId: cfg.id, created: 0, tools: true, images: true }));
     },
 
@@ -270,74 +341,135 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const args = spec.args({ model: t.model === "default" ? undefined : t.model, session, access: t.access ?? "auto", mode: t.mode, images: saved?.files, attachDir: saved?.dir, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)) });
-      const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
-      let text = "";
-      const actions = new Map<string, Activity>();
-      let final = "";
-      let usage: ReturnType<typeof tokenUsage>;
-      let error = "";
-      const emit = (s: string) => {
-        text += s;
-        t.onText(s);
-      };
-      const executable = id === "codex" ? await codexExecutable() : id === "cursor-agent" ? await cursorExecutable() : await claudeExecutable();
-      // Codex does not report its subagents on stdout: read them from its rollout files while the turn runs (codexRollout.ts).
-      const rollout = id === "codex" && (await rolloutEnabled())
-        ? createRolloutTracker({ startedAt: Date.now(), onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onDebug: log.debug })
-        : undefined;
-      let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
-      // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
-      let viaServer = false;
-      if (id === "codex" && (await codexTransport()) === "app-server") {
-        try {
-          const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
-          const r = await runAppServerTurn(conn, { cwd: t.cwd, model: t.model === "default" ? undefined : t.model, session, prompt, images: saved?.files, access: t.access ?? "auto", mode: t.mode, reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)), approvals: !!t.approve, goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined }, {
-            signal: t.signal, onApproval: t.approve, onGoal: t.goal?.onUpdate, onText: emit, onActivity: (a) => t.onActivity?.(applyActivity(actions, a)), onUsage: (u) => { usage = u; }, onDebug: log.debug,
-          });
-          viaServer = true;
-          session = r.session;
-          if (r.error) error = r.error;
-          res = { code: 0, stderr: "" };
-        } catch (e) {
-          if (t.signal.aborted) throw e;
-          if (!(e instanceof AppServerUnavailable)) throw e;
-          log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
+        const args = spec.args({
+          model: t.model === "default" ? undefined : t.model,
+          session,
+          access: t.access ?? "auto",
+          mode: t.mode,
+          images: saved?.files,
+          attachDir: saved?.dir,
+          reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)),
+        });
+        const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
+        let text = "";
+        const actions = new Map<string, Activity>();
+        let final = "";
+        let usage: ReturnType<typeof tokenUsage>;
+        let error = "";
+        const emit = (s: string) => {
+          text += s;
+          t.onText(s);
+        };
+        const executable =
+          id === "codex"
+            ? await codexExecutable()
+            : id === "cursor-agent"
+              ? await cursorExecutable()
+              : await claudeExecutable();
+        // Codex does not report its subagents on stdout: read them from its rollout files while the turn runs (codexRollout.ts).
+        const rollout =
+          id === "codex" && (await rolloutEnabled())
+            ? createRolloutTracker({
+                startedAt: Date.now(),
+                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onDebug: log.debug,
+              })
+            : undefined;
+        let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
+        // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
+        let viaServer = false;
+        if (id === "codex" && (await codexTransport()) === "app-server") {
+          try {
+            const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
+            const r = await runAppServerTurn(
+              conn,
+              {
+                cwd: t.cwd,
+                model: t.model === "default" ? undefined : t.model,
+                session,
+                prompt,
+                images: saved?.files,
+                access: t.access ?? "auto",
+                mode: t.mode,
+                reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)),
+                approvals: !!t.approve,
+                goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined,
+              },
+              {
+                signal: t.signal,
+                onApproval: t.approve,
+                onGoal: t.goal?.onUpdate,
+                onText: emit,
+                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onUsage: (u) => {
+                  usage = u;
+                },
+                onDebug: log.debug,
+              },
+            );
+            viaServer = true;
+            session = r.session;
+            if (r.error) error = r.error;
+            res = { code: 0, stderr: "" };
+          } catch (e) {
+            if (t.signal.aborted) throw e;
+            if (!(e instanceof AppServerUnavailable)) throw e;
+            log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
+          }
         }
-      }
-      try {
-      if (!viaServer) res = await spawnLines(
-        // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
-        runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
-        (e) => {
-          if (e.type === "result" || e.type === "turn.completed") usage = tokenUsage(e.usage, id === "claude") ?? usage;
-          const limit = claudeLimit(e);
-          if (limit) t.onLimits?.([limit]);
-          const ev = spec.parse(e);
-          if (ev.session) session = ev.session;
-          if (ev.text) emit(ev.text);
-          if (e.type === "thread.started" && typeof e.thread_id === "string") rollout?.begin(e.thread_id);
-          const acts = nativeActivities(id, e, log.unmapped);
-          // Waits that name no agent are held back: the rollout scan shows the agents, and a merged card replaces them if it finds none.
-          if (rollout && isBareCollabWait(e)) rollout.hold(acts);
-          else for (const action of acts) t.onActivity?.(applyActivity(actions, action));
-          if (ev.final) final = ev.final;
-          if (ev.error) error = ev.error;
-        },
-        { signal: t.signal, cwd: t.cwd, onRaw: log.raw, killTree: t.killTree, env: cursorAccountEnv(cfg, await accountKey(), cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined) },
-      );
-      } finally {
-        // The turn is over: one last scan unless it was stopped, then the polling ends.
-        for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) t.onActivity?.(applyActivity(actions, action));
-      }
-      if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
-      if (error) {
-        const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
-        throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
-      }
-      if (!text.trim() && final) emit(final);
-      return { parts: [...[...actions.values()].map(a => a.status === "running" ? { ...a, status: "unknown" as const } : a), ...(text ? [{ type: "text" as const, text }] : [])], responseId: session, usage };
+        try {
+          if (!viaServer)
+            res = await spawnLines(
+              // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
+              runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
+              (e) => {
+                if (e.type === "result" || e.type === "turn.completed")
+                  usage = tokenUsage(e.usage, id === "claude") ?? usage;
+                const limit = claudeLimit(e);
+                if (limit) t.onLimits?.([limit]);
+                const ev = spec.parse(e);
+                if (ev.session) session = ev.session;
+                if (ev.text) emit(ev.text);
+                if (e.type === "thread.started" && typeof e.thread_id === "string") rollout?.begin(e.thread_id);
+                const acts = nativeActivities(id, e, log.unmapped);
+                // Waits that name no agent are held back: the rollout scan shows the agents, and a merged card replaces them if it finds none.
+                if (rollout && isBareCollabWait(e)) rollout.hold(acts);
+                else for (const action of acts) t.onActivity?.(applyActivity(actions, action));
+                if (ev.final) final = ev.final;
+                if (ev.error) error = ev.error;
+              },
+              {
+                signal: t.signal,
+                cwd: t.cwd,
+                onRaw: log.raw,
+                killTree: t.killTree,
+                env: cursorAccountEnv(
+                  cfg,
+                  await accountKey(),
+                  cfg.cliProfile ? await cursorProfiles.dir(cfg.cliProfile) : undefined,
+                ),
+              },
+            );
+        } finally {
+          // The turn is over: one last scan unless it was stopped, then the polling ends.
+          for (const action of (await rollout?.finish(!t.signal.aborted)) ?? [])
+            t.onActivity?.(applyActivity(actions, action));
+        }
+        if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
+        if (error) {
+          const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
+          throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
+        }
+        if (!text.trim() && final) emit(final);
+        return {
+          parts: [
+            ...[...actions.values()].map((a) => (a.status === "running" ? { ...a, status: "unknown" as const } : a)),
+            ...(text ? [{ type: "text" as const, text }] : []),
+          ],
+          responseId: session,
+          usage,
+        };
       } finally {
         await log.flush();
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});

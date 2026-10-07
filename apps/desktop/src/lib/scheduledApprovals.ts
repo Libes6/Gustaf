@@ -4,7 +4,14 @@ import { useSyncExternalStore } from "react";
 // requests are listed here and answered from a floating card (components/ScheduledPromptsRuntime.tsx); the sidebar badge
 // and the native notification come from lib/attention.ts. Nothing here ever answers for the user.
 
-export type ScheduledApproval = { id: number; scheduleId: string; chatId: number | null; title: string; command: string; at: number };
+export type ScheduledApproval = {
+  id: number;
+  scheduleId: string;
+  chatId: number | null;
+  title: string;
+  command: string;
+  at: number;
+};
 
 let seq = 0;
 let items: readonly ScheduledApproval[] = [];
@@ -17,7 +24,10 @@ const subscribe = (l: () => void) => {
 };
 
 /** Lists a request; `onAnswer` is called once when the user answers. Returns a function that withdraws the request. */
-export function openScheduledApproval(info: Omit<ScheduledApproval, "id" | "at">, onAnswer: (ok: boolean) => void): () => void {
+export function openScheduledApproval(
+  info: Omit<ScheduledApproval, "id" | "at">,
+  onAnswer: (ok: boolean) => void,
+): () => void {
   const id = ++seq;
   items = [...items, { ...info, id, at: Date.now() }];
   answers.set(id, onAnswer);

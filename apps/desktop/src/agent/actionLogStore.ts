@@ -2,7 +2,19 @@ import { useEffect, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "../lib/api";
 import { undoFileEdit } from "../lib/checkpoints";
 import type { UndoResult } from "../lib/fileUndo";
-import { ACTION_LOG_SETTING, appendEntry, clipDetail, mergeLogs, normalizeActionLog, patchEntry, undoBlocker, type ActionEntry, type ActionStatus, type HookMeta, type GateMeta } from "./actionLog";
+import {
+  ACTION_LOG_SETTING,
+  appendEntry,
+  clipDetail,
+  mergeLogs,
+  normalizeActionLog,
+  patchEntry,
+  undoBlocker,
+  type ActionEntry,
+  type ActionStatus,
+  type HookMeta,
+  type GateMeta,
+} from "./actionLog";
 
 // One shared in-memory log (several chats can run at once), persisted to the app settings shortly after each change.
 let entries: ActionEntry[] = [];
@@ -50,7 +62,15 @@ const change = (next: ActionEntry[], now = false) => {
   schedule(now);
 };
 
-export type ActionStart = { tool: string; summary: string; root?: string; project?: string; source?: "scheduled" | "hook" | "gate"; hook?: HookMeta; gate?: GateMeta };
+export type ActionStart = {
+  tool: string;
+  summary: string;
+  root?: string;
+  project?: string;
+  source?: "scheduled" | "hook" | "gate";
+  hook?: HookMeta;
+  gate?: GateMeta;
+};
 
 /** Records a tool call that is about to run; returns its id. */
 export function logStart(a: ActionStart): string {
@@ -64,7 +84,13 @@ export const logPatch = (id: string, patch: Partial<ActionEntry>) => change(patc
 
 export function logFinish(id: string, status: ActionStatus, detail?: string) {
   const started = entries.find((e) => e.id === id)?.at ?? Date.now();
-  change(patchEntry(entries, id, { status, durationMs: Date.now() - started, ...(detail ? { detail: clipDetail(detail) } : {}) }));
+  change(
+    patchEntry(entries, id, {
+      status,
+      durationMs: Date.now() - started,
+      ...(detail ? { detail: clipDetail(detail) } : {}),
+    }),
+  );
 }
 
 /** While a run is active in a folder, edits made there cannot be undone (the agent may be editing the same files). */
@@ -81,7 +107,10 @@ export function endRun(root: string) {
 }
 
 export function clearActionLog() {
-  change(entries.filter((e) => e.status === "running"), true);
+  change(
+    entries.filter((e) => e.status === "running"),
+    true,
+  );
 }
 
 export function useActionLog() {

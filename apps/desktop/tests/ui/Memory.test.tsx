@@ -10,10 +10,23 @@ import { chat, makeApp, project, provider, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 // The model call is the only part that is not a Tauri command: replace the adapter factory.
-const model = vi.hoisted(() => ({ requests: [] as any[], reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown> }));
-vi.mock("../../src/providers", async (orig) => ({ ...(await orig<typeof import("../../src/providers")>()), getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }) }));
+const model = vi.hoisted(() => ({
+  requests: [] as any[],
+  reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown>,
+}));
+vi.mock("../../src/providers", async (orig) => ({
+  ...(await orig<typeof import("../../src/providers")>()),
+  getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }),
+}));
 
-type Row = { id: number; project_root: string | null; text: string; source_chat: number | null; created_at: number; updated_at: number };
+type Row = {
+  id: number;
+  project_root: string | null;
+  text: string;
+  source_chat: number | null;
+  created_at: number;
+  updated_at: number;
+};
 const ROOT = "/work/alpha";
 let rows: Row[];
 let nextId: number;
@@ -24,23 +37,54 @@ let messages: any[];
 function backend(extra: Record<string, unknown> = {}) {
   mockInvoke({
     db_select: ({ sql, params }: { sql: string; params: any[] }) => {
-      if (/from settings where key/.test(sql)) return params[0] in settings ? [{ value: JSON.stringify(settings[params[0]]) }] : [];
-      if (/from messages where chat_id/.test(sql)) return messages.map((m, i) => ({ id: i + 1, chat_id: params[0], content: JSON.stringify(m), created_at: i }));
-      if (/from memories where project_root is \? and text = \?/.test(sql)) return rows.filter((r) => r.project_root === params[0] && r.text === params[1]).slice(0, 1);
+      if (/from settings where key/.test(sql))
+        return params[0] in settings ? [{ value: JSON.stringify(settings[params[0]]) }] : [];
+      if (/from messages where chat_id/.test(sql))
+        return messages.map((m, i) => ({ id: i + 1, chat_id: params[0], content: JSON.stringify(m), created_at: i }));
+      if (/from memories where project_root is \? and text = \?/.test(sql))
+        return rows.filter((r) => r.project_root === params[0] && r.text === params[1]).slice(0, 1);
       if (/from memories where project_root is \?/.test(sql)) return rows.filter((r) => r.project_root === params[0]);
       return [];
     },
     db_execute: ({ sql, params }: { sql: string; params: any[] }) => {
-      if (/insert into memories/.test(sql)) { rows.push({ id: nextId, project_root: params[0], text: params[1], source_chat: params[2], created_at: params[3], updated_at: params[4] }); return [1, nextId++]; }
-      if (/update memories set text/.test(sql)) { const r = rows.find((x) => x.id === params[2] && x.project_root === params[3]); if (r) r.text = params[0]; return [r ? 1 : 0, 0]; }
-      if (/delete from memories/.test(sql)) { const n = rows.length; rows = rows.filter((x) => !(x.id === params[0] && x.project_root === params[1])); return [n - rows.length, 0]; }
-      if (/insert into settings/.test(sql)) { settings[params[0]] = JSON.parse(params[1]); return [1, 1]; }
+      if (/insert into memories/.test(sql)) {
+        rows.push({
+          id: nextId,
+          project_root: params[0],
+          text: params[1],
+          source_chat: params[2],
+          created_at: params[3],
+          updated_at: params[4],
+        });
+        return [1, nextId++];
+      }
+      if (/update memories set text/.test(sql)) {
+        const r = rows.find((x) => x.id === params[2] && x.project_root === params[3]);
+        if (r) r.text = params[0];
+        return [r ? 1 : 0, 0];
+      }
+      if (/delete from memories/.test(sql)) {
+        const n = rows.length;
+        rows = rows.filter((x) => !(x.id === params[0] && x.project_root === params[1]));
+        return [n - rows.length, 0];
+      }
+      if (/insert into settings/.test(sql)) {
+        settings[params[0]] = JSON.parse(params[1]);
+        return [1, 1];
+      }
       return [1, 1];
     },
     ...extra,
   });
 }
-const row = (id: number, text: string, project_root: string | null = ROOT): Row => ({ id, project_root, text, source_chat: null, created_at: 1, updated_at: id });
+const row = (id: number, text: string, project_root: string | null = ROOT): Row => ({
+  id,
+  project_root,
+  text,
+  source_chat: null,
+  created_at: 1,
+  updated_at: id,
+});
 
 beforeEach(() => {
   rows = [row(1, "Use pnpm here"), row(2, "Prefers short answers", null)];
@@ -52,7 +96,14 @@ beforeEach(() => {
 });
 
 describe("project menu: Memory…", () => {
-  const setup = () => renderApp(<Sidebar onCreateProject={() => {}} onSearch={() => {}} />, makeApp({ projects: [project({ path: ROOT })], chats: [chat({ id: 1, project_id: 1, title: "Fix the parser" })] }));
+  const setup = () =>
+    renderApp(
+      <Sidebar onCreateProject={() => {}} onSearch={() => {}} />,
+      makeApp({
+        projects: [project({ path: ROOT })],
+        chats: [chat({ id: 1, project_id: 1, title: "Fix the parser" })],
+      }),
+    );
   const open = async () => {
     setup();
     fireEvent.contextMenu(screen.getByText("Alpha"));
@@ -71,7 +122,10 @@ describe("project menu: Memory…", () => {
 
   it("is not offered for a project without a folder", () => {
     backend();
-    renderApp(<Sidebar onCreateProject={() => {}} onSearch={() => {}} />, makeApp({ projects: [project({ path: null })], chats: [] }));
+    renderApp(
+      <Sidebar onCreateProject={() => {}} onSearch={() => {}} />,
+      makeApp({ projects: [project({ path: null })], chats: [] }),
+    );
     fireEvent.contextMenu(screen.getByText("Alpha"));
     expect(within(screen.getByRole("menu")).queryByRole("menuitem", { name: "Memory…" })).toBeNull();
   });
@@ -83,12 +137,16 @@ describe("project menu: Memory…", () => {
 
     await userEvent.type(within(dialog).getByLabelText("Fact"), "Tests live in tests/");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(rows.some((r) => r.text === "Tests live in tests/" && r.project_root === ROOT)).toBe(true));
+    await waitFor(() =>
+      expect(rows.some((r) => r.text === "Tests live in tests/" && r.project_root === ROOT)).toBe(true),
+    );
 
     await userEvent.selectOptions(within(dialog).getByLabelText("Scope"), "global");
     await userEvent.type(within(dialog).getByLabelText("Fact"), "Answers in Russian");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(rows.some((r) => r.text === "Answers in Russian" && r.project_root === null)).toBe(true));
+    await waitFor(() =>
+      expect(rows.some((r) => r.text === "Answers in Russian" && r.project_root === null)).toBe(true),
+    );
 
     // Edit a global entry from the project dialog: it stays global.
     const globalRow = within(dialog).getByText("Prefers short answers").closest(".card-row") as HTMLElement;
@@ -136,18 +194,40 @@ describe("Settings -> Memory", () => {
 });
 
 describe("MemorySuggestDialog", () => {
-  const app = () => makeApp({
-    projects: [project({ path: ROOT })], providers: [provider()],
-    models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
-    selection: { providerId: "p1", model: "m1" },
-  });
-  const reply = (facts: unknown) => { model.reply = async () => ({ parts: [{ type: "text", text: JSON.stringify({ facts }) }], usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 } }); };
-  const open = (initial?: any) => renderApp(<MemorySuggestDialog chat={{ id: 7, title: "Parser work" }} project={project({ path: ROOT })} initial={initial} onClose={() => {}} />, app());
+  const app = () =>
+    makeApp({
+      projects: [project({ path: ROOT })],
+      providers: [provider()],
+      models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
+      selection: { providerId: "p1", model: "m1" },
+    });
+  const reply = (facts: unknown) => {
+    model.reply = async () => ({
+      parts: [{ type: "text", text: JSON.stringify({ facts }) }],
+      usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 },
+    });
+  };
+  const open = (initial?: any) =>
+    renderApp(
+      <MemorySuggestDialog
+        chat={{ id: 7, title: "Parser work" }}
+        project={project({ path: ROOT })}
+        initial={initial}
+        onClose={() => {}}
+      />,
+      app(),
+    );
 
   beforeEach(() => {
     messages = [
       { role: "user", parts: [{ type: "text", text: "We always use pnpm; my key is sk-" + "a".repeat(30) }] },
-      { role: "assistant", parts: [{ type: "text", text: "Understood." }, { type: "tool_call", id: "1", name: "bash", args: { command: "SECRET_TOOL_ARGS" } }] },
+      {
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Understood." },
+          { type: "tool_call", id: "1", name: "bash", args: { command: "SECRET_TOOL_ARGS" } },
+        ],
+      },
       { role: "tool", parts: [{ type: "tool_result", id: "1", name: "bash", output: "SECRET_TOOL_OUTPUT" }] },
     ];
   });
@@ -194,13 +274,19 @@ describe("MemorySuggestDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Save 2 selected" }));
     expect(await screen.findByText("Saved 2, already known 0.")).toBeInTheDocument();
-    expect(rows.slice(2).map((r) => [r.project_root, r.text, r.source_chat])).toEqual([[ROOT, "Use pnpm, not npm", 7], [ROOT, "Answers in English", 7]]);
+    expect(rows.slice(2).map((r) => [r.project_root, r.text, r.source_chat])).toEqual([
+      [ROOT, "Use pnpm, not npm", 7],
+      [ROOT, "Answers in English", 7],
+    ]);
     expect(rows.some((r) => r.text === "Tests live in tests/")).toBe(false);
   });
 
   it("does not store a duplicate that appeared after the suggestions were shown, and needs at least one ticked fact", async () => {
     backend();
-    open([{ id: "s0", text: "Use pnpm here", scope: "project" }, { id: "s1", text: "Fresh fact", scope: "project" }]);
+    open([
+      { id: "s0", text: "Use pnpm here", scope: "project" },
+      { id: "s1", text: "Fresh fact", scope: "project" },
+    ]);
     await userEvent.click(screen.getByLabelText("Save suggestion 2"));
     await userEvent.click(screen.getByRole("button", { name: "Save 1 selected" }));
     expect(await screen.findByText("Saved 0, already known 1.")).toBeInTheDocument();
@@ -229,12 +315,19 @@ describe("MemorySuggestDialog", () => {
 
 describe("MemoryExportDialog", () => {
   let files: Record<string, string>;
-  beforeEach(() => { files = {}; });
-  const fsBackend = () => backend({
-    read_instructions: () => Object.entries(files).map(([name, text]) => ({ name, bytes: new TextEncoder().encode(text).length, text })),
-    fs_list: () => ["src/", ...Object.keys(files)].join("\n"),
-    fs_write: ({ path, content }: { path: string; content: string }) => { files[path] = content; return "ok"; },
+  beforeEach(() => {
+    files = {};
   });
+  const fsBackend = () =>
+    backend({
+      read_instructions: () =>
+        Object.entries(files).map(([name, text]) => ({ name, bytes: new TextEncoder().encode(text).length, text })),
+      fs_list: () => ["src/", ...Object.keys(files)].join("\n"),
+      fs_write: ({ path, content }: { path: string; content: string }) => {
+        files[path] = content;
+        return "ok";
+      },
+    });
   const open = () => renderApp(<MemoryExportDialog root={ROOT} name="Alpha" onClose={() => {}} />);
   const preview = () => screen.getByLabelText("Resulting AGENTS.md").textContent ?? "";
 
@@ -254,7 +347,8 @@ describe("MemoryExportDialog", () => {
   });
 
   it("includes global facts only when ticked and keeps the text around an existing section", async () => {
-    files["AGENTS.md"] = "# Notes\n\nHand-written.\n\n<!-- gustaf-memory:start -->\nold\n<!-- gustaf-memory:end -->\n\nTail.\n";
+    files["AGENTS.md"] =
+      "# Notes\n\nHand-written.\n\n<!-- gustaf-memory:start -->\nold\n<!-- gustaf-memory:end -->\n\nTail.\n";
     fsBackend();
     open();
     await screen.findByText(/existing Gustaf section will be updated/);
@@ -322,10 +416,14 @@ describe("automatic memory suggestions", () => {
       providers: [provider({ id: "cli1", kind: "cli", cli: "claude", name: "Claude Code" })],
       models: [{ id: "default", name: "default", providerId: "cli1", created: 0 }],
       selection: { providerId: "cli1", model: "default" },
-      bumpUsage: () => {}, recordTokens: () => {},
+      bumpUsage: () => {},
+      recordTokens: () => {},
     };
     const signal = new AbortController().signal;
-    expect(await suggestMemories(app, { chatId: 7, projectRoot: ROOT, signal, auto: true })).toEqual({ suggestions: [], model: "default" });
+    expect(await suggestMemories(app, { chatId: 7, projectRoot: ROOT, signal, auto: true })).toEqual({
+      suggestions: [],
+      model: "default",
+    });
     expect(model.requests).toHaveLength(0);
     model.reply = async () => ({ parts: [{ type: "text", text: JSON.stringify({ facts: [] }) }] });
     await suggestMemories(app, { chatId: 7, projectRoot: ROOT, signal });

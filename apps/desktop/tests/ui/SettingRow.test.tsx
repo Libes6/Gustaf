@@ -6,7 +6,11 @@ import { renderApp } from "./render";
 
 describe("SettingRow", () => {
   it("shows title and description on the left and the control in its own wrapper", () => {
-    renderApp(<SettingRow id="x" title="Title" description="About it"><button>Go</button></SettingRow>);
+    renderApp(
+      <SettingRow id="x" title="Title" description="About it">
+        <button>Go</button>
+      </SettingRow>,
+    );
     const row = screen.getByText("Title").closest(".setting-row") as HTMLElement;
     expect(row).toHaveAttribute("data-setting", "x");
     expect(row.querySelector(".setting-text")).toHaveTextContent("TitleAbout it");
@@ -23,10 +27,14 @@ describe("SettingRow", () => {
   });
 
   it("two rows get different label ids", () => {
-    renderApp(<SettingsSection title="Block" description="Why"><SettingRow title="A" toggle={{ on: true, onChange: () => {} }} /><SettingRow title="B" toggle={{ on: false, onChange: () => {} }} /></SettingsSection>);
+    renderApp(
+      <SettingsSection title="Block" description="Why">
+        <SettingRow title="A" toggle={{ on: true, onChange: () => {} }} />
+        <SettingRow title="B" toggle={{ on: false, onChange: () => {} }} />
+      </SettingsSection>,
+    );
     expect(screen.getByRole("switch", { name: "A" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: "B" })).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText("Why")).toHaveClass("h4-sub");
   });
-
 });

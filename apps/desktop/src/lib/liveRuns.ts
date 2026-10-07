@@ -50,9 +50,10 @@ export const subscribeLiveRuns = (l: () => void) => {
   return () => void listeners.delete(l);
 };
 /** The active live run of a chat (the latest when two schedules share a chat). Stable between changes. */
-export const getLiveRun = (chatId: number | null): LiveRun | undefined => (chatId === null ? undefined : runs.get(chatId)?.slice(-1)[0]);
+export const getLiveRun = (chatId: number | null): LiveRun | undefined =>
+  chatId === null ? undefined : runs.get(chatId)?.slice(-1)[0];
 /** Changes whenever a message of a live run was stored in this chat or a live run ended. */
-export const liveVersion = (chatId: number | null): number => (chatId === null ? 0 : versions.get(chatId) ?? 0);
+export const liveVersion = (chatId: number | null): number => (chatId === null ? 0 : (versions.get(chatId) ?? 0));
 /** Chats with an active live run (sidebar). */
 export const getLiveChats = () => chats;
 
@@ -60,7 +61,17 @@ const bump = (chatId: number) => versions.set(chatId, liveVersion(chatId) + 1);
 
 /** Registers a run in `chatId`. `abort` is what the chat's Stop button calls. */
 export function beginLiveRun(chatId: number, title: string, abort: () => void): LiveRunHandle {
-  let current: LiveRun = { chatId, title, stream: "", activities: [], toolResults: [], approval: null, retryNotice: "", stats: { start: Date.now(), chars: 0, input: 0 }, abort };
+  let current: LiveRun = {
+    chatId,
+    title,
+    stream: "",
+    activities: [],
+    toolResults: [],
+    approval: null,
+    retryNotice: "",
+    stats: { start: Date.now(), chars: 0, input: 0 },
+    abort,
+  };
   const list = runs.get(chatId) ?? [];
   list.push(current);
   runs.set(chatId, list);
@@ -78,7 +89,12 @@ export function beginLiveRun(chatId: number, title: string, abort: () => void): 
     emit();
   };
   return {
-    text: (delta) => set({ stream: current.stream + delta, retryNotice: "", stats: { ...current.stats, chars: current.stats.chars + delta.length } }),
+    text: (delta) =>
+      set({
+        stream: current.stream + delta,
+        retryNotice: "",
+        stats: { ...current.stats, chars: current.stats.chars + delta.length },
+      }),
     toolResult: (result) => set({ toolResults: [...current.toolResults.filter((r) => r.id !== result.id), result] }),
     activities: (list) => set({ activities: list }),
     retry: (notice) => set({ retryNotice: notice }),

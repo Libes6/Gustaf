@@ -1,7 +1,15 @@
 // Pure settings of background agents (tests/agentSettings.test.mjs): default model per agent type, the allow-list of models
 // an agent call may request explicitly, per-type budget defaults, the cheap model for summaries/commit messages, the
 // orchestration default and notifications. Stored in the app `settings` table under "agentSettings" (agentSettingsStore.ts).
-import { AGENT_ROLES, AGENT_TYPES, HARD_CAPS, type AgentRole, type AgentType, type Budget, type BudgetOverrides } from "./subagentCore";
+import {
+  AGENT_ROLES,
+  AGENT_TYPES,
+  HARD_CAPS,
+  type AgentRole,
+  type AgentType,
+  type Budget,
+  type BudgetOverrides,
+} from "./subagentCore";
 
 export const AGENT_SETTINGS = "agentSettings";
 export const MAX_ALLOWED_MODELS = 20;
@@ -31,10 +39,22 @@ export type AgentSettings = {
 };
 
 export const MAX_ALLOWED_PROVIDERS = 20;
-export const DEFAULT_AGENT_SETTINGS: AgentSettings = { models: {}, allowedModels: [], budgets: {}, cheapModel: null, cancelDependents: true, stopOnBudget: true, notifications: true, roles: {}, allowedProviders: [], cleanupUntouchedWorktrees: false };
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  models: {},
+  allowedModels: [],
+  budgets: {},
+  cheapModel: null,
+  cancelDependents: true,
+  stopOnBudget: true,
+  notifications: true,
+  roles: {},
+  allowedProviders: [],
+  cleanupUntouchedWorktrees: false,
+};
 
 export const refKey = (r: ModelRef) => `${r.providerId}/${r.model}`;
-export const sameRef = (a: ModelRef | null | undefined, b: ModelRef | null | undefined) => !!a && !!b && a.providerId === b.providerId && a.model === b.model;
+export const sameRef = (a: ModelRef | null | undefined, b: ModelRef | null | undefined) =>
+  !!a && !!b && a.providerId === b.providerId && a.model === b.model;
 
 export function normalizeRef(raw: unknown): ModelRef | null {
   if (!raw || typeof raw !== "object") return null;
@@ -78,7 +98,13 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
     const ref = normalizeRef(rr[role]);
     if (ref) roles[role] = ref;
   }
-  const allowedProviders = [...new Set((Array.isArray(r.allowedProviders) ? r.allowedProviders : []).filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim().slice(0, 100)))].slice(0, MAX_ALLOWED_PROVIDERS);
+  const allowedProviders = [
+    ...new Set(
+      (Array.isArray(r.allowedProviders) ? r.allowedProviders : [])
+        .filter((x): x is string => typeof x === "string" && !!x.trim())
+        .map((x) => x.trim().slice(0, 100)),
+    ),
+  ].slice(0, MAX_ALLOWED_PROVIDERS);
   return {
     models,
     allowedModels,
@@ -96,7 +122,8 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
 /** Models an agent call may name: the allow-list, the per-type defaults and the parent's own model. */
 export function allowedRefs(s: AgentSettings, parent: ModelRef): ModelRef[] {
   const out: ModelRef[] = [];
-  for (const r of [parent, ...Object.values(s.models), ...s.allowedModels]) if (r && !out.some((o) => sameRef(o, r))) out.push(r);
+  for (const r of [parent, ...Object.values(s.models), ...s.allowedModels])
+    if (r && !out.some((o) => sameRef(o, r))) out.push(r);
   return out;
 }
 
@@ -110,7 +137,8 @@ export function matchModelArg(arg: string, allowed: readonly ModelRef[]): ModelR
   return byId.length === 1 ? byId[0] : null;
 }
 
-export type ModelChoice = { ok: true; ref: ModelRef; source: "requested" | "type" | "parent" } | { ok: false; error: string };
+export type ModelChoice =
+  { ok: true; ref: ModelRef; source: "requested" | "type" | "parent" } | { ok: false; error: string };
 
 /**
  * The model a subagent runs on: an explicitly requested one (only from the allowed models), else the type's default,
@@ -120,15 +148,22 @@ export function selectModel(type: AgentType, s: AgentSettings, parent: ModelRef,
   if (requested !== undefined && requested.trim()) {
     const allowed = allowedRefs(s, parent);
     const ref = matchModelArg(requested, allowed);
-    if (!ref) return { ok: false, error: `Model "${requested.trim()}" is not allowed for subagents. Allowed: ${allowed.map(refKey).join(", ")}. Omit \`model\` to use the default.` };
+    if (!ref)
+      return {
+        ok: false,
+        error: `Model "${requested.trim()}" is not allowed for subagents. Allowed: ${allowed.map(refKey).join(", ")}. Omit \`model\` to use the default.`,
+      };
     return { ok: true, ref, source: sameRef(ref, parent) ? "parent" : "requested" };
   }
   const typed = s.models[type];
-  return typed && !sameRef(typed, parent) ? { ok: true, ref: typed, source: "type" } : { ok: true, ref: parent, source: "parent" };
+  return typed && !sameRef(typed, parent)
+    ? { ok: true, ref: typed, source: "type" }
+    : { ok: true, ref: parent, source: "parent" };
 }
 
 /** The model for compaction and commit messages: the configured cheap model when it is usable, else the chat's own. */
-export const cheapModelFor = (s: AgentSettings, fallback: ModelRef, usable: (r: ModelRef) => boolean): ModelRef => (s.cheapModel && usable(s.cheapModel) ? s.cheapModel : fallback);
+export const cheapModelFor = (s: AgentSettings, fallback: ModelRef, usable: (r: ModelRef) => boolean): ModelRef =>
+  s.cheapModel && usable(s.cheapModel) ? s.cheapModel : fallback;
 
 // ---- providers and roles ----
 
@@ -137,7 +172,14 @@ export type ProviderLite = { id: string; name: string; /** A CLI agent that runs
 
 /** Provider ids a task may name: the chat's own, those of the type defaults and of the allowed models, and the allow-list. Roles are NOT included: a role's provider has to be allowed on its own. */
 export function allowedProviderIds(s: AgentSettings, parentProviderId: string): string[] {
-  return [...new Set([parentProviderId, ...Object.values(s.models).map((r) => r.providerId), ...s.allowedModels.map((r) => r.providerId), ...s.allowedProviders])];
+  return [
+    ...new Set([
+      parentProviderId,
+      ...Object.values(s.models).map((r) => r.providerId),
+      ...s.allowedModels.map((r) => r.providerId),
+      ...s.allowedProviders,
+    ]),
+  ];
 }
 
 /** Matches a `provider` argument: an exact id, else a name (case-insensitive) that only one provider has. */
@@ -150,17 +192,41 @@ export function matchProviderArg(arg: string, known: readonly ProviderLite[]): P
   return byName.length === 1 ? byName[0] : null;
 }
 
-export type ProviderRoute = { providerId: string; /** Absent: the provider's default model. */ model?: string; via: "role" | "provider"; role?: AgentRole };
+export type ProviderRoute = {
+  providerId: string;
+  /** Absent: the provider's default model. */ model?: string;
+  via: "role" | "provider";
+  role?: AgentRole;
+};
 export type RouteChoice = { ok: true; route: ProviderRoute } | { ok: false; error: string };
 
-const listProviders = (ids: readonly string[], known: readonly ProviderLite[]) => ids.map((id) => known.find((p) => p.id === id)).filter((p): p is ProviderLite => !!p).map((p) => `${p.id} (${p.name})`).join(", ") || "none";
+const listProviders = (ids: readonly string[], known: readonly ProviderLite[]) =>
+  ids
+    .map((id) => known.find((p) => p.id === id))
+    .filter((p): p is ProviderLite => !!p)
+    .map((p) => `${p.id} (${p.name})`)
+    .join(", ") || "none";
 
 /** One provider id (or name) checked against the known providers and the allowed ones. */
-function allowedProvider(arg: string, s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[], what: string): { ok: true; id: string } | { ok: false; error: string } {
+function allowedProvider(
+  arg: string,
+  s: AgentSettings,
+  parentProviderId: string,
+  known: readonly ProviderLite[],
+  what: string,
+): { ok: true; id: string } | { ok: false; error: string } {
   const p = matchProviderArg(arg, known);
   const allowed = allowedProviderIds(s, parentProviderId);
-  if (!p) return { ok: false, error: `${what} "${arg.trim()}" is not a known, enabled provider. Allowed: ${listProviders(allowed, known)}.` };
-  if (!allowed.includes(p.id)) return { ok: false, error: `${what} "${p.id}" is not allowed for subagents (Settings > Usage > Agents > Allowed providers). Allowed: ${listProviders(allowed, known)}.` };
+  if (!p)
+    return {
+      ok: false,
+      error: `${what} "${arg.trim()}" is not a known, enabled provider. Allowed: ${listProviders(allowed, known)}.`,
+    };
+  if (!allowed.includes(p.id))
+    return {
+      ok: false,
+      error: `${what} "${p.id}" is not allowed for subagents (Settings > Usage > Agents > Allowed providers). Allowed: ${listProviders(allowed, known)}.`,
+    };
   return { ok: true, id: p.id };
 }
 
@@ -168,20 +234,33 @@ function allowedProvider(arg: string, s: AgentSettings, parentProviderId: string
  * Where a task runs when it names a provider or a role; null when it names neither (the existing model routing applies).
  * A role resolves to its preset, which must name an enabled and allowed provider. An explicit provider must be allowed.
  */
-export function selectProviderRoute(a: { provider?: string; role?: AgentRole; model?: string }, s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[]): RouteChoice | null {
+export function selectProviderRoute(
+  a: { provider?: string; role?: AgentRole; model?: string },
+  s: AgentSettings,
+  parentProviderId: string,
+  known: readonly ProviderLite[],
+): RouteChoice | null {
   if (a.role) {
     const preset = s.roles[a.role];
-    if (!preset) return { ok: false, error: `Role "${a.role}" has no provider configured (Settings > Usage > Agents > Roles).` };
+    if (!preset)
+      return { ok: false, error: `Role "${a.role}" has no provider configured (Settings > Usage > Agents > Roles).` };
     const p = allowedProvider(preset.providerId, s, parentProviderId, known, `Provider of role "${a.role}"`);
     return p.ok ? { ok: true, route: { providerId: p.id, model: preset.model, via: "role", role: a.role } } : p;
   }
   if (!a.provider) return null;
   const p = allowedProvider(a.provider, s, parentProviderId, known, "Provider");
-  return p.ok ? { ok: true, route: { providerId: p.id, ...(a.model?.trim() ? { model: a.model.trim() } : {}), via: "provider" } } : p;
+  return p.ok
+    ? { ok: true, route: { providerId: p.id, ...(a.model?.trim() ? { model: a.model.trim() } : {}), via: "provider" } }
+    : p;
 }
 
 /** The fallback providers of a task, each checked like an explicit provider. */
-export function selectFallbacks(ids: readonly string[], s: AgentSettings, parentProviderId: string, known: readonly ProviderLite[]): { ok: true; routes: ProviderRoute[] } | { ok: false; error: string } {
+export function selectFallbacks(
+  ids: readonly string[],
+  s: AgentSettings,
+  parentProviderId: string,
+  known: readonly ProviderLite[],
+): { ok: true; routes: ProviderRoute[] } | { ok: false; error: string } {
   const routes: ProviderRoute[] = [];
   for (const id of ids) {
     const p = allowedProvider(id, s, parentProviderId, known, "Fallback provider");

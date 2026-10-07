@@ -19,6 +19,11 @@ export function takeComposerDraft(chatId: number | null): string | null {
   pending.delete(chatId);
   return texts.join("\n\n");
 }
-export function onComposerDraft(fn: () => void) { subscribers.add(fn); return () => { subscribers.delete(fn); }; }
+export function onComposerDraft(fn: () => void) {
+  subscribers.add(fn);
+  return () => {
+    subscribers.delete(fn);
+  };
+}
 /** Test helper. */
 export const clearComposerDrafts = () => pending.clear();

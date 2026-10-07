@@ -7,11 +7,24 @@ import { makeApp, provider, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
 // The model call is the only part that is not a Tauri command: replace the adapter factory.
-const model = vi.hoisted(() => ({ requests: [] as any[], reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown> }));
-vi.mock("../../src/providers", async (orig) => ({ ...(await orig<typeof import("../../src/providers")>()), getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }) }));
+const model = vi.hoisted(() => ({
+  requests: [] as any[],
+  reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown>,
+}));
+vi.mock("../../src/providers", async (orig) => ({
+  ...(await orig<typeof import("../../src/providers")>()),
+  getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }),
+}));
 
 const status = (over: Partial<GitStatus> = {}): GitStatus => ({
-  repo: true, toplevel: "/work/alpha", prefix: "", branch: "main", detached: false, head: "abc1234", inProgress: null, total: 3,
+  repo: true,
+  toplevel: "/work/alpha",
+  prefix: "",
+  branch: "main",
+  detached: false,
+  head: "abc1234",
+  inProgress: null,
+  total: 3,
   files: [
     { path: "src/a.ts", kind: "modified", staged: false },
     { path: "notes.md", kind: "untracked", staged: false },
@@ -19,27 +32,58 @@ const status = (over: Partial<GitStatus> = {}): GitStatus => ({
   ],
   ...over,
 });
-const result: CommitResult = { sha: "f".repeat(40), short: "fffffff", branch: "main", files: ["src/a.ts"], createdBranch: false };
-const context: CommitContext = { files: ["src/a.ts"], stat: " src/a.ts | 2 +-", diff: "diff --git a/src/a.ts b/src/a.ts\n+x", truncated: false, recent: ["Fix things"] };
+const result: CommitResult = {
+  sha: "f".repeat(40),
+  short: "fffffff",
+  branch: "main",
+  files: ["src/a.ts"],
+  createdBranch: false,
+};
+const context: CommitContext = {
+  files: ["src/a.ts"],
+  stat: " src/a.ts | 2 +-",
+  diff: "diff --git a/src/a.ts b/src/a.ts\n+x",
+  truncated: false,
+  recent: ["Fix things"],
+};
 
-const app = () => makeApp({
-  providers: [provider()],
-  models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
-  selection: { providerId: "p1", model: "m1" },
-});
+const app = () =>
+  makeApp({
+    providers: [provider()],
+    models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
+    selection: { providerId: "p1", model: "m1" },
+  });
 
-function open(over: { status?: GitStatus; accepted?: string[]; onClose?: () => void; onCommitted?: (r: CommitResult) => void; app?: ReturnType<typeof makeApp> } = {}) {
+function open(
+  over: {
+    status?: GitStatus;
+    accepted?: string[];
+    onClose?: () => void;
+    onCommitted?: (r: CommitResult) => void;
+    app?: ReturnType<typeof makeApp>;
+  } = {},
+) {
   mockInvoke({ git_status: over.status ?? status() });
   const onClose = over.onClose ?? vi.fn();
   const onCommitted = over.onCommitted ?? vi.fn();
-  const view = renderApp(<GitCommitDialog root="/work/alpha" accepted={over.accepted ?? ["src/a.ts"]} onClose={onClose} onCommitted={onCommitted} />, over.app ?? app());
+  const view = renderApp(
+    <GitCommitDialog
+      root="/work/alpha"
+      accepted={over.accepted ?? ["src/a.ts"]}
+      onClose={onClose}
+      onCommitted={onCommitted}
+    />,
+    over.app ?? app(),
+  );
   return { ...view, onClose, onCommitted };
 }
 const commitButton = () => screen.getByRole("button", { name: /^Commit \d+ files?$/ });
 const messageBox = () => screen.getByLabelText("Commit message") as HTMLTextAreaElement;
 const checkbox = (path: string) => screen.getByRole("checkbox", { name: new RegExp(path.replace(".", "\\.")) });
 
-beforeEach(() => { model.requests.length = 0; });
+beforeEach(() => {
+  model.requests.length = 0;
+});
 
 describe("GitCommitDialog", () => {
   it("loads the repository status and pre-selects only the files accepted in review", async () => {
@@ -67,7 +111,9 @@ describe("GitCommitDialog", () => {
     mockInvoke({ git_commit: result });
     await userEvent.click(commitButton());
     await waitFor(() => expect(onCommitted).toHaveBeenCalledWith(result));
-    expect(callsOf("git_commit")).toEqual([{ root: "/work/alpha", message: "Add parser", paths: ["src/a.ts"], newBranch: null }]);
+    expect(callsOf("git_commit")).toEqual([
+      { root: "/work/alpha", message: "Add parser", paths: ["src/a.ts"], newBranch: null },
+    ]);
   });
 
   it("ticking another file updates the count; unticking everything blocks the commit", async () => {
@@ -115,7 +161,9 @@ describe("GitCommitDialog", () => {
 
   it("shows the model error and keeps the message empty when generation fails", async () => {
     mockInvoke({ git_commit_context: context });
-    model.reply = async () => { throw new Error("rate limited"); };
+    model.reply = async () => {
+      throw new Error("rate limited");
+    };
     open();
     await screen.findByText("main");
     await userEvent.click(screen.getByRole("button", { name: /Generate message/ }));
@@ -200,11 +248,25 @@ describe("GitCommitDialog", () => {
 
   describe("after the commit: push and pull request", () => {
     const pub = (over: Partial<PublishInfo> = {}): PublishInfo => ({
-      repo: true, branch: "gustaf/x", hasCommits: true, remotes: [{ name: "origin", url: "https://github.com/o/r.git" }], upstream: null, ahead: null, behind: null,
-      remoteBranches: ["origin/main", "origin/gustaf/x"], defaultBase: "main", protected: false, ...over,
+      repo: true,
+      branch: "gustaf/x",
+      hasCommits: true,
+      remotes: [{ name: "origin", url: "https://github.com/o/r.git" }],
+      upstream: null,
+      ahead: null,
+      behind: null,
+      remoteBranches: ["origin/main", "origin/gustaf/x"],
+      defaultBase: "main",
+      protected: false,
+      ...over,
     });
     const commitNow = async (info: PublishInfo, extra: Record<string, unknown> = {}) => {
-      mockInvoke({ git_commit: { ...result, branch: info.branch }, git_publish_info: info, gh_status: { installed: true, authenticated: true, detail: "" }, ...extra });
+      mockInvoke({
+        git_commit: { ...result, branch: info.branch },
+        git_publish_info: info,
+        gh_status: { installed: true, authenticated: true, detail: "" },
+        ...extra,
+      });
       open();
       await screen.findByText("main");
       await userEvent.type(messageBox(), "Add parser\n\nbody");
@@ -215,10 +277,19 @@ describe("GitCommitDialog", () => {
     it("pushes only on click, shows the new ahead/behind and never sends a force option", async () => {
       await commitNow(pub());
       expect(callsOf("git_push")).toEqual([]);
-      mockInvoke({ git_push: { remote: "origin", branch: "gustaf/x", output: "", info: pub({ upstream: "origin/gustaf/x", ahead: 0, behind: 0 }) } });
+      mockInvoke({
+        git_push: {
+          remote: "origin",
+          branch: "gustaf/x",
+          output: "",
+          info: pub({ upstream: "origin/gustaf/x", ahead: 0, behind: 0 }),
+        },
+      });
       await userEvent.click(screen.getByRole("button", { name: "Push gustaf/x" }));
       expect(await screen.findByText("Pushed gustaf/x to origin.")).toBeInTheDocument();
-      expect(callsOf("git_push")).toEqual([{ root: "/work/alpha", remote: "origin", branch: "gustaf/x", setUpstream: true, confirmProtected: false }]);
+      expect(callsOf("git_push")).toEqual([
+        { root: "/work/alpha", remote: "origin", branch: "gustaf/x", setUpstream: true, confirmProtected: false },
+      ]);
       expect(screen.getByText(/origin\/gustaf\/x: 0 ahead, 0 behind/)).toBeInTheDocument();
     });
 
@@ -236,7 +307,14 @@ describe("GitCommitDialog", () => {
 
     it("confirmed protected push passes the confirmation", async () => {
       await commitNow(pub({ branch: "main", protected: true }));
-      mockInvoke({ git_push: { remote: "origin", branch: "main", output: "", info: pub({ branch: "main", upstream: "origin/main", ahead: 0, behind: 0 }) } });
+      mockInvoke({
+        git_push: {
+          remote: "origin",
+          branch: "main",
+          output: "",
+          info: pub({ branch: "main", upstream: "origin/main", ahead: 0, behind: 0 }),
+        },
+      });
       await userEvent.click(screen.getByRole("button", { name: "Push main" }));
       await userEvent.click(screen.getByRole("button", { name: "Push to main anyway" }));
       await waitFor(() => expect(callsOf("git_push")).toHaveLength(1));
@@ -259,7 +337,9 @@ describe("GitCommitDialog", () => {
       await userEvent.click(screen.getByLabelText("Draft"));
       await userEvent.click(screen.getByRole("button", { name: "Create pull request" }));
       expect(await screen.findByText("https://github.com/o/r/pull/9")).toBeInTheDocument();
-      expect(callsOf("git_create_pr")).toEqual([{ root: "/work/alpha", title: "Add parser", body: "", base: "main", draft: true }]);
+      expect(callsOf("git_create_pr")).toEqual([
+        { root: "/work/alpha", title: "Add parser", body: "", base: "main", draft: true },
+      ]);
     });
 
     it("blocks the pull request when gh is missing or the branch is not pushed", async () => {

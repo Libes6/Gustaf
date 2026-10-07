@@ -6,38 +6,99 @@ import type { Hunk } from "../../src/lib/api";
 import { makeApp, provider, renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
 
-const model = vi.hoisted(() => ({ requests: [] as any[], reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown> }));
-vi.mock("../../src/providers", async (orig) => ({ ...(await orig<typeof import("../../src/providers")>()), getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }) }));
+const model = vi.hoisted(() => ({
+  requests: [] as any[],
+  reply: (async () => ({ parts: [] })) as (req: any) => Promise<unknown>,
+}));
+vi.mock("../../src/providers", async (orig) => ({
+  ...(await orig<typeof import("../../src/providers")>()),
+  getAdapter: async () => ({ turn: (req: any) => (model.requests.push(req), model.reply(req)) }),
+}));
 
 const hunks: Hunk[] = [
-  { id: "h1", header: "@@ -1,2 +1,2 @@", old_start: 1, old_lines: 2, new_start: 1, new_lines: 2, lines: [{ kind: " ", text: "keep" }, { kind: "+", text: "const x = y.z;" }] },
-  { id: "h2", header: "@@ -20,1 +20,1 @@", old_start: 20, old_lines: 1, new_start: 20, new_lines: 1, lines: [{ kind: "+", text: "other()" }] },
+  {
+    id: "h1",
+    header: "@@ -1,2 +1,2 @@",
+    old_start: 1,
+    old_lines: 2,
+    new_start: 1,
+    new_lines: 2,
+    lines: [
+      { kind: " ", text: "keep" },
+      { kind: "+", text: "const x = y.z;" },
+    ],
+  },
+  {
+    id: "h2",
+    header: "@@ -20,1 +20,1 @@",
+    old_start: 20,
+    old_lines: 1,
+    new_start: 20,
+    new_lines: 1,
+    lines: [{ kind: "+", text: "other()" }],
+  },
 ];
-const reply = (findings: unknown[], summary = "Looks mostly fine.") => ({ parts: [{ type: "text", text: JSON.stringify({ findings, summary }) }], usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 } });
-
-const app = () => makeApp({
-  providers: [provider()],
-  models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
-  selection: { providerId: "p1", model: "m1" },
+const reply = (findings: unknown[], summary = "Looks mostly fine.") => ({
+  parts: [{ type: "text", text: JSON.stringify({ findings, summary }) }],
+  usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 },
 });
+
+const app = () =>
+  makeApp({
+    providers: [provider()],
+    models: [{ id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, created: 1, firstSeen: 1 }],
+    selection: { providerId: "p1", model: "m1" },
+  });
 
 function open(over: { busy?: boolean; onReplyToAgent?: (t: string) => void } = {}) {
   mockInvoke({
-    review_list: [[{ id: "r1", root: "/work/alpha", workspace: "/tmp/ws" }, [{ path: "src/a.ts", binary: false }, { path: "img.png", binary: true }]]],
+    review_list: [
+      [
+        { id: "r1", root: "/work/alpha", workspace: "/tmp/ws" },
+        [
+          { path: "src/a.ts", binary: false },
+          { path: "img.png", binary: true },
+        ],
+      ],
+    ],
     review_diff: "diff --git a/src/a.ts b/src/a.ts\n+const x = y.z;",
     review_hunks: hunks,
   });
   const onReplyToAgent = over.onReplyToAgent ?? vi.fn();
-  const view = renderApp(<ChangesPanel name="Alpha" root="/work/alpha" busy={over.busy ?? false} messages={[]} tick={0} onChanged={() => {}} onReplyToAgent={onReplyToAgent} />, app());
+  const view = renderApp(
+    <ChangesPanel
+      name="Alpha"
+      root="/work/alpha"
+      busy={over.busy ?? false}
+      messages={[]}
+      tick={0}
+      onChanged={() => {}}
+      onReplyToAgent={onReplyToAgent}
+    />,
+    app(),
+  );
   return { ...view, onReplyToAgent };
 }
 const reviewAll = async () => userEvent.click(await screen.findByRole("button", { name: "Review all with AI" }));
 
-beforeEach(() => { model.requests.length = 0; });
+beforeEach(() => {
+  model.requests.length = 0;
+});
 
 describe("ChangesPanel AI review", () => {
   it("runs a read-only review without tools, records usage, and lists findings with a live status", async () => {
-    model.reply = async () => reply([{ file: "src/a.ts", line: 1, severity: "bug", title: "Null deref", detail: "y may be undefined", suggestion: "guard it" }, { file: "other.ts", title: "ignored", detail: "unknown file" }]);
+    model.reply = async () =>
+      reply([
+        {
+          file: "src/a.ts",
+          line: 1,
+          severity: "bug",
+          title: "Null deref",
+          detail: "y may be undefined",
+          suggestion: "guard it",
+        },
+        { file: "other.ts", title: "ignored", detail: "unknown file" },
+      ]);
     const { app } = open();
     await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
     await reviewAll();
@@ -66,7 +127,8 @@ describe("ChangesPanel AI review", () => {
   });
 
   it("jumps to the hunk, shows the finding inline, dismisses it, and the dismissal sticks", async () => {
-    model.reply = async () => reply([{ file: "src/a.ts", line: 20, severity: "warn", title: "Fragile call", detail: "d" }]);
+    model.reply = async () =>
+      reply([{ file: "src/a.ts", line: 20, severity: "warn", title: "Fragile call", detail: "d" }]);
     open();
     await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
     await reviewAll();
@@ -95,10 +157,30 @@ describe("ChangesPanel AI review", () => {
     expect(await screen.findByText("Comments for the agent: 1")).toBeInTheDocument();
 
     // While the agent works the send is disabled and says why.
-    rerenderApp(<ChangesPanel name="Alpha" root="/work/alpha" busy messages={[]} tick={0} onChanged={() => {}} onReplyToAgent={onReplyToAgent} />);
+    rerenderApp(
+      <ChangesPanel
+        name="Alpha"
+        root="/work/alpha"
+        busy
+        messages={[]}
+        tick={0}
+        onChanged={() => {}}
+        onReplyToAgent={onReplyToAgent}
+      />,
+    );
     expect(screen.getByRole("button", { name: /Send to the agent/ })).toBeDisabled();
     expect(screen.getByText(/The agent is working/)).toBeInTheDocument();
-    rerenderApp(<ChangesPanel name="Alpha" root="/work/alpha" busy={false} messages={[]} tick={0} onChanged={() => {}} onReplyToAgent={onReplyToAgent} />);
+    rerenderApp(
+      <ChangesPanel
+        name="Alpha"
+        root="/work/alpha"
+        busy={false}
+        messages={[]}
+        tick={0}
+        onChanged={() => {}}
+        onReplyToAgent={onReplyToAgent}
+      />,
+    );
     await userEvent.click(screen.getByRole("button", { name: /Send to the agent/ }));
     expect(onReplyToAgent).toHaveBeenCalledTimes(1);
     const text = onReplyToAgent.mock.calls[0][0] as string;

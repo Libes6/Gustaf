@@ -6,12 +6,30 @@ import { useT } from "../i18n";
 import { db, fsx } from "../lib/api";
 import { SOURCES } from "./HistoryImport";
 import {
-  addMessage, archiveChat, createChat, importFromCursor, listArchived, listChats, listProjects, loadMessages, scanCursor,
-  type Chat, type ImportProject,
+  addMessage,
+  archiveChat,
+  createChat,
+  importFromCursor,
+  listArchived,
+  listChats,
+  listProjects,
+  loadMessages,
+  scanCursor,
+  type Chat,
+  type ImportProject,
 } from "../lib/data";
 import {
-  buildBundle, exportFileName, ImportError, importBundle, parseBundle, toJson, toMarkdown,
-  type ChatStore, type ExportFormat, type ExportSource, type MdLabels,
+  buildBundle,
+  exportFileName,
+  ImportError,
+  importBundle,
+  parseBundle,
+  toJson,
+  toMarkdown,
+  type ChatStore,
+  type ExportFormat,
+  type ExportSource,
+  type MdLabels,
 } from "../lib/exportChats";
 import { matchOrCreateProject } from "../lib/importers/store";
 import { useApp } from "../state";
@@ -35,7 +53,12 @@ export const mdLabels = (t: T): MdLabels => ({
   toolResult: t("mdToolResult"),
   noOutput: t("mdNoOutput"),
   truncated: t("mdTruncated", { chars: "{chars}" }),
-  status: { running: t("action_running"), success: t("action_success"), error: t("action_error"), unknown: t("action_unknown") },
+  status: {
+    running: t("action_running"),
+    success: t("action_success"),
+    error: t("action_error"),
+    unknown: t("action_unknown"),
+  },
 });
 
 /** Asks where to save with the native dialog, then writes the chats. Resolves to the saved path, or `null` if cancelled. */
@@ -46,7 +69,10 @@ export async function exportChatsToFile(
 ): Promise<string | null> {
   const ext = format === "json" ? "json" : "md";
   const path = await save({
-    defaultPath: exportFileName(format, chats.map((c) => c.title)),
+    defaultPath: exportFileName(
+      format,
+      chats.map((c) => c.title),
+    ),
     filters: [{ name: format === "json" ? "JSON" : "Markdown", extensions: [ext] }],
   });
   if (!path) return null;
@@ -54,7 +80,11 @@ export async function exportChatsToFile(
   const sources: ExportSource[] = [];
   for (const chat of chats) {
     const project = chat.project_id == null ? undefined : projects.get(chat.project_id);
-    sources.push({ chat, project: project && { name: project.name, path: project.path }, messages: await loadMessages(chat.id) });
+    sources.push({
+      chat,
+      project: project && { name: project.name, path: project.path },
+      messages: await loadMessages(chat.id),
+    });
   }
   const bundle = buildBundle(sources, { includeImages });
   const content = format === "json" ? toJson(bundle) : toMarkdown(bundle, labels);
@@ -83,9 +113,15 @@ const dataStore: ChatStore = {
   createChat,
   addMessage,
   async stamp(chatId, chat, messages) {
-    for (const m of messages) if (m.createdAt) await db.exec("update messages set created_at = ? where id = ?", [m.createdAt, m.id]);
+    for (const m of messages)
+      if (m.createdAt) await db.exec("update messages set created_at = ? where id = ?", [m.createdAt, m.id]);
     const created = chat.createdAt ?? chat.updatedAt;
-    if (created) await db.exec("update chats set created_at = ?, updated_at = ? where id = ?", [created, chat.updatedAt ?? created, chatId]);
+    if (created)
+      await db.exec("update chats set created_at = ?, updated_at = ? where id = ?", [
+        created,
+        chat.updatedAt ?? created,
+        chatId,
+      ]);
     if (chat.archived) await archiveChat(chatId);
   },
   async discard(chatId) {
@@ -116,7 +152,11 @@ export function ChatTransfer() {
   const [error, setError] = useState("");
   const file = useRef<HTMLInputElement>(null);
 
-  const refresh = () => allChats().then((c) => (setCount(c.length), setList(c)), () => {});
+  const refresh = () =>
+    allChats().then(
+      (c) => (setCount(c.length), setList(c)),
+      () => {},
+    );
   useEffect(() => void refresh(), []);
 
   const run = async (kind: ExportFormat | "import", job: () => Promise<string>) => {
@@ -128,7 +168,11 @@ export function ChatTransfer() {
       setStatus(await job());
     } catch (e) {
       setError(
-        e instanceof ImportError ? t(`importErr_${e.code}`, { mb: MAX_IMPORT_MB }) : kind === "import" ? errorText(e) : t("exportFailed", { error: errorText(e) }),
+        e instanceof ImportError
+          ? t(`importErr_${e.code}`, { mb: MAX_IMPORT_MB })
+          : kind === "import"
+            ? errorText(e)
+            : t("exportFailed", { error: errorText(e) }),
       );
     } finally {
       setBusy(null);
@@ -163,7 +207,9 @@ export function ChatTransfer() {
               <FileDown size={15} />
               <div className="grow">
                 <div className="t">{t("exportAllChats")}</div>
-                <div className="d">{t("chatsCount", { count })} · {t("exportAllChatsSub")}</div>
+                <div className="d">
+                  {t("chatsCount", { count })} · {t("exportAllChatsSub")}
+                </div>
               </div>
               {(["markdown", "json"] as const).map((f) => (
                 <button key={f} className="btn-soft" disabled={!!busy} onClick={() => exportAll(f)}>
@@ -177,11 +223,27 @@ export function ChatTransfer() {
                 <div className="t">{t("shareHtmlTitle")}</div>
                 <div className="d">{t("shareHtmlIntro")}</div>
               </div>
-              <select className="input" aria-label={t("shareHtmlChat")} style={{ maxWidth: 180 }} value={shareId} onChange={(e) => setShareId(e.target.value)}>
+              <select
+                className="input"
+                aria-label={t("shareHtmlChat")}
+                style={{ maxWidth: 180 }}
+                value={shareId}
+                onChange={(e) => setShareId(e.target.value)}
+              >
                 <option value="">{t("shareHtmlChat")}</option>
-                {list.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                {list.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
               </select>
-              <button className="btn-soft" disabled={!shareId} onClick={() => setSharing(list.find((c) => String(c.id) === shareId) ?? null)}>{t("shareHtml")}</button>
+              <button
+                className="btn-soft"
+                disabled={!shareId}
+                onClick={() => setSharing(list.find((c) => String(c.id) === shareId) ?? null)}
+              >
+                {t("shareHtml")}
+              </button>
             </div>
             <label className="card-row">
               <input type="checkbox" className="check" checked={images} onChange={(e) => setImages(e.target.checked)} />
@@ -205,32 +267,63 @@ export function ChatTransfer() {
         </div>
       </div>
       {busy === "import" && progress && (
-        <div className="d" style={{ color: "var(--text-2)", marginTop: 8 }}>{t("importing", { done: progress[0], total: progress[1] })}</div>
+        <div className="d" style={{ color: "var(--text-2)", marginTop: 8 }}>
+          {t("importing", { done: progress[0], total: progress[1] })}
+        </div>
       )}
-      {status && <div className="ok" role="status" style={{ fontSize: 12.5, marginTop: 8, wordBreak: "break-all" }}>{status}</div>}
-      {error && <div className="error-box" role="alert">{error}</div>}
+      {status && (
+        <div className="ok" role="status" style={{ fontSize: 12.5, marginTop: 8, wordBreak: "break-all" }}>
+          {status}
+        </div>
+      )}
+      {error && (
+        <div className="error-box" role="alert">
+          {error}
+        </div>
+      )}
       {sharing && <ShareHtmlDialog chat={sharing} onClose={() => setSharing(null)} />}
     </>
   );
 }
 
 /** One import element for every source (Cursor projects, Claude Code, Codex, ChatGPT) and the chat files; the Settings import page and onboarding both render this. */
-export function ImportPanel({ onDone, files = true }: { onDone: (imported: number) => void; /** Chat export/import files; left out of onboarding, where they only add noise. */ files?: boolean }) {
+export function ImportPanel({
+  onDone,
+  files = true,
+}: {
+  onDone: (imported: number) => void;
+  /** Chat export/import files; left out of onboarding, where they only add noise. */ files?: boolean;
+}) {
   const t = useT();
   const [source, setSource] = useState<"cursor" | ImportSource>("cursor");
   const [busy, setBusy] = useState(false);
-  const tabs: { id: "cursor" | ImportSource; label: string }[] = [{ id: "cursor", label: "Cursor" }, ...SOURCES.map((s) => ({ id: s.id, label: s.label }))];
+  const tabs: { id: "cursor" | ImportSource; label: string }[] = [
+    { id: "cursor", label: "Cursor" },
+    ...SOURCES.map((s) => ({ id: s.id, label: s.label })),
+  ];
   return (
     <>
       <div className="seg" role="group" aria-label={t("importFrom")}>
         {tabs.map((s) => (
-          <button key={s.id} aria-pressed={source === s.id} className={source === s.id ? "active" : ""} disabled={busy} onClick={() => setSource(s.id)}>
+          <button
+            key={s.id}
+            aria-pressed={source === s.id}
+            className={source === s.id ? "active" : ""}
+            disabled={busy}
+            onClick={() => setSource(s.id)}
+          >
             {s.label}
           </button>
         ))}
       </div>
-      <p className="h4-sub" style={{ margin: "10px 0 12px" }}>{source === "cursor" ? t("importCursorSub") : t("historyImportSub")}</p>
-      {source === "cursor" ? <CursorImport onDone={onDone} onBusy={setBusy} /> : <HistoryImport source={source} onDone={onDone} onBusy={setBusy} />}
+      <p className="h4-sub" style={{ margin: "10px 0 12px" }}>
+        {source === "cursor" ? t("importCursorSub") : t("historyImportSub")}
+      </p>
+      {source === "cursor" ? (
+        <CursorImport onDone={onDone} onBusy={setBusy} />
+      ) : (
+        <HistoryImport source={source} onDone={onDone} onBusy={setBusy} />
+      )}
       {files && <ChatTransfer />}
     </>
   );
@@ -243,7 +336,9 @@ function CursorImport({ onDone, onBusy }: { onDone: (imported: number) => void; 
   const [error, setError] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<[number, number] | null>(null);
-  useEffect(() => { onBusy?.(!!progress); }, [progress, onBusy]);
+  useEffect(() => {
+    onBusy?.(!!progress);
+  }, [progress, onBusy]);
 
   useEffect(() => {
     scanCursor()
@@ -291,7 +386,9 @@ function CursorImport({ onDone, onBusy }: { onDone: (imported: number) => void; 
             <MousePointer2 size={15} />
             <div className="grow">
               <div className="t">{p.name}</div>
-              <div className="d" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.path}</div>
+              <div className="d" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {p.path}
+              </div>
             </div>
             <span className="d">{t("chatsCount", { count: p.chats })}</span>
           </label>
@@ -311,7 +408,9 @@ function CursorImport({ onDone, onBusy }: { onDone: (imported: number) => void; 
       )}
       <div className="onb-foot">
         <span className="d" style={{ color: "var(--text-2)" }}>
-          {progress ? t("importing", { done: progress[0], total: progress[1] }) : t("selectedProjects", { count: picked.size })}
+          {progress
+            ? t("importing", { done: progress[0], total: progress[1] })
+            : t("selectedProjects", { count: picked.size })}
         </span>
         <button className="btn btn-primary" disabled={!picked.size || !!progress} onClick={run}>
           {progress && <Loader2 size={13} className="spin" />} {t("import")}

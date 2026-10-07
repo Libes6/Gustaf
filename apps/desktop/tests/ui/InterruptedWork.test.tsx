@@ -7,15 +7,36 @@ import type { InterruptedWork } from "../../src/lib/interruptedWork";
 import { renderApp } from "./render";
 
 const work = (over: Partial<InterruptedWork> = {}): InterruptedWork => ({
-  taskId: "w1", branch: "gustaf/parser-fix", path: "/data/wt/w1", commits: 2, files: 3, provider: "claude", model: "opus", createdAt: 1, ...over,
+  taskId: "w1",
+  branch: "gustaf/parser-fix",
+  path: "/data/wt/w1",
+  commits: 2,
+  files: 3,
+  provider: "claude",
+  model: "opus",
+  createdAt: 1,
+  ...over,
 });
 
 // The backend wrapper is replaced (the tests are about what the UI asks for, not about the Tauri bridge).
 const wt = vi.hoisted(() => ({ diff: vi.fn(), remove: vi.fn() }));
-vi.mock("../../src/lib/worktrees", async (orig) => ({ ...(await orig<typeof import("../../src/lib/worktrees")>()), worktrees: wt }));
+vi.mock("../../src/lib/worktrees", async (orig) => ({
+  ...(await orig<typeof import("../../src/lib/worktrees")>()),
+  worktrees: wt,
+}));
 
 const setup = (items: InterruptedWork[]) => {
-  wt.diff.mockResolvedValue({ base: "aaa", truncated: false, files: ["a.ts", "b.ts", "c.ts"].map((path) => ({ path, status: "modified", additions: 1, deletions: 0, binary: false })) });
+  wt.diff.mockResolvedValue({
+    base: "aaa",
+    truncated: false,
+    files: ["a.ts", "b.ts", "c.ts"].map((path) => ({
+      path,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      binary: false,
+    })),
+  });
   wt.remove.mockResolvedValue({ removed: true, branchDeleted: true, branchKeptReason: null });
   renderApp(<InterruptedWorkSection root="/work/alpha" items={items} />);
 };
@@ -59,14 +80,21 @@ describe("InterruptedWorkSection", () => {
     setup([work()]);
     fireEvent.click(screen.getByRole("button", { name: /Discard/ }));
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Discard work" }));
-    await waitFor(() => expect(wt.remove).toHaveBeenCalledWith({ root: "/work/alpha", taskId: "w1", force: true, deleteBranch: true }));
+    await waitFor(() =>
+      expect(wt.remove).toHaveBeenCalledWith({ root: "/work/alpha", taskId: "w1", force: true, deleteBranch: true }),
+    );
   });
 });
 
 describe("useStopGuard", () => {
   function Probe({ count, onStop, onAgents }: { count: number; onStop: () => void; onAgents: () => void }) {
     const g = useStopGuard(count, onAgents);
-    return <><button onClick={() => void Promise.resolve(g.confirmStop()).then((ok) => ok && onStop())}>stop</button>{g.node}</>;
+    return (
+      <>
+        <button onClick={() => void Promise.resolve(g.confirmStop()).then((ok) => ok && onStop())}>stop</button>
+        {g.node}
+      </>
+    );
   }
 
   it("stops at once when no agent is running", async () => {
@@ -77,8 +105,9 @@ describe("useStopGuard", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
-  it("asks \"N agents are running, stop them?\" and stops nothing until confirmed", async () => {
-    let stopped = 0; let agents = 0;
+  it('asks "N agents are running, stop them?" and stops nothing until confirmed', async () => {
+    let stopped = 0;
+    let agents = 0;
     renderApp(<Probe count={3} onStop={() => stopped++} onAgents={() => agents++} />);
     fireEvent.click(screen.getByText("stop"));
     const dialog = await screen.findByRole("alertdialog");
@@ -90,7 +119,8 @@ describe("useStopGuard", () => {
   });
 
   it("keeping the agents running cancels the stop", async () => {
-    let stopped = 0; let agents = 0;
+    let stopped = 0;
+    let agents = 0;
     renderApp(<Probe count={2} onStop={() => stopped++} onAgents={() => agents++} />);
     fireEvent.click(screen.getByText("stop"));
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Keep running" }));

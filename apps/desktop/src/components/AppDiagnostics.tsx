@@ -3,7 +3,16 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { FolderOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { mcpStdio, type McpStatus } from "../lib/api";
-import { collectErrors, formatMemory, formatUptime, isHeavy, processName, scrubText, totals, type ProcInfo } from "../lib/appDiagnostics";
+import {
+  collectErrors,
+  formatMemory,
+  formatUptime,
+  isHeavy,
+  processName,
+  scrubText,
+  totals,
+  type ProcInfo,
+} from "../lib/appDiagnostics";
 import { diagnose } from "../lib/providerDiagnostics";
 import { useT, type Key } from "../i18n";
 import { useApp } from "../state";
@@ -14,9 +23,21 @@ import { SettingRow } from "./SettingRow";
 export const SAMPLE_MS = 4000;
 
 const STATE_LABEL: Record<string, Key> = {
-  ok: "provAuthenticated", auth: "provNotAuthenticated", error: "provUnavailable", cliMissing: "provUnavailable", disabled: "providerOff", unchecked: "provNotChecked",
+  ok: "provAuthenticated",
+  auth: "provNotAuthenticated",
+  error: "provUnavailable",
+  cliMissing: "provUnavailable",
+  disabled: "providerOff",
+  unchecked: "provNotChecked",
 };
-const STATE_COLOR: Record<string, string> = { ok: "var(--green)", auth: "var(--yellow, #d9a33b)", error: "var(--red)", cliMissing: "var(--red)", disabled: "var(--text-3)", unchecked: "var(--text-3)" };
+const STATE_COLOR: Record<string, string> = {
+  ok: "var(--green)",
+  auth: "var(--yellow, #d9a33b)",
+  error: "var(--red)",
+  cliMissing: "var(--red)",
+  disabled: "var(--text-3)",
+  unchecked: "var(--text-3)",
+};
 
 /** Process list of the app's own tree, sampled only while mounted (one read every SAMPLE_MS, none while the window is hidden). */
 function useProcesses() {
@@ -30,7 +51,10 @@ function useProcesses() {
       if (busy || document.hidden) return;
       busy = true;
       try {
-        const [procs, servers] = await Promise.all([invoke<ProcInfo[]>("process_snapshot"), mcpStdio.status().catch(() => [] as McpStatus[])]);
+        const [procs, servers] = await Promise.all([
+          invoke<ProcInfo[]>("process_snapshot"),
+          mcpStdio.status().catch(() => [] as McpStatus[]),
+        ]);
         if (!alive) return;
         setList(Array.isArray(procs) ? procs : []);
         setMcp(Array.isArray(servers) ? servers : []);
@@ -58,8 +82,17 @@ export function AppDiagnostics() {
   const now = useRef(Date.now());
   now.current = Date.now();
   const sum = list ? totals(list) : null;
-  const errors = collectErrors({ providers: app.providers, health: app.providerHealth, modelErrors: app.modelErrors, limitErrors: app.limitErrors, mcp });
-  const openLogs = () => void invoke<string>("app_logs_dir").then((dir) => revealItemInDir(dir)).catch(() => {});
+  const errors = collectErrors({
+    providers: app.providers,
+    health: app.providerHealth,
+    modelErrors: app.modelErrors,
+    limitErrors: app.limitErrors,
+    mcp,
+  });
+  const openLogs = () =>
+    void invoke<string>("app_logs_dir")
+      .then((dir) => revealItemInDir(dir))
+      .catch(() => {});
 
   return (
     <>
@@ -68,7 +101,11 @@ export function AppDiagnostics() {
 
       <div className="card" data-testid="diag-processes">
         <SettingRow id="diagProcesses" title={t("appDiagProcesses")} description={t("appDiagProcessesDesc")}>
-          {sum && <span className="d" data-testid="diag-summary">{t("appDiagSummary", { count: sum.count, memory: formatMemory(sum.rssKb), cpu: sum.cpu })}</span>}
+          {sum && (
+            <span className="d" data-testid="diag-summary">
+              {t("appDiagSummary", { count: sum.count, memory: formatMemory(sum.rssKb), cpu: sum.cpu })}
+            </span>
+          )}
         </SettingRow>
         {unsupported && !list && <div className="card-row d">{t("appDiagUnsupported")}</div>}
         {!unsupported && !list?.length && <div className="card-row d">{t("appDiagProcessesEmpty")}</div>}
@@ -77,12 +114,19 @@ export function AppDiagnostics() {
             <div className="grow">
               <div className="t">
                 {p.isApp ? t("appDiagApp") : processName(p.command)} <span className="d mono">#{p.pid}</span>
-                {isHeavy(p) && <span className="err" style={{ marginLeft: 8 }}>{t("appDiagHeavy")}</span>}
+                {isHeavy(p) && (
+                  <span className="err" style={{ marginLeft: 8 }}>
+                    {t("appDiagHeavy")}
+                  </span>
+                )}
               </div>
-              <div className="d mono" style={{ overflowWrap: "anywhere" }}>{scrubText(p.command)}</div>
+              <div className="d mono" style={{ overflowWrap: "anywhere" }}>
+                {scrubText(p.command)}
+              </div>
             </div>
             <span className="d" style={{ whiteSpace: "nowrap" }}>
-              {t("appDiagCpu")} {p.cpu.toFixed(1)}% · {t("appDiagMemory")} {formatMemory(p.rssKb)} · {t("appDiagUptime", { time: formatUptime(p.elapsedSecs) })}
+              {t("appDiagCpu")} {p.cpu.toFixed(1)}% · {t("appDiagMemory")} {formatMemory(p.rssKb)} ·{" "}
+              {t("appDiagUptime", { time: formatUptime(p.elapsedSecs) })}
             </span>
           </div>
         ))}
@@ -90,17 +134,31 @@ export function AppDiagnostics() {
 
       <div className="card" data-testid="diag-providers">
         <SettingRow id="diagProviders" title={t("appDiagProviders")} description={t("appDiagProvidersDesc")}>
-          <button className="btn-soft" onClick={() => app.openSettings("providers")}>{t("appDiagOpenProviders")}</button>
+          <button className="btn-soft" onClick={() => app.openSettings("providers")}>
+            {t("appDiagOpenProviders")}
+          </button>
         </SettingRow>
         {!app.providers.length && <div className="card-row d">{t("appDiagProvidersEmpty")}</div>}
         {app.providers.map((p) => {
-          const d = diagnose({ disabled: p.disabled, health: app.providerHealth[p.id], listError: app.modelErrors[p.id], now: now.current });
+          const d = diagnose({
+            disabled: p.disabled,
+            health: app.providerHealth[p.id],
+            listError: app.modelErrors[p.id],
+            now: now.current,
+          });
           return (
             <div key={p.id} className="card-row" data-testid={`diag-provider-${p.id}`}>
               <ProviderIcon kind={p.kind} cli={p.cli} />
               <div className="grow">
-                <div className="t"><span className="status-dot" style={{ background: STATE_COLOR[d.state] }} />{p.name} · {t(STATE_LABEL[d.state])}</div>
-                {d.detail && <div className="d err" style={{ whiteSpace: "pre-wrap" }}>{scrubText(d.detail)}</div>}
+                <div className="t">
+                  <span className="status-dot" style={{ background: STATE_COLOR[d.state] }} />
+                  {p.name} · {t(STATE_LABEL[d.state])}
+                </div>
+                {d.detail && (
+                  <div className="d err" style={{ whiteSpace: "pre-wrap" }}>
+                    {scrubText(d.detail)}
+                  </div>
+                )}
               </div>
               <span className="d">{d.checkedAt ? t.date(d.checkedAt) : t("provNeverChecked")}</span>
             </div>
@@ -115,7 +173,9 @@ export function AppDiagnostics() {
           <div key={e.id} className="card-row">
             <div className="grow">
               <div className="t">{e.source}</div>
-              <div className="d err" style={{ whiteSpace: "pre-wrap" }}>{e.text}</div>
+              <div className="d err" style={{ whiteSpace: "pre-wrap" }}>
+                {e.text}
+              </div>
             </div>
             {e.at && <span className="d">{t.date(e.at)}</span>}
           </div>
@@ -124,7 +184,9 @@ export function AppDiagnostics() {
 
       <div className="card">
         <SettingRow id="diagLogs" title={t("appDiagLogs")} description={t("appDiagLogsDesc")}>
-          <button className="btn-soft" onClick={openLogs}><FolderOpen size={13} /> {t("appDiagOpenLogs")}</button>
+          <button className="btn-soft" onClick={openLogs}>
+            <FolderOpen size={13} /> {t("appDiagOpenLogs")}
+          </button>
         </SettingRow>
       </div>
     </>

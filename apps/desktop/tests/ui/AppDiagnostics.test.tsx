@@ -10,24 +10,68 @@ import { callsOf, mockInvoke } from "./tauri";
 
 const SECRET = "sk-ant-abcdefghijklmnopqrstuvwxyz0123456789";
 const procs = [
-  { pid: 100, ppid: 1, cpu: 2.5, rssKb: 204_800, elapsedSecs: 3700, command: "/Applications/Gustaf.app/Contents/MacOS/gustaf", isApp: true },
-  { pid: 101, ppid: 100, cpu: 95.2, rssKb: 512_000, elapsedSecs: 61, command: `node /x/sidecar/index.mjs --api-key ${SECRET} --token=hunter2hunter2`, isApp: false },
-  { pid: 102, ppid: 101, cpu: 0, rssKb: 2048, elapsedSecs: 5, command: `claude --env ANTHROPIC_API_KEY=${SECRET}`, isApp: false },
+  {
+    pid: 100,
+    ppid: 1,
+    cpu: 2.5,
+    rssKb: 204_800,
+    elapsedSecs: 3700,
+    command: "/Applications/Gustaf.app/Contents/MacOS/gustaf",
+    isApp: true,
+  },
+  {
+    pid: 101,
+    ppid: 100,
+    cpu: 95.2,
+    rssKb: 512_000,
+    elapsedSecs: 61,
+    command: `node /x/sidecar/index.mjs --api-key ${SECRET} --token=hunter2hunter2`,
+    isApp: false,
+  },
+  {
+    pid: 102,
+    ppid: 101,
+    cpu: 0,
+    rssKb: 2048,
+    elapsedSecs: 5,
+    command: `claude --env ANTHROPIC_API_KEY=${SECRET}`,
+    isApp: false,
+  },
 ];
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  mockInvoke({ process_snapshot: procs, mcp_status: [{ id: "srv", state: "error", error: `spawn failed with Bearer ${"a".repeat(40)}`, pid: null, restarts: 0, toolsEpoch: 0, resourcesEpoch: 0, promptsEpoch: 0, init: null }], app_logs_dir: "/logs" });
+  mockInvoke({
+    process_snapshot: procs,
+    mcp_status: [
+      {
+        id: "srv",
+        state: "error",
+        error: `spawn failed with Bearer ${"a".repeat(40)}`,
+        pid: null,
+        restarts: 0,
+        toolsEpoch: 0,
+        resourcesEpoch: 0,
+        promptsEpoch: 0,
+        init: null,
+      },
+    ],
+    app_logs_dir: "/logs",
+  });
 });
 afterEach(() => vi.useRealTimers());
 
-const app = () => makeApp({
-  settingsPage: "diagnostics",
-  providers: [provider({ id: "p1", name: "Claude Code" }), provider({ id: "p2", name: "Broken AI" })],
-  providerHealth: { p1: { status: "ok", message: "", at: Date.now() }, p2: { status: "error", message: `401 for key ${SECRET}`, at: Date.now() } },
-  modelErrors: {},
-  limitErrors: { p1: "limit endpoint timed out" },
-});
+const app = () =>
+  makeApp({
+    settingsPage: "diagnostics",
+    providers: [provider({ id: "p1", name: "Claude Code" }), provider({ id: "p2", name: "Broken AI" })],
+    providerHealth: {
+      p1: { status: "ok", message: "", at: Date.now() },
+      p2: { status: "error", message: `401 for key ${SECRET}`, at: Date.now() },
+    },
+    modelErrors: {},
+    limitErrors: { p1: "limit endpoint timed out" },
+  });
 
 describe("AppDiagnostics", () => {
   it("lists the app's processes with CPU and memory and flags the heavy one", async () => {
@@ -82,7 +126,11 @@ describe("AppDiagnostics", () => {
   });
 
   it("says so when the process list is unavailable", async () => {
-    mockInvoke({ process_snapshot: () => { throw new Error("unsupported"); } });
+    mockInvoke({
+      process_snapshot: () => {
+        throw new Error("unsupported");
+      },
+    });
     renderApp(<AppDiagnostics />, app());
     expect(await screen.findByText("Process list is not available on this system.")).toBeInTheDocument();
   });

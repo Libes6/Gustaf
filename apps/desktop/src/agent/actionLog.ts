@@ -36,9 +36,21 @@ export type ActionEntry = {
   gate?: GateMeta;
 };
 /** What is recorded of a verification check run (docs/features/verification-gates.md); its output is the entry's `detail`. */
-export type GateMeta = { check: string; command: string; exitCode?: number | null; timedOut?: boolean; attempt?: number };
+export type GateMeta = {
+  check: string;
+  command: string;
+  exitCode?: number | null;
+  timedOut?: boolean;
+  attempt?: number;
+};
 /** What is recorded of a hook run (its output is the entry's `detail`). */
-export type HookMeta = { event: string; command: string; exitCode?: number | null; timedOut?: boolean; scope?: "global" | "project" };
+export type HookMeta = {
+  event: string;
+  command: string;
+  exitCode?: number | null;
+  timedOut?: boolean;
+  scope?: "global" | "project";
+};
 
 const STATUSES: readonly string[] = ["running", "success", "error", "blocked", "declined", "cancelled", "interrupted"];
 const APPROVALS: readonly string[] = ["rule", "mode", "user"];
@@ -90,7 +102,19 @@ export function summarizeCall(name: string, args: unknown, computer?: Computer):
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   let text: string;
   if (computer) {
-    text = computer.actions.map((x) => (typeof x.x === "number" && typeof x.y === "number" ? `${x.type} ${x.x},${x.y}` : x.type === "type" ? `type "${str(x.text).slice(0, 30)}"` : x.type === "keypress" ? (x.keys ?? []).join("+") : x.type === "open_app" ? `open_app "${str(x.name).slice(0, 40)}"` : x.type)).join(" · ");
+    text = computer.actions
+      .map((x) =>
+        typeof x.x === "number" && typeof x.y === "number"
+          ? `${x.type} ${x.x},${x.y}`
+          : x.type === "type"
+            ? `type "${str(x.text).slice(0, 30)}"`
+            : x.type === "keypress"
+              ? (x.keys ?? []).join("+")
+              : x.type === "open_app"
+                ? `open_app "${str(x.name).slice(0, 40)}"`
+                : x.type,
+      )
+      .join(" · ");
   } else if (name === "run_command") text = str(a.command);
   else if (name === "search") text = [str(a.pattern), str(a.glob)].filter(Boolean).join(" · ");
   else if (name === "list_dir") text = str(a.path) || ".";
@@ -106,7 +130,14 @@ function normalizeUndo(raw: unknown): UndoRecord | undefined {
   if (typeof u.root !== "string" || typeof u.path !== "string" || !isBlobId(u.after)) return undefined;
   if (u.before !== null && !isBlobId(u.before)) return undefined;
   const reviewId = typeof u.reviewId === "string" && /^\d+-\d+$/.test(u.reviewId) ? u.reviewId : undefined;
-  return { root: u.root, path: u.path, before: u.before as string | null, after: u.after, ...(reviewId ? { reviewId } : {}), ...(typeof u.undone === "number" ? { undone: u.undone } : {}) };
+  return {
+    root: u.root,
+    path: u.path,
+    before: u.before as string | null,
+    after: u.after,
+    ...(reviewId ? { reviewId } : {}),
+    ...(typeof u.undone === "number" ? { undone: u.undone } : {}),
+  };
 }
 
 /** Accepts whatever was persisted and returns valid entries, oldest first. A call that was "running" belongs to a run that never finished. */
@@ -117,7 +148,17 @@ export function normalizeActionLog(raw: unknown): ActionEntry[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const e = item as Record<string, unknown>;
-    if (typeof e.id !== "string" || !e.id || ids.has(e.id) || typeof e.at !== "number" || !Number.isFinite(e.at) || typeof e.tool !== "string" || typeof e.status !== "string" || !STATUSES.includes(e.status)) continue;
+    if (
+      typeof e.id !== "string" ||
+      !e.id ||
+      ids.has(e.id) ||
+      typeof e.at !== "number" ||
+      !Number.isFinite(e.at) ||
+      typeof e.tool !== "string" ||
+      typeof e.status !== "string" ||
+      !STATUSES.includes(e.status)
+    )
+      continue;
     ids.add(e.id);
     const undo = normalizeUndo(e.undo);
     out.push({
@@ -142,8 +183,10 @@ export function normalizeActionLog(raw: unknown): ActionEntry[] {
   return out.slice(-MAX_ENTRIES);
 }
 
-export const appendEntry = (list: readonly ActionEntry[], entry: ActionEntry): ActionEntry[] => [...list, entry].slice(-MAX_ENTRIES);
-export const patchEntry = (list: readonly ActionEntry[], id: string, patch: Partial<ActionEntry>): ActionEntry[] => list.map((e) => (e.id === id ? { ...e, ...patch } : e));
+export const appendEntry = (list: readonly ActionEntry[], entry: ActionEntry): ActionEntry[] =>
+  [...list, entry].slice(-MAX_ENTRIES);
+export const patchEntry = (list: readonly ActionEntry[], id: string, patch: Partial<ActionEntry>): ActionEntry[] =>
+  list.map((e) => (e.id === id ? { ...e, ...patch } : e));
 
 /** Merges the stored log with entries recorded before it finished loading. */
 export function mergeLogs(stored: readonly ActionEntry[], recent: readonly ActionEntry[]): ActionEntry[] {
@@ -158,11 +201,18 @@ export type UndoBlock = "none" | "undone" | "running" | "later";
  * Why an entry cannot be undone right now, or null when it can be tried. `running`: the agent still works in that
  * folder. `later`: a newer edit of the same file has to be undone first (edits are undone newest first).
  */
-export function undoBlocker(entries: readonly ActionEntry[], entry: ActionEntry, active: ReadonlySet<string>): UndoBlock | null {
+export function undoBlocker(
+  entries: readonly ActionEntry[],
+  entry: ActionEntry,
+  active: ReadonlySet<string>,
+): UndoBlock | null {
   const u = entry.undo;
   if (!u) return "none";
   if (u.undone) return "undone";
   if (active.has(u.root)) return "running";
   const i = entries.findIndex((e) => e.id === entry.id);
-  return i >= 0 && entries.slice(i + 1).some((e) => e.undo && !e.undo.undone && e.undo.root === u.root && e.undo.path === u.path) ? "later" : null;
+  return i >= 0 &&
+    entries.slice(i + 1).some((e) => e.undo && !e.undo.undone && e.undo.root === u.root && e.undo.path === u.path)
+    ? "later"
+    : null;
 }

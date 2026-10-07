@@ -18,13 +18,27 @@ const INIT = readFileSync(join(root, 'tests/e2e/tauriInit.js'), 'utf8');
 const conf = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
 const csp = (() => {
   const c = conf.app.security.csp;
-  return typeof c === 'string' ? c : Object.entries(c).map(([k, v]) => `${k} ${[].concat(v).join(' ')}`).join('; ');
+  return typeof c === 'string'
+    ? c
+    : Object.entries(c)
+        .map(([k, v]) => `${k} ${[].concat(v).join(' ')}`)
+        .join('; ');
 })();
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2' };
+const MIME = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.woff2': 'font/woff2',
+};
 
 export const chromePath = findChrome();
-export const skipReason = chromePath ? false : 'no local Chrome/Chromium found (set CHROME_BIN to run the end-to-end tests)';
+export const skipReason = chromePath
+  ? false
+  : 'no local Chrome/Chromium found (set CHROME_BIN to run the end-to-end tests)';
 
 /** The built frontend: `E2E_DIST` (set by tests/e2e/run.mjs, which builds once) or a private build for this process. */
 function distDir() {
@@ -35,12 +49,14 @@ function distDir() {
   return dir;
 }
 
-
 function serve(dir) {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
     let file = normalize(join(dir, decodeURIComponent(url.pathname)));
-    if (!file.startsWith(dir + sep) && file !== dir) { res.writeHead(403).end(); return; }
+    if (!file.startsWith(dir + sep) && file !== dir) {
+      res.writeHead(403).end();
+      return;
+    }
     if (url.pathname === '/') file = join(dir, 'index.html');
     if (!existsSync(file)) {
       // Tauri answers every asset it has; the Vite template's favicon is not part of the bundle.
@@ -51,7 +67,9 @@ function serve(dir) {
     if (file.endsWith('.html')) headers['content-security-policy'] = csp;
     res.writeHead(200, headers).end(readFileSync(file));
   });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` })));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` })),
+  );
 }
 
 /** One browser + static server per test file. Call in `before`; `close()` in `after`. */
@@ -66,12 +84,16 @@ export async function startSuite() {
   return {
     origin,
     browser,
-    async close() { await browser.close(); server.close(); },
+    async close() {
+      await browser.close();
+      server.close();
+    },
   };
 }
 
 /** Console output that must never happen: errors (CSP violations are errors), and anything that mentions a refusal. */
-const isProblem = (m) => m.type() === 'error' || /Refused to|violates the following Content Security Policy/.test(m.text());
+const isProblem = (m) =>
+  m.type() === 'error' || /Refused to|violates the following Content Security Policy/.test(m.text());
 
 /**
  * Runs one scenario in a fresh browser context with its own fake backend.
@@ -79,17 +101,29 @@ const isProblem = (m) => m.type() === 'error' || /Refused to|violates the follow
  * The scenario fails when the page logged a console error / CSP refusal or threw an uncaught exception.
  * On failure a screenshot and a Playwright trace go to tests/e2e/artifacts/.
  */
-export async function scenario(suite, name, { setup, locale = 'en-US', colorScheme = 'light', artifacts = true } = {}, fn) {
+export async function scenario(
+  suite,
+  name,
+  { setup, locale = 'en-US', colorScheme = 'light', artifacts = true } = {},
+  fn,
+) {
   const backend = new FakeBackend();
   setup?.(backend);
-  const context = await suite.browser.newContext({ locale, colorScheme, viewport: { width: 1280, height: 800 }, acceptDownloads: true });
+  const context = await suite.browser.newContext({
+    locale,
+    colorScheme,
+    viewport: { width: 1280, height: 800 },
+    acceptDownloads: true,
+  });
   await context.tracing.start({ screenshots: true, snapshots: true });
   await context.exposeBinding('__e2e_invoke', async (_src, cmd, args) => backend.invoke(cmd, args ?? {}));
   await context.addInitScript({ content: INIT });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   const problems = [];
-  page.on('console', (m) => { if (isProblem(m)) problems.push(`console.${m.type()}: ${m.text()}`); });
+  page.on('console', (m) => {
+    if (isProblem(m)) problems.push(`console.${m.type()}: ${m.text()}`);
+  });
   page.on('pageerror', (e) => problems.push(`uncaught: ${e.stack ?? e.message}`));
   let failed = true;
   try {
@@ -101,7 +135,14 @@ export async function scenario(suite, name, { setup, locale = 'en-US', colorSche
       mkdirSync(ARTIFACTS, { recursive: true });
       const base = join(ARTIFACTS, name.replace(/[^a-z0-9]+/gi, '-').toLowerCase());
       await page.screenshot({ path: `${base}.png` }).catch(() => {});
-      writeFileSync(`${base}.backend-calls.json`, JSON.stringify({ problems, calls: backend.calls.filter(([c]) => c !== 'db_select' && c !== 'db_execute') }, null, 1));
+      writeFileSync(
+        `${base}.backend-calls.json`,
+        JSON.stringify(
+          { problems, calls: backend.calls.filter(([c]) => c !== 'db_select' && c !== 'db_execute') },
+          null,
+          1,
+        ),
+      );
       await context.tracing.stop({ path: `${base}.trace.zip` }).catch(() => {});
     } else await context.tracing.stop().catch(() => {});
     await context.close();

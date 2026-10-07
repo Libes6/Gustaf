@@ -1,8 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  COMMIT_SYSTEM_PROMPT, MAX_DIFF_CHARS, MAX_MESSAGE_CHARS, MAX_SUBJECT_CHARS, MIN_DIFF_CHARS, TRUNCATED_MARK,
-  buildCommitPrompt, diffBudget, messageFromParts, sanitizeCommitMessage,
+  COMMIT_SYSTEM_PROMPT,
+  MAX_DIFF_CHARS,
+  MAX_MESSAGE_CHARS,
+  MAX_SUBJECT_CHARS,
+  MIN_DIFF_CHARS,
+  TRUNCATED_MARK,
+  buildCommitPrompt,
+  diffBudget,
+  messageFromParts,
+  sanitizeCommitMessage,
 } from '../src/lib/commitMessage.ts';
 
 const ctx = (over = {}) => ({
@@ -47,7 +55,10 @@ test('hostile file content stays inside the JSON string and cannot break out of 
 });
 
 test('oversized input is capped again on the JavaScript side and flagged', () => {
-  const { user } = buildCommitPrompt(ctx({ diff: 'x'.repeat(50_000), stat: 's'.repeat(50_000), files: Array.from({ length: 500 }, (_, i) => `f${i}`) }), 5000);
+  const { user } = buildCommitPrompt(
+    ctx({ diff: 'x'.repeat(50_000), stat: 's'.repeat(50_000), files: Array.from({ length: 500 }, (_, i) => `f${i}`) }),
+    5000,
+  );
   const data = JSON.parse(user);
   assert.ok(data.diff.length <= 5000 + TRUNCATED_MARK.length + 2);
   assert.ok(data.diff.includes(TRUNCATED_MARK));
@@ -61,7 +72,8 @@ test('oversized input is capped again on the JavaScript side and flagged', () =>
 });
 
 test('sanitize keeps a clean subject and body untouched', () => {
-  const msg = 'Add retry to the upload client\n\nThe client gave up after one failed request.\nRetry three times with backoff.';
+  const msg =
+    'Add retry to the upload client\n\nThe client gave up after one failed request.\nRetry three times with backoff.';
   assert.equal(sanitizeCommitMessage(msg), msg);
   assert.equal(sanitizeCommitMessage('fix: handle empty input'), 'fix: handle empty input');
 });
@@ -73,7 +85,7 @@ test('sanitize unwraps code fences, labels, quotes, preambles and reasoning bloc
   assert.equal(sanitizeCommitMessage('Suggested commit message:\nfix: a'), 'fix: a');
   assert.equal(sanitizeCommitMessage('"fix: a"'), 'fix: a');
   assert.equal(sanitizeCommitMessage('`fix: a`'), 'fix: a');
-  assert.equal(sanitizeCommitMessage("Here is the commit message:\n\nfix: a"), 'fix: a');
+  assert.equal(sanitizeCommitMessage('Here is the commit message:\n\nfix: a'), 'fix: a');
   assert.equal(sanitizeCommitMessage("Sure! Here's a commit message:\n```\nfix: a\n```"), 'fix: a');
   assert.equal(sanitizeCommitMessage('<think>I should be careful\nabout this</think>\nfix: a'), 'fix: a');
   assert.equal(sanitizeCommitMessage('<THINKING>x</THINKING>fix: a'), 'fix: a');

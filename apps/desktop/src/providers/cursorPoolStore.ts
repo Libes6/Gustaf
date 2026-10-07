@@ -41,10 +41,17 @@ export function useCursorPool() {
   const [state, setState] = useState<{ pool: CursorPool; providers: ProviderConfig[] } | null>(null);
   useEffect(() => {
     let alive = true;
-    const refresh = () => loadPool().then(s => alive && setState(s), () => {});
+    const refresh = () =>
+      loadPool().then(
+        (s) => alive && setState(s),
+        () => {},
+      );
     refresh();
     addEventListener(CHANGED, refresh);
-    return () => { alive = false; removeEventListener(CHANGED, refresh); };
+    return () => {
+      alive = false;
+      removeEventListener(CHANGED, refresh);
+    };
   }, []);
   return state?.pool ?? EMPTY_POOL;
 }

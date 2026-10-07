@@ -14,9 +14,15 @@ import { quickAskApi } from "../../src/lib/quickAskApi";
 const configure = vi.mocked(quickAskApi.configure);
 const view = (node = <QuickAskSettings />) => render(<I18nProvider locale="en">{node}</I18nProvider>);
 const sw = (name: string) => screen.getByRole("switch", { name });
-const saved = () => callsOf("db_execute").filter((a: any) => /insert into settings/.test(a.sql) && a.params[0] === "quickAsk").map((a: any) => JSON.parse(a.params[1]));
+const saved = () =>
+  callsOf("db_execute")
+    .filter((a: any) => /insert into settings/.test(a.sql) && a.params[0] === "quickAsk")
+    .map((a: any) => JSON.parse(a.params[1]));
 
-beforeEach(() => { setPlatformForTests("linux"); resetQuickAskStatus(); });
+beforeEach(() => {
+  setPlatformForTests("linux");
+  resetQuickAskStatus();
+});
 afterEach(() => setPlatformForTests(undefined));
 
 describe("Settings: Quick ask window", () => {

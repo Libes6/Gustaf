@@ -16,7 +16,9 @@ export function ScheduledPromptsRuntime() {
   const t = useT();
   const app = useApp();
   // A request of the chat that is open is answered in the chat itself (it is live there), not in the corner card.
-  const approvals = useScheduledApprovals().filter((a) => !(a.chatId !== null && app.view === "chat" && app.activeChat === a.chatId));
+  const approvals = useScheduledApprovals().filter(
+    (a) => !(a.chatId !== null && app.view === "chat" && app.activeChat === a.chatId),
+  );
   const appRef = useRef(app);
   appRef.current = app;
   const ready = app.ready && app.onboarded && app.checkedAt > 0;
@@ -45,14 +47,30 @@ export function ScheduledPromptsRuntime() {
   return (
     <div className="sched-approvals" role="region" aria-label={t("scheduledTitle")}>
       {approvals.map((a) => (
-        <div className="sched-approval" key={a.id} role="alertdialog" aria-label={t("scheduledApprovalTitle", { title: a.title })}>
+        <div
+          className="sched-approval"
+          key={a.id}
+          role="alertdialog"
+          aria-label={t("scheduledApprovalTitle", { title: a.title })}
+        >
           <div className="t">{t("scheduledApprovalTitle", { title: a.title })}</div>
           <code className="sched-cmd">{a.command}</code>
           <div className="d">{t("scheduledApprovalHint")}</div>
           <div className="sched-actions">
-            <button className="btn btn-primary" onClick={() => answerScheduledApproval(a.id, true)}>{t("scheduledAllowOnce")}</button>
-            <button className="btn btn-ghost" onClick={() => answerScheduledApproval(a.id, false)}>{t("scheduledDeny")}</button>
-            {a.chatId !== null && <button className="btn btn-ghost" onClick={() => app.openChat(a.chatId!, app.chats.find((c) => c.id === a.chatId)?.project_id ?? null)}>{t("scheduledOpenChat")}</button>}
+            <button className="btn btn-primary" onClick={() => answerScheduledApproval(a.id, true)}>
+              {t("scheduledAllowOnce")}
+            </button>
+            <button className="btn btn-ghost" onClick={() => answerScheduledApproval(a.id, false)}>
+              {t("scheduledDeny")}
+            </button>
+            {a.chatId !== null && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => app.openChat(a.chatId!, app.chats.find((c) => c.id === a.chatId)?.project_id ?? null)}
+              >
+                {t("scheduledOpenChat")}
+              </button>
+            )}
           </div>
         </div>
       ))}

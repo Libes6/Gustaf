@@ -25,21 +25,64 @@ const usage = { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 0 };
 const say = (text) => ({ parts: [{ type: 'text', text }], usage });
 const use = (...calls) => ({ parts: calls, usage });
 
-const schedule = (over = {}) => ({ ...sp.createSchedule({ title: 'Nightly', prompt: 'Check the build', projectId: 1, providerId: 'p', model: 'm', access: 'auto', schedule: { kind: 'daily', time: '09:00' } }, 's1', 0), enabled: true, confirmedAt: 1, ...over });
+const schedule = (over = {}) => ({
+  ...sp.createSchedule(
+    {
+      title: 'Nightly',
+      prompt: 'Check the build',
+      projectId: 1,
+      providerId: 'p',
+      model: 'm',
+      access: 'auto',
+      schedule: { kind: 'daily', time: '09:00' },
+    },
+    's1',
+    0,
+  ),
+  enabled: true,
+  confirmedAt: 1,
+  ...over,
+});
 
 /** Dependencies over an in-memory chat store and a scripted model. */
-function harness({ script = [say('all good')], root = mkdtempSync(join(tmpdir(), 'sched-')), timeout = 40, ask, own = false, project = 'same', existingChat = null, resolveError } = {}) {
+function harness({
+  script = [say('all good')],
+  root = mkdtempSync(join(tmpdir(), 'sched-')),
+  timeout = 40,
+  ask,
+  own = false,
+  project = 'same',
+  existingChat = null,
+  resolveError,
+} = {}) {
   state.reset();
   clearActionLog();
   writeFileSync(join(root, 'a.txt'), 'hello\n');
-  const seen = { turns: [], approvals: 0, asked: [], badges: [], ended: 0, messages: [], created: [], usage: [], results: [], bumped: [], reviews: [] };
+  const seen = {
+    turns: [],
+    approvals: 0,
+    asked: [],
+    badges: [],
+    ended: 0,
+    messages: [],
+    created: [],
+    usage: [],
+    results: [],
+    bumped: [],
+    reviews: [],
+  };
   let i = 0;
   const adapter = {
     supportsComputer: true,
     supportsReasoning: () => false,
     listModels: async () => [],
     turn: async (input) => {
-      seen.turns.push({ access: input.access, tools: input.tools.map((t) => t.name), system: input.system, messages: [...input.messages] });
+      seen.turns.push({
+        access: input.access,
+        tools: input.tools.map((t) => t.name),
+        system: input.system,
+        messages: [...input.messages],
+      });
       const next = script[i++] ?? say('done');
       return typeof next === 'function' ? next(input) : next;
     },
@@ -73,7 +116,13 @@ test('a scheduled run writes the prompt and the replies to a new "⏰ title" cha
   const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
   assert.deepEqual(r, { status: 'success', chatId: 42 });
   assert.deepEqual(seen.created, [{ projectId: 1, title: '⏰ Nightly' }]);
-  assert.deepEqual(seen.messages.map((m) => [m.chatId, m.msg.role]), [[42, 'user'], [42, 'assistant']]);
+  assert.deepEqual(
+    seen.messages.map((m) => [m.chatId, m.msg.role]),
+    [
+      [42, 'user'],
+      [42, 'assistant'],
+    ],
+  );
   assert.equal(seen.messages[0].msg.parts[0].text, 'Check the build');
   assert.equal(seen.usage.length, 1, 'tokens go to the same counters as a normal chat');
   assert.deepEqual(seen.bumped, ['p']);
@@ -115,23 +164,43 @@ test('tool calls are logged with source "scheduled"', async () => {
 });
 
 test('an approval request is shown, never auto-approved: unanswered it times out as "needs attention" and nothing runs', async () => {
-  const { deps, seen } = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('after')], timeout: 40 });
+  const { deps, seen } = harness({
+    script: [use(call('run_command', { command: 'npm publish' })), say('after')],
+    timeout: 40,
+  });
   const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
   assert.equal(r.status, 'attention');
   assert.deepEqual(state.runs, [], 'the command was not executed');
-  assert.deepEqual(seen.asked.map((a) => a.command), ['npm publish']);
+  assert.deepEqual(
+    seen.asked.map((a) => a.command),
+    ['npm publish'],
+  );
   assert.deepEqual(seen.badges, [{ chatId: 42, who: 'Nightly' }], 'sidebar badge / notification registered');
   assert.equal(seen.ended, 1, 'and cleared again');
   assert.equal(seen.turns.length, 1, 'the run was stopped, the model was not asked again');
-  assert.ok(seen.messages.some((m) => m.msg.role === 'assistant' && m.msg.parts[0].text === 'attention:'), 'the chat explains why it stopped');
+  assert.ok(
+    seen.messages.some((m) => m.msg.role === 'assistant' && m.msg.parts[0].text === 'attention:'),
+    'the chat explains why it stopped',
+  );
 });
 
 test('when the user allows the request the command runs; when they deny it, it does not', async () => {
-  const allow = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('done')], timeout: 5000, ask: (answer) => setTimeout(() => answer(true), 10) });
+  const allow = harness({
+    script: [use(call('run_command', { command: 'npm publish' })), say('done')],
+    timeout: 5000,
+    ask: (answer) => setTimeout(() => answer(true), 10),
+  });
   const ok = await executeScheduledRun(schedule(), allow.deps, new AbortController().signal);
   assert.equal(ok.status, 'success');
-  assert.deepEqual(state.runs.map((r) => r.command), ['npm publish']);
-  const deny = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('done')], timeout: 5000, ask: (answer) => setTimeout(() => answer(false), 10) });
+  assert.deepEqual(
+    state.runs.map((r) => r.command),
+    ['npm publish'],
+  );
+  const deny = harness({
+    script: [use(call('run_command', { command: 'npm publish' })), say('done')],
+    timeout: 5000,
+    ask: (answer) => setTimeout(() => answer(false), 10),
+  });
   const no = await executeScheduledRun(schedule(), deny.deps, new AbortController().signal);
   assert.equal(no.status, 'success');
   assert.deepEqual(state.runs, []);
@@ -146,7 +215,11 @@ test('rules still apply: a denied command is blocked without even asking', async
 
 test('stopping a run marks it stopped', async () => {
   const ctl = new AbortController();
-  const { deps } = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('x')], timeout: 5000, ask: () => setTimeout(() => ctl.abort(), 10) });
+  const { deps } = harness({
+    script: [use(call('run_command', { command: 'npm publish' })), say('x')],
+    timeout: 5000,
+    ask: () => setTimeout(() => ctl.abort(), 10),
+  });
   const r = await executeScheduledRun(schedule(), deps, ctl.signal);
   assert.equal(r.status, 'stopped');
   assert.deepEqual(state.runs, []);
@@ -154,13 +227,32 @@ test('stopping a run marks it stopped', async () => {
 
 test('failures: a provider that cannot be resolved, a deleted project, a model error', async () => {
   const a = harness({ resolveError: 'no provider' });
-  assert.deepEqual(await executeScheduledRun(schedule(), a.deps, new AbortController().signal), { status: 'failed', chatId: null, error: 'no provider' });
+  assert.deepEqual(await executeScheduledRun(schedule(), a.deps, new AbortController().signal), {
+    status: 'failed',
+    chatId: null,
+    error: 'no provider',
+  });
   const b = harness({ project: 'gone' });
   const gone = await executeScheduledRun(schedule(), b.deps, new AbortController().signal);
   assert.equal(gone.status, 'failed');
   assert.match(gone.error, /no longer exists/);
-  const c = harness({ script: [() => { throw new Error('boom'); }] });
-  c.deps.resolve = async () => ({ adapter: { supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: async () => { throw new Error('boom'); } } });
+  const c = harness({
+    script: [
+      () => {
+        throw new Error('boom');
+      },
+    ],
+  });
+  c.deps.resolve = async () => ({
+    adapter: {
+      supportsComputer: false,
+      supportsReasoning: () => false,
+      listModels: async () => [],
+      turn: async () => {
+        throw new Error('boom');
+      },
+    },
+  });
   const failed = await executeScheduledRun(schedule(), c.deps, new AbortController().signal);
   assert.equal(failed.status, 'failed');
   assert.match(failed.error, /boom/);
@@ -182,7 +274,11 @@ test('runner: a schedule never runs twice at once; the due occurrence during a r
   let release;
   const gate = new Promise((r) => (release = r));
   let clock = now;
-  const runner = createRunner(store, async () => (started++, await gate, { status: 'success', chatId: 5 }), () => clock);
+  const runner = createRunner(
+    store,
+    async () => (started++, await gate, { status: 'success', chatId: 5 }),
+    () => clock,
+  );
   runner.tick();
   runner.tick();
   assert.equal(started, 1);
@@ -205,9 +301,16 @@ test('runner: a schedule never runs twice at once; the due occurrence during a r
 
 test('runner: disabled or unconfirmed schedules do not run, "Run now" does; failures are recorded', async () => {
   const now = new Date(2026, 4, 10, 9, 0, 0).getTime();
-  const store = memoryStore([schedule({ enabled: false, nextRunAt: now - 1000 }), schedule({ id: 's2', title: 'B', nextRunAt: now - 1000, confirmedAt: undefined })]);
+  const store = memoryStore([
+    schedule({ enabled: false, nextRunAt: now - 1000 }),
+    schedule({ id: 's2', title: 'B', nextRunAt: now - 1000, confirmedAt: undefined }),
+  ]);
   let started = [];
-  const runner = createRunner(store, async (sc) => (started.push(sc.id), { status: 'failed', chatId: null, error: 'nope' }), () => now);
+  const runner = createRunner(
+    store,
+    async (sc) => (started.push(sc.id), { status: 'failed', chatId: null, error: 'nope' }),
+    () => now,
+  );
   runner.tick();
   assert.deepEqual(started, []);
   assert.equal(runner.runNow('s1'), true);
@@ -221,7 +324,13 @@ test('runner: disabled or unconfirmed schedules do not run, "Run now" does; fail
 test('runner: a thrown error from the executor is recorded, not lost', async () => {
   const now = new Date(2026, 4, 10, 9, 0, 0).getTime();
   const store = memoryStore([schedule({ nextRunAt: now })]);
-  const runner = createRunner(store, async () => { throw new Error('exploded'); }, () => now);
+  const runner = createRunner(
+    store,
+    async () => {
+      throw new Error('exploded');
+    },
+    () => now,
+  );
   runner.tick();
   await sleep(10);
   assert.equal(store.get()[0].lastStatus, 'failed');
@@ -236,13 +345,15 @@ const live = await import('../src/lib/liveRuns.ts');
 test('the chat is live while the run goes on: streamed text, then stored messages, then gone', async () => {
   const snapshots = [];
   const { deps } = harness({
-    script: [(turn) => {
-      snapshots.push({ ...live.getLiveRun(42) });
-      turn.onText('Hel');
-      turn.onText('lo');
-      snapshots.push({ ...live.getLiveRun(42) });
-      return say('Hello');
-    }],
+    script: [
+      (turn) => {
+        snapshots.push({ ...live.getLiveRun(42) });
+        turn.onText('Hel');
+        turn.onText('lo');
+        snapshots.push({ ...live.getLiveRun(42) });
+        return say('Hello');
+      },
+    ],
   });
   deps.live = live.beginLiveRun;
   const v0 = live.liveVersion(42);
@@ -256,7 +367,15 @@ test('the chat is live while the run goes on: streamed text, then stored message
 });
 
 test('Stop in the chat stops the run like an outer stop', async () => {
-  const { deps, seen } = harness({ script: [() => { live.getLiveRun(42).abort(); return say('x'); }, say('never')] });
+  const { deps, seen } = harness({
+    script: [
+      () => {
+        live.getLiveRun(42).abort();
+        return say('x');
+      },
+      say('never'),
+    ],
+  });
   deps.live = live.beginLiveRun;
   const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
   assert.equal(r.status, 'stopped');
@@ -266,7 +385,10 @@ test('Stop in the chat stops the run like an outer stop', async () => {
 
 test('an approval is also offered in the open chat; answering there runs the command, the corner card is withdrawn', async () => {
   let withdrawn = 0;
-  const { deps, seen } = harness({ script: [use(call('run_command', { command: 'npm publish' })), say('done')], timeout: 5000 });
+  const { deps, seen } = harness({
+    script: [use(call('run_command', { command: 'npm publish' })), say('done')],
+    timeout: 5000,
+  });
   deps.live = live.beginLiveRun;
   deps.askUser = (info) => (seen.asked.push(info), () => void withdrawn++);
   const answered = new Promise((resolve) => {
@@ -278,14 +400,23 @@ test('an approval is also offered in the open chat; answering there runs the com
   const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
   assert.equal(await answered, 'npm publish');
   assert.equal(r.status, 'success');
-  assert.deepEqual(state.runs.map((x) => x.command), ['npm publish']);
+  assert.deepEqual(
+    state.runs.map((x) => x.command),
+    ['npm publish'],
+  );
   assert.equal(withdrawn, 1);
   assert.equal(seen.asked.length, 1);
   assert.equal(seen.ended, 1);
 });
 
 test('a failed run ends its live state too', async () => {
-  const { deps } = harness({ script: [() => { throw new Error('boom'); }] });
+  const { deps } = harness({
+    script: [
+      () => {
+        throw new Error('boom');
+      },
+    ],
+  });
   deps.live = live.beginLiveRun;
   const r = await executeScheduledRun(schedule(), deps, new AbortController().signal);
   assert.equal(r.status, 'failed');
@@ -297,13 +428,29 @@ test('a writable project runs in the shadow copy and the copy is finished afterw
     const copy = mkdtempSync(join(tmpdir(), 'sched-copy-'));
     writeFileSync(join(copy, 'a.txt'), 'copy\n');
     const finished = [];
-    const { deps, seen } = harness({ script: [fail ? () => { throw new Error('boom'); } : use(call('read_file', { path: 'a.txt' })), say('ok')] });
+    const { deps, seen } = harness({
+      script: [
+        fail
+          ? () => {
+              throw new Error('boom');
+            }
+          : use(call('read_file', { path: 'a.txt' })),
+        say('ok'),
+      ],
+    });
     deps.prepareReview = async () => ({ review: { id: 'rv', workspace: copy }, error: 'setup failed' });
     deps.finishReview = async (id) => void finished.push(id);
     const r = await executeScheduledRun(schedule({ access: 'auto' }), deps, new AbortController().signal);
     assert.equal(r.status, fail ? 'failed' : 'success');
     assert.deepEqual(finished, ['rv']);
-    assert.ok(seen.messages.some((m) => m.msg.parts[0].text === 'failed:setup failed'), 'the setup problem is noted in the chat');
-    if (!fail) assert.ok(seen.messages.some((m) => m.msg.role === 'tool' && m.msg.parts[0].output.includes('copy')), 'the tools worked in the copy');
+    assert.ok(
+      seen.messages.some((m) => m.msg.parts[0].text === 'failed:setup failed'),
+      'the setup problem is noted in the chat',
+    );
+    if (!fail)
+      assert.ok(
+        seen.messages.some((m) => m.msg.role === 'tool' && m.msg.parts[0].output.includes('copy')),
+        'the tools worked in the copy',
+      );
   }
 });

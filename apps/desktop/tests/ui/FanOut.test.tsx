@@ -13,9 +13,15 @@ describe("fanOutCore", () => {
     let running = 0;
     let peak = 0;
     const results = await fanOutCore([target("a"), target("b"), target("c")], {
-      create: async (t) => (order.push(`create ${t.model}`), t.model === "b" ? { ok: false, message: "no git" } : { ok: true, chatId: t.model === "a" ? 1 : 3, root: `/ws/${t.model}` }),
+      create: async (t) => (
+        order.push(`create ${t.model}`),
+        t.model === "b"
+          ? { ok: false, message: "no git" }
+          : { ok: true, chatId: t.model === "a" ? 1 : 3, root: `/ws/${t.model}` }
+      ),
       run: async (t, chatId, root) => {
-        running++; peak = Math.max(peak, running);
+        running++;
+        peak = Math.max(peak, running);
         await new Promise((r) => setTimeout(r, 5));
         running--;
         order.push(`run ${t.model} ${chatId} ${root}`);
@@ -24,19 +30,40 @@ describe("fanOutCore", () => {
     });
     expect(order.slice(0, 3)).toEqual(["create a", "create b", "create c"]);
     expect(peak).toBe(2);
-    expect(results.map((r) => [r.target.model, r.status, r.chatId, r.error])).toEqual([["a", "success", 1, undefined], ["b", "not-created", null, "no git"], ["c", "failed", 3, "quota"]]);
+    expect(results.map((r) => [r.target.model, r.status, r.chatId, r.error])).toEqual([
+      ["a", "success", 1, undefined],
+      ["b", "not-created", null, "no git"],
+      ["c", "failed", 3, "quota"],
+    ]);
   });
 
   it("never starts more than the limit", async () => {
     const create = vi.fn(async () => ({ ok: true as const, chatId: 1, root: "/ws" }));
-    await fanOutCore(Array.from({ length: 6 }, (_, i) => target(`m${i}`)), { create, run: async () => ({ status: "success", chatId: 1 }) });
+    await fanOutCore(
+      Array.from({ length: 6 }, (_, i) => target(`m${i}`)),
+      { create, run: async () => ({ status: "success", chatId: 1 }) },
+    );
     expect(create).toHaveBeenCalledTimes(FAN_OUT_MAX);
   });
 });
 
 describe("ModelPicker multi-pick", () => {
-  const models: Model[] = ["a", "b", "c"].map((id) => ({ id, name: `Model ${id}`, providerId: "p1", created: 0, firstSeen: 0 }));
-  const app = () => makeApp({ providers: [provider()], models, selection: { providerId: "p1", model: "a" }, favorites: [], hiddenModels: [], modelErrors: {} });
+  const models: Model[] = ["a", "b", "c"].map((id) => ({
+    id,
+    name: `Model ${id}`,
+    providerId: "p1",
+    created: 0,
+    firstSeen: 0,
+  }));
+  const app = () =>
+    makeApp({
+      providers: [provider()],
+      models,
+      selection: { providerId: "p1", model: "a" },
+      favorites: [],
+      hiddenModels: [],
+      modelErrors: {},
+    });
 
   it("shift-click toggles a model for the fan-out; a plain click still picks one", () => {
     const toggle = vi.fn();

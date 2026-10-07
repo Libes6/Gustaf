@@ -14,14 +14,41 @@ const { trackCliAgents, getCliAgents, resetCliAgents } = await import('../src/ag
 const ROOT = 'thr-root';
 const note = (method, params) => ({ jsonrpc: '2.0', method, params });
 const item = (method, threadId, it) => note(method, { threadId, turnId: 't1', item: it });
-const spawn = (id, ids) => ({ type: 'collabAgentToolCall', id, tool: 'spawnAgent', status: 'completed', senderThreadId: ROOT, receiverThreadIds: ids, prompt: 'Review the parser', model: 'gpt-5.1-codex', agentsStates: Object.fromEntries(ids.map((i) => [i, { status: 'running', message: null }])) });
-const turnDone = (threadId, status = 'completed', extra = {}) => note('turn/completed', { threadId, turn: { id: 't1', status, items: [], ...extra } });
-const usage = (threadId, total, last) => note('thread/tokenUsage/updated', { threadId, turnId: 't1', tokenUsage: { total: { inputTokens: total, outputTokens: 1, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: total }, last: { inputTokens: last, outputTokens: 1, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: last } } });
+const spawn = (id, ids) => ({
+  type: 'collabAgentToolCall',
+  id,
+  tool: 'spawnAgent',
+  status: 'completed',
+  senderThreadId: ROOT,
+  receiverThreadIds: ids,
+  prompt: 'Review the parser',
+  model: 'gpt-5.1-codex',
+  agentsStates: Object.fromEntries(ids.map((i) => [i, { status: 'running', message: null }])),
+});
+const turnDone = (threadId, status = 'completed', extra = {}) =>
+  note('turn/completed', { threadId, turn: { id: 't1', status, items: [], ...extra } });
+const usage = (threadId, total, last) =>
+  note('thread/tokenUsage/updated', {
+    threadId,
+    turnId: 't1',
+    tokenUsage: {
+      total: {
+        inputTokens: total,
+        outputTokens: 1,
+        cachedInputTokens: 0,
+        reasoningOutputTokens: 0,
+        totalTokens: total,
+      },
+      last: { inputTokens: last, outputTokens: 1, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: last },
+    },
+  });
 
 function fakeConn(script) {
   let cb = () => {};
   let close;
-  const closed = new Promise((r) => { close = r; });
+  const closed = new Promise((r) => {
+    close = r;
+  });
   const written = [];
   const conn = {
     written,
@@ -31,30 +58,56 @@ function fakeConn(script) {
       written.push(m);
       if (m.id !== undefined && m.method) {
         const r = script(m, conn);
-        if (r !== 'silent') queueMicrotask(() => { cb({ jsonrpc: '2.0', id: m.id, result: r?.result ?? {} }); for (const n of r?.then ?? []) cb(n); });
+        if (r !== 'silent')
+          queueMicrotask(() => {
+            cb({ jsonrpc: '2.0', id: m.id, result: r?.result ?? {} });
+            for (const n of r?.then ?? []) cb(n);
+          });
       }
     },
-    onMessage(f) { cb = f; },
-    closed, kill() { close(null); }, stderr: () => '', exit: (code) => close(code),
+    onMessage(f) {
+      cb = f;
+    },
+    closed,
+    kill() {
+      close(null);
+    },
+    stderr: () => '',
+    exit: (code) => close(code),
   };
   return conn;
 }
-const base = (then = []) => (m) => {
-  if (m.method === 'initialize') return { result: { userAgent: 'codex' } };
-  if (m.method === 'thread/start' || m.method === 'thread/resume') return { result: { thread: { id: ROOT } } };
-  if (m.method === 'turn/start') return { result: { turn: { id: 't1' } }, then };
-};
+const base =
+  (then = []) =>
+  (m) => {
+    if (m.method === 'initialize') return { result: { userAgent: 'codex' } };
+    if (m.method === 'thread/start' || m.method === 'thread/resume') return { result: { thread: { id: ROOT } } };
+    if (m.method === 'turn/start') return { result: { turn: { id: 't1' } }, then };
+  };
 const handlers = (extra = {}) => {
   const out = { acts: new Map() };
-  return { out, h: { onText() {}, onActivity: (a) => { applyActivity(out.acts, a); extra.onActivity?.(out.acts); }, ...extra.h } };
+  return {
+    out,
+    h: {
+      onText() {},
+      onActivity: (a) => {
+        applyActivity(out.acts, a);
+        extra.onActivity?.(out.acts);
+      },
+      ...extra.h,
+    },
+  };
 };
 const P = { prompt: 'hi', model: 'gpt-5.1-codex', access: 'auto', mode: 'agent', cwd: '/proj' };
-const agentsOf = (out) => Object.fromEntries([...out.acts.values()].filter((a) => a.subagent).map((a) => [a.subagent.agentId, a]));
+const agentsOf = (out) =>
+  Object.fromEntries([...out.acts.values()].filter((a) => a.subagent).map((a) => [a.subagent.agentId, a]));
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
 test('wait limit: children that never reported are "unknown" (neutral), not running and not completed', async () => {
   const { out, h } = handlers();
-  const conn = fakeConn(base([item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])), turnDone('ca'), turnDone(ROOT)]));
+  const conn = fakeConn(
+    base([item('item/completed', ROOT, spawn('s1', ['ca', 'cb'])), turnDone('ca'), turnDone(ROOT)]),
+  );
   const r = await runAppServerTurn(conn, P, { ...h, childWaitMs: 30 });
   const a = agentsOf(out);
   assert.equal(a.ca.subagent.state, 'completed');
@@ -83,7 +136,12 @@ test('process crash while children run: stopped (runtime confirmed gone), the tu
 test('parent turn failed or interrupted with running children: settled as stopped, not left running', async () => {
   for (const status of ['failed', 'interrupted']) {
     const { out, h } = handlers();
-    const conn = fakeConn(base([item('item/completed', ROOT, spawn('s1', ['ca'])), turnDone(ROOT, status, status === 'failed' ? { error: { message: 'model error' } } : {})]));
+    const conn = fakeConn(
+      base([
+        item('item/completed', ROOT, spawn('s1', ['ca'])),
+        turnDone(ROOT, status, status === 'failed' ? { error: { message: 'model error' } } : {}),
+      ]),
+    );
     const r = await runAppServerTurn(conn, P, h);
     assert.equal(agentsOf(out).ca.subagent.state, 'stopped', status);
     assert.deepEqual(r.unreported, ['ca']);
@@ -105,7 +163,9 @@ test('user stop settles running children as stopped before the AbortError', asyn
 test('thread/closed ends a running child as stopped; a reported child is untouched; a held closed frame is replayed', () => {
   const rd = createReducer(ROOT);
   const map = new Map();
-  const feed = (m) => { for (const e of rd.onMessage(m)) if (e.kind === 'activity') applyActivity(map, e.activity); };
+  const feed = (m) => {
+    for (const e of rd.onMessage(m)) if (e.kind === 'activity') applyActivity(map, e.activity);
+  };
   feed(note('thread/closed', { threadId: 'late' }));
   feed(item('item/completed', ROOT, spawn('s1', ['ca', 'cb', 'late'])));
   feed(turnDone('cb'));
@@ -128,7 +188,9 @@ test('settle leaves finished children alone and returns nothing when none run', 
 test('a provider report after an "unknown" verdict replaces it; progress frames do not revive it', () => {
   const rd = createReducer(ROOT);
   const map = new Map();
-  const feed = (effects) => { for (const e of effects) if (e.kind === 'activity') applyActivity(map, e.activity); };
+  const feed = (effects) => {
+    for (const e of effects) if (e.kind === 'activity') applyActivity(map, e.activity);
+  };
   feed(rd.onMessage(item('item/completed', ROOT, spawn('s1', ['ca']))));
   feed(rd.settle('unknown', 'lost'));
   const get = () => [...map.values()].find((a) => a.subagent?.agentId === 'ca');
@@ -142,7 +204,7 @@ test('a provider report after an "unknown" verdict replaces it; progress frames 
 
 test('reconnect/resume: a child re-announced by the next connection stays one panel entry (no duplicate cards)', async () => {
   resetCliAgents();
-  const track = (acts) => trackCliAgents({ chatId: 7, root: "/p" }, [...acts.values()]);
+  const track = (acts) => trackCliAgents({ chatId: 7, root: '/p' }, [...acts.values()]);
   // Turn 1: the process dies with the child running.
   const one = handlers({ onActivity: track });
   const c1 = fakeConn(base([item('item/completed', ROOT, spawn('s1', ['ca'])), turnDone(ROOT)]));
@@ -150,23 +212,48 @@ test('reconnect/resume: a child re-announced by the next connection stays one pa
   await tick();
   c1.exit(1);
   await p1;
-  assert.deepEqual(getCliAgents().map((e) => [e.agentId, e.state]), [['ca', 'stopped']]);
+  assert.deepEqual(
+    getCliAgents().map((e) => [e.agentId, e.state]),
+    [['ca', 'stopped']],
+  );
   // Turn 2 resumes the thread; the same child thread is announced again under a new item id, then finishes.
   const two = handlers({ onActivity: track });
-  const again = { type: 'subAgentActivity', id: 'again', kind: 'started', agentThreadId: 'ca', agentPath: '/root/review' };
+  const again = {
+    type: 'subAgentActivity',
+    id: 'again',
+    kind: 'started',
+    agentThreadId: 'ca',
+    agentPath: '/root/review',
+  };
   const c2 = fakeConn(base([item('item/started', ROOT, again), turnDone('ca'), turnDone(ROOT)]));
   const r2 = await runAppServerTurn(c2, { ...P, session: ROOT }, two.h);
   assert.equal(c2.written.find((m) => m.method === 'thread/resume').params.threadId, ROOT);
   assert.deepEqual(r2.unreported, []);
-  assert.deepEqual(getCliAgents().map((e) => [e.agentId, e.state]), [['ca', 'completed']]);
+  assert.deepEqual(
+    getCliAgents().map((e) => [e.agentId, e.state]),
+    [['ca', 'completed']],
+  );
 });
 
 test('Codex agent status mapping: shutdown stops (not completes), notFound fails, interrupted stops', () => {
   const rd = createReducer(ROOT);
   const map = new Map();
-  for (const [id, status] of [['a', 'shutdown'], ['b', 'notFound'], ['c', 'interrupted']]) {
-    const wait = { type: 'collabAgentToolCall', id: `w${id}`, tool: 'wait', status: 'completed', senderThreadId: ROOT, receiverThreadIds: [id], agentsStates: { [id]: { status, message: null } } };
-    for (const e of rd.onMessage(item('item/completed', ROOT, wait))) if (e.kind === 'activity') applyActivity(map, e.activity);
+  for (const [id, status] of [
+    ['a', 'shutdown'],
+    ['b', 'notFound'],
+    ['c', 'interrupted'],
+  ]) {
+    const wait = {
+      type: 'collabAgentToolCall',
+      id: `w${id}`,
+      tool: 'wait',
+      status: 'completed',
+      senderThreadId: ROOT,
+      receiverThreadIds: [id],
+      agentsStates: { [id]: { status, message: null } },
+    };
+    for (const e of rd.onMessage(item('item/completed', ROOT, wait)))
+      if (e.kind === 'activity') applyActivity(map, e.activity);
   }
   const st = (id) => [...map.values()].find((a) => a.subagent?.agentId === id).subagent.state;
   assert.deepEqual([st('a'), st('b'), st('c')], ['stopped', 'failed', 'stopped']);

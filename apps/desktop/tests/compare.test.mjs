@@ -1,8 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  COMPARE_SYSTEM, MAX_COLUMNS, answerText, canContinue, canRun, columnError, compareChatTitle, compareReducer, continueMessages,
-  elapsedMs, emptyCompare, estimateInput, estimateOutput, startCompare, toggleTarget,
+  COMPARE_SYSTEM,
+  MAX_COLUMNS,
+  answerText,
+  canContinue,
+  canRun,
+  columnError,
+  compareChatTitle,
+  compareReducer,
+  continueMessages,
+  elapsedMs,
+  emptyCompare,
+  estimateInput,
+  estimateOutput,
+  startCompare,
+  toggleTarget,
 } from '../src/lib/compare.ts';
 import { makeError, errorForStatus } from '../src/providers/retry.ts';
 
@@ -17,8 +30,15 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 function harness(adapters, deps = {}) {
   const h = { state: emptyCompare, requests: [], usages: [], clock: 1000, calls: [] };
   h.deps = {
-    getAdapter: async (t) => ({ turn: async (input) => { h.calls.push({ t, input }); return adapters[t.key](input, t); } }),
-    dispatch: (a) => { h.state = compareReducer(h.state, a); },
+    getAdapter: async (t) => ({
+      turn: async (input) => {
+        h.calls.push({ t, input });
+        return adapters[t.key](input, t);
+      },
+    }),
+    dispatch: (a) => {
+      h.state = compareReducer(h.state, a);
+    },
     onRequest: (t) => h.requests.push(t.providerId),
     onUsage: (t, u) => h.usages.push([t.providerId, t.model, u]),
     now: () => (h.clock += 10),
@@ -79,8 +99,15 @@ test('canRun needs a prompt, 2-4 models and no active run', () => {
 
 test('parallel run: read-only turns, streaming, usage recorded, both columns done', async () => {
   const h = harness({
-    [T[0].key]: async (i) => { i.onText('Hel'); i.onText('lo'); return { parts: text('Hello'), usage: usage(10, 2) }; },
-    [T[1].key]: async (i) => { i.onText('Yo'); return { parts: text('Yo'), usage: undefined }; },
+    [T[0].key]: async (i) => {
+      i.onText('Hel');
+      i.onText('lo');
+      return { parts: text('Hello'), usage: usage(10, 2) };
+    },
+    [T[1].key]: async (i) => {
+      i.onText('Yo');
+      return { parts: text('Yo'), usage: undefined };
+    },
   });
   const run = startCompare([T[0], T[1]], 'say hi', h.deps);
   await run.settled();
@@ -105,7 +132,17 @@ test('parallel run: read-only turns, streaming, usage recorded, both columns don
 test('columns really run concurrently', async () => {
   const open = [];
   const gate = () => new Promise((res) => open.push(res));
-  const h = harness(Object.fromEntries(T.slice(0, 4).map((t) => [t.key, async () => { await gate(); return { parts: text('ok') }; }])));
+  const h = harness(
+    Object.fromEntries(
+      T.slice(0, 4).map((t) => [
+        t.key,
+        async () => {
+          await gate();
+          return { parts: text('ok') };
+        },
+      ]),
+    ),
+  );
   const run = startCompare(T.slice(0, 4), 'q', h.deps);
   await tick();
   assert.equal(open.length, 4, 'all four turns started before any finished');
@@ -122,8 +159,12 @@ test('more than four targets: only the first four run', async () => {
 
 test('a failing column does not affect the others; ProviderError keeps its classification', async () => {
   const h = harness({
-    [T[0].key]: async () => { throw errorForStatus(429, 'slow down', 5000); },
-    [T[1].key]: async () => { throw new Error('boom'); },
+    [T[0].key]: async () => {
+      throw errorForStatus(429, 'slow down', 5000);
+    },
+    [T[1].key]: async () => {
+      throw new Error('boom');
+    },
     [T[2].key]: async () => ({ parts: text('fine') }),
   });
   await startCompare(T.slice(0, 3), 'q', h.deps).settled();
@@ -152,7 +193,10 @@ test('empty answer is an error, not a blank done column', async () => {
 test('getAdapter failure becomes a column error and no request is counted', async () => {
   const h = harness({ [T[1].key]: async () => ({ parts: text('x') }) });
   const inner = h.deps.getAdapter;
-  h.deps.getAdapter = async (t) => { if (t.providerId === 'p1') throw new Error('no key'); return inner(t); };
+  h.deps.getAdapter = async (t) => {
+    if (t.providerId === 'p1') throw new Error('no key');
+    return inner(t);
+  };
   await startCompare([T[0], T[1]], 'q', h.deps).settled();
   assert.equal(col(h, 1).error.message, 'no key');
   assert.equal(col(h, 2).status, 'done');
@@ -171,7 +215,11 @@ test('stop cancels one column only; its late text and result are dropped', async
       i.onText('late');
       throw abortErr();
     },
-    [T[1].key]: async (i) => { signals[2] = i.signal; await wait; return { parts: text('second'), usage: usage(1, 1) }; },
+    [T[1].key]: async (i) => {
+      signals[2] = i.signal;
+      await wait;
+      return { parts: text('second'), usage: usage(1, 1) };
+    },
   });
   const run = startCompare([T[0], T[1]], 'q', h.deps);
   await tick();
@@ -191,7 +239,10 @@ test('stop cancels one column only; its late text and result are dropped', async
 
 test('usage of a stopped request that still returns is recorded for budgets, but the column stays stopped', async () => {
   const h = harness({
-    [T[0].key]: async (i) => { await new Promise((res) => i.signal.addEventListener('abort', res)); return { parts: text('cut'), usage: usage(5, 1) }; },
+    [T[0].key]: async (i) => {
+      await new Promise((res) => i.signal.addEventListener('abort', res));
+      return { parts: text('cut'), usage: usage(5, 1) };
+    },
     [T[1].key]: async () => ({ parts: text('x') }),
   });
   const run = startCompare([T[0], T[1]], 'q', h.deps);
@@ -199,7 +250,10 @@ test('usage of a stopped request that still returns is recorded for budgets, but
   run.stopAll();
   await run.settled();
   assert.equal(col(h, 1).status, 'stopped');
-  assert.deepEqual(h.usages.map((u) => u[0]), ['p1']);
+  assert.deepEqual(
+    h.usages.map((u) => u[0]),
+    ['p1'],
+  );
 });
 
 test('stopAll stops running columns and leaves finished ones alone', async () => {
@@ -212,14 +266,22 @@ test('stopAll stops running columns and leaves finished ones alone', async () =>
   await tick();
   run.stopAll();
   await run.settled();
-  assert.deepEqual(h.state.columns.map((c) => c.status), ['done', 'stopped', 'stopped']);
+  assert.deepEqual(
+    h.state.columns.map((c) => c.status),
+    ['done', 'stopped', 'stopped'],
+  );
 });
 
 test('retry notices show up and are cleared by the next text', async () => {
   const info = { attempt: 1, maxAttempts: 4, delayMs: 2000, kind: 'server', status: 503, message: 'x' };
   let mid;
   const h = harness({
-    [T[0].key]: async (i) => { i.onRetry(info); mid = h.state.columns[0].retry; i.onText('ok'); return { parts: text('ok') }; },
+    [T[0].key]: async (i) => {
+      i.onRetry(info);
+      mid = h.state.columns[0].retry;
+      i.onText('ok');
+      return { parts: text('ok') };
+    },
     [T[1].key]: async () => ({ parts: text('x') }),
   });
   await startCompare([T[0], T[1]], 'q', h.deps).settled();
@@ -230,7 +292,11 @@ test('retry notices show up and are cleared by the next text', async () => {
 test('rerun restarts a failed column with a fresh state', async () => {
   let n = 0;
   const h = harness({
-    [T[0].key]: async (i) => { if (++n === 1) throw errorForStatus(503, 'down'); i.onText('again'); return { parts: text('again') }; },
+    [T[0].key]: async (i) => {
+      if (++n === 1) throw errorForStatus(503, 'down');
+      i.onText('again');
+      return { parts: text('again') };
+    },
     [T[1].key]: async () => ({ parts: text('x') }),
   });
   const run = startCompare([T[0], T[1]], 'q', h.deps);
@@ -247,7 +313,12 @@ test('rerun while running silences the superseded run', async () => {
   let n = 0;
   const h = harness({
     [T[0].key]: async (i) => {
-      if (++n === 1) { await hangUntilAbort(i).catch(() => { i.onText('stale'); throw abortErr(); }); }
+      if (++n === 1) {
+        await hangUntilAbort(i).catch(() => {
+          i.onText('stale');
+          throw abortErr();
+        });
+      }
       i.onText('fresh');
       return { parts: text('fresh') };
     },
@@ -262,7 +333,14 @@ test('rerun while running silences the superseded run', async () => {
 });
 
 test('answerText joins text parts only', () => {
-  assert.equal(answerText([{ type: 'text', text: ' a' }, { type: 'activity', id: '1', name: 'x', args: {}, status: 'success' }, { type: 'text', text: 'b ' }]), 'ab');
+  assert.equal(
+    answerText([
+      { type: 'text', text: ' a' },
+      { type: 'activity', id: '1', name: 'x', args: {}, status: 'success' },
+      { type: 'text', text: 'b ' },
+    ]),
+    'ab',
+  );
 });
 
 test('continueMessages builds the prompt and the attributed answer; title falls back', () => {

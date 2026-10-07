@@ -1,7 +1,14 @@
 import type { Msg } from "../providers/types";
 import { claimChat } from "./chatCoordinator";
 import { loadQueue, updateQueue } from "./chatQueue";
-import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ReviewCopy } from "./chatRunCore";
+import {
+  appendUserMessage,
+  createApprover,
+  finishReviewCopy,
+  reportRunFailure,
+  runChatCore,
+  type ReviewCopy,
+} from "./chatRunCore";
 import { effectiveHistory } from "./context";
 import type { LiveRunHandle } from "./liveRuns";
 import { APPROVAL_TIMEOUT_MS, capAccess } from "./scheduledPrompts";
@@ -23,8 +30,16 @@ export type MobileSendDeps = ScheduledRunDeps & {
   access(): string;
 };
 
-export type MobileSend = { chatId?: number; projectId?: number; title?: string; text: string; providerId?: string | null; model?: string | null };
-export type SendResult = { ok: true; chatId: number } | { ok: false; code: "busy" | "not_found" | "bad_request" | "failed"; message: string };
+export type MobileSend = {
+  chatId?: number;
+  projectId?: number;
+  title?: string;
+  text: string;
+  providerId?: string | null;
+  model?: string | null;
+};
+export type SendResult =
+  { ok: true; chatId: number } | { ok: false; code: "busy" | "not_found" | "bad_request" | "failed"; message: string };
 
 /** Runs started from phones, by chat, so that Stop can reach them. */
 const running = new Map<number, AbortController>();
@@ -37,14 +52,24 @@ export const stopMobileRun = (chatId: number): boolean => {
 export const mobileRunning = (chatId: number) => running.has(chatId);
 
 const msgText = (text: string): Msg => ({ role: "assistant", parts: [{ type: "text", text }] });
-const firstLine = (text: string) => text.split("\n").find((l) => l.trim())?.trim().slice(0, 60) || "New chat";
-const fail = (code: Extract<SendResult, { ok: false }>["code"], message: string): SendResult => ({ ok: false, code, message });
+const firstLine = (text: string) =>
+  text
+    .split("\n")
+    .find((l) => l.trim())
+    ?.trim()
+    .slice(0, 60) || "New chat";
+const fail = (code: Extract<SendResult, { ok: false }>["code"], message: string): SendResult => ({
+  ok: false,
+  code,
+  message,
+});
 
 /** The model that answered last in this chat, so a phone keeps talking to the same one the desktop used. */
 function lastTarget(history: Msg[]): { providerId: string; model: string } | null {
   for (let i = history.length - 1; i >= 0; i--) {
     const m = history[i];
-    if (m.role === "assistant" && m.meta?.provider && m.meta.model) return { providerId: m.meta.provider, model: m.meta.model };
+    if (m.role === "assistant" && m.meta?.provider && m.meta.model)
+      return { providerId: m.meta.provider, model: m.meta.model };
   }
   return null;
 }
@@ -66,7 +91,10 @@ export async function startMobileSend(deps: MobileSendDeps, o: MobileSend): Prom
   const projectRoot = deps.projectRoot(projectId);
   if (projectRoot === undefined) return fail("not_found", "The project no longer exists");
 
-  const wanted = o.providerId && o.model ? { providerId: o.providerId, model: o.model } : lastTarget(prior) ?? deps.defaultTarget();
+  const wanted =
+    o.providerId && o.model
+      ? { providerId: o.providerId, model: o.model }
+      : (lastTarget(prior) ?? deps.defaultTarget());
   if (!wanted) return fail("failed", "No provider is set up on the desktop");
   const target = await deps.resolve(wanted.providerId, wanted.model);
   if ("error" in target) return fail("failed", target.error);
@@ -101,7 +129,8 @@ async function run(
   let succeeded = false;
   let review: ReviewCopy | null = null;
   let live: LiveRunHandle | undefined;
-  const note = (kind: "failed" | "attention" | "stopped", detail?: string) => deps.addMessage(cid, msgText(deps.note(kind, detail))).catch(() => {});
+  const note = (kind: "failed" | "attention" | "stopped", detail?: string) =>
+    deps.addMessage(cid, msgText(deps.note(kind, detail))).catch(() => {});
   try {
     await loadQueue(cid);
     await updateQueue(cid, (q) => ({ ...q, active: true }));
@@ -116,7 +145,15 @@ async function run(
       ask: (req) => req.kind === "command",
       present: (req, answer) => {
         const inChat = live?.approval(req, answer);
-        const card = deps.askUser({ scheduleId: `mobile:${cid}`, chatId: cid, title: firstLine(r.text), command: req.kind === "command" ? req.command : "" }, answer);
+        const card = deps.askUser(
+          {
+            scheduleId: `mobile:${cid}`,
+            chatId: cid,
+            title: firstLine(r.text),
+            command: req.kind === "command" ? req.command : "",
+          },
+          answer,
+        );
         return () => {
           inChat?.();
           card();
@@ -128,7 +165,13 @@ async function run(
         ctl.abort();
       },
     });
-    const { history } = await appendUserMessage(deps, { chatId: cid, root: r.projectRoot, prior: r.prior, parts: [{ type: "text", text: r.text }], ignoreCheckpointErrors: true });
+    const { history } = await appendUserMessage(deps, {
+      chatId: cid,
+      root: r.projectRoot,
+      prior: r.prior,
+      parts: [{ type: "text", text: r.text }],
+      ignoreCheckpointErrors: true,
+    });
     live?.message("user");
     await runChatCore(
       {
@@ -136,7 +179,15 @@ async function run(
         root: r.projectRoot,
         history,
         access,
-        target: async () => ({ adapter: target.adapter, providerId: wanted.providerId, model: wanted.model, supportsTools: target.supportsTools, reasoning: deps.reasoning(), computerUse: false, nativeInstructions: target.nativeInstructions }),
+        target: async () => ({
+          adapter: target.adapter,
+          providerId: wanted.providerId,
+          model: wanted.model,
+          supportsTools: target.supportsTools,
+          reasoning: deps.reasoning(),
+          computerUse: false,
+          nativeInstructions: target.nativeInstructions,
+        }),
         allowlist: deps.allowlist(),
         signal: ctl.signal,
         stop: () => ctl.abort(),
@@ -159,12 +210,21 @@ async function run(
     else succeeded = true;
   } catch (e) {
     if (attention || ctl.signal.aborted) await note(attention ? "attention" : "stopped");
-    else await note("failed", (await reportRunFailure(e, { providerId: wanted.providerId, signal: ctl.signal }, deps)) ?? "");
+    else
+      await note(
+        "failed",
+        (await reportRunFailure(e, { providerId: wanted.providerId, signal: ctl.signal }, deps)) ?? "",
+      );
   } finally {
     try {
       await finishReviewCopy(deps, review);
     } finally {
-      await updateQueue(cid, (q) => ({ ...q, active: false, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
+      await updateQueue(cid, (q) => ({
+        ...q,
+        active: false,
+        interrupted: !succeeded,
+        paused: succeeded ? q.paused : true,
+      })).catch(() => {});
       live?.end();
       running.delete(cid);
       r.release();

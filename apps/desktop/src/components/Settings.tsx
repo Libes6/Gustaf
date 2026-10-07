@@ -5,7 +5,25 @@ import { WebSettings } from "./WebSettings";
 import { UpdaterPanel } from "./UpdaterPanel";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  Activity, Archive, BarChart3, Bot, HardDrive, Globe, Smartphone, Clock, Download, FileText, GitBranch, History, Monitor, MousePointer2, Plug, Settings as Gear, Undo2, Boxes, Keyboard,
+  Activity,
+  Archive,
+  BarChart3,
+  Bot,
+  HardDrive,
+  Globe,
+  Smartphone,
+  Clock,
+  Download,
+  FileText,
+  GitBranch,
+  History,
+  Monitor,
+  MousePointer2,
+  Plug,
+  Settings as Gear,
+  Undo2,
+  Boxes,
+  Keyboard,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { loadProjectInstructions } from "../agent/instructionsStore";
@@ -56,8 +74,24 @@ const NAV: { group: Key; items: { id: SettingsPage; label: Key; icon: typeof Gea
       { id: "diagnostics", label: "appDiagNav", icon: Activity },
     ],
   },
-  { group: "integrations", items: [{ id: "computer", label: "computerUse", icon: Monitor }, { id: "web", label: "webTools", icon: Globe }, { id: "mcp", label: "mcp", icon: Plug }, { id: "scheduled", label: "scheduledNav", icon: Clock }, { id: "knowledge", label: "knowledgeNav", icon: BookOpen }, { id: "mobile", label: "mobileTitle", icon: Smartphone }] },
-  { group: "code", items: [{ id: "git", label: "gitAndCommands", icon: GitBranch }, { id: "rules", label: "rules", icon: FileText }] },
+  {
+    group: "integrations",
+    items: [
+      { id: "computer", label: "computerUse", icon: Monitor },
+      { id: "web", label: "webTools", icon: Globe },
+      { id: "mcp", label: "mcp", icon: Plug },
+      { id: "scheduled", label: "scheduledNav", icon: Clock },
+      { id: "knowledge", label: "knowledgeNav", icon: BookOpen },
+      { id: "mobile", label: "mobileTitle", icon: Smartphone },
+    ],
+  },
+  {
+    group: "code",
+    items: [
+      { id: "git", label: "gitAndCommands", icon: GitBranch },
+      { id: "rules", label: "rules", icon: FileText },
+    ],
+  },
   { group: "archiveGroup", items: [{ id: "archive", label: "archivedChats", icon: Archive }] },
 ];
 
@@ -71,17 +105,45 @@ function General() {
       <div className="card">
         <SettingRow id="language" title={t("language")}>
           <div className="seg" role="group" aria-label={t("language")}>
-            <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" onClick={() => app.setLocale("ru")}>Русский</button>
-            <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" onClick={() => app.setLocale("en")}>English</button>
+            <button
+              className={app.locale === "ru" ? "active" : ""}
+              aria-pressed={app.locale === "ru"}
+              lang="ru"
+              onClick={() => app.setLocale("ru")}
+            >
+              Русский
+            </button>
+            <button
+              className={app.locale === "en" ? "active" : ""}
+              aria-pressed={app.locale === "en"}
+              lang="en"
+              onClick={() => app.setLocale("en")}
+            >
+              English
+            </button>
           </div>
         </SettingRow>
         <SettingRow id="onboarding" title={t("onboarding")} description={t("onboardingDesc")}>
-          <button className="btn-soft" onClick={() => app.setOnboarded(false)}>{t("runAgain")}</button>
+          <button className="btn-soft" onClick={() => app.setOnboarded(false)}>
+            {t("runAgain")}
+          </button>
         </SettingRow>
         <SettingRow id="followUp" title={t("followUpSetting")} description={t("followUpSettingDesc")}>
           <div className="seg" role="group" aria-label={t("followUpSetting")}>
-            <button className={app.followUp === "queue" ? "active" : ""} aria-pressed={app.followUp === "queue"} onClick={() => app.setFollowUp("queue")}>{t("followUpQueue")}</button>
-            <button className={app.followUp === "steer" ? "active" : ""} aria-pressed={app.followUp === "steer"} onClick={() => app.setFollowUp("steer")}>{t("followUpSteer")}</button>
+            <button
+              className={app.followUp === "queue" ? "active" : ""}
+              aria-pressed={app.followUp === "queue"}
+              onClick={() => app.setFollowUp("queue")}
+            >
+              {t("followUpQueue")}
+            </button>
+            <button
+              className={app.followUp === "steer" ? "active" : ""}
+              aria-pressed={app.followUp === "steer"}
+              onClick={() => app.setFollowUp("steer")}
+            >
+              {t("followUpSteer")}
+            </button>
           </div>
         </SettingRow>
       </div>
@@ -140,9 +202,13 @@ function ImportPage() {
       <p className="h4-sub">{t("importFromAppSub")}</p>
       <div className="card">
         <div className="card-row">
-          <span className="prov-icon"><MousePointer2 size={15} /></span>
+          <span className="prov-icon">
+            <MousePointer2 size={15} />
+          </span>
           <div className="grow t">{t("importSources")}</div>
-          <button className="btn-soft" onClick={() => setOpen(!open)}>{t("import")}</button>
+          <button className="btn-soft" onClick={() => setOpen(!open)}>
+            {t("import")}
+          </button>
         </div>
       </div>
       {open && (
@@ -160,10 +226,15 @@ function ImportPage() {
           <div key={i} className="card-row">
             {h.source === "cursor" ? <MousePointer2 size={15} /> : <History size={15} />}
             <div className="grow">
-              <div className="t">{t("importedFrom", { source: SOURCE_LABELS[h.source as keyof typeof SOURCE_LABELS] ?? h.source })}</div>
+              <div className="t">
+                {t("importedFrom", { source: SOURCE_LABELS[h.source as keyof typeof SOURCE_LABELS] ?? h.source })}
+              </div>
               <div className="d">{t.date(h.at)}</div>
             </div>
-            <span className="d"><span className="status-dot" style={{ background: "var(--green)" }} />{t("chatsCount", { count: h.chats })}</span>
+            <span className="d">
+              <span className="status-dot" style={{ background: "var(--green)" }} />
+              {t("chatsCount", { count: h.chats })}
+            </span>
           </div>
         ))}
       </div>
@@ -173,38 +244,138 @@ function ImportPage() {
 
 function AgentsBudgets() {
   const t = useT();
-  return <>
-    <h1>{t("agentsBudgetsNav")}</h1><p className="lead">{t("agentsBudgetsLead")}</p>
-    <BudgetsSection />
-    <AgentSettingsSection />
-  </>;
+  return (
+    <>
+      <h1>{t("agentsBudgetsNav")}</h1>
+      <p className="lead">{t("agentsBudgetsLead")}</p>
+      <BudgetsSection />
+      <AgentSettingsSection />
+    </>
+  );
 }
 
 function Usage() {
   const t = useT();
   const app = useApp();
   const format = (n: number) => n.toLocaleString(app.locale);
-  const dashboard = (p: ProviderConfig) => p.cli === "claude" ? "https://claude.ai/settings/usage" : p.cli === "codex" ? "https://chatgpt.com/codex/settings/usage" : p.cli === "cursor-agent" || p.kind === "cursor" ? "https://cursor.com/dashboard?tab=usage" : p.kind === "openrouter" ? "https://openrouter.ai/activity" : null;
-  return <>
-    <h1>{t("usage")}</h1><p className="lead">{t("tokenUsageLead")}</p>
-    <UsageCharts />
-    <h4 aria-level={2}>{t("providers")}</h4>
-    {app.providers.map(p => {
-      const stats = Object.values(app.tokenStats).filter(s => s.providerId === p.id);
-      const total = stats.reduce((a,s) => ({ input: a.input + s.input, output: a.output + s.output, cached: a.cached + s.cached }), { input: 0, output: 0, cached: 0 });
-      const snapshot = app.limits[p.id]; const link = dashboard(p);
-      return <div className="card usage-card" key={p.id}>
-        <div className="card-row"><ProviderIcon kind={p.kind} cli={p.cli} /><div className="grow t">{p.name}</div><span className="d">{t("requestsCount", { count: app.usage[p.id] ?? 0 })}</span></div>
-        <div className="usage-metrics"><div><small>{t("inputTokens")}</small><strong>{stats.length ? format(total.input) : "—"}</strong></div><div><small>{t("outputTokens")}</small><strong>{stats.length ? format(total.output) : "—"}</strong></div><div><small>{t("cachedTokens")}</small><strong>{stats.length ? format(total.cached) : "—"}</strong></div></div>
-        {!stats.length && <p className="d usage-note">{t("tokensUnavailable")}</p>}
-        {stats.map(s => <div className="card-row" key={s.model}><ModelIcon model={s.model} provider={p} /><div className="grow"><div className="t">{app.models.find(m => m.providerId === p.id && m.id === s.model)?.name ?? s.model}{s.level && <span className="d" title={t("effortTitle")}> · {t(`reasoning_${s.level}`)}</span>}</div><div className="d">{t("reportedTurns", { count: s.turns })}</div></div><span className="d">{format(s.input)} ↓ · {format(s.output)} ↑</span></div>)}
-        <div className="card-row"><div className="grow t">{t("subscriptionLimits")}</div>{p.cli === "codex" && <button className="btn-soft" disabled={!!app.loadingLimits} onClick={() => app.refreshLimits(p)}>{t(app.loadingLimits === p.id ? "providerChecking" : "refreshLimits")}</button>}{link && <button className="btn-soft" onClick={() => openUrl(link)}>{t("usageDashboard")}</button>}</div>
-        {snapshot?.windows.length ? <div className="usage-limits">{snapshot.windows.map(w => <div key={w.id}><div className="usage-limit-label"><span>{w.label}{w.plan ? ` · ${w.plan}` : ""}</span><span>{Math.round(w.usedPercent)}% {t("used")}</span></div><progress max={100} value={w.usedPercent} aria-label={`${w.label}: ${Math.round(w.usedPercent)}% ${t("used")}`} />{w.resetsAt && <div className="d">{t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}</div>}</div>)}<p className="d">{t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}</p></div> : <p className="d usage-note">{t("limitsUnavailable")}</p>}
-        {app.limitErrors[p.id] && <div className="error-box">{app.limitErrors[p.id]}</div>}
-      </div>;
-    })}
-    {!app.providers.length && <p className="d">{t("noProviders")}</p>}
-  </>;
+  const dashboard = (p: ProviderConfig) =>
+    p.cli === "claude"
+      ? "https://claude.ai/settings/usage"
+      : p.cli === "codex"
+        ? "https://chatgpt.com/codex/settings/usage"
+        : p.cli === "cursor-agent" || p.kind === "cursor"
+          ? "https://cursor.com/dashboard?tab=usage"
+          : p.kind === "openrouter"
+            ? "https://openrouter.ai/activity"
+            : null;
+  return (
+    <>
+      <h1>{t("usage")}</h1>
+      <p className="lead">{t("tokenUsageLead")}</p>
+      <UsageCharts />
+      <h4 aria-level={2}>{t("providers")}</h4>
+      {app.providers.map((p) => {
+        const stats = Object.values(app.tokenStats).filter((s) => s.providerId === p.id);
+        const total = stats.reduce(
+          (a, s) => ({ input: a.input + s.input, output: a.output + s.output, cached: a.cached + s.cached }),
+          { input: 0, output: 0, cached: 0 },
+        );
+        const snapshot = app.limits[p.id];
+        const link = dashboard(p);
+        return (
+          <div className="card usage-card" key={p.id}>
+            <div className="card-row">
+              <ProviderIcon kind={p.kind} cli={p.cli} />
+              <div className="grow t">{p.name}</div>
+              <span className="d">{t("requestsCount", { count: app.usage[p.id] ?? 0 })}</span>
+            </div>
+            <div className="usage-metrics">
+              <div>
+                <small>{t("inputTokens")}</small>
+                <strong>{stats.length ? format(total.input) : "—"}</strong>
+              </div>
+              <div>
+                <small>{t("outputTokens")}</small>
+                <strong>{stats.length ? format(total.output) : "—"}</strong>
+              </div>
+              <div>
+                <small>{t("cachedTokens")}</small>
+                <strong>{stats.length ? format(total.cached) : "—"}</strong>
+              </div>
+            </div>
+            {!stats.length && <p className="d usage-note">{t("tokensUnavailable")}</p>}
+            {stats.map((s) => (
+              <div className="card-row" key={s.model}>
+                <ModelIcon model={s.model} provider={p} />
+                <div className="grow">
+                  <div className="t">
+                    {app.models.find((m) => m.providerId === p.id && m.id === s.model)?.name ?? s.model}
+                    {s.level && (
+                      <span className="d" title={t("effortTitle")}>
+                        {" "}
+                        · {t(`reasoning_${s.level}`)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="d">{t("reportedTurns", { count: s.turns })}</div>
+                </div>
+                <span className="d">
+                  {format(s.input)} ↓ · {format(s.output)} ↑
+                </span>
+              </div>
+            ))}
+            <div className="card-row">
+              <div className="grow t">{t("subscriptionLimits")}</div>
+              {p.cli === "codex" && (
+                <button className="btn-soft" disabled={!!app.loadingLimits} onClick={() => app.refreshLimits(p)}>
+                  {t(app.loadingLimits === p.id ? "providerChecking" : "refreshLimits")}
+                </button>
+              )}
+              {link && (
+                <button className="btn-soft" onClick={() => openUrl(link)}>
+                  {t("usageDashboard")}
+                </button>
+              )}
+            </div>
+            {snapshot?.windows.length ? (
+              <div className="usage-limits">
+                {snapshot.windows.map((w) => (
+                  <div key={w.id}>
+                    <div className="usage-limit-label">
+                      <span>
+                        {w.label}
+                        {w.plan ? ` · ${w.plan}` : ""}
+                      </span>
+                      <span>
+                        {Math.round(w.usedPercent)}% {t("used")}
+                      </span>
+                    </div>
+                    <progress
+                      max={100}
+                      value={w.usedPercent}
+                      aria-label={`${w.label}: ${Math.round(w.usedPercent)}% ${t("used")}`}
+                    />
+                    {w.resetsAt && (
+                      <div className="d">
+                        {t("resetsAt")} {new Date(w.resetsAt * 1000).toLocaleString(app.locale)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <p className="d">
+                  {t("usageCheckedAt")} {new Date(snapshot.checkedAt).toLocaleString(app.locale)}
+                </p>
+              </div>
+            ) : (
+              <p className="d usage-note">{t("limitsUnavailable")}</p>
+            )}
+            {app.limitErrors[p.id] && <div className="error-box">{app.limitErrors[p.id]}</div>}
+          </div>
+        );
+      })}
+      {!app.providers.length && <p className="d">{t("noProviders")}</p>}
+    </>
+  );
 }
 
 function ComputerPage() {
@@ -218,9 +389,30 @@ function ComputerPage() {
     return () => clearInterval(i);
   }, []);
   const row = (id: string, ok: boolean | undefined, title: Key, desc: Key, pane: string, request?: boolean) => (
-    <SettingRow id={id} title={<><span className="status-dot" style={{ background: ok ? "var(--green)" : "var(--warn)" }} />{t(title)}</>} description={t(desc)}>
-      {ok ? <span className="d ok">{t("granted")}</span> : (
-        isMac() ? <button className="btn-soft" onClick={() => (request && check(true), openUrl(`x-apple.systempreferences:com.apple.preference.security?${pane}`))}>{t("openSettings")}</button> : <span className="d">{t("computerUnsupportedHere")}</span>
+    <SettingRow
+      id={id}
+      title={
+        <>
+          <span className="status-dot" style={{ background: ok ? "var(--green)" : "var(--warn)" }} />
+          {t(title)}
+        </>
+      }
+      description={t(desc)}
+    >
+      {ok ? (
+        <span className="d ok">{t("granted")}</span>
+      ) : isMac() ? (
+        <button
+          className="btn-soft"
+          onClick={() => (
+            request && check(true),
+            openUrl(`x-apple.systempreferences:com.apple.preference.security?${pane}`)
+          )}
+        >
+          {t("openSettings")}
+        </button>
+      ) : (
+        <span className="d">{t("computerUnsupportedHere")}</span>
       )}
     </SettingRow>
   );
@@ -230,13 +422,34 @@ function ComputerPage() {
       <p className="lead">{t("computerLead")}</p>
       <h4 aria-level={2}>{t("permissions")}</h4>
       <div className="card">
-        {row("permAccessibility", perm?.accessibility, "permAccessibility", "permAccessibilityDesc", "Privacy_Accessibility")}
+        {row(
+          "permAccessibility",
+          perm?.accessibility,
+          "permAccessibility",
+          "permAccessibilityDesc",
+          "Privacy_Accessibility",
+        )}
         {row("permScreen", perm?.screen, "permScreen", "permScreenDesc", "Privacy_ScreenCapture", true)}
       </div>
       <h4 aria-level={2}>{t("behavior")}</h4>
       <div className="card">
-        <SettingRow id="computerEnable" title={t("computerEnable")} description={t("computerEnableDesc")} toggle={{ on: app.computerUse, onChange: (v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen) }} />
-        <SettingRow id="computerSafety" title={t("computerSafety")} description={t("computerSafetyDesc", { mod: displayKeys("⌘").replace(/\+$/, ""), stop: shortcutDisplay(shortcut("stopAgent")) })} />
+        <SettingRow
+          id="computerEnable"
+          title={t("computerEnable")}
+          description={t("computerEnableDesc")}
+          toggle={{
+            on: app.computerUse,
+            onChange: (v) => app.setComputerUse(v && !!perm?.accessibility && !!perm?.screen),
+          }}
+        />
+        <SettingRow
+          id="computerSafety"
+          title={t("computerSafety")}
+          description={t("computerSafetyDesc", {
+            mod: displayKeys("⌘").replace(/\+$/, ""),
+            stop: shortcutDisplay(shortcut("stopAgent")),
+          })}
+        />
       </div>
     </>
   );
@@ -250,11 +463,18 @@ function GitPage() {
       <h1>{t("gitAndCommands")}</h1>
       <p className="lead">{t("gitLead")}</p>
       <div className="card">
-        <SettingRow id="reviewCopy" title={t("reviewCopySetting")} description={t("reviewCopySettingDesc")} toggle={{ on: app.reviewCopy === true, onChange: app.setReviewCopy }} />
+        <SettingRow
+          id="reviewCopy"
+          title={t("reviewCopySetting")}
+          description={t("reviewCopySettingDesc")}
+          toggle={{ on: app.reviewCopy === true, onChange: app.setReviewCopy }}
+        />
       </div>
       <AutoReviewSettings />
       <CommandRules />
-      <DiagnosticsSettings /><SemanticSettings /><HooksSettings />
+      <DiagnosticsSettings />
+      <SemanticSettings />
+      <HooksSettings />
       <VerificationSettings />
     </>
   );
@@ -274,11 +494,32 @@ function Rules() {
     <>
       <h1>{t("rules")}</h1>
       <p className="lead">{t("rulesLead")}</p>
-      <select aria-label={t("searchProject")} className="input" value={pid} onChange={(e) => setPid(Number(e.target.value))} style={{ marginBottom: 12 }}>
-        {withPath.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      <select
+        aria-label={t("searchProject")}
+        className="input"
+        value={pid}
+        onChange={(e) => setPid(Number(e.target.value))}
+        style={{ marginBottom: 12 }}
+      >
+        {withPath.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
       </select>
       <div className="card" style={{ padding: 14 }}>
-        <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "var(--mono)", fontSize: 12, color: "var(--text-2)", userSelect: "text" }}>{rules || t("rulesNone")}</pre>
+        <pre
+          style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            fontFamily: "var(--mono)",
+            fontSize: 12,
+            color: "var(--text-2)",
+            userSelect: "text",
+          }}
+        >
+          {rules || t("rulesNone")}
+        </pre>
       </div>
     </>
   );
@@ -334,14 +575,37 @@ function useSettingTarget() {
     if (find()) return () => clearTimeout(flash);
     const timer = setInterval(() => {
       if (find()) clearInterval(timer);
-      else if (++tries > 20) { clearInterval(timer); clear.current(); }
+      else if (++tries > 20) {
+        clearInterval(timer);
+        clear.current();
+      }
     }, 100);
-    return () => { clearInterval(timer); clearTimeout(flash); };
+    return () => {
+      clearInterval(timer);
+      clearTimeout(flash);
+    };
   }, [target, app.settingsPage]);
 }
 
 const PAGES: Record<SettingsPage, () => React.JSX.Element> = {
-  memory: MemorySettings, storage: StoragePage, web: WebPage, general: General, shortcuts: ShortcutsPage, import: ImportPage, providers: ProvidersPage, usage: Usage, agents: AgentsBudgets, computer: ComputerPage, mcp: McpServers, scheduled: ScheduledPage, git: GitPage, rules: Rules, archive: ArchivePage, knowledge: KnowledgeSettings, diagnostics: AppDiagnostics, mobile: MobileSettings,
+  memory: MemorySettings,
+  storage: StoragePage,
+  web: WebPage,
+  general: General,
+  shortcuts: ShortcutsPage,
+  import: ImportPage,
+  providers: ProvidersPage,
+  usage: Usage,
+  agents: AgentsBudgets,
+  computer: ComputerPage,
+  mcp: McpServers,
+  scheduled: ScheduledPage,
+  git: GitPage,
+  rules: Rules,
+  archive: ArchivePage,
+  knowledge: KnowledgeSettings,
+  diagnostics: AppDiagnostics,
+  mobile: MobileSettings,
 };
 
 export function Settings() {
@@ -355,22 +619,39 @@ export function Settings() {
       <nav className="settings-nav drag" aria-label={t("settings")}>
         <div className="settings-nav-title">{t("settings")}</div>
         <SettingsSearch onActive={setSearching} />
-        {!searching && NAV.map((g) => (
-          <div key={g.group} role="group" aria-label={t(g.group)}>
-            <div className="section-title" aria-hidden="true" style={{ paddingTop: 10 }}>{t(g.group)}</div>
-            {g.items.map((it) => (
-              <button key={it.id} className={`row${app.settingsPage === it.id ? " active" : ""}`} aria-current={app.settingsPage === it.id ? "page" : undefined} onClick={() => app.openSettings(it.id)}>
-                <it.icon size={15} />
-                <span className="label">{t(it.label)}</span>
-              </button>
-            ))}
-          </div>
-        ))}
-        {!searching && <button className="row muted" style={{ marginTop: 12 }} onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}>
-          <span className="label">{t("docs")}</span>
-        </button>}
+        {!searching &&
+          NAV.map((g) => (
+            <div key={g.group} role="group" aria-label={t(g.group)}>
+              <div className="section-title" aria-hidden="true" style={{ paddingTop: 10 }}>
+                {t(g.group)}
+              </div>
+              {g.items.map((it) => (
+                <button
+                  key={it.id}
+                  className={`row${app.settingsPage === it.id ? " active" : ""}`}
+                  aria-current={app.settingsPage === it.id ? "page" : undefined}
+                  onClick={() => app.openSettings(it.id)}
+                >
+                  <it.icon size={15} />
+                  <span className="label">{t(it.label)}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        {!searching && (
+          <button
+            className="row muted"
+            style={{ marginTop: 12 }}
+            onClick={() => openUrl("https://developers.openai.com/api/docs/guides/tools-computer-use")}
+          >
+            <span className="label">{t("docs")}</span>
+          </button>
+        )}
       </nav>
-      <main className="settings-main" aria-label={t(NAV.flatMap((g) => g.items).find((it) => it.id === app.settingsPage)?.label ?? "settings")}>
+      <main
+        className="settings-main"
+        aria-label={t(NAV.flatMap((g) => g.items).find((it) => it.id === app.settingsPage)?.label ?? "settings")}
+      >
         <div className="drag" style={{ height: 0 }} />
         <div className={`settings-inner${app.settingsPage === "providers" ? " wide" : ""}`}>
           <Page />

@@ -21,13 +21,24 @@ export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => voi
   };
 
   const create = async () => {
-    const id = await createProject(name.trim() || path?.split("/").pop() || t("newProject"), path, path ? `local:${path}` : null);
+    const id = await createProject(
+      name.trim() || path?.split("/").pop() || t("newProject"),
+      path,
+      path ? `local:${path}` : null,
+    );
     onCreated(id);
   };
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-label={t("createProject")} onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div
+        ref={dialogRef}
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("createProject")}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+      >
         <h2>
           <span className="grow">{t("createProject")}</span>
           <button className="icon-btn" title={t("cancel")} aria-label={t("cancel")} onClick={onClose}>
@@ -38,7 +49,14 @@ export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => voi
           <span className="icon">
             <Folder size={16} />
           </span>
-          <input autoFocus aria-label={t("projectName")} placeholder={t("projectName")} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
+          <input
+            autoFocus
+            aria-label={t("projectName")}
+            placeholder={t("projectName")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && create()}
+          />
         </div>
         <div className="sub">{t("sourceFolders")}</div>
         <div className="folder-box">
@@ -46,7 +64,8 @@ export function CreateProjectDialog({ onClose, onCreated }: { onClose: () => voi
             <span className="picked">{path}</span>
           ) : (
             <span>
-              {t("addFolderOn")} <b style={{ color: "var(--text)", fontWeight: 500 }}>{t("thisComputer")}</b> <ChevronDown size={13} />
+              {t("addFolderOn")} <b style={{ color: "var(--text)", fontWeight: 500 }}>{t("thisComputer")}</b>{" "}
+              <ChevronDown size={13} />
             </span>
           )}
           <button className="btn-soft" onClick={pick}>

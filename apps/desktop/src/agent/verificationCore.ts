@@ -10,7 +10,11 @@ export type Check = { name: string; command: string; timeoutMs: number; source: 
 export type CheckIssue = { source: CheckSource; index: number | null; message: string };
 
 /** What is stored per project in the settings table (key `verification:<project>`). */
-export type VerificationSettings = { checks: { name: string; command: string; timeoutMs: number }[]; maxFixAttempts: number; useProjectFile: boolean };
+export type VerificationSettings = {
+  checks: { name: string; command: string; timeoutMs: number }[];
+  maxFixAttempts: number;
+  useProjectFile: boolean;
+};
 /** The file `<project>/.gustaf/done.json` (or the legacy `.mcode/done.json`), validated. */
 export type DoneFile = { checks: Check[]; maxFixAttempts?: number; issues: CheckIssue[] };
 /** What one run uses. */
@@ -37,10 +41,16 @@ export const KILL_REPEATS = 3;
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
-export const defaultSettings = (): VerificationSettings => ({ checks: [], maxFixAttempts: DEFAULT_FIX_ATTEMPTS, useProjectFile: false });
+export const defaultSettings = (): VerificationSettings => ({
+  checks: [],
+  maxFixAttempts: DEFAULT_FIX_ATTEMPTS,
+  useProjectFile: false,
+});
 
-const isTimeout = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= MIN_CHECK_TIMEOUT_MS && v <= MAX_CHECK_TIMEOUT_MS;
-const isFixAttempts = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_FIX_ATTEMPTS;
+const isTimeout = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= MIN_CHECK_TIMEOUT_MS && v <= MAX_CHECK_TIMEOUT_MS;
+const isFixAttempts = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_FIX_ATTEMPTS;
 
 /** Validates a list of checks. Invalid entries are skipped and reported; nothing here throws. */
 export function validateChecks(raw: unknown, source: CheckSource): { checks: Check[]; issues: CheckIssue[] } {
@@ -59,14 +69,19 @@ export function validateChecks(raw: unknown, source: CheckSource): { checks: Che
     if (!item || typeof item !== "object" || Array.isArray(item)) return issue(i, "A check must be an object.");
     const c = item as Record<string, unknown>;
     if (typeof c.command !== "string" || !c.command.trim()) return issue(i, '"command" must be a non-empty string.');
-    if (c.command.length > MAX_CHECK_COMMAND) return issue(i, `"command" is longer than ${MAX_CHECK_COMMAND} characters.`);
+    if (c.command.length > MAX_CHECK_COMMAND)
+      return issue(i, `"command" is longer than ${MAX_CHECK_COMMAND} characters.`);
     if (c.name !== undefined && typeof c.name !== "string") return issue(i, '"name" must be a string.');
     const command = c.command.trim();
     const name = ((c.name as string | undefined) ?? "").trim() || clip(command, 40);
     if (name.length > MAX_CHECK_NAME) return issue(i, `"name" is longer than ${MAX_CHECK_NAME} characters.`);
     let timeoutMs = DEFAULT_CHECK_TIMEOUT_MS;
     if (c.timeoutMs !== undefined) {
-      if (!isTimeout(c.timeoutMs)) return issue(i, `"timeoutMs" must be a whole number between ${MIN_CHECK_TIMEOUT_MS} and ${MAX_CHECK_TIMEOUT_MS}.`);
+      if (!isTimeout(c.timeoutMs))
+        return issue(
+          i,
+          `"timeoutMs" must be a whole number between ${MIN_CHECK_TIMEOUT_MS} and ${MAX_CHECK_TIMEOUT_MS}.`,
+        );
       timeoutMs = c.timeoutMs;
     }
     checks.push({ name, command, timeoutMs, source });
@@ -76,27 +91,55 @@ export function validateChecks(raw: unknown, source: CheckSource): { checks: Che
 
 /** Validates the parsed content of `.gustaf/done.json`: `{ "checks": [...], "maxFixAttempts": 2 }`. */
 export function validateDoneFile(raw: unknown): DoneFile {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { checks: [], issues: [{ source: "project", index: null, message: 'The file must be a JSON object with a "checks" array.' }] };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    return {
+      checks: [],
+      issues: [{ source: "project", index: null, message: 'The file must be a JSON object with a "checks" array.' }],
+    };
   const f = raw as { checks?: unknown; maxFixAttempts?: unknown };
   const { checks, issues } = validateChecks(f.checks, "project");
   const out: DoneFile = { checks, issues };
   if (f.maxFixAttempts !== undefined) {
     if (isFixAttempts(f.maxFixAttempts)) out.maxFixAttempts = f.maxFixAttempts;
-    else issues.push({ source: "project", index: null, message: `"maxFixAttempts" must be a whole number between 0 and ${MAX_FIX_ATTEMPTS}.` });
+    else
+      issues.push({
+        source: "project",
+        index: null,
+        message: `"maxFixAttempts" must be a whole number between 0 and ${MAX_FIX_ATTEMPTS}.`,
+      });
   }
   return out;
 }
 
 /** Removes the `   12|` line numbers `fs_read` puts in front of every line. */
-const stripLineNumbers = (text: string) => text.split("\n").map((l) => l.replace(/^\s*\d+\|/, "")).join("\n");
+const stripLineNumbers = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+\|/, ""))
+    .join("\n");
 
 /** Parses the text of the file as read through `fsx.read` (line numbers included or not). */
 export function parseDoneText(text: string): DoneFile {
-  if (text.length > MAX_DONE_FILE_BYTES) return { checks: [], issues: [{ source: "project", index: null, message: `The file is larger than ${MAX_DONE_FILE_BYTES / 1024} KB and was ignored.` }] };
+  if (text.length > MAX_DONE_FILE_BYTES)
+    return {
+      checks: [],
+      issues: [
+        {
+          source: "project",
+          index: null,
+          message: `The file is larger than ${MAX_DONE_FILE_BYTES / 1024} KB and was ignored.`,
+        },
+      ],
+    };
   try {
     return validateDoneFile(JSON.parse(stripLineNumbers(text)));
   } catch (e) {
-    return { checks: [], issues: [{ source: "project", index: null, message: `Invalid JSON: ${clip(String((e as Error)?.message ?? e), 200)}` }] };
+    return {
+      checks: [],
+      issues: [
+        { source: "project", index: null, message: `Invalid JSON: ${clip(String((e as Error)?.message ?? e), 200)}` },
+      ],
+    };
   }
 }
 
@@ -112,7 +155,11 @@ export function normalizeSettings(raw: unknown): VerificationSettings {
 }
 
 /** Settings checks first, then the project file's only when the user switched it on (default off). */
-export function effectiveConfig(settings: VerificationSettings, file: DoneFile | null, fileEnabled = settings.useProjectFile): VerificationConfig {
+export function effectiveConfig(
+  settings: VerificationSettings,
+  file: DoneFile | null,
+  fileEnabled = settings.useProjectFile,
+): VerificationConfig {
   const own = validateChecks(settings.checks, "settings");
   const useFile = fileEnabled && !!file;
   const checks = [...own.checks, ...(useFile ? file!.checks : [])].slice(0, MAX_CHECKS);
@@ -126,7 +173,14 @@ export function effectiveConfig(settings: VerificationSettings, file: DoneFile |
 // ---------- results ----------
 
 export type CheckStatus = "running" | "passed" | "failed" | "timeout" | "denied" | "declined" | "skipped";
-export type CheckResult = { name: string; command: string; status: CheckStatus; exitCode: number | null; durationMs: number; output: string };
+export type CheckResult = {
+  name: string;
+  command: string;
+  status: CheckStatus;
+  exitCode: number | null;
+  durationMs: number;
+  output: string;
+};
 /** `retry`: failed, sent back to the agent. `failed`: the run ends here as "failed verification". */
 export type GateOutcome = "running" | "passed" | "retry" | "failed";
 export type GateReason = "max_attempts" | "repeated" | "blocked" | "declined";
@@ -151,9 +205,28 @@ export function readReport(args: unknown): GateReport | null {
   const r = args && typeof args === "object" ? (args as { report?: unknown }).report : null;
   if (!r || typeof r !== "object") return null;
   const g = r as Partial<GateReport>;
-  if (!Array.isArray(g.results) || typeof g.attempt !== "number" || !["running", "passed", "retry", "failed"].includes(String(g.outcome))) return null;
-  const results = g.results.filter((c): c is CheckResult => !!c && typeof c === "object" && typeof (c as CheckResult).name === "string" && typeof (c as CheckResult).command === "string" && typeof (c as CheckResult).status === "string");
-  return { results, attempt: g.attempt, maxFixAttempts: typeof g.maxFixAttempts === "number" ? g.maxFixAttempts : 0, outcome: g.outcome as GateOutcome, ...(g.reason ? { reason: g.reason } : {}), ...(g.suggestion === "another_model" ? { suggestion: "another_model" as const } : {}) };
+  if (
+    !Array.isArray(g.results) ||
+    typeof g.attempt !== "number" ||
+    !["running", "passed", "retry", "failed"].includes(String(g.outcome))
+  )
+    return null;
+  const results = g.results.filter(
+    (c): c is CheckResult =>
+      !!c &&
+      typeof c === "object" &&
+      typeof (c as CheckResult).name === "string" &&
+      typeof (c as CheckResult).command === "string" &&
+      typeof (c as CheckResult).status === "string",
+  );
+  return {
+    results,
+    attempt: g.attempt,
+    maxFixAttempts: typeof g.maxFixAttempts === "number" ? g.maxFixAttempts : 0,
+    outcome: g.outcome as GateOutcome,
+    ...(g.reason ? { reason: g.reason } : {}),
+    ...(g.suggestion === "another_model" ? { suggestion: "another_model" as const } : {}),
+  };
 }
 
 // ---------- output ----------
@@ -171,9 +244,11 @@ export function clipOutput(text: string, max: number): string {
 }
 
 /** Output as stored and shown: no escape codes, secrets scrubbed, bounded. */
-export const cleanOutput = (text: string, max = MAX_CHECK_OUTPUT) => clipOutput(redactSecrets(stripAnsi(text)).trim(), max);
+export const cleanOutput = (text: string, max = MAX_CHECK_OUTPUT) =>
+  clipOutput(redactSecrets(stripAnsi(text)).trim(), max);
 
-const FAILING_LINE = /\b(error|errors|fail|failed|failure|failing|assert|assertion|not ok|cannot|exception|panicked|fatal)\b|[✗✖×]/i;
+const FAILING_LINE =
+  /\b(error|errors|fail|failed|failure|failing|assert|assertion|not ok|cannot|exception|panicked|fatal)\b|[✗✖×]/i;
 
 /**
  * Identity of a failure for the kill criteria: the check's name plus the first line that looks like a failure (else the
@@ -182,7 +257,10 @@ const FAILING_LINE = /\b(error|errors|fail|failed|failure|failing|assert|asserti
  */
 export function failureSignature(check: string, output: string, timedOut = false): string {
   if (timedOut) return `${check}::timed out`;
-  const lines = stripAnsi(output).split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = stripAnsi(output)
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   const line = lines.find((l) => FAILING_LINE.test(l)) ?? lines[0] ?? "";
   const norm = line
     .toLowerCase()
@@ -196,13 +274,17 @@ export function failureSignature(check: string, output: string, timedOut = false
 }
 
 /** True when the last `n` signatures are all the same. */
-export const repeated = (sigs: readonly string[], n = KILL_REPEATS) => sigs.length >= n && sigs.slice(-n).every((s) => s === sigs[sigs.length - 1]);
+export const repeated = (sigs: readonly string[], n = KILL_REPEATS) =>
+  sigs.length >= n && sigs.slice(-n).every((s) => s === sigs[sigs.length - 1]);
 
 const seconds = (ms: number) => `${Math.max(0.1, Math.round(ms / 100) / 10)} s`;
 
 /** The user message that sends the failing output back to the agent. */
 export function feedbackMessage(failed: CheckResult, attempt: number, max: number): string {
-  const how = failed.status === "timeout" ? `timed out after ${seconds(failed.durationMs)}` : `exited with code ${failed.exitCode ?? "unknown"}`;
+  const how =
+    failed.status === "timeout"
+      ? `timed out after ${seconds(failed.durationMs)}`
+      : `exited with code ${failed.exitCode ?? "unknown"}`;
   const out = cleanOutput(failed.output, MAX_FEEDBACK_OUTPUT);
   return [
     `Verification failed: the required check "${failed.name}" (${failed.command}) ${how}.`,
@@ -215,14 +297,22 @@ export function feedbackMessage(failed: CheckResult, attempt: number, max: numbe
 export function reportText(r: GateReport): string {
   const passed = r.results.filter((c) => c.status === "passed").length;
   const head =
-    r.outcome === "passed" ? `Checks passed (${passed})`
-    : r.outcome === "running" ? "Verification running"
-    : r.outcome === "retry" ? "Verification failed; sent back to the agent"
-    : r.reason === "repeated" ? "Failed verification: the same failure three times in a row"
-    : r.reason === "blocked" ? "Failed verification: a check was blocked by command rules"
-    : r.reason === "declined" ? "Failed verification: a check was declined"
-    : "Failed verification";
-  const lines = r.results.map((c) => `${c.status === "passed" ? "ok" : c.status} ${c.name}${c.durationMs ? ` (${seconds(c.durationMs)})` : ""}`);
+    r.outcome === "passed"
+      ? `Checks passed (${passed})`
+      : r.outcome === "running"
+        ? "Verification running"
+        : r.outcome === "retry"
+          ? "Verification failed; sent back to the agent"
+          : r.reason === "repeated"
+            ? "Failed verification: the same failure three times in a row"
+            : r.reason === "blocked"
+              ? "Failed verification: a check was blocked by command rules"
+              : r.reason === "declined"
+                ? "Failed verification: a check was declined"
+                : "Failed verification";
+  const lines = r.results.map(
+    (c) => `${c.status === "passed" ? "ok" : c.status} ${c.name}${c.durationMs ? ` (${seconds(c.durationMs)})` : ""}`,
+  );
   const bad = r.results.find((c) => c.status !== "passed" && c.status !== "skipped" && c.output);
   return [head, ...lines, ...(bad && r.outcome !== "passed" ? ["", clipOutput(bad.output, 1500)] : [])].join("\n");
 }

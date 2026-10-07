@@ -7,7 +7,12 @@ let undo: { before: TriageMap; label: string } | null = null;
 const listeners = new Set<() => void>();
 let loaded = false;
 
-export const subscribeTriage = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+export const subscribeTriage = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 export const getTriage = () => map;
 export const lastUndo = () => undo;
 
@@ -17,7 +22,14 @@ const save = () => setSetting("chatTriage", map).catch(() => {});
 export function loadTriage() {
   if (loaded) return;
   loaded = true;
-  getSetting<unknown>("chatTriage", {}).then((v) => { map = { ...parseTriage(v), ...map }; emit(); }).catch(() => { loaded = false; });
+  getSetting<unknown>("chatTriage", {})
+    .then((v) => {
+      map = { ...parseTriage(v), ...map };
+      emit();
+    })
+    .catch(() => {
+      loaded = false;
+    });
 }
 
 /** Applies a change; `label` names it for the undo notice (empty: an automatic change, not undoable). */
@@ -41,4 +53,9 @@ export function undoTriage() {
   return true;
 }
 
-export const dismissUndo = () => { if (undo) { undo = null; emit(); } };
+export const dismissUndo = () => {
+  if (undo) {
+    undo = null;
+    emit();
+  }
+};

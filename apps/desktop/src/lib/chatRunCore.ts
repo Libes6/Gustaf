@@ -1,6 +1,14 @@
 import { runAgent, type ApprovalAnswer, type ApprovalRequest, type RunOptions, type RunOutcome } from "../agent/agent";
 import { finishCliAgents, isBackgroundShell, trackCliAgents } from "../agent/cliAgents";
-import { levelsOf, type Adapter, type LimitWindow, type Msg, type Part, type Reasoning, type TokenUsage } from "../providers/types";
+import {
+  levelsOf,
+  type Adapter,
+  type LimitWindow,
+  type Msg,
+  type Part,
+  type Reasoning,
+  type TokenUsage,
+} from "../providers/types";
 import { pickLevel } from "../providers/reasoning";
 
 // The part of "run the agent in a chat" that interactive sends (lib/useChatRun.ts) and scheduled runs
@@ -16,7 +24,12 @@ export function effortOf(tg: Pick<RunTarget, "adapter" | "model" | "reasoning">)
   return pickLevel(tg.reasoning, levelsOf(tg.adapter, tg.model));
 }
 
-export type ReviewCopy = { id: string; workspace: string; root?: string; /** Directories symlinked into the copy; never applied. */ linked?: string[] };
+export type ReviewCopy = {
+  id: string;
+  workspace: string;
+  root?: string;
+  /** Directories symlinked into the copy; never applied. */ linked?: string[];
+};
 export type RunTarget = {
   adapter: Adapter;
   providerId: string;
@@ -34,7 +47,10 @@ export type ChatRunDeps = {
   /** Snapshot of the project taken before a user message (for rewind and undo). */
   checkpoint?(root: string): Promise<string | undefined>;
   /** Shadow copy for a writable project; `review: null` runs in the project folder. `error` is shown as a notice. */
-  prepareReview?(root: string, approve: (command: string) => Promise<boolean>): Promise<{ review: ReviewCopy | null; error?: string }>;
+  prepareReview?(
+    root: string,
+    approve: (command: string) => Promise<boolean>,
+  ): Promise<{ review: ReviewCopy | null; error?: string }>;
   /** Removes the copy when nothing changed in it, otherwise it stays for the review panel. */
   finishReview?(id: string): Promise<void>;
   /** `level`: the effort level the turn ran with (absent when the model has none). */
@@ -97,9 +113,18 @@ export type ChatRunInput = {
 /** Stores a new user message, with the checkpoint of the project taken just before it. */
 export async function appendUserMessage(
   deps: Pick<ChatRunDeps, "addMessage" | "checkpoint">,
-  o: { chatId: number; root: string | null; parts: Part[]; prior?: Msg[]; /** An unattended run goes on without a checkpoint; a user's send reports the failure. */ ignoreCheckpointErrors?: boolean },
+  o: {
+    chatId: number;
+    root: string | null;
+    parts: Part[];
+    prior?: Msg[];
+    /** An unattended run goes on without a checkpoint; a user's send reports the failure. */ ignoreCheckpointErrors?: boolean;
+  },
 ): Promise<{ msg: Msg; stored: Msg & StoredFields; history: Msg[] }> {
-  const cp = o.root && deps.checkpoint ? await (o.ignoreCheckpointErrors ? deps.checkpoint(o.root).catch(() => undefined) : deps.checkpoint(o.root)) : undefined;
+  const cp =
+    o.root && deps.checkpoint
+      ? await (o.ignoreCheckpointErrors ? deps.checkpoint(o.root).catch(() => undefined) : deps.checkpoint(o.root))
+      : undefined;
   const msg: Msg = { role: "user", parts: o.parts, meta: { checkpoint: cp } };
   const id = await deps.addMessage(o.chatId, msg);
   const stored = { ...msg, id, chat_id: o.chatId, created_at: Date.now() };
@@ -107,7 +132,15 @@ export async function appendUserMessage(
 }
 
 /** Runs the agent once. Throws on failure (after storing the partial activities); use `reportRunFailure` in the catch. */
-export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRunUi = {}): Promise<{ review: ReviewCopy | null; target: RunTarget; /** Last verification gate of the run (docs/features/verification-gates.md). */ verification?: RunOutcome["verification"] }> {
+export async function runChatCore(
+  i: ChatRunInput,
+  deps: ChatRunDeps,
+  ui: ChatRunUi = {},
+): Promise<{
+  review: ReviewCopy | null;
+  target: RunTarget;
+  /** Last verification gate of the run (docs/features/verification-gates.md). */ verification?: RunOutcome["verification"];
+}> {
   let review = i.review;
   if (review === undefined) {
     review = null;
@@ -121,7 +154,10 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
   } else if (review) ui.onReview?.(review);
   const workspace = review?.workspace ?? i.root;
   // A copy starts from the files, not from the provider's stored conversation.
-  const history = review && !i.retry ? i.history.map((m) => ({ ...m, meta: m.meta ? { ...m.meta, responseId: undefined } : undefined })) : i.history;
+  const history =
+    review && !i.retry
+      ? i.history.map((m) => ({ ...m, meta: m.meta ? { ...m.meta, responseId: undefined } : undefined }))
+      : i.history;
   ui.onReady?.(history);
   let target: RunTarget | undefined;
   let activities: Activity[] = [];
@@ -158,7 +194,8 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
         // An update keeps the position of its card (a subagent's rows must not jump around while it works).
         const at = activities.findIndex((p) => p.id === a.id);
         activities = at < 0 ? [...activities, a] : activities.map((p, k) => (k === at ? a : p));
-        if (a.subagent || isBackgroundShell(a)) trackCliAgents({ chatId: i.chatId, root: i.root, stop: i.stop }, activities);
+        if (a.subagent || isBackgroundShell(a))
+          trackCliAgents({ chatId: i.chatId, root: i.root, stop: i.stop }, activities);
         ui.onActivity?.(activities);
       },
       onMessage: async (m) => {
@@ -174,11 +211,19 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
       requestSecret: i.requestSecret,
     });
     if (!i.signal.aborted) deps.recordResult(tg.providerId);
-    return { review: review ?? null, target: tg, ...(outcome && outcome.verification ? { verification: outcome.verification } : {}) };
+    return {
+      review: review ?? null,
+      target: tg,
+      ...(outcome && outcome.verification ? { verification: outcome.verification } : {}),
+    };
   } catch (e) {
     // The interrupted step's tool cards are kept (still-running ones as "unknown") so the chat shows what happened.
     if (target && activities.length) {
-      const partial: Msg = { role: "assistant", parts: activities.map((a) => (a.status === "running" ? { ...a, status: "unknown" } : a)), meta: { provider: target.providerId, model: target.model } };
+      const partial: Msg = {
+        role: "assistant",
+        parts: activities.map((a) => (a.status === "running" ? { ...a, status: "unknown" } : a)),
+        meta: { provider: target.providerId, model: target.model },
+      };
       ui.onAccepted?.(partial);
       const id = await deps.addMessage(i.chatId, partial).catch(() => null);
       if (id !== null) ui.onMessage?.(partial, id);
@@ -193,7 +238,11 @@ export async function runChatCore(i: ChatRunInput, deps: ChatRunDeps, ui: ChatRu
  * The failure of a run: `null` when the user stopped it (nothing to report), else the text for the user. `decorate`
  * may extend it (the Cursor quota note). The provider's health is recorded here.
  */
-export async function reportRunFailure(e: unknown, o: { providerId: string; signal: AbortSignal; decorate?: (message: string) => Promise<string> | string }, deps: Pick<ChatRunDeps, "recordResult">): Promise<string | null> {
+export async function reportRunFailure(
+  e: unknown,
+  o: { providerId: string; signal: AbortSignal; decorate?: (message: string) => Promise<string> | string },
+  deps: Pick<ChatRunDeps, "recordResult">,
+): Promise<string | null> {
   if (o.signal.aborted) return null;
   let message = String((e as Error)?.message ?? e);
   if (o.decorate) message += await o.decorate(message);
@@ -202,9 +251,15 @@ export async function reportRunFailure(e: unknown, o: { providerId: string; sign
 }
 
 /** Ends the shadow copy; returns the error text when that failed. */
-export async function finishReviewCopy(deps: Pick<ChatRunDeps, "finishReview">, review: ReviewCopy | null): Promise<string | undefined> {
+export async function finishReviewCopy(
+  deps: Pick<ChatRunDeps, "finishReview">,
+  review: ReviewCopy | null,
+): Promise<string | undefined> {
   if (!review || !deps.finishReview) return undefined;
-  return deps.finishReview(review.id).then(() => undefined, (e) => String(e));
+  return deps.finishReview(review.id).then(
+    () => undefined,
+    (e) => String(e),
+  );
 }
 
 export type ApproverOptions = {

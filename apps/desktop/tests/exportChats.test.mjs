@@ -1,8 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_MD_LABELS, EXPORT_FORMAT, EXPORT_VERSION, IMAGE_OMITTED, ImportError, MD_BLOCK_LIMIT, REDACTED,
-  buildBundle, exportFileName, formatDate, importBundle, parseBundle, partsInDisplayOrder, redactSecrets, redactValue, toJson, toMarkdown,
+  DEFAULT_MD_LABELS,
+  EXPORT_FORMAT,
+  EXPORT_VERSION,
+  IMAGE_OMITTED,
+  ImportError,
+  MD_BLOCK_LIMIT,
+  REDACTED,
+  buildBundle,
+  exportFileName,
+  formatDate,
+  importBundle,
+  parseBundle,
+  partsInDisplayOrder,
+  redactSecrets,
+  redactValue,
+  toJson,
+  toMarkdown,
 } from '../src/lib/exportChats.ts';
 
 const NOW = Date.UTC(2026, 9, 2, 12, 30, 15);
@@ -18,24 +33,66 @@ function sampleSource() {
     chat: chat(),
     project: { name: 'web-app', path: '/Users/me/web-app' },
     messages: [
-      msg('user', [text('Please fix the login bug')], { id: 1, chat_id: 1, created_at: T0, meta: { checkpoint: 'cp-1' } }),
-      msg('assistant', [
-        text('Looking at the code.'),
-        { type: 'tool_call', id: 'call_1', name: 'run_command', args: { command: 'npm test' } },
-        { type: 'tool_call', id: 'call_2', name: 'edit_file', args: { path: 'src/login.ts', old_string: 'a\nb', new_string: 'a\nc' } },
-      ], {
-        id: 2, chat_id: 1, created_at: T0 + 1000,
-        meta: { provider: 'openai', model: 'gpt-5', responseId: 'resp_123', durationMs: 1200, usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 1 } },
+      msg('user', [text('Please fix the login bug')], {
+        id: 1,
+        chat_id: 1,
+        created_at: T0,
+        meta: { checkpoint: 'cp-1' },
       }),
-      msg('tool', [
-        { type: 'tool_result', id: 'call_1', name: 'run_command', output: '1 failing', isError: true },
-        { type: 'tool_result', id: 'call_2', name: 'edit_file', output: 'ok' },
-      ], { id: 3, chat_id: 1, created_at: T0 + 2000 }),
-      msg('assistant', [
-        { type: 'activity', id: 'act_1', name: 'bash', args: { command: 'ls' }, status: 'success', output: 'a.txt' },
-        { type: 'tool_call', id: 'cu_1', name: 'computer', args: {}, computer: { actions: [{ type: 'click', x: 10, y: 20 }, { type: 'type', text: 'hello' }, { type: 'keypress', keys: ['cmd', 'l'] }] } },
-        text('Done.'),
-      ], { id: 4, chat_id: 1, created_at: T0 + 3000, meta: { compacted: true } }),
+      msg(
+        'assistant',
+        [
+          text('Looking at the code.'),
+          { type: 'tool_call', id: 'call_1', name: 'run_command', args: { command: 'npm test' } },
+          {
+            type: 'tool_call',
+            id: 'call_2',
+            name: 'edit_file',
+            args: { path: 'src/login.ts', old_string: 'a\nb', new_string: 'a\nc' },
+          },
+        ],
+        {
+          id: 2,
+          chat_id: 1,
+          created_at: T0 + 1000,
+          meta: {
+            provider: 'openai',
+            model: 'gpt-5',
+            responseId: 'resp_123',
+            durationMs: 1200,
+            usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 1 },
+          },
+        },
+      ),
+      msg(
+        'tool',
+        [
+          { type: 'tool_result', id: 'call_1', name: 'run_command', output: '1 failing', isError: true },
+          { type: 'tool_result', id: 'call_2', name: 'edit_file', output: 'ok' },
+        ],
+        { id: 3, chat_id: 1, created_at: T0 + 2000 },
+      ),
+      msg(
+        'assistant',
+        [
+          { type: 'activity', id: 'act_1', name: 'bash', args: { command: 'ls' }, status: 'success', output: 'a.txt' },
+          {
+            type: 'tool_call',
+            id: 'cu_1',
+            name: 'computer',
+            args: {},
+            computer: {
+              actions: [
+                { type: 'click', x: 10, y: 20 },
+                { type: 'type', text: 'hello' },
+                { type: 'keypress', keys: ['cmd', 'l'] },
+              ],
+            },
+          },
+          text('Done.'),
+        ],
+        { id: 4, chat_id: 1, created_at: T0 + 3000, meta: { compacted: true } },
+      ),
     ],
   };
 }
@@ -46,7 +103,10 @@ function memoryStore(existing = []) {
     db,
     existing: async () => db.chats.map(({ title, created_at }) => ({ title, created_at })),
     project: async (name, path) => (db.projects.push({ name, path }), db.projects.length),
-    createChat: async (projectId, title) => (db.chats.push({ id: db.chats.length + 1, projectId, title, created_at: Date.now() }), db.chats.length),
+    createChat: async (projectId, title) => (
+      db.chats.push({ id: db.chats.length + 1, projectId, title, created_at: Date.now() }),
+      db.chats.length
+    ),
     addMessage: async (chatId, m) => {
       if (db.failOn === db.messages.length) throw new Error('disk full');
       db.messages.push({ chatId, ...JSON.parse(JSON.stringify(m)) });
@@ -56,7 +116,9 @@ function memoryStore(existing = []) {
       db.stamps.push({ chatId, ...c, messages });
       db.chats[chatId - 1].created_at = c.createdAt ?? db.chats[chatId - 1].created_at;
     },
-    discard: async (chatId) => { db.discarded.push(chatId); },
+    discard: async (chatId) => {
+      db.discarded.push(chatId);
+    },
   };
 }
 
@@ -71,13 +133,28 @@ test('JSON export is versioned and drops machine-local metadata', () => {
   assert.equal(c.createdAt, T0);
   assert.equal(c.messages[0].meta, undefined, 'checkpoint ids are not exported');
   assert.equal(c.messages[1].meta.responseId, undefined, 'provider response ids are not exported');
-  assert.deepEqual(c.messages[1].meta, { provider: 'openai', model: 'gpt-5', durationMs: 1200, usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 1 } });
+  assert.deepEqual(c.messages[1].meta, {
+    provider: 'openai',
+    model: 'gpt-5',
+    durationMs: 1200,
+    usage: { input: 10, output: 5, cached: 0, cacheWrite: 0, reasoning: 1 },
+  });
   assert.equal(c.messages[0].createdAt, T0);
   assert.ok(!toJson(bundle).includes('chat_id'));
 });
 
 test('JSON round trip through parse and import restores messages, timestamps and projects', async () => {
-  const bundle = buildBundle([sampleSource(), { chat: chat({ title: 'Old', archived: 1, created_at: T0 - 5000 }), project: null, messages: [msg('user', [text('hi')], { created_at: T0 - 5000 })] }], { now: NOW });
+  const bundle = buildBundle(
+    [
+      sampleSource(),
+      {
+        chat: chat({ title: 'Old', archived: 1, created_at: T0 - 5000 }),
+        project: null,
+        messages: [msg('user', [text('hi')], { created_at: T0 - 5000 })],
+      },
+    ],
+    { now: NOW },
+  );
   const parsed = parseBundle(toJson(bundle));
   assert.deepEqual(parsed, bundle);
 
@@ -90,10 +167,16 @@ test('JSON round trip through parse and import restores messages, timestamps and
   assert.equal(store.db.chats[0].projectId, 1);
   assert.equal(store.db.chats[1].projectId, null);
   // Every stored message is exactly what was exported.
-  assert.deepEqual(store.db.messages.slice(0, 4).map(({ chatId, ...m }) => m), bundle.chats[0].messages.map(({ createdAt, ...m }) => m));
+  assert.deepEqual(
+    store.db.messages.slice(0, 4).map(({ chatId, ...m }) => m),
+    bundle.chats[0].messages.map(({ createdAt, ...m }) => m),
+  );
   assert.equal(store.db.stamps[0].createdAt, T0);
   assert.equal(store.db.stamps[1].archived, true);
-  assert.deepEqual(store.db.stamps[0].messages.map((m) => m.createdAt), [T0, T0 + 1000, T0 + 2000, T0 + 3000]);
+  assert.deepEqual(
+    store.db.stamps[0].messages.map((m) => m.createdAt),
+    [T0, T0 + 1000, T0 + 2000, T0 + 3000],
+  );
 });
 
 test('importing the same export twice skips chats that already exist', async () => {
@@ -188,13 +271,33 @@ Done.
 });
 
 test('Markdown for several chats has one section per chat and localizable labels', () => {
-  const ru = { ...DEFAULT_MD_LABELS, user: 'Пользователь', assistant: 'Ассистент', exported: 'Экспорт из Gustaf, {date}', chats: 'Чатов', messages: 'Сообщений' };
-  const bundle = buildBundle([
-    { chat: chat({ title: 'Первый чат' }), project: null, messages: [msg('user', [text('Привет')]), msg('assistant', [text('Здравствуйте')])] },
-    { chat: chat({ title: 'Second', created_at: 0, updated_at: 0 }), project: null, messages: [msg('user', [text('Hello')])] },
-  ], { now: NOW });
+  const ru = {
+    ...DEFAULT_MD_LABELS,
+    user: 'Пользователь',
+    assistant: 'Ассистент',
+    exported: 'Экспорт из Gustaf, {date}',
+    chats: 'Чатов',
+    messages: 'Сообщений',
+  };
+  const bundle = buildBundle(
+    [
+      {
+        chat: chat({ title: 'Первый чат' }),
+        project: null,
+        messages: [msg('user', [text('Привет')]), msg('assistant', [text('Здравствуйте')])],
+      },
+      {
+        chat: chat({ title: 'Second', created_at: 0, updated_at: 0 }),
+        project: null,
+        messages: [msg('user', [text('Hello')])],
+      },
+    ],
+    { now: NOW },
+  );
   const md = toMarkdown(bundle, ru);
-  assert.equal(md, `# Gustaf
+  assert.equal(
+    md,
+    `# Gustaf
 
 *Экспорт из Gustaf, 2026-10-02 12:30 UTC*
 
@@ -225,23 +328,39 @@ test('Markdown for several chats has one section per chat and localizable labels
 ### Пользователь
 
 Hello
-`);
+`,
+  );
 });
 
 test('tool cards: write_file, generic JSON, native error, empty output and computer calls read well', () => {
-  const md = toMarkdown(buildBundle([{
-    chat: chat(), project: null,
-    messages: [
-      msg('assistant', [
-        { type: 'tool_call', id: '1', name: 'write_file', args: { path: 'a.txt', content: 'hello' } },
-        { type: 'tool_call', id: '2', name: 'search', args: { pattern: 'foo', glob: '*.ts' } },
-        { type: 'tool_call', id: '3', name: 'run_command', args: { command: 'sleep 1', timeout_ms: 500 } },
-        { type: 'activity', id: '4', name: 'shell', args: { command: 'false' }, status: 'error', output: 'exit 1' },
-        { type: 'activity', id: '5', name: 'shell', args: {}, status: 'running' },
-      ]),
-      msg('tool', [{ type: 'tool_result', id: '2', name: 'search', output: '' }]),
-    ],
-  }], { now: NOW }));
+  const md = toMarkdown(
+    buildBundle(
+      [
+        {
+          chat: chat(),
+          project: null,
+          messages: [
+            msg('assistant', [
+              { type: 'tool_call', id: '1', name: 'write_file', args: { path: 'a.txt', content: 'hello' } },
+              { type: 'tool_call', id: '2', name: 'search', args: { pattern: 'foo', glob: '*.ts' } },
+              { type: 'tool_call', id: '3', name: 'run_command', args: { command: 'sleep 1', timeout_ms: 500 } },
+              {
+                type: 'activity',
+                id: '4',
+                name: 'shell',
+                args: { command: 'false' },
+                status: 'error',
+                output: 'exit 1',
+              },
+              { type: 'activity', id: '5', name: 'shell', args: {}, status: 'running' },
+            ]),
+            msg('tool', [{ type: 'tool_result', id: '2', name: 'search', output: '' }]),
+          ],
+        },
+      ],
+      { now: NOW },
+    ),
+  );
   assert.match(md, /`a\.txt`\n\n```\nhello\n```/);
   assert.match(md, /\*\*Tool call: `search`\*\*\n\n```json\n\{\n {2}"pattern": "foo",\n {2}"glob": "\*\.ts"\n\}\n```/);
   assert.match(md, /```sh\nsleep 1\n```\n\n```json\n\{\n {2}"timeout_ms": 500\n\}\n```/);
@@ -252,15 +371,23 @@ test('tool cards: write_file, generic JSON, native error, empty output and compu
 
 test('long outputs are clipped in Markdown but kept in JSON; fences cannot be broken by content', () => {
   const output = 'x'.repeat(MD_BLOCK_LIMIT + 50);
-  const bundle = buildBundle([{
-    chat: chat(), project: null,
-    messages: [
-      msg('tool', [{ type: 'tool_result', id: '1', name: 'run_command', output }]),
-      msg('tool', [{ type: 'tool_result', id: '2', name: 'run_command', output: 'before\n```js\ncode\n```\nafter' }]),
-      msg('assistant', [text('unclosed:\n```js\nconst a = 1;')]),
-      msg('assistant', [text('next message')]),
+  const bundle = buildBundle(
+    [
+      {
+        chat: chat(),
+        project: null,
+        messages: [
+          msg('tool', [{ type: 'tool_result', id: '1', name: 'run_command', output }]),
+          msg('tool', [
+            { type: 'tool_result', id: '2', name: 'run_command', output: 'before\n```js\ncode\n```\nafter' },
+          ]),
+          msg('assistant', [text('unclosed:\n```js\nconst a = 1;')]),
+          msg('assistant', [text('next message')]),
+        ],
+      },
     ],
-  }], { now: NOW });
+    { now: NOW },
+  );
   const md = toMarkdown(bundle);
   assert.ok(md.includes('x'.repeat(MD_BLOCK_LIMIT) + '\n… 50 more characters not shown'));
   assert.ok(!md.includes('x'.repeat(MD_BLOCK_LIMIT + 1)));
@@ -271,10 +398,16 @@ test('long outputs are clipped in Markdown but kept in JSON; fences cannot be br
 
 test('unicode survives JSON and Markdown unchanged and clipping never splits a surrogate pair', async () => {
   const sample = 'Привет, мир! 你好 \u{1F600}\u{1F468}‍\u{1F469}‍\u{1F467} é שלום ‮abc‬ "quotes" \\ \t\u0000 end';
-  const bundle = buildBundle([{
-    chat: chat({ title: 'Заметки \u{1F4DD} 日本語' }), project: { name: 'проект', path: null },
-    messages: [msg('user', [text(sample)]), msg('assistant', [text(sample)], { meta: { model: 'модель-1' } })],
-  }], { now: NOW });
+  const bundle = buildBundle(
+    [
+      {
+        chat: chat({ title: 'Заметки \u{1F4DD} 日本語' }),
+        project: { name: 'проект', path: null },
+        messages: [msg('user', [text(sample)]), msg('assistant', [text(sample)], { meta: { model: 'модель-1' } })],
+      },
+    ],
+    { now: NOW },
+  );
   const parsed = parseBundle(toJson(bundle));
   assert.deepEqual(parsed, bundle);
   assert.equal(parsed.chats[0].messages[0].parts[0].text, sample);
@@ -285,8 +418,22 @@ test('unicode survives JSON and Markdown unchanged and clipping never splits a s
   assert.ok(md.includes('## Assistant (модель-1)'));
 
   const tail = '\u{1F600}'.repeat(MD_BLOCK_LIMIT);
-  const clipped = toMarkdown(buildBundle([{ chat: chat(), project: null, messages: [msg('tool', [{ type: 'tool_result', id: '1', name: 't', output: tail }])] }], { now: NOW }));
-  assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(clipped), 'no lone surrogates');
+  const clipped = toMarkdown(
+    buildBundle(
+      [
+        {
+          chat: chat(),
+          project: null,
+          messages: [msg('tool', [{ type: 'tool_result', id: '1', name: 't', output: tail }])],
+        },
+      ],
+      { now: NOW },
+    ),
+  );
+  assert.ok(
+    !/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(clipped),
+    'no lone surrogates',
+  );
 
   const store = memoryStore();
   await importBundle(parsed, store);
@@ -314,13 +461,34 @@ test('API keys and secrets are never exported', () => {
     'hunter2-secret-pass',
   ];
   const source = {
-    chat: chat({ title: `title ${keys[0]}` }), project: null,
+    chat: chat({ title: `title ${keys[0]}` }),
+    project: null,
     messages: [
       msg('user', [text(`my key is ${keys[1]} and OPENAI_API_KEY=${keys[2]}`)]),
-      msg('assistant', [
-        { type: 'tool_call', id: '1', name: 'run_command', args: { command: `curl -H "Authorization: Bearer ${keys[3]}" https://x`, env: { API_KEY: keys[4], password: keys[7] }, headers: { Authorization: 'Basic dXNlcjpwYXNz' } } },
-      ], { meta: { provider: 'openai', model: 'gpt-5' } }),
-      msg('tool', [{ type: 'tool_result', id: '1', name: 'run_command', output: `.env:\nANTHROPIC_API_KEY=${keys[0]}\nAWS=${keys[5]}\njwt=${keys[6]}\nDATABASE_URL=postgres://admin:${keys[7]}@db:5432/app` }]),
+      msg(
+        'assistant',
+        [
+          {
+            type: 'tool_call',
+            id: '1',
+            name: 'run_command',
+            args: {
+              command: `curl -H "Authorization: Bearer ${keys[3]}" https://x`,
+              env: { API_KEY: keys[4], password: keys[7] },
+              headers: { Authorization: 'Basic dXNlcjpwYXNz' },
+            },
+          },
+        ],
+        { meta: { provider: 'openai', model: 'gpt-5' } },
+      ),
+      msg('tool', [
+        {
+          type: 'tool_result',
+          id: '1',
+          name: 'run_command',
+          output: `.env:\nANTHROPIC_API_KEY=${keys[0]}\nAWS=${keys[5]}\njwt=${keys[6]}\nDATABASE_URL=postgres://admin:${keys[7]}@db:5432/app`,
+        },
+      ]),
     ],
   };
   const bundle = buildBundle([source], { now: NOW });
@@ -345,11 +513,15 @@ test('redaction keeps ordinary code and numbers intact', () => {
     'password=${PASSWORD} api_key=$KEY secret: <your-secret>',
     'Use a bearer token in the header',
     'sk-short',
-  ]) assert.equal(redactSecrets(ok), ok);
+  ])
+    assert.equal(redactSecrets(ok), ok);
   assert.equal(redactSecrets('password = hunter22'), `password = ${REDACTED}`);
   assert.equal(redactSecrets(`"apiKey": "abcdef123456"`), `"apiKey": "${REDACTED}"`);
   assert.equal(redactSecrets(`Authorization: ${REDACTED}`), `Authorization: ${REDACTED}`);
-  assert.deepEqual(redactValue({ a: [{ accessToken: 'abc', max_tokens: 5, n: 1, note: 'ok' }], __proto__x: 1 }), { a: [{ accessToken: REDACTED, max_tokens: 5, n: 1, note: 'ok' }], __proto__x: 1 });
+  assert.deepEqual(redactValue({ a: [{ accessToken: 'abc', max_tokens: 5, n: 1, note: 'ok' }], __proto__x: 1 }), {
+    a: [{ accessToken: REDACTED, max_tokens: 5, n: 1, note: 'ok' }],
+    __proto__x: 1,
+  });
   const nested = JSON.parse('{"__proto__": {"polluted": true}, "x": 1}');
   assert.equal(redactValue(nested).polluted, undefined);
   assert.equal({}.polluted, undefined);
@@ -357,7 +529,8 @@ test('redaction keeps ordinary code and numbers intact', () => {
 
 test('images are omitted unless requested and computer screenshots stay out of the default export', async () => {
   const source = {
-    chat: chat(), project: null,
+    chat: chat(),
+    project: null,
     messages: [
       msg('user', [text('look'), { type: 'image', data: 'AAAA' }]),
       msg('tool', [{ type: 'tool_result', id: '1', name: 'computer', output: 'shot', image: 'BBBB', computer: true }]),
@@ -379,48 +552,119 @@ test('images are omitted unless requested and computer screenshots stay out of t
 });
 
 test('import rejects foreign or newer files and sanitizes unknown fields', () => {
-  const code = (input) => { try { parseBundle(input); } catch (e) { assert.ok(e instanceof ImportError); return e.code; } return 'ok'; };
+  const code = (input) => {
+    try {
+      parseBundle(input);
+    } catch (e) {
+      assert.ok(e instanceof ImportError);
+      return e.code;
+    }
+    return 'ok';
+  };
   assert.equal(code('not json'), 'invalid_json');
   assert.equal(code('[]'), 'not_export');
   assert.equal(code(JSON.stringify({ chats: [] })), 'not_export');
   assert.equal(code(JSON.stringify({ format: 'chatgpt', version: 1, chats: [] })), 'not_export');
   assert.equal(code(JSON.stringify({ format: EXPORT_FORMAT, version: 'one', chats: [] })), 'not_export');
-  assert.equal(code(JSON.stringify({ format: EXPORT_FORMAT, version: EXPORT_VERSION + 1, chats: [] })), 'unsupported_version');
+  assert.equal(
+    code(JSON.stringify({ format: EXPORT_FORMAT, version: EXPORT_VERSION + 1, chats: [] })),
+    'unsupported_version',
+  );
   assert.equal(code(JSON.stringify({ format: EXPORT_FORMAT, version: 1, chats: [] })), 'empty');
-  assert.equal(code(JSON.stringify({ format: EXPORT_FORMAT, version: 1, chats: [{ title: 'x', messages: [{ role: 'system', parts: [text('a')] }, { role: 'user', parts: [] }] }] })), 'empty');
+  assert.equal(
+    code(
+      JSON.stringify({
+        format: EXPORT_FORMAT,
+        version: 1,
+        chats: [
+          {
+            title: 'x',
+            messages: [
+              { role: 'system', parts: [text('a')] },
+              { role: 'user', parts: [] },
+            ],
+          },
+        ],
+      }),
+    ),
+    'empty',
+  );
 
-  const parsed = parseBundle('﻿' + JSON.stringify({
-    format: EXPORT_FORMAT, version: 1, extra: 'ignored',
-    chats: [{
-      title: '  ', createdAt: -5, updatedAt: 'x', archived: 'yes', project: { name: ' ', path: 5 }, secret: 'drop me',
+  const parsed = parseBundle(
+    '﻿' +
+      JSON.stringify({
+        format: EXPORT_FORMAT,
+        version: 1,
+        extra: 'ignored',
+        chats: [
+          {
+            title: '  ',
+            createdAt: -5,
+            updatedAt: 'x',
+            archived: 'yes',
+            project: { name: ' ', path: 5 },
+            secret: 'drop me',
+            messages: [
+              {
+                role: 'assistant',
+                createdAt: T0,
+                evil: 1,
+                parts: [
+                  text('ok'),
+                  { type: 'unknown' },
+                  { type: 'text', text: 5 },
+                  { type: 'tool_call', id: 'c', name: 'n', args: { a: 1 }, extra: 1 },
+                ],
+                meta: { responseId: 'r', checkpoint: 'c', model: 'm', usage: { input: 1 } },
+              },
+              { role: 'user', parts: [{ type: 'tool_result', id: 't' }] },
+            ],
+          },
+        ],
+      }),
+  );
+  assert.deepEqual(parsed.chats, [
+    {
+      title: 'Untitled',
+      archived: false,
+      project: null,
       messages: [
-        { role: 'assistant', createdAt: T0, evil: 1, parts: [text('ok'), { type: 'unknown' }, { type: 'text', text: 5 }, { type: 'tool_call', id: 'c', name: 'n', args: { a: 1 }, extra: 1 }], meta: { responseId: 'r', checkpoint: 'c', model: 'm', usage: { input: 1 } } },
-        { role: 'user', parts: [{ type: 'tool_result', id: 't' }] },
+        {
+          role: 'assistant',
+          createdAt: T0,
+          parts: [text('ok'), { type: 'tool_call', id: 'c', name: 'n', args: { a: 1 } }],
+          meta: { model: 'm' },
+        },
+        { role: 'user', parts: [{ type: 'tool_result', id: 't', name: '', output: '' }] },
       ],
-    }],
-  }));
-  assert.deepEqual(parsed.chats, [{
-    title: 'Untitled', archived: false, project: null,
-    messages: [
-      { role: 'assistant', createdAt: T0, parts: [text('ok'), { type: 'tool_call', id: 'c', name: 'n', args: { a: 1 } }], meta: { model: 'm' } },
-      { role: 'user', parts: [{ type: 'tool_result', id: 't', name: '', output: '' }] },
-    ],
-  }]);
+    },
+  ]);
 });
 
 const src = (messages) => ({ chat: chat(), project: null, messages });
 test('a sent message lists its pictures before the text in Markdown; the JSON keeps the stored order', () => {
-  const bundle = buildBundle([src([
-    msg('user', [text('look at these'), { type: 'image', data: 'AAAA' }, { type: 'image', data: 'CCCC' }]),
-    msg('assistant', [text('answer'), { type: 'image', data: 'DDDD' }]),
-  ])], { now: NOW, includeImages: true });
+  const bundle = buildBundle(
+    [
+      src([
+        msg('user', [text('look at these'), { type: 'image', data: 'AAAA' }, { type: 'image', data: 'CCCC' }]),
+        msg('assistant', [text('answer'), { type: 'image', data: 'DDDD' }]),
+      ]),
+    ],
+    { now: NOW, includeImages: true },
+  );
   const md = toMarkdown(bundle);
   const at = (s) => md.indexOf(s);
   assert.ok(at('data:image/png;base64,AAAA') < at('data:image/png;base64,CCCC'), 'pictures keep their relative order');
   assert.ok(at('data:image/png;base64,CCCC') < at('look at these'), 'user: pictures first');
   assert.ok(at('answer') < at('data:image/png;base64,DDDD'), 'assistant: unchanged');
-  assert.deepEqual(bundle.chats[0].messages[0].parts.map((p) => p.type), ['text', 'image', 'image']);
+  assert.deepEqual(
+    bundle.chats[0].messages[0].parts.map((p) => p.type),
+    ['text', 'image', 'image'],
+  );
   const omitted = toMarkdown(buildBundle([src([msg('user', [text('look'), { type: 'image', data: 'AAAA' }])])]));
   assert.ok(omitted.indexOf('[image omitted]') < omitted.indexOf('look'), 'omitted placeholder leads');
-  assert.deepEqual(partsInDisplayOrder('tool', [text('a'), { type: 'image', data: 'x' }]).map((p) => p.type), ['text', 'image']);
+  assert.deepEqual(
+    partsInDisplayOrder('tool', [text('a'), { type: 'image', data: 'x' }]).map((p) => p.type),
+    ['text', 'image'],
+  );
 });

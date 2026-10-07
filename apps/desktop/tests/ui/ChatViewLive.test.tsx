@@ -16,15 +16,27 @@ vi.mock("../../src/components/AgentsPanel", () => ({ AgentsColumn: () => null, A
 const model = vi.hoisted(() => ({ turn: undefined as undefined | ((input: any) => Promise<any>) }));
 vi.mock("../../src/providers", async (orig) => ({
   ...(await orig<typeof import("../../src/providers")>()),
-  getAdapter: async () => ({ supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: (input: any) => model.turn!(input) }),
+  getAdapter: async () => ({
+    supportsComputer: false,
+    supportsReasoning: () => false,
+    listModels: async () => [],
+    turn: (input: any) => model.turn!(input),
+  }),
 }));
 
 // A scheduled run writing to a chat (lib/liveRuns.ts): the open chat shows it like an interactive run.
 
-const row = (id: number, role: "user" | "assistant", text: string) => ({ id, chat_id: 5, created_at: id, content: JSON.stringify({ role, parts: [{ type: "text", text }] }) });
+const row = (id: number, role: "user" | "assistant", text: string) => ({
+  id,
+  chat_id: 5,
+  created_at: id,
+  content: JSON.stringify({ role, parts: [{ type: "text", text }] }),
+});
 let rows = [row(1, "user", "Check the build")];
 
-beforeEach(async () => { await updateQueue(5, () => ({ items: [], paused: true })); });
+beforeEach(async () => {
+  await updateQueue(5, () => ({ items: [], paused: true }));
+});
 
 const setup = () => {
   rows = [row(1, "user", "Check the build")];
@@ -32,7 +44,12 @@ const setup = () => {
   const session = { key: "k", chatId: 5, projectId: null };
   return renderApp(
     <ChatView session={session} visible />,
-    makeApp({ chats: [chat({ id: 5, project_id: null, title: "⏰ Nightly" })], providers: [provider()], selection: { providerId: "p1", model: "m1" }, sessions: { active: "k", items: [session] } }),
+    makeApp({
+      chats: [chat({ id: 5, project_id: null, title: "⏰ Nightly" })],
+      providers: [provider()],
+      selection: { providerId: "p1", model: "m1" },
+      sessions: { active: "k", items: [session] },
+    }),
   );
 };
 
@@ -44,7 +61,9 @@ describe("ChatView with a live scheduled run", () => {
 
     const abort = vi.fn();
     let handle!: ReturnType<typeof beginLiveRun>;
-    act(() => { handle = beginLiveRun(5, "Nightly", abort); });
+    act(() => {
+      handle = beginLiveRun(5, "Nightly", abort);
+    });
     expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
     expect(screen.getAllByText(/Scheduled run "Nightly" is writing to this chat/).length).toBeGreaterThan(0);
     expect(app.setSessionBusy).toHaveBeenCalledWith("k", true);
@@ -90,8 +109,17 @@ describe("ChatView with a live scheduled run", () => {
 
 describe("Queued chat context integration", () => {
   it("edits the queued message body without changing its frozen chat attachment", async () => {
-    const reference = { sourceId: 9, title: "Reference chat", snapshot: "user: Original snapshot", fullSize: 23, shortened: false };
-    await updateQueue(5, () => ({ paused: true, items: [{ id: "with-context", text: joinChatReferences("Question", [reference]), images: [], clarify: false }] }));
+    const reference = {
+      sourceId: 9,
+      title: "Reference chat",
+      snapshot: "user: Original snapshot",
+      fullSize: 23,
+      shortened: false,
+    };
+    await updateQueue(5, () => ({
+      paused: true,
+      items: [{ id: "with-context", text: joinChatReferences("Question", [reference]), images: [], clarify: false }],
+    }));
     setup();
     await userEvent.click(await screen.findByRole("button", { name: "Edit queued message" }));
     const editor = await screen.findByRole("textbox", { name: "Edit queued message" });
@@ -107,7 +135,10 @@ describe("Queued chat context integration", () => {
 
 describe("ChatView interactive send (shared run core)", () => {
   const usage = { input: 3, output: 2, cached: 0, cacheWrite: 0, reasoning: 0 };
-  const inserted = () => callsOf("db_execute").filter((a) => /insert into messages/i.test(a.sql)).map((a) => JSON.parse(a.params[2]).role);
+  const inserted = () =>
+    callsOf("db_execute")
+      .filter((a) => /insert into messages/i.test(a.sql))
+      .map((a) => JSON.parse(a.params[2]).role);
 
   it("stores the user message and the reply, streams, counts tokens, records the result and toggles busy", async () => {
     model.turn = async (input) => (input.onText("Hi there"), { parts: [{ type: "text", text: "Hi there" }], usage });
@@ -125,7 +156,9 @@ describe("ChatView interactive send (shared run core)", () => {
   });
 
   it("shows a model failure in the chat and records it for the provider", async () => {
-    model.turn = async () => { throw new Error("rate limited"); };
+    model.turn = async () => {
+      throw new Error("rate limited");
+    };
     const { app } = setup();
     await screen.findByText("Check the build");
     await userEvent.type(screen.getByRole("textbox"), "hello{Enter}");
@@ -135,51 +168,59 @@ describe("ChatView interactive send (shared run core)", () => {
   });
 });
 
-describe('pending interactive messages', () => {
- it('automatically sends the next queued request after the active model finishes', async () => {
-   let finish!: () => void;
-   let calls = 0;
-   const seen: string[] = [];
-   model.turn = async input => {
-     calls++;
-     seen.push(input.messages.filter((m: any) => m.role === 'user').at(-1).parts[0].text);
-     if (calls === 1) await new Promise<void>(resolve => { finish = resolve; });
-     return { parts: [{ type: 'text', text: calls === 1 ? 'First completed' : 'Second completed' }] };
-   };
-   setup(); await screen.findByText('Check the build');
-   await userEvent.type(screen.getByRole('textbox'), 'first{Enter}');
-   await waitFor(() => expect(calls).toBe(1));
-   await userEvent.type(screen.getByRole('textbox'), 'second');
-   await userEvent.keyboard('{Enter}');
-   expect(await screen.findByText('second')).toBeInTheDocument();
-   expect(calls).toBe(1);
-   act(() => finish());
-   await screen.findByText('Second completed');
-   expect(seen).toEqual(['first', 'second']);
-   expect(screen.queryByRole('textbox', { name: 'Edit queued message' })).not.toBeInTheDocument();
- });
+describe("pending interactive messages", () => {
+  it("automatically sends the next queued request after the active model finishes", async () => {
+    let finish!: () => void;
+    let calls = 0;
+    const seen: string[] = [];
+    model.turn = async (input) => {
+      calls++;
+      seen.push(input.messages.filter((m: any) => m.role === "user").at(-1).parts[0].text);
+      if (calls === 1)
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+      return { parts: [{ type: "text", text: calls === 1 ? "First completed" : "Second completed" }] };
+    };
+    setup();
+    await screen.findByText("Check the build");
+    await userEvent.type(screen.getByRole("textbox"), "first{Enter}");
+    await waitFor(() => expect(calls).toBe(1));
+    await userEvent.type(screen.getByRole("textbox"), "second");
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByText("second")).toBeInTheDocument();
+    expect(calls).toBe(1);
+    act(() => finish());
+    await screen.findByText("Second completed");
+    expect(seen).toEqual(["first", "second"]);
+    expect(screen.queryByRole("textbox", { name: "Edit queued message" })).not.toBeInTheDocument();
+  });
 });
 
-it('queues Enter during an active API run and keeps Stop available', async () => {
- let finish!: () => void;
- let turns = 0;
- let received = '';
- model.turn = async input => {
-   turns++;
-   if (turns === 1) await new Promise<void>(resolve => { finish = resolve; });
-   else received = input.messages.at(-1).parts[0].text;
-   return { parts: [{ type: 'text', text: turns === 1 ? 'Original response' : 'Clarified response' }] };
- };
- setup(); await screen.findByText('Check the build');
- await userEvent.type(screen.getByRole('textbox'), 'do this{Enter}');
- await waitFor(() => expect(turns).toBe(1));
- await userEvent.type(screen.getByRole('textbox'), 'use this detail');
- expect(screen.queryByRole('button', { name: 'Clarify current task' })).not.toBeInTheDocument();
- expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
- await userEvent.keyboard('{Enter}');
- expect(await screen.findByText('use this detail')).toBeInTheDocument();
- act(() => finish());
- await screen.findByText('Clarified response');
- expect(received).toBe('use this detail');
- expect(screen.queryByRole('textbox', { name: 'Edit queued message' })).not.toBeInTheDocument();
+it("queues Enter during an active API run and keeps Stop available", async () => {
+  let finish!: () => void;
+  let turns = 0;
+  let received = "";
+  model.turn = async (input) => {
+    turns++;
+    if (turns === 1)
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    else received = input.messages.at(-1).parts[0].text;
+    return { parts: [{ type: "text", text: turns === 1 ? "Original response" : "Clarified response" }] };
+  };
+  setup();
+  await screen.findByText("Check the build");
+  await userEvent.type(screen.getByRole("textbox"), "do this{Enter}");
+  await waitFor(() => expect(turns).toBe(1));
+  await userEvent.type(screen.getByRole("textbox"), "use this detail");
+  expect(screen.queryByRole("button", { name: "Clarify current task" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  await userEvent.keyboard("{Enter}");
+  expect(await screen.findByText("use this detail")).toBeInTheDocument();
+  act(() => finish());
+  await screen.findByText("Clarified response");
+  expect(received).toBe("use this detail");
+  expect(screen.queryByRole("textbox", { name: "Edit queued message" })).not.toBeInTheDocument();
 });

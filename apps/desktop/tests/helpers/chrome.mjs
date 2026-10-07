@@ -27,15 +27,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function launchChrome(bin = findChrome()) {
   if (!bin || typeof WebSocket === 'undefined') return null;
   const profile = mkdtempSync(join(tmpdir(), 'gustaf-chrome-'));
-  const child = spawn(bin, [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run',
-    '--no-default-browser-check', '--disable-extensions', '--disable-gpu', '--disable-background-networking',
-    // CI containers/runners (root, or AppArmor-restricted user namespaces) cannot start Chrome's sandbox; the page is our own static build.
-    ...(process.env.CI || process.getuid?.() === 0 ? ['--no-sandbox'] : []),
-    'about:blank',
-  ], { stdio: 'ignore' });
+  const child = spawn(
+    bin,
+    [
+      '--headless=new',
+      '--remote-debugging-port=0',
+      `--user-data-dir=${profile}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-extensions',
+      '--disable-gpu',
+      '--disable-background-networking',
+      // CI containers/runners (root, or AppArmor-restricted user namespaces) cannot start Chrome's sandbox; the page is our own static build.
+      ...(process.env.CI || process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+      'about:blank',
+    ],
+    { stdio: 'ignore' },
+  );
   let exited = false;
-  child.on('exit', () => { exited = true; });
+  child.on('exit', () => {
+    exited = true;
+  });
   const portFile = join(profile, 'DevToolsActivePort');
   let endpoint = null;
   for (let i = 0; i < 100 && !endpoint && !exited; i++) {
@@ -43,13 +55,32 @@ export async function launchChrome(bin = findChrome()) {
     try {
       const [port, path] = readFileSync(portFile, 'utf8').trim().split('\n');
       if (port && path) endpoint = `ws://127.0.0.1:${port}${path}`;
-    } catch { /* not written yet */ }
+    } catch {
+      /* not written yet */
+    }
   }
-  const cleanup = () => { try { child.kill('SIGKILL'); } catch { /* gone */ } try { rmSync(profile, { recursive: true, force: true }); } catch { /* best effort */ } };
-  if (!endpoint) { cleanup(); return null; }
+  const cleanup = () => {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      /* gone */
+    }
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch {
+      /* best effort */
+    }
+  };
+  if (!endpoint) {
+    cleanup();
+    return null;
+  }
 
   const ws = new WebSocket(endpoint);
-  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('devtools connection failed')); });
+  await new Promise((res, rej) => {
+    ws.onopen = res;
+    ws.onerror = () => rej(new Error('devtools connection failed'));
+  });
   let seq = 0;
   const pending = new Map();
   const listeners = new Set();
@@ -61,11 +92,12 @@ export async function launchChrome(bin = findChrome()) {
       m.error ? rej(new Error(`${m.error.message}`)) : res(m.result);
     } else for (const l of listeners) l(m);
   };
-  const send = (method, params = {}, sessionId) => new Promise((res, rej) => {
-    const id = ++seq;
-    pending.set(id, { res, rej });
-    ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-  });
+  const send = (method, params = {}, sessionId) =>
+    new Promise((res, rej) => {
+      const id = ++seq;
+      pending.set(id, { res, rej });
+      ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+    });
 
   return {
     async open(url, { init } = {}) {
@@ -75,9 +107,18 @@ export async function launchChrome(bin = findChrome()) {
       const messages = [];
       listeners.add((m) => {
         if (m.sessionId !== sessionId) return;
-        if (m.method === 'Runtime.consoleAPICalled') messages.push(`console.${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
-        if (m.method === 'Runtime.exceptionThrown') messages.push(`exception: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
-        if (m.method === 'Log.entryAdded') messages.push(`log.${m.params.entry.level}(${m.params.entry.source}): ${m.params.entry.text} ${m.params.entry.url ?? ''}`);
+        if (m.method === 'Runtime.consoleAPICalled')
+          messages.push(
+            `console.${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`,
+          );
+        if (m.method === 'Runtime.exceptionThrown')
+          messages.push(
+            `exception: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`,
+          );
+        if (m.method === 'Log.entryAdded')
+          messages.push(
+            `log.${m.params.entry.level}(${m.params.entry.source}): ${m.params.entry.text} ${m.params.entry.url ?? ''}`,
+          );
       });
       await send('Runtime.enable', {}, sessionId);
       await send('Log.enable', {}, sessionId);
@@ -93,7 +134,12 @@ export async function launchChrome(bin = findChrome()) {
         },
         async waitFor(expression, ms = 8000) {
           for (let t = 0; t < ms; t += 100) {
-            try { const v = await page.eval(expression); if (v) return v; } catch { /* page still loading */ }
+            try {
+              const v = await page.eval(expression);
+              if (v) return v;
+            } catch {
+              /* page still loading */
+            }
             await sleep(100);
           }
           return null;
@@ -101,6 +147,13 @@ export async function launchChrome(bin = findChrome()) {
       };
       return page;
     },
-    async close() { try { ws.close(); } catch { /* closed */ } cleanup(); },
+    async close() {
+      try {
+        ws.close();
+      } catch {
+        /* closed */
+      }
+      cleanup();
+    },
   };
 }

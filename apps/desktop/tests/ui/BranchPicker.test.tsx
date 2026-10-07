@@ -9,7 +9,9 @@ it("requires explicit selection and passes that model without starting a run", a
   renderApp(<BranchPicker busy={false} onCancel={() => {}} onCreate={create} />, app);
   const button = screen.getByRole("button", { name: "branch" });
   expect(button).toBeDisabled();
-  fireEvent.change(screen.getByRole("combobox"), { target: { value: JSON.stringify({ providerId: "p1", model: "m1" }) } });
+  fireEvent.change(screen.getByRole("combobox"), {
+    target: { value: JSON.stringify({ providerId: "p1", model: "m1" }) },
+  });
   expect(button).toBeEnabled();
   fireEvent.click(button);
   expect(create).toHaveBeenCalledWith({ providerId: "p1", model: "m1" });

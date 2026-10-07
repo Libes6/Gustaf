@@ -10,7 +10,8 @@ import { CursorAccounts } from "./CursorAccounts";
 import { ProviderIcon } from "./ProviderIcon";
 
 /** Driver tiles of the "Add provider" wizard; `soon` tiles are visual placeholders only. */
-export type TileId = "claude" | "codex" | "cursor" | "grok" | "openrouter" | "local" | "gemini" | "custom" | "copilot" | "opencode";
+export type TileId =
+  "claude" | "codex" | "cursor" | "grok" | "openrouter" | "local" | "gemini" | "custom" | "copilot" | "opencode";
 type Method = { id: string; kind: ProviderKind; cli?: CliId; cliAuth?: "key"; browser?: boolean };
 type Clis = { id: CliId; version: string }[];
 
@@ -28,12 +29,26 @@ const TILES: { id: TileId; kind: ProviderKind; cli?: CliId; soon?: boolean }[] =
 ];
 
 const METHODS: Record<TileId, Method[]> = {
-  claude: [{ id: "cli", kind: "cli", cli: "claude" }, { id: "api", kind: "anthropic" }],
-  codex: [{ id: "cli", kind: "cli", cli: "codex" }, { id: "api", kind: "openai" }],
-  cursor: [{ id: "browser", kind: "cli", cli: "cursor-agent", browser: true }, { id: "cli", kind: "cli", cli: "cursor-agent" }, { id: "clikey", kind: "cli", cli: "cursor-agent", cliAuth: "key" }, { id: "sdk", kind: "cursor" }],
+  claude: [
+    { id: "cli", kind: "cli", cli: "claude" },
+    { id: "api", kind: "anthropic" },
+  ],
+  codex: [
+    { id: "cli", kind: "cli", cli: "codex" },
+    { id: "api", kind: "openai" },
+  ],
+  cursor: [
+    { id: "browser", kind: "cli", cli: "cursor-agent", browser: true },
+    { id: "cli", kind: "cli", cli: "cursor-agent" },
+    { id: "clikey", kind: "cli", cli: "cursor-agent", cliAuth: "key" },
+    { id: "sdk", kind: "cursor" },
+  ],
   grok: [{ id: "api", kind: "xai" }],
   openrouter: [{ id: "api", kind: "openrouter" }],
-  local: [{ id: "ollama", kind: "ollama" }, { id: "lmstudio", kind: "lmstudio" }],
+  local: [
+    { id: "ollama", kind: "ollama" },
+    { id: "lmstudio", kind: "lmstudio" },
+  ],
   gemini: [{ id: "api", kind: "gemini" }],
   custom: [{ id: "api", kind: "custom" }],
   copilot: [],
@@ -41,17 +56,32 @@ const METHODS: Record<TileId, Method[]> = {
 };
 
 const needsKey = (m: Method) => (m.kind === "cli" ? m.cliAuth === "key" : PRESETS[m.kind].needsKey);
-const keyUrl = (m: Method) => (m.kind === "cli" ? (m.cliAuth === "key" ? PRESETS.cursor.keyUrl : undefined) : PRESETS[m.kind].keyUrl);
-const defaultName = (m: Method) => (m.kind === "cli" ? (m.cliAuth === "key" ? "Cursor CLI" : cliName(m.cli!)) : PRESETS[m.kind].name);
+const keyUrl = (m: Method) =>
+  m.kind === "cli" ? (m.cliAuth === "key" ? PRESETS.cursor.keyUrl : undefined) : PRESETS[m.kind].keyUrl;
+const defaultName = (m: Method) =>
+  m.kind === "cli" ? (m.cliAuth === "key" ? "Cursor CLI" : cliName(m.cli!)) : PRESETS[m.kind].name;
 /** The first usable sign-in method of a driver: a CLI only when it is installed (browser sign-in always works). */
-const bestMethod = (id: TileId, clis: Clis) => METHODS[id].find((m) => m.browser || m.kind !== "cli" || m.cliAuth || clis.some((c) => c.id === m.cli)) ?? METHODS[id][0];
-const signInCommand = (cli: CliId) => (cli === "claude" ? "claude auth login" : cli === "cursor-agent" ? "cursor-agent login" : "codex login");
+const bestMethod = (id: TileId, clis: Clis) =>
+  METHODS[id].find((m) => m.browser || m.kind !== "cli" || m.cliAuth || clis.some((c) => c.id === m.cli)) ??
+  METHODS[id][0];
+const signInCommand = (cli: CliId) =>
+  cli === "claude" ? "claude auth login" : cli === "cursor-agent" ? "cursor-agent login" : "codex login";
 
 /**
  * The three-step "Add provider" flow (Driver, Identity, Config), shared by the providers page dialog and onboarding.
  * Saving stores the key through `saveProvider` (Keychain) and reports the listed models.
  */
-export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCancel }: { initialTile?: TileId; clis?: Clis; onSaved: (cfg: ProviderConfig, models: ModelInfo[]) => void; onCancel?: () => void }) {
+export function AddProviderWizard({
+  initialTile,
+  clis: knownClis,
+  onSaved,
+  onCancel,
+}: {
+  initialTile?: TileId;
+  clis?: Clis;
+  onSaved: (cfg: ProviderConfig, models: ModelInfo[]) => void;
+  onCancel?: () => void;
+}) {
   const t = useT();
   const [step, setStep] = useState<0 | 1 | 2>(initialTile ? 1 : 0);
   const [tile, setTile] = useState<TileId>(initialTile ?? "claude");
@@ -116,20 +146,42 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
   const hasBaseUrl = method.kind !== "cli" && method.kind !== "cursor";
   const canSave = keyOk && (method.kind !== "custom" || !!baseUrl.trim()) && !cliMissing;
   const methodLabel = (m: Method) =>
-    m.browser ? t("provMethodBrowser")
-    : m.cliAuth ? t("provMethodCliKey")
-    : m.kind === "cli" ? `${cliName(m.cli!)} CLI`
-    : m.kind === "cursor" ? t("provMethodSdk")
-    : t("provMethodApi", { name: PRESETS[m.kind].name });
+    m.browser
+      ? t("provMethodBrowser")
+      : m.cliAuth
+        ? t("provMethodCliKey")
+        : m.kind === "cli"
+          ? `${cliName(m.cli!)} CLI`
+          : m.kind === "cursor"
+            ? t("provMethodSdk")
+            : t("provMethodApi", { name: PRESETS[m.kind].name });
   const tileLabel = (id: TileId) =>
-    id === "codex" ? "Codex / OpenAI" : id === "local" ? t("provLocal") : id === "custom" ? t("provCustom") : id === "copilot" ? "GitHub Copilot" : id === "opencode" ? "OpenCode" : id === "claude" ? "Claude" : id === "grok" ? "Grok" : PRESETS[TILES.find((x) => x.id === id)!.kind].name;
+    id === "codex"
+      ? "Codex / OpenAI"
+      : id === "local"
+        ? t("provLocal")
+        : id === "custom"
+          ? t("provCustom")
+          : id === "copilot"
+            ? "GitHub Copilot"
+            : id === "opencode"
+              ? "OpenCode"
+              : id === "claude"
+                ? "Claude"
+                : id === "grok"
+                  ? "Grok"
+                  : PRESETS[TILES.find((x) => x.id === id)!.kind].name;
 
   const steps = [t("provStepDriver"), t("provStepIdentity"), t("provStepConfig")];
   return (
     <div className="wizard">
       <ol className="wizard-steps" aria-label={t("stepOf", { n: step + 1, total: 3 })}>
         {steps.map((s, i) => (
-          <li key={s} className={i === step ? "on" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}>
+          <li
+            key={s}
+            className={i === step ? "on" : i < step ? "done" : ""}
+            aria-current={i === step ? "step" : undefined}
+          >
             <span className="n">{i < step ? <Check size={11} /> : i + 1}</span> {s}
           </li>
         ))}
@@ -138,7 +190,12 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
       {step === 0 && (
         <div className="kind-grid" role="group" aria-label={t("provStepDriver")}>
           {TILES.map((x) => (
-            <button key={x.id} className={`kind${tile === x.id ? " active" : ""}${x.soon ? " soon" : ""}`} disabled={x.soon} onClick={() => pickTile(x.id)}>
+            <button
+              key={x.id}
+              className={`kind${tile === x.id ? " active" : ""}${x.soon ? " soon" : ""}`}
+              disabled={x.soon}
+              onClick={() => pickTile(x.id)}
+            >
               <ProviderIcon kind={x.kind} cli={x.cli} size={20} />
               {tileLabel(x.id)}
               {x.soon && <span className="soon-tag">{t("provComingSoon")}</span>}
@@ -152,13 +209,18 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
           {METHODS[tile].length > 1 && (
             <div className="card method-list" role="radiogroup" aria-label={t("provStepIdentity")}>
               {METHODS[tile].map((m) => {
-                const info = m.kind === "cli" && !m.browser && !m.cliAuth ? clis.find((c) => c.id === m.cli) : undefined;
+                const info =
+                  m.kind === "cli" && !m.browser && !m.cliAuth ? clis.find((c) => c.id === m.cli) : undefined;
                 return (
                   <label className="card-row" key={m.id}>
                     <input type="radio" name="method" checked={method.id === m.id} onChange={() => pickMethod(m)} />
                     <div className="grow">
                       <div className="t">{methodLabel(m)}</div>
-                      {m.kind === "cli" && !m.browser && !m.cliAuth && <div className="d">{info ? t("provCliFound", { version: info.version }) : t("provCliMissing")}</div>}
+                      {m.kind === "cli" && !m.browser && !m.cliAuth && (
+                        <div className="d">
+                          {info ? t("provCliFound", { version: info.version }) : t("provCliMissing")}
+                        </div>
+                      )}
                     </div>
                   </label>
                 );
@@ -168,7 +230,9 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
           {method.browser ? (
             <>
               <CursorAccounts />
-              <p className="hint" style={{ padding: 0 }}>{t("provBrowserDone")}</p>
+              <p className="hint" style={{ padding: 0 }}>
+                {t("provBrowserDone")}
+              </p>
             </>
           ) : (
             <>
@@ -178,13 +242,31 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
               </label>
               {method.kind === "cli" && !method.cliAuth ? (
                 <p className="hint" style={{ padding: 0 }}>
-                  <SquareTerminal size={13} /> {cliMissing ? t("provCliMissing") : t("provCliSignIn", { command: signInCommand(method.cli!) })}
+                  <SquareTerminal size={13} />{" "}
+                  {cliMissing ? t("provCliMissing") : t("provCliSignIn", { command: signInCommand(method.cli!) })}
                 </p>
               ) : (
-                <KeyField t={t} url={keyUrl(method)} optional={!needsKey(method)} value={key} onChange={setKey} placeholder={method.kind === "cursor" || method.cliAuth ? "cursor_…" : method.kind === "xai" ? "xai-…" : "sk-…"} />
+                <KeyField
+                  t={t}
+                  url={keyUrl(method)}
+                  optional={!needsKey(method)}
+                  value={key}
+                  onChange={setKey}
+                  placeholder={
+                    method.kind === "cursor" || method.cliAuth ? "cursor_…" : method.kind === "xai" ? "xai-…" : "sk-…"
+                  }
+                />
               )}
-              {method.cliAuth && <p className="hint" style={{ padding: 0 }}>{t("cursorCliAccountHint")}</p>}
-              {method.kind === "cursor" && <p className="hint" style={{ padding: 0 }}>{t("cursorHint")}</p>}
+              {method.cliAuth && (
+                <p className="hint" style={{ padding: 0 }}>
+                  {t("cursorCliAccountHint")}
+                </p>
+              )}
+              {method.kind === "cursor" && (
+                <p className="hint" style={{ padding: 0 }}>
+                  {t("cursorHint")}
+                </p>
+              )}
             </>
           )}
         </>
@@ -196,15 +278,28 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
             <div className="card" style={{ marginBottom: 14 }}>
               <div className="card-row">
                 <Radar size={16} />
-                <div className="grow d">{found === null ? t("detectLocalHint") : found.length ? t("detectFound", { list: found.map((k) => PRESETS[k].name).join(", ") }) : t("detectNone")}</div>
-                <button className="btn-soft" onClick={async () => setFound(await detectLocal())}>{t("detect")}</button>
+                <div className="grow d">
+                  {found === null
+                    ? t("detectLocalHint")
+                    : found.length
+                      ? t("detectFound", { list: found.map((k) => PRESETS[k].name).join(", ") })
+                      : t("detectNone")}
+                </div>
+                <button className="btn-soft" onClick={async () => setFound(await detectLocal())}>
+                  {t("detect")}
+                </button>
               </div>
             </div>
           )}
           {hasBaseUrl ? (
             <label className="field">
               <span>Base URL</span>
-              <input className="input" value={baseUrl} placeholder="https://example.com/v1" onChange={(e) => setBaseUrl(e.target.value)} />
+              <input
+                className="input"
+                value={baseUrl}
+                placeholder="https://example.com/v1"
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
             </label>
           ) : method.kind === "cli" ? (
             <div className="card">
@@ -217,7 +312,9 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
               </div>
             </div>
           ) : (
-            <p className="hint" style={{ padding: 0 }}>{t("provNoBaseUrl")}</p>
+            <p className="hint" style={{ padding: 0 }}>
+              {t("provNoBaseUrl")}
+            </p>
           )}
         </>
       )}
@@ -230,27 +327,45 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
       )}
 
       <div className="dialog-foot">
-        {onCancel && <button className="btn btn-ghost" onClick={onCancel}>{t("cancel")}</button>}
+        {onCancel && (
+          <button className="btn btn-ghost" onClick={onCancel}>
+            {t("cancel")}
+          </button>
+        )}
         <span className="grow" />
-        {step > 0 && <button className="btn-soft" onClick={() => (setState({}), setStep(step === 2 ? 1 : 0))}>{t("provBack")}</button>}
+        {step > 0 && (
+          <button className="btn-soft" onClick={() => (setState({}), setStep(step === 2 ? 1 : 0))}>
+            {t("provBack")}
+          </button>
+        )}
         {step === 1 && !method.browser && method.kind === "cli" && !method.cliAuth && (
           <>
-            <button className="btn-soft" onClick={() => setStep(2)}>{t("provConfigureManually")}</button>
+            <button className="btn-soft" onClick={() => setStep(2)}>
+              {t("provConfigureManually")}
+            </button>
             <button className="btn btn-primary" disabled={state.busy || cliMissing} onClick={save}>
               {state.busy ? <Loader2 size={13} className="spin" /> : null} {t("cliConnect")}
             </button>
           </>
         )}
-        {step === 1 && method.browser && onCancel && <button className="btn btn-primary" onClick={onCancel}>{t("provDone")}</button>}
+        {step === 1 && method.browser && onCancel && (
+          <button className="btn btn-primary" onClick={onCancel}>
+            {t("provDone")}
+          </button>
+        )}
         {step === 1 && !method.browser && (method.kind !== "cli" || method.cliAuth) && (
-          <button className="btn btn-primary" disabled={!keyOk} onClick={() => (setState({}), setStep(2))}>{t("provNext")}</button>
+          <button className="btn btn-primary" disabled={!keyOk} onClick={() => (setState({}), setStep(2))}>
+            {t("provNext")}
+          </button>
         )}
         {step === 2 && (
           <>
             <button className="btn-soft" onClick={() => test()} disabled={state.busy || !canSave}>
               {state.busy ? <Loader2 size={13} className="spin" /> : null} {t("testConnection")}
             </button>
-            <button className="btn btn-primary" onClick={save} disabled={state.busy || !canSave}>{t("save")}</button>
+            <button className="btn btn-primary" onClick={save} disabled={state.busy || !canSave}>
+              {t("save")}
+            </button>
           </>
         )}
       </div>
@@ -258,7 +373,21 @@ export function AddProviderWizard({ initialTile, clis: knownClis, onSaved, onCan
   );
 }
 
-function KeyField({ t, url, optional, value, onChange, placeholder }: { t: ReturnType<typeof useT>; url?: string; optional: boolean; value: string; onChange: (v: string) => void; placeholder: string }) {
+function KeyField({
+  t,
+  url,
+  optional,
+  value,
+  onChange,
+  placeholder,
+}: {
+  t: ReturnType<typeof useT>;
+  url?: string;
+  optional: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
   return (
     <label className="field">
       <span style={{ display: "flex", justifyContent: "space-between" }}>
@@ -269,23 +398,40 @@ function KeyField({ t, url, optional, value, onChange, placeholder }: { t: Retur
           </a>
         )}
       </span>
-      <input className="input" type="password" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <input
+        className="input"
+        type="password"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </label>
   );
 }
 
 /** Modal wrapper of the wizard used by the providers page ("+" and the "Connect" actions of unconfigured drivers). */
-export function AddProviderDialog({ initialTile, clis, onSaved, onClose }: { initialTile?: TileId; clis?: Clis; onSaved: (cfg: ProviderConfig, models: ModelInfo[]) => void; onClose: () => void }) {
+export function AddProviderDialog({
+  initialTile,
+  clis,
+  onSaved,
+  onClose,
+}: {
+  initialTile?: TileId;
+  clis?: Clis;
+  onSaved: (cfg: ProviderConfig, models: ModelInfo[]) => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   useDialogFocus(ref, onClose);
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={ref} className="dialog wide" role="dialog" aria-modal="true" aria-label={t("provAddTitle")}>
-        <h2><span className="grow">{t("provAddTitle")}</span></h2>
+        <h2>
+          <span className="grow">{t("provAddTitle")}</span>
+        </h2>
         <AddProviderWizard initialTile={initialTile} clis={clis} onSaved={onSaved} onCancel={onClose} />
       </div>
     </div>
   );
 }
-

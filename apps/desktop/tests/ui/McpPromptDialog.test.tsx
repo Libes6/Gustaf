@@ -5,17 +5,64 @@ import { McpPromptDialog } from "../../src/components/McpPromptDialog";
 import { callsOf, mockInvoke, mockSettings } from "./tauri";
 import { renderApp } from "./render";
 
-const server = { id: "s1", name: "docs", enabled: true, scope: "global", transport: "stdio", command: "node", args: [], env: [], alwaysAllow: false, allowedTools: [], readOnlyTools: [] };
+const server = {
+  id: "s1",
+  name: "docs",
+  enabled: true,
+  scope: "global",
+  transport: "stdio",
+  command: "node",
+  args: [],
+  env: [],
+  alwaysAllow: false,
+  allowedTools: [],
+  readOnlyTools: [],
+};
 
 /** A stdio MCP server that offers one prompt with a required argument, behind the mocked backend. */
 function backend() {
   mockSettings({ mcpServers: { servers: [server] } });
   mockInvoke({
-    mcp_start: { id: "s1", state: "running", error: null, pid: 1, restarts: 0, toolsEpoch: 0, resourcesEpoch: 0, promptsEpoch: 0, init: { protocolVersion: "2025-06-18", capabilities: { prompts: {} }, serverInfo: { name: "docs" } } },
-    mcp_status: [{ id: "s1", state: "running", error: null, pid: 1, restarts: 0, toolsEpoch: 0, resourcesEpoch: 0, promptsEpoch: 0, init: null }],
+    mcp_start: {
+      id: "s1",
+      state: "running",
+      error: null,
+      pid: 1,
+      restarts: 0,
+      toolsEpoch: 0,
+      resourcesEpoch: 0,
+      promptsEpoch: 0,
+      init: { protocolVersion: "2025-06-18", capabilities: { prompts: {} }, serverInfo: { name: "docs" } },
+    },
+    mcp_status: [
+      {
+        id: "s1",
+        state: "running",
+        error: null,
+        pid: 1,
+        restarts: 0,
+        toolsEpoch: 0,
+        resourcesEpoch: 0,
+        promptsEpoch: 0,
+        init: null,
+      },
+    ],
     mcp_request: ({ method, params }: { method: string; params: any }) => {
-      if (method === "prompts/list") return { prompts: [{ name: "review", title: "Review code", description: "Reviews a snippet", arguments: [{ name: "code", required: true, description: "Code to review" }] }] };
-      if (method === "prompts/get") return { messages: [{ role: "user", content: { type: "text", text: `Please review: ${params.arguments.code}` } }] };
+      if (method === "prompts/list")
+        return {
+          prompts: [
+            {
+              name: "review",
+              title: "Review code",
+              description: "Reviews a snippet",
+              arguments: [{ name: "code", required: true, description: "Code to review" }],
+            },
+          ],
+        };
+      if (method === "prompts/get")
+        return {
+          messages: [{ role: "user", content: { type: "text", text: `Please review: ${params.arguments.code}` } }],
+        };
       throw new Error("unexpected " + method);
     },
   });

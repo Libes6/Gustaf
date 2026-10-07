@@ -17,7 +17,12 @@ describe("Usage statistics", () => {
 
   it("reads the range with one query and shows per-provider totals", async () => {
     mockSettings({});
-    mockInvoke({ db_select: (a: { sql: string }) => /from messages/.test(a.sql) ? [{ created_at: Date.now() - 1000, meta: JSON.stringify({ provider: "p1", model: "m1", usage }) }] : [] });
+    mockInvoke({
+      db_select: (a: { sql: string }) =>
+        /from messages/.test(a.sql)
+          ? [{ created_at: Date.now() - 1000, meta: JSON.stringify({ provider: "p1", model: "m1", usage }) }]
+          : [],
+    });
     renderApp(<UsageCharts />, makeApp({ providers: [provider({ id: "p1", name: "Alpha" })] }));
     const legend = await screen.findByRole("list");
     expect(within(legend).getByText("Alpha")).toBeInTheDocument();

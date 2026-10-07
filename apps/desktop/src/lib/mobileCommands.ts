@@ -19,14 +19,18 @@ function mobileDeps(getApp: () => AppState): MobileSendDeps {
   return {
     ...depsFor(getApp),
     loadChat: async (chatId) => {
-      const [row] = await db.select<{ project_id: number | null; workspace_task_id: string | null }>("select project_id, workspace_task_id from chats where id = ?", [chatId]);
+      const [row] = await db.select<{ project_id: number | null; workspace_task_id: string | null }>(
+        "select project_id, workspace_task_id from chats where id = ?",
+        [chatId],
+      );
       return row ? { projectId: row.project_id, workspace: !!row.workspace_task_id } : null;
     },
     loadHistory: (chatId) => loadMessages(chatId),
     defaultTarget: () => {
       const app = getApp();
       const sel = app.selection;
-      if (sel && app.providers.some((p) => p.id === sel.providerId && !p.disabled)) return { providerId: sel.providerId, model: sel.model };
+      if (sel && app.providers.some((p) => p.id === sel.providerId && !p.disabled))
+        return { providerId: sel.providerId, model: sel.model };
       const p = app.providers.find((x) => !x.disabled);
       const model = p && app.models.find((m) => m.providerId === p.id)?.id;
       return p && model ? { providerId: p.id, model } : null;
@@ -52,13 +56,20 @@ export async function handleMobileCommand(cmd: Command, getApp: () => AppState):
     if (cmd.kind === "send") {
       const chatId = num(p.chatId);
       const body = text(p.text);
-      if (chatId === undefined || !body) return { ok: false, code: "bad_request", message: "chatId and text are required" };
-      return await startMobileSend(mobileDeps(getApp), { chatId, text: body, providerId: text(p.providerId), model: text(p.model) });
+      if (chatId === undefined || !body)
+        return { ok: false, code: "bad_request", message: "chatId and text are required" };
+      return await startMobileSend(mobileDeps(getApp), {
+        chatId,
+        text: body,
+        providerId: text(p.providerId),
+        model: text(p.model),
+      });
     }
     if (cmd.kind === "newChat") {
       const projectId = num(p.projectId);
       const body = text(p.text);
-      if (projectId === undefined || !body) return { ok: false, code: "bad_request", message: "projectId and text are required" };
+      if (projectId === undefined || !body)
+        return { ok: false, code: "bad_request", message: "projectId and text are required" };
       return await startMobileSend(mobileDeps(getApp), { projectId, text: body, title: text(p.title) });
     }
     if (cmd.kind === "stop") {
@@ -79,7 +90,13 @@ export function startMobileCommands(getApp: () => AppState): () => void {
     const cmd = e.payload;
     const r = await handleMobileCommand(cmd, getApp);
     const data = r.ok ? { chatId: r.chatId } : undefined;
-    void invoke("mobile_command_reply", { id: cmd.id, ok: r.ok, code: r.ok ? null : r.code, message: r.ok ? null : r.message, data }).catch(() => {});
+    void invoke("mobile_command_reply", {
+      id: cmd.id,
+      ok: r.ok,
+      code: r.ok ? null : r.code,
+      message: r.ok ? null : r.message,
+      data,
+    }).catch(() => {});
   }).then((un) => (stopped ? un() : (off = un)));
   return () => {
     stopped = true;

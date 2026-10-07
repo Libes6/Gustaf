@@ -13,7 +13,8 @@ const { state, review, db } = await import('./helpers/apiStub.mjs');
 const { runAgent } = await import('../src/agent/agent.ts');
 const { createSubagentHost } = await import('../src/agent/subagents.ts');
 const { Scheduler } = await import('../src/agent/scheduler.ts');
-const { getRuns, resetAgentRuns, stopRun, getAgentUsage, settleAgentRunWrites, loadRunSteps } = await import('../src/agent/agentRuns.ts');
+const { getRuns, resetAgentRuns, stopRun, getAgentUsage, settleAgentRunWrites, loadRunSteps } =
+  await import('../src/agent/agentRuns.ts');
 const { DEFAULT_AGENT_SETTINGS, normalizeAgentSettings } = await import('../src/agent/agentSettings.ts');
 const { localDayKey } = await import('../src/lib/budgets.ts');
 const { saveRulesConfig } = await import('../src/agent/rulesStore.ts');
@@ -49,7 +50,16 @@ function fakeReviews(root) {
   };
   review.list = async () =>
     made
-      .map((r) => [r, readdirSync(r.workspace).filter((f) => !existsSync(join(root, f)) || readFileSync(join(root, f), 'utf8') !== readFileSync(join(r.workspace, f), 'utf8')).map((path) => ({ path, binary: false }))])
+      .map((r) => [
+        r,
+        readdirSync(r.workspace)
+          .filter(
+            (f) =>
+              !existsSync(join(root, f)) ||
+              readFileSync(join(root, f), 'utf8') !== readFileSync(join(r.workspace, f), 'utf8'),
+          )
+          .map((path) => ({ path, binary: false })),
+      ])
       .filter(([, list]) => list.length);
   review.finish = async (id) => void finished.push(id);
   return { made, finished, prepare };
@@ -59,14 +69,36 @@ function fakeReviews(root) {
  * Runs the main agent over `parentScript`; children are answered by `child(title-prompt text, input)`, a function that
  * returns the next scripted turn for that child (per-prompt queues keep parallel children independent).
  */
-async function run({ root, parentScript, children = {}, hostCfg = {}, access = 'auto', approve, signal, parentTools = true, resolve, chatId, stored = {} } = {}) {
+async function run({
+  root,
+  parentScript,
+  children = {},
+  hostCfg = {},
+  access = 'auto',
+  approve,
+  signal,
+  parentTools = true,
+  resolve,
+  chatId,
+  stored = {},
+} = {}) {
   state.reset();
   for (const [k, v] of Object.entries(stored)) state.settings.set(k, JSON.stringify(v));
   saveRulesConfig(hostCfg.rules ?? DEFAULT_RULES);
   resetAgentRuns();
   const ctl = new AbortController();
   if (signal) signal(ctl);
-  const seen = { parentTools: [], childTools: {}, childSystems: {}, childMessages: {}, childModels: {}, tokens: [], approvals: [], live: 0, maxLive: 0 };
+  const seen = {
+    parentTools: [],
+    childTools: {},
+    childSystems: {},
+    childMessages: {},
+    childModels: {},
+    tokens: [],
+    approvals: [],
+    live: 0,
+    maxLive: 0,
+  };
   const queues = new Map(Object.entries(children).map(([k, v]) => [k, [...v]]));
   let pi = 0;
   const adapter = {
@@ -92,7 +124,7 @@ async function run({ root, parentScript, children = {}, hostCfg = {}, access = '
         const q = queues.get(key) ?? [];
         const next = q.shift();
         if (input.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        return typeof next === 'function' ? await next(input) : next ?? say(`report for ${key}`);
+        return typeof next === 'function' ? await next(input) : (next ?? say(`report for ${key}`));
       } finally {
         seen.live--;
       }
@@ -100,7 +132,13 @@ async function run({ root, parentScript, children = {}, hostCfg = {}, access = '
   };
   const outputs = [];
   const resolveModel = resolve && (async (ref) => (resolve(ref) ? { adapter, supportsTools: true } : null));
-  const host = createSubagentHost({ projectRoot: root, recordTokens: (p, m, u) => seen.tokens.push([p, m, u]), settings: DEFAULT_AGENT_SETTINGS, ...(resolveModel ? { resolveModel } : {}), ...hostCfg });
+  const host = createSubagentHost({
+    projectRoot: root,
+    recordTokens: (p, m, u) => seen.tokens.push([p, m, u]),
+    settings: DEFAULT_AGENT_SETTINGS,
+    ...(resolveModel ? { resolveModel } : {}),
+    ...hostCfg,
+  });
   await runAgent({
     root,
     ...(chatId !== undefined ? { chatId } : {}),
@@ -114,7 +152,8 @@ async function run({ root, parentScript, children = {}, hostCfg = {}, access = '
     signal: ctl.signal,
     onText: () => {},
     onMessage: async (m) => {
-      if (m.role === 'tool') outputs.push(...m.parts.map((p) => ({ name: p.name, output: p.output, isError: !!p.isError })));
+      if (m.role === 'tool')
+        outputs.push(...m.parts.map((p) => ({ name: p.name, output: p.output, isError: !!p.isError })));
     },
     approve: async (req) => {
       seen.approvals.push(req);
@@ -140,7 +179,9 @@ test('a subagent has its own history, read-only tools, and only its report reach
   const r = await run({
     root,
     parentScript: [use(spawn('Explorer', 'find the answer')), say('ok')],
-    children: { 'find the answer': [use(call('read_file', { path: 'a.txt' })), say('The answer is 42. ' + 'x'.repeat(20_000))] },
+    children: {
+      'find the answer': [use(call('read_file', { path: 'a.txt' })), say('The answer is 42. ' + 'x'.repeat(20_000))],
+    },
   });
   assert.deepEqual(r.seen.childTools['find the answer'], ['read_file', 'list_dir', 'search']);
   assert.equal(r.seen.childMessages['find the answer'][0].parts[0].text, 'find the answer');
@@ -189,7 +230,10 @@ test('parallel subagents respect the concurrency limit and queue the rest', asyn
   const r = await run({ root, parentScript: [use(...calls), say('ok')], hostCfg: { scheduler: new Scheduler(3) } });
   assert.equal(r.seen.maxLive, 3);
   assert.equal(r.outputs.filter((o) => o.name === 'spawn_agent' && /finished/.test(o.output)).length, 5);
-  assert.deepEqual(r.runs.map((x) => x.status), Array(5).fill('completed'));
+  assert.deepEqual(
+    r.runs.map((x) => x.status),
+    Array(5).fill('completed'),
+  );
 });
 
 test('stopping the parent cancels running and queued subagents', async () => {
@@ -222,7 +266,11 @@ test('stopRun cancels one run only', async () => {
     if (input.signal.aborted) throw new DOMException('Aborted', 'AbortError');
     return say('finished anyway');
   };
-  const done = run({ root, parentScript: [use(spawn('A', 'task a'), spawn('B', 'task b')), say('ok')], children: { 'task a': [slow], 'task b': [slow] } });
+  const done = run({
+    root,
+    parentScript: [use(spawn('A', 'task a'), spawn('B', 'task b')), say('ok')],
+    children: { 'task a': [slow], 'task b': [slow] },
+  });
   await sleep(60);
   stopRun(getRuns().find((x) => x.title === 'A').id);
   const r = await done;
@@ -237,7 +285,20 @@ test('budget: tool call limit stops the run and the report says so', async () =>
   const r = await run({
     root,
     parentScript: [use(spawn('Looper', 'loop forever')), say('ok')],
-    children: { 'loop forever': [{ parts: [{ type: 'text', text: 'looking around' }, call('list_dir', { path: '.' }), call('list_dir', { path: '.' }), call('list_dir', { path: '.' })], usage }, ...looping] },
+    children: {
+      'loop forever': [
+        {
+          parts: [
+            { type: 'text', text: 'looking around' },
+            call('list_dir', { path: '.' }),
+            call('list_dir', { path: '.' }),
+            call('list_dir', { path: '.' }),
+          ],
+          usage,
+        },
+        ...looping,
+      ],
+    },
     hostCfg: { budgets: { explore: { maxToolCalls: 2 } } },
   });
   const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
@@ -245,7 +306,10 @@ test('budget: tool call limit stops the run and the report says so', async () =>
   assert.equal(r.runs[0].status, 'limit');
   assert.equal(r.runs[0].toolUses, 3);
   assert.match(r.outputs.find((o) => o.name === 'spawn_agent').output, /looking around/, 'the partial text is kept');
-  assert.ok(r.runs[0].transcript.filter((s) => s.kind === 'tool').every((s) => s.error), 'calls past the limit were cancelled, not run');
+  assert.ok(
+    r.runs[0].transcript.filter((s) => s.kind === 'tool').every((s) => s.error),
+    'calls past the limit were cancelled, not run',
+  );
 });
 
 test('budget: step limit ends a run that never answers', async () => {
@@ -268,15 +332,26 @@ test('budget: wall time stops a hanging run', async () => {
     await sleep(2000, undefined, { signal: input.signal }).catch(() => {});
     throw new DOMException('Aborted', 'AbortError');
   };
-  const r = await run({ root, parentScript: [use(spawn('Hang', 'hang')), say('ok')], children: { hang: [hang] }, hostCfg: { budgets: { explore: { maxMs: 60 } } } });
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Hang', 'hang')), say('ok')],
+    children: { hang: [hang] },
+    hostCfg: { budgets: { explore: { maxMs: 60 } } },
+  });
   assert.match(r.outputs.find((o) => o.name === 'spawn_agent').output, /time limit/);
   assert.equal(r.runs[0].status, 'limit');
 });
 
 test('a failing subagent reports the error and the parent continues', async () => {
   const root = project();
-  const boom = async () => { throw new Error('HTTP 500'); };
-  const r = await run({ root, parentScript: [use(spawn('Broken', 'break')), say('recovered')], children: { break: [boom] } });
+  const boom = async () => {
+    throw new Error('HTTP 500');
+  };
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Broken', 'break')), say('recovered')],
+    children: { break: [boom] },
+  });
   const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
   assert.match(out, /failed: HTTP 500/);
   assert.equal(r.runs[0].status, 'failed');
@@ -285,7 +360,10 @@ test('a failing subagent reports the error and the parent continues', async () =
 
 test('invalid spawn arguments come back as a tool error', async () => {
   const root = project();
-  const r = await run({ root, parentScript: [use(call('spawn_agent', { title: 'x', prompt: 'y', type: 'root' })), say('ok')] });
+  const r = await run({
+    root,
+    parentScript: [use(call('spawn_agent', { title: 'x', prompt: 'y', type: 'root' })), say('ok')],
+  });
   const out = r.outputs.find((o) => o.name === 'spawn_agent');
   assert.equal(out.isError, true);
   assert.match(out.output, /type/);
@@ -324,7 +402,11 @@ test('writing subagents work in separate copies; the project is untouched and ov
 test('a writing subagent with no changes leaves no review and says so', async () => {
   const root = project();
   const fake = fakeReviews(root);
-  const r = await run({ root, parentScript: [use(spawn('Idle', 'nothing', 'general')), say('ok')], hostCfg: { prepare: fake.prepare } });
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Idle', 'nothing', 'general')), say('ok')],
+    hostCfg: { prepare: fake.prepare },
+  });
   assert.match(r.outputs.find((o) => o.name === 'spawn_agent').output, /No files were changed/);
   assert.deepEqual(fake.finished, ['r1']);
 });
@@ -332,7 +414,12 @@ test('a writing subagent with no changes leaves no review and says so', async ()
 test('read-only subagents run in the parent workspace, not in a copy', async () => {
   const root = project();
   const fake = fakeReviews(root);
-  const r = await run({ root, parentScript: [use(spawn('Reader', 'read a', 'review')), say('ok')], hostCfg: { prepare: fake.prepare }, children: { 'read a': [use(call('read_file', { path: 'a.txt' })), say('read it')] } });
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Reader', 'read a', 'review')), say('ok')],
+    hostCfg: { prepare: fake.prepare },
+    children: { 'read a': [use(call('read_file', { path: 'a.txt' })), say('read it')] },
+  });
   assert.equal(fake.made.length, 0);
   assert.match(r.runs[0].transcript.find((s) => s.tool === 'read_file').result, /one/);
 });
@@ -352,7 +439,8 @@ test('approvals of a subagent surface through the parent callback, titled and on
       'cmd 2': [use(call('run_command', { command: 'make test' })), say('r2 done')],
     },
     approve: async () => {
-      open++; maxOpen = Math.max(maxOpen, open);
+      open++;
+      maxOpen = Math.max(maxOpen, open);
       await sleep(20);
       open--;
       return true;
@@ -360,9 +448,15 @@ test('approvals of a subagent surface through the parent callback, titled and on
   });
   assert.equal(maxOpen, 1);
   const asked = r.seen.approvals.filter((a) => a.kind === 'command');
-  assert.deepEqual(asked.map((a) => [a.command, a.agent]).sort(), [['make build', 'Runner 1'], ['make test', 'Runner 2']]);
+  assert.deepEqual(asked.map((a) => [a.command, a.agent]).sort(), [
+    ['make build', 'Runner 1'],
+    ['make test', 'Runner 2'],
+  ]);
   assert.deepEqual(state.runs.map((x) => x.command).sort(), ['make build', 'make test']);
-  assert.ok(state.runs.every((x) => x.root !== root), 'commands run in the private copies');
+  assert.ok(
+    state.runs.every((x) => x.root !== root),
+    'commands run in the private copies',
+  );
 });
 
 test('a declined approval blocks the command in the subagent', async () => {
@@ -402,19 +496,31 @@ test('setup command of a shadow copy asks through the parent with the agent titl
   };
   review.list = async () => [];
   const r = await run({ root, parentScript: [use(spawn('Setup', 'x', 'general')), say('ok')], hostCfg: { prepare } });
-  assert.deepEqual(r.seen.approvals.map((a) => [a.command, a.agent]), [['npm ci', 'Setup']]);
+  assert.deepEqual(
+    r.seen.approvals.map((a) => [a.command, a.agent]),
+    [['npm ci', 'Setup']],
+  );
 });
 
 test('tokens of subagents are recorded through the provided hook with provider and model', async () => {
   const root = project();
-  const r = await run({ root, parentScript: [use(spawn('Counter', 'count')), say('ok')], children: { count: [say('x')] } });
+  const r = await run({
+    root,
+    parentScript: [use(spawn('Counter', 'count')), say('ok')],
+    children: { count: [say('x')] },
+  });
   assert.ok(r.seen.tokens.some(([p, m, u]) => p === 'p' && m === 'm' && u.input === 10 && u.output === 5));
   assert.equal(r.runs[0].tokens, 15);
 });
 
 test('subagent tokens go to the budget ledger for the day and the parent chat; runs carry the chat id', async () => {
   const root = project();
-  const r = await run({ root, chatId: 42, parentScript: [use(spawn('Counter', 'count')), say('ok')], children: { count: [use(call('list_dir', {})), say('x')] } });
+  const r = await run({
+    root,
+    chatId: 42,
+    parentScript: [use(spawn('Counter', 'count')), say('ok')],
+    children: { count: [use(call('list_dir', {})), say('x')] },
+  });
   assert.equal(r.runs[0].chatId, 42);
   const l = getAgentUsage();
   assert.equal(l.days[localDayKey(Date.now())], 30);
@@ -442,7 +548,12 @@ test('a type with a configured default model runs on it; tokens and the run name
 test('an unusable default model falls back to the parent model with a note', async () => {
   const root = project();
   const settings = normalizeAgentSettings({ models: { explore: { providerId: 'q', model: 'gone' } } });
-  const r = await run({ root, resolve: () => false, hostCfg: { settings }, parentScript: [use(spawn('Finder', 'find')), say('ok')] });
+  const r = await run({
+    root,
+    resolve: () => false,
+    hostCfg: { settings },
+    parentScript: [use(spawn('Finder', 'find')), say('ok')],
+  });
   assert.equal(r.seen.childModels.find, 'm');
   assert.match(r.outputs[0].output, /q\/gone is not available/);
   assert.ok(r.runs[0].transcript.some((s) => s.kind === 'note' && /not available/.test(s.text)));
@@ -455,7 +566,13 @@ test('an explicit model must be on the allow-list; allowed models are named in t
     root,
     resolve: () => true,
     hostCfg: { settings },
-    parentScript: [use(call('spawn_agent', { title: 'A', prompt: 'a', type: 'explore', model: 'evil/model' }), call('spawn_agent', { title: 'B', prompt: 'b', type: 'explore', model: 'strong' })), say('ok')],
+    parentScript: [
+      use(
+        call('spawn_agent', { title: 'A', prompt: 'a', type: 'explore', model: 'evil/model' }),
+        call('spawn_agent', { title: 'B', prompt: 'b', type: 'explore', model: 'strong' }),
+      ),
+      say('ok'),
+    ],
   });
   assert.equal(r.outputs[0].isError, true);
   assert.match(r.outputs[0].output, /not allowed/);
@@ -467,7 +584,12 @@ test('an explicit model must be on the allow-list; allowed models are named in t
 test('budget defaults from the agent settings apply when the host has no overrides', async () => {
   const root = project();
   const settings = normalizeAgentSettings({ budgets: { explore: { maxToolCalls: 1 } } });
-  const r = await run({ root, hostCfg: { settings }, parentScript: [use(spawn('Busy', 'busy')), say('ok')], children: { busy: [use(call('list_dir', {}), call('list_dir', {})), say('never')] } });
+  const r = await run({
+    root,
+    hostCfg: { settings },
+    parentScript: [use(spawn('Busy', 'busy')), say('ok')],
+    children: { busy: [use(call('list_dir', {}), call('list_dir', {})), say('never')] },
+  });
   assert.equal(r.runs[0].status, 'limit');
   assert.match(r.outputs[0].output, /tool call limit \(1\)/);
   assert.ok(r.runs[0].transcript.some((s) => s.kind === 'note' && /Stopped at its tool call limit/.test(s.text)));
@@ -528,7 +650,11 @@ test('delegate_tasks: a failed task cancels its dependants; overlapping writers 
       ]),
       say('ok'),
     ],
-    children: { w1: [writer('a.txt'), say('w1 done')], w2: [writer('a.txt'), say('w2 done')], bad: [() => Promise.reject(new Error('model exploded'))] },
+    children: {
+      w1: [writer('a.txt'), say('w1 done')],
+      w2: [writer('a.txt'), say('w2 done')],
+      bad: [() => Promise.reject(new Error('model exploded'))],
+    },
   });
   const out = r.outputs[0].output;
   assert.equal(peak, 1, 'w1 and w2 own the same file and never overlap');
@@ -545,8 +671,18 @@ test('delegate_tasks with an invalid plan or a disallowed model is a tool error 
     root,
     parentScript: [
       use(
-        call('delegate_tasks', { tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore', dependsOn: ['b'] }, { id: 'b', title: 'B', prompt: 'b', type: 'explore', dependsOn: ['a'] }] }),
-        call('delegate_tasks', { tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }, { id: 'b', title: 'B', prompt: 'b', type: 'explore', model: 'x/y' }] }),
+        call('delegate_tasks', {
+          tasks: [
+            { id: 'a', title: 'A', prompt: 'a', type: 'explore', dependsOn: ['b'] },
+            { id: 'b', title: 'B', prompt: 'b', type: 'explore', dependsOn: ['a'] },
+          ],
+        }),
+        call('delegate_tasks', {
+          tasks: [
+            { id: 'a', title: 'A', prompt: 'a', type: 'explore' },
+            { id: 'b', title: 'B', prompt: 'b', type: 'explore', model: 'x/y' },
+          ],
+        }),
       ),
       say('ok'),
     ],
@@ -569,14 +705,23 @@ test('every message of a subagent is written to the database as it happens and r
   });
   await settleAgentRunWrites();
   const id = r.runs[0].id;
-  const rows = db.raw().prepare('select seq, role, parts_json from agent_messages where run_id = ? order by seq').all(id);
-  assert.deepEqual(rows.map((x) => x.role), ['user', 'assistant', 'tool', 'assistant']);
+  const rows = db
+    .raw()
+    .prepare('select seq, role, parts_json from agent_messages where run_id = ? order by seq')
+    .all(id);
+  assert.deepEqual(
+    rows.map((x) => x.role),
+    ['user', 'assistant', 'tool', 'assistant'],
+  );
   assert.match(rows[0].parts_json, /read a\.txt/);
   assert.match(rows[2].parts_json, /one/, 'the full tool result is stored, not a 240-character summary');
   const saved = db.raw().prepare('select status, report, tokens, tool_uses from agent_runs where id = ?').get(id);
   assert.deepEqual({ ...saved }, { status: 'completed', report: 'a.txt says one', tokens: 30, tool_uses: 1 });
   const steps = await loadRunSteps(id);
-  assert.deepEqual(steps.map((s) => s.kind), ['note', 'tool', 'text']);
+  assert.deepEqual(
+    steps.map((s) => s.kind),
+    ['note', 'tool', 'text'],
+  );
   assert.equal(steps[1].tool, 'read_file');
   assert.match(steps[1].result, /one/);
   assert.deepEqual(state.dbErrors, []);
@@ -586,18 +731,34 @@ test('every message of a subagent is written to the database as it happens and r
 
 test('continue_from starts a new run seeded with the earlier task, calls, report and the follow-up', async () => {
   const root = project();
-  const next = (build) => ({ get parts() { return [build()]; }, usage });
+  const next = (build) => ({
+    get parts() {
+      return [build()];
+    },
+    usage,
+  });
   const r = await run({
     root,
     parentScript: [
       use(spawn('First', 'First task: look at a.txt')),
-      next(() => call('spawn_agent', { title: 'Second', prompt: 'now check b.txt too', type: 'explore', continue_from: getRuns().at(-1).id })),
+      next(() =>
+        call('spawn_agent', {
+          title: 'Second',
+          prompt: 'now check b.txt too',
+          type: 'explore',
+          continue_from: getRuns().at(-1).id,
+        }),
+      ),
       say('ok'),
     ],
-    children: { 'First task: look at a.txt': [use(call('read_file', { path: 'a.txt' })), say('first report: a.txt has one line')] },
+    children: {
+      'First task: look at a.txt': [use(call('read_file', { path: 'a.txt' })), say('first report: a.txt has one line')],
+    },
   });
   assert.equal(r.runs.length, 2);
-  const key = Object.keys(r.seen.childMessages).find((k) => k.startsWith('You are continuing an earlier subagent run "First"'));
+  const key = Object.keys(r.seen.childMessages).find((k) =>
+    k.startsWith('You are continuing an earlier subagent run "First"'),
+  );
   assert.ok(key, 'the second run got the summary prompt');
   const seed = r.seen.childMessages[key][0].parts[0].text;
   assert.match(seed, /First task: look at a\.txt/);
@@ -606,7 +767,7 @@ test('continue_from starts a new run seeded with the earlier task, calls, report
   assert.match(seed, /--- Follow-up \(your task now\) ---\nnow check b\.txt too$/);
   assert.equal(r.outputs.at(-1).isError, false);
   await settleAgentRunWrites();
-  const first = db.raw().prepare("select count(*) as n from agent_messages where run_id = ?").get(r.runs.at(-1).id).n;
+  const first = db.raw().prepare('select count(*) as n from agent_messages where run_id = ?').get(r.runs.at(-1).id).n;
   assert.ok(first >= 3);
 });
 
@@ -614,7 +775,10 @@ test('continue_from refuses unknown, running and cancelled runs with a clear too
   const root = project();
   const r = await run({
     root,
-    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'nope' })), say('ok')],
+    parentScript: [
+      use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'nope' })),
+      say('ok'),
+    ],
   });
   assert.equal(r.outputs[0].isError, true);
   assert.match(r.outputs[0].output, /no subagent run "nope"/);
@@ -622,13 +786,19 @@ test('continue_from refuses unknown, running and cancelled runs with a clear too
   const prev = { title: 'Old', type: 'plan', status: 'cancelled', steps: [] };
   const c = await run({
     root,
-    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })), say('ok')],
+    parentScript: [
+      use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })),
+      say('ok'),
+    ],
     hostCfg: { previousRun: async () => prev },
   });
   assert.match(c.outputs[0].output, /is cancelled; only finished, failed or limit-stopped runs can be continued/);
   const ok = await run({
     root,
-    parentScript: [use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })), say('ok')],
+    parentScript: [
+      use(call('spawn_agent', { title: 'X', prompt: 'p', type: 'explore', continue_from: 'a' })),
+      say('ok'),
+    ],
     hostCfg: { previousRun: async () => ({ ...prev, status: 'limit', report: 'partial' }) },
   });
   assert.equal(ok.outputs[0].isError, false);
@@ -642,22 +812,46 @@ test('delegate_tasks retries: a failed task is re-run (fresh run each time), dep
     root,
     hostCfg: { retryBackoffMs: () => 0 },
     parentScript: [
-      delegate([
-        { id: 'flaky', title: 'Flaky', prompt: 'flaky', type: 'explore' },
-        { id: 'steady', title: 'Steady', prompt: 'steady', type: 'explore' },
-        { id: 'after', title: 'After', prompt: 'after', type: 'explore', dependsOn: ['flaky'] },
-      ], { retries: 2 }),
+      delegate(
+        [
+          { id: 'flaky', title: 'Flaky', prompt: 'flaky', type: 'explore' },
+          { id: 'steady', title: 'Steady', prompt: 'steady', type: 'explore' },
+          { id: 'after', title: 'After', prompt: 'after', type: 'explore', dependsOn: ['flaky'] },
+        ],
+        { retries: 2 },
+      ),
       say('ok'),
     ],
-    children: { flaky: [() => Promise.reject(new Error('rate limited')), () => Promise.reject(new Error('rate limited')), say('third time lucky')], steady: [say('fine')] },
+    children: {
+      flaky: [
+        () => Promise.reject(new Error('rate limited')),
+        () => Promise.reject(new Error('rate limited')),
+        say('third time lucky'),
+      ],
+      steady: [say('fine')],
+    },
   });
   const out = r.outputs[0].output;
   assert.match(out, /Plan finished: 3 task\(s\); 3 completed\. Failed tasks were retried up to 2 time\(s\)\./);
   assert.match(out, /- flaky "Flaky" \(explore\): completed, 3 attempts/);
   assert.match(out, /- steady "Steady" \(explore\): completed, 1 attempt$/m);
   assert.match(out, /third time lucky/);
-  assert.deepEqual(r.runs.filter((x) => x.title.startsWith('Flaky')).map((x) => [x.title, x.status]).reverse(), [['Flaky', 'failed'], ['Flaky (retry 1)', 'failed'], ['Flaky (retry 2)', 'completed']]);
-  assert.match(r.seen.childMessages.after[0].parts[0].text, /third time lucky/, 'the dependant started after the retries and got the final report');
+  assert.deepEqual(
+    r.runs
+      .filter((x) => x.title.startsWith('Flaky'))
+      .map((x) => [x.title, x.status])
+      .reverse(),
+    [
+      ['Flaky', 'failed'],
+      ['Flaky (retry 1)', 'failed'],
+      ['Flaky (retry 2)', 'completed'],
+    ],
+  );
+  assert.match(
+    r.seen.childMessages.after[0].parts[0].text,
+    /third time lucky/,
+    'the dependant started after the retries and got the final report',
+  );
 });
 
 test('delegate_tasks without retries runs a failed task once; retries stop after the allowed number; limit stops are not retried', async () => {
@@ -666,7 +860,11 @@ test('delegate_tasks without retries runs a failed task once; retries stop after
   const r = await run({
     root,
     hostCfg: { retryBackoffMs: () => 0 },
-    parentScript: [delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }]), delegate([{ id: 'b', title: 'B', prompt: 'b', type: 'explore' }], { retries: 1 }), say('ok')],
+    parentScript: [
+      delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }]),
+      delegate([{ id: 'b', title: 'B', prompt: 'b', type: 'explore' }], { retries: 1 }),
+      say('ok'),
+    ],
     children: { a: failing, b: failing },
   });
   assert.match(r.outputs[0].output, /- a "A" \(explore\): failed$/m);
@@ -683,7 +881,7 @@ test('delegate_tasks without retries runs a failed task once; retries stop after
   assert.equal(lim.runs.length, 1);
 });
 
-test('a retried writing task starts in a fresh copy and the failed attempt\'s changes are rejected, not left pending', async () => {
+test("a retried writing task starts in a fresh copy and the failed attempt's changes are rejected, not left pending", async () => {
   const root = project();
   const fake = fakeReviews(root);
   const decided = [];
@@ -691,8 +889,17 @@ test('a retried writing task starts in a fresh copy and the failed attempt\'s ch
   const r = await run({
     root,
     hostCfg: { prepare: fake.prepare, retryBackoffMs: () => 0 },
-    parentScript: [delegate([{ id: 'w', title: 'W', prompt: 'w', type: 'general', files: ['a.txt'] }], { retries: 1 }), say('ok')],
-    children: { w: [use(call('write_file', { path: 'a.txt', content: 'partial\n' })), () => Promise.reject(new Error('crashed')), say('redone')] },
+    parentScript: [
+      delegate([{ id: 'w', title: 'W', prompt: 'w', type: 'general', files: ['a.txt'] }], { retries: 1 }),
+      say('ok'),
+    ],
+    children: {
+      w: [
+        use(call('write_file', { path: 'a.txt', content: 'partial\n' })),
+        () => Promise.reject(new Error('crashed')),
+        say('redone'),
+      ],
+    },
   });
   review.decide = async () => {};
   assert.equal(fake.made.length, 2, 'one private copy per attempt');
@@ -703,7 +910,10 @@ test('a retried writing task starts in a fresh copy and the failed attempt\'s ch
 
 test('delegate_tasks rejects a bad retries value as a tool error', async () => {
   const root = project();
-  const r = await run({ root, parentScript: [delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }], { retries: 3 }), say('ok')] });
+  const r = await run({
+    root,
+    parentScript: [delegate([{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }], { retries: 3 }), say('ok')],
+  });
   assert.equal(r.outputs[0].isError, true);
   assert.match(r.outputs[0].output, /`retries` must be a whole number from 0 to 2/);
   assert.equal(r.runs.length, 0);
@@ -717,7 +927,12 @@ test('budget stop: a running subagent stops at the next step with status budget 
     root,
     stored: { budgets: { dayTokens: 20, chatTokens: null, warnPercent: 80 } },
     parentScript: [use(spawn('Spender', 'spend tokens')), say('ok')],
-    children: { 'spend tokens': Array.from({ length: 8 }, () => ({ parts: [{ type: 'text', text: 'working' }, call('list_dir', {})], usage })) },
+    children: {
+      'spend tokens': Array.from({ length: 8 }, () => ({
+        parts: [{ type: 'text', text: 'working' }, call('list_dir', {})],
+        usage,
+      })),
+    },
   });
   const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
   assert.equal(r.runs[0].status, 'budget');
@@ -732,7 +947,10 @@ test('budget stop: new spawns and plans are refused with a clear tool error and 
   const r = await run({
     root,
     hostCfg: { checkBudget: async () => 'chat' },
-    parentScript: [use(spawn('A', 'a'), delegate([{ id: 'x', title: 'X', prompt: 'x', type: 'explore' }]).parts[0]), say('ok')],
+    parentScript: [
+      use(spawn('A', 'a'), delegate([{ id: 'x', title: 'X', prompt: 'x', type: 'explore' }]).parts[0]),
+      say('ok'),
+    ],
   });
   assert.equal(r.outputs.length, 2);
   for (const o of r.outputs) {
@@ -787,7 +1005,17 @@ function gatedReviews(root) {
   };
   review.list = async () => [];
   review.finish = async () => {};
-  return { made, prepare, stored: { [verificationKey(root)]: { checks: [{ name: 'npm test', command: 'npm test' }], maxFixAttempts: 1, useProjectFile: false } } };
+  return {
+    made,
+    prepare,
+    stored: {
+      [verificationKey(root)]: {
+        checks: [{ name: 'npm test', command: 'npm test' }],
+        maxFixAttempts: 1,
+        useProjectFile: false,
+      },
+    },
+  };
 }
 const failingCheck = { code: 1, output: 'FAIL a.test.ts', timed_out: false };
 
@@ -799,10 +1027,19 @@ test('a general subagent runs the project gate; a failed gate is a warning on th
     stored: g.stored,
     hostCfg: { prepare: g.prepare },
     parentScript: [use(spawn('Gated', 'gated work', 'general')), say('ok')],
-    children: { 'gated work': [() => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))), say('done'), say('still done')] },
+    children: {
+      'gated work': [
+        () => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))),
+        say('done'),
+        say('still done'),
+      ],
+    },
   });
   const out = r.outputs.find((o) => o.name === 'spawn_agent').output;
-  assert.ok(state.runs.some((x) => x.command === 'npm test'), 'the check ran in the subagent');
+  assert.ok(
+    state.runs.some((x) => x.command === 'npm test'),
+    'the check ran in the subagent',
+  );
   assert.match(out, /Failed verification/);
   assert.equal(r.runs[0].status, 'completed');
   assert.ok(r.runs[0].warnings.some((w) => /Failed verification/.test(w)));
@@ -816,7 +1053,12 @@ test('a subagent that runs out of steps right after gate feedback is limit-stopp
     stored: g.stored,
     hostCfg: { prepare: g.prepare, budgets: { general: { maxSteps: 2 } } },
     parentScript: [use(spawn('Short', 'short work', 'general')), say('ok')],
-    children: { 'short work': [() => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))), say('done')] },
+    children: {
+      'short work': [
+        () => ((state.runResult = failingCheck), use(call('write_file', { path: 'a.txt', content: 'x\n' }))),
+        say('done'),
+      ],
+    },
   });
   assert.equal(r.runs[0].status, 'limit');
   assert.match(r.outputs.find((o) => o.name === 'spawn_agent').output, /step limit \(2\)/);

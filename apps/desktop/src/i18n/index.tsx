@@ -27,7 +27,9 @@ const Ctx = createContext<Locale>("en");
 
 export const I18nProvider = ({ locale, children }: { locale: Locale; children: ReactNode }) => {
   // Screen readers pick the voice and pronunciation from <html lang>.
-  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   return <Ctx.Provider value={locale}>{children}</Ctx.Provider>;
 };
 

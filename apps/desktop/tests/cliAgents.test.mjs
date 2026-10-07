@@ -5,10 +5,18 @@ import { register } from 'node:module';
 
 register('./helpers/hooks.mjs', import.meta.url);
 await import('./helpers/apiStub.mjs');
-const { trackCliAgents, finishCliAgents, clearFinishedCliAgents, getCliAgents, resetCliAgents, cliAgentFrom } = await import('../src/agent/cliAgents.ts');
+const { trackCliAgents, finishCliAgents, clearFinishedCliAgents, getCliAgents, resetCliAgents, cliAgentFrom } =
+  await import('../src/agent/cliAgents.ts');
 const { runChatCore } = await import('../src/lib/chatRunCore.ts');
 
-const act = (id, state, over = {}) => ({ type: 'activity', id, name: 'subagent', args: {}, status: state === 'completed' ? 'success' : state === 'failed' ? 'error' : 'running', subagent: { provider: 'codex', agentId: `t-${id}`, title: `Agent ${id}`, action: 'wait', state, ...over } });
+const act = (id, state, over = {}) => ({
+  type: 'activity',
+  id,
+  name: 'subagent',
+  args: {},
+  status: state === 'completed' ? 'success' : state === 'failed' ? 'error' : 'running',
+  subagent: { provider: 'codex', agentId: `t-${id}`, title: `Agent ${id}`, action: 'wait', state, ...over },
+});
 
 beforeEach(() => resetCliAgents());
 
@@ -34,7 +42,15 @@ test('an update that changes nothing does not replace the list; activities witho
   trackCliAgents({ chatId: 1, root: '/p' }, [{ type: 'activity', id: 'x', name: 'Read', args: {}, status: 'running' }]);
   trackCliAgents({ chatId: 3, root: null }, [act('z', 'running')]);
   assert.equal(getCliAgents().length, 1);
-  assert.equal(cliAgentFrom({ type: 'activity', id: 'x', name: 'Read', args: {}, status: 'running' }, { chatId: 1, root: '/p' }, undefined, 0), null);
+  assert.equal(
+    cliAgentFrom(
+      { type: 'activity', id: 'x', name: 'Read', args: {}, status: 'running' },
+      { chatId: 1, root: '/p' },
+      undefined,
+      0,
+    ),
+    null,
+  );
 });
 
 test('finishing a run marks running agents ended, drops their stop handle and clearing removes only finished ones', () => {
@@ -49,7 +65,10 @@ test('finishing a run marks running agents ended, drops their stop handle and cl
   assert.equal(b.state, 'completed');
   trackCliAgents({ chatId: 2, root: '/p' }, [act('c', 'running')]);
   clearFinishedCliAgents('/p');
-  assert.deepEqual(getCliAgents().map((e) => e.key), ['2:c']);
+  assert.deepEqual(
+    getCliAgents().map((e) => e.key),
+    ['2:c'],
+  );
 });
 
 test('agents still running when the user stopped the chat run are "stopped", not "unknown"', () => {
@@ -66,7 +85,9 @@ test('runChatCore feeds the store while the run is live and finishes it afterwar
   const seenLive = [];
   const deps = {
     addMessage: async () => 1,
-    recordUsage() {}, bumpUsage() {}, recordResult() {},
+    recordUsage() {},
+    bumpUsage() {},
+    recordResult() {},
     runAgent: async (o) => {
       o.onActivity(act('a', 'running'));
       o.onActivity(act('b', 'running'));
@@ -76,12 +97,25 @@ test('runChatCore feeds the store while the run is live and finishes it afterwar
     },
   };
   const stop = () => {};
-  const input = (history) => ({ chatId: 9, root: '/proj', history, access: 'readonly', allowlist: [], signal: new AbortController().signal, stop, approve: async () => ({ ok: true }), target: async () => ({ adapter: {}, providerId: 'codex', model: 'm', supportsTools: true, computerUse: false }) });
+  const input = (history) => ({
+    chatId: 9,
+    root: '/proj',
+    history,
+    access: 'readonly',
+    allowlist: [],
+    signal: new AbortController().signal,
+    stop,
+    approve: async () => ({ ok: true }),
+    target: async () => ({ adapter: {}, providerId: 'codex', model: 'm', supportsTools: true, computerUse: false }),
+  });
   const ui = { onActivity: (list) => seenLive.push(list.map((p) => p.id)) };
   await runChatCore(input([{ role: 'user', parts: [{ type: 'text', text: 'go' }] }]), deps, ui);
   // The card order stays a, b even though a was updated last.
   assert.deepEqual(seenLive.filter((x) => typeof x[0] === 'string').pop(), ['a', 'b']);
-  assert.deepEqual(seenLive.find((x) => Array.isArray(x[0]))?.sort(), [['9:a', 'completed'], ['9:b', 'running']]);
+  assert.deepEqual(seenLive.find((x) => Array.isArray(x[0]))?.sort(), [
+    ['9:a', 'completed'],
+    ['9:b', 'running'],
+  ]);
   const after = Object.fromEntries(getCliAgents().map((e) => [e.key, e.state]));
   assert.deepEqual(after, { '9:a': 'completed', '9:b': 'unknown' });
   resetCliAgents();
@@ -102,9 +136,36 @@ test('a provider-reported "unknown" agent is not active, has an end time and can
 
 // Background shell commands (Claude Code `Bash` with `run_in_background`): they used to be dropped because only
 // activities with `subagent` info were tracked, so the panel never listed them.
-const shellCall = (over = {}) => ({ type: 'activity', id: 'tu7', name: 'Bash', args: { command: 'npm run tauri -- build', description: 'Release build', run_in_background: true }, status: 'running', ...over });
-const launched = () => shellCall({ status: 'success', output: 'Command running in background with ID: bx9y8z. Output is being written to: /tmp/bx9y8z.output' });
-const shellNotice = (state) => ({ type: 'activity', id: 'bg:bx9y8z', name: '', args: {}, status: state === 'completed' ? 'success' : 'error', output: 'Build finished', subagent: { provider: 'claude', agentId: 'bx9y8z', bgId: 'bx9y8z', title: '', action: 'close', state, result: 'Build finished' } });
+const shellCall = (over = {}) => ({
+  type: 'activity',
+  id: 'tu7',
+  name: 'Bash',
+  args: { command: 'npm run tauri -- build', description: 'Release build', run_in_background: true },
+  status: 'running',
+  ...over,
+});
+const launched = () =>
+  shellCall({
+    status: 'success',
+    output: 'Command running in background with ID: bx9y8z. Output is being written to: /tmp/bx9y8z.output',
+  });
+const shellNotice = (state) => ({
+  type: 'activity',
+  id: 'bg:bx9y8z',
+  name: '',
+  args: {},
+  status: state === 'completed' ? 'success' : 'error',
+  output: 'Build finished',
+  subagent: {
+    provider: 'claude',
+    agentId: 'bx9y8z',
+    bgId: 'bx9y8z',
+    title: '',
+    action: 'close',
+    state,
+    result: 'Build finished',
+  },
+});
 
 test('a background Bash command becomes a running command task with its shell id, tracked from its start', () => {
   trackCliAgents({ chatId: 1, root: '/p' }, [shellCall()], 100);
@@ -156,8 +217,33 @@ test('a background command that failed to start is failed at once', () => {
 
 test('runChatCore feeds background Bash activities into the store', async () => {
   let live;
-  const deps = { addMessage: async () => 1, recordUsage() {}, bumpUsage() {}, recordResult() {}, runAgent: async (o) => { o.onActivity(shellCall()); o.onActivity(launched()); live = getCliAgents().map((e) => e.state); } };
-  const input = { chatId: 8, root: '/proj', history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }], access: 'readonly', allowlist: [], signal: new AbortController().signal, approve: async () => ({ ok: true }), target: async () => ({ adapter: {}, providerId: 'claude-code', model: 'm', supportsTools: true, computerUse: false }) };
+  const deps = {
+    addMessage: async () => 1,
+    recordUsage() {},
+    bumpUsage() {},
+    recordResult() {},
+    runAgent: async (o) => {
+      o.onActivity(shellCall());
+      o.onActivity(launched());
+      live = getCliAgents().map((e) => e.state);
+    },
+  };
+  const input = {
+    chatId: 8,
+    root: '/proj',
+    history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
+    access: 'readonly',
+    allowlist: [],
+    signal: new AbortController().signal,
+    approve: async () => ({ ok: true }),
+    target: async () => ({
+      adapter: {},
+      providerId: 'claude-code',
+      model: 'm',
+      supportsTools: true,
+      computerUse: false,
+    }),
+  };
   await runChatCore(input, deps, {});
   assert.deepEqual(live, ['running']);
   assert.equal(getCliAgents()[0].state, 'unknown');

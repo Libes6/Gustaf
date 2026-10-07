@@ -36,24 +36,50 @@ test('selectModel: explicit request from the allow-list, else the type default, 
   assert.deepEqual(s.selectModel('explore', st, parent), { ok: true, ref: cheap, source: 'type' });
   assert.deepEqual(s.selectModel('general', st, parent), { ok: true, ref: parent, source: 'parent' });
   assert.deepEqual(s.selectModel('general', st, parent, 'q/mid'), { ok: true, ref: other, source: 'requested' });
-  assert.deepEqual(s.selectModel('general', st, parent, 'mid'), { ok: true, ref: other, source: 'requested' }, 'unambiguous model id');
-  assert.deepEqual(s.selectModel('general', st, parent, 'small'), { ok: true, ref: cheap, source: 'requested' }, 'type defaults are allowed');
+  assert.deepEqual(
+    s.selectModel('general', st, parent, 'mid'),
+    { ok: true, ref: other, source: 'requested' },
+    'unambiguous model id',
+  );
+  assert.deepEqual(
+    s.selectModel('general', st, parent, 'small'),
+    { ok: true, ref: cheap, source: 'requested' },
+    'type defaults are allowed',
+  );
   assert.deepEqual(s.selectModel('explore', st, parent, 'p/big'), { ok: true, ref: parent, source: 'parent' });
   const denied = s.selectModel('general', st, parent, 'x/huge');
   assert.equal(denied.ok, false);
   assert.match(denied.error, /not allowed.*p\/big, p\/small, q\/mid/);
-  assert.deepEqual(s.selectModel('general', st, parent, '  '), { ok: true, ref: parent, source: 'parent' }, 'blank = no request');
+  assert.deepEqual(
+    s.selectModel('general', st, parent, '  '),
+    { ok: true, ref: parent, source: 'parent' },
+    'blank = no request',
+  );
   // Ambiguous bare id is refused.
-  const amb = s.normalizeAgentSettings({ allowedModels: [{ providerId: 'a', model: 'm' }, { providerId: 'b', model: 'm' }] });
+  const amb = s.normalizeAgentSettings({
+    allowedModels: [
+      { providerId: 'a', model: 'm' },
+      { providerId: 'b', model: 'm' },
+    ],
+  });
   assert.equal(s.matchModelArg('m', s.allowedRefs(amb, parent)), null);
   assert.equal(s.selectModel('explore', amb, parent, 'm').ok, false);
 });
 
 test('cheapModelFor uses the configured model only when usable', () => {
   const st = s.normalizeAgentSettings({ cheapModel: cheap });
-  assert.deepEqual(s.cheapModelFor(st, parent, () => true), cheap);
-  assert.deepEqual(s.cheapModelFor(st, parent, () => false), parent);
-  assert.deepEqual(s.cheapModelFor(s.DEFAULT_AGENT_SETTINGS, parent, () => true), parent);
+  assert.deepEqual(
+    s.cheapModelFor(st, parent, () => true),
+    cheap,
+  );
+  assert.deepEqual(
+    s.cheapModelFor(st, parent, () => false),
+    parent,
+  );
+  assert.deepEqual(
+    s.cheapModelFor(s.DEFAULT_AGENT_SETTINGS, parent, () => true),
+    parent,
+  );
 });
 
 test('budget defaults per type, user overrides per field, hard caps', () => {
@@ -81,7 +107,10 @@ test('token ledger: per day and chat, bounded, and added to budget totals', () =
   assert.equal(runs.ledgerChat(l, 1000), 1);
   assert.equal(runs.ledgerChat(l, 1001 + runs.MAX_LEDGER_CHATS), 1);
   assert.deepEqual(runs.normalizeLedger(JSON.parse(JSON.stringify(l))), l);
-  assert.deepEqual(runs.normalizeLedger({ days: { bad: 1, '2026-01-01': -3 }, chats: { 5: 2 } }), { days: {}, chats: {} });
+  assert.deepEqual(runs.normalizeLedger({ days: { bad: 1, '2026-01-01': -3 }, chats: { 5: 2 } }), {
+    days: {},
+    chats: {},
+  });
 
   assert.equal(withExtraTokens(undefined, 10), undefined, 'unreadable stays unreadable');
   assert.deepEqual(withExtraTokens({ tokens: 5, counted: 1, missing: 0 }, 10), { tokens: 15, counted: 2, missing: 0 });

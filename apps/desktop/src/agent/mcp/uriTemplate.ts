@@ -26,7 +26,8 @@ const RESERVED = "\u0001";
  * literal scheme or lets a reserved expansion (`+`, `#`) land in the authority, where it could change the host.
  */
 export function parseUriTemplate(template: string): ParsedTemplate {
-  if (typeof template !== "string" || !template || template.length > MAX_TEMPLATE_URI) throw new Error("invalid URI template");
+  if (typeof template !== "string" || !template || template.length > MAX_TEMPLATE_URI)
+    throw new Error("invalid URI template");
   const parts: TemplatePart[] = [];
   const variables: string[] = [];
   let lit = "";
@@ -42,7 +43,10 @@ export function parseUriTemplate(template: string): ParsedTemplate {
     const body = template.slice(i + 1, end);
     const op = body[0] === "+" || body[0] === "#" ? (body[0] as "+" | "#") : "";
     const name = op ? body.slice(1) : body;
-    if (!/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/.test(name)) throw new Error(`unsupported URI template expression {${body.slice(0, 40)}} (only {var}, {+var} and {#var} are supported)`);
+    if (!/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/.test(name))
+      throw new Error(
+        `unsupported URI template expression {${body.slice(0, 40)}} (only {var}, {+var} and {#var} are supported)`,
+      );
     if (lit) parts.push(lit);
     lit = "";
     parts.push({ op, name });
@@ -58,7 +62,10 @@ export function parseUriTemplate(template: string): ParsedTemplate {
   let authority: string | null = null;
   if (after.startsWith("//")) {
     const auth = /^\/\/([^/?#]*)/.exec(after)![1];
-    if (auth.includes(RESERVED)) throw new Error("unsupported URI template: a reserved expansion ({+var} or {#var}) is not allowed in the host part");
+    if (auth.includes(RESERVED))
+      throw new Error(
+        "unsupported URI template: a reserved expansion ({+var} or {#var}) is not allowed in the host part",
+      );
     authority = auth.includes(SIMPLE) ? null : auth;
   }
   return { parts, variables, scheme: m[1].toLowerCase(), authority };
@@ -70,7 +77,7 @@ const RESERVED_CHARS = /^[:/?#[\]@!$&'()*+,;=]$/;
 /** Percent-encodes a value: unreserved characters stay; for `{+var}` / `{#var}` reserved ones and existing %XX triplets stay too. */
 function encodeValue(v: string, reserved: boolean): string {
   let out = "";
-  for (let i = 0; i < v.length; ) {
+  for (let i = 0; i < v.length;) {
     if (reserved && v[i] === "%" && /^[0-9A-Fa-f]{2}$/.test(v.slice(i + 1, i + 3))) {
       out += v.slice(i, i + 3);
       i += 3;
@@ -79,7 +86,8 @@ function encodeValue(v: string, reserved: boolean): string {
     const ch = String.fromCodePoint(v.codePointAt(i)!);
     i += ch.length;
     if (UNRESERVED.test(ch) || (reserved && RESERVED_CHARS.test(ch))) out += ch;
-    else out += [...new TextEncoder().encode(ch)].map((b) => "%" + b.toString(16).toUpperCase().padStart(2, "0")).join("");
+    else
+      out += [...new TextEncoder().encode(ch)].map((b) => "%" + b.toString(16).toUpperCase().padStart(2, "0")).join("");
   }
   return out;
 }
@@ -111,7 +119,9 @@ export function expandUriTemplate(template: string, args: unknown): string {
   const a = args === undefined || args === null ? {} : args;
   if (typeof a !== "object" || Array.isArray(a)) throw new Error("arguments must be an object of variable values");
   const given = a as Record<string, unknown>;
-  for (const k of Object.keys(given)) if (!variables.includes(k)) throw new Error(`unknown template variable "${k.slice(0, 40)}" (expected: ${variables.join(", ") || "none"})`);
+  for (const k of Object.keys(given))
+    if (!variables.includes(k))
+      throw new Error(`unknown template variable "${k.slice(0, 40)}" (expected: ${variables.join(", ") || "none"})`);
   const values: Record<string, string> = {};
   for (const v of variables) {
     const raw = given[v];
@@ -123,7 +133,8 @@ export function expandUriTemplate(template: string, args: unknown): string {
     values[v] = val;
   }
   let out = "";
-  for (const p of parts) out += typeof p === "string" ? p : (p.op === "#" ? "#" : "") + encodeValue(values[p.name], p.op !== "");
+  for (const p of parts)
+    out += typeof p === "string" ? p : (p.op === "#" ? "#" : "") + encodeValue(values[p.name], p.op !== "");
   if (out.length > MAX_TEMPLATE_URI) throw new Error("the expanded URI is too long");
   // Defence in depth: whatever the expansion did, the result must still be the template's scheme and literal host.
   let u: URL;

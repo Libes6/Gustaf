@@ -5,7 +5,10 @@ import type { SourceSession } from "../api.ts";
 export const LIST_LIMIT = 200;
 
 /** Case-insensitive match of every word of `query` against title, project path and id. */
-export function filterSessions<T extends Pick<SourceSession, "title" | "projectPath" | "id">>(list: T[], query: string): T[] {
+export function filterSessions<T extends Pick<SourceSession, "title" | "projectPath" | "id">>(
+  list: T[],
+  query: string,
+): T[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return list;
   return list.filter((s) => {
@@ -15,4 +18,5 @@ export function filterSessions<T extends Pick<SourceSession, "title" | "projectP
 }
 
 /** Ids that can still be selected (not imported yet), for "select all shown". */
-export const selectable = <T extends { id: string }>(list: T[], imported: Set<string>) => list.filter((s) => !imported.has(s.id));
+export const selectable = <T extends { id: string }>(list: T[], imported: Set<string>) =>
+  list.filter((s) => !imported.has(s.id));

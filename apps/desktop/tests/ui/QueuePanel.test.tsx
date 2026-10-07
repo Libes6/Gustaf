@@ -14,10 +14,25 @@ function Harness({ initial }: { initial: QueueState }) {
   latest = queue;
   return <QueuePanel queue={queue} onChange={setQueue} />;
 }
-const setup = (interrupted = false) => renderApp(<Harness initial={{ paused: interrupted, interrupted, items: [
-  { id: "first", text: joinChatReferences("First request", [reference]), images: ["persisted-image"], clarify: false },
-  { id: "second", text: "Second request", images: [], clarify: false },
-] }} />, makeApp());
+const setup = (interrupted = false) =>
+  renderApp(
+    <Harness
+      initial={{
+        paused: interrupted,
+        interrupted,
+        items: [
+          {
+            id: "first",
+            text: joinChatReferences("First request", [reference]),
+            images: ["persisted-image"],
+            clarify: false,
+          },
+          { id: "second", text: "Second request", images: [], clarify: false },
+        ],
+      }}
+    />,
+    makeApp(),
+  );
 
 describe("Compact queue", () => {
   it("shows previews and count; edits on demand with keyboard and preserves FIFO attachments", async () => {
@@ -33,11 +48,11 @@ describe("Compact queue", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(splitChatReferences(latest.items[0].text)).toEqual({ body: "Updated\nline", references: [reference] });
     expect(latest.items[0].images).toEqual(["persisted-image"]);
-    expect(latest.items.map(i => i.id)).toEqual(["first", "second"]);
+    expect(latest.items.map((i) => i.id)).toEqual(["first", "second"]);
     expect(screen.getAllByRole("button", { name: "Edit queued message" })[0]).toHaveFocus();
     await userEvent.tab();
     await userEvent.keyboard("{Enter}");
-    expect(latest.items.map(i => i.id)).toEqual(["second"]);
+    expect(latest.items.map((i) => i.id)).toEqual(["second"]);
     expect(screen.getByRole("status")).toHaveTextContent("Queued messages · 1");
     await userEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(latest.items).toEqual([]);

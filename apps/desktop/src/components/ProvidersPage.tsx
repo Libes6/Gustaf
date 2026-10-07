@@ -15,24 +15,46 @@ import { SettingRow } from "./SettingRow";
 type Clis = { id: CliId; version: string }[];
 type Row = { key: string; driver: Driver | null; p?: ProviderConfig };
 
-const DRIVER_KIND: Record<Driver, ProviderKind> = { claude: "anthropic", codex: "openai", cursor: "cursor", grok: "xai" };
+const DRIVER_KIND: Record<Driver, ProviderKind> = {
+  claude: "anthropic",
+  codex: "openai",
+  cursor: "cursor",
+  grok: "xai",
+};
 const DRIVER_CLI: Partial<Record<Driver, CliId>> = { claude: "claude", codex: "codex", cursor: "cursor-agent" };
 const short = (v: string) => /\d+(?:\.\d+)+/.exec(v)?.[0] ?? v.split(/[\s-]/)[0];
-const signInCommand = (cli?: CliId) => (cli === "claude" ? "claude auth login" : cli === "cursor-agent" ? "cursor-agent login" : "codex login");
+const signInCommand = (cli?: CliId) =>
+  cli === "claude" ? "claude auth login" : cli === "cursor-agent" ? "cursor-agent login" : "codex login";
 
 function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
-  return <button role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={`toggle${on ? " on" : ""}`}
+      onClick={() => onChange(!on)}
+    />
+  );
 }
 
 /** Status of a provider from cached data only (last check, last model listing): opening the page sends nothing and reads no key. */
 function useStatus() {
   const t = useT();
   const app = useApp();
-  return (p: ProviderConfig): { color: string; label: string; detail: string; tone: "ok" | "warn" | "err" | "muted" } => {
+  return (
+    p: ProviderConfig,
+  ): { color: string; label: string; detail: string; tone: "ok" | "warn" | "err" | "muted" } => {
     const count = t("modelsCount", { count: app.models.filter((m) => m.providerId === p.id).length });
     if (p.disabled) return { color: "var(--text-3)", label: t("providerOff"), detail: "", tone: "muted" };
     const health = app.providerHealth[p.id];
-    if (health?.status === "auth") return { color: "var(--yellow, #d9a33b)", label: t("provNotAuthenticated"), detail: health.message, tone: "warn" };
+    if (health?.status === "auth")
+      return {
+        color: "var(--yellow, #d9a33b)",
+        label: t("provNotAuthenticated"),
+        detail: health.message,
+        tone: "warn",
+      };
     const err = health?.status === "error" ? health.message : app.modelErrors[p.id];
     if (err) return { color: "var(--red)", label: t("provUnavailable"), detail: err, tone: "err" };
     if (health?.status === "ok") {
@@ -57,7 +79,14 @@ export function ProvidersPage() {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState<{ tile?: TileId } | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => void detectClis().then((c) => (setClis(c), setClisLoaded(true)), () => {}), []);
+  useEffect(
+    () =>
+      void detectClis().then(
+        (c) => (setClis(c), setClisLoaded(true)),
+        () => {},
+      ),
+    [],
+  );
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -87,7 +116,13 @@ export function ProvidersPage() {
     await app.refreshModels(refetch ? { only: [p.id] } : { refresh: "startup" }).finally(() => setBusy(false));
   };
   const connectCli = async (id: CliId) => {
-    const c: ProviderConfig = { id: `cli-${id}-${Date.now().toString(36)}`, kind: "cli", name: cliName(id), baseUrl: "", cli: id };
+    const c: ProviderConfig = {
+      id: `cli-${id}-${Date.now().toString(36)}`,
+      kind: "cli",
+      name: cliName(id),
+      baseUrl: "",
+      cli: id,
+    };
     await update(c);
     setSel(c.id);
   };
@@ -101,12 +136,28 @@ export function ProvidersPage() {
           <p className="lead">{t("providersLead")}</p>
         </div>
         <button className="btn-ghost small" onClick={refresh} disabled={busy} title={t("checkNow")}>
-          <RefreshCw size={13} className={busy ? "spin" : ""} /> {minutes < 0 ? t("checkNow") : minutes < 1 ? t("provCheckedJustNow") : t("provCheckedMin", { count: minutes })}
+          <RefreshCw size={13} className={busy ? "spin" : ""} />{" "}
+          {minutes < 0
+            ? t("checkNow")
+            : minutes < 1
+              ? t("provCheckedJustNow")
+              : t("provCheckedMin", { count: minutes })}
         </button>
-        <button className="btn-ghost small" data-setting="providerCheckAll" title={t("providerCheckAllHint")} onClick={() => void app.checkAllProviders()} disabled={!!app.checkingProvider || !app.providers.some((p) => !p.disabled)}>
+        <button
+          className="btn-ghost small"
+          data-setting="providerCheckAll"
+          title={t("providerCheckAllHint")}
+          onClick={() => void app.checkAllProviders()}
+          disabled={!!app.checkingProvider || !app.providers.some((p) => !p.disabled)}
+        >
           {t(app.checkingProvider ? "providerCheckingAll" : "providerCheckAll")}
         </button>
-        <button className="icon-btn" title={t("addProvider")} aria-label={t("addProvider")} onClick={() => setAdding({})}>
+        <button
+          className="icon-btn"
+          title={t("addProvider")}
+          aria-label={t("addProvider")}
+          onClick={() => setAdding({})}
+        >
           <Plus size={15} />
         </button>
       </div>
@@ -118,11 +169,20 @@ export function ProvidersPage() {
               const d = r.driver!;
               return (
                 <div key={r.key} role="listitem" className={`split-item unset${active ? " active" : ""}`}>
-                  <button className="split-main" aria-current={active ? "true" : undefined} onClick={() => setSel(r.key)}>
+                  <button
+                    className="split-main"
+                    aria-current={active ? "true" : undefined}
+                    onClick={() => setSel(r.key)}
+                  >
                     <ProviderIcon kind={DRIVER_KIND[d]} cli={DRIVER_CLI[d]} />
                     <div className="grow">
-                      <div className="t">{DRIVER_NAMES[d]} {version(DRIVER_CLI[d]) && <span className="mono d">v{version(DRIVER_CLI[d])}</span>}</div>
-                      <div className="sub d">{t("provNotSetUp")} · <span className="link">{t("provConnect")}</span></div>
+                      <div className="t">
+                        {DRIVER_NAMES[d]}{" "}
+                        {version(DRIVER_CLI[d]) && <span className="mono d">v{version(DRIVER_CLI[d])}</span>}
+                      </div>
+                      <div className="sub d">
+                        {t("provNotSetUp")} · <span className="link">{t("provConnect")}</span>
+                      </div>
                     </div>
                   </button>
                 </div>
@@ -137,10 +197,17 @@ export function ProvidersPage() {
                 <button className="split-main" aria-current={active ? "true" : undefined} onClick={() => setSel(r.key)}>
                   <ProviderIcon kind={p.kind} cli={p.cli} />
                   <div className="grow">
-                    <div className="t">{p.name} {v && <span className="mono d">v{v}</span>}</div>
-                    <div className={`sub ${s.tone === "err" || s.tone === "warn" ? "err" : "d"}`} title={s.detail || undefined}>
+                    <div className="t">
+                      {p.name} {v && <span className="mono d">v{v}</span>}
+                    </div>
+                    <div
+                      className={`sub ${s.tone === "err" || s.tone === "warn" ? "err" : "d"}`}
+                      title={s.detail || undefined}
+                    >
                       <span className="status-dot" style={{ background: s.color }} />
-                      {s.label}{s.detail ? ` · ${s.detail.slice(0, 80)}` : ""}{outdated ? ` · ${t("provStaleShort")}` : ""}
+                      {s.label}
+                      {s.detail ? ` · ${s.detail.slice(0, 80)}` : ""}
+                      {outdated ? ` · ${t("provStaleShort")}` : ""}
                     </div>
                   </div>
                 </button>
@@ -151,29 +218,60 @@ export function ProvidersPage() {
         </div>
         <div className="split-detail">
           {current.p ? (
-            <ProviderDetail key={current.p.id} p={current.p} now={now} version={current.p.kind === "cli" ? version(current.p.cli) : undefined} cliFound={current.p.kind === "cli" && clisLoaded ? clis.some((c) => c.id === current.p!.cli) : undefined} update={update}
+            <ProviderDetail
+              key={current.p.id}
+              p={current.p}
+              now={now}
+              version={current.p.kind === "cli" ? version(current.p.cli) : undefined}
+              cliFound={current.p.kind === "cli" && clisLoaded ? clis.some((c) => c.id === current.p!.cli) : undefined}
+              update={update}
               onDuplicate={async (copy) => (await update(copy), setSel(copy.id))}
-              onDeleted={() => setSel(null)} />
+              onDeleted={() => setSel(null)}
+            />
           ) : (
-            <UnsetDriver driver={current.driver!} cli={DRIVER_CLI[current.driver!]} version={version(DRIVER_CLI[current.driver!])} busy={busy}
-              onConnectCli={connectCli} onAdd={() => setAdding({ tile: current.driver! })} />
+            <UnsetDriver
+              driver={current.driver!}
+              cli={DRIVER_CLI[current.driver!]}
+              version={version(DRIVER_CLI[current.driver!])}
+              busy={busy}
+              onConnectCli={connectCli}
+              onAdd={() => setAdding({ tile: current.driver! })}
+            />
           )}
         </div>
       </div>
       {adding && (
-        <AddProviderDialog initialTile={adding.tile} clis={clis} onClose={() => setAdding(null)}
+        <AddProviderDialog
+          initialTile={adding.tile}
+          clis={clis}
+          onClose={() => setAdding(null)}
           onSaved={async (cfg, models) => {
             setAdding(null);
             await app.refreshModels({ only: [cfg.id] });
             setSel(cfg.id);
             if (!app.selection && models[0]) app.setSelection({ providerId: cfg.id, model: models[0].id });
-          }} />
+          }}
+        />
       )}
     </>
   );
 }
 
-function UnsetDriver({ driver, cli, version, busy, onConnectCli, onAdd }: { driver: Driver; cli?: CliId; version?: string; busy: boolean; onConnectCli: (id: CliId) => void; onAdd: () => void }) {
+function UnsetDriver({
+  driver,
+  cli,
+  version,
+  busy,
+  onConnectCli,
+  onAdd,
+}: {
+  driver: Driver;
+  cli?: CliId;
+  version?: string;
+  busy: boolean;
+  onConnectCli: (id: CliId) => void;
+  onAdd: () => void;
+}) {
   const t = useT();
   return (
     <>
@@ -181,22 +279,52 @@ function UnsetDriver({ driver, cli, version, busy, onConnectCli, onAdd }: { driv
         <ProviderIcon kind={DRIVER_KIND[driver]} cli={cli} size={22} />
         <h3 className="grow">{DRIVER_NAMES[driver]}</h3>
       </div>
-      <p className="d">{t("provUnsetLead", { name: DRIVER_NAMES[driver] })} {t(`provAbout_${driver}`)}</p>
+      <p className="d">
+        {t("provUnsetLead", { name: DRIVER_NAMES[driver] })} {t(`provAbout_${driver}`)}
+      </p>
       {cli && (
         <div className="card">
-          <SettingRow title={`${cliName(cli)} CLI`} description={version ? t("provCliFound", { version }) : t("provCliMissing")}>
-            <button className="btn-soft" aria-label={`${t("cliConnect")} ${cliName(cli)} CLI`} disabled={busy || !version} onClick={() => onConnectCli(cli)}>{t("cliConnect")}</button>
+          <SettingRow
+            title={`${cliName(cli)} CLI`}
+            description={version ? t("provCliFound", { version }) : t("provCliMissing")}
+          >
+            <button
+              className="btn-soft"
+              aria-label={`${t("cliConnect")} ${cliName(cli)} CLI`}
+              disabled={busy || !version}
+              onClick={() => onConnectCli(cli)}
+            >
+              {t("cliConnect")}
+            </button>
           </SettingRow>
         </div>
       )}
       <div className="dialog-foot" style={{ justifyContent: "flex-start" }}>
-        <button className="btn btn-primary" onClick={onAdd}><Plus size={13} /> {t("provConnect")} {DRIVER_NAMES[driver]}</button>
+        <button className="btn btn-primary" onClick={onAdd}>
+          <Plus size={13} /> {t("provConnect")} {DRIVER_NAMES[driver]}
+        </button>
       </div>
     </>
   );
 }
 
-function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDeleted }: { p: ProviderConfig; version?: string; now: number; cliFound?: boolean; update: (p: ProviderConfig, key?: string | null) => Promise<unknown>; onDuplicate: (copy: ProviderConfig) => void; onDeleted: () => void }) {
+function ProviderDetail({
+  p,
+  version,
+  now,
+  cliFound,
+  update,
+  onDuplicate,
+  onDeleted,
+}: {
+  p: ProviderConfig;
+  version?: string;
+  now: number;
+  cliFound?: boolean;
+  update: (p: ProviderConfig, key?: string | null) => Promise<unknown>;
+  onDuplicate: (copy: ProviderConfig) => void;
+  onDeleted: () => void;
+}) {
   const t = useT();
   const app = useApp();
   const [name, setName] = useState(p.name);
@@ -215,7 +343,11 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
   // The copy gets a new id and no key (copying would mean reading the Keychain); a browser-login Cursor account owns its profile folder, so it is not duplicated.
   const duplicate = () => {
     const { cliProfile: _profile, backupProviderId: _backup, ...rest } = p;
-    onDuplicate({ ...rest, id: `${p.kind === "cli" ? `cli-${p.cli}` : p.kind}-${Date.now().toString(36)}`, name: t("provCopyName", { name: p.name }) });
+    onDuplicate({
+      ...rest,
+      id: `${p.kind === "cli" ? `cli-${p.cli}` : p.kind}-${Date.now().toString(36)}`,
+      name: t("provCopyName", { name: p.name }),
+    });
   };
   const refreshModels = async () => {
     setLoading(true);
@@ -226,29 +358,106 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
     <>
       <div className="detail-head">
         <ProviderIcon kind={p.kind} cli={p.cli} size={22} />
-        <h3 className="grow">{p.name} {version && <span className="mono d">v{version}</span>}</h3>
-        {!p.cliProfile && <button className="icon-btn" title={t("provDuplicate")} aria-label={t("provDuplicate")} onClick={duplicate}><Copy size={14} /></button>}
-        <button className="icon-btn" title={t("delete")} aria-label={t("delete")} onClick={async () => (await deleteProvider(p.id), await app.refreshModels({ refresh: "startup" }), onDeleted())}><Trash2 size={14} /></button>
+        <h3 className="grow">
+          {p.name} {version && <span className="mono d">v{version}</span>}
+        </h3>
+        {!p.cliProfile && (
+          <button className="icon-btn" title={t("provDuplicate")} aria-label={t("provDuplicate")} onClick={duplicate}>
+            <Copy size={14} />
+          </button>
+        )}
+        <button
+          className="icon-btn"
+          title={t("delete")}
+          aria-label={t("delete")}
+          onClick={async () => (
+            await deleteProvider(p.id),
+            await app.refreshModels({ refresh: "startup" }),
+            onDeleted()
+          )}
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
       <div className="card">
-        <SettingRow id="providerName" title={t("displayName")} description={p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}>
-          <input aria-label={t("displayName")} className="input narrow" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })} />
+        <SettingRow
+          id="providerName"
+          title={t("displayName")}
+          description={p.kind === "cli" ? t("cliSubscription") : PRESETS[p.kind].name}
+        >
+          <input
+            aria-label={t("displayName")}
+            className="input narrow"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => name.trim() && name !== p.name && update({ ...p, name: name.trim() })}
+          />
         </SettingRow>
       </div>
       <div className="card" aria-label={t("provDiagnostics")}>
         {p.kind === "cli" && (
-          <SettingRow id="providerCliVersion" testId="prov-version" title={t("provCliVersion")} description={cliFound === false ? <div className="err">{t("provCliNotFound", { name: cliName(p.cli!) })}</div> : undefined}>
-            <span className="d mono">{version ? `v${version}` : cliFound === false ? t("provNotFoundShort") : "—"}</span>
+          <SettingRow
+            id="providerCliVersion"
+            testId="prov-version"
+            title={t("provCliVersion")}
+            description={
+              cliFound === false ? (
+                <div className="err">{t("provCliNotFound", { name: cliName(p.cli!) })}</div>
+              ) : undefined
+            }
+          >
+            <span className="d mono">
+              {version ? `v${version}` : cliFound === false ? t("provNotFoundShort") : "—"}
+            </span>
           </SettingRow>
         )}
-        <SettingRow id="providerStatus" testId="prov-status" title={t(diag.state === "auth" ? "provNotAuthenticated" : diag.state === "ok" ? "provAuthenticated" : diag.state === "error" || diag.state === "cliMissing" ? "provUnavailable" : diag.state === "disabled" ? "providerOff" : "provNotChecked")} description={<>
-            {t("providerCheckHint")}
-            {diag.detail && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{diag.detail}</div>}
-            {diag.state === "auth" && p.kind === "cli" && <div>{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>}
-            <div data-testid="prov-checked">{diag.checkedAt ? t("provLastChecked", { time: t.date(diag.checkedAt) }) : diag.state === "unchecked" || !health ? t("provNeverChecked") : t("provCheckedUnknown")}</div>
-            {diag.stale && <div className="err" role="status">{t("provStale")}</div>}
-          </>}>
-          <button className="btn-soft" disabled={!!app.checkingProvider || p.disabled} onClick={() => app.checkProvider(p)}>{t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}</button>
+        <SettingRow
+          id="providerStatus"
+          testId="prov-status"
+          title={t(
+            diag.state === "auth"
+              ? "provNotAuthenticated"
+              : diag.state === "ok"
+                ? "provAuthenticated"
+                : diag.state === "error" || diag.state === "cliMissing"
+                  ? "provUnavailable"
+                  : diag.state === "disabled"
+                    ? "providerOff"
+                    : "provNotChecked",
+          )}
+          description={
+            <>
+              {t("providerCheckHint")}
+              {diag.detail && (
+                <div className="err" style={{ whiteSpace: "pre-wrap" }}>
+                  {diag.detail}
+                </div>
+              )}
+              {diag.state === "auth" && p.kind === "cli" && (
+                <div>{t("provSignInCommand", { command: signInCommand(p.cli) })}</div>
+              )}
+              <div data-testid="prov-checked">
+                {diag.checkedAt
+                  ? t("provLastChecked", { time: t.date(diag.checkedAt) })
+                  : diag.state === "unchecked" || !health
+                    ? t("provNeverChecked")
+                    : t("provCheckedUnknown")}
+              </div>
+              {diag.stale && (
+                <div className="err" role="status">
+                  {t("provStale")}
+                </div>
+              )}
+            </>
+          }
+        >
+          <button
+            className="btn-soft"
+            disabled={!!app.checkingProvider || p.disabled}
+            onClick={() => app.checkProvider(p)}
+          >
+            {t(app.checkingProvider === p.id ? "providerChecking" : "providerCheck")}
+          </button>
         </SettingRow>
       </div>
       <h4 aria-level={2}>{t("runtime")}</h4>
@@ -260,8 +469,21 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
             </SettingRow>
             {p.cliAuth === "key" && (
               <SettingRow id="providerApiKey" title={t("apiKey")} description={t("cursorCliAccountHint")}>
-                <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder={t("keyUnchanged")} value={key} onChange={(e) => setKey(e.target.value)} />
-                <button className="btn-soft" disabled={!key.trim()} onClick={() => update(p, key.trim()).then(() => setKey(""))}>{t("save")}</button>
+                <input
+                  aria-label={t("apiKey")}
+                  className="input narrow"
+                  type="password"
+                  placeholder={t("keyUnchanged")}
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                />
+                <button
+                  className="btn-soft"
+                  disabled={!key.trim()}
+                  onClick={() => update(p, key.trim()).then(() => setKey(""))}
+                >
+                  {t("save")}
+                </button>
               </SettingRow>
             )}
           </>
@@ -269,11 +491,25 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
           <>
             {p.kind !== "cursor" && (
               <SettingRow id="providerBaseUrl" title={t("baseUrl")}>
-                <input aria-label={t("baseUrl")} className="input narrow" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })} />
+                <input
+                  aria-label={t("baseUrl")}
+                  className="input narrow"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })}
+                />
               </SettingRow>
             )}
             <SettingRow id="providerApiKey" title={t("apiKey")} description={t("keyUnchanged")}>
-              <input aria-label={t("apiKey")} className="input narrow" type="password" placeholder="••••••••" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))} />
+              <input
+                aria-label={t("apiKey")}
+                className="input narrow"
+                type="password"
+                placeholder="••••••••"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))}
+              />
             </SettingRow>
           </>
         )}
@@ -282,8 +518,23 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
       <h4 aria-level={2}>{t("models")}</h4>
       <div className="card">
         <div className="card-row" style={{ minHeight: 44 }}>
-          <input aria-label={t("searchModels")} className="input narrow" placeholder={t("searchModels")} value={q} onChange={(e) => setQ(e.target.value)} />
-          <button className="btn-ghost small" onClick={() => app.setHiddenModels(allHidden ? app.hiddenModels.filter((k) => !keys.includes(k)) : [...new Set([...app.hiddenModels, ...keys])])}>
+          <input
+            aria-label={t("searchModels")}
+            className="input narrow"
+            placeholder={t("searchModels")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button
+            className="btn-ghost small"
+            onClick={() =>
+              app.setHiddenModels(
+                allHidden
+                  ? app.hiddenModels.filter((k) => !keys.includes(k))
+                  : [...new Set([...app.hiddenModels, ...keys])],
+              )
+            }
+          >
             {t(allHidden ? "showAll" : "hideAll")}
           </button>
           <span className="grow d">{t("modelsCount", { count: models.length })}</span>
@@ -297,11 +548,23 @@ function ProviderDetail({ p, version, now, cliFound, update, onDuplicate, onDele
             const fav = app.favorites.includes(k);
             return (
               <div key={m.id} className="model-line">
-                <button className={`star${fav ? " on" : ""}`} title={t("favorite")} aria-label={`${t("favorite")}: ${m.name}`} aria-pressed={fav} onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}>
+                <button
+                  className={`star${fav ? " on" : ""}`}
+                  title={t("favorite")}
+                  aria-label={`${t("favorite")}: ${m.name}`}
+                  aria-pressed={fav}
+                  onClick={() => app.setFavorites(toggle(app.favorites, k, !fav))}
+                >
                   <Star size={13} fill={fav ? "currentColor" : "none"} />
                 </button>
-                <span className="grow">{m.name} {m.name !== m.id && <span className="mono d">{m.id}</span>}</span>
-                <Toggle on={!app.hiddenModels.includes(k)} label={m.name} onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))} />
+                <span className="grow">
+                  {m.name} {m.name !== m.id && <span className="mono d">{m.id}</span>}
+                </span>
+                <Toggle
+                  on={!app.hiddenModels.includes(k)}
+                  label={m.name}
+                  onChange={(on) => app.setHiddenModels(toggle(app.hiddenModels, k, !on))}
+                />
               </div>
             );
           })}

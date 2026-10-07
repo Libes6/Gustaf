@@ -20,7 +20,10 @@ async function call(req: object, onEvent: (e: any) => void, signal?: AbortSignal
     if (e?.type === "error") reported = true;
     onEvent(e);
   };
-  const { code, stderr } = await spawnLines(runScript({ executable: "node", args: [await sidecarPath()] }), relay, { signal, stdin: JSON.stringify(req) + "\n" });
+  const { code, stderr } = await spawnLines(runScript({ executable: "node", args: [await sidecarPath()] }), relay, {
+    signal,
+    stdin: JSON.stringify(req) + "\n",
+  });
   const failure = sidecarFailure({ code, stderr, reported, aborted: !!signal?.aborted });
   if (failure) throw new Error(failure);
 }
@@ -40,7 +43,15 @@ export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
         if (e.type === "error") error = e.message;
       });
       if (error) throw new Error(error);
-      return list.map((m) => ({ id: m.id, name: m.name, providerId: cfg.id, created: 0, tools: true, images: false, effort: sdkEffort(m.parameters) }));
+      return list.map((m) => ({
+        id: m.id,
+        name: m.name,
+        providerId: cfg.id,
+        created: 0,
+        tools: true,
+        images: false,
+        effort: sdkEffort(m.parameters),
+      }));
     },
 
     async turn(t: TurnInput) {
@@ -48,36 +59,42 @@ export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
       // Images (attachments, Computer Use screenshots) go to disk and the prompt points at them; removed when the turn ends.
       const saved = point.images.length && t.chatId ? await attachments.save(t.chatId, point.images) : undefined;
       try {
-      const prompt = saved ? withImagePaths(point.prompt, saved.files) : point.prompt;
-      let agentId = point.session;
-      let text = "";
-      const activities = new Map<string, Activity>();
-      let error = "";
-      // The effort parameter the model reported, set to the chosen level (the nearest one the model offers).
-      const spec = reportedEffort(cfg.id, t.model);
-      const level = pickLevel(t.reasoning, specLevels(spec));
-      const params = spec && level ? [{ id: spec.param, value: spec.values[level]! }] : undefined;
-      const emit = (s: string) => {
-        text += s;
-        t.onText(s);
-      };
-      await call(
-        { type: "send", apiKey: await resolveKey(key), model: t.model, params, cwd: t.cwd, agentId, prompt },
-        (e) => {
-          if (e.type === "agent") agentId = e.agentId;
-          else if (e.type === "text") emit(e.text);
-          else if (e.type === "tool") {
-            const next: Activity = { type: "activity", id: e.id ?? `${e.name}:${JSON.stringify(e.args ?? {})}`, name: e.name, args: e.args ?? {}, status: e.status === "error" ? "error" : e.status === "running" ? "running" : "unknown", output: e.output };
-            const merged = mergeActivity(activities.get(next.id), next);
-            activities.set(next.id, merged);
-            t.onActivity?.(merged);
-          }
-          else if (e.type === "error") error = e.message;
-        },
-        t.signal,
-      );
-      if (error) throw new Error(error);
-      return { parts: [...activities.values(), { type: "text" as const, text }], responseId: agentId };
+        const prompt = saved ? withImagePaths(point.prompt, saved.files) : point.prompt;
+        let agentId = point.session;
+        let text = "";
+        const activities = new Map<string, Activity>();
+        let error = "";
+        // The effort parameter the model reported, set to the chosen level (the nearest one the model offers).
+        const spec = reportedEffort(cfg.id, t.model);
+        const level = pickLevel(t.reasoning, specLevels(spec));
+        const params = spec && level ? [{ id: spec.param, value: spec.values[level]! }] : undefined;
+        const emit = (s: string) => {
+          text += s;
+          t.onText(s);
+        };
+        await call(
+          { type: "send", apiKey: await resolveKey(key), model: t.model, params, cwd: t.cwd, agentId, prompt },
+          (e) => {
+            if (e.type === "agent") agentId = e.agentId;
+            else if (e.type === "text") emit(e.text);
+            else if (e.type === "tool") {
+              const next: Activity = {
+                type: "activity",
+                id: e.id ?? `${e.name}:${JSON.stringify(e.args ?? {})}`,
+                name: e.name,
+                args: e.args ?? {},
+                status: e.status === "error" ? "error" : e.status === "running" ? "running" : "unknown",
+                output: e.output,
+              };
+              const merged = mergeActivity(activities.get(next.id), next);
+              activities.set(next.id, merged);
+              t.onActivity?.(merged);
+            } else if (e.type === "error") error = e.message;
+          },
+          t.signal,
+        );
+        if (error) throw new Error(error);
+        return { parts: [...activities.values(), { type: "text" as const, text }], responseId: agentId };
       } finally {
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
       }

@@ -61,7 +61,8 @@ export function candidates(status: GitStatus | null | undefined, accepted: strin
 }
 
 /** Only accepted, committable files start selected; the user's other changes are opt-in. */
-export const initialSelection = (list: Candidate[]): Set<string> => new Set(list.filter((f) => f.accepted && committable(f)).map((f) => f.path));
+export const initialSelection = (list: Candidate[]): Set<string> =>
+  new Set(list.filter((f) => f.accepted && committable(f)).map((f) => f.path));
 
 /** `null` when fine, otherwise why `raw` cannot be a branch name (mirrors `git check-ref-format`; git has the last word). */
 export function branchNameProblem(raw: string): "empty" | "invalid" | null {
@@ -70,7 +71,8 @@ export function branchNameProblem(raw: string): "empty" | "invalid" | null {
   if (name.length > 200) return "invalid";
   if (/[\u0000- \u007f~^:?*[\\]/.test(name)) return "invalid";
   if (name.startsWith("-") || name.startsWith("/") || name.endsWith("/") || name.endsWith(".")) return "invalid";
-  if (name.includes("..") || name.includes("@{") || name.includes("//") || name === "@" || name === "HEAD") return "invalid";
+  if (name.includes("..") || name.includes("@{") || name.includes("//") || name === "@" || name === "HEAD")
+    return "invalid";
   if (name.split("/").some((part) => part.startsWith(".") || part.endsWith(".lock"))) return "invalid";
   return null;
 }
@@ -92,7 +94,12 @@ export function suggestBranchName(message: string): string {
 export type CommitProblem = "notRepo" | "inProgress" | "noFiles" | "noMessage" | "badBranch" | null;
 
 /** Why the Commit button must stay disabled, or `null` when committing is possible. */
-export function commitProblem(status: GitStatus | null | undefined, selected: Iterable<string>, message: string, branch: { create: boolean; name: string }): CommitProblem {
+export function commitProblem(
+  status: GitStatus | null | undefined,
+  selected: Iterable<string>,
+  message: string,
+  branch: { create: boolean; name: string },
+): CommitProblem {
   if (!status?.repo) return "notRepo";
   if (status.inProgress) return "inProgress";
   const chosen = new Set(selected);

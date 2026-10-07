@@ -14,23 +14,47 @@ export function GoalBar({ chatId, running }: { chatId: number | null; running: b
   const t = useT();
   const app = useApp();
   useSyncExternalStore(subscribeGoals, goalsVersion);
-  useEffect(() => { if (chatId) void loadGoal(chatId).catch(() => {}); }, [chatId]);
+  useEffect(() => {
+    if (chatId) void loadGoal(chatId).catch(() => {});
+  }, [chatId]);
   const goal = getGoal(chatId);
   if (!chatId || !goal) return null;
-  const dropContinuations = () => updateQueue(chatId, (q) => ({ ...q, items: q.items.filter((i) => !isContinuation(i.text)) }));
-  const pause = () => { void setGoal(chatId, { ...goal, status: "paused", note: undefined }); void dropContinuations(); };
-  const clear = () => { void setGoal(chatId, null); void dropContinuations(); };
+  const dropContinuations = () =>
+    updateQueue(chatId, (q) => ({ ...q, items: q.items.filter((i) => !isContinuation(i.text)) }));
+  const pause = () => {
+    void setGoal(chatId, { ...goal, status: "paused", note: undefined });
+    void dropContinuations();
+  };
+  const clear = () => {
+    void setGoal(chatId, null);
+    void dropContinuations();
+  };
   const resume = () => {
     const next = resumeGoal(goal);
     void setGoal(chatId, next);
-    if (!running) void updateQueue(chatId, (q) => ({ ...q, paused: false, interrupted: false, items: [...q.items.filter((i) => !isContinuation(i.text)), { id: crypto.randomUUID(), text: continuePrompt(next), images: [], clarify: false }] }));
+    if (!running)
+      void updateQueue(chatId, (q) => ({
+        ...q,
+        paused: false,
+        interrupted: false,
+        items: [
+          ...q.items.filter((i) => !isContinuation(i.text)),
+          { id: crypto.randomUUID(), text: continuePrompt(next), images: [], clarify: false },
+        ],
+      }));
   };
-  const note = goal.note && (["stopped", "failed", "limit", "restart", "idle", "usage", "budget"].includes(goal.note) ? t(`goalNote_${goal.note}` as Key) : goal.note);
+  const note =
+    goal.note &&
+    (["stopped", "failed", "limit", "restart", "idle", "usage", "budget"].includes(goal.note)
+      ? t(`goalNote_${goal.note}` as Key)
+      : goal.note);
   return (
     <section className={`goal-bar goal-${goal.status}`} aria-label={t("goal")}>
       <Flag size={14} aria-hidden="true" className="goal-icon" />
       <div className="goal-main">
-        <div className="goal-objective" title={goal.objective}>{goal.objective}</div>
+        <div className="goal-objective" title={goal.objective}>
+          {goal.objective}
+        </div>
         <div className="goal-meta" role="status">
           <span className="goal-status">{t(`goal_${goal.status}` as Key)}</span>
           {note && <span> · {note}</span>}
@@ -39,11 +63,17 @@ export function GoalBar({ chatId, running }: { chatId: number | null; running: b
         </div>
       </div>
       {goal.status === "active" ? (
-        <button className="chip" onClick={pause}><Pause size={12} aria-hidden="true" /> {t("goalPause")}</button>
+        <button className="chip" onClick={pause}>
+          <Pause size={12} aria-hidden="true" /> {t("goalPause")}
+        </button>
       ) : goal.status !== "done" ? (
-        <button className="chip" onClick={resume}><Play size={12} aria-hidden="true" /> {t("goalResume")}</button>
+        <button className="chip" onClick={resume}>
+          <Play size={12} aria-hidden="true" /> {t("goalResume")}
+        </button>
       ) : null}
-      <button className="icon-btn" title={t("goalClear")} aria-label={t("goalClear")} onClick={clear}><X size={14} /></button>
+      <button className="icon-btn" title={t("goalClear")} aria-label={t("goalClear")} onClick={clear}>
+        <X size={14} />
+      </button>
     </section>
   );
 }

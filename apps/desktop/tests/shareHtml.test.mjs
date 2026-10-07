@@ -4,18 +4,27 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
 register('./helpers/hooks.mjs', import.meta.url);
-const { buildShareHtml, shareFileName, markdownToHtml, SHARE_CSP, SHARE_TEXT_LIMIT, SHARE_OUTPUT_LIMIT } = await import('../src/lib/shareHtml.ts');
+const { buildShareHtml, shareFileName, markdownToHtml, SHARE_CSP, SHARE_TEXT_LIMIT, SHARE_OUTPUT_LIMIT } =
+  await import('../src/lib/shareHtml.ts');
 
 const NOW = Date.UTC(2026, 9, 2, 12, 30, 15);
 const T0 = Date.UTC(2026, 0, 5, 9, 0, 0);
 const text = (t) => ({ type: 'text', text: t });
 const msg = (role, parts, extra = {}) => ({ role, parts, ...extra });
-const source = (messages, over = {}) => ({ chat: { title: 'Fix login', created_at: T0, updated_at: T0 + 60_000 }, project: { name: 'web-app', path: '/Users/me/web-app' }, messages, ...over });
+const source = (messages, over = {}) => ({
+  chat: { title: 'Fix login', created_at: T0, updated_at: T0 + 60_000 },
+  project: { name: 'web-app', path: '/Users/me/web-app' },
+  messages,
+  ...over,
+});
 const build = (messages, opts = {}, over = {}) => buildShareHtml(source(messages, over), { now: NOW, ...opts });
 const KEY = 'sk-ant-api03-' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
 
 test('a page is self-contained: strict CSP meta, no scripts, no external loads, light/dark/print', () => {
-  const { html } = build([msg('user', [text('Hello **world** [link](https://example.com) ![pic](https://evil.example/x.png)')]), msg('assistant', [text('Hi')], { meta: { model: 'gpt-5' } })]);
+  const { html } = build([
+    msg('user', [text('Hello **world** [link](https://example.com) ![pic](https://evil.example/x.png)')]),
+    msg('assistant', [text('Hi')], { meta: { model: 'gpt-5' } }),
+  ]);
   assert.match(html, /^<!doctype html>/);
   assert.ok(html.includes(`<meta http-equiv="Content-Security-Policy" content="${SHARE_CSP}">`));
   assert.match(SHARE_CSP, /default-src 'none'/);
@@ -57,7 +66,14 @@ test('javascript: links are not rendered as links', () => {
 test('secrets are redacted everywhere and counted for the review step', () => {
   const m = [
     msg('user', [text(`my key is ${KEY}`)]),
-    msg('assistant', [{ type: 'tool_call', id: 'c1', name: 'run_command', args: { command: `curl -H "Authorization: Bearer ${'x'.repeat(30)}" https://api.example` } }]),
+    msg('assistant', [
+      {
+        type: 'tool_call',
+        id: 'c1',
+        name: 'run_command',
+        args: { command: `curl -H "Authorization: Bearer ${'x'.repeat(30)}" https://api.example` },
+      },
+    ]),
     msg('tool', [{ type: 'tool_result', id: 'c1', name: 'run_command', output: 'API_KEY=supersecretvalue123\nok' }]),
   ];
   const { html, redactions } = build(m);
@@ -101,7 +117,12 @@ test('an unpaired result and a native activity still render', () => {
 test('file edits render as a diff; written files show their path', () => {
   const { html } = build([
     msg('assistant', [
-      { type: 'tool_call', id: 'e', name: 'edit_file', args: { path: 'src/a.ts', old_string: 'a\nb', new_string: 'a\nc' } },
+      {
+        type: 'tool_call',
+        id: 'e',
+        name: 'edit_file',
+        args: { path: 'src/a.ts', old_string: 'a\nb', new_string: 'a\nc' },
+      },
       { type: 'tool_call', id: 'w', name: 'write_file', args: { path: 'src/b.ts', content: 'export {}' } },
     ]),
   ]);
@@ -112,7 +133,13 @@ test('file edits render as a diff; written files show their path', () => {
 });
 
 test('canvas artifacts are shown as source blocks, not run', () => {
-  const { html } = build([msg('assistant', [text('Here:\n\n```tsx-canvas title="Counter <b>"\nexport default () => <div onClick={() => alert(1)}>x</div>\n```\n\nbye')])]);
+  const { html } = build([
+    msg('assistant', [
+      text(
+        'Here:\n\n```tsx-canvas title="Counter <b>"\nexport default () => <div onClick={() => alert(1)}>x</div>\n```\n\nbye',
+      ),
+    ]),
+  ]);
   assert.match(html, /class="card canvas"/);
   assert.match(html, /Canvas: Counter &lt;b&gt;/);
   assert.match(html, /export default \(\) =&gt; &lt;div onClick/);
@@ -128,7 +155,10 @@ test('code blocks keep the highlight classes, which are styled inline', () => {
 
 test('images are omitted by default and embedded as data: URIs on request', () => {
   const png = 'iVBORw0KGgo=';
-  const m = [msg('user', [text('see'), { type: 'image', data: png }]), msg('tool', [{ type: 'tool_result', id: 't', name: 'shot', output: 'ok', image: png }])];
+  const m = [
+    msg('user', [text('see'), { type: 'image', data: png }]),
+    msg('tool', [{ type: 'tool_result', id: 't', name: 'shot', output: 'ok', image: png }]),
+  ];
   const off = build(m).html;
   assert.doesNotMatch(off, /<img|base64/);
   assert.match(off, /\[image omitted\]/);
@@ -141,7 +171,13 @@ test('images are omitted by default and embedded as data: URIs on request', () =
 
 test('a sent message shows its pictures before the text; other roles keep their order', () => {
   const png = 'iVBORw0KGgo=';
-  const on = build([msg('user', [text('see this'), { type: 'image', data: png }, { type: 'image', data: png }]), msg('assistant', [text('seen'), { type: 'image', data: png }])], { includeImages: true }).html;
+  const on = build(
+    [
+      msg('user', [text('see this'), { type: 'image', data: png }, { type: 'image', data: png }]),
+      msg('assistant', [text('seen'), { type: 'image', data: png }]),
+    ],
+    { includeImages: true },
+  ).html;
   const user = /<section class="msg user">[\s\S]*?<\/section>/.exec(on)[0];
   assert.ok(user.indexOf('<img') !== -1 && user.indexOf('<img') < user.indexOf('see this'), 'user: image first');
   assert.equal(user.split('<img').length - 1, 2);
@@ -152,7 +188,10 @@ test('a sent message shows its pictures before the text; other roles keep their 
 });
 
 test('unicode survives; huge messages are clipped with a note', () => {
-  const { html } = build([msg('user', [text('Привет, мир 👋 日本語 \u{1F600}')]), msg('assistant', [text('x'.repeat(SHARE_TEXT_LIMIT + 5000))])]);
+  const { html } = build([
+    msg('user', [text('Привет, мир 👋 日本語 \u{1F600}')]),
+    msg('assistant', [text('x'.repeat(SHARE_TEXT_LIMIT + 5000))]),
+  ]);
   assert.match(html, /Привет, мир 👋 日本語 \u{1F600}/u);
   assert.match(html, /5000 more characters not shown/);
   assert.ok(html.length < SHARE_TEXT_LIMIT + 60_000);

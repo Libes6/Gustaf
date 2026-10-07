@@ -14,22 +14,30 @@ export function parseWebhookConfig(v: unknown): WebhookConfig {
   const port = Number.isInteger(o.port) && o.port! >= 1024 && o.port! <= 65535 ? o.port! : DEFAULT_PORT;
   const hooks: Record<string, HookConfig> = {};
   for (const [id, h] of Object.entries(o.hooks ?? {})) {
-    if (h && typeof h.secret === "string" && /^[0-9a-f]{32,128}$/.test(h.secret)) hooks[id] = { secret: h.secret, enabled: h.enabled === true };
+    if (h && typeof h.secret === "string" && /^[0-9a-f]{32,128}$/.test(h.secret))
+      hooks[id] = { secret: h.secret, enabled: h.enabled === true };
   }
   return { port, hooks };
 }
 
 /** 32 random bytes as hex. */
-export function newSecret(random: (n: number) => ArrayLike<number> = (n) => crypto.getRandomValues(new Uint8Array(n))): string {
+export function newSecret(
+  random: (n: number) => ArrayLike<number> = (n) => crypto.getRandomValues(new Uint8Array(n)),
+): string {
   return Array.from(random(32), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export const webhookUrl = (port: number, id: string) => `http://127.0.0.1:${port}/hooks/${encodeURIComponent(id)}`;
 
 /** Hooks the server should accept: switched on, for a schedule that exists and is switched on. */
-export function activeHooks(cfg: WebhookConfig, schedules: { id: string; enabled: boolean }[]): { id: string; secret: string }[] {
+export function activeHooks(
+  cfg: WebhookConfig,
+  schedules: { id: string; enabled: boolean }[],
+): { id: string; secret: string }[] {
   const on = new Set(schedules.filter((s) => s.enabled).map((s) => s.id));
-  return Object.entries(cfg.hooks).filter(([id, h]) => h.enabled && on.has(id)).map(([id, h]) => ({ id, secret: h.secret }));
+  return Object.entries(cfg.hooks)
+    .filter(([id, h]) => h.enabled && on.has(id))
+    .map(([id, h]) => ({ id, secret: h.secret }));
 }
 
 /** The schedule's prompt plus the delivery, fenced as untrusted data (the body can be written by anyone who has the secret). */

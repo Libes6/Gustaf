@@ -19,7 +19,10 @@ it("New scratch chat creates a chat without a project, remembers it and opens it
 });
 
 it("the folder is asked from the backend once per chat", async () => {
-  mockInvoke({ scratch_dir: ({ chatId, name }: { chatId: number; name: string }) => `/data/scratch/${name.replace(/\W+/g, "-")}-${chatId}` });
+  mockInvoke({
+    scratch_dir: ({ chatId, name }: { chatId: number; name: string }) =>
+      `/data/scratch/${name.replace(/\W+/g, "-")}-${chatId}`,
+  });
   const a = await scratchRoot(91, "Notes");
   expect(a).toMatch(/\/data\/scratch\/\d{4}-\d{2}-\d{2}-Notes-91$/);
   expect(await scratchRoot(91, "Renamed")).toBe(a);

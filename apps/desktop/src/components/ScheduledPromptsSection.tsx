@@ -67,8 +67,27 @@ type Form = {
   time: string;
 };
 
-function Toggle({ on, label, onChange, disabled }: { on: boolean; label: string; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return <button role="switch" aria-checked={on} aria-label={label} disabled={disabled} className={`toggle${on ? " on" : ""}`} onClick={() => onChange(!on)} />;
+function Toggle({
+  on,
+  label,
+  onChange,
+  disabled,
+}: {
+  on: boolean;
+  label: string;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      className={`toggle${on ? " on" : ""}`}
+      onClick={() => onChange(!on)}
+    />
+  );
 }
 
 export function ScheduledPage() {
@@ -93,16 +112,26 @@ export function ScheduledPage() {
     wasOpen.current = !!form;
   }, [form]);
 
-  const models = app.models.filter((m) => !app.hiddenModels.includes(modelKey(m)) || (app.selection?.providerId === m.providerId && app.selection.model === m.id));
+  const models = app.models.filter(
+    (m) =>
+      !app.hiddenModels.includes(modelKey(m)) ||
+      (app.selection?.providerId === m.providerId && app.selection.model === m.id),
+  );
   const encode = (providerId: string, model: string) => `${providerId}\n${model}`;
   const when = (ms: number) => t.date(ms);
 
   const describe = (s: Schedule) => {
     switch (s.kind) {
-      case "once": return t("scheduledDescOnce", { when: when(s.at) });
-      case "interval": return s.everyMinutes % 60 === 0 ? t("scheduledDescEveryHour", { n: s.everyMinutes / 60 }) : t("scheduledDescEveryMin", { n: s.everyMinutes });
-      case "daily": return t("scheduledDescDaily", { time: s.time });
-      case "weekdays": return t("scheduledDescWeekdays", { time: s.time });
+      case "once":
+        return t("scheduledDescOnce", { when: when(s.at) });
+      case "interval":
+        return s.everyMinutes % 60 === 0
+          ? t("scheduledDescEveryHour", { n: s.everyMinutes / 60 })
+          : t("scheduledDescEveryMin", { n: s.everyMinutes });
+      case "daily":
+        return t("scheduledDescDaily", { time: s.time });
+      case "weekdays":
+        return t("scheduledDescWeekdays", { time: s.time });
     }
   };
 
@@ -133,10 +162,23 @@ export function ScheduledPage() {
   const draftOf = (f: Form): Draft => {
     const i = f.model.indexOf("\n");
     const schedule: Schedule =
-      f.kind === "once" ? { kind: "once", at: new Date(f.at).getTime() }
-      : f.kind === "interval" ? { kind: "interval", everyMinutes: Math.round(Number(f.every.replace(",", ".")) * (f.unit === "hours" ? 60 : 1)) }
-      : { kind: f.kind, time: f.time };
-    return { title: f.title, prompt: f.prompt, projectId: f.projectId ? Number(f.projectId) : null, providerId: i > 0 ? f.model.slice(0, i) : "", model: i > 0 ? f.model.slice(i + 1) : "", access: f.access, schedule };
+      f.kind === "once"
+        ? { kind: "once", at: new Date(f.at).getTime() }
+        : f.kind === "interval"
+          ? {
+              kind: "interval",
+              everyMinutes: Math.round(Number(f.every.replace(",", ".")) * (f.unit === "hours" ? 60 : 1)),
+            }
+          : { kind: f.kind, time: f.time };
+    return {
+      title: f.title,
+      prompt: f.prompt,
+      projectId: f.projectId ? Number(f.projectId) : null,
+      providerId: i > 0 ? f.model.slice(0, i) : "",
+      model: i > 0 ? f.model.slice(i + 1) : "",
+      access: f.access,
+      schedule,
+    };
   };
 
   const save = () => {
@@ -157,21 +199,32 @@ export function ScheduledPage() {
     const now = Date.now();
     if (!setEnabled(s, on, now)) return setNote(t("scheduledIssueOnce"));
     setNote("");
-    updateScheduled((l) => l.map((x) => (x.id === s.id ? setEnabled(x, on, now) ?? x : x)));
+    updateScheduled((l) => l.map((x) => (x.id === s.id ? (setEnabled(x, on, now) ?? x) : x)));
   };
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
-  const issueText = (i: DraftIssue) => t(ISSUE[i], { max: i === "promptLong" ? MAX_PROMPT : MAX_SCHEDULES, min: MIN_INTERVAL_MINUTES });
-  const projectName = (id: number | null) => (id === null ? t("scheduledNoProject") : app.projects.find((p) => p.id === id)?.name ?? "?");
-  const modelName = (s: ScheduledPrompt) => app.models.find((m) => m.providerId === s.providerId && m.id === s.model)?.name ?? s.model;
+  const issueText = (i: DraftIssue) =>
+    t(ISSUE[i], { max: i === "promptLong" ? MAX_PROMPT : MAX_SCHEDULES, min: MIN_INTERVAL_MINUTES });
+  const projectName = (id: number | null) =>
+    id === null ? t("scheduledNoProject") : (app.projects.find((p) => p.id === id)?.name ?? "?");
+  const modelName = (s: ScheduledPrompt) =>
+    app.models.find((m) => m.providerId === s.providerId && m.id === s.model)?.name ?? s.model;
 
   const rowMenu = (e: React.MouseEvent<HTMLButtonElement>, s: ScheduledPrompt, running: boolean) => {
     const items: MenuEntry[] = [];
     if (!running) items.push({ label: t("scheduledEdit"), onClick: () => open(s) });
     if (running) items.push({ label: t("scheduledStop"), onClick: () => runner?.stop(s.id) });
     else if (runner) items.push({ label: t("scheduledRunNow"), onClick: () => runner.runNow(s.id) });
-    if (s.lastChatId !== undefined) items.push({ label: t("scheduledOpenChat"), onClick: () => { app.openChat(s.lastChatId!, s.projectId); app.setView("chat"); } });
-    if (!running) items.push({ sep: true }, { label: t("scheduledDelete"), danger: true, onClick: () => setConfirmDelete(s.id) });
+    if (s.lastChatId !== undefined)
+      items.push({
+        label: t("scheduledOpenChat"),
+        onClick: () => {
+          app.openChat(s.lastChatId!, s.projectId);
+          app.setView("chat");
+        },
+      });
+    if (!running)
+      items.push({ sep: true }, { label: t("scheduledDelete"), danger: true, onClick: () => setConfirmDelete(s.id) });
     menu.open(e.currentTarget.getBoundingClientRect(), items);
   };
 
@@ -185,38 +238,83 @@ export function ScheduledPage() {
         <p className="h4-sub sched-safety">{t("scheduledSafety")}</p>
       </details>
       <div className="sched-toolbar">
-        <button ref={addRef} className="btn-soft sched-add" disabled={!!form || list.length >= MAX_SCHEDULES} onClick={() => open()}>{t("scheduledAdd")}</button>
+        <button
+          ref={addRef}
+          className="btn-soft sched-add"
+          disabled={!!form || list.length >= MAX_SCHEDULES}
+          onClick={() => open()}
+        >
+          {t("scheduledAdd")}
+        </button>
       </div>
       {form && (
-        <div className="card sched-formcard" role="group" aria-label={t(editing === "new" ? "scheduledAdd" : "scheduledEdit")}>
+        <div
+          className="card sched-formcard"
+          role="group"
+          aria-label={t(editing === "new" ? "scheduledAdd" : "scheduledEdit")}
+        >
           <div className="sched-form">
-            <label className="field"><span>{t("scheduledFieldTitle")}</span>
-              <input ref={titleRef} className="input" maxLength={MAX_TITLE} value={form.title} onChange={(e) => set("title", e.target.value)} />
+            <label className="field">
+              <span>{t("scheduledFieldTitle")}</span>
+              <input
+                ref={titleRef}
+                className="input"
+                maxLength={MAX_TITLE}
+                value={form.title}
+                onChange={(e) => set("title", e.target.value)}
+              />
             </label>
-            <label className="field"><span>{t("scheduledFieldPrompt")}</span>
-              <textarea className="input sched-prompt" value={form.prompt} onChange={(e) => set("prompt", e.target.value)} />
+            <label className="field">
+              <span>{t("scheduledFieldPrompt")}</span>
+              <textarea
+                className="input sched-prompt"
+                value={form.prompt}
+                onChange={(e) => set("prompt", e.target.value)}
+              />
             </label>
             <div className="sched-grid">
-              <label className="field"><span>{t("scheduledFieldProject")}</span>
+              <label className="field">
+                <span>{t("scheduledFieldProject")}</span>
                 <select className="input" value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
                   <option value="">{t("scheduledNoProject")}</option>
-                  {app.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {app.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="field"><span>{t("scheduledFieldModel")}</span>
+              <label className="field">
+                <span>{t("scheduledFieldModel")}</span>
                 <select className="input" value={form.model} onChange={(e) => set("model", e.target.value)}>
-                  {!models.some((m) => encode(m.providerId, m.id) === form.model) && <option value={form.model}>{form.model.split("\n")[1] ?? ""}</option>}
-                  {models.map((m) => <option key={modelKey(m)} value={encode(m.providerId, m.id)}>{app.providers.find((p) => p.id === m.providerId)?.name ?? m.providerId} · {m.name}</option>)}
+                  {!models.some((m) => encode(m.providerId, m.id) === form.model) && (
+                    <option value={form.model}>{form.model.split("\n")[1] ?? ""}</option>
+                  )}
+                  {models.map((m) => (
+                    <option key={modelKey(m)} value={encode(m.providerId, m.id)}>
+                      {app.providers.find((p) => p.id === m.providerId)?.name ?? m.providerId} · {m.name}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="field"><span>{t("scheduledFieldAccess")}</span>
-                <select className="input" value={form.access} onChange={(e) => set("access", capAccess(e.target.value))}>
+              <label className="field">
+                <span>{t("scheduledFieldAccess")}</span>
+                <select
+                  className="input"
+                  value={form.access}
+                  onChange={(e) => set("access", capAccess(e.target.value))}
+                >
                   <option value="readonly">{t("scheduledAccessReadonly")}</option>
                   <option value="auto">{t("scheduledAccessAuto")}</option>
                 </select>
               </label>
-              <label className="field"><span>{t("scheduledFieldSchedule")}</span>
-                <select className="input" value={form.kind} onChange={(e) => set("kind", e.target.value as Schedule["kind"])}>
+              <label className="field">
+                <span>{t("scheduledFieldSchedule")}</span>
+                <select
+                  className="input"
+                  value={form.kind}
+                  onChange={(e) => set("kind", e.target.value as Schedule["kind"])}
+                >
                   <option value="daily">{t("scheduledKindDaily")}</option>
                   <option value="weekdays">{t("scheduledKindWeekdays")}</option>
                   <option value="interval">{t("scheduledKindInterval")}</option>
@@ -225,15 +323,31 @@ export function ScheduledPage() {
               </label>
             </div>
             {form.kind === "once" && (
-              <label className="field"><span>{t("scheduledAt")}</span>
-                <input className="input sched-narrow" type="datetime-local" value={form.at} onChange={(e) => set("at", e.target.value)} />
+              <label className="field">
+                <span>{t("scheduledAt")}</span>
+                <input
+                  className="input sched-narrow"
+                  type="datetime-local"
+                  value={form.at}
+                  onChange={(e) => set("at", e.target.value)}
+                />
               </label>
             )}
             {form.kind === "interval" && (
-              <label className="field"><span>{t("scheduledEvery")}</span>
+              <label className="field">
+                <span>{t("scheduledEvery")}</span>
                 <div className="sched-inline">
-                  <input className="input sched-num" inputMode="decimal" value={form.every} onChange={(e) => set("every", e.target.value)} />
-                  <select className="input sched-narrow" value={form.unit} onChange={(e) => set("unit", e.target.value as Form["unit"])}>
+                  <input
+                    className="input sched-num"
+                    inputMode="decimal"
+                    value={form.every}
+                    onChange={(e) => set("every", e.target.value)}
+                  />
+                  <select
+                    className="input sched-narrow"
+                    value={form.unit}
+                    onChange={(e) => set("unit", e.target.value as Form["unit"])}
+                  >
                     <option value="minutes">{t("scheduledUnitMinutes")}</option>
                     <option value="hours">{t("scheduledUnitHours")}</option>
                   </select>
@@ -241,20 +355,44 @@ export function ScheduledPage() {
               </label>
             )}
             {(form.kind === "daily" || form.kind === "weekdays") && (
-              <label className="field"><span>{t("scheduledTime")}</span>
-                <input className="input sched-narrow" type="time" value={form.time} onChange={(e) => set("time", e.target.value)} />
+              <label className="field">
+                <span>{t("scheduledTime")}</span>
+                <input
+                  className="input sched-narrow"
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => set("time", e.target.value)}
+                />
               </label>
             )}
-            {issues.length > 0 && <div className="sched-issues" role="alert">{issues.map((i) => <div key={i}>{issueText(i)}</div>)}</div>}
+            {issues.length > 0 && (
+              <div className="sched-issues" role="alert">
+                {issues.map((i) => (
+                  <div key={i}>{issueText(i)}</div>
+                ))}
+              </div>
+            )}
             <div className="sched-actions">
-              <button className="btn btn-primary" onClick={save}>{t("scheduledSave")}</button>
-              <button className="btn btn-ghost" onClick={close}>{t("scheduledCancel")}</button>
+              <button className="btn btn-primary" onClick={save}>
+                {t("scheduledSave")}
+              </button>
+              <button className="btn btn-ghost" onClick={close}>
+                {t("scheduledCancel")}
+              </button>
             </div>
           </div>
         </div>
       )}
-      {note && <p className="d sched-note" role="status">{note}</p>}
-      {!list.length && !form && <div className="card"><div className="card-row d sched-empty">{t("scheduledNone")}</div></div>}
+      {note && (
+        <p className="d sched-note" role="status">
+          {note}
+        </p>
+      )}
+      {!list.length && !form && (
+        <div className="card">
+          <div className="card-row d sched-empty">{t("scheduledNone")}</div>
+        </div>
+      )}
       {list.length > 0 && (
         <div className="card">
           <ul className="sched-list" aria-label={t("scheduledTitle")}>
@@ -264,25 +402,61 @@ export function ScheduledPage() {
                 <li className="sched-row" key={s.id}>
                   <div className="sched-line">
                     <div className="grow">
-                      <div className="t"><Clock size={13} aria-hidden="true" /> {s.title}</div>
-                      <div className="d">{describe(s.schedule)} · {projectName(s.projectId)} · {modelName(s)} · {t(s.access === "auto" ? "scheduledAccessAuto" : "scheduledAccessReadonly").split(" (")[0]}</div>
+                      <div className="t">
+                        <Clock size={13} aria-hidden="true" /> {s.title}
+                      </div>
+                      <div className="d">
+                        {describe(s.schedule)} · {projectName(s.projectId)} · {modelName(s)} ·{" "}
+                        {t(s.access === "auto" ? "scheduledAccessAuto" : "scheduledAccessReadonly").split(" (")[0]}
+                      </div>
                     </div>
-                    <Toggle on={s.enabled} label={t("scheduledEnabled", { title: s.title })} onChange={(v) => toggle(s, v)} />
-                    <button className="icon-btn" aria-label={t("scheduledMenu", { title: s.title })} aria-haspopup="menu" onKeyDown={menu.onTriggerKeyDown} onClick={(e) => rowMenu(e, s, running)}><MoreHorizontal size={16} /></button>
+                    <Toggle
+                      on={s.enabled}
+                      label={t("scheduledEnabled", { title: s.title })}
+                      onChange={(v) => toggle(s, v)}
+                    />
+                    <button
+                      className="icon-btn"
+                      aria-label={t("scheduledMenu", { title: s.title })}
+                      aria-haspopup="menu"
+                      onKeyDown={menu.onTriggerKeyDown}
+                      onClick={(e) => rowMenu(e, s, running)}
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
                   </div>
                   <div className="d sched-meta">
-                    {s.enabled ? (s.nextRunAt ? t("scheduledNext", { when: when(s.nextRunAt) }) : t("scheduledNextNone")) : t("scheduledNotConfirmed")}
+                    {s.enabled
+                      ? s.nextRunAt
+                        ? t("scheduledNext", { when: when(s.nextRunAt) })
+                        : t("scheduledNextNone")
+                      : t("scheduledNotConfirmed")}
                   </div>
                   {s.lastStatus && (
                     <div className={`d sched-meta sched-${s.lastStatus}`}>
-                      {t("scheduledLast", { status: t(STATUS[s.lastStatus]), when: s.lastRunAt ? when(s.lastRunAt) : "—" })}
+                      {t("scheduledLast", {
+                        status: t(STATUS[s.lastStatus]),
+                        when: s.lastRunAt ? when(s.lastRunAt) : "—",
+                      })}
                       {s.lastError ? ` · ${s.lastError}` : ""}
                     </div>
                   )}
                   {confirmDelete === s.id && (
                     <div className="sched-actions">
-                      <button className="btn-soft btn-danger" autoFocus onClick={() => { updateScheduled((l) => l.filter((x) => x.id !== s.id)); setConfirmDelete(null); addRef.current?.focus(); }}>{t("scheduledDeleteConfirm")}</button>
-                      <button className="btn-soft" onClick={() => setConfirmDelete(null)}>{t("scheduledCancel")}</button>
+                      <button
+                        className="btn-soft btn-danger"
+                        autoFocus
+                        onClick={() => {
+                          updateScheduled((l) => l.filter((x) => x.id !== s.id));
+                          setConfirmDelete(null);
+                          addRef.current?.focus();
+                        }}
+                      >
+                        {t("scheduledDeleteConfirm")}
+                      </button>
+                      <button className="btn-soft" onClick={() => setConfirmDelete(null)}>
+                        {t("scheduledCancel")}
+                      </button>
                     </div>
                   )}
                 </li>

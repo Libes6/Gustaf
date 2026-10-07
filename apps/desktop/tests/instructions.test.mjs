@@ -10,7 +10,8 @@ import { join } from 'node:path';
 register('./helpers/hooks.mjs', import.meta.url);
 const { state } = await import('./helpers/apiStub.mjs');
 const I = await import('../src/agent/instructions.ts');
-const { loadProjectInstructions, setProjectInstructionText, getProjectInstructionText } = await import('../src/agent/instructionsStore.ts');
+const { loadProjectInstructions, setProjectInstructionText, getProjectInstructionText } =
+  await import('../src/agent/instructionsStore.ts');
 const { runAgent } = await import('../src/agent/agent.ts');
 
 const file = (name, text, bytes) => ({ name, text, bytes: bytes ?? new TextEncoder().encode(text).length });
@@ -33,7 +34,11 @@ test('nothing is added when there are no files and no custom text', () => {
 });
 
 test('identical files are loaded once, ignoring line endings and surrounding whitespace', () => {
-  const r = I.assembleInstructions([file('AGENTS.md', 'rules\r\nhere\n'), file('CLAUDE.md', '\nrules\nhere'), file('.cursorrules', 'other')]);
+  const r = I.assembleInstructions([
+    file('AGENTS.md', 'rules\r\nhere\n'),
+    file('CLAUDE.md', '\nrules\nhere'),
+    file('.cursorrules', 'other'),
+  ]);
   assert.deepEqual(byName(r), { 'AGENTS.md': 'loaded', 'CLAUDE.md': 'duplicate', '.cursorrules': 'loaded' });
   assert.equal(r.text.split('<project_instruction_file ').length - 1, 2);
 });
@@ -52,7 +57,12 @@ test('a file the reader already cut (bytes > text) is marked truncated', () => {
 
 test('the total cap limits all files together; later files are omitted once it is spent', () => {
   const big = (n) => file(n, `${n} `.repeat(6000));
-  const r = I.assembleInstructions([big('AGENTS.md'), big('CLAUDE.md'), big('.cursorrules'), file('.cursor/rules/z.mdc', 'z'.repeat(50) + ' tail')]);
+  const r = I.assembleInstructions([
+    big('AGENTS.md'),
+    big('CLAUDE.md'),
+    big('.cursorrules'),
+    file('.cursor/rules/z.mdc', 'z'.repeat(50) + ' tail'),
+  ]);
   const used = r.entries.reduce((n, e) => n + e.used, 0);
   assert.ok(used <= I.INSTRUCTION_TOTAL_CAP);
   assert.equal(r.entries[2].status, 'truncated', 'third file only gets what is left');
@@ -61,14 +71,37 @@ test('the total cap limits all files together; later files are omitted once it i
 });
 
 test('files the CLI reads itself are not repeated, nor are copies of them under another name', () => {
-  const files = [file('AGENTS.md', 'same'), file('CLAUDE.md', 'same'), file('.cursorrules', 'legacy'), file('.cursor/rules/a.mdc', 'rule')];
+  const files = [
+    file('AGENTS.md', 'same'),
+    file('CLAUDE.md', 'same'),
+    file('.cursorrules', 'legacy'),
+    file('.cursor/rules/a.mdc', 'rule'),
+  ];
   const claude = I.assembleInstructions(files, { native: I.nativeInstructionFiles({ kind: 'cli', cli: 'claude' }) });
-  assert.deepEqual(byName(claude), { 'AGENTS.md': 'duplicate', 'CLAUDE.md': 'native', '.cursorrules': 'loaded', '.cursor/rules/a.mdc': 'loaded' });
+  assert.deepEqual(byName(claude), {
+    'AGENTS.md': 'duplicate',
+    'CLAUDE.md': 'native',
+    '.cursorrules': 'loaded',
+    '.cursor/rules/a.mdc': 'loaded',
+  });
   const codex = I.assembleInstructions(files, { native: I.nativeInstructionFiles({ kind: 'cli', cli: 'codex' }) });
-  assert.deepEqual(byName(codex), { 'AGENTS.md': 'native', 'CLAUDE.md': 'duplicate', '.cursorrules': 'loaded', '.cursor/rules/a.mdc': 'loaded' });
-  const cursor = I.assembleInstructions(files, { native: I.nativeInstructionFiles({ kind: 'cli', cli: 'cursor-agent' }) });
-  assert.deepEqual(byName(cursor), { 'AGENTS.md': 'native', 'CLAUDE.md': 'native', '.cursorrules': 'loaded', '.cursor/rules/a.mdc': 'native' });
-  for (const p of [{ kind: 'openai' }, { kind: 'cursor' }, { kind: 'cli' }, undefined]) assert.deepEqual(I.nativeInstructionFiles(p), []);
+  assert.deepEqual(byName(codex), {
+    'AGENTS.md': 'native',
+    'CLAUDE.md': 'duplicate',
+    '.cursorrules': 'loaded',
+    '.cursor/rules/a.mdc': 'loaded',
+  });
+  const cursor = I.assembleInstructions(files, {
+    native: I.nativeInstructionFiles({ kind: 'cli', cli: 'cursor-agent' }),
+  });
+  assert.deepEqual(byName(cursor), {
+    'AGENTS.md': 'native',
+    'CLAUDE.md': 'native',
+    '.cursorrules': 'loaded',
+    '.cursor/rules/a.mdc': 'native',
+  });
+  for (const p of [{ kind: 'openai' }, { kind: 'cursor' }, { kind: 'cli' }, undefined])
+    assert.deepEqual(I.nativeInstructionFiles(p), []);
 });
 
 test('file text cannot close its own block or the custom block', () => {
@@ -103,7 +136,7 @@ test('the custom text is stored per project (trailing slash and /private prefix 
   assert.equal((await getProjectInstructionText('/work/a')).length, I.CUSTOM_INSTRUCTIONS_CAP);
 });
 
-test('loadProjectInstructions combines files from the run folder with the original project\'s custom text', async () => {
+test("loadProjectInstructions combines files from the run folder with the original project's custom text", async () => {
   state.reset();
   state.instructionFiles = [{ name: 'AGENTS.md', text: 'from file' }];
   await setProjectInstructionText('/orig', 'from settings');
@@ -119,16 +152,32 @@ async function systemOf(o = {}) {
   await runAgent({
     root: mkdtempSync(join(tmpdir(), 'instr-test-')),
     history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
-    adapter: { supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: async (t) => ((system = t.system), { parts: [{ type: 'text', text: 'done' }] }) },
-    providerId: 'p', model: 'm', access: 'auto', computerUse: false, allowlist: [], signal: ctl.signal,
-    onText: () => {}, onMessage: async () => {}, approve: async () => true, ...o,
+    adapter: {
+      supportsComputer: false,
+      supportsReasoning: () => false,
+      listModels: async () => [],
+      turn: async (t) => ((system = t.system), { parts: [{ type: 'text', text: 'done' }] }),
+    },
+    providerId: 'p',
+    model: 'm',
+    access: 'auto',
+    computerUse: false,
+    allowlist: [],
+    signal: ctl.signal,
+    onText: () => {},
+    onMessage: async () => {},
+    approve: async () => true,
+    ...o,
   });
   return system;
 }
 
 test('the agent system prompt carries the instructions, minus what the CLI reads itself', async () => {
   state.reset();
-  state.instructionFiles = [{ name: 'AGENTS.md', text: 'AGENTS-BODY' }, { name: 'CLAUDE.md', text: 'CLAUDE-BODY' }];
+  state.instructionFiles = [
+    { name: 'AGENTS.md', text: 'AGENTS-BODY' },
+    { name: 'CLAUDE.md', text: 'CLAUDE-BODY' },
+  ];
   const api = await systemOf();
   assert.ok(api.includes('AGENTS-BODY') && api.includes('CLAUDE-BODY'));
   assert.match(api, /cannot grant permissions/);

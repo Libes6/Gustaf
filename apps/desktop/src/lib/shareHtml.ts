@@ -10,7 +10,14 @@ import remarkGfm from "remark-gfm";
 import { parseArtifacts } from "../canvas/artifacts";
 import type { Part } from "../providers/types";
 import {
-  buildBundle, formatDate, partsInDisplayOrder, REDACTED, type ExportedChat, type ExportedMessage, type ExportSource, type MdLabels,
+  buildBundle,
+  formatDate,
+  partsInDisplayOrder,
+  REDACTED,
+  type ExportedChat,
+  type ExportedMessage,
+  type ExportSource,
+  type MdLabels,
 } from "./exportChats";
 
 export type ShareLabels = MdLabels & {
@@ -21,10 +28,21 @@ export type ShareLabels = MdLabels & {
 };
 export const DEFAULT_SHARE_LABELS: ShareLabels = {
   exported: "Exported from Gustaf on {date}",
-  project: "Project", created: "Created", updated: "Updated", messages: "Messages", chats: "Chats", user: "User", assistant: "Assistant",
-  toolCall: "Tool", toolResult: "Result", noOutput: "(no output)", truncated: "… {chars} more characters not shown",
+  project: "Project",
+  created: "Created",
+  updated: "Updated",
+  messages: "Messages",
+  chats: "Chats",
+  user: "User",
+  assistant: "Assistant",
+  toolCall: "Tool",
+  toolResult: "Result",
+  noOutput: "(no output)",
+  truncated: "… {chars} more characters not shown",
   status: { running: "Running", success: "Completed", error: "Failed", unknown: "Result not reported" },
-  canvas: "Canvas", model: "Model", generated: "Shared from Gustaf on {date}",
+  canvas: "Canvas",
+  model: "Model",
+  generated: "Shared from Gustaf on {date}",
 };
 
 /** Longest text of one message, one tool output and one tool argument block; the rest is replaced by a note. */
@@ -33,7 +51,8 @@ export const SHARE_OUTPUT_LIMIT = 6_000;
 export const SHARE_ARGS_LIMIT = 4_000;
 
 /** No network at all: nothing may load, nothing may run. Images are data: URIs. */
-export const SHARE_CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+export const SHARE_CSP =
+  "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c]);
@@ -53,8 +72,10 @@ function clip(text: string, limit: number, L: ShareLabels): string {
 
 const MARKDOWN_COMPONENTS = {
   // Remote images would be a network request when the file is opened: show the alt text instead.
-  img: ({ alt }: { alt?: string }) => createElement("span", { className: "img-omitted" }, alt ? `[image: ${alt}]` : "[image]"),
-  a: ({ href, children }: { href?: string; children?: unknown }) => createElement("a", { href, rel: "noopener noreferrer" }, children as never),
+  img: ({ alt }: { alt?: string }) =>
+    createElement("span", { className: "img-omitted" }, alt ? `[image: ${alt}]` : "[image]"),
+  a: ({ href, children }: { href?: string; children?: unknown }) =>
+    createElement("a", { href, rel: "noopener noreferrer" }, children as never),
 };
 
 /** The app's Markdown pipeline as static HTML. Raw HTML in the source is escaped; unsafe URL schemes are dropped by react-markdown. */
@@ -62,7 +83,11 @@ export function markdownToHtml(text: string): string {
   return renderToStaticMarkup(
     createElement(
       ReactMarkdown,
-      { remarkPlugins: [remarkGfm], rehypePlugins: [[rehypeHighlight, { detect: false, ignoreMissing: true }]], components: MARKDOWN_COMPONENTS as never },
+      {
+        remarkPlugins: [remarkGfm],
+        rehypePlugins: [[rehypeHighlight, { detect: false, ignoreMissing: true }]],
+        components: MARKDOWN_COMPONENTS as never,
+      },
       text,
     ),
   );
@@ -73,10 +98,12 @@ function textHtml(text: string, L: ShareLabels): string {
   return parseArtifacts(clipped)
     .map((seg) =>
       seg.type === "text"
-        ? seg.text.trim() ? `<div class="md">${markdownToHtml(seg.text)}</div>` : ""
+        ? seg.text.trim()
+          ? `<div class="md">${markdownToHtml(seg.text)}</div>`
+          : ""
         : seg.type === "page"
-          // An agent's HTML page is shared as its source: embedding it would run its markup inside the shared page.
-          ? `<div class="card canvas"><div class="card-head">HTML: ${escapeHtml(seg.page.title)}</div><pre>${escapeHtml(seg.page.html)}</pre></div>`
+          ? // An agent's HTML page is shared as its source: embedding it would run its markup inside the shared page.
+            `<div class="card canvas"><div class="card-head">HTML: ${escapeHtml(seg.page.title)}</div><pre>${escapeHtml(seg.page.html)}</pre></div>`
           : `<div class="card canvas"><div class="card-head">${escapeHtml(L.canvas)}: ${escapeHtml(seg.artifact.title)}</div><pre>${escapeHtml(seg.artifact.code)}</pre></div>`,
     )
     .join("");
@@ -85,15 +112,25 @@ function textHtml(text: string, L: ShareLabels): string {
 // ---- Tool cards ---------------------------------------------------------------------------------------------------
 
 function diffHtml(oldText: string, newText: string, L: ShareLabels): string {
-  const lines = (t: string, sign: string, cls: string) => t.split("\n").map((l) => `<span class="${cls}">${sign} ${escapeHtml(l)}</span>`);
+  const lines = (t: string, sign: string, cls: string) =>
+    t.split("\n").map((l) => `<span class="${cls}">${sign} ${escapeHtml(l)}</span>`);
   const all = [...lines(oldText, "-", "del"), ...lines(newText, "+", "add")];
-  const shown = all.length > 400 ? [...all.slice(0, 400), `<span class="note">${escapeHtml(L.truncated.replace("{chars}", String(all.length - 400)))}</span>`] : all;
+  const shown =
+    all.length > 400
+      ? [
+          ...all.slice(0, 400),
+          `<span class="note">${escapeHtml(L.truncated.replace("{chars}", String(all.length - 400)))}</span>`,
+        ]
+      : all;
   return `<pre class="diff">${shown.join("\n")}</pre>`;
 }
 
 function callHtml(args: unknown, computer: Extract<Part, { type: "tool_call" }>["computer"], L: ShareLabels): string {
   if (computer?.actions?.length) {
-    const items = computer.actions.map((a: any) => `<li>${escapeHtml(`${a?.type ?? ""}${typeof a?.text === "string" ? ` ${JSON.stringify(a.text.slice(0, 200))}` : ""}`)}</li>`);
+    const items = computer.actions.map(
+      (a: any) =>
+        `<li>${escapeHtml(`${a?.type ?? ""}${typeof a?.text === "string" ? ` ${JSON.stringify(a.text.slice(0, 200))}` : ""}`)}</li>`,
+    );
     return `<ul class="actions">${items.join("")}</ul>`;
   }
   if (args === undefined || args === null || (rec(args) && !Object.keys(args).length)) return "";
@@ -120,7 +157,9 @@ function callHtml(args: unknown, computer: Extract<Part, { type: "tool_call" }>[
 type Result = Extract<Part, { type: "tool_result" }>;
 
 function outputHtml(output: string | undefined, L: ShareLabels): string {
-  return output?.trim() ? `<pre class="out">${escapeHtml(clip(output, SHARE_OUTPUT_LIMIT, L))}</pre>` : `<p class="muted">${escapeHtml(L.noOutput)}</p>`;
+  return output?.trim()
+    ? `<pre class="out">${escapeHtml(clip(output, SHARE_OUTPUT_LIMIT, L))}</pre>`
+    : `<p class="muted">${escapeHtml(L.noOutput)}</p>`;
 }
 
 const imageSrc = (data: string): string | null => {
@@ -147,14 +186,30 @@ function partHtml(p: Part, results: Map<string, Result>, used: Set<string>, L: S
       if (r) used.add(p.id);
       const kind = !r ? "unk" : r.isError ? "err" : "ok";
       const status = !r ? L.status.unknown : r.isError ? L.status.error : L.status.success;
-      return card(p.name, status, kind, callHtml(p.args, p.computer, L) + (r ? outputHtml(r.output, L) + (r.image ? imageHtml(r.image) : "") : ""));
+      return card(
+        p.name,
+        status,
+        kind,
+        callHtml(p.args, p.computer, L) + (r ? outputHtml(r.output, L) + (r.image ? imageHtml(r.image) : "") : ""),
+      );
     }
     case "tool_result":
       if (used.has(p.id)) return "";
-      return card(p.name || L.toolResult, p.isError ? L.status.error : L.status.success, p.isError ? "err" : "ok", outputHtml(p.output, L) + (p.image ? imageHtml(p.image) : ""));
+      return card(
+        p.name || L.toolResult,
+        p.isError ? L.status.error : L.status.success,
+        p.isError ? "err" : "ok",
+        outputHtml(p.output, L) + (p.image ? imageHtml(p.image) : ""),
+      );
     case "activity": {
-      const kind = p.status === "success" ? "ok" : p.status === "error" ? "err" : p.status === "running" ? "run" : "unk";
-      return card(p.name, L.status[p.status], kind, callHtml(p.args, undefined, L) + (p.output || p.status !== "running" ? outputHtml(p.output, L) : ""));
+      const kind =
+        p.status === "success" ? "ok" : p.status === "error" ? "err" : p.status === "running" ? "run" : "unk";
+      return card(
+        p.name,
+        L.status[p.status],
+        kind,
+        callHtml(p.args, undefined, L) + (p.output || p.status !== "running" ? outputHtml(p.output, L) : ""),
+      );
     }
   }
 }
@@ -185,16 +240,25 @@ pre{margin:0;padding:10px 14px;background:var(--code);border-radius:8px;overflow
 @media print{:root{--bg:#fff;--text:#000;--card:#fff;--code:#f4f4f4;--user:#f4f4f4;--text2:#444}main{max-width:none;padding:0}pre{white-space:pre-wrap;overflow:visible}.card,.msg{break-inside:avoid-page}a{color:inherit}}`;
 
 function messageHtml(m: ExportedMessage, results: Map<string, Result>, used: Set<string>, L: ShareLabels): string {
-  const body = partsInDisplayOrder(m.role, m.parts).map((p) => partHtml(p, results, used, L)).join("");
+  const body = partsInDisplayOrder(m.role, m.parts)
+    .map((p) => partHtml(p, results, used, L))
+    .join("");
   if (!body) return "";
   // Tool messages continue the assistant turn that requested them, so they get no heading of their own.
   if (m.role === "tool") return `<section class="msg tool"><div class="body">${body}</div></section>`;
-  const who = m.role === "user" ? escapeHtml(L.user) : `${escapeHtml(L.assistant)}${m.meta?.model ? ` (${escapeHtml(m.meta.model)})` : ""}`;
+  const who =
+    m.role === "user"
+      ? escapeHtml(L.user)
+      : `${escapeHtml(L.assistant)}${m.meta?.model ? ` (${escapeHtml(m.meta.model)})` : ""}`;
   return `<section class="msg ${m.role}"><div class="who">${who}</div><div class="body">${body}</div></section>`;
 }
 
 /** The page for one already-cleaned (redacted) chat. */
-export function renderShareDocument(chat: ExportedChat, exportedAt: string, L: ShareLabels = DEFAULT_SHARE_LABELS): string {
+export function renderShareDocument(
+  chat: ExportedChat,
+  exportedAt: string,
+  L: ShareLabels = DEFAULT_SHARE_LABELS,
+): string {
   const results = new Map<string, Result>();
   for (const m of chat.messages) for (const p of m.parts) if (p.type === "tool_result") results.set(p.id, p);
   const used = new Set<string>();
@@ -231,7 +295,10 @@ export type ShareResult = { html: string; redactions: number; messages: number }
  * Builds the page for one chat. `redactions` is how many secrets the scrubbing replaced (for the review step before saving);
  * images are left out unless `includeImages`.
  */
-export function buildShareHtml(source: ExportSource, options: { includeImages?: boolean; labels?: ShareLabels; now?: number } = {}): ShareResult {
+export function buildShareHtml(
+  source: ExportSource,
+  options: { includeImages?: boolean; labels?: ShareLabels; now?: number } = {},
+): ShareResult {
   const L = options.labels ?? DEFAULT_SHARE_LABELS;
   const bundle = buildBundle([source], { includeImages: options.includeImages, now: options.now });
   const raw = buildBundle([source], { includeImages: options.includeImages, now: options.now, redact: false });
@@ -242,7 +309,13 @@ export function buildShareHtml(source: ExportSource, options: { includeImages?: 
 
 /** Default file name for the save dialog. */
 export function shareFileName(title: string): string {
-  const base = Array.from(title.normalize("NFC").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, " ").replace(/\s+/g, "-").replace(/^[.-]+/, ""))
+  const base = Array.from(
+    title
+      .normalize("NFC")
+      .replace(/[\u0000-\u001f\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, "-")
+      .replace(/^[.-]+/, ""),
+  )
     .slice(0, 60)
     .join("")
     .replace(/-+$/, "");

@@ -16,9 +16,14 @@ export const rawLogEnabled = (): Promise<boolean> => Promise.resolve(false);
 
 const two = (n: number) => String(n).padStart(2, "0");
 /** Local calendar day, the name of the day's file. */
-export const dayOf = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`; };
+export const dayOf = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+};
 
-type Entry = { t: number; provider: string; chat: number | null } & ({ line: string } | { debug: string; data?: Record<string, unknown> });
+type Entry = { t: number; provider: string; chat: number | null } & (
+  { line: string } | { debug: string; data?: Record<string, unknown> }
+);
 
 /** Pure: one JSON line (no newline). A line that is JSON is stored as an object, anything else as text; secrets are scrubbed. */
 export function rawLogLine(e: Entry): string {
@@ -27,11 +32,20 @@ export function rawLogLine(e: Entry): string {
   if ("debug" in e) body = { debug: e.debug, ...(e.data ? { data: redactValue(e.data) } : {}) };
   else {
     let event: unknown;
-    try { event = JSON.parse(e.line); } catch { /* a banner or a warning */ }
-    body = event !== undefined && event !== null && typeof event === "object" ? { event: redactValue(event) } : { text: redactSecrets(e.line) };
+    try {
+      event = JSON.parse(e.line);
+    } catch {
+      /* a banner or a warning */
+    }
+    body =
+      event !== undefined && event !== null && typeof event === "object"
+        ? { event: redactValue(event) }
+        : { text: redactSecrets(e.line) };
   }
   const out = JSON.stringify({ ...head, ...body });
-  return out.length <= MAX_ENTRY_CHARS ? out : JSON.stringify({ ...head, truncated: out.length, text: out.slice(0, MAX_ENTRY_CHARS) });
+  return out.length <= MAX_ENTRY_CHARS
+    ? out
+    : JSON.stringify({ ...head, truncated: out.length, text: out.slice(0, MAX_ENTRY_CHARS) });
 }
 
 export type RawLogger = {
@@ -47,25 +61,41 @@ export type RawLogger = {
 const NOOP: RawLogger = { raw() {}, debug() {}, unmapped() {}, async flush() {} };
 
 /** Buffers lines and appends them in batches; writing never throws into the chat run. `enabled` false returns a no-op logger. */
-export function createRawLogger(enabled: boolean, provider: string, chat: number | null, sink: (day: string, lines: string) => Promise<unknown> = rawLog.append, now: () => number = Date.now): RawLogger {
+export function createRawLogger(
+  enabled: boolean,
+  provider: string,
+  chat: number | null,
+  sink: (day: string, lines: string) => Promise<unknown> = rawLog.append,
+  now: () => number = Date.now,
+): RawLogger {
   if (!enabled) return NOOP;
   let buffer: { day: string; line: string }[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let unmapped = 0;
   let chain: Promise<unknown> = Promise.resolve();
   const flush = () => {
-    if (timer) { clearTimeout(timer); timer = undefined; }
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
     const batch = buffer;
     buffer = [];
     const days = [...new Set(batch.map((b) => b.day))];
     for (const day of days) {
-      const lines = batch.filter((b) => b.day === day).map((b) => `${b.line}\n`).join("");
+      const lines = batch
+        .filter((b) => b.day === day)
+        .map((b) => `${b.line}\n`)
+        .join("");
       chain = chain.then(() => sink(day, lines)).catch(() => {});
     }
     return chain.then(() => {});
   };
   const push = (e: Entry) => {
-    try { buffer.push({ day: dayOf(e.t), line: rawLogLine(e) }); } catch { return; }
+    try {
+      buffer.push({ day: dayOf(e.t), line: rawLogLine(e) });
+    } catch {
+      return;
+    }
     if (buffer.length >= 200) void flush();
     else timer ??= setTimeout(() => void flush(), FLUSH_MS);
   };
@@ -77,7 +107,10 @@ export function createRawLogger(enabled: boolean, provider: string, chat: number
       push({ t: now(), provider, chat, debug: "unmapped-collab-item", data: info });
     },
     flush() {
-      if (unmapped) { push({ t: now(), provider, chat, debug: "unmapped-total", data: { count: unmapped } }); unmapped = 0; }
+      if (unmapped) {
+        push({ t: now(), provider, chat, debug: "unmapped-total", data: { count: unmapped } });
+        unmapped = 0;
+      }
       return flush();
     },
   };

@@ -1,8 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getSetting, setSetting } from "../lib/api";
 import {
-  CHAT_KNOWLEDGE_SETTING, CitationBook, formatKnowledgeHits, knowledgeOf, knowledgePrompt, normalizeChatKnowledge, parseKnowledgeArgs, searchable, withChatKnowledge,
-  type EmbedConfig, type KnowledgeCollection, type KnowledgeEstimate, type KnowledgeHit, type KnowledgeProgress, type KnowledgeStats,
+  CHAT_KNOWLEDGE_SETTING,
+  CitationBook,
+  formatKnowledgeHits,
+  knowledgeOf,
+  knowledgePrompt,
+  normalizeChatKnowledge,
+  parseKnowledgeArgs,
+  searchable,
+  withChatKnowledge,
+  type EmbedConfig,
+  type KnowledgeCollection,
+  type KnowledgeEstimate,
+  type KnowledgeHit,
+  type KnowledgeProgress,
+  type KnowledgeStats,
 } from "./knowledgeCore";
 
 export * from "./knowledgeCore";
@@ -10,7 +23,8 @@ export * from "./knowledgeCore";
 // Collections live in the app data folder (src-tauri/src/knowledge.rs); these are thin wrappers over its commands.
 export const knowledge = {
   list: () => invoke<KnowledgeCollection[]>("knowledge_list"),
-  create: (name: string, config: EmbedConfig, include?: string[]) => invoke<KnowledgeCollection>("knowledge_create", { name, config, include: include ?? null }),
+  create: (name: string, config: EmbedConfig, include?: string[]) =>
+    invoke<KnowledgeCollection>("knowledge_create", { name, config, include: include ?? null }),
   rename: (id: string, name: string) => invoke<KnowledgeCollection>("knowledge_rename", { id, name }),
   remove: (id: string) => invoke<void>("knowledge_delete", { id }),
   addSource: (id: string, path: string) => invoke<KnowledgeCollection>("knowledge_add_source", { id, path }),
@@ -19,7 +33,8 @@ export const knowledge = {
   estimate: (id: string) => invoke<KnowledgeEstimate>("knowledge_estimate", { id }),
   reindex: (id: string, confirm: boolean) => invoke<KnowledgeStats>("knowledge_reindex", { id, confirm }),
   cancel: (id: string) => invoke<void>("knowledge_cancel", { id }),
-  search: (ids: string[], query: string, limit = 6) => invoke<KnowledgeHit[]>("knowledge_search", { ids, query, limit }),
+  search: (ids: string[], query: string, limit = 6) =>
+    invoke<KnowledgeHit[]>("knowledge_search", { ids, query, limit }),
 };
 
 // Changes made in Settings reach open chats (the composer menu) without a reload.
@@ -39,13 +54,18 @@ export async function onKnowledgeProgress(fn: (p: KnowledgeProgress) => void): P
 
 let queue: Promise<unknown> = Promise.resolve();
 export const loadChatKnowledge = async (chatId: number | null): Promise<string[]> =>
-  knowledgeOf(normalizeChatKnowledge(await getSetting<unknown>(CHAT_KNOWLEDGE_SETTING, null).catch(() => null)), chatId);
+  knowledgeOf(
+    normalizeChatKnowledge(await getSetting<unknown>(CHAT_KNOWLEDGE_SETTING, null).catch(() => null)),
+    chatId,
+  );
 /** Stores the selection of one chat; writes are serialized so quick toggles cannot overwrite each other. */
 export const saveChatKnowledge = (chatId: number, ids: string[]): Promise<void> =>
-  (queue = queue.then(async () => {
-    const map = normalizeChatKnowledge(await getSetting<unknown>(CHAT_KNOWLEDGE_SETTING, null).catch(() => null));
-    await setSetting(CHAT_KNOWLEDGE_SETTING, withChatKnowledge(map, chatId, ids));
-  }).catch(() => {})) as Promise<void>;
+  (queue = queue
+    .then(async () => {
+      const map = normalizeChatKnowledge(await getSetting<unknown>(CHAT_KNOWLEDGE_SETTING, null).catch(() => null));
+      await setSetting(CHAT_KNOWLEDGE_SETTING, withChatKnowledge(map, chatId, ids));
+    })
+    .catch(() => {})) as Promise<void>;
 
 /** The chat's selected collections that still exist and have something indexed (null: none, so no tool is offered). */
 export async function knowledgeForChat(chatId: number | undefined): Promise<{ ids: string[]; prompt: string } | null> {
@@ -59,7 +79,11 @@ export async function knowledgeForChat(chatId: number | undefined): Promise<{ id
 
 const books = new WeakMap<AbortSignal, CitationBook>();
 /** Runs `knowledge_search` for a chat. Citation numbers stay stable across the calls of one run (keyed by its abort signal). */
-export async function runKnowledgeSearch(chatId: number | undefined, signal: AbortSignal, args: unknown): Promise<string> {
+export async function runKnowledgeSearch(
+  chatId: number | undefined,
+  signal: AbortSignal,
+  args: unknown,
+): Promise<string> {
   const { query, limit } = parseKnowledgeArgs(args);
   const scope = await knowledgeForChat(chatId);
   if (!scope) throw new Error("No indexed knowledge collection is selected for this chat.");

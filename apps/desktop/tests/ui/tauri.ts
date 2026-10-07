@@ -13,14 +13,14 @@ export async function invokeMock(cmd: string, args?: unknown): Promise<unknown> 
   const h = handlers.get(cmd);
   if (h) return h(args);
   if (/^(db_select|fs_files|import_scan|search_models|cursor_scan|read_instructions)$/.test(cmd)) return [];
-  if (cmd === "db_execute") return [1, 1];
-  if (cmd === "cu_permissions") return { accessibility: true, screen: true };
+  if (cmd === 'db_execute') return [1, 1];
+  if (cmd === 'cu_permissions') return { accessibility: true, screen: true };
   return undefined;
 }
 
 /** Register backend responses by command name; a function receives the invoke arguments. Cleared after every test. */
 export function mockInvoke(map: Record<string, unknown>) {
-  for (const [cmd, v] of Object.entries(map)) handlers.set(cmd, typeof v === "function" ? (v as Handler) : () => v);
+  for (const [cmd, v] of Object.entries(map)) handlers.set(cmd, typeof v === 'function' ? (v as Handler) : () => v);
 }
 
 /** Arguments of every call to one command. */

@@ -18,7 +18,11 @@ export function shellFor(platform: Platform): ShellSpec {
     case "macos":
       return { name: "zsh", kind: "posix", args: (s) => ["-lc", s] };
     case "windows":
-      return { name: "powershell", kind: "powershell", args: (s) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", PS_PRELUDE + s] };
+      return {
+        name: "powershell",
+        kind: "powershell",
+        args: (s) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", PS_PRELUDE + s],
+      };
     default:
       return { name: "bash", kind: "posix", args: (s) => ["-lc", s] };
   }
@@ -107,7 +111,8 @@ export function invocationScript(kind: ShellKind, inv: Invocation): string {
   if (dir) s += `$env:PATH = ${psq(dir)} + ';' + $env:PATH; `;
   for (const [k, v] of Object.entries(inv.env ?? {})) s += `$env:${k.replace(/[^A-Za-z0-9_]/g, "_")} = ${psq(v)}; `;
   const call = `& ${psq(inv.executable)}${argv ? " " + argv : ""}`;
-  if (viaStdin) s += `$prompt = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(${psq(b64(inv.prompt!))})); $prompt | ${call}`;
+  if (viaStdin)
+    s += `$prompt = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(${psq(b64(inv.prompt!))})); $prompt | ${call}`;
   else if (inv.nullStdin) s += `$null | ${call}`;
   else s += call;
   return s + "; exit $LASTEXITCODE";
@@ -124,16 +129,23 @@ export function cliCandidates(platform: Platform, id: CliName): string[] {
     const w: Record<CliName, string[]> = {
       claude: ["%USERPROFILE%\\.local\\bin\\claude.exe", "%APPDATA%\\npm\\claude.cmd"],
       codex: ["%APPDATA%\\npm\\codex.cmd", "%USERPROFILE%\\.local\\bin\\codex.exe"],
-      "cursor-agent": ["%LOCALAPPDATA%\\cursor-agent\\cursor-agent.cmd", "%USERPROFILE%\\.local\\bin\\cursor-agent.exe"],
+      "cursor-agent": [
+        "%LOCALAPPDATA%\\cursor-agent\\cursor-agent.cmd",
+        "%USERPROFILE%\\.local\\bin\\cursor-agent.exe",
+      ],
     };
     return w[id];
   }
   const nvm = `$NVM:versions/node/*/bin/${id}`;
   const common = [`~/.local/bin/${id}`, `~/.npm-global/bin/${id}`, `~/.volta/bin/${id}`, nvm];
-  const system = platform === "macos" ? [`/opt/homebrew/bin/${id}`, `/usr/local/bin/${id}`] : [`/usr/local/bin/${id}`, `/usr/bin/${id}`];
+  const system =
+    platform === "macos"
+      ? [`/opt/homebrew/bin/${id}`, `/usr/local/bin/${id}`]
+      : [`/usr/local/bin/${id}`, `/usr/bin/${id}`];
   const extra: string[] = [];
   if (id === "claude") extra.push("~/.claude/local/claude");
-  if (id === "codex" && platform === "macos") extra.push("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex");
+  if (id === "codex" && platform === "macos")
+    extra.push("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex");
   return [...common, ...extra, ...system];
 }
 
@@ -156,7 +168,8 @@ const psPath = (c: string) => `"${c.replace(/%([A-Za-z]+)%/g, "$$env:$1")}"`;
  */
 export function findCliScript(platform: Platform, id: CliName, verify = false): string {
   const cands = cliCandidates(platform, id);
-  if (platform === "windows") return `${PS_FIND_FN}$p = Find-Cli ${psq(id)} @(${cands.map(psPath).join(", ")}) ${verify ? "$true" : "$false"}; if ($p) { $p; exit 0 } else { exit 1 }`;
+  if (platform === "windows")
+    return `${PS_FIND_FN}$p = Find-Cli ${psq(id)} @(${cands.map(psPath).join(", ")}) ${verify ? "$true" : "$false"}; if ($p) { $p; exit 0 } else { exit 1 }`;
   const zsh = platform === "macos";
   const ok = (p: string) => (verify ? `[ -x ${p} ] && ${p} --version >/dev/null 2>&1` : `[ -x ${p} ]`);
   return (

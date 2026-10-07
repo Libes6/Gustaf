@@ -26,14 +26,18 @@ export const COMMIT_SYSTEM_PROMPT = [
 
 /** Characters of diff to send: 40% of the model's context window at ~3 characters per token, within fixed bounds. */
 export function diffBudget(contextWindow?: number): number {
-  const window = typeof contextWindow === "number" && Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 8192;
+  const window =
+    typeof contextWindow === "number" && Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 8192;
   return Math.min(MAX_DIFF_CHARS, Math.max(MIN_DIFF_CHARS, Math.floor(window * 0.4 * 3)));
 }
 
 const clip = (text: string, max: number) => (text.length > max ? text.slice(0, max) : text);
 
 /** The system prompt and the JSON user message for one generation. The diff is capped again here as a second line of defence. */
-export function buildCommitPrompt(ctx: CommitContext, budget: number = MAX_DIFF_CHARS): { system: string; user: string } {
+export function buildCommitPrompt(
+  ctx: CommitContext,
+  budget: number = MAX_DIFF_CHARS,
+): { system: string; user: string } {
   const limit = Math.max(MIN_DIFF_CHARS, Math.floor(budget));
   const cut = ctx.diff.length > limit;
   const diff = cut ? `${clip(ctx.diff, limit)}\n${TRUNCATED_MARK}\n` : ctx.diff;
@@ -60,7 +64,12 @@ const LABEL = /^(?:(?:proposed |suggested |final )?commit message|message|subjec
  * from body and bounds the length. Returns "" when nothing usable is left.
  */
 export function sanitizeCommitMessage(raw: string): string {
-  let text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(ANSI, "").replace(THINKING, "").replace(CONTROL, "").trim();
+  let text = String(raw ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(ANSI, "")
+    .replace(THINKING, "")
+    .replace(CONTROL, "")
+    .trim();
   text = text.replace(PREAMBLE, "");
   const fenced = FENCED.exec(text);
   if (fenced) text = fenced[1].trim();
@@ -90,5 +99,10 @@ export function sanitizeCommitMessage(raw: string): string {
 
 /** The sanitized commit message from a model reply; only text parts count, tool calls and activity are ignored. */
 export function messageFromParts(parts: Part[]): string {
-  return sanitizeCommitMessage(parts.filter((p): p is Extract<Part, { type: "text" }> => p.type === "text").map((p) => p.text).join("\n"));
+  return sanitizeCommitMessage(
+    parts
+      .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join("\n"),
+  );
 }

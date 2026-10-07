@@ -23,8 +23,24 @@ export function Onboarding() {
     <div className="onboarding">
       <WindowHeader />
       <div className="lang-switch seg" role="group" aria-label={t("language")}>
-        <button className={app.locale === "ru" ? "active" : ""} aria-pressed={app.locale === "ru"} lang="ru" aria-label="Русский" onClick={() => app.setLocale("ru")}>RU</button>
-        <button className={app.locale === "en" ? "active" : ""} aria-pressed={app.locale === "en"} lang="en" aria-label="English" onClick={() => app.setLocale("en")}>EN</button>
+        <button
+          className={app.locale === "ru" ? "active" : ""}
+          aria-pressed={app.locale === "ru"}
+          lang="ru"
+          aria-label="Русский"
+          onClick={() => app.setLocale("ru")}
+        >
+          RU
+        </button>
+        <button
+          className={app.locale === "en" ? "active" : ""}
+          aria-pressed={app.locale === "en"}
+          lang="en"
+          aria-label="English"
+          onClick={() => app.setLocale("en")}
+        >
+          EN
+        </button>
       </div>
       <main className="onb-body">
         <div className="onb-inner">
@@ -35,17 +51,25 @@ export function Onboarding() {
           {step === 0 ? (
             <>
               <h1>{t("onbImportTitle")}</h1>
-              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbImportLead")}</p>
+              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>
+                {t("onbImportLead")}
+              </p>
               <ImportPanel files={false} onDone={async () => (await app.reload(), setStep(1))} />
               <div className="onb-foot" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                <button className="btn-soft" onClick={() => setCreating(true)}>{t("createProject")}</button>
-                <button className="btn btn-ghost" onClick={() => setStep(1)}>{t("skip")}</button>
+                <button className="btn-soft" onClick={() => setCreating(true)}>
+                  {t("createProject")}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setStep(1)}>
+                  {t("skip")}
+                </button>
               </div>
             </>
           ) : (
             <>
               <h1>{t("onbProviderTitle")}</h1>
-              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>{t("onbProviderLead", { store: t(keyStoreKey()) })}</p>
+              <p className="lead" style={{ color: "var(--text-2)", marginBottom: 20 }}>
+                {t("onbProviderLead", { store: t(keyStoreKey()) })}
+              </p>
               <AddProviderWizard
                 onSaved={async (cfg, models) => {
                   await app.refreshModels({ only: [cfg.id] });
@@ -58,7 +82,12 @@ export function Onboarding() {
           )}
         </div>
       </main>
-      {creating && <CreateProjectDialog onClose={() => setCreating(false)} onCreated={async () => (setCreating(false), await app.reload(), setStep(1))} />}
+      {creating && (
+        <CreateProjectDialog
+          onClose={() => setCreating(false)}
+          onCreated={async () => (setCreating(false), await app.reload(), setStep(1))}
+        />
+      )}
     </div>
   );
 }

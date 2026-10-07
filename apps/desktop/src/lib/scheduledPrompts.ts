@@ -102,12 +102,16 @@ export function nextRunAfter(schedule: Schedule, from: number): number | null {
 }
 
 /** First `nextRunAt` of a freshly enabled schedule. A one-off keeps its own time (the missed-run policy then decides). */
-export const initialNext = (schedule: Schedule, now: number): number | null => (schedule.kind === "once" ? schedule.at : nextRunAfter(schedule, now));
+export const initialNext = (schedule: Schedule, now: number): number | null =>
+  schedule.kind === "once" ? schedule.at : nextRunAfter(schedule, now);
 
 // ---- validation and normalization ----
 
 export type DraftIssue = "title" | "prompt" | "promptLong" | "provider" | "interval" | "time" | "once" | "limit";
-export type Draft = Pick<ScheduledPrompt, "title" | "prompt" | "projectId" | "providerId" | "model" | "access" | "schedule">;
+export type Draft = Pick<
+  ScheduledPrompt,
+  "title" | "prompt" | "projectId" | "providerId" | "model" | "access" | "schedule"
+>;
 
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
@@ -120,7 +124,15 @@ export function validateDraft(d: Draft, now: number, count: number): DraftIssue[
   else if (d.prompt.length > MAX_PROMPT) issues.push("promptLong");
   if (!d.providerId || !d.model) issues.push("provider");
   const s = d.schedule;
-  if (s.kind === "interval" && !(Number.isInteger(s.everyMinutes) && s.everyMinutes >= MIN_INTERVAL_MINUTES && s.everyMinutes <= MAX_INTERVAL_MINUTES)) issues.push("interval");
+  if (
+    s.kind === "interval" &&
+    !(
+      Number.isInteger(s.everyMinutes) &&
+      s.everyMinutes >= MIN_INTERVAL_MINUTES &&
+      s.everyMinutes <= MAX_INTERVAL_MINUTES
+    )
+  )
+    issues.push("interval");
   if ((s.kind === "daily" || s.kind === "weekdays") && !parseTime(s.time)) issues.push("time");
   if (s.kind === "once" && !(Number.isFinite(s.at) && s.at > now)) issues.push("once");
   return issues;
@@ -132,7 +144,10 @@ function normalizeSchedule(raw: unknown): Schedule | null {
   if (r.kind === "once") return typeof r.at === "number" && Number.isFinite(r.at) ? { kind: "once", at: r.at } : null;
   if (r.kind === "interval") {
     if (typeof r.everyMinutes !== "number" || !Number.isFinite(r.everyMinutes)) return null;
-    return { kind: "interval", everyMinutes: Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(r.everyMinutes))) };
+    return {
+      kind: "interval",
+      everyMinutes: Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(r.everyMinutes))),
+    };
   }
   if (r.kind === "daily" || r.kind === "weekdays") {
     const t = parseTime(r.time);
@@ -172,7 +187,9 @@ export function normalizeScheduled(raw: unknown): ScheduledPrompt[] {
       ...(confirmedAt !== undefined ? { confirmedAt } : {}),
       createdAt: finiteNumber(e.createdAt) ? e.createdAt : 0,
       ...(finiteNumber(e.lastRunAt) ? { lastRunAt: e.lastRunAt } : {}),
-      ...(typeof e.lastStatus === "string" && STATUSES.includes(e.lastStatus) ? { lastStatus: e.lastStatus as RunStatus } : {}),
+      ...(typeof e.lastStatus === "string" && STATUSES.includes(e.lastStatus)
+        ? { lastStatus: e.lastStatus as RunStatus }
+        : {}),
       ...(typeof e.lastError === "string" && e.lastError ? { lastError: e.lastError.slice(0, 300) } : {}),
       ...(finiteNumber(e.lastChatId) ? { lastChatId: e.lastChatId } : {}),
       ...(finiteNumber(e.nextRunAt) || e.nextRunAt === null ? { nextRunAt: e.nextRunAt as number | null } : {}),
@@ -183,18 +200,45 @@ export function normalizeScheduled(raw: unknown): ScheduledPrompt[] {
 }
 
 /** A run that was "running" when the app closed did not finish. */
-export const recoverInterrupted = (list: ScheduledPrompt[]): ScheduledPrompt[] => list.map((s) => (s.lastStatus === "running" ? { ...s, lastStatus: "interrupted" as const } : s));
+export const recoverInterrupted = (list: ScheduledPrompt[]): ScheduledPrompt[] =>
+  list.map((s) => (s.lastStatus === "running" ? { ...s, lastStatus: "interrupted" as const } : s));
 
 export function createSchedule(d: Draft, id: string, now: number): ScheduledPrompt {
-  return { id, title: oneLine(d.title).slice(0, MAX_TITLE), prompt: d.prompt, projectId: d.projectId, providerId: d.providerId, model: d.model, access: capAccess(d.access), schedule: d.schedule, enabled: false, createdAt: now };
+  return {
+    id,
+    title: oneLine(d.title).slice(0, MAX_TITLE),
+    prompt: d.prompt,
+    projectId: d.projectId,
+    providerId: d.providerId,
+    model: d.model,
+    access: capAccess(d.access),
+    schedule: d.schedule,
+    enabled: false,
+    createdAt: now,
+  };
 }
 
 const sameSchedule = (a: Schedule, b: Schedule) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Applies an edit. Anything that changes what runs or when switches the schedule off: the user has to confirm it again. */
 export function editSchedule(s: ScheduledPrompt, d: Draft): ScheduledPrompt {
-  const next: ScheduledPrompt = { ...s, title: oneLine(d.title).slice(0, MAX_TITLE), prompt: d.prompt, projectId: d.projectId, providerId: d.providerId, model: d.model, access: capAccess(d.access), schedule: d.schedule };
-  const changed = s.prompt !== d.prompt || s.projectId !== d.projectId || s.providerId !== d.providerId || s.model !== d.model || s.access !== capAccess(d.access) || !sameSchedule(s.schedule, d.schedule);
+  const next: ScheduledPrompt = {
+    ...s,
+    title: oneLine(d.title).slice(0, MAX_TITLE),
+    prompt: d.prompt,
+    projectId: d.projectId,
+    providerId: d.providerId,
+    model: d.model,
+    access: capAccess(d.access),
+    schedule: d.schedule,
+  };
+  const changed =
+    s.prompt !== d.prompt ||
+    s.projectId !== d.projectId ||
+    s.providerId !== d.providerId ||
+    s.model !== d.model ||
+    s.access !== capAccess(d.access) ||
+    !sameSchedule(s.schedule, d.schedule);
   if (!changed) return next;
   const { confirmedAt: _drop, ...rest } = next;
   return { ...rest, enabled: false, nextRunAt: null };
@@ -237,7 +281,12 @@ function advance(s: ScheduledPrompt, now: number): Partial<ScheduledPrompt> {
  *  - at most `maxConcurrent` scheduled runs at a time, the rest stay due until the next check.
  * `running` holds the ids of schedules with an active run.
  */
-export function planTick(list: readonly ScheduledPrompt[], now: number, running: ReadonlySet<string>, maxConcurrent = MAX_CONCURRENT_RUNS): TickPlan {
+export function planTick(
+  list: readonly ScheduledPrompt[],
+  now: number,
+  running: ReadonlySet<string>,
+  maxConcurrent = MAX_CONCURRENT_RUNS,
+): TickPlan {
   const plan: TickPlan = { start: [], missed: [], patches: [] };
   let slots = Math.max(0, maxConcurrent - running.size);
   const due = list
@@ -262,7 +311,10 @@ export function planTick(list: readonly ScheduledPrompt[], now: number, running:
     if (slots <= 0) continue;
     slots--;
     plan.start.push(s.id);
-    plan.patches.push({ id: s.id, patch: { lastRunAt: now, lastStatus: "running", lastError: undefined, ...advance(s, now) } });
+    plan.patches.push({
+      id: s.id,
+      patch: { lastRunAt: now, lastStatus: "running", lastError: undefined, ...advance(s, now) },
+    });
   }
   return plan;
 }
@@ -275,8 +327,16 @@ export function applyPatches(list: readonly ScheduledPrompt[], patches: TickPlan
 }
 
 /** The patch recorded when a run ends. */
-export function finishPatch(status: Exclude<RunStatus, "running" | "missed" | "interrupted">, chatId: number | null, error?: string): Partial<ScheduledPrompt> {
-  return { lastStatus: status, lastError: error ? error.slice(0, 300) : undefined, ...(chatId !== null ? { lastChatId: chatId } : {}) };
+export function finishPatch(
+  status: Exclude<RunStatus, "running" | "missed" | "interrupted">,
+  chatId: number | null,
+  error?: string,
+): Partial<ScheduledPrompt> {
+  return {
+    lastStatus: status,
+    lastError: error ? error.slice(0, 300) : undefined,
+    ...(chatId !== null ? { lastChatId: chatId } : {}),
+  };
 }
 
 /** Title of the chat a schedule writes to. */

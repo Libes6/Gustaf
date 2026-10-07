@@ -20,8 +20,14 @@ export function parseTriage(value: unknown): TriageMap {
   return out;
 }
 
-export const settle = (m: TriageMap, id: number, now: number): TriageMap => ({ ...without(m, id), [id]: { settledAt: now } });
-export const snooze = (m: TriageMap, id: number, until: number): TriageMap => ({ ...without(m, id), [id]: { snoozedUntil: until } });
+export const settle = (m: TriageMap, id: number, now: number): TriageMap => ({
+  ...without(m, id),
+  [id]: { settledAt: now },
+});
+export const snooze = (m: TriageMap, id: number, until: number): TriageMap => ({
+  ...without(m, id),
+  [id]: { snoozedUntil: until },
+});
 export function without(m: TriageMap, id: number): TriageMap {
   if (!(id in m)) return m;
   const { [id]: _gone, ...rest } = m;
@@ -31,7 +37,12 @@ export function without(m: TriageMap, id: number): TriageMap {
 export type Place = "attention" | "working" | "open" | "snoozed" | "settled";
 
 /** Where a chat goes in Recent. Attention wins over everything; an expired snooze is open again. */
-export function placeOf(id: number, m: TriageMap, status: "waiting" | "running" | "failed" | "unread" | null, now: number): Place {
+export function placeOf(
+  id: number,
+  m: TriageMap,
+  status: "waiting" | "running" | "failed" | "unread" | null,
+  now: number,
+): Place {
   if (status === "waiting" || status === "failed" || status === "unread") return "attention";
   if (status === "running") return "working";
   const e = m[id];
@@ -41,7 +52,12 @@ export function placeOf(id: number, m: TriageMap, status: "waiting" | "running" 
 }
 
 /** Entries to drop: snoozes that expired, and settled/snoozed chats that now need attention or got newer activity. */
-export function wakeUps(m: TriageMap, now: number, attention: ReadonlySet<number>, updatedAt: ReadonlyMap<number, number>): number[] {
+export function wakeUps(
+  m: TriageMap,
+  now: number,
+  attention: ReadonlySet<number>,
+  updatedAt: ReadonlyMap<number, number>,
+): number[] {
   return Object.entries(m).flatMap(([k, e]) => {
     const id = Number(k);
     const expired = !!e.snoozedUntil && e.snoozedUntil <= now;
@@ -53,9 +69,14 @@ export function wakeUps(m: TriageMap, now: number, attention: ReadonlySet<number
 /** Snooze presets in local time: in an hour, this evening (18:00, or tomorrow's if past), tomorrow 9:00, next Monday 9:00. */
 export function snoozePresets(now: number): { key: "hour" | "evening" | "tomorrow" | "nextWeek"; at: number }[] {
   const d = new Date(now);
-  const at = (days: number, h: number) => { const x = new Date(d); x.setDate(x.getDate() + days); x.setHours(h, 0, 0, 0); return x.getTime(); };
+  const at = (days: number, h: number) => {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    x.setHours(h, 0, 0, 0);
+    return x.getTime();
+  };
   const evening = at(0, 18) > now + 30 * 60_000 ? at(0, 18) : at(1, 18);
-  const toMonday = ((8 - d.getDay()) % 7) || 7;
+  const toMonday = (8 - d.getDay()) % 7 || 7;
   return [
     { key: "hour", at: now + 3600_000 },
     { key: "evening", at: evening },

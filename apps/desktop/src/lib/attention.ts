@@ -68,7 +68,14 @@ export async function notifyUnfocused(title: string, body: string) {
   }
 }
 
-const NOTIFY: Partial<Record<RunStatus, "notifyAgentDone" | "notifyAgentFailed" | "notifyAgentLimit" | "notifyAgentBudget">> = { completed: "notifyAgentDone", failed: "notifyAgentFailed", limit: "notifyAgentLimit", budget: "notifyAgentBudget" };
+const NOTIFY: Partial<
+  Record<RunStatus, "notifyAgentDone" | "notifyAgentFailed" | "notifyAgentLimit" | "notifyAgentBudget">
+> = {
+  completed: "notifyAgentDone",
+  failed: "notifyAgentFailed",
+  limit: "notifyAgentLimit",
+  budget: "notifyAgentBudget",
+};
 
 /** Mounted once (App): notifies about finished agents and new approval requests while unfocused; clears the badge on focus. */
 export function useAttentionNotifications() {
@@ -85,7 +92,8 @@ export function useAttentionNotifications() {
       known.set(r.id, r.status);
       const key = NOTIFY[r.status];
       // Only transitions seen in this session (not runs loaded from the last one); a stopped run needs no notice.
-      if (before && isActiveStatus(before) && key) void notifyUnfocused(t(key, { title: r.title }), r.summary?.slice(0, 180) || r.error?.slice(0, 180) || r.model);
+      if (before && isActiveStatus(before) && key)
+        void notifyUnfocused(t(key, { title: r.title }), r.summary?.slice(0, 180) || r.error?.slice(0, 180) || r.model);
     }
   }, [runs, t]);
 
@@ -94,7 +102,8 @@ export function useAttentionNotifications() {
     if (seq <= asked.current) return;
     asked.current = seq;
     const last = pending.get(seq);
-    if (last && !isMuted(last.chatId)) void notifyUnfocused(t("notifyApproval"), t("notifyApprovalBody", { who: last.who || t("notifyMainAgent") }));
+    if (last && !isMuted(last.chatId))
+      void notifyUnfocused(t("notifyApproval"), t("notifyApprovalBody", { who: last.who || t("notifyMainAgent") }));
   }, [approvals, t]);
 
   useEffect(() => {
@@ -118,10 +127,18 @@ type NoticeT = (key: "notifyAgentDone" | "notifyAgentFailed", vars: { title: str
  * A chat run ended. Updates the sidebar flags; with `notify` and the window in the background it also raises the same
  * native notification and dock badge as a finished background agent (scheduled runs notify on their own).
  */
-export function reportChatRun(chatId: number | null | undefined, outcome: "ok" | "failed" | "stopped", notify?: { title: string; detail?: string; t: NoticeT }) {
+export function reportChatRun(
+  chatId: number | null | undefined,
+  outcome: "ok" | "failed" | "stopped",
+  notify?: { title: string; detail?: string; t: NoticeT },
+) {
   if (chatId == null) return;
   chatStatusStore.runEnded(chatId, outcome);
-  if (notify && outcome !== "stopped" && !isMuted(chatId)) void notifyUnfocused(notify.t(outcome === "ok" ? "notifyAgentDone" : "notifyAgentFailed", { title: notify.title }), (notify.detail ?? "").slice(0, 180));
+  if (notify && outcome !== "stopped" && !isMuted(chatId))
+    void notifyUnfocused(
+      notify.t(outcome === "ok" ? "notifyAgentDone" : "notifyAgentFailed", { title: notify.title }),
+      (notify.detail ?? "").slice(0, 180),
+    );
 }
 
 /** Mounted once (App): tells the status store which chat is in front (visible, window focused); restores and persists the unread ids. */
@@ -143,7 +160,9 @@ export function useChatStatusSync(activeChat: number | null, view: string) {
   }, [activeChat, view, focused]);
   useEffect(() => {
     let last = "[]";
-    void getSetting<unknown>(UNREAD_KEY, []).then((v) => chatStatusStore.load(v)).catch(() => {});
+    void getSetting<unknown>(UNREAD_KEY, [])
+      .then((v) => chatStatusStore.load(v))
+      .catch(() => {});
     return chatStatusStore.subscribe(() => {
       const now = JSON.stringify(chatStatusStore.unreadIds());
       if (now === last) return;

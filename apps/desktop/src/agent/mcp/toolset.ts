@@ -14,15 +14,28 @@ export const MAX_DESCRIPTION = 1024;
 export const MAX_RESULT_TEXT = 50_000;
 export const MAX_IMAGE_BASE64 = 5_000_000;
 
-export type McpTool = { name: string; title?: string; description: string; inputSchema: unknown; readOnlyHint?: boolean; destructiveHint?: boolean };
+export type McpTool = {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema: unknown;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+};
 /** `tool` is the server's tool name, or for the built-in resource tools their policy key (`mcp_list_resources` / `mcp_read_resource`). */
-export type McpRoute = { serverId: string; server: string; tool: string; kind?: "tool" | "list_resources" | "read_resource" | "list_resource_templates" };
+export type McpRoute = {
+  serverId: string;
+  server: string;
+  tool: string;
+  kind?: "tool" | "list_resources" | "read_resource" | "list_resource_templates";
+};
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 /** Validates a `tools/list` page: named, unique tools with bounded text. */
 export function normalizeTools(raw: unknown): McpTool[] {
-  const list = raw && typeof raw === "object" && Array.isArray((raw as any).tools) ? ((raw as any).tools as unknown[]) : [];
+  const list =
+    raw && typeof raw === "object" && Array.isArray((raw as any).tools) ? ((raw as any).tools as unknown[]) : [];
   const seen = new Set<string>();
   const out: McpTool[] = [];
   for (const t of list.slice(0, 1000)) {
@@ -76,7 +89,10 @@ const size = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
  * `properties` map, no top-level combinators (OpenAI refuses them), no meta keywords, bounded depth and size.
  * Too large: descriptions are dropped first, then the schema becomes a permissive object (`note: "truncated"`).
  */
-export function sanitizeSchema(raw: unknown, maxBytes = MAX_SCHEMA_BYTES): { schema: Record<string, unknown>; note?: "invalid" | "truncated" } {
+export function sanitizeSchema(
+  raw: unknown,
+  maxBytes = MAX_SCHEMA_BYTES,
+): { schema: Record<string, unknown>; note?: "invalid" | "truncated" } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { schema: { ...PERMISSIVE }, note: "invalid" };
   const r = raw as Record<string, unknown>;
   if (r.type !== undefined && r.type !== "object") return { schema: { ...PERMISSIVE }, note: "invalid" };
@@ -131,7 +147,11 @@ export const isMcpToolName = (name: string) => name.startsWith(MCP_PREFIX);
  * tools). Names that collide after sanitizing or cutting get a numeric suffix; the route map gives the real target.
  */
 export function namespaceTools(
-  groups: { server: Pick<McpServer, "id" | "name">; tools: McpTool[]; resources?: { list: boolean; read: boolean; templates?: boolean } }[],
+  groups: {
+    server: Pick<McpServer, "id" | "name">;
+    tools: McpTool[];
+    resources?: { list: boolean; read: boolean; templates?: boolean };
+  }[],
   reserved: Iterable<string> = [],
 ): { defs: ToolDef[]; route: Map<string, McpRoute>; dropped: number } {
   const taken = new Set(reserved);
@@ -151,7 +171,10 @@ export function namespaceTools(
       const label = t.title && t.title !== t.name ? `${t.title}: ` : "";
       defs.push({
         name,
-        description: clip(`[MCP server "${g.server.name}", tool "${t.name}"] ${label}${t.description}`.trim(), MAX_DESCRIPTION),
+        description: clip(
+          `[MCP server "${g.server.name}", tool "${t.name}"] ${label}${t.description}`.trim(),
+          MAX_DESCRIPTION,
+        ),
         parameters: sanitizeSchema(t.inputSchema).schema,
       });
       route.set(name, { serverId: g.server.id, server: g.server.name, tool: t.name });
@@ -176,8 +199,23 @@ export function namespaceTools(
         }
         taken.add(d.name);
         defs.push(d);
-        const kind = d.name === names.list ? "list_resources" : d.name === names.templates ? "list_resource_templates" : "read_resource";
-        route.set(d.name, { serverId: g.server.id, server: g.server.name, tool: kind === "list_resources" ? RESOURCE_TOOLS.list : kind === "list_resource_templates" ? RESOURCE_TOOLS.templates : RESOURCE_TOOLS.read, kind });
+        const kind =
+          d.name === names.list
+            ? "list_resources"
+            : d.name === names.templates
+              ? "list_resource_templates"
+              : "read_resource";
+        route.set(d.name, {
+          serverId: g.server.id,
+          server: g.server.name,
+          tool:
+            kind === "list_resources"
+              ? RESOURCE_TOOLS.list
+              : kind === "list_resource_templates"
+                ? RESOURCE_TOOLS.templates
+                : RESOURCE_TOOLS.read,
+          kind,
+        });
       }
     }
   }
@@ -206,7 +244,10 @@ const PNG = /^iVBORw0KGgo/;
  * tool images as PNG), other images/audio and binary resources replaced by a note, resource links and embedded text
  * resources rendered as text, `structuredContent` used when there is no content. Text is capped.
  */
-export function mapCallResult(raw: unknown, maxText = MAX_RESULT_TEXT): { output: string; image?: string; isError: boolean } {
+export function mapCallResult(
+  raw: unknown,
+  maxText = MAX_RESULT_TEXT,
+): { output: string; image?: string; isError: boolean } {
   if (!raw || typeof raw !== "object") return { output: "Invalid MCP result.", isError: true };
   const r = raw as Record<string, any>;
   const content = Array.isArray(r.content) ? r.content.slice(0, 200) : [];
@@ -218,11 +259,18 @@ export function mapCallResult(raw: unknown, maxText = MAX_RESULT_TEXT): { output
     const mime = typeof c.mimeType === "string" ? c.mimeType.slice(0, 100) : "";
     if (type === "text") pieces.push(typeof c.text === "string" ? c.text : "");
     else if (type === "image") {
-      const ok = typeof c.data === "string" && (mime === "image/png" || !mime) && PNG.test(c.data) && c.data.length <= MAX_IMAGE_BASE64;
+      const ok =
+        typeof c.data === "string" &&
+        (mime === "image/png" || !mime) &&
+        PNG.test(c.data) &&
+        c.data.length <= MAX_IMAGE_BASE64;
       if (ok && !image) {
         image = c.data;
         pieces.push("[image attached]");
-      } else pieces.push(`[${mime || "image"} omitted${ok ? ": only one image per result" : typeof c.data === "string" && c.data.length > MAX_IMAGE_BASE64 ? ": too large" : ": unsupported format"}]`);
+      } else
+        pieces.push(
+          `[${mime || "image"} omitted${ok ? ": only one image per result" : typeof c.data === "string" && c.data.length > MAX_IMAGE_BASE64 ? ": too large" : ": unsupported format"}]`,
+        );
     } else if (type === "audio") pieces.push(`[${mime || "audio"} omitted]`);
     else if (type === "resource_link") {
       const uri = typeof c.uri === "string" ? c.uri.slice(0, 2000) : "";
@@ -234,7 +282,10 @@ export function mapCallResult(raw: unknown, maxText = MAX_RESULT_TEXT): { output
       const uri = typeof res.uri === "string" ? res.uri.slice(0, 2000) : "";
       const rm = typeof res.mimeType === "string" ? ` (${res.mimeType.slice(0, 100)})` : "";
       if (typeof res.text === "string") pieces.push(`[resource ${uri}${rm}]\n${res.text}`);
-      else pieces.push(`[binary resource ${uri}${rm}, ${typeof res.blob === "string" ? Math.floor((res.blob.length * 3) / 4) : 0} bytes omitted]`);
+      else
+        pieces.push(
+          `[binary resource ${uri}${rm}, ${typeof res.blob === "string" ? Math.floor((res.blob.length * 3) / 4) : 0} bytes omitted]`,
+        );
     } else pieces.push(`[${clip(type || "unknown", 40)} content omitted]`);
   }
   if (!pieces.length && r.structuredContent !== undefined) {
@@ -245,6 +296,7 @@ export function mapCallResult(raw: unknown, maxText = MAX_RESULT_TEXT): { output
     }
   }
   let output = pieces.join("\n");
-  if (output.length > maxText) output = output.slice(0, maxText) + `\n[output truncated: ${output.length - maxText} more characters]`;
+  if (output.length > maxText)
+    output = output.slice(0, maxText) + `\n[output truncated: ${output.length - maxText} more characters]`;
   return { output: output || "(no output)", ...(image ? { image } : {}), isError: r.isError === true };
 }

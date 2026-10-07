@@ -15,7 +15,12 @@ export const resetAutoSuggestAttempts = () => attempts.clear();
  * messages, and returns the new suggestions so the caller can open the dialog; nothing is saved here and failures stay silent
  * (the manual action in the chat menu shows them).
  */
-export function useAutoMemorySuggest(o: { chatId: number | null; running: boolean; active: boolean; projectRoot: string | null }) {
+export function useAutoMemorySuggest(o: {
+  chatId: number | null;
+  running: boolean;
+  active: boolean;
+  projectRoot: string | null;
+}) {
   const app = useApp();
   const latest = useRef({ app, o });
   latest.current = { app, o };
@@ -36,7 +41,12 @@ export function useAutoMemorySuggest(o: { chatId: number | null; running: boolea
       ctl.current?.abort();
       const c = new AbortController();
       ctl.current = c;
-      const r = await suggestMemories(latest.current.app, { chatId, projectRoot: latest.current.o.projectRoot, signal: c.signal, auto: true });
+      const r = await suggestMemories(latest.current.app, {
+        chatId,
+        projectRoot: latest.current.o.projectRoot,
+        signal: c.signal,
+        auto: true,
+      });
       if (!c.signal.aborted && r.suggestions.length) setFound({ chatId, suggestions: r.suggestions });
     })().catch(() => {});
   }, [o.running]);

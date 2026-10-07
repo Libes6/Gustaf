@@ -10,4 +10,8 @@ export const LEGACY_OVERRIDES_KEY = "chatReviewOverrides";
 export const resolveReviewCopy = (global: unknown): boolean => global === true;
 
 /** One-time cleanup of the old per-chat overrides; a failure is harmless (the value is never read). */
-export const removeLegacyReviewOverrides = (): Promise<void> => deleteSetting(LEGACY_OVERRIDES_KEY).then(() => {}, () => {});
+export const removeLegacyReviewOverrides = (): Promise<void> =>
+  deleteSetting(LEGACY_OVERRIDES_KEY).then(
+    () => {},
+    () => {},
+  );

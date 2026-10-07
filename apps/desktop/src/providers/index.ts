@@ -10,10 +10,30 @@ import { rememberEfforts } from "./reasoning";
 import type { Adapter, ModelInfo, ProviderConfig, ProviderKind } from "./types";
 
 export const PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean; keyUrl?: string }> = {
-  openai: { name: "OpenAI", baseUrl: "https://api.openai.com/v1", needsKey: true, keyUrl: "https://platform.openai.com/api-keys" },
-  gemini: { name: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", needsKey: true, keyUrl: "https://aistudio.google.com/api-keys" },
-  anthropic: { name: "Anthropic", baseUrl: "https://api.anthropic.com", needsKey: true, keyUrl: "https://console.anthropic.com/settings/keys" },
-  openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", needsKey: true, keyUrl: "https://openrouter.ai/keys" },
+  openai: {
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    needsKey: true,
+    keyUrl: "https://platform.openai.com/api-keys",
+  },
+  gemini: {
+    name: "Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    needsKey: true,
+    keyUrl: "https://aistudio.google.com/api-keys",
+  },
+  anthropic: {
+    name: "Anthropic",
+    baseUrl: "https://api.anthropic.com",
+    needsKey: true,
+    keyUrl: "https://console.anthropic.com/settings/keys",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    needsKey: true,
+    keyUrl: "https://openrouter.ai/keys",
+  },
   ollama: { name: "Ollama", baseUrl: "http://localhost:11434/v1", needsKey: false },
   lmstudio: { name: "LM Studio", baseUrl: "http://localhost:1234/v1", needsKey: false },
   custom: { name: "Custom", baseUrl: "", needsKey: false },
@@ -44,7 +64,10 @@ export async function deleteProvider(id: string) {
   // A browser-login Cursor account owns its isolated profile folder; it goes with the account.
   const profile = list.find((p) => p.id === id)?.cliProfile;
   if (profile) await cursorProfiles.remove(profile).catch(() => {});
-  await setSetting("providers", list.filter((p) => p.id !== id));
+  await setSetting(
+    "providers",
+    list.filter((p) => p.id !== id),
+  );
   await removeSecret(providerSecretId(id), true);
   adapters.delete(id);
   forgetModelState(id);
@@ -98,17 +121,22 @@ const inflight = new Map<string, Promise<ModelInfo[]>>();
 const forgetModelState = (id: string) => void (modelErrors.delete(id), lastAttempt.delete(id), inflight.delete(id));
 let cacheWrites: Promise<unknown> = Promise.resolve();
 
-const readModelCache = () => getSetting<Record<string, CachedModels>>(MODEL_CACHE, {}).catch(() => ({}) as Record<string, CachedModels>);
+const readModelCache = () =>
+  getSetting<Record<string, CachedModels>>(MODEL_CACHE, {}).catch(() => ({}) as Record<string, CachedModels>);
 function writeModelCache(fn: (c: Record<string, CachedModels>) => Record<string, CachedModels>) {
   const run = cacheWrites.then(async () => setSetting(MODEL_CACHE, fn({ ...(await readModelCache()) })));
   cacheWrites = run.catch(() => {});
-  return run.then(() => {}, () => {});
+  return run.then(
+    () => {},
+    () => {},
+  );
 }
 
 /** Whether listing this provider's models can never read a secret. */
 async function listsWithoutKey(p: ProviderConfig) {
   if (p.kind === "cli") return p.cliAuth !== "key";
-  if (p.kind === "ollama" || p.kind === "lmstudio" || p.kind === "custom") return (await secretPresence(providerSecretId(p.id))) === false;
+  if (p.kind === "ollama" || p.kind === "lmstudio" || p.kind === "custom")
+    return (await secretPresence(providerSecretId(p.id))) === false;
   return false;
 }
 
@@ -124,12 +152,17 @@ function fetchModels(p: ProviderConfig) {
     lastAttempt.set(p.id, Date.now());
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${p.name} did not answer within ${Math.round(modelListLimits.timeoutMs / 1000)}s.`)), modelListLimits.timeoutMs);
+      timer = setTimeout(
+        () => reject(new Error(`${p.name} did not answer within ${Math.round(modelListLimits.timeoutMs / 1000)}s.`)),
+        modelListLimits.timeoutMs,
+      );
     });
-    const mine: Promise<ModelInfo[]> = Promise.race([getAdapter(p).then((a) => a.listModels()), timeout]).finally(() => {
-      clearTimeout(timer);
-      if (inflight.get(p.id) === mine) inflight.delete(p.id);
-    });
+    const mine: Promise<ModelInfo[]> = Promise.race([getAdapter(p).then((a) => a.listModels()), timeout]).finally(
+      () => {
+        clearTimeout(timer);
+        if (inflight.get(p.id) === mine) inflight.delete(p.id);
+      },
+    );
     run = mine;
     inflight.set(p.id, run);
   }
@@ -186,7 +219,12 @@ export async function listAllModels(all: ProviderConfig[], refresh: ModelRefresh
       if (first === undefined) {
         // On the first listing of a provider, nothing is "new" except genuinely recent models.
         first = firstRun ? Math.min(now, m.created || 0) : now;
-        if (fresh) await db.exec("insert or ignore into models_seen(provider, model, first_seen) values(?, ?, ?)", [m.providerId, m.id, first]);
+        if (fresh)
+          await db.exec("insert or ignore into models_seen(provider, model, first_seen) values(?, ?, ?)", [
+            m.providerId,
+            m.id,
+            first,
+          ]);
       }
       models.push({ ...m, firstSeen: first });
     }

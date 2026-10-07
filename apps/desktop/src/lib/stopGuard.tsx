@@ -15,7 +15,12 @@ export function useStopGuard(count: number, stopAgents?: () => void) {
   const confirmStop = (): boolean | Promise<boolean> => {
     const n = latest.current.count;
     if (n <= 0) return true;
-    return ask({ title: t("stopAgentsTitle", { count: n }), body: <p>{t("stopAgentsBody", { count: n })}</p>, confirmLabel: t("stopAgentsConfirm"), cancelLabel: t("stopAgentsKeep") }).then((ok) => {
+    return ask({
+      title: t("stopAgentsTitle", { count: n }),
+      body: <p>{t("stopAgentsBody", { count: n })}</p>,
+      confirmLabel: t("stopAgentsConfirm"),
+      cancelLabel: t("stopAgentsKeep"),
+    }).then((ok) => {
       if (ok) latest.current.stopAgents?.();
       return ok;
     });

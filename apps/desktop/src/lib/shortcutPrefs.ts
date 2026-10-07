@@ -1,6 +1,14 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "./api";
-import { effectiveShortcuts, getShortcutOverrides, setShortcutOverrides, shortcutsVersion, subscribeShortcuts, type Shortcut, type ShortcutId } from "./shortcuts";
+import {
+  effectiveShortcuts,
+  getShortcutOverrides,
+  setShortcutOverrides,
+  shortcutsVersion,
+  subscribeShortcuts,
+  type Shortcut,
+  type ShortcutId,
+} from "./shortcuts";
 
 /** App setting holding the user's key bindings: `{ [shortcutId]: "Cmd+Shift+K" }` (only the ones that differ from the default). */
 export const SHORTCUT_SETTING = "shortcutBindings";

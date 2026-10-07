@@ -13,7 +13,11 @@ export function visit(nav: Nav, e: NavEntry): Nav {
 }
 
 /** Moves the cursor; `exists` skips chats that were deleted or archived. Returns null when there is nowhere to go. */
-export function move(nav: Nav, step: -1 | 1, exists: (chatId: number) => boolean): { nav: Nav; entry: NavEntry } | null {
+export function move(
+  nav: Nav,
+  step: -1 | 1,
+  exists: (chatId: number) => boolean,
+): { nav: Nav; entry: NavEntry } | null {
   for (let i = nav.index + step; i >= 0 && i < nav.items.length; i += step) {
     if (exists(nav.items[i].chatId)) return { nav: { ...nav, index: i }, entry: nav.items[i] };
   }

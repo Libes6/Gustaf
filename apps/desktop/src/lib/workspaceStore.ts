@@ -20,7 +20,10 @@ const entries = new Map<string, WorkspaceEntry>();
 const inflight = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
 let version = 0;
-const emit = () => { version++; listeners.forEach((l) => l()); };
+const emit = () => {
+  version++;
+  listeners.forEach((l) => l());
+};
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
 
 /** Re-renders the caller whenever any root's list changes (read the data with `workspaceEntry`). */
@@ -32,15 +35,26 @@ export function refreshWorkspaces(root: string, o: { force?: boolean } = {}): Pr
   if (!o.force && known && Date.now() - known.at < WORKSPACE_REFRESH_MS) return Promise.resolve();
   const running = inflight.get(root);
   if (running) return running;
-  const p = worktrees.list(root).then(
-    (list) => { entries.set(root, { list: Array.isArray(list) ? list : [], error: null, at: Date.now() }); },
-    (e) => { entries.set(root, { list: entries.get(root)?.list ?? [], error: parseWorktreeError(e).code, at: Date.now() }); },
-  ).finally(() => { inflight.delete(root); emit(); });
+  const p = worktrees
+    .list(root)
+    .then(
+      (list) => {
+        entries.set(root, { list: Array.isArray(list) ? list : [], error: null, at: Date.now() });
+      },
+      (e) => {
+        entries.set(root, { list: entries.get(root)?.list ?? [], error: parseWorktreeError(e).code, at: Date.now() });
+      },
+    )
+    .finally(() => {
+      inflight.delete(root);
+      emit();
+    });
   inflight.set(root, p);
   return p;
 }
 
-export const workspaceEntry = (root: string | null | undefined): WorkspaceEntry => (root ? entries.get(root) ?? empty : empty);
+export const workspaceEntry = (root: string | null | undefined): WorkspaceEntry =>
+  root ? (entries.get(root) ?? empty) : empty;
 
 /** Live workspaces of a project root; `enabled` false leaves the store alone (a project without workspace chats). */
 export function useWorkspaces(root: string | null | undefined, enabled = true): WorkspaceEntry {
@@ -56,13 +70,18 @@ export function useWorkspacePolling(roots: readonly string[], refreshKey: string
   const key = roots.join("\n");
   useEffect(() => {
     if (!roots.length) return;
-    const tick = () => { if (typeof document === "undefined" || document.visibilityState !== "hidden") roots.forEach((r) => void refreshWorkspaces(r)); };
+    const tick = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "hidden")
+        roots.forEach((r) => void refreshWorkspaces(r));
+    };
     tick();
     const timer = setInterval(tick, WORKSPACE_POLL_MS);
     return () => clearInterval(timer);
   }, [key]);
   // A run started or finished somewhere: the changed-file counts moved.
-  useEffect(() => { roots.forEach((r) => void refreshWorkspaces(r)); }, [refreshKey]);
+  useEffect(() => {
+    roots.forEach((r) => void refreshWorkspaces(r));
+  }, [refreshKey]);
 }
 
 // Where the project sits inside its repository (`""` or `sub/dir/`): a project in a subfolder works in the same subfolder of a checkout.
@@ -70,7 +89,10 @@ const prefixes = new Map<string, Promise<string>>();
 export function repoPrefix(root: string): Promise<string> {
   let p = prefixes.get(root);
   if (!p) {
-    p = gitRepo.status(root).then((s) => (s?.repo ? s.prefix ?? "" : ""), () => "");
+    p = gitRepo.status(root).then(
+      (s) => (s?.repo ? (s.prefix ?? "") : ""),
+      () => "",
+    );
     prefixes.set(root, p);
   }
   return p;
@@ -81,16 +103,26 @@ const repos = new Map<string, Promise<boolean>>();
 export function isGitProject(root: string): Promise<boolean> {
   let p = repos.get(root);
   if (!p) {
-    p = gitRepo.status(root).then((s) => !!s?.repo && !!s.head, () => false);
+    p = gitRepo.status(root).then(
+      (s) => !!s?.repo && !!s.head,
+      () => false,
+    );
     repos.set(root, p);
   }
   return p;
 }
-export const forgetRepoInfo = (root: string) => { repos.delete(root); prefixes.delete(root); };
+export const forgetRepoInfo = (root: string) => {
+  repos.delete(root);
+  prefixes.delete(root);
+};
 
 /** Test hook. */
 export function resetWorkspaceStore() {
-  entries.clear(); inflight.clear(); prefixes.clear(); repos.clear(); emit();
+  entries.clear();
+  inflight.clear();
+  prefixes.clear();
+  repos.clear();
+  emit();
 }
 
 /** `repoPrefix` as a hook; null while loading or when `enabled` is false. */
@@ -99,8 +131,13 @@ export function usePrefix(root: string | null | undefined, enabled: boolean): st
   useEffect(() => {
     let cancelled = false;
     setValue(null);
-    if (root && enabled) repoPrefix(root).then((p) => { if (!cancelled) setValue(p); });
-    return () => { cancelled = true; };
+    if (root && enabled)
+      repoPrefix(root).then((p) => {
+        if (!cancelled) setValue(p);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [root, enabled]);
   return value;
 }
@@ -111,8 +148,13 @@ export function useIsGitProject(root: string | null | undefined): boolean {
   useEffect(() => {
     let cancelled = false;
     setValue(false);
-    if (root) isGitProject(root).then((v) => { if (!cancelled) setValue(v); });
-    return () => { cancelled = true; };
+    if (root)
+      isGitProject(root).then((v) => {
+        if (!cancelled) setValue(v);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [root]);
   return value;
 }

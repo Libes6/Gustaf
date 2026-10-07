@@ -25,7 +25,16 @@ type Options = {
  * the id to highlight, or null. The scroll happens in an effect after the render that shows the highlight, so
  * collapsed steps containing the message are already expanded by then.
  */
-export function useMessageJump({ jump, clearJump, chatId, visible, loaded, messages, feedRef, onJump }: Options): number | null {
+export function useMessageJump({
+  jump,
+  clearJump,
+  chatId,
+  visible,
+  loaded,
+  messages,
+  feedRef,
+  onJump,
+}: Options): number | null {
   const [focus, setFocus] = useState<{ id: number; seq: number } | null>(null);
 
   useEffect(() => {
@@ -33,7 +42,10 @@ export function useMessageJump({ jump, clearJump, chatId, visible, loaded, messa
     if (Date.now() - jump.seq > JUMP_TTL_MS) return clearJump();
     if (!visible || !loaded) return;
     clearJump();
-    const id = nearestMessageId(messages.map((m) => m.id), jump.messageId);
+    const id = nearestMessageId(
+      messages.map((m) => m.id),
+      jump.messageId,
+    );
     if (id === null) return;
     onJump();
     setFocus({ id, seq: jump.seq });

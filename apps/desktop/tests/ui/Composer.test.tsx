@@ -8,7 +8,16 @@ import { Composer } from "../../src/components/chat/Composer";
 import type { ModelInfo } from "../../src/providers/types";
 import { makeApp, provider, renderApp } from "./render";
 
-const model = { id: "m1", name: "Model One", providerId: "p1", contextWindow: 200_000, images: true, tools: true, created: 1, firstSeen: 1 };
+const model = {
+  id: "m1",
+  name: "Model One",
+  providerId: "p1",
+  contextWindow: 200_000,
+  images: true,
+  tools: true,
+  created: 1,
+  firstSeen: 1,
+};
 
 type Over = {
   text?: string;
@@ -35,13 +44,34 @@ function Harness(o: Over) {
   const [mode, setMode] = useState<"ask" | "plan" | "agent">("agent");
   return (
     <Composer
-      text={text} setText={setText} images={images} setImages={setImages} taRef={taRef} visible
-      root={o.root ?? null} projectName={undefined} files={o.files ?? []}
-      provider={provider()} selectedModel={"selectedModel" in o ? o.selectedModel : model} modelName="Model One"
+      text={text}
+      setText={setText}
+      images={images}
+      setImages={setImages}
+      taRef={taRef}
+      visible
+      root={o.root ?? null}
+      projectName={undefined}
+      files={o.files ?? []}
+      provider={provider()}
+      selectedModel={"selectedModel" in o ? o.selectedModel : model}
+      modelName="Model One"
       supports={o.supports ?? { computer: false, reasoning: false }}
-      running={o.running ?? false} followUp={o.followUp} mode={mode} onModeChange={(m) => { setMode(m); o.onModeChange?.(m); }} onSend={o.onSend ?? (() => {})} onStop={o.onStop ?? (() => {})}
-      contextTokens={1234} lastInput={900} canCompact={o.canCompact ?? true} canRestore={false}
-      onCompact={o.onCompact ?? (() => {})} onRestore={o.onRestore ?? (() => {})}
+      running={o.running ?? false}
+      followUp={o.followUp}
+      mode={mode}
+      onModeChange={(m) => {
+        setMode(m);
+        o.onModeChange?.(m);
+      }}
+      onSend={o.onSend ?? (() => {})}
+      onStop={o.onStop ?? (() => {})}
+      contextTokens={1234}
+      lastInput={900}
+      canCompact={o.canCompact ?? true}
+      canRestore={false}
+      onCompact={o.onCompact ?? (() => {})}
+      onRestore={o.onRestore ?? (() => {})}
     />
   );
 }
@@ -52,7 +82,7 @@ const box = () => screen.getByPlaceholderText("Ask anything") as HTMLTextAreaEle
 describe("Composer mode menu", () => {
   it("offers modes in the plus menu and retains the selection", async () => {
     const seen: string[] = [];
-    renderApp(<Harness onModeChange={m => seen.push(m)} />);
+    renderApp(<Harness onModeChange={(m) => seen.push(m)} />);
     const plus = screen.getByRole("button", { name: "Attach" });
     await userEvent.click(plus);
     expect(screen.getByRole("menuitemradio", { name: /^Agent/ })).toHaveAttribute("aria-checked", "true");
@@ -131,8 +161,13 @@ describe("Composer", () => {
 
   it("removes one attachment at a time", async () => {
     const { container } = renderApp(<Harness images={["AAAA", "BBBB", "CCCC"]} />);
-    const thumbs = () => [...container.querySelectorAll<HTMLImageElement>(".attach img")].map((i) => i.getAttribute("src"));
-    expect(thumbs()).toEqual(["data:image/png;base64,AAAA", "data:image/png;base64,BBBB", "data:image/png;base64,CCCC"]);
+    const thumbs = () =>
+      [...container.querySelectorAll<HTMLImageElement>(".attach img")].map((i) => i.getAttribute("src"));
+    expect(thumbs()).toEqual([
+      "data:image/png;base64,AAAA",
+      "data:image/png;base64,BBBB",
+      "data:image/png;base64,CCCC",
+    ]);
     await userEvent.click(container.querySelectorAll<HTMLButtonElement>(".attach button")[1]);
     expect(thumbs()).toEqual(["data:image/png;base64,AAAA", "data:image/png;base64,CCCC"]);
     await userEvent.click(container.querySelectorAll<HTMLButtonElement>(".attach button")[0]);
@@ -157,7 +192,9 @@ describe("Composer", () => {
   it("outside a project the attach menu has no @file entry", async () => {
     renderApp(<Harness root={null} />);
     await userEvent.click(screen.getByTitle("Attach"));
-    expect(within(screen.getByRole("menu")).queryByRole("menuitem", { name: /Mention a file/ })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("menu")).queryByRole("menuitem", { name: /Mention a file/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("typing @ in a project lists matching files and Enter inserts the highlighted one instead of sending", async () => {
@@ -281,7 +318,12 @@ describe("Composer", () => {
 
   it("uses the model's own levels and shows a level from another model as the nearest one", async () => {
     const all = ["low", "medium", "high", "xhigh", "max"] as const;
-    const app = makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model], reasoning: "max" });
+    const app = makeApp({
+      providers: [provider()],
+      selection: { providerId: "p1", model: "m1" },
+      models: [model],
+      reasoning: "max",
+    });
     const { unmount } = renderApp(<Harness supports={{ computer: false, reasoning: true, levels: [...all] }} />, app);
     await userEvent.click(screen.getByRole("button", { name: "Model One Max" }));
     expect(screen.getAllByRole("menuitemradio")).toHaveLength(5);
@@ -289,14 +331,21 @@ describe("Composer", () => {
     await userEvent.click(screen.getByRole("menuitemradio", { name: /^Extra high/ }));
     expect(app.setReasoning).toHaveBeenCalledWith("xhigh");
     unmount();
-    renderApp(<Harness supports={{ computer: false, reasoning: true, levels: ["low", "medium", "high"] }} />, makeApp({ providers: [provider()], reasoning: "xhigh" }));
+    renderApp(
+      <Harness supports={{ computer: false, reasoning: true, levels: ["low", "medium", "high"] }} />,
+      makeApp({ providers: [provider()], reasoning: "xhigh" }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Model One High" }));
     expect(screen.getAllByRole("menuitemradio")).toHaveLength(3);
     expect(screen.getByRole("menuitemradio", { name: /^High/ })).toHaveAttribute("aria-checked", "true");
   });
 
   it("uses Russian level names in the effort menu", async () => {
-    renderApp(<Harness supports={{ computer: false, reasoning: true }} />, makeApp({ providers: [provider()], reasoning: "low" }), "ru");
+    renderApp(
+      <Harness supports={{ computer: false, reasoning: true }} />,
+      makeApp({ providers: [provider()], reasoning: "low" }),
+      "ru",
+    );
     await userEvent.click(screen.getByRole("button", { name: /Лёгкое/ }));
     expect(screen.getByText("Вдумчивость")).toBeInTheDocument();
     expect(screen.getByRole("menuitemradio", { name: /^Лёгкое/ })).toHaveAttribute("aria-checked", "true");
@@ -304,7 +353,10 @@ describe("Composer", () => {
   });
 
   it("without effort levels the model chip opens the model list directly, with no effort section", async () => {
-    renderApp(<Harness />, makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }));
+    renderApp(
+      <Harness />,
+      makeApp({ providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Model One" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(screen.queryByText("Reasoning effort")).not.toBeInTheDocument();
@@ -315,14 +367,22 @@ describe("Composer", () => {
     // Everything that used to add a chip is on: a project, a computer-capable model, Computer Use and the review copy.
     const { container } = renderApp(
       <Harness root="/work/alpha" supports={{ computer: true, reasoning: false }} />,
-      makeApp({ computerUse: true, reviewCopy: true, providers: [provider()], selection: { providerId: "p1", model: "m1" }, models: [model] }),
+      makeApp({
+        computerUse: true,
+        reviewCopy: true,
+        providers: [provider()],
+        selection: { providerId: "p1", model: "m1" },
+        models: [model],
+      }),
     );
     const bar = container.querySelector(".composer-bar")!;
     expect(bar.querySelector(".composer-mode")).toHaveTextContent("Agent");
     // Keyboard (DOM) order: attach menu, access, context ring, model, send.
-    expect(within(bar as HTMLElement).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
-      "Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Send",
-    ]);
+    expect(
+      within(bar as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim()),
+    ).toEqual(["Attach", "Ask for commands", "Context: about 1,234 tokens, 1% of the window", "Model One", "Send"]);
     expect(screen.queryByText(/Computer use/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Review copy/i)).not.toBeInTheDocument();
   });
@@ -341,7 +401,10 @@ describe("Composer", () => {
     off.unmount();
 
     // On, but this model has no computer support: the agent gets no computer tools, so nothing is claimed.
-    const unsupported = renderApp(<Harness supports={{ computer: false, reasoning: false }} />, makeApp({ computerUse: true }));
+    const unsupported = renderApp(
+      <Harness supports={{ computer: false, reasoning: false }} />,
+      makeApp({ computerUse: true }),
+    );
     await userEvent.click(unsupported.container.querySelector(".chip.ctx")!);
     expect(screen.getByText("Compress chat")).toBeInTheDocument();
     expect(screen.queryByText("Computer Use on")).not.toBeInTheDocument();
@@ -351,7 +414,11 @@ describe("Composer", () => {
     const { app } = renderApp(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: /Ask for commands/ }));
     const menu = screen.getByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Read only", "Ask for commands✓", "Full access"]);
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((m) => m.textContent),
+    ).toEqual(["Read only", "Ask for commands✓", "Full access"]);
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Full access/ }));
     expect(app.setAccess).toHaveBeenCalledWith("full");
   });
@@ -380,16 +447,23 @@ describe("Composer slash commands", () => {
   });
 });
 
-
-describe("Screenshot paste",()=>{
- it("accepts clipboard image items even when files collection is empty",async()=>{
- const {container}=renderApp(<Harness/>);
- const file=new File(["screenshot"],"Screenshot.png",{type:"image/png"});
- fireEvent.paste(box(),{clipboardData:{files:[],items:[{kind:"file",type:"image/png",getAsFile:()=>file}]}});
- await vi.waitFor(()=>expect(container.querySelector(".attach img")).not.toBeNull());
- expect(box().value).toBe("");
- });
- it("leaves ordinary text paste to the textarea",()=>{renderApp(<Harness/>);const event=new Event("paste",{bubbles:true,cancelable:true});Object.defineProperty(event,"clipboardData",{value:{files:[],items:[]}});box().dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
+describe("Screenshot paste", () => {
+  it("accepts clipboard image items even when files collection is empty", async () => {
+    const { container } = renderApp(<Harness />);
+    const file = new File(["screenshot"], "Screenshot.png", { type: "image/png" });
+    fireEvent.paste(box(), {
+      clipboardData: { files: [], items: [{ kind: "file", type: "image/png", getAsFile: () => file }] },
+    });
+    await vi.waitFor(() => expect(container.querySelector(".attach img")).not.toBeNull());
+    expect(box().value).toBe("");
+  });
+  it("leaves ordinary text paste to the textarea", () => {
+    renderApp(<Harness />);
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [], items: [] } });
+    box().dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
 });
 
 describe("Composer image viewer", () => {
@@ -415,10 +489,13 @@ describe("Composer image viewer", () => {
   });
 });
 
-
 describe("chat reference attachments", () => {
   it("accepts sidebar drag, offers full or short versions and previews the chosen snapshot", async () => {
-    const read = vi.spyOn(chatData, "loadMessages").mockResolvedValue([{ id: 1, chat_id: 5, created_at: 0, role: "user", parts: [{ type: "text", text: "a".repeat(30_000) }] }]);
+    const read = vi
+      .spyOn(chatData, "loadMessages")
+      .mockResolvedValue([
+        { id: 1, chat_id: 5, created_at: 0, role: "user", parts: [{ type: "text", text: "a".repeat(30_000) }] },
+      ]);
     const app = makeApp({ chats: [{ id: 5, title: "Large source", project_id: null }] });
     const { container } = renderApp(<Harness />, app);
     fireEvent.drop(container.querySelector(".composer")!, { dataTransfer: { getData: () => "5", files: [] } });
@@ -456,7 +533,10 @@ describe("chat reference attachments", () => {
 
 describe("Composer: large pastes", () => {
   const big = Array.from({ length: 40 }, (_, i) => `log line ${i}`).join("\n");
-  const paste = (el: HTMLElement, text: string) => fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : ""), items: [], files: [] } });
+  const paste = (el: HTMLElement, text: string) =>
+    fireEvent.paste(el, {
+      clipboardData: { getData: (type: string) => (type === "text/plain" ? text : ""), items: [], files: [] },
+    });
 
   it("a large paste becomes a card; the field keeps only what was typed", () => {
     renderApp(<Harness text="check this" />);
@@ -478,7 +558,9 @@ describe("Composer: large pastes", () => {
     expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
     await userEvent.clear(field);
     paste(field, big);
-    await userEvent.click(within(screen.getByRole("group", { name: "Pasted text" })).getByRole("button", { name: "Remove attachment" }));
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Pasted text" })).getByRole("button", { name: "Remove attachment" }),
+    );
     expect(screen.queryByRole("group", { name: "Pasted text" })).not.toBeInTheDocument();
   });
 
@@ -505,13 +587,21 @@ it("⌘⌥↵ sends and opens a new chat; a plain Enter only sends", () => {
 
 describe("Composer follow-up while a run is going", () => {
   type Plan = NonNullable<Over["followUp"]>;
-  const plan = (action: "queue" | "steer", canSteer = true): Plan => ({ action, other: canSteer ? (action === "steer" ? "queue" : "steer") : null, canSteer });
+  const plan = (action: "queue" | "steer", canSteer = true): Plan => ({
+    action,
+    other: canSteer ? (action === "steer" ? "queue" : "steer") : null,
+    canSteer,
+  });
 
   it("tells before sending whether the message refines the work or becomes the next request", () => {
     const { rerenderApp } = renderApp(<Harness text="x" running followUp={plan("queue")} />);
-    expect(screen.getByTestId("followup-hint")).toHaveTextContent(/^Next request, runs after this one\. ⌘↵: refine the current work instead/);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(
+      /^Next request, runs after this one\. ⌘↵: refine the current work instead/,
+    );
     rerenderApp(<Harness text="x" running followUp={plan("steer")} />);
-    expect(screen.getByTestId("followup-hint")).toHaveTextContent(/^Refines the current work\. ⌘↵: queue as the next request instead/);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(
+      /^Refines the current work\. ⌘↵: queue as the next request instead/,
+    );
   });
 
   it("a provider without steering shows that only queueing is available", () => {
@@ -535,4 +625,3 @@ describe("Composer follow-up while a run is going", () => {
     expect(screen.queryByTestId("followup-hint")).not.toBeInTheDocument();
   });
 });
-

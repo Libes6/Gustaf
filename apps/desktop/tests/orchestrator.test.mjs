@@ -25,10 +25,19 @@ test('parsePlanArgs validates ids, dependencies, cycles and the task count', () 
   bad([task('a b')], /id/);
   bad([task('a', { dependsOn: ['x'] })], /unknown task "x"/);
   bad([task('a', { dependsOn: ['a'] })], /itself/);
-  bad([task('a', { dependsOn: ['b'] }), task('b', { dependsOn: ['c'] }), task('c', { dependsOn: ['a'] })], /cycle: a -> b -> c -> a/);
+  bad(
+    [task('a', { dependsOn: ['b'] }), task('b', { dependsOn: ['c'] }), task('c', { dependsOn: ['a'] })],
+    /cycle: a -> b -> c -> a/,
+  );
   bad([task('a', { prompt: '' })], /Task "a".*prompt/);
-  bad(Array.from({ length: o.MAX_PLAN_TASKS + 1 }, (_, i) => task(`t${i}`)), /at most/);
-  const ok = o.parsePlanArgs({ tasks: [task('a', { files: ['../x', 'src/a.ts'], model: 'p/m' })], cancelDependents: false }, { cancelDependents: true });
+  bad(
+    Array.from({ length: o.MAX_PLAN_TASKS + 1 }, (_, i) => task(`t${i}`)),
+    /at most/,
+  );
+  const ok = o.parsePlanArgs(
+    { tasks: [task('a', { files: ['../x', 'src/a.ts'], model: 'p/m' })], cancelDependents: false },
+    { cancelDependents: true },
+  );
   assert.ok(ok.ok);
   assert.deepEqual(ok.value.tasks[0].files, ['src/a.ts']);
   assert.equal(ok.value.tasks[0].model, 'p/m');
@@ -56,11 +65,23 @@ test('nextStep respects dependencies, the limit and ownership; skips dependants 
   const failed = new Map([['a', { status: 'failed', report: '' }]]);
   assert.deepEqual(o.nextStep(p, failed, new Set(['b']), 3), { start: ['d'], skip: [{ id: 'c', because: 'a' }] });
   const keep = { ...p, cancelDependents: false };
-  assert.deepEqual(o.nextStep(keep, failed, new Set(['b']), 3).start, ['c', 'd'], 'dependants run anyway when not cancelling');
+  assert.deepEqual(
+    o.nextStep(keep, failed, new Set(['b']), 3).start,
+    ['c', 'd'],
+    'dependants run anyway when not cancelling',
+  );
 
-  const w = plan([task('w1', { type: 'general', files: ['src/a.ts'] }), task('w2', { type: 'general', files: ['src/a.ts'] }), task('w3', { type: 'general', files: ['lib'] }), task('r', { files: ['src/a.ts'] })]);
+  const w = plan([
+    task('w1', { type: 'general', files: ['src/a.ts'] }),
+    task('w2', { type: 'general', files: ['src/a.ts'] }),
+    task('w3', { type: 'general', files: ['lib'] }),
+    task('r', { files: ['src/a.ts'] }),
+  ]);
   assert.deepEqual(o.nextStep(w, new Map(), new Set(), 4).start, ['w1', 'w3', 'r'], 'w2 waits for w1');
-  assert.deepEqual(o.nextStep(w, new Map([['w1', { status: 'completed', report: '' }]]), new Set(['w3', 'r']), 4).start, ['w2']);
+  assert.deepEqual(
+    o.nextStep(w, new Map([['w1', { status: 'completed', report: '' }]]), new Set(['w3', 'r']), 4).start,
+    ['w2'],
+  );
 });
 
 /** A fake runner: records the order of starts and the peak concurrency; results per id. */
@@ -86,7 +107,13 @@ function fakeRun(results = {}, delay = {}) {
 }
 
 test('runPlan runs a dependency graph within the limit and passes dependency outcomes', async () => {
-  const p = plan([task('a'), task('b'), task('c', { dependsOn: ['a', 'b'] }), task('d'), task('e', { dependsOn: ['c'] })]);
+  const p = plan([
+    task('a'),
+    task('b'),
+    task('c', { dependsOn: ['a', 'b'] }),
+    task('d'),
+    task('e', { dependsOn: ['c'] }),
+  ]);
   const f = fakeRun({}, { a: 5, b: 15, d: 5 });
   const out = await o.runPlan(p, { limit: 2, run: f.run });
   assert.deepEqual([...out.keys()], ['a', 'b', 'c', 'd', 'e']);
@@ -114,7 +141,11 @@ test('runPlan never runs overlapping writers at the same time (queues them inste
 test('a failure cancels dependants transitively (or not, when configured); a throw counts as failure', async () => {
   const tasks = [task('a'), task('b', { dependsOn: ['a'] }), task('c', { dependsOn: ['b'] }), task('d')];
   const skipped = [];
-  const out = await o.runPlan(plan(tasks), { limit: 3, run: fakeRun({ a: 'throw' }).run, onSkip: (t, because) => skipped.push(`${t.id}<${because}`) });
+  const out = await o.runPlan(plan(tasks), {
+    limit: 3,
+    run: fakeRun({ a: 'throw' }).run,
+    onSkip: (t, because) => skipped.push(`${t.id}<${because}`),
+  });
   assert.equal(out.get('a').status, 'failed');
   assert.match(out.get('a').report, /boom a/);
   assert.equal(out.get('b').status, 'skipped');
@@ -144,12 +175,22 @@ test('aborting stops new starts and marks the rest cancelled', async () => {
 test('mergeReports lists every task and stays bounded; dependency context is bounded', () => {
   const p = plan([task('a'), task('b', { dependsOn: ['a'] })]);
   const big = 'x'.repeat(50_000);
-  const merged = o.mergeReports(p, new Map([['a', { status: 'completed', report: big }], ['b', { status: 'skipped', report: 'Not run' }]]), 6000);
+  const merged = o.mergeReports(
+    p,
+    new Map([
+      ['a', { status: 'completed', report: big }],
+      ['b', { status: 'skipped', report: 'Not run' }],
+    ]),
+    6000,
+  );
   assert.match(merged, /^Plan finished: 2 task\(s\); 1 completed, 1 skipped\./);
   assert.match(merged, /- b "T b" \(explore, after a\): skipped/);
   assert.ok(merged.length < 6500, String(merged.length));
   assert.match(merged, /report truncated/);
-  const ctx = o.dependencyContext([{ task: { id: 'a', title: 'A' }, outcome: { status: 'completed', report: big } }], 2000);
+  const ctx = o.dependencyContext(
+    [{ task: { id: 'a', title: 'A' }, outcome: { status: 'completed', report: big } }],
+    2000,
+  );
   assert.ok(ctx.length < 2500);
   assert.match(ctx, /NOT in your copy/);
   assert.equal(o.dependencyContext([]), '');

@@ -10,7 +10,8 @@ export function ModeSwitch({ mode, onChange }: { mode: ChatMode; onChange: (m: C
   const label = { ask: t("modeAsk"), plan: t("modePlan"), agent: t("modeAgent") };
   const hint = { ask: t("modeAskHint"), plan: t("modePlanHint"), agent: t("modeAgentHint") };
   const move = (e: React.KeyboardEvent, i: number) => {
-    const d = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    const d =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
     if (!d) return;
     e.preventDefault();
     const next = CHAT_MODES[(i + d + CHAT_MODES.length) % CHAT_MODES.length];
@@ -22,7 +23,9 @@ export function ModeSwitch({ mode, onChange }: { mode: ChatMode; onChange: (m: C
       {CHAT_MODES.map((m, i) => (
         <button
           key={m}
-          ref={(el) => { refs.current[m] = el; }}
+          ref={(el) => {
+            refs.current[m] = el;
+          }}
           type="button"
           role="radio"
           aria-checked={mode === m}

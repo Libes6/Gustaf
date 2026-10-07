@@ -4,8 +4,16 @@ import { getSetting, setSetting } from "../lib/api";
 import { currentPlatform } from "../lib/platform";
 import { acceleratorOf as stopAcceleratorOf } from "../lib/shortcuts";
 import {
-  acceleratorOf, DEFAULT_ACCELERATOR, DEFAULT_QUICK_ASK, displayAccelerator, normalizeQuickAsk, QUICK_ASK_SETTING, quickAskErrorKey, recordAccelerator,
-  type AcceleratorError, type QuickAskSettings,
+  acceleratorOf,
+  DEFAULT_ACCELERATOR,
+  DEFAULT_QUICK_ASK,
+  displayAccelerator,
+  normalizeQuickAsk,
+  QUICK_ASK_SETTING,
+  quickAskErrorKey,
+  recordAccelerator,
+  type AcceleratorError,
+  type QuickAskSettings,
 } from "../lib/quickAsk";
 import { SettingRow } from "./SettingRow";
 import { applyQuickAsk, useQuickAskStatus } from "../lib/quickAskHost";
@@ -29,7 +37,10 @@ export function QuickAskSettings() {
   const status = useQuickAskStatus();
 
   useEffect(() => {
-    getSetting<unknown>(QUICK_ASK_SETTING, null).then((raw) => setSettings(normalizeQuickAsk(raw))).catch(() => {}).finally(() => setLoaded(true));
+    getSetting<unknown>(QUICK_ASK_SETTING, null)
+      .then((raw) => setSettings(normalizeQuickAsk(raw)))
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
   const update = (patch: Partial<QuickAskSettings>) => {
@@ -47,8 +58,23 @@ export function QuickAskSettings() {
   return (
     <>
       <div className="card" style={{ marginTop: 12 }}>
-        <SettingRow id="quickAskSwitch" title={t("quickAskSwitch")} description={t("quickAskSwitchDesc")} toggle={{ on: settings.enabled, disabled: !loaded, onChange: (enabled) => update({ enabled }) }} />
-        <SettingRow id="quickAskShortcut" title={t("quickAskShortcut")} description={settings.enabled && status.state === "on" ? t("quickAskStatusOn", { keys }) : !settings.enabled ? t("quickAskStatusOff") : ""}>
+        <SettingRow
+          id="quickAskSwitch"
+          title={t("quickAskSwitch")}
+          description={t("quickAskSwitchDesc")}
+          toggle={{ on: settings.enabled, disabled: !loaded, onChange: (enabled) => update({ enabled }) }}
+        />
+        <SettingRow
+          id="quickAskShortcut"
+          title={t("quickAskShortcut")}
+          description={
+            settings.enabled && status.state === "on"
+              ? t("quickAskStatusOn", { keys })
+              : !settings.enabled
+                ? t("quickAskStatusOff")
+                : ""
+          }
+        >
           {recording ? (
             <input
               className="input narrow"
@@ -72,15 +98,33 @@ export function QuickAskSettings() {
           ) : (
             <>
               <span className="kbd-chip">{keys}</span>
-              <button className="btn-soft" onClick={() => (setRecordError(null), setRecording(true))}>{t("quickAskRecord")}</button>
-              {customized && <button className="btn-soft" onClick={() => (setRecordError(null), update({ accelerator: null }))}>{t("quickAskReset")}</button>}
+              <button className="btn-soft" onClick={() => (setRecordError(null), setRecording(true))}>
+                {t("quickAskRecord")}
+              </button>
+              {customized && (
+                <button className="btn-soft" onClick={() => (setRecordError(null), update({ accelerator: null }))}>
+                  {t("quickAskReset")}
+                </button>
+              )}
             </>
           )}
         </SettingRow>
-        <SettingRow id="quickAskHideOnBlur" title={t("quickAskHideOnBlur")} toggle={{ on: settings.hideOnBlur, onChange: (hideOnBlur) => update({ hideOnBlur }) }} />
+        <SettingRow
+          id="quickAskHideOnBlur"
+          title={t("quickAskHideOnBlur")}
+          toggle={{ on: settings.hideOnBlur, onChange: (hideOnBlur) => update({ hideOnBlur }) }}
+        />
       </div>
-      {recordError && <p className="h4-sub" role="alert">{t(recordError)}</p>}
-      {failure && <p className="h4-sub" role="alert" style={{ color: "var(--error-fg)" }}>{failure}</p>}
+      {recordError && (
+        <p className="h4-sub" role="alert">
+          {t(recordError)}
+        </p>
+      )}
+      {failure && (
+        <p className="h4-sub" role="alert" style={{ color: "var(--error-fg)" }}>
+          {failure}
+        </p>
+      )}
     </>
   );
 }

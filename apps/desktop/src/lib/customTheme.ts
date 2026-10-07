@@ -22,12 +22,20 @@ export function applyCustomTheme(mode: ResolvedTheme = resolvedNow()) {
 }
 
 const publish = () => listeners.forEach((l) => l(state));
-const remember = () => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ } };
+const remember = () => {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable */
+  }
+};
 
 export const getCustomThemes = () => state;
 export function subscribeCustomThemes(l: (s: State) => void) {
   listeners.add(l);
-  return () => { listeners.delete(l); };
+  return () => {
+    listeners.delete(l);
+  };
 }
 
 function commit(next: State, persist: { themes?: boolean; active?: boolean }) {
@@ -53,7 +61,10 @@ export function saveCustomTheme(theme: CustomTheme, activate = false) {
 
 export function deleteCustomTheme(id: string) {
   const wasActive = state.activeId === id;
-  commit({ themes: state.themes.filter((t) => t.id !== id), activeId: wasActive ? "" : state.activeId }, { themes: true, active: wasActive });
+  commit(
+    { themes: state.themes.filter((t) => t.id !== id), activeId: wasActive ? "" : state.activeId },
+    { themes: true, active: wasActive },
+  );
 }
 
 /** Call once before first render (after initTheme): applies the cached theme, then reconciles with the stored settings. */
@@ -61,7 +72,9 @@ export function initCustomTheme() {
   try {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "null");
     if (c) state = { themes: parseStoredThemes(c.themes), activeId: typeof c.activeId === "string" ? c.activeId : "" };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   applyCustomTheme();
   Promise.all([getSetting<unknown>("customThemes", null), getSetting<unknown>("customThemeId", "")])
     .then(([themes, activeId]) => {

@@ -29,7 +29,11 @@ export const NO_RULES: ReviewRules = { status: "none", path: REVIEW_RULES_PATH, 
 
 /** `fs_read` prefixes each line with its number ("     1|text"); the file's own text is what follows the bar. */
 export function stripLineNumbers(read: string): string {
-  return read.replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/^ *\d+\|/, "")).join("\n");
+  return read
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => l.replace(/^ *\d+\|/, ""))
+    .join("\n");
 }
 
 const utf8Length = (s: string) => new TextEncoder().encode(s).length;
@@ -40,28 +44,48 @@ const defang = (s: string) => s.replace(new RegExp(`<(/?)(${RULES_TAG})`, "gi"),
  * The rules for the prompt from the file's text (`null`: it does not exist). Oversize files are cut at the cap, not refused.
  * `path` is where the text was read (the legacy `.mcode/REVIEW.md` for projects set up before the rename).
  */
-export function assembleReviewRules(raw: string | null | undefined, cap = REVIEW_RULES_CAP, path = REVIEW_RULES_PATH): ReviewRules {
+export function assembleReviewRules(
+  raw: string | null | undefined,
+  cap = REVIEW_RULES_CAP,
+  path = REVIEW_RULES_PATH,
+): ReviewRules {
   if (raw === null || raw === undefined) return NO_RULES;
-  const body = String(raw).replace(/\r\n?/g, "\n").replace(/\u0000/g, "").trim();
+  const body = String(raw)
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u0000/g, "")
+    .trim();
   if (!body) return { ...NO_RULES, status: "empty", path };
   const cut = utf8Length(body) > cap;
   let text = body;
-  if (cut) { const enc = new TextEncoder().encode(body).slice(0, cap); text = new TextDecoder("utf-8", { fatal: false }).decode(enc).replace(/�+$/, ""); }
+  if (cut) {
+    const enc = new TextEncoder().encode(body).slice(0, cap);
+    text = new TextDecoder("utf-8", { fatal: false }).decode(enc).replace(/�+$/, "");
+  }
   const note = cut ? `\n…[truncated: only the first ${cap} bytes of ${path} are used]` : "";
   return {
-    status: cut ? "truncated" : "loaded", path, used: text.length,
+    status: cut ? "truncated" : "loaded",
+    path,
+    used: text.length,
     text: `${REVIEW_RULES_WARNING}\n<${RULES_TAG} path="${path}">\n${defang(text)}${note}\n</${RULES_TAG}>`,
   };
 }
 
 /** The review system prompt with the project's rules appended (the base prompt, and with it the no-tools rule, comes first and is unchanged). */
-export const withReviewRules = (system: string, rules: ReviewRules) => (rules.text ? `${system}\n\n${rules.text}` : system);
+export const withReviewRules = (system: string, rules: ReviewRules) =>
+  rules.text ? `${system}\n\n${rules.text}` : system;
 
 // --- Settings -------------------------------------------------------------------------------------------------------
 
 export const AUTO_REVIEW_KEY = "autoReview";
 export type AutoTrigger = "afterRun" | "beforeAccept";
-export type AutoReviewSettings = { enabled: boolean; trigger: AutoTrigger; /** Per project path: forced on or off; a missing entry follows the global switch. */ projects: Record<string, boolean> };
+export type AutoReviewSettings = {
+  enabled: boolean;
+  trigger: AutoTrigger;
+  /** Per project path: forced on or off; a missing entry follows the global switch. */ projects: Record<
+    string,
+    boolean
+  >;
+};
 export const DEFAULT_AUTO_REVIEW: AutoReviewSettings = { enabled: false, trigger: "afterRun", projects: {} };
 export const MAX_PROJECT_OVERRIDES = 500;
 
@@ -84,9 +108,14 @@ export const resolveAutoReview = (s: AutoReviewSettings, project?: string | null
 });
 
 /** Sets or clears (`undefined`) one project's override. */
-export function setProjectOverride(s: AutoReviewSettings, project: string, value: boolean | undefined): AutoReviewSettings {
+export function setProjectOverride(
+  s: AutoReviewSettings,
+  project: string,
+  value: boolean | undefined,
+): AutoReviewSettings {
   const projects = { ...s.projects };
-  if (value === undefined) delete projects[project]; else projects[project] = value;
+  if (value === undefined) delete projects[project];
+  else projects[project] = value;
   return { ...s, projects };
 }
 
@@ -113,14 +142,25 @@ export type AutoPlan = {
 };
 
 const SECRET_NAME = [
-  /^\.env(\..+)?$/i, /\.(pem|key|p12|pfx|jks|keystore|ppk|kdbx|asc|gpg)$/i, /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
-  /^\.(npmrc|netrc|pgpass|htpasswd|git-credentials|pypirc|dockercfg)$/i, /^credentials(\..+)?$/i, /^secrets?(\..+)?$/i, /\.secrets?(\..+)?$/i,
-  /^service[-_]?account.*\.json$/i, /\.tfvars$/i, /\.tfstate(\..+)?$/i, /^kubeconfig$/i, /^auth\.json$/i,
+  /^\.env(\..+)?$/i,
+  /\.(pem|key|p12|pfx|jks|keystore|ppk|kdbx|asc|gpg)$/i,
+  /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
+  /^\.(npmrc|netrc|pgpass|htpasswd|git-credentials|pypirc|dockercfg)$/i,
+  /^credentials(\..+)?$/i,
+  /^secrets?(\..+)?$/i,
+  /\.secrets?(\..+)?$/i,
+  /^service[-_]?account.*\.json$/i,
+  /\.tfvars$/i,
+  /\.tfstate(\..+)?$/i,
+  /^kubeconfig$/i,
+  /^auth\.json$/i,
 ];
 const SECRET_TEMPLATE = /\.(example|sample|template|dist|defaults?)$/i;
 const SECRET_DIR = /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube|secrets?)\//i;
-const IGNORED_DIR = /(^|\/)(node_modules|\.git|target|dist|\.next|\.nuxt|__pycache__|\.venv|venv|coverage|\.turbo|\.gradle|Pods)\//;
-const GENERATED_NAME = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|bun\.lockb?)$|\.(min\.(js|css)|map|snap)$/i;
+const IGNORED_DIR =
+  /(^|\/)(node_modules|\.git|target|dist|\.next|\.nuxt|__pycache__|\.venv|venv|coverage|\.turbo|\.gradle|Pods)\//;
+const GENERATED_NAME =
+  /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|bun\.lockb?)$|\.(min\.(js|css)|map|snap)$/i;
 
 /** Why a file must not be sent to the model by an automatic review, or null. Path heuristics only; real .gitignore matches come in as `ignored`. */
 export function skipReasonFor(path: string, ignored?: ReadonlySet<string>): SkipReason | null {
@@ -137,15 +177,22 @@ export function skipReasonFor(path: string, ignored?: ReadonlySet<string>): Skip
  * secret-looking files are dropped, the diffs are redacted like exported chats (lib/exportChats.ts), and above the cap
  * nothing is sent (`tooLarge`) so the caller can say so. Unlike a manual review it never truncates a diff.
  */
-export function planAutoReview(input: AutoInput[], opts: { maxChars?: number; maxFiles?: number; ignored?: ReadonlySet<string> } = {}): AutoPlan {
+export function planAutoReview(
+  input: AutoInput[],
+  opts: { maxChars?: number; maxFiles?: number; ignored?: ReadonlySet<string> } = {},
+): AutoPlan {
   const maxChars = opts.maxChars ?? AUTO_REVIEW_MAX_CHARS;
   const maxFiles = opts.maxFiles ?? AUTO_REVIEW_MAX_FILES;
   const skipped: AutoPlan["skipped"] = [];
   const files: ReviewFile[] = [];
-  let redactions = 0, chars = 0;
+  let redactions = 0,
+    chars = 0;
   for (const f of input) {
     const reason: SkipReason | null = f.binary ? "binary" : skipReasonFor(f.path, opts.ignored);
-    if (reason) { skipped.push({ path: f.path, reason }); continue; }
+    if (reason) {
+      skipped.push({ path: f.path, reason });
+      continue;
+    }
     const diff = redactSecrets(f.diff);
     if (diff !== f.diff) redactions += diff.split("[REDACTED]").length - f.diff.split("[REDACTED]").length;
     if (!diff.trim()) continue;
@@ -153,7 +200,15 @@ export function planAutoReview(input: AutoInput[], opts: { maxChars?: number; ma
     files.push({ path: f.path, diff, ...(f.hunks ? { hunks: f.hunks } : {}) });
   }
   const tooLarge = files.length > maxFiles || chars > maxChars;
-  return { files: tooLarge ? [] : files, skipped, count: files.length, chars, tooLarge, empty: !tooLarge && files.length === 0, redactions };
+  return {
+    files: tooLarge ? [] : files,
+    skipped,
+    count: files.length,
+    chars,
+    tooLarge,
+    empty: !tooLarge && files.length === 0,
+    redactions,
+  };
 }
 
 // --- When a review starts -------------------------------------------------------------------------------------------
@@ -175,7 +230,9 @@ export type AutoDeps = {
  * flight and begins a new run. Failures are outcomes, never exceptions.
  */
 export function createAutoReviewTrigger(deps: AutoDeps) {
-  let runId = 0, reviewedRun = -1, epoch = 0;
+  let runId = 0,
+    reviewedRun = -1,
+    epoch = 0;
   let inflight: Promise<AutoOutcome> | null = null;
 
   const start = (): Promise<AutoOutcome> => {
@@ -189,8 +246,12 @@ export function createAutoReviewTrigger(deps: AutoDeps) {
         reviewedRun = runId;
         const out = await deps.run();
         return mine !== epoch ? "cancelled" : out;
-      } catch { return "error"; }
-    })().finally(() => { if (inflight === job) inflight = null; });
+      } catch {
+        return "error";
+      }
+    })().finally(() => {
+      if (inflight === job) inflight = null;
+    });
     inflight = job;
     return job;
   };
@@ -198,8 +259,15 @@ export function createAutoReviewTrigger(deps: AutoDeps) {
   return {
     /** The agent starts (or continues after a new message): cancel any review in flight. */
     runStarted() {
-      runId++; epoch++;
-      if (inflight) { try { deps.cancel(); } catch { /* nothing to cancel */ } }
+      runId++;
+      epoch++;
+      if (inflight) {
+        try {
+          deps.cancel();
+        } catch {
+          /* nothing to cancel */
+        }
+      }
     },
     /** The agent run ended. */
     runFinished(): Promise<AutoOutcome> {
@@ -227,7 +295,14 @@ export type GateFinding = { id: string; file: string; line?: number; title: stri
  * The undismissed high-severity findings that should be confirmed before accepting or committing, optionally only those
  * about `paths`. Empty when automatic review is off: manual reviews never put a confirm step in the way.
  */
-export function gateFindings<T extends Finding>(findings: T[], opts: { enabled: boolean; dismissed?: ReadonlySet<string> | ReadonlyMap<string, unknown>; paths?: readonly string[] | null }): T[] {
+export function gateFindings<T extends Finding>(
+  findings: T[],
+  opts: {
+    enabled: boolean;
+    dismissed?: ReadonlySet<string> | ReadonlyMap<string, unknown>;
+    paths?: readonly string[] | null;
+  },
+): T[] {
   if (!opts.enabled) return [];
   const only = opts.paths ? new Set(opts.paths) : null;
   return findings.filter((f) => isHighSeverity(f) && !opts.dismissed?.has(f.id) && (!only || only.has(f.file)));
@@ -236,8 +311,19 @@ export function gateFindings<T extends Finding>(findings: T[], opts: { enabled: 
 export const MAX_REASON = 300;
 export type Dismissal = { reason: string; at: number };
 /** Records a dismissal (reason trimmed and bounded, control characters dropped); the map is session memory only. */
-export function recordDismissal(map: ReadonlyMap<string, Dismissal>, id: string, reason?: string, now = Date.now()): Map<string, Dismissal> {
+export function recordDismissal(
+  map: ReadonlyMap<string, Dismissal>,
+  id: string,
+  reason?: string,
+  now = Date.now(),
+): Map<string, Dismissal> {
   const next = new Map(map);
-  next.set(id, { reason: (reason ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_REASON), at: now });
+  next.set(id, {
+    reason: (reason ?? "")
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .trim()
+      .slice(0, MAX_REASON),
+    at: now,
+  });
   return next;
 }

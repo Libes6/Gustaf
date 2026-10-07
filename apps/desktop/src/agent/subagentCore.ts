@@ -27,11 +27,31 @@ export const SPAWN_TOOL: ToolDef = {
       title: { type: "string", description: "Short name shown in the background tasks panel" },
       prompt: { type: "string", description: "Complete, self-contained instructions for the subagent" },
       type: { type: "string", enum: [...AGENT_TYPES], description: "explore | plan | general | review" },
-      files: { type: "array", items: { type: "string" }, description: "Optional project-relative files the subagent should focus on" },
-      model: { type: "string", description: "Optional model (`provider/model`) from the allowed list; omit to use the default for the type" },
-      provider: { type: "string", description: "Optional provider id from the allowed providers list (an API provider, or a CLI agent such as Codex, Claude Code or Cursor Agent that runs its own tools in its own git worktree); omit to use the default" },
-      role: { type: "string", enum: [...AGENT_ROLES], description: "Optional role preset (planner | implementer | reviewer | tester) that chooses provider and model; cannot be combined with `provider` or `model`" },
-      continue_from: { type: "string", description: "Optional id of a finished, failed or limit-stopped subagent run to continue (the run id is given in the user's message). The new run starts with a summary of that run and `prompt` as the follow-up; use the same `type` unless told otherwise" },
+      files: {
+        type: "array",
+        items: { type: "string" },
+        description: "Optional project-relative files the subagent should focus on",
+      },
+      model: {
+        type: "string",
+        description: "Optional model (`provider/model`) from the allowed list; omit to use the default for the type",
+      },
+      provider: {
+        type: "string",
+        description:
+          "Optional provider id from the allowed providers list (an API provider, or a CLI agent such as Codex, Claude Code or Cursor Agent that runs its own tools in its own git worktree); omit to use the default",
+      },
+      role: {
+        type: "string",
+        enum: [...AGENT_ROLES],
+        description:
+          "Optional role preset (planner | implementer | reviewer | tester) that chooses provider and model; cannot be combined with `provider` or `model`",
+      },
+      continue_from: {
+        type: "string",
+        description:
+          "Optional id of a finished, failed or limit-stopped subagent run to continue (the run id is given in the user's message). The new run starts with a summary of that run and `prompt` as the follow-up; use the same `type` unless told otherwise",
+      },
     },
     required: ["title", "prompt", "type"],
   },
@@ -42,7 +62,9 @@ export type RoutingHints = { providers?: readonly string[]; roles?: readonly str
 /** The sentences naming `providers` and `roles` in a tool description (empty when there is nothing to name). */
 export const routingNote = (h?: RoutingHints) =>
   [
-    h?.providers?.length ? ` Providers you may pass in \`provider\`: ${h.providers.join(", ")}. A CLI provider runs in its own git worktree on a \`gustaf/...\` branch that is left in place for you to merge; it never merges or pushes.` : "",
+    h?.providers?.length
+      ? ` Providers you may pass in \`provider\`: ${h.providers.join(", ")}. A CLI provider runs in its own git worktree on a \`gustaf/...\` branch that is left in place for you to merge; it never merges or pushes.`
+      : "",
     h?.roles?.length ? ` Roles you may pass in \`role\`: ${h.roles.join(", ")}.` : "",
   ].join("");
 
@@ -77,7 +99,13 @@ export type SpawnArgs = {
 export const MAX_FALLBACK_PROVIDERS = 3;
 
 /** A project-relative path that cannot leave the project (no absolute path, no `..`). */
-export const safeRelativePath = (p: string) => !!p && !p.startsWith("/") && !p.startsWith("~") && !/^[a-z]:[\\/]/i.test(p) && !p.split(/[\\/]/).includes("..") && !p.includes("\0");
+export const safeRelativePath = (p: string) =>
+  !!p &&
+  !p.startsWith("/") &&
+  !p.startsWith("~") &&
+  !/^[a-z]:[\\/]/i.test(p) &&
+  !p.split(/[\\/]/).includes("..") &&
+  !p.includes("\0");
 
 export function parseSpawnArgs(raw: unknown): { ok: true; value: SpawnArgs } | { ok: false; error: string } {
   const a = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -85,25 +113,57 @@ export function parseSpawnArgs(raw: unknown): { ok: true; value: SpawnArgs } | {
   const prompt = typeof a.prompt === "string" ? a.prompt.trim() : "";
   if (!title) return { ok: false, error: "spawn_agent needs a non-empty `title`." };
   if (!prompt) return { ok: false, error: "spawn_agent needs a non-empty `prompt`." };
-  if (prompt.length > MAX_PROMPT) return { ok: false, error: `spawn_agent \`prompt\` is too long (${prompt.length} > ${MAX_PROMPT} characters).` };
+  if (prompt.length > MAX_PROMPT)
+    return { ok: false, error: `spawn_agent \`prompt\` is too long (${prompt.length} > ${MAX_PROMPT} characters).` };
   const type = a.type === undefined ? "explore" : a.type;
-  if (!isAgentType(type)) return { ok: false, error: `spawn_agent \`type\` must be one of: ${AGENT_TYPES.join(", ")}.` };
-  const files = Array.isArray(a.files) ? [...new Set(a.files.filter((f): f is string => typeof f === "string").map((f) => f.trim().replace(/^\.\//, "")).filter(safeRelativePath))].slice(0, MAX_FILES) : [];
+  if (!isAgentType(type))
+    return { ok: false, error: `spawn_agent \`type\` must be one of: ${AGENT_TYPES.join(", ")}.` };
+  const files = Array.isArray(a.files)
+    ? [
+        ...new Set(
+          a.files
+            .filter((f): f is string => typeof f === "string")
+            .map((f) => f.trim().replace(/^\.\//, ""))
+            .filter(safeRelativePath),
+        ),
+      ].slice(0, MAX_FILES)
+    : [];
   const model = typeof a.model === "string" && a.model.trim() ? a.model.trim().slice(0, 300) : undefined;
-  const continueFrom = typeof a.continue_from === "string" && a.continue_from.trim() ? a.continue_from.trim().slice(0, 100) : undefined;
+  const continueFrom =
+    typeof a.continue_from === "string" && a.continue_from.trim() ? a.continue_from.trim().slice(0, 100) : undefined;
   const provider = typeof a.provider === "string" && a.provider.trim() ? a.provider.trim().slice(0, 100) : undefined;
-  if (a.role !== undefined && a.role !== null && a.role !== "" && !isAgentRole(a.role)) return { ok: false, error: `spawn_agent \`role\` must be one of: ${AGENT_ROLES.join(", ")} (got ${JSON.stringify(String(a.role).slice(0, 40))}).` };
+  if (a.role !== undefined && a.role !== null && a.role !== "" && !isAgentRole(a.role))
+    return {
+      ok: false,
+      error: `spawn_agent \`role\` must be one of: ${AGENT_ROLES.join(", ")} (got ${JSON.stringify(String(a.role).slice(0, 40))}).`,
+    };
   const role = isAgentRole(a.role) ? a.role : undefined;
-  if (role && (provider || model)) return { ok: false, error: "spawn_agent: use either `role` or `provider`/`model`, not both." };
+  if (role && (provider || model))
+    return { ok: false, error: "spawn_agent: use either `role` or `provider`/`model`, not both." };
   let fallbackProviders: string[] | undefined;
   if (a.fallbackProviders !== undefined && a.fallbackProviders !== null) {
-    if (!Array.isArray(a.fallbackProviders) || a.fallbackProviders.some((f) => typeof f !== "string" || !f.trim())) return { ok: false, error: "spawn_agent `fallbackProviders` must be a list of provider ids." };
+    if (!Array.isArray(a.fallbackProviders) || a.fallbackProviders.some((f) => typeof f !== "string" || !f.trim()))
+      return { ok: false, error: "spawn_agent `fallbackProviders` must be a list of provider ids." };
     fallbackProviders = [...new Set((a.fallbackProviders as string[]).map((f) => f.trim().slice(0, 100)))];
-    if (fallbackProviders.length > MAX_FALLBACK_PROVIDERS) return { ok: false, error: `spawn_agent \`fallbackProviders\` takes at most ${MAX_FALLBACK_PROVIDERS} providers.` };
+    if (fallbackProviders.length > MAX_FALLBACK_PROVIDERS)
+      return {
+        ok: false,
+        error: `spawn_agent \`fallbackProviders\` takes at most ${MAX_FALLBACK_PROVIDERS} providers.`,
+      };
   }
   return {
     ok: true,
-    value: { title, prompt, type, files, ...(model ? { model } : {}), ...(continueFrom ? { continueFrom } : {}), ...(provider ? { provider } : {}), ...(role ? { role } : {}), ...(fallbackProviders?.length ? { fallbackProviders } : {}) },
+    value: {
+      title,
+      prompt,
+      type,
+      files,
+      ...(model ? { model } : {}),
+      ...(continueFrom ? { continueFrom } : {}),
+      ...(provider ? { provider } : {}),
+      ...(role ? { role } : {}),
+      ...(fallbackProviders?.length ? { fallbackProviders } : {}),
+    },
   };
 }
 
@@ -161,12 +221,18 @@ export function budgetBreach(use: BudgetUse, b: Budget, now: number): BudgetBrea
   return null;
 }
 export const breachMessage = (x: Exclude<BudgetBreach, "budget">, b: Budget) =>
-  ({ steps: `step limit (${b.maxSteps})`, toolCalls: `tool call limit (${b.maxToolCalls})`, tokens: `token limit (${b.maxTokens})`, time: `time limit (${Math.round(b.maxMs / 1000)} s)` })[x];
+  ({
+    steps: `step limit (${b.maxSteps})`,
+    toolCalls: `tool call limit (${b.maxToolCalls})`,
+    tokens: `token limit (${b.maxTokens})`,
+    time: `time limit (${Math.round(b.maxMs / 1000)} s)`,
+  })[x];
 
 /** Which of the user's token budgets (Settings > Usage > Budgets) stopped agents. */
 export type BudgetScope = "day" | "chat";
 /** Text for a stopped run and for the tool error of a refused spawn. */
-export const budgetStopMessage = (scope: BudgetScope) => `the ${scope === "day" ? "daily" : "chat"} token budget is exceeded (Settings > Usage > Budgets; turn off "stop agents when over budget" in the agent settings to continue)`;
+export const budgetStopMessage = (scope: BudgetScope) =>
+  `the ${scope === "day" ? "daily" : "chat"} token budget is exceeded (Settings > Usage > Budgets; turn off "stop agents when over budget" in the agent settings to continue)`;
 
 // ---- overlap detection ----
 
@@ -187,7 +253,10 @@ export function findOverlaps(own: FileSet, others: readonly FileSet[]): Overlap[
 
 export function overlapWarning(overlaps: readonly Overlap[], maxFiles = 5): string {
   if (!overlaps.length) return "";
-  const parts = overlaps.map((o) => `"${o.label}" (${o.files.slice(0, maxFiles).join(", ")}${o.files.length > maxFiles ? `, +${o.files.length - maxFiles} more` : ""})`);
+  const parts = overlaps.map(
+    (o) =>
+      `"${o.label}" (${o.files.slice(0, maxFiles).join(", ")}${o.files.length > maxFiles ? `, +${o.files.length - maxFiles} more` : ""})`,
+  );
   return `Warning: these changes touch files also changed by ${parts.join("; ")}. Accepting both will conflict; review them one after the other.`;
 }
 
@@ -224,10 +293,19 @@ export function buildReport(r: ReportInput): string {
   const list = r.changed ? `${r.changed.slice(0, 30).join(", ")}${r.changed.length > 30 ? ", ..." : ""}` : "";
   if (r.branch) {
     const where = r.branch.path ? ` (worktree ${r.branch.path})` : "";
-    if (r.branch.removed) lines.push("", `No files were changed; its worktree and branch ${r.branch.name} were removed.`);
-    else if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}) on branch ${r.branch.name}${where}, left in place; nothing was committed, merged or pushed. Commit and merge it from the workspace or the merge queue: ${list}`);
+    if (r.branch.removed)
+      lines.push("", `No files were changed; its worktree and branch ${r.branch.name} were removed.`);
+    else if (r.changed?.length)
+      lines.push(
+        "",
+        `Changed files (${r.changed.length}) on branch ${r.branch.name}${where}, left in place; nothing was committed, merged or pushed. Commit and merge it from the workspace or the merge queue: ${list}`,
+      );
     else lines.push("", `No files were changed. Branch ${r.branch.name} was left in place${where}.`);
-  } else if (r.changed?.length) lines.push("", `Changed files (${r.changed.length}, pending in a separate review in the Changes panel, nothing applied yet): ${list}`);
+  } else if (r.changed?.length)
+    lines.push(
+      "",
+      `Changed files (${r.changed.length}, pending in a separate review in the Changes panel, nothing applied yet): ${list}`,
+    );
   else if (r.type === "general") lines.push("", "No files were changed.");
   for (const w of r.warnings ?? []) lines.push("", w);
   return lines.join("\n");
@@ -247,12 +325,16 @@ export function serializeCalls<A extends unknown[], R>(fn: (...args: A) => Promi
 
 // ---- prompts ----
 
-const COMMON = "You are a subagent started by the main Gustaf agent for one task. You cannot ask the user questions and cannot see the main conversation. Your final message is your report: the main agent receives only that, so put the results in it, concisely (under 400 words), with project-relative file paths.";
+const COMMON =
+  "You are a subagent started by the main Gustaf agent for one task. You cannot ask the user questions and cannot see the main conversation. Your final message is your report: the main agent receives only that, so put the results in it, concisely (under 400 words), with project-relative file paths.";
 const TYPE_PROMPT: Record<AgentType, string> = {
-  explore: "You are read-only: investigate with list_dir/search/read_file and report what you found (paths and line numbers). Do not propose edits unless asked.",
+  explore:
+    "You are read-only: investigate with list_dir/search/read_file and report what you found (paths and line numbers). Do not propose edits unless asked.",
   plan: "You are read-only: study the code and return a concrete, ordered implementation plan (files to change, what to change, risks). Do not make edits.",
-  review: "You are read-only: review the code or changes named in the task for bugs, regressions and missing tests. List findings by severity with file and line. Say so if you found nothing.",
-  general: "You may edit files and run commands, but only in your own private copy of the project; your changes will be reviewed by the user before anything is applied. Finish by listing what you changed and what you could not verify.",
+  review:
+    "You are read-only: review the code or changes named in the task for bugs, regressions and missing tests. List findings by severity with file and line. Say so if you found nothing.",
+  general:
+    "You may edit files and run commands, but only in your own private copy of the project; your changes will be reviewed by the user before anything is applied. Finish by listing what you changed and what you could not verify.",
 };
 export function subagentSystem(type: AgentType, files: readonly string[]): string {
   return [COMMON, TYPE_PROMPT[type], files.length ? `Focus on: ${files.join(", ")}.` : ""].filter(Boolean).join("\n");

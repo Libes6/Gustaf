@@ -5,7 +5,16 @@ import { listen } from "@tauri-apps/api/event";
 import { getSetting, setSetting } from "./api";
 import { getScheduled, subscribeScheduled } from "./scheduledPromptsStore";
 import { getRunner } from "./scheduledRuntime";
-import { activeHooks, addDelivery, newSecret, parseWebhookConfig, webhookPrompt, type Delivery, type DeliveryRecord, type WebhookConfig } from "./webhooksCore";
+import {
+  activeHooks,
+  addDelivery,
+  newSecret,
+  parseWebhookConfig,
+  webhookPrompt,
+  type Delivery,
+  type DeliveryRecord,
+  type WebhookConfig,
+} from "./webhooksCore";
 
 let config: WebhookConfig = parseWebhookConfig(undefined);
 let deliveries: Record<string, DeliveryRecord[]> = {};
@@ -13,12 +22,20 @@ let serverPort: number | null = null;
 let serverError = "";
 const listeners = new Set<() => void>();
 let version = 0;
-export const subscribeWebhooks = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+export const subscribeWebhooks = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 export const webhooksVersion = () => version;
 export const getWebhookConfig = () => config;
 export const getDeliveries = (id: string) => deliveries[id] ?? [];
 export const webhookServer = () => ({ port: serverPort, error: serverError });
-const emit = () => { version++; listeners.forEach((fn) => fn()); };
+const emit = () => {
+  version++;
+  listeners.forEach((fn) => fn());
+};
 
 let synced = "";
 /** Starts, updates or stops the server when the set of active hooks (or the port) changed. */
@@ -28,9 +45,17 @@ async function sync(force = false) {
   if (!force && key === synced) return;
   synced = key;
   try {
-    if (hooks.length) { serverPort = await invoke<number>("webhook_serve", { port: config.port, hooks }); serverError = ""; }
-    else if (serverPort !== null) { await invoke("webhook_stop"); serverPort = null; }
-  } catch (e) { serverPort = null; serverError = String(e); }
+    if (hooks.length) {
+      serverPort = await invoke<number>("webhook_serve", { port: config.port, hooks });
+      serverError = "";
+    } else if (serverPort !== null) {
+      await invoke("webhook_stop");
+      serverPort = null;
+    }
+  } catch (e) {
+    serverPort = null;
+    serverError = String(e);
+  }
   emit();
 }
 
@@ -45,7 +70,11 @@ export function setHook(id: string, enabled: boolean) {
   const h = config.hooks[id] ?? { secret: newSecret(), enabled: false };
   save({ ...config, hooks: { ...config.hooks, [id]: { ...h, enabled } } });
 }
-export const rotateSecret = (id: string) => save({ ...config, hooks: { ...config.hooks, [id]: { secret: newSecret(), enabled: config.hooks[id]?.enabled ?? false } } });
+export const rotateSecret = (id: string) =>
+  save({
+    ...config,
+    hooks: { ...config.hooks, [id]: { secret: newSecret(), enabled: config.hooks[id]?.enabled ?? false } },
+  });
 export const setWebhookPort = (port: number) => save(parseWebhookConfig({ ...config, port }));
 
 /** A delivery from the server: recorded; a signed one starts its schedule (only a switched-on schedule, never twice at once). */
@@ -54,7 +83,12 @@ export function onDelivery(d: Delivery) {
   let outcome: DeliveryRecord["outcome"] = "rejected";
   if (d.status === 202) {
     const runner = getRunner();
-    outcome = !sc?.enabled || !config.hooks[d.id]?.enabled || !runner ? "off" : runner.runNow(d.id, webhookPrompt(sc.prompt, d)) ? "started" : "running";
+    outcome =
+      !sc?.enabled || !config.hooks[d.id]?.enabled || !runner
+        ? "off"
+        : runner.runNow(d.id, webhookPrompt(sc.prompt, d))
+          ? "started"
+          : "running";
   }
   deliveries = { ...deliveries, [d.id]: addDelivery(deliveries[d.id] ?? [], { ...d, outcome }) };
   emit();
@@ -64,7 +98,12 @@ export function onDelivery(d: Delivery) {
 export function startWebhooks() {
   let stopped = false;
   let unlisten: (() => void) | undefined;
-  void getSetting<unknown>("webhooks", null).then((v) => { if (!stopped) { config = parseWebhookConfig(v); void sync(true); } });
+  void getSetting<unknown>("webhooks", null).then((v) => {
+    if (!stopped) {
+      config = parseWebhookConfig(v);
+      void sync(true);
+    }
+  });
   void listen<Delivery>("webhook-delivery", (e) => onDelivery(e.payload)).then((u) => (stopped ? u() : (unlisten = u)));
   const unsub = subscribeScheduled(() => void sync());
   return () => {

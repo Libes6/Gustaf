@@ -38,17 +38,47 @@ const saved = (key: string) => JSON.parse(settings.get(key) ?? "null");
 const fetchMock = vi.mocked(tauriFetch);
 
 const claudeCli: ProviderConfig = { id: "cli-claude", kind: "cli", cli: "claude", name: "Claude Code", baseUrl: "" };
-const cursorA: ProviderConfig = { id: "cli-acc-a", kind: "cli", cli: "cursor-agent", cliProfile: "acc-a", name: "work@cursor", baseUrl: "" };
-const cursorB: ProviderConfig = { id: "cli-acc-b", kind: "cli", cli: "cursor-agent", cliProfile: "acc-b", name: "home@cursor", baseUrl: "" };
+const cursorA: ProviderConfig = {
+  id: "cli-acc-a",
+  kind: "cli",
+  cli: "cursor-agent",
+  cliProfile: "acc-a",
+  name: "work@cursor",
+  baseUrl: "",
+};
+const cursorB: ProviderConfig = {
+  id: "cli-acc-b",
+  kind: "cli",
+  cli: "cursor-agent",
+  cliProfile: "acc-b",
+  name: "home@cursor",
+  baseUrl: "",
+};
 const openai: ProviderConfig = { id: "oa", kind: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1" };
 const grok: ProviderConfig = { id: "gx", kind: "xai", name: "Grok", baseUrl: "https://api.x.ai/v1", disabled: true };
-const router: ProviderConfig = { id: "or", kind: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" };
+const router: ProviderConfig = {
+  id: "or",
+  kind: "openrouter",
+  name: "OpenRouter",
+  baseUrl: "https://openrouter.ai/api/v1",
+};
 const ollama: ProviderConfig = { id: "ol", kind: "ollama", name: "Ollama", baseUrl: "http://localhost:11434/v1" };
-const custom: ProviderConfig = { id: "cu", kind: "custom", name: "My endpoint", baseUrl: "https://llm.example.test/v1" };
+const custom: ProviderConfig = {
+  id: "cu",
+  kind: "custom",
+  name: "My endpoint",
+  baseUrl: "https://llm.example.test/v1",
+};
 
 const list = () => screen.getByRole("list", { name: "Model providers" });
-const rowNames = () => within(list()).getAllByRole("listitem").map((li) => li.querySelector(".t")!.textContent!.trim());
-const row = (name: string) => within(list()).getAllByRole("listitem").find((li) => li.querySelector(".t")!.textContent!.startsWith(name))!;
+const rowNames = () =>
+  within(list())
+    .getAllByRole("listitem")
+    .map((li) => li.querySelector(".t")!.textContent!.trim());
+const row = (name: string) =>
+  within(list())
+    .getAllByRole("listitem")
+    .find((li) => li.querySelector(".t")!.textContent!.startsWith(name))!;
 
 beforeEach(() => {
   settings.clear();
@@ -76,9 +106,17 @@ describe("ProvidersPage", () => {
   it("shows authenticated, not authenticated, unavailable and disabled from cached health", () => {
     const app = makeApp({
       providers: [claudeCli, cursorA, openai, grok],
-      providerHealth: { [claudeCli.id]: { status: "ok", message: "" }, [cursorA.id]: { status: "auth", message: "Cursor Agent is not authenticated" } },
+      providerHealth: {
+        [claudeCli.id]: { status: "ok", message: "" },
+        [cursorA.id]: { status: "auth", message: "Cursor Agent is not authenticated" },
+      },
       modelErrors: { [openai.id]: "probe failed: 401" },
-      limits: { [claudeCli.id]: { windows: [{ id: "5h", label: "5h", usedPercent: 3, plan: "Claude Pro Subscription" }], checkedAt: 1 } },
+      limits: {
+        [claudeCli.id]: {
+          windows: [{ id: "5h", label: "5h", usedPercent: 3, plan: "Claude Pro Subscription" }],
+          checkedAt: 1,
+        },
+      },
     });
     renderApp(<ProvidersPage />, app);
     expect(row("Claude Code")).toHaveTextContent("Authenticated · Claude Pro Subscription");
@@ -91,7 +129,13 @@ describe("ProvidersPage", () => {
 
   it("detail shows when the status was last checked, marks an old one as outdated, and rechecks on demand", async () => {
     const now = Date.now();
-    const app = makeApp({ providers: [openai, router], providerHealth: { [openai.id]: { status: "ok", message: "", at: now - 3 * 24 * 3600_000 }, [router.id]: { status: "error", message: "HTTP 503 from upstream", at: now - 60_000 } } });
+    const app = makeApp({
+      providers: [openai, router],
+      providerHealth: {
+        [openai.id]: { status: "ok", message: "", at: now - 3 * 24 * 3600_000 },
+        [router.id]: { status: "error", message: "HTTP 503 from upstream", at: now - 60_000 },
+      },
+    });
     renderApp(<ProvidersPage />, app);
     expect(screen.getByTestId("prov-checked")).toHaveTextContent(/Last checked: /);
     expect(screen.getByText(/may be outdated/)).toBeInTheDocument();
@@ -114,7 +158,13 @@ describe("ProvidersPage", () => {
   });
 
   it("selecting a row shows that provider's details", async () => {
-    renderApp(<ProvidersPage />, makeApp({ providers: [openai, router], models: [{ id: "or/model-x", name: "Model X", providerId: router.id, created: 0, firstSeen: 0 }] }));
+    renderApp(
+      <ProvidersPage />,
+      makeApp({
+        providers: [openai, router],
+        models: [{ id: "or/model-x", name: "Model X", providerId: router.id, created: 0, firstSeen: 0 }],
+      }),
+    );
     // The first configured provider is selected at first.
     expect(screen.getByRole("textbox", { name: "Display name" })).toHaveValue("OpenAI");
     await userEvent.click(within(row("OpenRouter")).getByRole("button"));
@@ -134,13 +184,30 @@ describe("ProvidersPage", () => {
   });
 
   it("the + wizard walks Driver, Identity, Config and saves a Grok provider", async () => {
-    fetchMock.mockImplementation((async () => new Response(JSON.stringify({ data: [{ id: "grok-4" }] }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof tauriFetch);
+    fetchMock.mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ data: [{ id: "grok-4" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })) as unknown as typeof tauriFetch,
+    );
     const app = makeApp({ providers: [] });
     renderApp(<ProvidersPage />, app);
     await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
     const dialog = screen.getByRole("dialog", { name: "Add provider instance" });
     expect(within(dialog).getByText("Driver").closest("li")).toHaveAttribute("aria-current", "step");
-    for (const name of ["Claude", "Codex / OpenAI", "Cursor", "Grok", "OpenRouter", "Ollama / LM Studio", "Custom (OpenAI-compatible)"]) expect(within(dialog).getByRole("button", { name: new RegExp(`^${name.replace(/[()/]/g, "\\$&")}`) })).toBeEnabled();
+    for (const name of [
+      "Claude",
+      "Codex / OpenAI",
+      "Cursor",
+      "Grok",
+      "OpenRouter",
+      "Ollama / LM Studio",
+      "Custom (OpenAI-compatible)",
+    ])
+      expect(
+        within(dialog).getByRole("button", { name: new RegExp(`^${name.replace(/[()/]/g, "\\$&")}`) }),
+      ).toBeEnabled();
     expect(within(dialog).getByRole("button", { name: /GitHub Copilot/ })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: /GitHub Copilot/ })).toHaveTextContent("Coming soon");
 
@@ -171,10 +238,29 @@ describe("ProvidersPage", () => {
   });
 
   it("keeps existing providers of every kind, unchanged, after the pinned drivers in their saved order", async () => {
-    const old = [custom, ollama, { id: "ge", kind: "gemini", name: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" } as ProviderConfig, router];
+    const old = [
+      custom,
+      ollama,
+      {
+        id: "ge",
+        kind: "gemini",
+        name: "Gemini",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+      } as ProviderConfig,
+      router,
+    ];
     const app = makeApp({ providers: old });
     renderApp(<ProvidersPage />, app);
-    expect(rowNames()).toEqual(["Claude", "GPT / Codex", "Cursor", "Grok", "My endpoint", "Ollama", "Gemini", "OpenRouter"]);
+    expect(rowNames()).toEqual([
+      "Claude",
+      "GPT / Codex",
+      "Cursor",
+      "Grok",
+      "My endpoint",
+      "Ollama",
+      "Gemini",
+      "OpenRouter",
+    ]);
     // Grouping is derived, never written back.
     expect(callsOf("db_execute").filter((a) => /insert into settings/.test(a.sql))).toEqual([]);
     expect(orderProviders(old)).toEqual(old);
@@ -214,14 +300,24 @@ describe("ModelPicker", () => {
     const anthropic: ProviderConfig = { id: "an", kind: "anthropic", name: "Anthropic", baseUrl: "" };
     const app = makeApp({
       providers: [router, { ...grok, disabled: false }, anthropic, openai],
-      models: [m(router.id, "model-router", 9), m(grok.id, "model-grok", 5), m(anthropic.id, "model-claude", 1), m(openai.id, "model-gpt", 2)],
+      models: [
+        m(router.id, "model-router", 9),
+        m(grok.id, "model-grok", 5),
+        m(anthropic.id, "model-claude", 1),
+        m(openai.id, "model-gpt", 2),
+      ],
     });
     renderApp(<ModelPicker onClose={() => {}} />, app);
     // The provider rail follows the same order.
     const rail = [...document.querySelectorAll(".picker-rail button")].map((b) => b.getAttribute("aria-label"));
     expect(rail).toEqual(["Favorites", "Anthropic", "OpenAI", "Grok", "OpenRouter"]);
     await userEvent.type(screen.getByRole("combobox"), "model");
-    expect(screen.getAllByRole("option").map((o) => o.querySelector(".model-name")!.textContent!.trim())).toEqual(["model-claude", "model-gpt", "model-grok", "model-router"]);
+    expect(screen.getAllByRole("option").map((o) => o.querySelector(".model-name")!.textContent!.trim())).toEqual([
+      "model-claude",
+      "model-gpt",
+      "model-grok",
+      "model-router",
+    ]);
     await userEvent.click(screen.getByRole("button", { name: "Manage providers…" }));
     expect(app.openSettings).toHaveBeenCalledWith("providers");
   });

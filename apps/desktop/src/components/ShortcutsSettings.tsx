@@ -3,11 +3,27 @@ import { Search } from "lucide-react";
 import { useT, type Key } from "../i18n";
 import { displayKeys } from "../lib/platform";
 import { resetShortcutBindings, saveShortcutBinding, useShortcuts } from "../lib/shortcutPrefs";
-import { comboFromEvent, EDITABLE_SHORTCUTS, getShortcutOverrides, isCustomized, shortcutContext, shortcutDisplay, validateBinding, type BindingCheck, type BindingError, type ShortcutId } from "../lib/shortcuts";
+import {
+  comboFromEvent,
+  EDITABLE_SHORTCUTS,
+  getShortcutOverrides,
+  isCustomized,
+  shortcutContext,
+  shortcutDisplay,
+  validateBinding,
+  type BindingCheck,
+  type BindingError,
+  type ShortcutId,
+} from "../lib/shortcuts";
 import { QuickAskSettings } from "./QuickAskSettings";
 import { SettingRow } from "./SettingRow";
 
-const ERROR_KEY: Record<BindingError, Key> = { needsCmd: "shortcutErrNeedsCmd", reserved: "shortcutErrReserved", unsupported: "shortcutErrUnsupported", conflict: "shortcutErrConflict" };
+const ERROR_KEY: Record<BindingError, Key> = {
+  needsCmd: "shortcutErrNeedsCmd",
+  reserved: "shortcutErrReserved",
+  unsupported: "shortcutErrUnsupported",
+  conflict: "shortcutErrConflict",
+};
 const compact = (s: string) => s.toLowerCase().replace(/[\s+\-]/g, "");
 
 /**
@@ -22,7 +38,12 @@ export function ShortcutsSettings() {
   const [recording, setRecording] = useState<ShortcutId | null>(null);
   const [error, setError] = useState<{ id: ShortcutId; text: string } | null>(null);
   const q = query.trim().toLowerCase();
-  const shown = list.filter((s) => !q || `${t(s.label)} ${s.label}`.toLowerCase().includes(q) || compact(`${shortcutDisplay(s)} ${displayKeys(s.display, "windows")} ${s.combo}`).includes(compact(q)));
+  const shown = list.filter(
+    (s) =>
+      !q ||
+      `${t(s.label)} ${s.label}`.toLowerCase().includes(q) ||
+      compact(`${shortcutDisplay(s)} ${displayKeys(s.display, "windows")} ${s.combo}`).includes(compact(q)),
+  );
   const anyCustom = Object.keys(getShortcutOverrides()).length > 0;
 
   const record = (id: ShortcutId, e: React.KeyboardEvent) => {
@@ -35,7 +56,14 @@ export function ShortcutsSettings() {
     const check: BindingCheck = combo === "" ? { ok: false, error: "unsupported" } : validateBinding(id, combo, list);
     if (!check.ok) {
       const other = check.with ? list.find((s) => s.id === check.with) : undefined;
-      setError({ id, text: t(ERROR_KEY[check.error], { mod, name: other ? t(other.label) : "", where: other ? t(`shortcutCtx_${shortcutContext(other)}` as Key) : "" }) });
+      setError({
+        id,
+        text: t(ERROR_KEY[check.error], {
+          mod,
+          name: other ? t(other.label) : "",
+          where: other ? t(`shortcutCtx_${shortcutContext(other)}` as Key) : "",
+        }),
+      });
       return;
     }
     setError(null);
@@ -47,14 +75,25 @@ export function ShortcutsSettings() {
     <>
       <div className="settings-search-field shortcut-search">
         <Search size={14} aria-hidden="true" />
-        <input type="text" aria-label={t("shortcutsSearch")} placeholder={t("shortcutsSearch")} spellCheck={false} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          type="text"
+          aria-label={t("shortcutsSearch")}
+          placeholder={t("shortcutsSearch")}
+          spellCheck={false}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       <div className="card">
         {shown.map((s) => {
           const editable = EDITABLE_SHORTCUTS.includes(s.id);
           return (
             <Fragment key={s.id}>
-              <SettingRow id={`shortcut-${s.id}`} title={t(s.label)} description={t(`shortcutCtx_${shortcutContext(s)}` as Key)}>
+              <SettingRow
+                id={`shortcut-${s.id}`}
+                title={t(s.label)}
+                description={t(`shortcutCtx_${shortcutContext(s)}` as Key)}
+              >
                 {recording === s.id ? (
                   <button
                     type="button"
@@ -77,7 +116,15 @@ export function ShortcutsSettings() {
                     >
                       {shortcutDisplay(s)}
                     </button>
-                    {isCustomized(s.id) && <button className="btn-soft" aria-label={`${t("shortcutReset")}: ${t(s.label)}`} onClick={() => (setError(null), void saveShortcutBinding(s.id, null).catch(() => {}))}>{t("shortcutReset")}</button>}
+                    {isCustomized(s.id) && (
+                      <button
+                        className="btn-soft"
+                        aria-label={`${t("shortcutReset")}: ${t(s.label)}`}
+                        onClick={() => (setError(null), void saveShortcutBinding(s.id, null).catch(() => {}))}
+                      >
+                        {t("shortcutReset")}
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -86,13 +133,29 @@ export function ShortcutsSettings() {
                   </>
                 )}
               </SettingRow>
-              {error?.id === s.id && <div className="card-row"><div className="d shortcut-error" role="alert">{error.text}</div></div>}
+              {error?.id === s.id && (
+                <div className="card-row">
+                  <div className="d shortcut-error" role="alert">
+                    {error.text}
+                  </div>
+                </div>
+              )}
             </Fragment>
           );
         })}
-        {!shown.length && <div className="card-row d" role="status">{t("shortcutsNoMatch", { query: query.trim() })}</div>}
+        {!shown.length && (
+          <div className="card-row d" role="status">
+            {t("shortcutsNoMatch", { query: query.trim() })}
+          </div>
+        )}
       </div>
-      {anyCustom && <p className="h4-sub"><button className="btn-soft" onClick={() => (setError(null), void resetShortcutBindings().catch(() => {}))}>{t("shortcutResetAll")}</button></p>}
+      {anyCustom && (
+        <p className="h4-sub">
+          <button className="btn-soft" onClick={() => (setError(null), void resetShortcutBindings().catch(() => {}))}>
+            {t("shortcutResetAll")}
+          </button>
+        </p>
+      )}
       <QuickAskSettings />
     </>
   );

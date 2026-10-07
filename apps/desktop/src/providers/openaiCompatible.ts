@@ -16,20 +16,32 @@ function toChat(system: string, messages: Msg[], providerId: string) {
       out.push({
         role: "user",
         content: imgs.length
-          ? [{ type: "text", text }, ...imgs.map((p: any) => ({ type: "image_url", image_url: { url: `data:image/png;base64,${p.data}` } }))]
+          ? [
+              { type: "text", text },
+              ...imgs.map((p: any) => ({ type: "image_url", image_url: { url: `data:image/png;base64,${p.data}` } })),
+            ]
           : text,
       });
     } else if (m.role === "assistant" && native) {
       const calls = m.parts.filter((p) => p.type === "tool_call") as Extract<Part, { type: "tool_call" }>[];
       out.push({
         role: "assistant",
-        content: m.parts.filter((p) => p.type === "text").map((p: any) => p.text).join("") || null,
+        content:
+          m.parts
+            .filter((p) => p.type === "text")
+            .map((p: any) => p.text)
+            .join("") || null,
         tool_calls: calls.length
-          ? calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args) } }))
+          ? calls.map((c) => ({
+              id: c.id,
+              type: "function",
+              function: { name: c.name, arguments: JSON.stringify(c.args) },
+            }))
           : undefined,
       });
     } else if (m.role === "tool" && out[out.length - 1]?.tool_calls) {
-      for (const p of m.parts) if (p.type === "tool_result") out.push({ role: "tool", tool_call_id: p.id, content: p.output });
+      for (const p of m.parts)
+        if (p.type === "tool_result") out.push({ role: "tool", tool_call_id: p.id, content: p.output });
     } else {
       out.push({ role: m.role === "assistant" ? "assistant" : "user", content: flattenMsg(m) });
     }
@@ -57,18 +69,38 @@ export function openaiCompatible(cfg: ProviderConfig, key: KeySource): Adapter {
     async listModels() {
       const res = await request(`${base}/models`, { headers: await authHeaders() });
       const j = await res.json();
-      return (j.data ?? []).map((m: any) => ({ id: m.id, name: m.name ?? m.id, providerId: cfg.id, created: (m.created ?? 0) * 1000, ...modelMetadata(m), ...(cfg.kind === "openrouter" ? { effort: openRouterEffort(m.supported_parameters) } : {}) }));
+      return (j.data ?? []).map((m: any) => ({
+        id: m.id,
+        name: m.name ?? m.id,
+        providerId: cfg.id,
+        created: (m.created ?? 0) * 1000,
+        ...modelMetadata(m),
+        ...(cfg.kind === "openrouter" ? { effort: openRouterEffort(m.supported_parameters) } : {}),
+      }));
     },
 
     async turn(t: TurnInput) {
-      const body: any = { model: t.model, messages: toChat(t.system, t.messages, cfg.id), stream: true, stream_options: { include_usage: true } };
+      const body: any = {
+        model: t.model,
+        messages: toChat(t.system, t.messages, cfg.id),
+        stream: true,
+        stream_options: { include_usage: true },
+      };
       const effort = pickLevel(t.reasoning, specLevels(reportedEffort(cfg.id, t.model)));
       if (effort) body.reasoning = { effort };
       if (t.tools.length)
-        body.tools = t.tools.map((d) => ({ type: "function", function: { name: d.name, description: d.description, parameters: d.parameters } }));
+        body.tools = t.tools.map((d) => ({
+          type: "function",
+          function: { name: d.name, description: d.description, parameters: d.parameters },
+        }));
       const { text, calls, usage } = await withRetry(
         async (onText) => {
-          const res = await request(`${base}/chat/completions`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/chat/completions`, {
+            method: "POST",
+            headers: await authHeaders(),
+            body: JSON.stringify(body),
+            signal: t.signal,
+          });
           let usage;
           let text = "";
           const calls: { id: string; name: string; args: string }[] = [];

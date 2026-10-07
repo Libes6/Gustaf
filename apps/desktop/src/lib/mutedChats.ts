@@ -6,22 +6,34 @@ let muted = new Set<number>();
 let loaded = false;
 const listeners = new Set<() => void>();
 let version = 0;
-export const subscribeMuted = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+export const subscribeMuted = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 export const mutedVersion = () => version;
 export const isMuted = (chatId: number | null | undefined) => chatId != null && muted.has(chatId);
 
 export function loadMuted() {
   if (loaded) return;
   loaded = true;
-  getSetting<unknown>("mutedChats", []).then((v) => {
-    if (Array.isArray(v)) muted = new Set([...muted, ...v.filter((x): x is number => Number.isInteger(x))]);
-    version++; listeners.forEach((fn) => fn());
-  }).catch(() => { loaded = false; });
+  getSetting<unknown>("mutedChats", [])
+    .then((v) => {
+      if (Array.isArray(v)) muted = new Set([...muted, ...v.filter((x): x is number => Number.isInteger(x))]);
+      version++;
+      listeners.forEach((fn) => fn());
+    })
+    .catch(() => {
+      loaded = false;
+    });
 }
 
 export function setMuted(chatId: number, on: boolean) {
   muted = new Set(muted);
-  if (on) muted.add(chatId); else muted.delete(chatId);
+  if (on) muted.add(chatId);
+  else muted.delete(chatId);
   void setSetting("mutedChats", [...muted].slice(-500)).catch(() => {});
-  version++; listeners.forEach((fn) => fn());
+  version++;
+  listeners.forEach((fn) => fn());
 }

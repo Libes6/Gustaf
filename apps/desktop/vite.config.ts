@@ -9,7 +9,11 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [react()],
   // Two HTML entries: the app (index.html) and the quick-ask window (quick-ask.html, created on demand by src-tauri/src/quick_ask.rs).
-  build: { rollupOptions: { input: { main: resolve(process.cwd(), "index.html"), "quick-ask": resolve(process.cwd(), "quick-ask.html") } } },
+  build: {
+    rollupOptions: {
+      input: { main: resolve(process.cwd(), "index.html"), "quick-ask": resolve(process.cwd(), "quick-ask.html") },
+    },
+  },
   define: { __SIDECAR__: JSON.stringify(`${process.cwd()}/sidecar/cursor-agent.mjs`) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

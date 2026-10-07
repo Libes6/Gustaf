@@ -16,14 +16,23 @@ const { DEFAULT_RULES } = await import('../src/agent/rules.ts');
 const { codexArgs, cursorArgs } = await import('../src/providers/cliArgs.ts');
 const { claudeArgs } = await import('../src/providers/claudeCli.ts');
 
-const plan = { title: 'Add X', steps: [{ id: '1', text: 'Read a', files: ['a.ts'] }, { id: '2', text: 'Edit b' }], risks: ['r'], questions: ['q?'] };
+const plan = {
+  title: 'Add X',
+  steps: [
+    { id: '1', text: 'Read a', files: ['a.ts'] },
+    { id: '2', text: 'Edit b' },
+  ],
+  risks: ['r'],
+  questions: ['q?'],
+};
 
 test('mode tool sets: ask none, plan the read-only subagent set, agent unrestricted', () => {
   assert.deepEqual(core.modeToolNames('ask'), []);
   assert.deepEqual(core.modeToolNames('plan'), ['read_file', 'list_dir', 'search']);
   assert.equal(core.modeToolNames('agent'), null);
   assert.equal(core.modeToolNames(undefined), null);
-  for (const n of ['run_command', 'edit_file', 'write_file', 'spawn_agent', 'mcp__s__t']) assert.equal(core.modeAllowsTool('plan', n), false, n);
+  for (const n of ['run_command', 'edit_file', 'write_file', 'spawn_agent', 'mcp__s__t'])
+    assert.equal(core.modeAllowsTool('plan', n), false, n);
   assert.equal(core.modeAllowsTool('plan', 'search'), true);
   assert.equal(core.modeAllowsTool('ask', 'read_file'), false);
   assert.equal(core.modeAllowsTool('agent', 'run_command'), true);
@@ -47,7 +56,10 @@ test('unparsable or empty plan blocks give null; string steps and missing ids ar
   assert.equal(core.extractPlan('```json\n{"steps":["a"]}\n```'), null);
   const p = core.extractPlan('```gustaf-plan\n{"steps":["a",{"text":"b","files":["x",3]},7]}\n```').plan;
   assert.equal(p.title, 'Plan');
-  assert.deepEqual(p.steps, [{ id: '1', text: 'a' }, { id: '2', text: 'b', files: ['x'] }]);
+  assert.deepEqual(p.steps, [
+    { id: '1', text: 'a' },
+    { id: '2', text: 'b', files: ['x'] },
+  ]);
 });
 
 test('an approved plan becomes an instruction that names the steps, files and risks', () => {
@@ -65,7 +77,10 @@ test('per-chat mode map: Agent is the default and is not stored; bad data is ign
   assert.deepEqual(m, { 5: 'plan' });
   assert.equal(core.chatModeOf(m, 5), 'plan');
   assert.deepEqual(core.withChatMode(m, 5, 'agent'), {});
-  assert.deepEqual(core.normalizeChatModes({ 1: 'plan', x: 'ask', 2: 'agent', 3: 'zzz', 4: 'ask' }), { 1: 'plan', 4: 'ask' });
+  assert.deepEqual(core.normalizeChatModes({ 1: 'plan', x: 'ask', 2: 'agent', 3: 'zzz', 4: 'ask' }), {
+    1: 'plan',
+    4: 'ask',
+  });
   assert.deepEqual(core.normalizeChatModes([1, 2]), {});
   let big = {};
   for (let i = 1; i <= core.MAX_STORED_MODES + 3; i++) big = core.withChatMode(big, i, 'plan');
@@ -79,7 +94,10 @@ test('CLI flags: Cursor --plan / --mode ask, Claude plan permission mode, Codex 
   assert.deepEqual(cursorArgs({ mode: 'ask' }).slice(5, 7), ['--mode', 'ask']);
   assert.deepEqual(cursorArgs({ access: 'readonly' }).slice(5, 7), ['--mode', 'plan']);
   assert.ok(cursorArgs({ access: 'full' }).includes('--force'));
-  assert.equal(cursorArgs({ mode: 'agent', access: 'auto' }).some((a) => a === '--plan' || a === '--mode'), false);
+  assert.equal(
+    cursorArgs({ mode: 'agent', access: 'auto' }).some((a) => a === '--plan' || a === '--mode'),
+    false,
+  );
   const perm = (a) => a[a.indexOf('--permission-mode') + 1];
   assert.equal(perm(claudeArgs({ mode: 'plan', access: 'full' })), 'plan');
   assert.equal(perm(claudeArgs({ mode: 'ask', access: 'auto' })), 'plan');
@@ -118,9 +136,21 @@ async function run(mode, script, extra = {}) {
     },
   };
   await runAgent({
-    root, history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }], adapter, providerId: 'p', model: 'm', access: 'full', computerUse: false, allowlist: [],
-    mode, signal: new AbortController().signal, onText: () => {},
-    onMessage: async (m) => { if (m.role === 'tool') outputs.push(...m.parts.map((p) => ({ name: p.name, output: p.output, isError: !!p.isError }))); },
+    root,
+    history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
+    adapter,
+    providerId: 'p',
+    model: 'm',
+    access: 'full',
+    computerUse: false,
+    allowlist: [],
+    mode,
+    signal: new AbortController().signal,
+    onText: () => {},
+    onMessage: async (m) => {
+      if (m.role === 'tool')
+        outputs.push(...m.parts.map((p) => ({ name: p.name, output: p.output, isError: !!p.isError })));
+    },
     approve: async () => true,
     ...extra,
   });
@@ -129,7 +159,16 @@ async function run(mode, script, extra = {}) {
 
 test('Plan mode offers only read tools and blocks writes, commands, MCP and spawn even if the model calls them', async () => {
   const r = await run('plan', [
-    { parts: [call('read_file', { path: 'a.txt' }), call('run_command', { command: 'echo hi' }), call('write_file', { path: 'new.txt', content: 'x' }), call('edit_file', { path: 'a.txt', old_string: 'hello', new_string: 'bye' }), call('spawn_agent', { title: 't', prompt: 'p', type: 'general' }), call('mcp__srv__tool', {})] },
+    {
+      parts: [
+        call('read_file', { path: 'a.txt' }),
+        call('run_command', { command: 'echo hi' }),
+        call('write_file', { path: 'new.txt', content: 'x' }),
+        call('edit_file', { path: 'a.txt', old_string: 'hello', new_string: 'bye' }),
+        call('spawn_agent', { title: 't', prompt: 'p', type: 'general' }),
+        call('mcp__srv__tool', {}),
+      ],
+    },
   ]);
   assert.deepEqual(r.offered[0].sort(), ['list_dir', 'read_file', 'search', 'use_skill']);
   assert.match(r.systems[0], /Plan mode/);
@@ -145,10 +184,18 @@ test('Plan mode offers only read tools and blocks writes, commands, MCP and spaw
 });
 
 test('Ask mode offers no tools at all and blocks even reads', async () => {
-  const r = await run('ask', [{ parts: [call('read_file', { path: 'a.txt' }), call('run_command', { command: 'ls' })] }]);
+  const r = await run('ask', [
+    { parts: [call('read_file', { path: 'a.txt' }), call('run_command', { command: 'ls' })] },
+  ]);
   assert.deepEqual(r.offered[0], []);
   assert.match(r.systems[0], /Ask mode/);
-  assert.deepEqual(r.outputs.map((o) => [o.isError, /^Blocked: Ask mode/.test(o.output)]), [[true, true], [true, true]]);
+  assert.deepEqual(
+    r.outputs.map((o) => [o.isError, /^Blocked: Ask mode/.test(o.output)]),
+    [
+      [true, true],
+      [true, true],
+    ],
+  );
   assert.deepEqual(r.runs, []);
 });
 
@@ -165,9 +212,28 @@ test('subagent and scheduled runs ignore the chat mode', async () => {
     const root = mkdtempSync(join(tmpdir(), 'plan-test-'));
     const seen = [];
     await runAgent({
-      root, history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }], providerId: 'p', model: 'm', access: 'full', computerUse: false, allowlist: [], mode: 'plan', ...extra,
-      adapter: { supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: async (i) => (seen.push({ mode: i.mode, system: i.system, tools: i.tools.map((t) => t.name) }), { parts: [{ type: 'text', text: 'ok' }] }) },
-      signal: new AbortController().signal, onText: () => {}, onMessage: async () => {}, approve: async () => true,
+      root,
+      history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
+      providerId: 'p',
+      model: 'm',
+      access: 'full',
+      computerUse: false,
+      allowlist: [],
+      mode: 'plan',
+      ...extra,
+      adapter: {
+        supportsComputer: false,
+        supportsReasoning: () => false,
+        listModels: async () => [],
+        turn: async (i) => (
+          seen.push({ mode: i.mode, system: i.system, tools: i.tools.map((t) => t.name) }),
+          { parts: [{ type: 'text', text: 'ok' }] }
+        ),
+      },
+      signal: new AbortController().signal,
+      onText: () => {},
+      onMessage: async () => {},
+      approve: async () => true,
     });
     assert.equal(seen[0].mode, undefined);
     assert.doesNotMatch(seen[0].system, /Plan mode/);

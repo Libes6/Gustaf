@@ -17,7 +17,9 @@ if (!chrome) {
 }
 const [major, minor] = process.versions.node.split('.').map(Number);
 if (major < 22 || (major === 22 && minor < 13)) {
-  console.log(`test:e2e skipped: Node ${process.versions.node} has no node:sqlite without a flag (needs 22.13+, see .nvmrc).`);
+  console.log(
+    `test:e2e skipped: Node ${process.versions.node} has no node:sqlite without a flag (needs 22.13+, see .nvmrc).`,
+  );
   process.exit(0);
 }
 console.log(`test:e2e using ${chrome}`);
@@ -26,10 +28,26 @@ const dist = mkdtempSync(join(tmpdir(), 'gustaf-e2e-dist-'));
 let code = 1;
 try {
   buildFrontend(dist);
-  const files = readdirSync(join(root, 'tests/e2e')).filter((f) => f.endsWith('.test.mjs')).sort().map((f) => `tests/e2e/${f}`);
-  const r = spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', '--test', '--test-reporter=spec', '--test-concurrency=2', ...files, ...process.argv.slice(2)], {
-    cwd: root, stdio: 'inherit', env: { ...process.env, E2E_DIST: dist },
-  });
+  const files = readdirSync(join(root, 'tests/e2e'))
+    .filter((f) => f.endsWith('.test.mjs'))
+    .sort()
+    .map((f) => `tests/e2e/${f}`);
+  const r = spawnSync(
+    process.execPath,
+    [
+      '--disable-warning=ExperimentalWarning',
+      '--test',
+      '--test-reporter=spec',
+      '--test-concurrency=2',
+      ...files,
+      ...process.argv.slice(2),
+    ],
+    {
+      cwd: root,
+      stdio: 'inherit',
+      env: { ...process.env, E2E_DIST: dist },
+    },
+  );
   code = r.status ?? 1;
 } finally {
   rmSync(dist, { recursive: true, force: true });

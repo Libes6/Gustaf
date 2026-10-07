@@ -9,8 +9,18 @@ import { invalidateSecret } from "../lib/keys";
 import { currentBudgetStop } from "../lib/budgetUsage";
 import { addMessage, createChat } from "../lib/data";
 import {
-  buildChatPayload, buildUserText, canKeep, clipboardPreview, INITIAL_QUICK_ASK, limitClipboard, MAX_CLIPBOARD_CHARS, pickDefaultModel, QUICK_ASK_SYSTEM,
-  quickAskReducer, usableModels, type Selection,
+  buildChatPayload,
+  buildUserText,
+  canKeep,
+  clipboardPreview,
+  INITIAL_QUICK_ASK,
+  limitClipboard,
+  MAX_CLIPBOARD_CHARS,
+  pickDefaultModel,
+  QUICK_ASK_SYSTEM,
+  quickAskReducer,
+  usableModels,
+  type Selection,
 } from "../lib/quickAsk";
 import { quickAskApi } from "../lib/quickAskApi";
 import { getAdapter, listAllModels, loadProviders } from "../providers";
@@ -27,7 +37,11 @@ async function loadConfig(): Promise<Config> {
   // This window keeps its own key cache: a key saved in the main window since the last show must not be shadowed by the
   // old one (or by a remembered "no key"). Rust keeps successful reads, so this asks the Keychain nothing new.
   invalidateSecret();
-  const [providers, selection, hidden] = await Promise.all([loadProviders(), getSetting<Selection | null>("selection", null), getSetting<string[]>("hiddenModels", [])]);
+  const [providers, selection, hidden] = await Promise.all([
+    loadProviders(),
+    getSetting<Selection | null>("selection", null),
+    getSetting<string[]>("hiddenModels", []),
+  ]);
   const { models } = await listAllModels(providers, "startup");
   const usable = usableModels(providers, models, hidden);
   const { model, fellBack } = pickDefaultModel(selection, usable);
@@ -69,8 +83,19 @@ export function QuickAskView({ session = 0 }: { session?: number }) {
     setCopied(false);
     inputRef.current?.focus();
     let cancelled = false;
-    loadConfig().then((c) => { if (!cancelled) { setConfig(c); setChosen(c.model ? modelId(c.model) : null); } }).catch(() => { if (!cancelled) setConfig({ providers: [], models: [], model: null, fellBack: false }); });
-    return () => { cancelled = true; };
+    loadConfig()
+      .then((c) => {
+        if (!cancelled) {
+          setConfig(c);
+          setChosen(c.model ? modelId(c.model) : null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setConfig({ providers: [], models: [], model: null, fellBack: false });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
   useEffect(() => abort, []);
 
@@ -150,7 +175,9 @@ export function QuickAskView({ session = 0 }: { session?: number }) {
       await navigator.clipboard.writeText(state.answer);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch { /* clipboard unavailable: nothing to confirm */ }
+    } catch {
+      /* clipboard unavailable: nothing to confirm */
+    }
   }
 
   async function readClipboard() {
@@ -188,7 +215,9 @@ export function QuickAskView({ session = 0 }: { session?: number }) {
   const drag = (e: React.MouseEvent) => {
     if (e.button !== 0 || !isTauri()) return;
     e.preventDefault();
-    getCurrentWindow().startDragging().catch(() => {});
+    getCurrentWindow()
+      .startDragging()
+      .catch(() => {});
   };
 
   return (
@@ -211,28 +240,56 @@ export function QuickAskView({ session = 0 }: { session?: number }) {
           }}
         />
         {streaming ? (
-          <button className="send" aria-label={t("stop")} title={t("stop")} onClick={stop}><Square size={13} fill="currentColor" /></button>
+          <button className="send" aria-label={t("stop")} title={t("stop")} onClick={stop}>
+            <Square size={13} fill="currentColor" />
+          </button>
         ) : (
-          <button className="send" aria-label={t("send")} title={t("send")} disabled={!input.trim() || !model} onClick={() => void send()}><ArrowUp size={16} /></button>
+          <button
+            className="send"
+            aria-label={t("send")}
+            title={t("send")}
+            disabled={!input.trim() || !model}
+            onClick={() => void send()}
+          >
+            <ArrowUp size={16} />
+          </button>
         )}
       </div>
       <div className="qa-options">
         {config && config.models.length > 0 && (
-          <select className="qa-model" aria-label={t("quickAskModel")} value={chosen ?? ""} disabled={streaming} onChange={(e) => setChosen(e.target.value)}>
+          <select
+            className="qa-model"
+            aria-label={t("quickAskModel")}
+            value={chosen ?? ""}
+            disabled={streaming}
+            onChange={(e) => setChosen(e.target.value)}
+          >
             {config.models.map((m) => (
-              <option key={modelId(m)} value={modelId(m)}>{m.name || m.id} · {config.providers.find((p) => p.id === m.providerId)?.name}</option>
+              <option key={modelId(m)} value={modelId(m)}>
+                {m.name || m.id} · {config.providers.find((p) => p.id === m.providerId)?.name}
+              </option>
             ))}
           </select>
         )}
         <span className="grow" />
         <label className="qa-switch">
           <span>{t("quickAskClipboard")}</span>
-          <button role="switch" aria-checked={clip.on} aria-label={t("quickAskClipboard")} className={`toggle${clip.on ? " on" : ""}`} onClick={() => (clip.on ? setClip(NO_CLIP) : void readClipboard())} />
+          <button
+            role="switch"
+            aria-checked={clip.on}
+            aria-label={t("quickAskClipboard")}
+            className={`toggle${clip.on ? " on" : ""}`}
+            onClick={() => (clip.on ? setClip(NO_CLIP) : void readClipboard())}
+          />
         </label>
       </div>
       {config && !config.models.length && <div className="qa-note">{t("quickAskNoModel")}</div>}
       {config?.fellBack && config.models.length > 0 && <div className="qa-note">{t("quickAskFallback")}</div>}
-      {clip.denied && <div className="qa-note" role="alert">{t("quickAskClipboardDenied")}</div>}
+      {clip.denied && (
+        <div className="qa-note" role="alert">
+          {t("quickAskClipboardDenied")}
+        </div>
+      )}
       {clip.on && (
         <div className="qa-clip" role="group" aria-label={t("quickAskClipboardPreview")}>
           {clip.text.trim() ? (
@@ -250,12 +307,24 @@ export function QuickAskView({ session = 0 }: { session?: number }) {
       )}
       {state.phase !== "idle" && (
         <div className="qa-answer" aria-live="polite" aria-busy={streaming}>
-          {state.answer ? <Markdown text={state.answer} /> : streaming && <span className="d">{t("quickAskThinking")}</span>}
+          {state.answer ? (
+            <Markdown text={state.answer} />
+          ) : (
+            streaming && <span className="d">{t("quickAskThinking")}</span>
+          )}
           {state.phase === "stopped" && <div className="d">{t("quickAskStopped")}</div>}
-          {state.phase === "error" && <div className="qa-error" role="alert">{state.error}</div>}
+          {state.phase === "error" && (
+            <div className="qa-error" role="alert">
+              {state.error}
+            </div>
+          )}
         </div>
       )}
-      {saveError && <div className="qa-error" role="alert">{saveError}</div>}
+      {saveError && (
+        <div className="qa-error" role="alert">
+          {saveError}
+        </div>
+      )}
       <div className="qa-foot">
         <span className="d">{t("quickAskNotSaved")}</span>
         <span className="grow" />
@@ -281,12 +350,20 @@ export function QuickAskRoot() {
   useEffect(() => {
     let off: (() => void) | undefined;
     let gone = false;
-    quickAskApi.onShown(() => setSession((s) => s + 1)).then((un) => (gone ? un() : (off = un))).catch(() => {});
+    quickAskApi
+      .onShown(() => setSession((s) => s + 1))
+      .then((un) => (gone ? un() : (off = un)))
+      .catch(() => {});
     quickAskApi.ready().catch(() => {});
-    return () => { gone = true; off?.(); };
+    return () => {
+      gone = true;
+      off?.();
+    };
   }, []);
   useEffect(() => {
-    getSetting<Locale>("locale", detectLocale()).then(setLocale).catch(() => {});
+    getSetting<Locale>("locale", detectLocale())
+      .then(setLocale)
+      .catch(() => {});
   }, [session]);
   return (
     <I18nProvider locale={locale}>

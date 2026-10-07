@@ -1,8 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  resolveTheme, isThemeMode, normalizeHex, parsePrefs, contrastRatio, readableOn, darkenUntilReadable, accentVars,
-  ACCENT_PRESETS, DEFAULT_ACCENT, DEFAULT_THEME, MIN_TEXT_CONTRAST, mix,
+  resolveTheme,
+  isThemeMode,
+  normalizeHex,
+  parsePrefs,
+  contrastRatio,
+  readableOn,
+  darkenUntilReadable,
+  accentVars,
+  ACCENT_PRESETS,
+  DEFAULT_ACCENT,
+  DEFAULT_THEME,
+  MIN_TEXT_CONTRAST,
+  mix,
 } from '../src/lib/themeUtil.ts';
 import { SHORTCUTS, matches, matchesCombo, findConflicts, isTextEditingSafe, shortcut } from '../src/lib/shortcuts.ts';
 
@@ -24,7 +35,8 @@ test('normalizeHex accepts 3/6 digits with or without #, rejects the rest', () =
   assert.equal(normalizeHex('#A884EE'), '#a884ee');
   assert.equal(normalizeHex(' a884ee '), '#a884ee');
   assert.equal(normalizeHex('#abc'), '#aabbcc');
-  for (const bad of ['', '#', '#abcd', '#12345', '#gggggg', 'rgb(1,2,3)', '#a884ee00', null, 5]) assert.equal(normalizeHex(bad), null, String(bad));
+  for (const bad of ['', '#', '#abcd', '#12345', '#gggggg', 'rgb(1,2,3)', '#a884ee00', null, 5])
+    assert.equal(normalizeHex(bad), null, String(bad));
 });
 
 test('contrastRatio matches the WCAG reference values', () => {
@@ -56,7 +68,9 @@ test('accentVars: every preset gives readable text on bubble and soft accent in 
     }
   }
   // soft accent is lighter than the accent on dark, darker on light
-  assert.ok(contrastRatio(accentVars('#a884ee', 'dark')['--accent-soft'], '#000000') > contrastRatio('#a884ee', '#000000'));
+  assert.ok(
+    contrastRatio(accentVars('#a884ee', 'dark')['--accent-soft'], '#000000') > contrastRatio('#a884ee', '#000000'),
+  );
   assert.notEqual(accentVars('#a884ee', 'light')['--accent-soft'], accentVars('#a884ee', 'dark')['--accent-soft']);
   assert.equal(accentVars('nonsense', 'dark')['--accent'], DEFAULT_ACCENT);
   assert.equal(mix('#000000', '#ffffff', 0.5), '#808080');
@@ -74,13 +88,18 @@ test('shortcuts: matchers are exact about modifiers', () => {
   assert.ok(matches(key('Escape'), 'closeSettings'));
   assert.ok(!matches(key('Escape', { metaKey: true, shiftKey: true }), 'closeSettings'));
   assert.ok(matches(key('Escape', { metaKey: true, shiftKey: true }), 'stopAgent'));
-  assert.ok(matchesCombo(key('7', { metaKey: true }), 'Cmd+1-9') && !matchesCombo(key('0', { metaKey: true }), 'Cmd+1-9'));
+  assert.ok(
+    matchesCombo(key('7', { metaKey: true }), 'Cmd+1-9') && !matchesCombo(key('0', { metaKey: true }), 'Cmd+1-9'),
+  );
   assert.ok(matchesCombo({ ...key('Dead'), code: 'KeyN', metaKey: true }, 'Cmd+N'));
 });
 
 test('shortcuts: no conflicts, no text-editing keys taken, global one has an accelerator', () => {
   assert.deepEqual(findConflicts(), []);
-  assert.deepEqual(SHORTCUTS.filter((s) => !isTextEditingSafe(s)).map((s) => s.id), []);
+  assert.deepEqual(
+    SHORTCUTS.filter((s) => !isTextEditingSafe(s)).map((s) => s.id),
+    [],
+  );
   assert.equal(shortcut('stopAgent').accelerator, 'CommandOrControl+Shift+Escape');
   assert.deepEqual(findConflicts([...SHORTCUTS, { ...shortcut('settings'), id: 'newChat' }]).length > 0, true);
   assert.equal(isTextEditingSafe({ ...shortcut('settings'), combo: 'Cmd+V' }), false);

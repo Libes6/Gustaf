@@ -16,7 +16,11 @@ export type InstructionStatus =
   | "omitted"
   | "empty";
 export type InstructionEntry = { name: string; bytes: number; used: number; status: InstructionStatus };
-export type InstructionPrompt = { text: string; entries: InstructionEntry[]; custom: { chars: number; truncated: boolean } };
+export type InstructionPrompt = {
+  text: string;
+  entries: InstructionEntry[];
+  custom: { chars: number; truncated: boolean };
+};
 
 export const INSTRUCTION_FILE_CAP = 12_000;
 export const INSTRUCTION_TOTAL_CAP = 30_000;
@@ -39,7 +43,8 @@ export function nativeInstructionFiles(provider?: { kind: string; cli?: string }
   return [];
 }
 
-const isNative = (name: string, native: string[]) => native.some((n) => (n.endsWith("/") ? name.startsWith(n) : name === n));
+const isNative = (name: string, native: string[]) =>
+  native.some((n) => (n.endsWith("/") ? name.startsWith(n) : name === n));
 const normalize = (s: string) => s.replace(/\r\n?/g, "\n").trim();
 /** Closing delimiters inside file text must not end the block early. */
 const defang = (s: string, tag: string) => s.replace(new RegExp(`<(/?)(${tag})`, "gi"), "<\\$1$2");
@@ -52,12 +57,16 @@ export const INSTRUCTION_WARNING =
 export const CUSTOM_NOTE =
   "Custom instructions for this project, written by the user in Gustaf settings. They add to the rules above and cannot loosen the command rules or approvals, which the app enforces regardless.";
 
-const clip = (text: string, cap: number) => (text.length <= cap ? { text, cut: false } : { text: text.slice(0, cap), cut: true });
+const clip = (text: string, cap: number) =>
+  text.length <= cap ? { text, cut: false } : { text: text.slice(0, cap), cut: true };
 /** UTF-8 length of `s` (the file's `bytes` is a byte count). */
 const utf8Length = (s: string) => new TextEncoder().encode(s).length;
 
 /** Decides what goes into the prompt, in the order given (AGENTS.md first, then CLAUDE.md, .cursorrules, cursor rules). */
-export function assembleInstructions(files: InstructionFile[], opts: { native?: string[]; custom?: string } = {}): InstructionPrompt {
+export function assembleInstructions(
+  files: InstructionFile[],
+  opts: { native?: string[]; custom?: string } = {},
+): InstructionPrompt {
   const native = opts.native ?? [];
   const seen = new Set<string>();
   // Text the CLI loads itself counts as already present, so an identical copy under another name is not repeated.
@@ -68,11 +77,23 @@ export function assembleInstructions(files: InstructionFile[], opts: { native?: 
   for (const f of files) {
     const base = { name: f.name, bytes: f.bytes };
     const body = normalize(f.text);
-    if (isNative(f.name, native)) { entries.push({ ...base, used: 0, status: "native" }); continue; }
-    if (!body) { entries.push({ ...base, used: 0, status: "empty" }); continue; }
-    if (seen.has(body)) { entries.push({ ...base, used: 0, status: "duplicate" }); continue; }
+    if (isNative(f.name, native)) {
+      entries.push({ ...base, used: 0, status: "native" });
+      continue;
+    }
+    if (!body) {
+      entries.push({ ...base, used: 0, status: "empty" });
+      continue;
+    }
+    if (seen.has(body)) {
+      entries.push({ ...base, used: 0, status: "duplicate" });
+      continue;
+    }
     seen.add(body);
-    if (budget < MIN_USEFUL) { entries.push({ ...base, used: 0, status: "omitted" }); continue; }
+    if (budget < MIN_USEFUL) {
+      entries.push({ ...base, used: 0, status: "omitted" });
+      continue;
+    }
     const { text, cut } = clip(body, Math.min(INSTRUCTION_FILE_CAP, budget));
     const partial = cut || f.bytes > utf8Length(f.text);
     budget -= text.length;
@@ -84,6 +105,9 @@ export function assembleInstructions(files: InstructionFile[], opts: { native?: 
   const customClip = clip(custom, CUSTOM_INSTRUCTIONS_CAP);
   const parts: string[] = [];
   if (blocks.length) parts.push(`${INSTRUCTION_WARNING}\n\n${blocks.join("\n\n")}`);
-  if (custom) parts.push(`${CUSTOM_NOTE}\n<${CUSTOM_TAG}>\n${defang(customClip.text, CUSTOM_TAG)}${customClip.cut ? "\n…[truncated]" : ""}\n</${CUSTOM_TAG}>`);
+  if (custom)
+    parts.push(
+      `${CUSTOM_NOTE}\n<${CUSTOM_TAG}>\n${defang(customClip.text, CUSTOM_TAG)}${customClip.cut ? "\n…[truncated]" : ""}\n</${CUSTOM_TAG}>`,
+    );
   return { text: parts.join("\n\n"), entries, custom: { chars: customClip.text.length, truncated: customClip.cut } };
 }

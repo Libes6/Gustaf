@@ -6,7 +6,15 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSettings } from "../../src/components/WebSettings";
 import { invalidateSecret, readSecret } from "../../src/lib/keys";
-import { deleteProvider, getAdapter, listAllModels, MODEL_TTL_MS, modelListLimits, resetModelState, saveProvider } from "../../src/providers";
+import {
+  deleteProvider,
+  getAdapter,
+  listAllModels,
+  MODEL_TTL_MS,
+  modelListLimits,
+  resetModelState,
+  saveProvider,
+} from "../../src/providers";
 import type { ProviderConfig, TurnInput } from "../../src/providers/types";
 import { renderApp } from "./render";
 import { callsOf, mockInvoke } from "./tauri";
@@ -36,8 +44,18 @@ const setting = (key: string, value: unknown) => settings.set(key, JSON.stringif
 const reads = () => callsOf("secret_get").map((a) => a.id);
 
 const openai: ProviderConfig = { id: "oa", kind: "openai", name: "OpenAI", baseUrl: "https://api.openai.test/v1" };
-const claude: ProviderConfig = { id: "an", kind: "anthropic", name: "Anthropic", baseUrl: "https://api.anthropic.test" };
-const router: ProviderConfig = { id: "or", kind: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.test/v1" };
+const claude: ProviderConfig = {
+  id: "an",
+  kind: "anthropic",
+  name: "Anthropic",
+  baseUrl: "https://api.anthropic.test",
+};
+const router: ProviderConfig = {
+  id: "or",
+  kind: "openrouter",
+  name: "OpenRouter",
+  baseUrl: "https://openrouter.test/v1",
+};
 const ollama: ProviderConfig = { id: "ol", kind: "ollama", name: "Ollama", baseUrl: "http://localhost:11434/v1" };
 const api = [openai, claude, router];
 const model = (p: ProviderConfig, id: string) => ({ id, name: id, providerId: p.id, created: 0 });
@@ -49,14 +67,27 @@ function http() {
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
     log.push({ url, headers: { ...(init?.headers as Record<string, string>) } });
     if (url.endsWith("/chat/completions")) {
-      const body = ['{"choices":[{"delta":{"content":"OK"}}]}', '{"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}'].map((d) => `data: ${d}\n\n`).join("") + "data: [DONE]\n\n";
+      const body =
+        ['{"choices":[{"delta":{"content":"OK"}}]}', '{"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}']
+          .map((d) => `data: ${d}\n\n`)
+          .join("") + "data: [DONE]\n\n";
       return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
     }
-    return new Response(JSON.stringify({ data: [{ id: `fresh-${new URL(url).host}` }] }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ data: [{ id: `fresh-${new URL(url).host}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }) as unknown as typeof tauriFetch);
   return log;
 }
-const turn = (): TurnInput => ({ system: "", messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }], tools: [], model: "m", signal: new AbortController().signal, onText: () => {} });
+const turn = (): TurnInput => ({
+  system: "",
+  messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+  tools: [],
+  model: "m",
+  signal: new AbortController().signal,
+  onText: () => {},
+});
 
 beforeEach(() => {
   settings.clear();
@@ -72,7 +103,12 @@ beforeEach(() => {
 describe("lazy API keys", () => {
   it("startup with cached lists reads no key and makes no request", async () => {
     const log = http();
-    setting("modelCache", Object.fromEntries(api.map((p) => [p.id, { at: Date.now() - 24 * 3600_000, models: [model(p, `cached-${p.id}`)] }])));
+    setting(
+      "modelCache",
+      Object.fromEntries(
+        api.map((p) => [p.id, { at: Date.now() - 24 * 3600_000, models: [model(p, `cached-${p.id}`)] }]),
+      ),
+    );
     for (const p of api) await getAdapter(p);
     const { models, errors } = await listAllModels(api, "startup");
     expect(models.map((m) => m.id).sort()).toEqual(["cached-an", "cached-oa", "cached-or"]);
@@ -141,18 +177,29 @@ describe("lazy API keys", () => {
   it("the picker refreshes stale lists once per 10 minutes; an explicit refresh always fetches", async () => {
     const log = http();
     const old = Date.now() - MODEL_TTL_MS - 1000;
-    setting("modelCache", { oa: { at: old, models: [model(openai, "cached-oa")] }, an: { at: Date.now(), models: [model(claude, "cached-an")] } });
+    setting("modelCache", {
+      oa: { at: old, models: [model(openai, "cached-oa")] },
+      an: { at: Date.now(), models: [model(claude, "cached-an")] },
+    });
     const first = await listAllModels(api, "stale");
     // OpenAI (stale) and OpenRouter (never listed) are fetched; Anthropic's list is fresh enough.
     expect(log.map((r) => new URL(r.url).host).sort()).toEqual(["api.openai.test", "openrouter.test"]);
-    expect(first.models.map((m) => m.id).sort()).toEqual(["cached-an", "fresh-api.openai.test", "fresh-openrouter.test"]);
+    expect(first.models.map((m) => m.id).sort()).toEqual([
+      "cached-an",
+      "fresh-api.openai.test",
+      "fresh-openrouter.test",
+    ]);
     expect(reads().sort()).toEqual(["provider:oa", "provider:or"]);
 
     await listAllModels(api, "stale");
     expect(log).toHaveLength(2);
     // The fetched lists are what the next launch shows.
     const next = await listAllModels(api, "startup");
-    expect(next.models.map((m) => m.id).sort()).toEqual(["cached-an", "fresh-api.openai.test", "fresh-openrouter.test"]);
+    expect(next.models.map((m) => m.id).sort()).toEqual([
+      "cached-an",
+      "fresh-api.openai.test",
+      "fresh-openrouter.test",
+    ]);
 
     await listAllModels(api, "force", [claude.id]);
     expect(log.map((r) => new URL(r.url).host)).toContain("api.anthropic.test");
@@ -174,7 +221,12 @@ describe("lazy API keys", () => {
   it("a denied Keychain read names the key, records no 'absent' flag and is retried next time", async () => {
     const log = http();
     let deny = true;
-    mockInvoke({ secret_get: ({ id }: { id: string }) => { if (deny) throw "User canceled the operation."; return keychain.get(id) ?? null; } });
+    mockInvoke({
+      secret_get: ({ id }: { id: string }) => {
+        if (deny) throw "User canceled the operation.";
+        return keychain.get(id) ?? null;
+      },
+    });
     const a = await getAdapter(router);
     await expect(a.turn(turn())).rejects.toThrow(/OpenRouter from the Keychain: User canceled the operation\. Allow/);
     expect(log).toHaveLength(0);
@@ -206,7 +258,8 @@ describe("lazy API keys", () => {
   it("a provider that never answers does not hold back the other lists", async () => {
     http();
     const answer = fetchMock.getMockImplementation()!;
-    fetchMock.mockImplementation(((url: string, init?: RequestInit) => (url.includes("openrouter") ? new Promise(() => {}) : answer(url, init))) as typeof tauriFetch);
+    fetchMock.mockImplementation(((url: string, init?: RequestInit) =>
+      url.includes("openrouter") ? new Promise(() => {}) : answer(url, init)) as typeof tauriFetch);
     modelListLimits.timeoutMs = 20;
     try {
       const { models, errors } = await listAllModels(api, "force");

@@ -4,7 +4,11 @@ import { ask, save } from "@tauri-apps/plugin-dialog";
 import { beforeEach, expect, it, vi } from "vitest";
 import { callsOf, mockInvoke } from "./tauri";
 
-vi.mock("../../src/lib/api", async (orig) => ({ ...(await orig<typeof import("../../src/lib/api")>()), setSetting: vi.fn(async () => {}), getSetting: vi.fn(async (_k: string, d: unknown) => d) }));
+vi.mock("../../src/lib/api", async (orig) => ({
+  ...(await orig<typeof import("../../src/lib/api")>()),
+  setSetting: vi.fn(async () => {}),
+  getSetting: vi.fn(async (_k: string, d: unknown) => d),
+}));
 const { ThemeEditor } = await import("../../src/components/ThemeEditor");
 const { getCustomThemes, deleteCustomTheme } = await import("../../src/lib/customTheme");
 const api = await import("../../src/lib/api");
@@ -77,7 +81,11 @@ it("rejects invalid files with a message and changes nothing", async () => {
   renderApp(<ThemeEditor />);
   upload(file("not json"));
   expect(await screen.findByRole("alert")).toHaveTextContent("not valid JSON");
-  upload(file(JSON.stringify({ format: "gustaf-theme", version: 1, name: "Evil", dark: { bg: "url(javascript:alert(1))" } })));
+  upload(
+    file(
+      JSON.stringify({ format: "gustaf-theme", version: 1, name: "Evil", dark: { bg: "url(javascript:alert(1))" } }),
+    ),
+  );
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Invalid colour"));
   upload(file(JSON.stringify({ format: "gustaf-theme", version: 1, name: "Evil", dark: { onload: "#000000" } })));
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("unknown field"));

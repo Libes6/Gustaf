@@ -1,7 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  editableText, messageImages, messagesBefore, turnMessageIds, branchCutoff, branchSlice, branchTitle, turnActions, MAX_TITLE,
+  editableText,
+  messageImages,
+  messagesBefore,
+  turnMessageIds,
+  branchCutoff,
+  branchSlice,
+  branchTitle,
+  turnActions,
+  MAX_TITLE,
 } from '../src/lib/messageActions.ts';
 
 const txt = (id, role, text, meta) => ({ id, role, parts: [{ type: 'text', text }], meta });
@@ -15,18 +23,32 @@ test('editableText drops the appended file blocks only', () => {
 });
 
 test('messageImages returns image data in order', () => {
-  const m = { id: 1, role: 'user', parts: [{ type: 'text', text: 'a' }, { type: 'image', data: 'AA' }, { type: 'image', data: 'BB' }] };
+  const m = {
+    id: 1,
+    role: 'user',
+    parts: [
+      { type: 'text', text: 'a' },
+      { type: 'image', data: 'AA' },
+      { type: 'image', data: 'BB' },
+    ],
+  };
   assert.deepEqual(messageImages(m), ['AA', 'BB']);
 });
 
 test('messagesBefore excludes the cut message and everything after', () => {
   const ms = [txt(1, 'user', 'a'), txt(2, 'assistant', 'b'), txt(3, 'user', 'c')];
-  assert.deepEqual(messagesBefore(ms, 3).map((m) => m.id), [1, 2]);
+  assert.deepEqual(
+    messagesBefore(ms, 3).map((m) => m.id),
+    [1, 2],
+  );
   assert.deepEqual(messagesBefore(ms, 1), []);
 });
 
 test('turnMessageIds covers user and steps', () => {
-  assert.deepEqual(turnMessageIds({ user: txt(1, 'user', 'a'), steps: [calls(2), result(3), txt(4, 'assistant', 'z')] }), [1, 2, 3, 4]);
+  assert.deepEqual(
+    turnMessageIds({ user: txt(1, 'user', 'a'), steps: [calls(2), result(3), txt(4, 'assistant', 'z')] }),
+    [1, 2, 3, 4],
+  );
   assert.deepEqual(turnMessageIds({ steps: [txt(5, 'assistant', 'z')] }), [5]);
 });
 
@@ -47,7 +69,10 @@ test('branchCutoff keeps the tool results that answer an assistant tool call', (
 
 test('branchSlice returns the history up to the cutoff and is empty for an unknown id', () => {
   const ms = [txt(10, 'user', 'a'), txt(20, 'assistant', 'b'), txt(30, 'user', 'c')];
-  assert.deepEqual(branchSlice(ms, 20).map((m) => m.id), [10, 20]);
+  assert.deepEqual(
+    branchSlice(ms, 20).map((m) => m.id),
+    [10, 20],
+  );
   assert.deepEqual(branchSlice(ms, 7), []);
 });
 
@@ -82,7 +107,10 @@ test('turnActions: regenerate only for the last turn that ends with assistant te
   assert.equal(turnActions(done, { busy: false, isLastTurn: true }).show.regenerate, true);
   assert.equal(turnActions(done, { busy: false, isLastTurn: false }).show.regenerate, false);
   assert.equal(turnActions(turn([calls(2), result(3)]), { busy: false, isLastTurn: true }).show.regenerate, false);
-  assert.equal(turnActions({ steps: [txt(2, 'assistant', 'a')] }, { busy: false, isLastTurn: true }).show.regenerate, false);
+  assert.equal(
+    turnActions({ steps: [txt(2, 'assistant', 'a')] }, { busy: false, isLastTurn: true }).show.regenerate,
+    false,
+  );
 });
 
 test('turnActions: every action is disabled while a run is active', () => {
@@ -94,12 +122,19 @@ test('turnActions: every action is disabled while a run is active', () => {
 });
 
 test('turnActions: compacted summaries offer no edit, regenerate, delete or branch', () => {
-  const a = turnActions(turn([txt(2, 'assistant', 'a')], txt(1, 'user', 's', { compacted: true })), { busy: false, isLastTurn: true });
+  const a = turnActions(turn([txt(2, 'assistant', 'a')], txt(1, 'user', 's', { compacted: true })), {
+    busy: false,
+    isLastTurn: true,
+  });
   assert.deepEqual(a.show, { edit: false, regenerate: false, remove: false, branch: false });
 });
 
 test('editableText keeps pasted texts and chat references that follow the file blocks', () => {
-  const paste = '\n\n<gustaf-pasted-text>\nText the user pasted into the message:\n{"text":"log"}\n</gustaf-pasted-text>';
-  assert.equal(editableText(txt(1, 'user', 'see @a.ts\n\n<file path="a.ts">\nx\n</file>' + paste)), 'see @a.ts' + paste);
+  const paste =
+    '\n\n<gustaf-pasted-text>\nText the user pasted into the message:\n{"text":"log"}\n</gustaf-pasted-text>';
+  assert.equal(
+    editableText(txt(1, 'user', 'see @a.ts\n\n<file path="a.ts">\nx\n</file>' + paste)),
+    'see @a.ts' + paste,
+  );
   assert.equal(editableText(txt(1, 'user', 'plain' + paste)), 'plain' + paste);
 });

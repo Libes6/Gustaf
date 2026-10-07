@@ -17,14 +17,21 @@ export const MAX_COLUMNS = 4;
 /** Same estimate as the chat live meter: roughly three characters per token. */
 export const CHARS_PER_TOKEN = 3;
 
-export const COMPARE_SYSTEM = "Answer the user's message directly and completely. This is a side-by-side model comparison: no tools, commands or file access are available, so do not try to use any.";
+export const COMPARE_SYSTEM =
+  "Answer the user's message directly and completely. This is a side-by-side model comparison: no tools, commands or file access are available, so do not try to use any.";
 
 export type CompareTarget = { key: string; providerId: string; model: string; label: string };
 
 export type ColumnStatus = "running" | "done" | "error" | "stopped";
 
 /** A classified failure (see providers/retry.ts); `kind` is absent for errors that are not `ProviderError`s. */
-export type ColumnError = { message: string; kind?: ErrorKind; status?: number; retryable?: boolean; attempts?: number };
+export type ColumnError = {
+  message: string;
+  kind?: ErrorKind;
+  status?: number;
+  retryable?: boolean;
+  attempts?: number;
+};
 
 export type Column = CompareTarget & {
   status: ColumnStatus;
@@ -60,7 +67,17 @@ export const estimateInput = (system: string, prompt: string) => estimateTokens(
 /** Estimated output tokens of a column from the characters received so far. */
 export const estimateOutput = (c: Pick<Column, "chars">) => estimateTokens(c.chars);
 
-const freshColumn = (t: CompareTarget, now: number, input: number): Column => ({ key: t.key, providerId: t.providerId, model: t.model, label: t.label, status: "running", text: "", start: now, chars: 0, input });
+const freshColumn = (t: CompareTarget, now: number, input: number): Column => ({
+  key: t.key,
+  providerId: t.providerId,
+  model: t.model,
+  label: t.label,
+  status: "running",
+  text: "",
+  start: now,
+  chars: 0,
+  input,
+});
 
 function patch(s: CompareState, key: string, f: (c: Column) => Column): CompareState {
   let changed = false;
@@ -86,15 +103,35 @@ export function compareReducer(s: CompareState, a: CompareAction): CompareState 
     case "begin":
       return patch(s, a.key, (c) => freshColumn(c, a.now, c.input));
     case "text":
-      return patch(s, a.key, live((c) => ({ ...c, text: c.text + a.delta, chars: c.chars + a.delta.length, retry: undefined })));
+      return patch(
+        s,
+        a.key,
+        live((c) => ({ ...c, text: c.text + a.delta, chars: c.chars + a.delta.length, retry: undefined })),
+      );
     case "retry":
-      return patch(s, a.key, live((c) => ({ ...c, retry: a.info })));
+      return patch(
+        s,
+        a.key,
+        live((c) => ({ ...c, retry: a.info })),
+      );
     case "done":
-      return patch(s, a.key, live((c) => ({ ...c, status: "done", text: a.text, end: a.now, usage: a.usage, retry: undefined })));
+      return patch(
+        s,
+        a.key,
+        live((c) => ({ ...c, status: "done", text: a.text, end: a.now, usage: a.usage, retry: undefined })),
+      );
     case "fail":
-      return patch(s, a.key, live((c) => ({ ...c, status: "error", end: a.now, error: a.error, retry: undefined })));
+      return patch(
+        s,
+        a.key,
+        live((c) => ({ ...c, status: "error", end: a.now, error: a.error, retry: undefined })),
+      );
     case "stop":
-      return patch(s, a.key, live((c) => ({ ...c, status: "stopped", end: a.now, retry: undefined })));
+      return patch(
+        s,
+        a.key,
+        live((c) => ({ ...c, status: "stopped", end: a.now, retry: undefined })),
+      );
     case "reset":
       return emptyCompare;
   }
@@ -114,10 +151,16 @@ export const canRun = (prompt: string, targets: CompareTarget[], busy = false) =
 export const anyRunning = (s: CompareState) => s.columns.some((c) => c.status === "running");
 
 /** Generated text of a finished answer from the turn's parts (text parts only, in order). */
-export const answerText = (parts: Part[]) => parts.filter((p): p is Extract<Part, { type: "text" }> => p.type === "text").map((p) => p.text).join("").trim();
+export const answerText = (parts: Part[]) =>
+  parts
+    .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+    .map((p) => p.text)
+    .join("")
+    .trim();
 
 export function columnError(e: unknown): ColumnError {
-  if (e instanceof ProviderError) return { message: e.message, kind: e.kind, status: e.status, retryable: e.retryable, attempts: e.attempts };
+  if (e instanceof ProviderError)
+    return { message: e.message, kind: e.kind, status: e.status, retryable: e.retryable, attempts: e.attempts };
   return { message: String((e as { message?: unknown } | null)?.message ?? e) };
 }
 
@@ -178,13 +221,23 @@ export function startCompare(targets: CompareTarget[], prompt: string, deps: Com
         cwd: deps.cwd,
         access: "readonly",
         signal: ctl.signal,
-        onText: (delta) => { if (current()) deps.dispatch({ type: "text", key: t.key, delta }); },
-        onRetry: (info) => { if (current()) deps.dispatch({ type: "retry", key: t.key, info }); },
+        onText: (delta) => {
+          if (current()) deps.dispatch({ type: "text", key: t.key, delta });
+        },
+        onRetry: (info) => {
+          if (current()) deps.dispatch({ type: "retry", key: t.key, info });
+        },
       });
       if (out.usage) deps.onUsage?.(t, out.usage);
       if (!current()) return;
       const text = answerText(out.parts);
-      if (!text) return deps.dispatch({ type: "fail", key: t.key, now: now(), error: { message: "The model returned an empty answer." } });
+      if (!text)
+        return deps.dispatch({
+          type: "fail",
+          key: t.key,
+          now: now(),
+          error: { message: "The model returned an empty answer." },
+        });
       deps.dispatch({ type: "done", key: t.key, now: now(), text, usage: out.usage });
     } catch (e) {
       if (controllers.get(t.key) !== ctl) return;
@@ -229,10 +282,14 @@ export function startCompare(targets: CompareTarget[], prompt: string, deps: Com
 // ---- Continue in chat --------------------------------------------------------------------------------------------
 
 /** Title of a chat created from a comparison: the first line of the prompt, as a normal new chat does. */
-export const compareChatTitle = (prompt: string, fallback: string) => prompt.trim().split("\n")[0].slice(0, 60) || fallback;
+export const compareChatTitle = (prompt: string, fallback: string) =>
+  prompt.trim().split("\n")[0].slice(0, 60) || fallback;
 
 /** The two messages a new chat starts with: the prompt, and the chosen answer attributed to its model. */
-export function continueMessages(prompt: string, c: Pick<Column, "providerId" | "model" | "text" | "usage" | "start" | "end">): Msg[] {
+export function continueMessages(
+  prompt: string,
+  c: Pick<Column, "providerId" | "model" | "text" | "usage" | "start" | "end">,
+): Msg[] {
   return [
     { role: "user", parts: [{ type: "text", text: prompt }] },
     {

@@ -5,7 +5,16 @@ import { useId, type ReactNode } from "react";
  * the control wraps under the text (flex-wrap, see `.setting-row` in theme.css). `id` makes the row a target of settings
  * search (`data-setting`, see lib/settingsIndex.ts). `toggle` renders the standard switch labelled by the title.
  */
-export function SettingRow({ id, title, description, toggle, children, stacked, className, testId }: {
+export function SettingRow({
+  id,
+  title,
+  description,
+  toggle,
+  children,
+  stacked,
+  className,
+  testId,
+}: {
   id?: string;
   title: ReactNode;
   description?: ReactNode;
@@ -18,15 +27,30 @@ export function SettingRow({ id, title, description, toggle, children, stacked, 
 }) {
   const labelId = useId();
   return (
-    <div className={`card-row setting-row${stacked ? " stacked" : ""}${className ? ` ${className}` : ""}`} data-setting={id} data-testid={testId}>
+    <div
+      className={`card-row setting-row${stacked ? " stacked" : ""}${className ? ` ${className}` : ""}`}
+      data-setting={id}
+      data-testid={testId}
+    >
       <div className="grow setting-text">
-        <div className="t" id={labelId}>{title}</div>
+        <div className="t" id={labelId}>
+          {title}
+        </div>
         {description ? <div className="d">{description}</div> : null}
       </div>
       {(toggle || children) && (
         <div className="setting-control">
           {children}
-          {toggle && <button role="switch" aria-checked={toggle.on} aria-labelledby={labelId} disabled={toggle.disabled} className={`toggle${toggle.on ? " on" : ""}`} onClick={() => toggle.onChange(!toggle.on)} />}
+          {toggle && (
+            <button
+              role="switch"
+              aria-checked={toggle.on}
+              aria-labelledby={labelId}
+              disabled={toggle.disabled}
+              className={`toggle${toggle.on ? " on" : ""}`}
+              onClick={() => toggle.onChange(!toggle.on)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -34,7 +58,15 @@ export function SettingRow({ id, title, description, toggle, children, stacked, 
 }
 
 /** A titled block of related rows in one card (title, optional sentence under it). */
-export function SettingsSection({ title, description, children }: { title: ReactNode; description?: ReactNode; children: ReactNode }) {
+export function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <>
       <h4 aria-level={2}>{title}</h4>

@@ -1,8 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  openSession, promoteSession, isAuthError,
-  DRAFT_LIMITS, draftScope, parseScope, boundDraft, serializeDraft, parseDraft, isEmptyDraft, createDraftSaver,
+  openSession,
+  promoteSession,
+  isAuthError,
+  DRAFT_LIMITS,
+  draftScope,
+  parseScope,
+  boundDraft,
+  serializeDraft,
+  parseDraft,
+  isEmptyDraft,
+  createDraftSaver,
 } from '../src/lib/chatSessions.ts';
 test('late chat creation preserves a newer active draft and stable session key', () => {
   const initial = { active: 'a', items: [{ key: 'a', chatId: null, projectId: null }] };
@@ -23,11 +32,11 @@ test('project drafts stay separate and authentication errors are classified', ()
 });
 
 test('new chat during async creation does not reuse a busy draft', () => {
- const state = { active: 'sending', items: [{ key: 'sending', chatId: null, projectId: null, busy: true }] };
- const next = openSession(state, null, null, 'new');
- assert.equal(next.active, 'new');
- assert.equal(next.items.length, 2);
- assert.equal(promoteSession(next, 'sending', 22).active, 'new');
+  const state = { active: 'sending', items: [{ key: 'sending', chatId: null, projectId: null, busy: true }] };
+  const next = openSession(state, null, null, 'new');
+  assert.equal(next.active, 'new');
+  assert.equal(next.items.length, 2);
+  assert.equal(promoteSession(next, 'sending', 22).active, 'new');
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,7 +88,10 @@ test('draft serialization round-trips and empty drafts are not stored', () => {
   assert.deepEqual(parseDraft(textOnly.text, textOnly.attachments), { text: 'hello', images: [] });
 
   const row = serializeDraft({ text: '', images: ['QUJD', 'REVG'] });
-  assert.deepEqual(JSON.parse(row.attachments), [{ type: 'image', data: 'QUJD' }, { type: 'image', data: 'REVG' }]);
+  assert.deepEqual(JSON.parse(row.attachments), [
+    { type: 'image', data: 'QUJD' },
+    { type: 'image', data: 'REVG' },
+  ]);
   assert.deepEqual(parseDraft(row.text, row.attachments), { text: '', images: ['QUJD', 'REVG'] });
 
   // Oversized attachments never reach the database.
@@ -105,7 +117,13 @@ test('stored drafts that are corrupt or hand-edited restore as much as is safe',
 
 function recorder(opts = {}) {
   const calls = [];
-  const saver = createDraftSaver(async (scope, row) => { calls.push([scope, row]); if (opts.fail?.()) throw new Error('db down'); }, { delayMs: 15, onError: opts.onError });
+  const saver = createDraftSaver(
+    async (scope, row) => {
+      calls.push([scope, row]);
+      if (opts.fail?.()) throw new Error('db down');
+    },
+    { delayMs: 15, onError: opts.onError },
+  );
   return { calls, saver };
 }
 
@@ -117,7 +135,9 @@ test('draft saver debounces rapid edits into one write and sends only the final 
   assert.equal(calls.length, 0, 'nothing is written before the debounce elapses');
   await sleep(60);
   await saver.flush();
-  assert.deepEqual(calls, [['chat:1', { text: 'abc', attachments: JSON.stringify([{ type: 'image', data: 'QUJD' }]) }]]);
+  assert.deepEqual(calls, [
+    ['chat:1', { text: 'abc', attachments: JSON.stringify([{ type: 'image', data: 'QUJD' }]) }],
+  ]);
 });
 
 test('draft saver omits unchanged attachments, skips no-op writes and deletes empty drafts', async () => {
@@ -150,7 +170,10 @@ test('draft saver trusts only what it was told about the database', async () => 
   await saver.flush();
   saver.schedule('chat:2', { text: 'x', images: [] });
   await saver.flush();
-  assert.deepEqual(calls, [['chat:1', null], ['chat:2', { text: 'x', attachments: '[]' }]]);
+  assert.deepEqual(calls, [
+    ['chat:1', null],
+    ['chat:2', { text: 'x', attachments: '[]' }],
+  ]);
 
   // Seeded with the restored draft: re-saving the same content is a no-op, an edit sends text only.
   calls.length = 0;
@@ -179,7 +202,12 @@ test('draft saver writes sequentially and survives write failures', async () => 
   let fail = true;
   const order = [];
   const saver = createDraftSaver(
-    async (scope, row) => { order.push(`start ${scope}`); await sleep(10); if (fail) throw new Error('db down'); order.push(`end ${scope}:${row?.text}`); },
+    async (scope, row) => {
+      order.push(`start ${scope}`);
+      await sleep(10);
+      if (fail) throw new Error('db down');
+      order.push(`end ${scope}:${row?.text}`);
+    },
     { delayMs: 5, onError: (e) => errors.push(e.message) },
   );
   saver.schedule('chat:1', { text: 'one', images: [] });

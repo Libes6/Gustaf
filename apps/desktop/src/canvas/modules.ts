@@ -20,10 +20,24 @@ export function parseFiles(code: string): ParsedFiles {
   const files: ArtifactFile[] = [];
   let name: string | null = null;
   let body: string[] = [];
-  const flush = () => { if (name !== null) files.push({ name, code: body.join("\n").replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "") + "\n" }); };
+  const flush = () => {
+    if (name !== null)
+      files.push({
+        name,
+        code:
+          body
+            .join("\n")
+            .replace(/^(?:[ \t]*\r?\n)+/, "")
+            .replace(/\s+$/, "") + "\n",
+      });
+  };
   for (const line of lines.slice(first)) {
     const marker = FILE_MARKER.exec(line);
-    if (marker) { flush(); name = marker[1]; body = []; } else body.push(line);
+    if (marker) {
+      flush();
+      name = marker[1];
+      body = [];
+    } else body.push(line);
   }
   flush();
   const problem = validateFiles(files);
@@ -34,7 +48,8 @@ export function validateFiles(files: ArtifactFile[]): string | undefined {
   if (files.length > MAX_FILES) return `Too many files (${files.length}, maximum ${MAX_FILES}).`;
   const seen = new Set<string>();
   for (const { name } of files) {
-    if (!FILE_NAME.test(name) || name.split("/").includes("..")) return `Invalid file name "${name}". Use relative paths such as App.tsx or lib/utils.ts.`;
+    if (!FILE_NAME.test(name) || name.split("/").includes(".."))
+      return `Invalid file name "${name}". Use relative paths such as App.tsx or lib/utils.ts.`;
     if (seen.has(name)) return `Duplicate file "${name}".`;
     seen.add(name);
   }
@@ -45,7 +60,10 @@ export function normalizePath(path: string): string | null {
   const out: string[] = [];
   for (const part of path.split("/")) {
     if (part === "" || part === ".") continue;
-    if (part === "..") { if (!out.length) return null; out.pop(); } else out.push(part);
+    if (part === "..") {
+      if (!out.length) return null;
+      out.pop();
+    } else out.push(part);
   }
   return out.join("/");
 }
@@ -57,7 +75,12 @@ export function resolveRelative(from: string, spec: string, names: Iterable<stri
   const base = normalizePath(`${dir}/${spec}`);
   if (!base) return null;
   const stripped = base.replace(/\.(?:jsx?|tsx?)$/, "");
-  for (const candidate of [base, ...EXTENSIONS.map((e) => base + e), ...EXTENSIONS.map((e) => `${base}/index${e}`), ...EXTENSIONS.map((e) => stripped + e)]) {
+  for (const candidate of [
+    base,
+    ...EXTENSIONS.map((e) => base + e),
+    ...EXTENSIONS.map((e) => `${base}/index${e}`),
+    ...EXTENSIONS.map((e) => stripped + e),
+  ]) {
     if (known.has(candidate)) return candidate;
   }
   return null;
@@ -67,7 +90,11 @@ export function resolveRelative(from: string, spec: string, names: Iterable<stri
  * Evaluates the entry file (the first one) and everything it imports. Only `externals` (react, ...) and relative
  * imports resolve. Modules are registered before they run, so import cycles see partially filled exports instead of looping.
  */
-export function loadModules(files: ArtifactFile[], compile: (code: string, name: string) => string, externals: Record<string, unknown>): Record<string, unknown> {
+export function loadModules(
+  files: ArtifactFile[],
+  compile: (code: string, name: string) => string,
+  externals: Record<string, unknown>,
+): Record<string, unknown> {
   const problem = validateFiles(files);
   if (problem) throw new Error(problem);
   if (!files.length) throw new Error("The artifact has no files.");
@@ -82,13 +109,25 @@ export function loadModules(files: ArtifactFile[], compile: (code: string, name:
       if (Object.prototype.hasOwnProperty.call(externals, spec)) return externals[spec];
       if (spec.startsWith("./") || spec.startsWith("../")) {
         const target = resolveRelative(name, spec, sources.keys());
-        if (!target) throw new Error(`Cannot find module "${spec}" imported from ${name}. Files: ${[...sources.keys()].join(", ")}.`);
+        if (!target)
+          throw new Error(
+            `Cannot find module "${spec}" imported from ${name}. Files: ${[...sources.keys()].join(", ")}.`,
+          );
         return evaluate(target);
       }
-      const allowed = Object.keys(externals).map((k) => `"${k}"`).join(", ");
-      throw new Error(`Unsupported import "${spec}" in ${name}. Only ${allowed} and relative imports of the artifact's own files are available.`);
+      const allowed = Object.keys(externals)
+        .map((k) => `"${k}"`)
+        .join(", ");
+      throw new Error(
+        `Unsupported import "${spec}" in ${name}. Only ${allowed} and relative imports of the artifact's own files are available.`,
+      );
     };
-    new Function("require", "module", "exports", "React", compile(sources.get(name)!, name))(require, module, module.exports, externals.react);
+    new Function("require", "module", "exports", "React", compile(sources.get(name)!, name))(
+      require,
+      module,
+      module.exports,
+      externals.react,
+    );
     return module.exports;
   };
   return evaluate(files[0].name);

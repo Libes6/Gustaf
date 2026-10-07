@@ -4,7 +4,10 @@ import { getQuickAskStatus, resetQuickAskStatus, useQuickAskHost } from "../../s
 import { setPlatformForTests } from "../../src/lib/platform";
 import { mockSettings } from "./tauri";
 
-const bus = vi.hoisted(() => ({ usage: undefined as undefined | ((e: any) => void), open: undefined as undefined | ((e: any) => void) }));
+const bus = vi.hoisted(() => ({
+  usage: undefined as undefined | ((e: any) => void),
+  open: undefined as undefined | ((e: any) => void),
+}));
 vi.mock("../../src/lib/quickAskApi", () => ({
   quickAskApi: {
     configure: vi.fn(async () => {}),
@@ -18,9 +21,19 @@ function Host({ app }: { app: Parameters<typeof useQuickAskHost>[0] }) {
   useQuickAskHost(app);
   return null;
 }
-const makeApp = () => ({ ready: true, recordTokens: vi.fn(), bumpUsage: vi.fn(), recordProviderResult: vi.fn(), reload: vi.fn(async () => {}), openChat: vi.fn() });
+const makeApp = () => ({
+  ready: true,
+  recordTokens: vi.fn(),
+  bumpUsage: vi.fn(),
+  recordProviderResult: vi.fn(),
+  reload: vi.fn(async () => {}),
+  openChat: vi.fn(),
+});
 
-beforeEach(() => { setPlatformForTests("macos"); resetQuickAskStatus(); });
+beforeEach(() => {
+  setPlatformForTests("macos");
+  resetQuickAskStatus();
+});
 afterEach(() => setPlatformForTests(undefined));
 
 describe("useQuickAskHost (main window)", () => {
@@ -43,7 +56,9 @@ describe("useQuickAskHost (main window)", () => {
     mockSettings({ quickAsk: { enabled: true, accelerator: "Alt+K", hideOnBlur: true } });
     vi.mocked(quickAskApi.configure).mockRejectedValueOnce("shortcut_unavailable: taken");
     render(<Host app={makeApp()} />);
-    await waitFor(() => expect(getQuickAskStatus()).toEqual({ state: "error", message: "shortcut_unavailable: taken" }));
+    await waitFor(() =>
+      expect(getQuickAskStatus()).toEqual({ state: "error", message: "shortcut_unavailable: taken" }),
+    );
   });
 
   it("records the usage the quick-ask window reports like a normal run", async () => {

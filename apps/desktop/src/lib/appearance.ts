@@ -14,13 +14,21 @@ export function applyAppearance(p: AppearancePrefs = prefs) {
 }
 
 const publish = () => listeners.forEach((l) => l(prefs));
-const remember = () => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(prefs)); } catch { /* storage unavailable */ } };
+const remember = () => {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(prefs));
+  } catch {
+    /* storage unavailable */
+  }
+};
 
 export const getAppearance = () => prefs;
 
 export function subscribeAppearance(l: (p: AppearancePrefs) => void) {
   listeners.add(l);
-  return () => { listeners.delete(l); };
+  return () => {
+    listeners.delete(l);
+  };
 }
 
 export function setAppearance(patch: Partial<AppearancePrefs>) {
@@ -31,11 +39,17 @@ export function setAppearance(patch: Partial<AppearancePrefs>) {
   publish();
 }
 
-export function resetAppearance() { setAppearance(DEFAULT_APPEARANCE); }
+export function resetAppearance() {
+  setAppearance(DEFAULT_APPEARANCE);
+}
 
 /** Call once before first render: applies the cached prefs, then reconciles with the stored setting. */
 export function initAppearance() {
-  try { prefs = parseAppearance(JSON.parse(localStorage.getItem(CACHE_KEY) ?? "null")); } catch { /* ignore */ }
+  try {
+    prefs = parseAppearance(JSON.parse(localStorage.getItem(CACHE_KEY) ?? "null"));
+  } catch {
+    /* ignore */
+  }
   applyAppearance();
   getSetting<unknown>("appearance", null)
     .then((stored) => {

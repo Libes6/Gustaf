@@ -8,7 +8,12 @@ import type { WorktreeDiffFile } from "./worktrees";
  * view uses WorkspaceChanges). `path` is repository-relative as `worktrees.diff` reports it; `root` is the checkout folder
  * the chat works in and `prefix` where the project sits in the repository.
  */
-export async function workspaceFileDiff(root: string, base: string, prefix: string, f: Pick<WorktreeDiffFile, "path" | "status">): Promise<string> {
+export async function workspaceFileDiff(
+  root: string,
+  base: string,
+  prefix: string,
+  f: Pick<WorktreeDiffFile, "path" | "status">,
+): Promise<string> {
   if (f.status === "untracked") {
     const rel = relativeToProject(f.path, prefix);
     return rel === null ? "" : untrackedDiffText(stripLineNumbers(await fsx.read(root, rel)));

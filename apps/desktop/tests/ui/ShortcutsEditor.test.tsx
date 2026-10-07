@@ -17,7 +17,7 @@ describe("shortcut editor", () => {
     await userEvent.keyboard("{Meta>}{Shift>}j{/Shift}{/Meta}");
     await waitFor(() => expect(shortcut("newChat").combo).toBe("Cmd+Shift+J"));
     expect(within(rowOf("New chat")).getByText("⌘⇧J")).toBeInTheDocument();
-    expect(JSON.stringify(callsOf("db_execute"))).toContain("{\\\"newChat\\\":\\\"Cmd+Shift+J\\\"}");
+    expect(JSON.stringify(callsOf("db_execute"))).toContain('{\\"newChat\\":\\"Cmd+Shift+J\\"}');
     await userEvent.click(within(rowOf("New chat")).getByRole("button", { name: "Reset: New chat" }));
     await waitFor(() => expect(shortcut("newChat").combo).toBe("Cmd+N"));
     expect(within(rowOf("New chat")).queryByRole("button", { name: /Reset/ })).toBeNull();

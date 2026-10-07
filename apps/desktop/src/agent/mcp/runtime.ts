@@ -4,14 +4,45 @@
 import { getSetting, mcpStdio, oauthLoopback, secrets, setSetting } from "../../lib/api";
 import { readSecret, removeSecret, storeSecret } from "../../lib/keys";
 import type { ToolDef } from "../../providers/types";
-import { MCP_SETTING, normalizeConfig, oauthSecretId, secretId, serversFor, splitSecrets, staleSecretIds, type KV, type McpConfig, type McpServer } from "./config";
+import {
+  MCP_SETTING,
+  normalizeConfig,
+  oauthSecretId,
+  secretId,
+  serversFor,
+  splitSecrets,
+  staleSecretIds,
+  type KV,
+  type McpConfig,
+  type McpServer,
+} from "./config";
 import { isLegacySseHint, McpHttpClient, type FetchLike, type HttpOptions, type RemoteClient } from "./http";
 import { McpSseClient } from "./sse";
 import { parseStored } from "./oauth";
-import { authorizationHeader, isSignedIn, refreshTokens, revokeTokens, signIn, signOut, type OAuthDeps, type Phase } from "./oauthFlow";
+import {
+  authorizationHeader,
+  isSignedIn,
+  refreshTokens,
+  revokeTokens,
+  signIn,
+  signOut,
+  type OAuthDeps,
+  type Phase,
+} from "./oauthFlow";
 import { buildPromptArguments, normalizePrompts, renderPromptMessages, type McpPrompt } from "./prompts";
 import { checkInitialize } from "./protocol";
-import { formatResourceList, formatTemplateList, mapReadResult, normalizeResources, normalizeResourceTemplates, readResourceTarget, resolveTemplateUri, RESOURCE_TOOLS, type McpResource, type McpResourceTemplate } from "./resources";
+import {
+  formatResourceList,
+  formatTemplateList,
+  mapReadResult,
+  normalizeResources,
+  normalizeResourceTemplates,
+  readResourceTarget,
+  resolveTemplateUri,
+  RESOURCE_TOOLS,
+  type McpResource,
+  type McpResourceTemplate,
+} from "./resources";
 import { mapCallResult, namespaceTools, normalizeTools, type McpRoute, type McpTool } from "./toolset";
 
 const CLIENT_VERSION = "0.1.0";
@@ -22,7 +53,8 @@ const MAX_PAGES = 10;
 
 // ---- configuration -------------------------------------------------------------------------------------------------
 
-export const loadMcpConfig = async (): Promise<McpConfig> => normalizeConfig(await getSetting<unknown>(MCP_SETTING, null).catch(() => null));
+export const loadMcpConfig = async (): Promise<McpConfig> =>
+  normalizeConfig(await getSetting<unknown>(MCP_SETTING, null).catch(() => null));
 
 let writes: Promise<unknown> = Promise.resolve();
 const listeners = new Set<() => void>();
@@ -88,17 +120,31 @@ export async function patchMcpServer(id: string, patch: PolicyPatch): Promise<vo
 
 /** "Always allow" one tool (from the approval card or settings). */
 export const allowMcpTool = (id: string, tool: string) =>
-  updateMcpConfig((c) => ({ servers: c.servers.map((s) => (s.id === id && !s.allowedTools.includes(tool) ? { ...s, allowedTools: [...s.allowedTools, tool] } : s)) }));
+  updateMcpConfig((c) => ({
+    servers: c.servers.map((s) =>
+      s.id === id && !s.allowedTools.includes(tool) ? { ...s, allowedTools: [...s.allowedTools, tool] } : s,
+    ),
+  }));
 
 // ---- connections ---------------------------------------------------------------------------------------------------
 
 type Cache<T> = { epoch: number; list: T[] };
-type Conn = { key: string; http?: RemoteClient; transport?: "streamable" | "sse"; tools?: Cache<McpTool>; resources?: Cache<McpResource>; templates?: Cache<McpResourceTemplate>; prompts?: Cache<McpPrompt>; info?: ReturnType<typeof checkInitialize> };
+type Conn = {
+  key: string;
+  http?: RemoteClient;
+  transport?: "streamable" | "sse";
+  tools?: Cache<McpTool>;
+  resources?: Cache<McpResource>;
+  templates?: Cache<McpResourceTemplate>;
+  prompts?: Cache<McpPrompt>;
+  info?: ReturnType<typeof checkInitialize>;
+};
 const conns = new Map<string, Conn>();
 let httpFetch: FetchLike | null = null;
 /** Tests replace the HTTP transport's fetch. */
 export const setMcpFetch = (f: FetchLike | null) => void (httpFetch = f);
-const getFetch = async (): Promise<FetchLike> => httpFetch ?? ((await import("@tauri-apps/plugin-http")).fetch as unknown as FetchLike);
+const getFetch = async (): Promise<FetchLike> =>
+  httpFetch ?? ((await import("@tauri-apps/plugin-http")).fetch as unknown as FetchLike);
 
 let oauthOverride: Partial<OAuthDeps> | null = null;
 /** Tests replace parts of the OAuth plumbing (browser, listener, Keychain, clock). */
@@ -115,7 +161,10 @@ const oauthDeps = async (): Promise<OAuthDeps> => ({
 export const mcpCapabilities = (id: string) => conns.get(id)?.info?.capabilities;
 /** Which HTTP transport a connected server ended up on (after auto-detection). */
 export const mcpTransport = (id: string) => conns.get(id)?.transport;
-const hasCapability = (conn: Conn, name: "resources" | "prompts") => !!conn.info?.capabilities && typeof conn.info.capabilities[name] === "object" && conn.info.capabilities[name] !== null;
+const hasCapability = (conn: Conn, name: "resources" | "prompts") =>
+  !!conn.info?.capabilities &&
+  typeof conn.info.capabilities[name] === "object" &&
+  conn.info.capabilities[name] !== null;
 
 async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
@@ -124,7 +173,8 @@ async function resolveKV(serverId: string, kind: "env" | "header", list: KV[]): 
     else {
       // Read only when this server is started (never at app launch), at most once per session (lib/keys.ts).
       const v = await readSecret(secretId(serverId, kind, e.key)).catch(() => null);
-      if (v == null) throw new Error(`the secret ${e.key} is missing from the Keychain; edit the server and enter it again`);
+      if (v == null)
+        throw new Error(`the secret ${e.key} is missing from the Keychain; edit the server and enter it again`);
       out[e.key] = v;
     }
   }
@@ -147,7 +197,11 @@ async function connect(server: McpServer): Promise<Conn> {
   if (server.transport === "stdio") {
     const env = await resolveKV(server.id, "env", server.env);
     const cwd = server.cwd ?? (server.scope === "project" ? server.project : undefined);
-    const status = await withTimeout(mcpStdio.start(server.id, { command: server.command, args: server.args, env, ...(cwd ? { cwd } : {}) }), START_TIMEOUT_MS + 5_000, "Starting the MCP server");
+    const status = await withTimeout(
+      mcpStdio.start(server.id, { command: server.command, args: server.args, env, ...(cwd ? { cwd } : {}) }),
+      START_TIMEOUT_MS + 5_000,
+      "Starting the MCP server",
+    );
     const conn = conns.get(server.id) ?? { key: "stdio" };
     conn.info = checkInitialize(status.init);
     conns.set(server.id, conn);
@@ -169,9 +223,19 @@ async function connect(server: McpServer): Promise<Conn> {
         refresh: async () => refreshTokens(await oauthDeps(), oauthSecretId(server.id)),
       }
     : undefined;
-  const opts: HttpOptions = { url: server.url, headers, fetch: await getFetch(), clientVersion: CLIENT_VERSION, ...(auth ? { auth } : {}) };
+  const opts: HttpOptions = {
+    url: server.url,
+    headers,
+    fetch: await getFetch(),
+    clientVersion: CLIENT_VERSION,
+    ...(auth ? { auth } : {}),
+  };
   // "auto": streamable HTTP first; a 4xx answer to its initialize POST (not 401/403/408/429) means a legacy HTTP+SSE server.
-  const conn: Conn = { key, http: mode === "sse" ? new McpSseClient(opts) : new McpHttpClient(opts), transport: mode === "sse" ? "sse" : "streamable" };
+  const conn: Conn = {
+    key,
+    http: mode === "sse" ? new McpSseClient(opts) : new McpHttpClient(opts),
+    transport: mode === "sse" ? "sse" : "streamable",
+  };
   conns.set(server.id, conn);
   try {
     conn.info = await conn.http!.connect(START_TIMEOUT_MS);
@@ -183,13 +247,22 @@ async function connect(server: McpServer): Promise<Conn> {
     try {
       conn.info = await conn.http.connect(START_TIMEOUT_MS);
     } catch (e2) {
-      throw new Error(`${(e2 as Error)?.message ?? e2} (streamable HTTP failed first: HTTP ${e.status}; set the transport in the server settings to skip detection)`);
+      throw new Error(
+        `${(e2 as Error)?.message ?? e2} (streamable HTTP failed first: HTTP ${e.status}; set the transport in the server settings to skip detection)`,
+      );
     }
   }
   return conn;
 }
 
-async function rpc(server: McpServer, conn: Conn, method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+async function rpc(
+  server: McpServer,
+  conn: Conn,
+  method: string,
+  params: unknown,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<unknown> {
   if (conn.http) return conn.http.request(method, params, timeoutMs, signal);
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   // Stdio: an abort returns at once here, and `mcp_cancel` makes Rust drop the pending call and send
@@ -198,7 +271,12 @@ async function rpc(server: McpServer, conn: Conn, method: string, params: unknow
   const onAbort = () => void mcpStdio.cancel(server.id, key).catch(() => {});
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    return await withTimeout(mcpStdio.request(server.id, method, params, timeoutMs, key), timeoutMs + 5_000, `MCP ${method}`, signal);
+    return await withTimeout(
+      mcpStdio.request(server.id, method, params, timeoutMs, key),
+      timeoutMs + 5_000,
+      `MCP ${method}`,
+      signal,
+    );
   } finally {
     signal?.removeEventListener("abort", onAbort);
   }
@@ -215,7 +293,13 @@ async function epoch(server: McpServer, conn: Conn, kind: ListKind): Promise<num
 }
 
 /** Follows `nextCursor` (bounded) and collects the validated items of a list method. */
-async function listAll<T extends { name?: string; uri?: string }>(server: McpServer, conn: Conn, method: string, normalize: (page: unknown) => T[], signal?: AbortSignal): Promise<T[]> {
+async function listAll<T extends { name?: string; uri?: string }>(
+  server: McpServer,
+  conn: Conn,
+  method: string,
+  normalize: (page: unknown) => T[],
+  signal?: AbortSignal,
+): Promise<T[]> {
   const list: T[] = [];
   const key = (x: T) => x.uri ?? x.name ?? "";
   let cursor: string | undefined;
@@ -255,7 +339,11 @@ export async function listMcpResources(server: McpServer, force = false, signal?
  * The server's resource templates (`resources/templates/list`), cached until `notifications/resources/list_changed`.
  * A server that does not implement the method (JSON-RPC -32601) simply has none.
  */
-export async function listMcpResourceTemplates(server: McpServer, force = false, signal?: AbortSignal): Promise<McpResourceTemplate[]> {
+export async function listMcpResourceTemplates(
+  server: McpServer,
+  force = false,
+  signal?: AbortSignal,
+): Promise<McpResourceTemplate[]> {
   const conn = await connect(server);
   if (!hasCapability(conn, "resources")) throw new Error(`MCP server ${server.name} does not offer resources`);
   const ep = await epoch(server, conn, "resources");
@@ -275,7 +363,14 @@ async function listTemplatePages(server: McpServer, conn: Conn, signal?: AbortSi
   const list: McpResourceTemplate[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const result = await rpc(server, conn, "resources/templates/list", cursor ? { cursor } : undefined, LIST_TIMEOUT_MS, signal);
+    const result = await rpc(
+      server,
+      conn,
+      "resources/templates/list",
+      cursor ? { cursor } : undefined,
+      LIST_TIMEOUT_MS,
+      signal,
+    );
     const seen = new Set(list.map((t) => t.uriTemplate));
     list.push(...normalizeResourceTemplates(result).filter((t) => !seen.has(t.uriTemplate)));
     const next = (result as { nextCursor?: unknown } | null)?.nextCursor;
@@ -289,7 +384,9 @@ async function listTemplatePages(server: McpServer, conn: Conn, signal?: AbortSi
 export async function readMcpResource(server: McpServer, uri: string, signal?: AbortSignal) {
   const conn = await connect(server);
   if (!hasCapability(conn, "resources")) throw new Error(`MCP server ${server.name} does not offer resources`);
-  return mapReadResult(await rpc(server, conn, "resources/read", { uri }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal));
+  return mapReadResult(
+    await rpc(server, conn, "resources/read", { uri }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal),
+  );
 }
 
 /**
@@ -300,14 +397,30 @@ export async function readMcpResourceTarget(server: McpServer, args: unknown, si
   const target = readResourceTarget(args);
   if ("uri" in target) return readMcpResource(server, target.uri, signal);
   let templates = await listMcpResourceTemplates(server, false, signal);
-  if (!templates.some((t) => t.uriTemplate === target.template)) templates = await listMcpResourceTemplates(server, true, signal);
+  if (!templates.some((t) => t.uriTemplate === target.template))
+    templates = await listMcpResourceTemplates(server, true, signal);
   return readMcpResource(server, resolveTemplateUri(templates, target.template, target.arguments), signal);
 }
 
 /** Runs the agent's built-in `mcp_list_resources` / `mcp_list_resource_templates` / `mcp_read_resource` tool. */
-export async function callMcpResourceTool(server: McpServer, kind: "list_resources" | "read_resource" | "list_resource_templates", args: unknown, signal?: AbortSignal) {
-  if (kind === "list_resources") return { output: formatResourceList(await listMcpResources(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
-  if (kind === "list_resource_templates") return { output: formatTemplateList(await listMcpResourceTemplates(server, false, signal)), isError: false as boolean, image: undefined as string | undefined };
+export async function callMcpResourceTool(
+  server: McpServer,
+  kind: "list_resources" | "read_resource" | "list_resource_templates",
+  args: unknown,
+  signal?: AbortSignal,
+) {
+  if (kind === "list_resources")
+    return {
+      output: formatResourceList(await listMcpResources(server, false, signal)),
+      isError: false as boolean,
+      image: undefined as string | undefined,
+    };
+  if (kind === "list_resource_templates")
+    return {
+      output: formatTemplateList(await listMcpResourceTemplates(server, false, signal)),
+      isError: false as boolean,
+      image: undefined as string | undefined,
+    };
   return { image: undefined as string | undefined, ...(await readMcpResourceTarget(server, args, signal)) };
 }
 
@@ -326,19 +439,42 @@ export async function listMcpPrompts(server: McpServer, force = false, signal?: 
  * `prompts/get`, rendered as text for the composer. Only ever called for a prompt the user chose and filled in; the
  * result is inserted into the composer and never sent anywhere by itself.
  */
-export async function getMcpPrompt(server: McpServer, prompt: McpPrompt, values: Record<string, string>, signal?: AbortSignal) {
+export async function getMcpPrompt(
+  server: McpServer,
+  prompt: McpPrompt,
+  values: Record<string, string>,
+  signal?: AbortSignal,
+) {
   const conn = await connect(server);
-  const result = await rpc(server, conn, "prompts/get", { name: prompt.name, arguments: buildPromptArguments(prompt, values) }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal);
+  const result = await rpc(
+    server,
+    conn,
+    "prompts/get",
+    { name: prompt.name, arguments: buildPromptArguments(prompt, values) },
+    server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+    signal,
+  );
   return renderPromptMessages(result);
 }
 
 /** Prompts of every enabled server that applies to `project` (the composer's picker). A server that fails is reported, not fatal. */
-export async function listPromptsForPicker(project: string | null, signal?: AbortSignal): Promise<{ server: McpServer; prompts: McpPrompt[]; error?: string }[]> {
+export async function listPromptsForPicker(
+  project: string | null,
+  signal?: AbortSignal,
+): Promise<{ server: McpServer; prompts: McpPrompt[]; error?: string }[]> {
   const servers = serversFor(await loadMcpConfig(), project);
   return Promise.all(
     servers.map(async (server) => {
       try {
-        return { server, prompts: await withTimeout(listMcpPrompts(server, false, signal), START_TIMEOUT_MS + LIST_TIMEOUT_MS, `MCP server ${server.name}`, signal) };
+        return {
+          server,
+          prompts: await withTimeout(
+            listMcpPrompts(server, false, signal),
+            START_TIMEOUT_MS + LIST_TIMEOUT_MS,
+            `MCP server ${server.name}`,
+            signal,
+          ),
+        };
       } catch (e) {
         return { server, prompts: [], error: String((e as Error)?.message ?? e).slice(0, 300) };
       }
@@ -348,7 +484,14 @@ export async function listPromptsForPicker(project: string | null, signal?: Abor
 
 export async function callMcpTool(server: McpServer, tool: string, args: unknown, signal?: AbortSignal) {
   const conn = await connect(server);
-  const result = await rpc(server, conn, "tools/call", { name: tool, arguments: args && typeof args === "object" ? args : {} }, server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, signal);
+  const result = await rpc(
+    server,
+    conn,
+    "tools/call",
+    { name: tool, arguments: args && typeof args === "object" ? args : {} },
+    server.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+    signal,
+  );
   return mapCallResult(result);
 }
 
@@ -369,16 +512,31 @@ export async function testMcpServer(server: McpServer): Promise<{ tools: McpTool
 // ---- OAuth sign-in (HTTP servers with `oauth` set) -------------------------------------------------------------------
 
 /** Whether tokens for this server are in the Keychain (not whether they are still valid: a 401 refreshes or asks to sign in). */
-export const isMcpSignedIn = async (server: McpServer) => server.transport === "http" && !!server.oauth && isSignedIn(await oauthDeps(), oauthSecretId(server.id));
+export const isMcpSignedIn = async (server: McpServer) =>
+  server.transport === "http" && !!server.oauth && isSignedIn(await oauthDeps(), oauthSecretId(server.id));
 
 /**
  * Browser sign-in (discovery, PKCE, loopback redirect, token exchange); tokens go to the Keychain. Aborting `signal`
  * closes the local listener. The connection is dropped so the next call uses the new tokens.
  */
-export async function signInMcpServer(server: McpServer, o: { signal?: AbortSignal; onPhase?: (p: Phase) => void } = {}): Promise<void> {
+export async function signInMcpServer(
+  server: McpServer,
+  o: { signal?: AbortSignal; onPhase?: (p: Phase) => void } = {},
+): Promise<void> {
   if (server.transport !== "http" || !server.oauth) throw new Error("OAuth is not enabled for this server");
-  const headers = await resolveKV(server.id, "header", server.headers.filter((h) => h.key.toLowerCase() !== "authorization"));
-  await signIn(await oauthDeps(), { serverUrl: server.url, secretId: oauthSecretId(server.id), headers, ...(server.oauth.clientId ? { clientId: server.oauth.clientId } : {}), ...(server.oauth.scope ? { scope: server.oauth.scope } : {}), ...o });
+  const headers = await resolveKV(
+    server.id,
+    "header",
+    server.headers.filter((h) => h.key.toLowerCase() !== "authorization"),
+  );
+  await signIn(await oauthDeps(), {
+    serverUrl: server.url,
+    secretId: oauthSecretId(server.id),
+    headers,
+    ...(server.oauth.clientId ? { clientId: server.oauth.clientId } : {}),
+    ...(server.oauth.scope ? { scope: server.oauth.scope } : {}),
+    ...o,
+  });
   await disconnectMcpServer(server.id);
 }
 
@@ -410,19 +568,40 @@ export type McpToolset = {
  * Tools of the enabled servers that apply to `project`, namespaced as `mcp__<server>__<tool>`. In read-only mode only
  * tools the user marked read-only are offered. A server that fails to start or list is skipped (see `errors`).
  */
-export async function loadMcpToolset(o: { project: string | null; access: "readonly" | "auto" | "full"; reserved?: Iterable<string>; signal?: AbortSignal }): Promise<McpToolset | null> {
+export async function loadMcpToolset(o: {
+  project: string | null;
+  access: "readonly" | "auto" | "full";
+  reserved?: Iterable<string>;
+  signal?: AbortSignal;
+}): Promise<McpToolset | null> {
   const list = serversFor(await loadMcpConfig(), o.project);
   if (!list.length) return null;
   const errors: McpToolset["errors"] = [];
   const groups = await Promise.all(
     list.map(async (server) => {
       try {
-        const tools = await withTimeout(listMcpTools(server, false, o.signal), START_TIMEOUT_MS + LIST_TIMEOUT_MS, `MCP server ${server.name}`, o.signal);
+        const tools = await withTimeout(
+          listMcpTools(server, false, o.signal),
+          START_TIMEOUT_MS + LIST_TIMEOUT_MS,
+          `MCP server ${server.name}`,
+          o.signal,
+        );
         // Servers that offer resources also get the two built-in resource tools (read-only mode: only those the user marked read-only).
         const caps = conns.get(server.id)?.info?.capabilities;
         const allow = (name: string) => o.access !== "readonly" || server.readOnlyTools.includes(name);
-        const resources = caps && typeof caps.resources === "object" && caps.resources !== null ? { list: allow(RESOURCE_TOOLS.list), read: allow(RESOURCE_TOOLS.read), templates: allow(RESOURCE_TOOLS.templates) } : undefined;
-        return { server, tools: o.access === "readonly" ? tools.filter((t) => server.readOnlyTools.includes(t.name)) : tools, ...(resources ? { resources } : {}) };
+        const resources =
+          caps && typeof caps.resources === "object" && caps.resources !== null
+            ? {
+                list: allow(RESOURCE_TOOLS.list),
+                read: allow(RESOURCE_TOOLS.read),
+                templates: allow(RESOURCE_TOOLS.templates),
+              }
+            : undefined;
+        return {
+          server,
+          tools: o.access === "readonly" ? tools.filter((t) => server.readOnlyTools.includes(t.name)) : tools,
+          ...(resources ? { resources } : {}),
+        };
       } catch (e) {
         errors.push({ server: server.name, message: String((e as Error)?.message ?? e).slice(0, 500) });
         return { server, tools: [] as McpTool[] };

@@ -12,8 +12,19 @@ import "../styles/workspaces.css";
  * here: a click shows the file's diff with the panel's usual diff view. Commit, push and pull request use the checkout
  * and its branch (the panel's commit button and `GitPublishPanel`).
  */
-export function WorkspaceChanges({ projectRoot, taskId, branch, root, prefix, tick, onShowDiff, onError }: {
-  projectRoot: string; taskId: string; branch: string;
+export function WorkspaceChanges({
+  projectRoot,
+  taskId,
+  branch,
+  root,
+  prefix,
+  tick,
+  onShowDiff,
+  onError,
+}: {
+  projectRoot: string;
+  taskId: string;
+  branch: string;
   /** The folder the chat works in (the checkout, at the project's subfolder). */
   root: string;
   /** Where the project sits in its repository (`""` or `sub/dir/`). */
@@ -26,8 +37,17 @@ export function WorkspaceChanges({ projectRoot, taskId, branch, root, prefix, ti
   const [diff, setDiff] = useState<WorktreeDiff | null>(null);
   useEffect(() => {
     let cancelled = false;
-    worktrees.diff(projectRoot, taskId).then((d) => { if (!cancelled) setDiff(d); }, (e) => { if (!cancelled) onError(String((e as Error)?.message ?? e)); });
-    return () => { cancelled = true; };
+    worktrees.diff(projectRoot, taskId).then(
+      (d) => {
+        if (!cancelled) setDiff(d);
+      },
+      (e) => {
+        if (!cancelled) onError(String((e as Error)?.message ?? e));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [projectRoot, taskId, tick]);
 
   const open = async (path: string, status: string) => {
@@ -39,22 +59,39 @@ export function WorkspaceChanges({ projectRoot, taskId, branch, root, prefix, ti
         // `:(top)` makes the path relative to the repository, as the list reports it, whatever folder `root` is.
         onShowDiff(path, await git(root, ["diff", "--no-color", "--no-ext-diff", diff!.base, "--", `:(top)${path}`]));
       }
-    } catch (e) { onError(String((e as Error)?.message ?? e)); }
+    } catch (e) {
+      onError(String((e as Error)?.message ?? e));
+    }
   };
 
   return (
     <div className="ws-diff">
-      <div className="review-intro"><strong>{t("workspaceDiffTitle")}</strong><p>{t("workspaceDiffHint", { branch })}</p></div>
-      {diff && !diff.files.length && <div className="hint" style={{ padding: "0 12px 12px" }}>{t("workspaceDiffEmpty")}</div>}
+      <div className="review-intro">
+        <strong>{t("workspaceDiffTitle")}</strong>
+        <p>{t("workspaceDiffHint", { branch })}</p>
+      </div>
+      {diff && !diff.files.length && (
+        <div className="hint" style={{ padding: "0 12px 12px" }}>
+          {t("workspaceDiffEmpty")}
+        </div>
+      )}
       {diff?.files.map((f) => (
         <div key={f.path} className="file-row">
-          <button className="path" disabled={f.binary} onClick={() => void open(f.path, f.status)}>{f.path}</button>
-          <span className={`status ${f.status}`}>{f.binary ? t("workspaceDiffBinary") : t(`workspaceStatus_${f.status}`)}</span>
+          <button className="path" disabled={f.binary} onClick={() => void open(f.path, f.status)}>
+            {f.path}
+          </button>
+          <span className={`status ${f.status}`}>
+            {f.binary ? t("workspaceDiffBinary") : t(`workspaceStatus_${f.status}`)}
+          </span>
           {!f.binary && <span className="plus">+{f.additions}</span>}
           {!f.binary && <span className="minus">−{f.deletions}</span>}
         </div>
       ))}
-      {diff?.truncated && <div className="hint" style={{ padding: "0 12px 12px" }}>{t("workspaceDiffTruncated")}</div>}
+      {diff?.truncated && (
+        <div className="hint" style={{ padding: "0 12px 12px" }}>
+          {t("workspaceDiffTruncated")}
+        </div>
+      )}
     </div>
   );
 }

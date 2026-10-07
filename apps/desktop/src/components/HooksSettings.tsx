@@ -3,7 +3,13 @@ import { useT } from "../i18n";
 import { useApp } from "../state";
 import { SettingRow } from "./SettingRow";
 import { PROJECT_HOOKS_FILE, type Hook, type HookIssue } from "../agent/hooksCore";
-import { loadGlobalHooksText, loadHooksView, saveGlobalHooksText, setProjectHooksEnabled, type HooksView } from "../agent/hooksStore";
+import {
+  loadGlobalHooksText,
+  loadHooksView,
+  saveGlobalHooksText,
+  setProjectHooksEnabled,
+  type HooksView,
+} from "../agent/hooksStore";
 
 /** Settings: the effective hooks of a project with their source, skipped entries, the per-project switch and an editor for the global hooks. */
 export function HooksSettings() {
@@ -31,7 +37,8 @@ export function HooksSettings() {
 
   const where = (h: Hook) => (h.source === "global" ? t("hooksSourceGlobal") : t("hooksSourceProject"));
   const allIssues = [...(view?.global.issues ?? []), ...(view?.project.issues ?? [])];
-  const issueLabel = (i: HookIssue) => `${i.source === "global" ? t("hooksSourceGlobal") : PROJECT_HOOKS_FILE}${i.index === null ? "" : ` #${i.index + 1}`}: ${i.message}`;
+  const issueLabel = (i: HookIssue) =>
+    `${i.source === "global" ? t("hooksSourceGlobal") : PROJECT_HOOKS_FILE}${i.index === null ? "" : ` #${i.index + 1}`}: ${i.message}`;
 
   const toggle = async (on: boolean) => {
     try {
@@ -59,18 +66,33 @@ export function HooksSettings() {
       <h4>{t("hooksTitle")}</h4>
       <p className="lead">{t("hooksLead")}</p>
       {projects.length > 0 && (
-        <select className="input" aria-label={t("searchProject")} value={root} onChange={(e) => setRoot(e.target.value)}>
+        <select
+          className="input"
+          aria-label={t("searchProject")}
+          value={root}
+          onChange={(e) => setRoot(e.target.value)}
+        >
           {projects.map((p) => (
-            <option key={p.id} value={p.path!}>{p.name}</option>
+            <option key={p.id} value={p.path!}>
+              {p.name}
+            </option>
           ))}
         </select>
       )}
       {root && (
         <div className="card">
           <SettingRow id="hooksProjectEnable" title={t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })}>
-            <input type="checkbox" aria-label={t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })} checked={!!view?.enabled} disabled={!view} onChange={(e) => toggle(e.target.checked)} />
+            <input
+              type="checkbox"
+              aria-label={t("hooksProjectEnable", { file: PROJECT_HOOKS_FILE })}
+              checked={!!view?.enabled}
+              disabled={!view}
+              onChange={(e) => toggle(e.target.checked)}
+            />
           </SettingRow>
-          <p className="hint" role="note">{t("hooksWarning")}</p>
+          <p className="hint" role="note">
+            {t("hooksWarning")}
+          </p>
           {view && !view.project.exists && <p className="hint">{t("hooksNoFile", { file: PROJECT_HOOKS_FILE })}</p>}
           {view && view.project.exists && !view.enabled && <p className="hint">{t("hooksProjectOff")}</p>}
         </div>
@@ -81,8 +103,12 @@ export function HooksSettings() {
           <div className="card-row" key={`${h.source}-${i}`}>
             <strong>{h.event}</strong>
             <code>{h.matcher}</code>
-            <code className="grow" style={{ overflowWrap: "anywhere" }}>{h.command}</code>
-            <span className="hint">{where(h)} · {t("hooksTimeout", { ms: h.timeoutMs })}</span>
+            <code className="grow" style={{ overflowWrap: "anywhere" }}>
+              {h.command}
+            </code>
+            <span className="hint">
+              {where(h)} · {t("hooksTimeout", { ms: h.timeoutMs })}
+            </span>
           </div>
         ))}
       </div>
@@ -97,19 +123,35 @@ export function HooksSettings() {
         </div>
       )}
       <label htmlFor="hooks-global">{t("hooksEditGlobal")}</label>
-      <textarea id="hooks-global" className="input" rows={8} spellCheck={false} value={text} placeholder={'{ "hooks": [ { "event": "stop", "command": "…" } ] }'} onChange={(e) => (setText(e.target.value), setSaved(false))} />
+      <textarea
+        id="hooks-global"
+        className="input"
+        rows={8}
+        spellCheck={false}
+        value={text}
+        placeholder={'{ "hooks": [ { "event": "stop", "command": "…" } ] }'}
+        onChange={(e) => (setText(e.target.value), setSaved(false))}
+      />
       <div className="card-row">
-        <button className="btn btn-primary" onClick={save}>{t("save")}</button>
+        <button className="btn btn-primary" onClick={save}>
+          {t("save")}
+        </button>
         {saved && <span role="status">{t("hooksSaved")}</span>}
       </div>
       {issues.some((i) => i.index === null) && (
         <ul className="error-box" role="alert">
-          {issues.filter((i) => i.index === null).map((i, k) => (
-            <li key={k}>{issueLabel(i)}</li>
-          ))}
+          {issues
+            .filter((i) => i.index === null)
+            .map((i, k) => (
+              <li key={k}>{issueLabel(i)}</li>
+            ))}
         </ul>
       )}
-      {error && <div className="error-box" role="alert">{error}</div>}
+      {error && (
+        <div className="error-box" role="alert">
+          {error}
+        </div>
+      )}
     </>
   );
 }

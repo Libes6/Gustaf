@@ -2,7 +2,17 @@ import { fsx, getSetting, setSetting } from "../lib/api";
 import { readProjectFile } from "../lib/projectFolder";
 import { detectDiagnostics } from "./diagnostics";
 import { normalizeProjectPath } from "./rules";
-import { defaultSettings, effectiveConfig, normalizeSettings, parseDoneText, PROJECT_DONE_FILE, SETTING_PREFIX, type DoneFile, type VerificationConfig, type VerificationSettings } from "./verificationCore";
+import {
+  defaultSettings,
+  effectiveConfig,
+  normalizeSettings,
+  parseDoneText,
+  PROJECT_DONE_FILE,
+  SETTING_PREFIX,
+  type DoneFile,
+  type VerificationConfig,
+  type VerificationSettings,
+} from "./verificationCore";
 
 export const verificationKey = (project: string) => `${SETTING_PREFIX}${normalizeProjectPath(project)}`;
 
@@ -12,7 +22,8 @@ export async function loadVerificationSettings(project: string): Promise<Verific
   return raw == null ? defaultSettings() : normalizeSettings(raw);
 }
 
-export const saveVerificationSettings = (project: string, value: VerificationSettings) => setSetting(verificationKey(project), normalizeSettings(value));
+export const saveVerificationSettings = (project: string, value: VerificationSettings) =>
+  setSetting(verificationKey(project), normalizeSettings(value));
 
 /** `<project>/.gustaf/done.json` (else the legacy `.mcode/done.json`), read-only. A missing file is not an error (`null`). */
 export async function loadDoneFile(project: string | null): Promise<(DoneFile & { exists: true }) | null> {
@@ -49,7 +60,8 @@ export type SuggestedCheck = { name: string; command: string; timeoutMs?: number
 export async function suggestChecks(root: string): Promise<SuggestedCheck[]> {
   const out: SuggestedCheck[] = [];
   const add = (name: string, command: string, timeoutMs?: number) => {
-    if (command && !out.some((c) => c.command === command)) out.push({ name, command, ...(timeoutMs ? { timeoutMs } : {}) });
+    if (command && !out.some((c) => c.command === command))
+      out.push({ name, command, ...(timeoutMs ? { timeoutMs } : {}) });
   };
   const diag = await detectDiagnostics(root).catch(() => "");
   add(/\blint\b/.test(diag) ? "lint" : "typecheck", diag);

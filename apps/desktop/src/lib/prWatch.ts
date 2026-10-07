@@ -13,17 +13,29 @@ let watches: Record<number, PrWatch> = {};
 let loaded: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 let version = 0;
-export const subscribePrWatches = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+export const subscribePrWatches = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 export const prWatchesVersion = () => version;
-export const getPrWatch = (chatId: number | null) => (chatId ? watches[chatId] ?? null : null);
-const emit = () => { version++; listeners.forEach((fn) => fn()); };
+export const getPrWatch = (chatId: number | null) => (chatId ? (watches[chatId] ?? null) : null);
+const emit = () => {
+  version++;
+  listeners.forEach((fn) => fn());
+};
 const save = () => setSetting("prWatches", watches).catch(() => {});
 
 export function loadPrWatches() {
-  loaded ??= getSetting<Record<number, PrWatch>>("prWatches", {}).then((v) => {
-    if (v && typeof v === "object") watches = { ...v, ...watches };
-    emit();
-  }).catch(() => { loaded = null; });
+  loaded ??= getSetting<Record<number, PrWatch>>("prWatches", {})
+    .then((v) => {
+      if (v && typeof v === "object") watches = { ...v, ...watches };
+      emit();
+    })
+    .catch(() => {
+      loaded = null;
+    });
   return loaded;
 }
 
@@ -57,16 +69,27 @@ export function clearPrWatch(chatId: number) {
 }
 
 /** One round over the active watches (exported for tests). */
-export async function pollPrWatches(now = Date.now(), view = (root: string, pr: string) => invoke<string>("gh_pr_view", { root, pr })) {
+export async function pollPrWatches(
+  now = Date.now(),
+  view = (root: string, pr: string) => invoke<string>("gh_pr_view", { root, pr }),
+) {
   await loadPrWatches();
   for (const w of Object.values(watches)) {
     if (w.stopped) continue;
-    const r = await view(w.root, w.pr).then((json) => ({ ok: true as const, snapshot: parseSnapshot(json) }), (e) => ({ ok: false as const, error: String(e) }));
+    const r = await view(w.root, w.pr).then(
+      (json) => ({ ok: true as const, snapshot: parseSnapshot(json) }),
+      (e) => ({ ok: false as const, error: String(e) }),
+    );
     const next = step(w, r, now);
     watches = { ...watches, [w.chatId]: next.watch };
     if (next.events.length && next.watch.last) {
       const text = wakeMessage(next.watch.last, next.events);
-      await updateQueue(w.chatId, (q) => ({ ...q, paused: false, interrupted: false, items: [...q.items, { id: crypto.randomUUID(), text, images: [], clarify: false }] })).catch(() => {});
+      await updateQueue(w.chatId, (q) => ({
+        ...q,
+        paused: false,
+        interrupted: false,
+        items: [...q.items, { id: crypto.randomUUID(), text, images: [], clarify: false }],
+      })).catch(() => {});
       chatStatusStore.runEnded(w.chatId, "ok");
       void notifyUnfocused(next.watch.last.title || "Pull request", text.split("\n").slice(1).join(" ").slice(0, 180));
     }
@@ -82,7 +105,9 @@ export function startPrWatchPoller() {
   const tick = () => {
     if (busy || !Object.values(watches).some((w) => !w.stopped)) return;
     busy = true;
-    void pollPrWatches().finally(() => { busy = false; });
+    void pollPrWatches().finally(() => {
+      busy = false;
+    });
   };
   const timer = setInterval(tick, POLL_MS);
   return () => clearInterval(timer);

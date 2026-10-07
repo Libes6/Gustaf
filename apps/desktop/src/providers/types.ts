@@ -42,7 +42,15 @@ export type SubagentInfo = {
 };
 
 export type Part =
-  | { type: "activity"; id: string; name: string; args: Record<string, any>; status: "running" | "success" | "error" | "unknown"; output?: string; subagent?: SubagentInfo }
+  | {
+      type: "activity";
+      id: string;
+      name: string;
+      args: Record<string, any>;
+      status: "running" | "success" | "error" | "unknown";
+      output?: string;
+      subagent?: SubagentInfo;
+    }
   | { type: "text"; text: string }
   | { type: "image"; data: string }
   | {
@@ -52,7 +60,15 @@ export type Part =
       args: any;
       computer?: { actions: CuAction[]; safetyChecks?: { id: string; code?: string; message?: string }[] };
     }
-  | { type: "tool_result"; id: string; name: string; output: string; image?: string; isError?: boolean; computer?: boolean };
+  | {
+      type: "tool_result";
+      id: string;
+      name: string;
+      output: string;
+      image?: string;
+      isError?: boolean;
+      computer?: boolean;
+    };
 
 export type Msg = {
   role: "user" | "assistant" | "tool";
@@ -72,12 +88,32 @@ export type Msg = {
 };
 
 /** `xai` (Grok) is an OpenAI-compatible preset served by the generic OpenAI-compatible adapter. */
-export type ProviderKind = "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
+export type ProviderKind =
+  "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
 export type CliId = "claude" | "cursor-agent" | "codex";
-export type ProviderConfig = { id: string; kind: ProviderKind; name: string; baseUrl: string; cli?: CliId; cliAuth?: "key"; /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string; /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string; disabled?: boolean };
+export type ProviderConfig = {
+  id: string;
+  kind: ProviderKind;
+  name: string;
+  baseUrl: string;
+  cli?: CliId;
+  cliAuth?: "key";
+  /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string;
+  /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string;
+  disabled?: boolean;
+};
 /** How a model takes an effort level when its provider reports that per model (Cursor SDK parameters, OpenRouter `reasoning`): level -> provider value. */
 export type EffortSpec = { param: string; values: Partial<Record<Reasoning, string>> };
-export type ModelInfo = { id: string; name: string; providerId: string; created: number; contextWindow?: number; images?: boolean; tools?: boolean; effort?: EffortSpec };
+export type ModelInfo = {
+  id: string;
+  name: string;
+  providerId: string;
+  created: number;
+  contextWindow?: number;
+  images?: boolean;
+  tools?: boolean;
+  effort?: EffortSpec;
+};
 export type ToolDef = { name: string; description: string; parameters: Record<string, unknown> };
 export type Reasoning = "low" | "medium" | "high" | "xhigh" | "max";
 /** Levels of an adapter that only says it supports reasoning (no `reasoningLevels`), weakest first. */
@@ -104,7 +140,11 @@ export type TurnInput = {
   onActivity?: (part: Extract<Part, { type: "activity" }>) => void;
   onLimits?: (windows: LimitWindow[]) => void;
   /** Codex app-server native goal: the server keeps working turn after turn until the goal leaves `active`; the turn lasts that long. */
-  goal?: { objective: string; /** Re-activate the thread's existing goal instead of setting a new one. */ resume?: boolean; onUpdate: (g: NativeGoal) => void };
+  goal?: {
+    objective: string;
+    /** Re-activate the thread's existing goal instead of setting a new one. */ resume?: boolean;
+    onUpdate: (g: NativeGoal) => void;
+  };
   /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
   approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
@@ -129,7 +169,11 @@ export interface Adapter {
 }
 
 /** Levels to show for a model, whichever way the adapter reports them. */
-export const levelsOf = (a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">, model: string, listed?: readonly string[]): readonly Reasoning[] =>
+export const levelsOf = (
+  a: Pick<Adapter, "supportsReasoning" | "reasoningLevels">,
+  model: string,
+  listed?: readonly string[],
+): readonly Reasoning[] =>
   a.reasoningLevels ? a.reasoningLevels(model, listed) : a.supportsReasoning(model) ? REASONING_LEVELS : [];
 
 export const textOf = (m: Msg) =>

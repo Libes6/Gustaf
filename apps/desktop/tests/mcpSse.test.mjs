@@ -38,7 +38,12 @@ function fakeServer(o = {}) {
         start(c) {
           ctl = c;
           streams.set(id, c);
-          if (o.endpoint !== null) c.enqueue(enc.encode(`: keepalive\n\nevent: endpoint\ndata: ${o.endpoint ?? `/messages?s=${id}`}\n\n`.replace('{id}', id)));
+          if (o.endpoint !== null)
+            c.enqueue(
+              enc.encode(
+                `: keepalive\n\nevent: endpoint\ndata: ${o.endpoint ?? `/messages?s=${id}`}\n\n`.replace('{id}', id),
+              ),
+            );
         },
         cancel() {
           log.streams.push({ id, cancelled: true });
@@ -61,13 +66,25 @@ function fakeServer(o = {}) {
       const id = Number(u.searchParams.get('s'));
       const msg = JSON.parse(init.body);
       log.sessionPosts.push({ url, headers: init.headers, body: msg });
-      if (o.postStatus && o.postStatus(msg, init.headers)) return new Response('', { status: o.postStatus(msg, init.headers) });
+      if (o.postStatus && o.postStatus(msg, init.headers))
+        return new Response('', { status: o.postStatus(msg, init.headers) });
       if (msg.method === 'notifications/cancelled') log.cancelled.push(msg.params);
       if (msg.id === undefined) return new Response('Accepted', { status: 202 });
-      const reply = (result, error) => send(id, 'message', JSON.stringify({ jsonrpc: '2.0', id: msg.id, ...(error ? { error } : { result }) }));
-      if (msg.method === 'initialize') setTimeout(() => reply({ protocolVersion: '2024-11-05', capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'legacy' } }), 0);
+      const reply = (result, error) =>
+        send(id, 'message', JSON.stringify({ jsonrpc: '2.0', id: msg.id, ...(error ? { error } : { result }) }));
+      if (msg.method === 'initialize')
+        setTimeout(
+          () =>
+            reply({
+              protocolVersion: '2024-11-05',
+              capabilities: { tools: {}, resources: {} },
+              serverInfo: { name: 'legacy' },
+            }),
+          0,
+        );
       else if (msg.method === 'tools/list') {
-        if (o.notifyOnList) send(id, 'message', JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' }));
+        if (o.notifyOnList)
+          send(id, 'message', JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' }));
         if (o.pingOnList) send(id, 'message', JSON.stringify({ jsonrpc: '2.0', id: 'srv1', method: 'ping' }));
         setTimeout(() => reply({ tools: [{ name: 'echo', description: 'Echo', inputSchema: { type: 'object' } }] }), 0);
       } else if (msg.method === 'slow') {
@@ -80,7 +97,8 @@ function fakeServer(o = {}) {
   };
   return { fetch, log, send, streams, endStream: () => log.lastStream.ctl.close(), sessions: () => sessions };
 }
-const mk = (srv, extra = {}) => new McpSseClient({ url: URL_SSE, headers: { 'X-Team': 'core' }, fetch: srv.fetch, ...extra });
+const mk = (srv, extra = {}) =>
+  new McpSseClient({ url: URL_SSE, headers: { 'X-Team': 'core' }, fetch: srv.fetch, ...extra });
 
 test('SSE decoder exposes event names and keeps comments out', () => {
   const d = new SseDecoder();
@@ -101,14 +119,21 @@ test('SSE: GET stream, endpoint event, initialize and requests over POST with an
   assert.equal(srv.log.gets.length, 1);
   assert.equal(srv.log.gets[0].headers.Accept, 'text/event-stream');
   assert.equal(srv.log.gets[0].headers['X-Team'], 'core');
-  assert.deepEqual(srv.log.sessionPosts.map((p) => p.body.method), ['initialize', 'notifications/initialized']);
+  assert.deepEqual(
+    srv.log.sessionPosts.map((p) => p.body.method),
+    ['initialize', 'notifications/initialized'],
+  );
   const tools = await c.request('tools/list', undefined);
   assert.equal(tools.tools[0].name, 'echo');
   assert.equal(c.toolsEpoch, 1);
   assert.deepEqual(seen, ['notifications/tools/list_changed']);
   await new Promise((r) => setTimeout(r, 10));
   const pong = srv.log.sessionPosts.find((p) => p.body.id === 'srv1');
-  assert.deepEqual(pong.body, { jsonrpc: '2.0', id: 'srv1', result: {} }, 'a server ping is answered through the POST endpoint');
+  assert.deepEqual(
+    pong.body,
+    { jsonrpc: '2.0', id: 'srv1', result: {} },
+    'a server ping is answered through the POST endpoint',
+  );
   // The streamable-HTTP session headers are not used on this transport; POSTs go to the announced endpoint.
   for (const p of srv.log.sessionPosts) {
     assert.ok(!('Mcp-Session-Id' in p.headers) && !('MCP-Protocol-Version' in p.headers));
@@ -126,13 +151,20 @@ test('SSE: GET stream, endpoint event, initialize and requests over POST with an
 test('SSE: the endpoint may be absolute on the same origin, never on another one; wrong content types and statuses are errors', async () => {
   const ok = fakeServer({ endpoint: 'https://sse.example/messages?s=1' });
   assert.equal((await mk(ok).connect()).serverInfo.name, 'legacy');
-  for (const endpoint of ['https://evil.example/messages?s=1', 'http://sse.example/messages?s=1', 'https://u:p@sse.example/messages?s=1']) {
+  for (const endpoint of [
+    'https://evil.example/messages?s=1',
+    'http://sse.example/messages?s=1',
+    'https://u:p@sse.example/messages?s=1',
+  ]) {
     const srv = fakeServer({ endpoint });
     await assert.rejects(mk(srv).connect(), /another origin/, endpoint);
     assert.equal(srv.log.sessionPosts.length, 0, 'nothing is POSTed to a foreign endpoint');
   }
   await assert.rejects(mk(fakeServer({ getType: 'text/html' })).connect(), /did not open an event stream/);
-  await assert.rejects(mk(fakeServer({ getStatus: 404 })).connect(), (e) => e instanceof HttpStatusError && e.status === 404);
+  await assert.rejects(
+    mk(fakeServer({ getStatus: 404 })).connect(),
+    (e) => e instanceof HttpStatusError && e.status === 404,
+  );
   await assert.rejects(mk(fakeServer({ getStatus: 500 })).connect(), /HTTP 500/);
 });
 
@@ -162,7 +194,10 @@ test('SSE: timeouts and aborts return at once, send notifications/cancelled, and
   assert.equal(srv.log.cancelled.length, 2);
   assert.equal(srv.log.cancelled[1].reason, 'cancelled by the user');
   const slowIds = srv.log.sessionPosts.filter((p) => p.body.method === 'slow').map((p) => p.body.id);
-  assert.deepEqual(srv.log.cancelled.map((x) => x.requestId), slowIds);
+  assert.deepEqual(
+    srv.log.cancelled.map((x) => x.requestId),
+    slowIds,
+  );
   // The server answers late: nothing breaks, the next request works.
   slowIds.forEach((id) => srv.send(1, 'message', JSON.stringify({ jsonrpc: '2.0', id, result: { late: true } })));
   assert.equal((await c.request('ping', {})).ok, true);
@@ -201,8 +236,16 @@ test('SSE: OAuth hooks add the bearer to the stream and the POSTs, and refresh o
   let t2 = 'bad';
   const srv2 = fakeServer();
   const inner = srv2.fetch;
-  srv2.fetch = async (url, init) => (init.method === 'GET' && init.headers.Authorization === 'Bearer bad' ? new Response('', { status: 401 }) : inner(url, init));
-  const c2 = new McpSseClient({ url: URL_SSE, headers: {}, fetch: srv2.fetch, auth: { header: async () => `Bearer ${t2}`, refresh: async () => ((t2 = 'good'), true) } });
+  srv2.fetch = async (url, init) =>
+    init.method === 'GET' && init.headers.Authorization === 'Bearer bad'
+      ? new Response('', { status: 401 })
+      : inner(url, init);
+  const c2 = new McpSseClient({
+    url: URL_SSE,
+    headers: {},
+    fetch: srv2.fetch,
+    auth: { header: async () => `Bearer ${t2}`, refresh: async () => ((t2 = 'good'), true) },
+  });
   await c2.connect();
   assert.equal(srv2.log.gets.length, 1);
   assert.equal(srv2.log.gets[0].headers.Authorization, 'Bearer good');
@@ -210,7 +253,15 @@ test('SSE: OAuth hooks add the bearer to the stream and the POSTs, and refresh o
   const srv3 = fakeServer();
   const inner3 = srv3.fetch;
   srv3.fetch = async (url, init) => (init.method === 'GET' ? new Response('', { status: 401 }) : inner3(url, init));
-  await assert.rejects(new McpSseClient({ url: URL_SSE, headers: {}, fetch: srv3.fetch, auth: { header: async () => 'Bearer x', refresh: async () => false } }).connect(), new RegExp(SIGN_IN_NEEDED));
+  await assert.rejects(
+    new McpSseClient({
+      url: URL_SSE,
+      headers: {},
+      fetch: srv3.fetch,
+      auth: { header: async () => 'Bearer x', refresh: async () => false },
+    }).connect(),
+    new RegExp(SIGN_IN_NEEDED),
+  );
 });
 
 // ---- the runtime's transport choice ----------------------------------------------------------------------------------
@@ -230,10 +281,32 @@ test('config: the transport choice is validated, stored and imported', () => {
   for (const t of ['auto', 'streamable', 'sse']) assert.deepEqual(cfg.validateServer({ ...s, httpTransport: t }), []);
   assert.deepEqual(cfg.validateServer({ ...s, httpTransport: 'websocket' }), ['transport']);
   assert.equal(cfg.normalizeConfig({ servers: [{ ...s, httpTransport: 'sse' }] }).servers[0].httpTransport, 'sse');
-  assert.equal(cfg.normalizeConfig({ servers: [{ ...s, httpTransport: 'auto' }] }).servers[0].httpTransport, undefined, 'auto is the default and is not stored');
-  assert.equal(cfg.normalizeConfig({ servers: [{ ...s, httpTransport: 'bogus' }] }).servers[0].httpTransport, undefined);
-  const imp = cfg.parseImport(JSON.stringify({ a: { type: 'sse', url: 'https://x.dev/sse' }, b: { type: 'streamable-http', url: 'https://x.dev/mcp' }, c: { url: 'https://x.dev/m' }, d: { type: 'sse', command: 'x' } }), [], (() => { let i = 0; return () => `i${++i}`; })());
-  assert.deepEqual(imp.servers.map((x) => x.httpTransport), ['sse', 'streamable', undefined]);
+  assert.equal(
+    cfg.normalizeConfig({ servers: [{ ...s, httpTransport: 'auto' }] }).servers[0].httpTransport,
+    undefined,
+    'auto is the default and is not stored',
+  );
+  assert.equal(
+    cfg.normalizeConfig({ servers: [{ ...s, httpTransport: 'bogus' }] }).servers[0].httpTransport,
+    undefined,
+  );
+  const imp = cfg.parseImport(
+    JSON.stringify({
+      a: { type: 'sse', url: 'https://x.dev/sse' },
+      b: { type: 'streamable-http', url: 'https://x.dev/mcp' },
+      c: { url: 'https://x.dev/m' },
+      d: { type: 'sse', command: 'x' },
+    }),
+    [],
+    (() => {
+      let i = 0;
+      return () => `i${++i}`;
+    })(),
+  );
+  assert.deepEqual(
+    imp.servers.map((x) => x.httpTransport),
+    ['sse', 'streamable', undefined],
+  );
   assert.deepEqual(imp.errors, [{ name: 'd', code: 'url' }]);
 });
 
@@ -253,7 +326,11 @@ test('runtime auto: a 4xx to the initialize POST falls back to SSE; 401, 403, 42
   for (const status of [401, 403, 408, 429, 500, 503]) {
     const fake = fakeServer({ streamablePost: status });
     const s = await httpServer(fake);
-    await assert.rejects(rt.testMcpServer(s), new RegExp(`${status === 401 ? 'HTTP 401|sign-in' : `HTTP ${status}`}`), String(status));
+    await assert.rejects(
+      rt.testMcpServer(s),
+      new RegExp(`${status === 401 ? 'HTTP 401|sign-in' : `HTTP ${status}`}`),
+      String(status),
+    );
     assert.equal(fake.log.gets.length, 0, `no SSE attempt after ${status}`);
     await rt.disconnectMcpServer(s.id);
   }

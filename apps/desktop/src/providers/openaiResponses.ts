@@ -3,7 +3,15 @@ import { tokenUsage } from "./usage";
 import type { CuAction } from "../lib/api";
 import { request, sse } from "./http";
 import { makeError, streamError, withRetry } from "./retry";
-import { flattenMsg, REASONING_LEVELS, type Adapter, type Msg, type Part, type ProviderConfig, type TurnInput } from "./types";
+import {
+  flattenMsg,
+  REASONING_LEVELS,
+  type Adapter,
+  type Msg,
+  type Part,
+  type ProviderConfig,
+  type TurnInput,
+} from "./types";
 import { pickLevel } from "./reasoning";
 
 function toAction(a: any): CuAction {
@@ -33,7 +41,10 @@ function userContent(m: Msg) {
 export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
   const base = cfg.baseUrl.replace(/\/$/, "");
   // The key is read on the first request that needs it (lib/keys.ts), not when the adapter is built.
-  const authHeaders = async () => ({ Authorization: `Bearer ${await resolveKey(key)}`, "Content-Type": "application/json" });
+  const authHeaders = async () => ({
+    Authorization: `Bearer ${await resolveKey(key)}`,
+    "Content-Type": "application/json",
+  });
 
   function buildInput(messages: Msg[]) {
     let start = 0;
@@ -55,7 +66,11 @@ export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
             input.push({
               type: "computer_call_output",
               call_id: p.id,
-              output: { type: "computer_screenshot", image_url: `data:image/png;base64,${p.image ?? ""}`, detail: "original" },
+              output: {
+                type: "computer_screenshot",
+                image_url: `data:image/png;base64,${p.image ?? ""}`,
+                detail: "original",
+              },
             });
           } else {
             input.push({ type: "function_call_output", call_id: p.id, output: p.output });
@@ -85,25 +100,49 @@ export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
     async turn(t: TurnInput) {
       const { input, previous } = buildInput(t.messages);
       const acks = new Map<string, any[]>();
-      for (const m of t.messages) for (const p of m.parts) if (p.type === "tool_call" && p.computer?.safetyChecks?.length) acks.set(p.id, p.computer.safetyChecks);
-      for (const item of input) if (item.type === "computer_call_output" && acks.has(item.call_id)) item.acknowledged_safety_checks = acks.get(item.call_id);
+      for (const m of t.messages)
+        for (const p of m.parts)
+          if (p.type === "tool_call" && p.computer?.safetyChecks?.length) acks.set(p.id, p.computer.safetyChecks);
+      for (const item of input)
+        if (item.type === "computer_call_output" && acks.has(item.call_id))
+          item.acknowledged_safety_checks = acks.get(item.call_id);
 
-      const tools: any[] = t.tools.map((d) => ({ type: "function", name: d.name, description: d.description, parameters: d.parameters, strict: false }));
+      const tools: any[] = t.tools.map((d) => ({
+        type: "function",
+        name: d.name,
+        description: d.description,
+        parameters: d.parameters,
+        strict: false,
+      }));
       if (t.computer) tools.push({ type: "computer" });
-      const body: any = { model: t.model, instructions: t.system, input, tools, stream: true, previous_response_id: previous };
+      const body: any = {
+        model: t.model,
+        instructions: t.system,
+        input,
+        tools,
+        stream: true,
+        previous_response_id: previous,
+      };
       // Only low/medium/high are offered here; a level chosen for another model (xhigh, max) is sent as the nearest one.
       const effort = this.supportsReasoning(t.model) ? pickLevel(t.reasoning, REASONING_LEVELS) : undefined;
       if (effort) body.reasoning = { effort };
 
       const final = await withRetry(
         async (onText) => {
-          const res = await request(`${base}/responses`, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: t.signal });
+          const res = await request(`${base}/responses`, {
+            method: "POST",
+            headers: await authHeaders(),
+            body: JSON.stringify(body),
+            signal: t.signal,
+          });
           let final: any;
           for await (const ev of sse(res, t.signal)) {
             if (ev.type === "response.output_text.delta") onText(ev.delta);
             else if (ev.type === "response.completed" || ev.type === "response.incomplete") final = ev.response;
-            else if (ev.type === "response.failed") throw streamError({ ...ev.response?.error, message: ev.response?.error?.message ?? "response failed" });
-            else if (ev.type === "error") throw streamError({ code: ev.code, message: ev.message ?? "response failed" });
+            else if (ev.type === "response.failed")
+              throw streamError({ ...ev.response?.error, message: ev.response?.error?.message ?? "response failed" });
+            else if (ev.type === "error")
+              throw streamError({ code: ev.code, message: ev.message ?? "response failed" });
           }
           if (!final) throw makeError("network", { detail: "the stream ended without a response" });
           return final;
@@ -114,7 +153,10 @@ export function openaiResponses(cfg: ProviderConfig, key: KeySource): Adapter {
       const parts: Part[] = [];
       for (const item of final.output ?? []) {
         if (item.type === "message") {
-          const text = (item.content ?? []).filter((c: any) => c.type === "output_text").map((c: any) => c.text).join("");
+          const text = (item.content ?? [])
+            .filter((c: any) => c.type === "output_text")
+            .map((c: any) => c.text)
+            .join("");
           if (text) parts.push({ type: "text", text });
         } else if (item.type === "function_call") {
           let args = {};

@@ -1,7 +1,15 @@
 import { loadQueue, updateQueue } from "./chatQueue";
 import { waitForChat } from "./chatCoordinator";
 import type { Adapter, Msg, Reasoning, TurnInput } from "../providers/types";
-import { appendUserMessage, createApprover, finishReviewCopy, reportRunFailure, runChatCore, type ChatRunDeps, type ReviewCopy } from "./chatRunCore";
+import {
+  appendUserMessage,
+  createApprover,
+  finishReviewCopy,
+  reportRunFailure,
+  runChatCore,
+  type ChatRunDeps,
+  type ReviewCopy,
+} from "./chatRunCore";
 import type { LiveRunHandle } from "./liveRuns";
 import {
   APPROVAL_TIMEOUT_MS,
@@ -29,7 +37,18 @@ import {
 export type ScheduledRunDeps = ChatRunDeps & {
   now(): number;
   /** The adapter and flags for the schedule's provider/model, or an error text when it cannot be used. */
-  resolve(providerId: string, model: string): Promise<{ adapter: Adapter; supportsTools?: boolean; nativeInstructions?: string[]; /** CLI agents run their own tools and approvals outside our rules, so they only get read-only access. */ ownTools?: boolean } | { error: string }>;
+  resolve(
+    providerId: string,
+    model: string,
+  ): Promise<
+    | {
+        adapter: Adapter;
+        supportsTools?: boolean;
+        nativeInstructions?: string[];
+        /** CLI agents run their own tools and approvals outside our rules, so they only get read-only access. */ ownTools?: boolean;
+      }
+    | { error: string }
+  >;
   /** Folder of the project: `null` for a chat without project, `undefined` when the project does not exist any more. */
   projectRoot(projectId: number | null): string | null | undefined;
   allowlist(): string[];
@@ -40,7 +59,10 @@ export type ScheduledRunDeps = ChatRunDeps & {
   /** Registers an open approval request (sidebar badge, notification); the returned function ends it. */
   beginApproval(chatId: number, who: string): () => void;
   /** Lists the request for the user to answer; returns a function that withdraws it. */
-  askUser(info: { scheduleId: string; chatId: number | null; title: string; command: string }, onAnswer: (ok: boolean) => void): () => void;
+  askUser(
+    info: { scheduleId: string; chatId: number | null; title: string; command: string },
+    onAnswer: (ok: boolean) => void,
+  ): () => void;
   /** Makes the run visible in an open chat (live text, tool cards, approval, Stop) and in the sidebar. `abort` is Stop. */
   live?(chatId: number, title: string, abort: () => void): LiveRunHandle;
   /** Text of the "retrying in N seconds" line shown in the live chat. */
@@ -51,12 +73,20 @@ export type ScheduledRunDeps = ChatRunDeps & {
   approvalTimeoutMs?: number;
 };
 
-export type RunResult = { status: "success" | "failed" | "attention" | "stopped"; chatId: number | null; error?: string };
+export type RunResult = {
+  status: "success" | "failed" | "attention" | "stopped";
+  chatId: number | null;
+  error?: string;
+};
 
 const msgText = (text: string, role: Msg["role"] = "user"): Msg => ({ role, parts: [{ type: "text", text }] });
 
 /** Runs one schedule to completion. Never throws: failures come back as `status: "failed"`. */
-export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRunDeps, outer: AbortSignal): Promise<RunResult> {
+export async function executeScheduledRun(
+  sc: ScheduledPrompt,
+  deps: ScheduledRunDeps,
+  outer: AbortSignal,
+): Promise<RunResult> {
   const ctl = new AbortController();
   const stopOuter = () => ctl.abort();
   if (outer.aborted) ctl.abort();
@@ -68,7 +98,8 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   let review: ReviewCopy | null = null;
   let live: LiveRunHandle | undefined;
   const fail = async (error: string): Promise<RunResult> => {
-    if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
+    if (chatId !== null && release)
+      await deps.addMessage(chatId, msgText(deps.note("failed", error), "assistant")).catch(() => {});
     return { status: "failed", chatId, error };
   };
   try {
@@ -82,7 +113,7 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
     const cid = chatId;
     release = await waitForChat(cid, ctl.signal);
     await loadQueue(cid);
-    await updateQueue(cid, q => ({ ...q, active: true }));
+    await updateQueue(cid, (q) => ({ ...q, active: true }));
     live = deps.live?.(cid, sc.title, () => ctl.abort());
     // The access mode is capped again here: whatever the stored value says, unattended runs never get "full".
     const access = target.ownTools ? "readonly" : capAccess(sc.access);
@@ -97,7 +128,10 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
       ask: (req) => req.kind === "command",
       present: (req, answer) => {
         const inChat = live?.approval(req, answer);
-        const card = deps.askUser({ scheduleId: sc.id, chatId: cid, title: sc.title, command: req.kind === "command" ? req.command : "" }, answer);
+        const card = deps.askUser(
+          { scheduleId: sc.id, chatId: cid, title: sc.title, command: req.kind === "command" ? req.command : "" },
+          answer,
+        );
         return () => {
           inChat?.();
           card();
@@ -110,7 +144,12 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
       },
     });
 
-    const { history } = await appendUserMessage(deps, { chatId: cid, root: projectRoot, parts: [{ type: "text", text: sc.prompt }], ignoreCheckpointErrors: true });
+    const { history } = await appendUserMessage(deps, {
+      chatId: cid,
+      root: projectRoot,
+      parts: [{ type: "text", text: sc.prompt }],
+      ignoreCheckpointErrors: true,
+    });
     live?.message("user");
     await runChatCore(
       {
@@ -118,7 +157,15 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
         root: projectRoot,
         history,
         access,
-        target: async () => ({ adapter: target.adapter, providerId: sc.providerId, model: sc.model, supportsTools: target.supportsTools, reasoning: deps.reasoning(), computerUse: false, nativeInstructions: target.nativeInstructions }),
+        target: async () => ({
+          adapter: target.adapter,
+          providerId: sc.providerId,
+          model: sc.model,
+          supportsTools: target.supportsTools,
+          reasoning: deps.reasoning(),
+          computerUse: false,
+          nativeInstructions: target.nativeInstructions,
+        }),
         allowlist: deps.allowlist(),
         signal: ctl.signal,
         stop: () => ctl.abort(),
@@ -149,7 +196,10 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } catch (e) {
     // The loop ends with an abort error when it was stopped mid-step; the chat still says why the run ended.
     if (attention || ctl.signal.aborted) {
-      if (chatId !== null && release) await deps.addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant")).catch(() => {});
+      if (chatId !== null && release)
+        await deps
+          .addMessage(chatId, msgText(deps.note(attention ? "attention" : "stopped"), "assistant"))
+          .catch(() => {});
       return { status: attention ? "attention" : "stopped", chatId };
     }
     const message = (await reportRunFailure(e, { providerId: sc.providerId, signal: ctl.signal }, deps)) ?? "";
@@ -157,9 +207,18 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
   } finally {
     outer.removeEventListener("abort", stopOuter);
     // Like a chat: the copy is removed when nothing was changed in it, otherwise it stays for the review panel.
-    try { await finishReviewCopy(deps, review); } finally {
-      if (release && chatId) await updateQueue(chatId, q => ({ ...q, active: false, interrupted: !succeeded, paused: succeeded ? q.paused : true })).catch(() => {});
-      live?.end(); release?.();
+    try {
+      await finishReviewCopy(deps, review);
+    } finally {
+      if (release && chatId)
+        await updateQueue(chatId, (q) => ({
+          ...q,
+          active: false,
+          interrupted: !succeeded,
+          paused: succeeded ? q.paused : true,
+        })).catch(() => {});
+      live?.end();
+      release?.();
     }
     deps.chatChanged?.();
   }
@@ -167,7 +226,10 @@ export async function executeScheduledRun(sc: ScheduledPrompt, deps: ScheduledRu
 
 // ---- the controller ----
 
-export type RunnerStore = { get(): ScheduledPrompt[]; update(fn: (list: ScheduledPrompt[]) => ScheduledPrompt[]): void };
+export type RunnerStore = {
+  get(): ScheduledPrompt[];
+  update(fn: (list: ScheduledPrompt[]) => ScheduledPrompt[]): void;
+};
 export type Runner = {
   /** Applies the periodic check: starts due schedules, records missed ones. */
   tick(): void;
@@ -179,7 +241,12 @@ export type Runner = {
 };
 
 /** `execute` runs one schedule; the controller guarantees that a schedule never runs twice at the same time. */
-export function createRunner(store: RunnerStore, execute: (sc: ScheduledPrompt, signal: AbortSignal) => Promise<RunResult>, now: () => number = Date.now, onChange?: () => void): Runner {
+export function createRunner(
+  store: RunnerStore,
+  execute: (sc: ScheduledPrompt, signal: AbortSignal) => Promise<RunResult>,
+  now: () => number = Date.now,
+  onChange?: () => void,
+): Runner {
   const active = new Map<string, AbortController>();
   const start = (sc: ScheduledPrompt) => {
     const ctl = new AbortController();
@@ -187,7 +254,9 @@ export function createRunner(store: RunnerStore, execute: (sc: ScheduledPrompt, 
     onChange?.();
     execute(sc, ctl.signal)
       .catch((e): RunResult => ({ status: "failed", chatId: null, error: String((e as Error)?.message ?? e) }))
-      .then((r) => store.update((list) => applyPatches(list, [{ id: sc.id, patch: finishPatch(r.status, r.chatId, r.error) }])))
+      .then((r) =>
+        store.update((list) => applyPatches(list, [{ id: sc.id, patch: finishPatch(r.status, r.chatId, r.error) }])),
+      )
       .finally(() => {
         active.delete(sc.id);
         onChange?.();
@@ -207,7 +276,11 @@ export function createRunner(store: RunnerStore, execute: (sc: ScheduledPrompt, 
       const stored = store.get().find((s) => s.id === id);
       if (!stored || active.has(id)) return false;
       const sc = prompt ? { ...stored, prompt } : stored;
-      store.update((list) => applyPatches(list, [{ id, patch: { lastRunAt: now(), lastStatus: "running" satisfies RunStatus, lastError: undefined } }]));
+      store.update((list) =>
+        applyPatches(list, [
+          { id, patch: { lastRunAt: now(), lastStatus: "running" satisfies RunStatus, lastError: undefined } },
+        ]),
+      );
       start(sc);
       return true;
     },

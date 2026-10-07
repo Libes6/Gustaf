@@ -5,11 +5,24 @@ import { McpServers } from "../../src/components/McpServers";
 import { callsOf, mockInvoke, mockSettings } from "./tauri";
 import { renderApp } from "./render";
 
-const http = { id: "h1", name: "remote", enabled: true, scope: "global", transport: "http", url: "https://example.com/sse", headers: [], alwaysAllow: false, allowedTools: [], readOnlyTools: [] };
+const http = {
+  id: "h1",
+  name: "remote",
+  enabled: true,
+  scope: "global",
+  transport: "http",
+  url: "https://example.com/sse",
+  headers: [],
+  alwaysAllow: false,
+  allowedTools: [],
+  readOnlyTools: [],
+};
 
 /** The `mcpServers` setting as last written through `insert into settings`. */
 const savedServers = () => {
-  const writes = callsOf("db_execute").filter((a: any) => /insert into settings/.test(a.sql) && a.params[0] === "mcpServers");
+  const writes = callsOf("db_execute").filter(
+    (a: any) => /insert into settings/.test(a.sql) && a.params[0] === "mcpServers",
+  );
   return writes.length ? JSON.parse(writes[writes.length - 1].params[1]).servers : null;
 };
 

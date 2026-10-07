@@ -2,7 +2,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/lib/api", async (orig) => ({ ...(await orig<typeof import("../../src/lib/api")>()), setSetting: vi.fn(async () => {}), getSetting: vi.fn(async (_k: string, d: unknown) => d) }));
+vi.mock("../../src/lib/api", async (orig) => ({
+  ...(await orig<typeof import("../../src/lib/api")>()),
+  setSetting: vi.fn(async () => {}),
+  getSetting: vi.fn(async (_k: string, d: unknown) => d),
+}));
 const { AppearanceSettings } = await import("../../src/components/AppearanceSettings");
 const api = await import("../../src/lib/api");
 const { renderApp } = await import("./render");
@@ -31,7 +35,10 @@ it("appearance: font size, wrapping and motion apply to the page, show in the pr
   expect(document.documentElement.dataset.codeWrap).toBe("on");
   await userEvent.click(screen.getByRole("button", { name: "Slow" }));
   expect(document.documentElement.style.getPropertyValue("--motion")).toBe("2");
-  expect(api.setSetting).toHaveBeenCalledWith("appearance", expect.objectContaining({ wrapCode: true, motion: "slow", codeSize: 15 }));
+  expect(api.setSetting).toHaveBeenCalledWith(
+    "appearance",
+    expect.objectContaining({ wrapCode: true, motion: "slow", codeSize: 15 }),
+  );
   await userEvent.selectOptions(screen.getByRole("combobox", { name: "Interface font" }), "serif");
   expect(document.documentElement.style.getPropertyValue("--font")).toContain("serif");
   await userEvent.click(screen.getByRole("button", { name: "Reset" }));

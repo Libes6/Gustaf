@@ -23,58 +23,97 @@ test('retries: only whole numbers 0-2 are accepted, default 0', () => {
   assert.equal(planOf({ retries: 2 }).retries, 2);
   assert.equal(planOf({ retries: null }).retries, 0);
   for (const bad of [-1, 3, 1.5, '1', true, NaN]) {
-    const r = o.parsePlanArgs({ tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }], retries: bad }, { cancelDependents: true });
+    const r = o.parsePlanArgs(
+      { tasks: [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }], retries: bad },
+      { cancelDependents: true },
+    );
     assert.equal(r.ok, false, String(bad));
     assert.match(r.error, /`retries` must be a whole number from 0 to 2/);
   }
-  assert.deepEqual(o.DELEGATE_TOOL.parameters.properties.retries, { type: 'integer', minimum: 0, maximum: 2, description: o.DELEGATE_TOOL.parameters.properties.retries.description });
+  assert.deepEqual(o.DELEGATE_TOOL.parameters.properties.retries, {
+    type: 'integer',
+    minimum: 0,
+    maximum: 2,
+    description: o.DELEGATE_TOOL.parameters.properties.retries.description,
+  });
 });
 
 test('runWithRetries re-runs only failed attempts, with the backoff, up to the allowed number', async () => {
   const log = [];
   const sleeps = [];
   const sleep = async (ms) => void sleeps.push(ms);
-  const script = (...statuses) => async (n, last) => {
-    log.push([n, last]);
-    return out(statuses[n - 1] ?? 'failed', `r${n}`);
-  };
+  const script =
+    (...statuses) =>
+    async (n, last) => {
+      log.push([n, last]);
+      return out(statuses[n - 1] ?? 'failed', `r${n}`);
+    };
   // No retries: one attempt, outcome untouched (no attempts field).
   assert.deepEqual(await o.runWithRetries(script('failed'), { retries: 0, sleep }), out('failed', 'r1'));
   assert.deepEqual(log, [[1, true]]);
   // Fails twice, then completes on the third: attempts = 3, backoff 1 s then 3 s.
   log.length = 0;
-  assert.deepEqual(await o.runWithRetries(script('failed', 'failed', 'completed'), { retries: 2, sleep }), { status: 'completed', report: 'r3', attempts: 3 });
-  assert.deepEqual(log, [[1, false], [2, false], [3, true]]);
+  assert.deepEqual(await o.runWithRetries(script('failed', 'failed', 'completed'), { retries: 2, sleep }), {
+    status: 'completed',
+    report: 'r3',
+    attempts: 3,
+  });
+  assert.deepEqual(log, [
+    [1, false],
+    [2, false],
+    [3, true],
+  ]);
   assert.deepEqual(sleeps, [1000, 3000]);
   // Never completes: stops after retries + 1 attempts.
-  assert.deepEqual(await o.runWithRetries(script(), { retries: 1, sleep }), { status: 'failed', report: 'r2', attempts: 2 });
+  assert.deepEqual(await o.runWithRetries(script(), { retries: 1, sleep }), {
+    status: 'failed',
+    report: 'r2',
+    attempts: 2,
+  });
   // Completed first time: attempts 1. Limit, budget and cancelled are final.
   assert.equal((await o.runWithRetries(script('completed'), { retries: 2, sleep })).attempts, 1);
-  for (const s of ['limit', 'budget', 'cancelled']) assert.equal((await o.runWithRetries(script(s), { retries: 2, sleep })).attempts, 1, s);
+  for (const s of ['limit', 'budget', 'cancelled'])
+    assert.equal((await o.runWithRetries(script(s), { retries: 2, sleep })).attempts, 1, s);
 });
 
 test('runWithRetries stops retrying when the signal aborts (also during the pause) and clamps retries', async () => {
   const ctl = new AbortController();
   let n = 0;
-  const p = o.runWithRetries(async () => out('failed', `r${++n}`), { retries: 2, signal: ctl.signal, backoffMs: () => 60_000 });
+  const p = o.runWithRetries(async () => out('failed', `r${++n}`), {
+    retries: 2,
+    signal: ctl.signal,
+    backoffMs: () => 60_000,
+  });
   setTimeout(() => ctl.abort(), 20);
   const r = await p;
   assert.equal(n, 1);
   assert.deepEqual(r, { status: 'failed', report: 'r1', attempts: 1 });
   n = 0;
-  await o.runWithRetries(async () => out('failed'), { retries: 99, sleep: async () => { n++; } });
+  await o.runWithRetries(async () => out('failed'), {
+    retries: 99,
+    sleep: async () => {
+      n++;
+    },
+  });
   assert.equal(n, 2, 'at most two retries');
 });
 
 test('a dependant waits for the retries of its dependency (the retry loop runs inside the running task)', async () => {
-  const plan = planOf({ retries: 1 }, [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }, { id: 'b', title: 'B', prompt: 'b', type: 'explore', dependsOn: ['a'] }]);
+  const plan = planOf({ retries: 1 }, [
+    { id: 'a', title: 'A', prompt: 'a', type: 'explore' },
+    { id: 'b', title: 'B', prompt: 'b', type: 'explore', dependsOn: ['a'] },
+  ]);
   const order = [];
   const outcomes = await o.runPlan(plan, {
     limit: 2,
-    run: (task) => o.runWithRetries(async (n) => {
-      order.push(`${task.id}${n}`);
-      return task.id === 'a' && n === 1 ? out('failed') : out('completed');
-    }, { retries: plan.retries, sleep: async () => {} }),
+    run: (task) =>
+      o.runWithRetries(
+        async (n) => {
+          order.push(`${task.id}${n}`);
+          return task.id === 'a' && n === 1 ? out('failed') : out('completed');
+        },
+        { retries: plan.retries, sleep: async () => {} },
+      ),
   });
   assert.deepEqual(order, ['a1', 'a2', 'b1']);
   assert.equal(outcomes.get('b').status, 'completed');
@@ -82,8 +121,17 @@ test('a dependant waits for the retries of its dependency (the retry loop runs i
 });
 
 test('the merged summary states the attempts and the retry allowance only when retries are on', () => {
-  const plan = planOf({ retries: 2 }, [{ id: 'a', title: 'A', prompt: 'a', type: 'explore' }, { id: 'b', title: 'B', prompt: 'b', type: 'explore' }]);
-  const merged = o.mergeReports(plan, new Map([['a', { ...out('completed'), attempts: 3 }], ['b', { ...out('failed'), attempts: 1 }]]));
+  const plan = planOf({ retries: 2 }, [
+    { id: 'a', title: 'A', prompt: 'a', type: 'explore' },
+    { id: 'b', title: 'B', prompt: 'b', type: 'explore' },
+  ]);
+  const merged = o.mergeReports(
+    plan,
+    new Map([
+      ['a', { ...out('completed'), attempts: 3 }],
+      ['b', { ...out('failed'), attempts: 1 }],
+    ]),
+  );
   assert.match(merged, /Failed tasks were retried up to 2 time\(s\)\./);
   assert.match(merged, /- a "A" \(explore\): completed, 3 attempts/);
   assert.match(merged, /- b "B" \(explore\): failed, 1 attempt\n/);
@@ -116,7 +164,13 @@ test('exceededBudget: only a crossed limit counts; the day is named before the c
 test('the budget stop text names the budget; a budget-stopped run is reported as stopped, not as a limit', () => {
   assert.match(core.budgetStopMessage('day'), /daily token budget is exceeded/);
   assert.match(core.budgetStopMessage('chat'), /chat token budget is exceeded/);
-  const report = core.buildReport({ title: 'T', type: 'explore', status: 'budget', text: 'partial', reason: core.budgetStopMessage('day') });
+  const report = core.buildReport({
+    title: 'T',
+    type: 'explore',
+    status: 'budget',
+    text: 'partial',
+    reason: core.budgetStopMessage('day'),
+  });
   assert.match(report, /^Subagent "T" \(explore\) was stopped: the daily token budget is exceeded/);
   assert.match(report, /partial/);
 });

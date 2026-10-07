@@ -2,7 +2,15 @@
 // Preferences live in app settings ("theme", "accent", "chatWidth"); a localStorage copy lets the first paint use them synchronously.
 import { getSetting, setSetting } from "./api";
 import { applyCustomTheme } from "./customTheme";
-import { accentVars, chatWidthCss, parseChatWidth, parsePrefs, resolveTheme, type ChatWidth, type ThemeMode } from "./themeUtil";
+import {
+  accentVars,
+  chatWidthCss,
+  parseChatWidth,
+  parsePrefs,
+  resolveTheme,
+  type ChatWidth,
+  type ThemeMode,
+} from "./themeUtil";
 
 const CACHE_KEY = "gustaf-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -26,18 +34,29 @@ export function applyTheme(p: Prefs = prefs) {
 const publish = () => listeners.forEach((l) => l(prefs));
 
 function remember(p: Prefs) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(p)); } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(p));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
-export function getThemePrefs(): Prefs { return prefs; }
+export function getThemePrefs(): Prefs {
+  return prefs;
+}
 
 export function subscribeTheme(l: (p: Prefs) => void) {
   listeners.add(l);
-  return () => { listeners.delete(l); };
+  return () => {
+    listeners.delete(l);
+  };
 }
 
 export function setThemePrefs(patch: Partial<Prefs>) {
-  prefs = { ...parsePrefs(patch.mode ?? prefs.mode, patch.accent ?? prefs.accent), width: parseChatWidth(patch.width ?? prefs.width) };
+  prefs = {
+    ...parsePrefs(patch.mode ?? prefs.mode, patch.accent ?? prefs.accent),
+    width: parseChatWidth(patch.width ?? prefs.width),
+  };
   applyTheme();
   remember(prefs);
   if (patch.mode !== undefined) setSetting("theme", prefs.mode).catch(() => {});
@@ -51,12 +70,24 @@ export function initTheme() {
   try {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "null");
     if (c) prefs = { ...parsePrefs(c.mode, c.accent), width: parseChatWidth(c.width) };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   applyTheme();
-  if (typeof matchMedia === "function") matchMedia(DARK_QUERY).addEventListener("change", () => { if (prefs.mode === "system") applyTheme(); });
-  Promise.all([getSetting<unknown>("theme", null), getSetting<unknown>("accent", null), getSetting<unknown>("chatWidth", null)])
+  if (typeof matchMedia === "function")
+    matchMedia(DARK_QUERY).addEventListener("change", () => {
+      if (prefs.mode === "system") applyTheme();
+    });
+  Promise.all([
+    getSetting<unknown>("theme", null),
+    getSetting<unknown>("accent", null),
+    getSetting<unknown>("chatWidth", null),
+  ])
     .then(([mode, accent, width]) => {
-      const next = { ...parsePrefs(mode ?? prefs.mode, accent ?? prefs.accent), width: parseChatWidth(width ?? prefs.width) };
+      const next = {
+        ...parsePrefs(mode ?? prefs.mode, accent ?? prefs.accent),
+        width: parseChatWidth(width ?? prefs.width),
+      };
       if (next.mode === prefs.mode && next.accent === prefs.accent && next.width === prefs.width) return;
       prefs = next;
       applyTheme();

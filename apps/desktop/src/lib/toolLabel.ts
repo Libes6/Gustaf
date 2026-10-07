@@ -2,23 +2,48 @@
 // ("git status", "TASKS.md", a skill name) and how consecutive calls are folded into one summary.
 // Pure functions, no React, so the formatting is unit-testable.
 
-export type ToolKind = "command" | "read" | "list" | "search" | "edit" | "write" | "skill" | "web" | "mcp" | "computer" | "unknown";
+export type ToolKind =
+  "command" | "read" | "list" | "search" | "edit" | "write" | "skill" | "web" | "mcp" | "computer" | "unknown";
 
 type CallLike = { name: string; args?: any; computer?: unknown };
 
 const KINDS: Record<string, ToolKind> = {
-  run_command: "command", shell: "command", bash: "command", command_execution: "command", terminal: "command",
-  read_file: "read", read: "read", readfile: "read",
-  list_dir: "list", ls: "list", glob: "list", list: "list",
-  search: "search", grep: "search", codebase_search: "search", semsearch: "search",
-  edit_file: "edit", edit: "edit", multiedit: "edit", file_change: "edit", strreplace: "edit", str_replace: "edit", apply_patch: "edit",
-  write_file: "write", write: "write",
+  run_command: "command",
+  shell: "command",
+  bash: "command",
+  command_execution: "command",
+  terminal: "command",
+  read_file: "read",
+  read: "read",
+  readfile: "read",
+  list_dir: "list",
+  ls: "list",
+  glob: "list",
+  list: "list",
+  search: "search",
+  grep: "search",
+  codebase_search: "search",
+  semsearch: "search",
+  edit_file: "edit",
+  edit: "edit",
+  multiedit: "edit",
+  file_change: "edit",
+  strreplace: "edit",
+  str_replace: "edit",
+  apply_patch: "edit",
+  write_file: "write",
+  write: "write",
   skill: "skill",
-  web_fetch: "web", webfetch: "web", web_search: "web", websearch: "web", fetch_url: "web",
+  web_fetch: "web",
+  webfetch: "web",
+  web_search: "web",
+  websearch: "web",
+  fetch_url: "web",
   mcp_tool_call: "mcp",
 };
 
-export const toolKind = (call: CallLike): ToolKind => (call.computer ? "computer" : KINDS[call.name.toLowerCase()] ?? "unknown");
+export const toolKind = (call: CallLike): ToolKind =>
+  call.computer ? "computer" : (KINDS[call.name.toLowerCase()] ?? "unknown");
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -47,27 +72,50 @@ export function shortPath(path: string, projectRoot?: string): string {
 export function toolTarget(call: CallLike, projectRoot?: string): string {
   const a = call.args ?? {};
   switch (toolKind(call)) {
-    case "command": return oneLine(stripCd(str(a.command), projectRoot));
-    case "read": case "edit": case "write": return shortPath(str(a.file_path) || str(a.path) || str(a.target_file), projectRoot);
-    case "list": return shortPath(str(a.path) || str(a.target_directory) || str(a.pattern) || str(a.glob_pattern) || ".", projectRoot);
-    case "search": return oneLine(str(a.pattern) || str(a.query) || str(a.regex));
-    case "skill": return str(a.skill) || str(a.name) || str(a.command);
-    case "web": return str(a.url) || str(a.query);
-    case "mcp": return [str(a.server), str(a.tool)].filter(Boolean).join(" · ");
-    default: return "";
+    case "command":
+      return oneLine(stripCd(str(a.command), projectRoot));
+    case "read":
+    case "edit":
+    case "write":
+      return shortPath(str(a.file_path) || str(a.path) || str(a.target_file), projectRoot);
+    case "list":
+      return shortPath(
+        str(a.path) || str(a.target_directory) || str(a.pattern) || str(a.glob_pattern) || ".",
+        projectRoot,
+      );
+    case "search":
+      return oneLine(str(a.pattern) || str(a.query) || str(a.regex));
+    case "skill":
+      return str(a.skill) || str(a.name) || str(a.command);
+    case "web":
+      return str(a.url) || str(a.query);
+    case "mcp":
+      return [str(a.server), str(a.tool)].filter(Boolean).join(" · ");
+    default:
+      return "";
   }
 }
 
 /** The full, untruncated text of a row for its tooltip (multi-line commands keep their line breaks). */
 export function toolFullText(call: CallLike, projectRoot?: string): string {
-  return toolKind(call) === "command" ? stripCd(str(call.args?.command), projectRoot).trim() : toolTarget(call, projectRoot);
+  return toolKind(call) === "command"
+    ? stripCd(str(call.args?.command), projectRoot).trim()
+    : toolTarget(call, projectRoot);
 }
 
 /** Buckets of a group summary ("Ran 6 commands · 2 files read"); everything that is not one of the first four is "other". */
 export type GroupBucket = "command" | "read" | "edit" | "search" | "other";
 export const GROUP_ORDER: GroupBucket[] = ["command", "read", "edit", "search", "other"];
 
-const BUCKET: Partial<Record<ToolKind, GroupBucket>> = { command: "command", read: "read", edit: "edit", write: "edit", search: "search", list: "search", web: "search" };
+const BUCKET: Partial<Record<ToolKind, GroupBucket>> = {
+  command: "command",
+  read: "read",
+  edit: "edit",
+  write: "edit",
+  search: "search",
+  list: "search",
+  web: "search",
+};
 
 export function groupCounts(calls: CallLike[]): Partial<Record<GroupBucket, number>> {
   const out: Partial<Record<GroupBucket, number>> = {};

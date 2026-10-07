@@ -57,7 +57,9 @@ export function cursorLevels(model: string, listed?: Iterable<string>): readonly
   const m = model.toLowerCase();
   if (m.includes("[") || CURSOR_LEVEL_SUFFIX.test(m)) return NONE;
   // A plain id listed next to its own level variants (`gpt-5.2` beside `gpt-5.2-high`) belongs to the old scheme too.
-  if (listed) for (const id of listed) if (id.toLowerCase().startsWith(`${m}-`) && CURSOR_LEVEL_SUFFIX.test(id.toLowerCase())) return NONE;
+  if (listed)
+    for (const id of listed)
+      if (id.toLowerCase().startsWith(`${m}-`) && CURSOR_LEVEL_SUFFIX.test(id.toLowerCase())) return NONE;
   return /^(claude-(opus|sonnet|fable|mythos)-|gpt-5|gpt-6)/.test(m) ? BASIC : NONE;
 }
 
@@ -75,7 +77,11 @@ export function pickLevel(level: Reasoning | undefined, levels: readonly Reasoni
   if (!level || !levels.length) return undefined;
   if (levels.includes(level)) return level;
   const want = ALL_LEVELS.indexOf(level);
-  return [...levels].sort((a, b) => Math.abs(ALL_LEVELS.indexOf(a) - want) - Math.abs(ALL_LEVELS.indexOf(b) - want) || ALL_LEVELS.indexOf(a) - ALL_LEVELS.indexOf(b))[0];
+  return [...levels].sort(
+    (a, b) =>
+      Math.abs(ALL_LEVELS.indexOf(a) - want) - Math.abs(ALL_LEVELS.indexOf(b) - want) ||
+      ALL_LEVELS.indexOf(a) - ALL_LEVELS.indexOf(b),
+  )[0];
 }
 
 /** Reset target in the composer: `medium` when offered, else the middle level. */
@@ -85,7 +91,16 @@ export function defaultLevel(levels: readonly Reasoning[]): Reasoning | undefine
 
 // ---- effort that the provider reports per model ----------------------------------------------------------------------
 
-const VALUE_LEVEL: Record<string, Reasoning> = { low: "low", medium: "medium", high: "high", xhigh: "xhigh", "x-high": "xhigh", "extra-high": "xhigh", extra_high: "xhigh", max: "max" };
+const VALUE_LEVEL: Record<string, Reasoning> = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  "x-high": "xhigh",
+  "extra-high": "xhigh",
+  extra_high: "xhigh",
+  max: "max",
+};
 
 /** The effort parameter of a Cursor SDK model (`ModelListItem.parameters`), or undefined when it has none (or fewer than two usable stops). */
 export function sdkEffort(parameters: unknown): EffortSpec | undefined {
@@ -109,7 +124,8 @@ export function openRouterEffort(supportedParameters: unknown): EffortSpec | und
   return { param: "reasoning", values: { low: "low", medium: "medium", high: "high" } };
 }
 
-export const specLevels = (spec: EffortSpec | undefined): readonly Reasoning[] => (spec ? ALL_LEVELS.filter((l) => spec.values[l] !== undefined) : NONE);
+export const specLevels = (spec: EffortSpec | undefined): readonly Reasoning[] =>
+  spec ? ALL_LEVELS.filter((l) => spec.values[l] !== undefined) : NONE;
 
 // The last model list of each provider (fresh or cached) feeds this, so adapters know a model's effort without listing again.
 const reported = new Map<string, Map<string, EffortSpec>>();
@@ -122,4 +138,5 @@ export function rememberEfforts(models: readonly ModelInfo[]) {
   }
   for (const [id, own] of next) reported.set(id, own);
 }
-export const reportedEffort = (providerId: string, model: string): EffortSpec | undefined => reported.get(providerId)?.get(model);
+export const reportedEffort = (providerId: string, model: string): EffortSpec | undefined =>
+  reported.get(providerId)?.get(model);

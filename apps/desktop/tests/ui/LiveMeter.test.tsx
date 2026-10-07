@@ -4,10 +4,16 @@ import { LiveMeter } from "../../src/components/LiveMeter";
 import { renderApp } from "./render";
 
 const START = 1_700_000_000_000;
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(START); });
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(START);
+});
 afterEach(() => vi.useRealTimers());
 
-const advance = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
+const advance = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
 const meter = () => document.querySelector(".live-meter")!.textContent;
 
 describe("LiveMeter", () => {

@@ -1,6 +1,33 @@
-import { freezeChat, shortenChat, splitComposerText, joinComposerText, isLargePaste, pasteStats, CHAT_REFERENCE_LIMIT, type ChatReference, type PastedText } from "../../lib/chatContext";
+import {
+  freezeChat,
+  shortenChat,
+  splitComposerText,
+  joinComposerText,
+  isLargePaste,
+  pasteStats,
+  CHAT_REFERENCE_LIMIT,
+  type ChatReference,
+  type PastedText,
+} from "../../lib/chatContext";
 import { loadMessages, type Chat } from "../../lib/data";
-import { ArrowUp, AtSign, Bot, MessageCircle, ListTodo, ChevronDown, GitBranch, ImagePlus, Lock, Monitor, Plug, Plus, ShieldCheck, Square, Unlock, X } from "lucide-react";
+import {
+  ArrowUp,
+  AtSign,
+  Bot,
+  MessageCircle,
+  ListTodo,
+  ChevronDown,
+  GitBranch,
+  ImagePlus,
+  Lock,
+  Monitor,
+  Plug,
+  Plus,
+  ShieldCheck,
+  Square,
+  Unlock,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Access } from "../../agent/agent";
 import { loadMcpConfig, onMcpConfigChange } from "../../agent/mcp/runtime";
@@ -12,7 +39,13 @@ import { computer } from "../../lib/api";
 import { McpPromptDialog } from "../McpPromptDialog";
 import { pickAccount } from "../../providers/cursorAccounts";
 import { useCursorPool } from "../../providers/cursorPoolStore";
-import { DEFAULT_REASONING, REASONING_LEVELS, type ModelInfo, type ProviderConfig, type Reasoning } from "../../providers/types";
+import {
+  DEFAULT_REASONING,
+  REASONING_LEVELS,
+  type ModelInfo,
+  type ProviderConfig,
+  type Reasoning,
+} from "../../providers/types";
 import { pickLevel } from "../../providers/reasoning";
 import { useApp } from "../../state";
 import { useMenu } from "../Menu";
@@ -83,44 +116,77 @@ export function Composer(p: Props) {
   const { text, setText, images, setImages, taRef, root, selectedModel } = p;
   const { body: composerBody, pastes, references } = splitComposerText(text);
   // Composer text = what is in the field, then pasted-text cards, then attached chats (lib/chatContext.ts).
-  const compose = (body: string, refs: ChatReference[] = references, ps: PastedText[] = pastes) => joinComposerText(body, ps, refs);
+  const compose = (body: string, refs: ChatReference[] = references, ps: PastedText[] = pastes) =>
+    joinComposerText(body, ps, refs);
   const [pendingChat, setPendingChat] = useState<ChatReference | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const ru = app.locale === "ru";
   const attachChat = async (chat: Chat) => {
     const scope = currentScope.current;
-    setChatLoading(true); setAttachmentError("");
+    setChatLoading(true);
+    setAttachmentError("");
     try {
       const ref = freezeChat(chat.id, chat.title, await loadMessages(chat.id));
       if (scope !== currentScope.current) return;
-      setPendingChat(ref); setMention(null);
-    } catch { setAttachmentError(ru ? "Не удалось прочитать чат" : "Could not read chat"); }
-    finally { if (scope === currentScope.current) setChatLoading(false); }
+      setPendingChat(ref);
+      setMention(null);
+    } catch {
+      setAttachmentError(ru ? "Не удалось прочитать чат" : "Could not read chat");
+    } finally {
+      if (scope === currentScope.current) setChatLoading(false);
+    }
   };
   const confirmChat = (ref: ChatReference) => {
     const latest = splitComposerText(text);
-    const next = compose(latest.body.replace(/@([^\s@]*)$/, ""), [...latest.references.filter(r => r.sourceId !== ref.sourceId), ref], latest.pastes);
-    if (next.length > 200_000) { setAttachmentError(ru ? "Снимок превышает лимит черновика (200 000 символов). Выберите сокращённую версию или удалите другое вложение." : "Snapshot exceeds draft limit (200,000 characters). Choose shortened version or remove another attachment."); return; }
+    const next = compose(
+      latest.body.replace(/@([^\s@]*)$/, ""),
+      [...latest.references.filter((r) => r.sourceId !== ref.sourceId), ref],
+      latest.pastes,
+    );
+    if (next.length > 200_000) {
+      setAttachmentError(
+        ru
+          ? "Снимок превышает лимит черновика (200 000 символов). Выберите сокращённую версию или удалите другое вложение."
+          : "Snapshot exceeds draft limit (200,000 characters). Choose shortened version or remove another attachment.",
+      );
+      return;
+    }
     setText(next);
-    setPendingChat(null); taRef.current?.focus();
+    setPendingChat(null);
+    taRef.current?.focus();
   };
   const instructions = useInstructionReport(root, p.provider);
   // Cursor account rotation: which account the next message will use (only when the selected one is in the pool).
   const pool = useCursorPool();
-  const pick = p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id) ? pickAccount(pool, app.providers, Date.now()) : undefined;
-  const accountTitle = pick?.ok ? t("cursorActiveAccount", { name: app.providers.find(x => x.id === pick.id)?.name ?? "" }) : undefined;
+  const pick =
+    p.provider && pool.ids.length > 1 && pool.ids.includes(p.provider.id)
+      ? pickAccount(pool, app.providers, Date.now())
+      : undefined;
+  const accountTitle = pick?.ok
+    ? t("cursorActiveAccount", { name: app.providers.find((x) => x.id === pick.id)?.name ?? "" })
+    : undefined;
   const [picker, setPicker] = useState(false);
   // Models picked with shift-click for a fan-out; offered only where a workspace can be created for each of them.
   const [fanKeys, setFanKeys] = useState<string[]>([]);
   const fanAllowed = !!p.onFanOut && !!p.workspace?.available;
-  const fanModels = fanAllowed ? fanKeys.map((k) => app.models.find((m) => modelKey(m) === k)).filter((m): m is NonNullable<typeof m> => !!m) : [];
-  useEffect(() => { if (!fanAllowed && fanKeys.length) setFanKeys([]); }, [fanAllowed]);
-  const toggleFan = (m: ModelInfo) => setFanKeys((ks) => {
-    const base = ks.length ? ks : app.selection ? [modelKey({ providerId: app.selection.providerId, id: app.selection.model })] : [];
-    const k = modelKey(m);
-    return base.includes(k) ? base.filter((x) => x !== k) : base.length >= FAN_OUT_MAX ? base : [...base, k];
-  });
-  const send = (opposite = false) => (fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend(opposite));
+  const fanModels = fanAllowed
+    ? fanKeys.map((k) => app.models.find((m) => modelKey(m) === k)).filter((m): m is NonNullable<typeof m> => !!m)
+    : [];
+  useEffect(() => {
+    if (!fanAllowed && fanKeys.length) setFanKeys([]);
+  }, [fanAllowed]);
+  const toggleFan = (m: ModelInfo) =>
+    setFanKeys((ks) => {
+      const base = ks.length
+        ? ks
+        : app.selection
+          ? [modelKey({ providerId: app.selection.providerId, id: app.selection.model })]
+          : [];
+      const k = modelKey(m);
+      return base.includes(k) ? base.filter((x) => x !== k) : base.length >= FAN_OUT_MAX ? base : [...base, k];
+    });
+  const send = (opposite = false) =>
+    fanModels.length > 1 ? (p.onFanOut!(fanModels), setFanKeys([])) : p.onSend(opposite);
   useShortcuts();
   const effortMenu = useMenu();
   // The stored level may belong to another model (xhigh on Opus, then a GPT model): show and reset within this model's levels.
@@ -130,28 +196,58 @@ export function Composer(p: Props) {
   const [promptDialog, setPromptDialog] = useState(false);
   const [hasMcp, setHasMcp] = useState(false);
   useEffect(() => {
-    const load = () => loadMcpConfig().then((c) => setHasMcp(c.servers.some((s) => s.enabled)), () => {});
+    const load = () =>
+      loadMcpConfig().then(
+        (c) => setHasMcp(c.servers.some((s) => s.enabled)),
+        () => {},
+      );
     load();
     return onMcpConfigChange(load);
   }, []);
   const [mention, setMention] = useState<{ q: string; hl: number } | null>(null);
-  const [attachmentError,setAttachmentError]=useState("");
-  const [capturing,setCapturing]=useState(false);
-  const currentScope=useRef(p.scopeKey); currentScope.current=p.scopeKey;
-  useEffect(() => { setPendingChat(null); setChatLoading(false); }, [p.scopeKey]);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [capturing, setCapturing] = useState(false);
+  const currentScope = useRef(p.scopeKey);
+  currentScope.current = p.scopeKey;
+  useEffect(() => {
+    setPendingChat(null);
+    setChatLoading(false);
+  }, [p.scopeKey]);
   const fileInput = useRef<HTMLInputElement>(null);
   const [skills, setSkills] = useState<Skill[]>(() => mergeSkills([]));
   const [slash, setSlash] = useState<{ q: string; hl: number } | null>(null);
   const [skillError, setSkillError] = useState(false);
   useEffect(() => {
     let stale = false;
-    loadSkills(root, true).then(xs => { if (!stale) { setSkills(xs); setSkillError(false); } }, () => { if (!stale) { setSkills(mergeSkills([])); setSkillError(true); } });
-    return () => { stale = true; };
+    loadSkills(root, true).then(
+      (xs) => {
+        if (!stale) {
+          setSkills(xs);
+          setSkillError(false);
+        }
+      },
+      () => {
+        if (!stale) {
+          setSkills(mergeSkills([]));
+          setSkillError(true);
+        }
+      },
+    );
+    return () => {
+      stale = true;
+    };
   }, [root, !!slash]);
   // `/goal` is a built-in command of the chat run (lib/goalCore.ts), listed first next to the skills.
   const goalCommand: Skill = { id: "command:goal", name: "goal", source: "builtin", description: t("goalCommandHint") };
-  const watchCommand: Skill = { id: "command:watch", name: "watch", source: "builtin", description: t("prWatchCommandHint") };
-  const slashList = slash ? [goalCommand, watchCommand, ...skills].filter(s => s.name.includes(slash.q.toLowerCase())).slice(0, 12) : [];
+  const watchCommand: Skill = {
+    id: "command:watch",
+    name: "watch",
+    source: "builtin",
+    description: t("prWatchCommandHint"),
+  };
+  const slashList = slash
+    ? [goalCommand, watchCommand, ...skills].filter((s) => s.name.includes(slash.q.toLowerCase())).slice(0, 12)
+    : [];
   const insertSkill = (skill: Skill) => {
     setText(`/${skill.name} `);
     setSlash(null);
@@ -163,7 +259,15 @@ export function Composer(p: Props) {
     ta.style.height = "auto";
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text]);
-  useEffect(() => { if (p.visible) taRef.current?.focus(); else { setPicker(false); effortMenu.close(); setMention(null); setSlash(null); } }, [p.visible]);
+  useEffect(() => {
+    if (p.visible) taRef.current?.focus();
+    else {
+      setPicker(false);
+      effortMenu.close();
+      setMention(null);
+      setSlash(null);
+    }
+  }, [p.visible]);
   // The "Try another model" button of a verification card (docs/features/verification-gates.md) opens the picker; it never re-runs anything.
   useEffect(() => {
     if (!p.visible) return;
@@ -172,10 +276,18 @@ export function Composer(p: Props) {
     return () => removeEventListener(OPEN_MODEL_PICKER_EVENT, open);
   }, [p.visible, app.providers.length]);
 
-  const mentionList = mention ? [
-    ...p.files.filter(f => f.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(path => ({ path, chat: undefined as Chat | undefined, label: path })),
-    ...app.chats.filter(c => c.title.toLowerCase().includes(mention.q.toLowerCase())).slice(0, 6).map(chat => ({ path: "", chat, label: `💬 ${chat.title}` }))
-  ].slice(0, 12) : [];
+  const mentionList = mention
+    ? [
+        ...p.files
+          .filter((f) => f.toLowerCase().includes(mention.q.toLowerCase()))
+          .slice(0, 6)
+          .map((path) => ({ path, chat: undefined as Chat | undefined, label: path })),
+        ...app.chats
+          .filter((c) => c.title.toLowerCase().includes(mention.q.toLowerCase()))
+          .slice(0, 6)
+          .map((chat) => ({ path: "", chat, label: `💬 ${chat.title}` })),
+      ].slice(0, 12)
+    : [];
   const insertMention = (path: string) => {
     setText(compose(composerBody.replace(/@([^\s@]*)$/, `@${path} `), references));
     setMention(null);
@@ -185,48 +297,93 @@ export function Composer(p: Props) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) return;
     if (slash && slashList.length) {
-      if (e.key === "ArrowDown") return e.preventDefault(), setSlash({ ...slash, hl: Math.min(slash.hl + 1, slashList.length - 1) });
-      if (e.key === "ArrowUp") return e.preventDefault(), setSlash({ ...slash, hl: Math.max(slash.hl - 1, 0) });
-      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), insertSkill(slashList[Math.min(slash.hl, slashList.length - 1)]);
-      if (e.key === "Escape") return e.preventDefault(), setSlash(null);
+      if (e.key === "ArrowDown")
+        return (e.preventDefault(), setSlash({ ...slash, hl: Math.min(slash.hl + 1, slashList.length - 1) }));
+      if (e.key === "ArrowUp") return (e.preventDefault(), setSlash({ ...slash, hl: Math.max(slash.hl - 1, 0) }));
+      if (e.key === "Enter" || e.key === "Tab")
+        return (e.preventDefault(), insertSkill(slashList[Math.min(slash.hl, slashList.length - 1)]));
+      if (e.key === "Escape") return (e.preventDefault(), setSlash(null));
     }
     if (mention && mentionList.length) {
-      if (e.key === "ArrowDown") return e.preventDefault(), setMention({ ...mention, hl: Math.min(mention.hl + 1, mentionList.length - 1) });
-      if (e.key === "ArrowUp") return e.preventDefault(), setMention({ ...mention, hl: Math.max(mention.hl - 1, 0) });
-      if (e.key === "Enter" || e.key === "Tab") return e.preventDefault(), (mentionList[Math.min(mention.hl, mentionList.length - 1)].chat ? void attachChat(mentionList[Math.min(mention.hl, mentionList.length - 1)].chat!) : insertMention(mentionList[Math.min(mention.hl, mentionList.length - 1)].path));
+      if (e.key === "ArrowDown")
+        return (e.preventDefault(), setMention({ ...mention, hl: Math.min(mention.hl + 1, mentionList.length - 1) }));
+      if (e.key === "ArrowUp") return (e.preventDefault(), setMention({ ...mention, hl: Math.max(mention.hl - 1, 0) }));
+      if (e.key === "Enter" || e.key === "Tab")
+        return (
+          e.preventDefault(),
+          mentionList[Math.min(mention.hl, mentionList.length - 1)].chat
+            ? void attachChat(mentionList[Math.min(mention.hl, mentionList.length - 1)].chat!)
+            : insertMention(mentionList[Math.min(mention.hl, mentionList.length - 1)].path)
+        );
       if (e.key === "Escape") return setMention(null);
     }
-    if (p.running && matches(e.nativeEvent, "followUpOpposite")) return e.preventDefault(), send(true);
+    if (p.running && matches(e.nativeEvent, "followUpOpposite")) return (e.preventDefault(), send(true));
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       send();
       // ⌘⌥↵: the message goes out here and a fresh chat opens next to it (the run continues in the background).
-      if (e.altKey && cmdKey(e.nativeEvent) && (text.trim() || images.length)) app.newChat(app.sessions.items.find((s) => s.key === app.sessions.active)?.projectId ?? null);
+      if (e.altKey && cmdKey(e.nativeEvent) && (text.trim() || images.length))
+        app.newChat(app.sessions.items.find((s) => s.key === app.sessions.active)?.projectId ?? null);
     }
   };
 
   const addImageFiles = (list: FileList | File[]) => {
-    const scope=p.scopeKey;
-    if(selectedModel?.images===false){setAttachmentError(t("imageUnsupported"));return;}
-    for(const file of Array.from(list).filter(f=>f.type.startsWith("image/")).slice(0,8)){
-      if(file.size>10*1024*1024){setAttachmentError(t("imageTooLarge"));continue;}
-      const reader=new FileReader();
-      reader.onerror=()=>setAttachmentError(t("imageReadError"));
-      reader.onload=()=>{
-        if(scope!==currentScope.current)return;
-        if(file.type==="image/png")setImages(xs=>[...xs,String(reader.result).split(",")[1]].slice(0,8));
+    const scope = p.scopeKey;
+    if (selectedModel?.images === false) {
+      setAttachmentError(t("imageUnsupported"));
+      return;
+    }
+    for (const file of Array.from(list)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, 8)) {
+      if (file.size > 10 * 1024 * 1024) {
+        setAttachmentError(t("imageTooLarge"));
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => setAttachmentError(t("imageReadError"));
+      reader.onload = () => {
+        if (scope !== currentScope.current) return;
+        if (file.type === "image/png") setImages((xs) => [...xs, String(reader.result).split(",")[1]].slice(0, 8));
         else {
-          const image=new Image();image.onerror=()=>setAttachmentError(t("imageReadError"));image.onload=()=>{
-            if(scope!==currentScope.current)return;
-            const canvas=document.createElement("canvas");const scale=Math.min(1,4096/Math.max(image.naturalWidth,image.naturalHeight));canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-            const ctx=canvas.getContext("2d");if(!ctx){setAttachmentError(t("imageReadError"));return;}ctx.drawImage(image,0,0,canvas.width,canvas.height);setImages(xs=>[...xs,canvas.toDataURL("image/png").split(",")[1]].slice(0,8));
-          };image.src=String(reader.result);
+          const image = new Image();
+          image.onerror = () => setAttachmentError(t("imageReadError"));
+          image.onload = () => {
+            if (scope !== currentScope.current) return;
+            const canvas = document.createElement("canvas");
+            const scale = Math.min(1, 4096 / Math.max(image.naturalWidth, image.naturalHeight));
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              setAttachmentError(t("imageReadError"));
+              return;
+            }
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            setImages((xs) => [...xs, canvas.toDataURL("image/png").split(",")[1]].slice(0, 8));
+          };
+          image.src = String(reader.result);
         }
-      };reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
     }
   };
-  const screenshot=async()=>{const scope=p.scopeKey;setCapturing(true);setAttachmentError("");try{const shot=await computer.execute([]);if(scope===currentScope.current){if(!shot.png)throw Error(t("imageReadError"));setImages(xs=>[...xs,shot.png].slice(0,8));}}catch(e){if(scope===currentScope.current)setAttachmentError(String(e));}finally{setCapturing(false);}};
-
+  const screenshot = async () => {
+    const scope = p.scopeKey;
+    setCapturing(true);
+    setAttachmentError("");
+    try {
+      const shot = await computer.execute([]);
+      if (scope === currentScope.current) {
+        if (!shot.png) throw Error(t("imageReadError"));
+        setImages((xs) => [...xs, shot.png].slice(0, 8));
+      }
+    } catch (e) {
+      if (scope === currentScope.current) setAttachmentError(String(e));
+    } finally {
+      setCapturing(false);
+    }
+  };
 
   const AccessIcon = ACCESS_ICON[app.access];
   const accessLabel = { readonly: t("accessReadonly"), auto: t("accessAuto"), full: t("accessFull") }[app.access];
@@ -237,61 +394,215 @@ export function Composer(p: Props) {
         <div
           className="composer"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); const id = Number(e.dataTransfer.getData("text/chat")); const chat = app.chats.find(c => c.id === id); if (chat) void attachChat(chat); else addImageFiles(e.dataTransfer.files); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const id = Number(e.dataTransfer.getData("text/chat"));
+            const chat = app.chats.find((c) => c.id === id);
+            if (chat) void attachChat(chat);
+            else addImageFiles(e.dataTransfer.files);
+          }}
         >
-          {attachmentError && <div className="error-box" role="alert">{attachmentError}<button className="btn-ghost" onClick={()=>setAttachmentError("")}>{t("cancel")}</button></div>}
+          {attachmentError && (
+            <div className="error-box" role="alert">
+              {attachmentError}
+              <button className="btn-ghost" onClick={() => setAttachmentError("")}>
+                {t("cancel")}
+              </button>
+            </div>
+          )}
           {slash && slashList.length > 0 && (
-            <div className="menu mention-list skill-list" id="skill-list" role="listbox" aria-label={app.locale === "ru" ? "Команды и навыки" : "Commands and skills"} style={{ position: "absolute" }}>
-              {skillError && <div className="menu-heading">{app.locale === "ru" ? "Не удалось прочитать навыки; доступны встроенные команды" : "Skills could not be read; built-in commands are available"}</div>}
+            <div
+              className="menu mention-list skill-list"
+              id="skill-list"
+              role="listbox"
+              aria-label={app.locale === "ru" ? "Команды и навыки" : "Commands and skills"}
+              style={{ position: "absolute" }}
+            >
+              {skillError && (
+                <div className="menu-heading">
+                  {app.locale === "ru"
+                    ? "Не удалось прочитать навыки; доступны встроенные команды"
+                    : "Skills could not be read; built-in commands are available"}
+                </div>
+              )}
               {slashList.map((s, i) => (
-                <button key={s.id} id={`skill-opt-${i}`} role="option" aria-selected={i === slash.hl} tabIndex={-1} className={`menu-item${i === slash.hl ? " hl" : ""}`} onMouseDown={e => { e.preventDefault(); insertSkill(s); }}>
-                  <span className="skill-option-content"><span className="skill-option-name">/{s.name}</span><span className="skill-option-description" title={s.description}>{s.description}</span><span className="skill-option-source">{s.source}</span></span>
+                <button
+                  key={s.id}
+                  id={`skill-opt-${i}`}
+                  role="option"
+                  aria-selected={i === slash.hl}
+                  tabIndex={-1}
+                  className={`menu-item${i === slash.hl ? " hl" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertSkill(s);
+                  }}
+                >
+                  <span className="skill-option-content">
+                    <span className="skill-option-name">/{s.name}</span>
+                    <span className="skill-option-description" title={s.description}>
+                      {s.description}
+                    </span>
+                    <span className="skill-option-source">{s.source}</span>
+                  </span>
                 </button>
               ))}
             </div>
           )}
           {mention && mentionList.length > 0 && (
-            <div className="menu mention-list" id="mention-list" role="listbox" aria-label={t("mentionFile")} style={{ position: "absolute" }}>
+            <div
+              className="menu mention-list"
+              id="mention-list"
+              role="listbox"
+              aria-label={t("mentionFile")}
+              style={{ position: "absolute" }}
+            >
               {mentionList.map((f, i) => (
-                <button key={f.chat ? `chat:${f.chat.id}` : f.path} id={`mention-opt-${i}`} role="option" aria-selected={i === mention.hl} tabIndex={-1} className={`menu-item${i === mention.hl ? " hl" : ""}`} onMouseDown={(e) => (e.preventDefault(), (f.chat ? void attachChat(f.chat) : insertMention(f.path)))}>
-                  <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f.label}</span>
+                <button
+                  key={f.chat ? `chat:${f.chat.id}` : f.path}
+                  id={`mention-opt-${i}`}
+                  role="option"
+                  aria-selected={i === mention.hl}
+                  tabIndex={-1}
+                  className={`menu-item${i === mention.hl ? " hl" : ""}`}
+                  onMouseDown={(e) => (e.preventDefault(), f.chat ? void attachChat(f.chat) : insertMention(f.path))}
+                >
+                  <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {f.label}
+                  </span>
                 </button>
               ))}
             </div>
           )}
           {chatLoading && <div role="status">{ru ? "Читаю чат…" : "Reading chat…"}</div>}
-          {references.map((ref, i) => <div key={`${ref.sourceId}:${i}`} className="chat-reference">
-            <button className="btn-ghost" disabled={!app.chats.some(c => c.id === ref.sourceId)} onClick={() => app.openChat(ref.sourceId, app.chats.find(c => c.id === ref.sourceId)?.project_id ?? null)}>{ref.title}</button>
-            <span>{ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}{ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}</span>
-            <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references.filter((_, j) => j !== i)))}><X size={14} /></button>
-            <details><summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary><pre>{ref.snapshot}</pre></details>
-          </div>)}
+          {references.map((ref, i) => (
+            <div key={`${ref.sourceId}:${i}`} className="chat-reference">
+              <button
+                className="btn-ghost"
+                disabled={!app.chats.some((c) => c.id === ref.sourceId)}
+                onClick={() =>
+                  app.openChat(ref.sourceId, app.chats.find((c) => c.id === ref.sourceId)?.project_id ?? null)
+                }
+              >
+                {ref.title}
+              </button>
+              <span>
+                {ref.snapshot.length.toLocaleString()} {ru ? "символов" : "characters"}
+                {ref.shortened ? (ru ? " · сокращено" : " · shortened") : ""}
+              </span>
+              <button
+                className="btn-ghost"
+                aria-label={t("removeAttachment")}
+                onClick={() =>
+                  setText(
+                    compose(
+                      composerBody,
+                      references.filter((_, j) => j !== i),
+                    ),
+                  )
+                }
+              >
+                <X size={14} />
+              </button>
+              <details>
+                <summary>{ru ? "Точный текст для отправки" : "Exact text to send"}</summary>
+                <pre>{ref.snapshot}</pre>
+              </details>
+            </div>
+          ))}
           {pastes.map((paste, i) => {
             const { lines, chars } = pasteStats(paste);
             return (
               <div key={`paste:${i}`} className="chat-reference paste-card" role="group" aria-label={t("pastedText")}>
                 <strong>{t("pastedText")}</strong>
-                <span>{t("pastedTextStats", { lines: lines.toLocaleString(app.locale), chars: chars.toLocaleString(app.locale) })}</span>
-                <button className="btn-ghost" onClick={() => setText(compose(composerBody + (composerBody && !composerBody.endsWith("\n") ? "\n" : "") + paste.text, references, pastes.filter((_, j) => j !== i)))}>{t("pastedTextInline")}</button>
-                <button className="btn-ghost" aria-label={t("removeAttachment")} onClick={() => setText(compose(composerBody, references, pastes.filter((_, j) => j !== i)))}><X size={14} /></button>
-                <details><summary>{t("pastedTextShow")}</summary><pre>{paste.text}</pre></details>
+                <span>
+                  {t("pastedTextStats", {
+                    lines: lines.toLocaleString(app.locale),
+                    chars: chars.toLocaleString(app.locale),
+                  })}
+                </span>
+                <button
+                  className="btn-ghost"
+                  onClick={() =>
+                    setText(
+                      compose(
+                        composerBody + (composerBody && !composerBody.endsWith("\n") ? "\n" : "") + paste.text,
+                        references,
+                        pastes.filter((_, j) => j !== i),
+                      ),
+                    )
+                  }
+                >
+                  {t("pastedTextInline")}
+                </button>
+                <button
+                  className="btn-ghost"
+                  aria-label={t("removeAttachment")}
+                  onClick={() =>
+                    setText(
+                      compose(
+                        composerBody,
+                        references,
+                        pastes.filter((_, j) => j !== i),
+                      ),
+                    )
+                  }
+                >
+                  <X size={14} />
+                </button>
+                <details>
+                  <summary>{t("pastedTextShow")}</summary>
+                  <pre>{paste.text}</pre>
+                </details>
               </div>
             );
           })}
-          {pendingChat && <div className="chat-reference" role="region" aria-label={ru ? "Прикрепить чат" : "Attach chat"}>
-            <strong>{pendingChat.title}</strong> · {pendingChat.fullSize.toLocaleString()} {ru ? "символов" : "characters"}
-            <p>{ru ? "Разговор будет отправлен как текстовый справочный материал (изображения не копируются). Снимок сохраняется независимо от последующих изменений исходника." : "Conversation is sent as text reference material (images are not copied). The snapshot is retained independently of later source edits."}</p>
-            <details><summary>{ru ? "Полный снимок" : "Full snapshot"}</summary><pre>{pendingChat.snapshot}</pre></details>
-            <button className="btn" onClick={() => confirmChat(pendingChat)}>{ru ? "Прикрепить полностью" : "Attach full version"}</button>
-            {pendingChat.fullSize > CHAT_REFERENCE_LIMIT && <><p>{ru ? "Большой разговор увеличит расход контекста. Можно явно сократить середину." : "A large conversation consumes more context. You can explicitly omit the middle."}</p><button className="btn" onClick={() => confirmChat(shortenChat(pendingChat))}>{ru ? "Прикрепить сокращённо" : "Attach shortened version"}</button></>}
-            <button className="btn-ghost" onClick={() => setPendingChat(null)}>{t("cancel")}</button>
-          </div>}
+          {pendingChat && (
+            <div className="chat-reference" role="region" aria-label={ru ? "Прикрепить чат" : "Attach chat"}>
+              <strong>{pendingChat.title}</strong> · {pendingChat.fullSize.toLocaleString()}{" "}
+              {ru ? "символов" : "characters"}
+              <p>
+                {ru
+                  ? "Разговор будет отправлен как текстовый справочный материал (изображения не копируются). Снимок сохраняется независимо от последующих изменений исходника."
+                  : "Conversation is sent as text reference material (images are not copied). The snapshot is retained independently of later source edits."}
+              </p>
+              <details>
+                <summary>{ru ? "Полный снимок" : "Full snapshot"}</summary>
+                <pre>{pendingChat.snapshot}</pre>
+              </details>
+              <button className="btn" onClick={() => confirmChat(pendingChat)}>
+                {ru ? "Прикрепить полностью" : "Attach full version"}
+              </button>
+              {pendingChat.fullSize > CHAT_REFERENCE_LIMIT && (
+                <>
+                  <p>
+                    {ru
+                      ? "Большой разговор увеличит расход контекста. Можно явно сократить середину."
+                      : "A large conversation consumes more context. You can explicitly omit the middle."}
+                  </p>
+                  <button className="btn" onClick={() => confirmChat(shortenChat(pendingChat))}>
+                    {ru ? "Прикрепить сокращённо" : "Attach shortened version"}
+                  </button>
+                </>
+              )}
+              <button className="btn-ghost" onClick={() => setPendingChat(null)}>
+                {t("cancel")}
+              </button>
+            </div>
+          )}
           {images.length > 0 && (
             <div className="attach-list">
               {images.map((d, i) => (
                 <div key={i} className="attach">
-                  <ImageThumb src={`data:image/png;base64,${d}`} alt={t("attachedImage", { n: i + 1, total: images.length })} />
-                  <button title={t("removeAttachment")} aria-label={t("removeAttachment")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
+                  <ImageThumb
+                    src={`data:image/png;base64,${d}`}
+                    alt={t("attachedImage", { n: i + 1, total: images.length })}
+                  />
+                  <button
+                    title={t("removeAttachment")}
+                    aria-label={t("removeAttachment")}
+                    onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}
+                  >
                     <X size={11} />
                   </button>
                 </div>
@@ -302,8 +613,16 @@ export function Composer(p: Props) {
             ref={taRef}
             aria-label={t("askAnything")}
             aria-haspopup="listbox"
-            aria-controls={slash && slashList.length ? "skill-list" : mention && mentionList.length ? "mention-list" : undefined}
-            aria-activedescendant={slash && slashList.length ? `skill-opt-${Math.min(slash.hl, slashList.length - 1)}` : mention && mentionList.length ? `mention-opt-${mention.hl}` : undefined}
+            aria-controls={
+              slash && slashList.length ? "skill-list" : mention && mentionList.length ? "mention-list" : undefined
+            }
+            aria-activedescendant={
+              slash && slashList.length
+                ? `skill-opt-${Math.min(slash.hl, slashList.length - 1)}`
+                : mention && mentionList.length
+                  ? `mention-opt-${mention.hl}`
+                  : undefined
+            }
             rows={1}
             value={composerBody}
             placeholder={p.projectName ? t("askProject") : t("askAnything")}
@@ -316,10 +635,19 @@ export function Composer(p: Props) {
             }}
             onKeyDown={onKeyDown}
             onBlur={() => setSlash(null)}
-            onPaste={e => {
-              const files = Array.from(e.clipboardData.items ?? []).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => !!file);
-              const images = files.length ? files : Array.from(e.clipboardData.files).filter(file => file.type.startsWith("image/"));
-              if (images.length) { e.preventDefault(); addImageFiles(images); return; }
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.items ?? [])
+                .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+                .map((item) => item.getAsFile())
+                .filter((file): file is File => !!file);
+              const images = files.length
+                ? files
+                : Array.from(e.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+              if (images.length) {
+                e.preventDefault();
+                addImageFiles(images);
+                return;
+              }
               // A large text paste becomes a card instead of filling the field (the model still gets all of it).
               const pasted = e.clipboardData.getData?.("text/plain") ?? "";
               if (!pasted || !isLargePaste(pasted)) return;
@@ -327,7 +655,10 @@ export function Composer(p: Props) {
               const field = e.currentTarget;
               const body = composerBody.slice(0, field.selectionStart) + composerBody.slice(field.selectionEnd);
               const next = compose(body, references, [...pastes, { text: pasted }]);
-              if (next.length > 200_000) { setAttachmentError(t("pasteTooLarge")); return; }
+              if (next.length > 200_000) {
+                setAttachmentError(t("pasteTooLarge"));
+                return;
+              }
               setAttachmentError("");
               setText(next);
             }}
@@ -341,37 +672,124 @@ export function Composer(p: Props) {
               aria-label={t("attach")}
               aria-haspopup="menu"
               onClick={(e) =>
-                addMenu.open(e.currentTarget.getBoundingClientRect(), [
-                  { heading: t("attach") },
-                  ...(selectedModel?.images !== false ? [{label: capturing ? t("capturingScreenshot") : t("takeScreenshot"), icon:<Monitor size={15}/>,onClick:()=>{if(!capturing)void screenshot();}}] : []),
-                  ...(selectedModel?.images !== false ? [{ label: t("attachImage"), icon: <ImagePlus size={15} />, onClick: () => fileInput.current?.click() }] : []),
-                  { label: ru ? "Прикрепить чат" : "Attach chat", icon: <MessageCircle size={15} />, onClick: () => { setText(compose(composerBody + " @", references)); setMention({ q: "", hl: 0 }); taRef.current?.focus(); } },
-                  ...(root ? [{ label: t("mentionFile"), icon: <AtSign size={15} />, onClick: () => (setText(compose(composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"), references)), setMention({ q: "", hl: 0 }), taRef.current?.focus()) }] : []),
-                  ...(hasMcp ? [{ label: t("mcpPromptAttach"), icon: <Plug size={18} />, onClick: () => setPromptDialog(true) }] : []),
-                  ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
-                  { sep: true },
-                  { heading: t("modeSwitch") },
-                  ...(["ask", "plan", "agent"] as const).map(m => ({
-                    label: t(m === "ask" ? "modeAsk" : m === "plan" ? "modePlan" : "modeAgent"),
-                    description: t(m === "ask" ? "modeAskHint" : m === "plan" ? "modePlanHint" : "modeAgentHint"),
-                    icon: m === "ask" ? <MessageCircle size={18} /> : m === "plan" ? <ListTodo size={18} /> : <Bot size={18} />,
-                    checked: p.mode === m, onClick: () => p.onModeChange(m),
-                  })),
-                ], { wide: true })
+                addMenu.open(
+                  e.currentTarget.getBoundingClientRect(),
+                  [
+                    { heading: t("attach") },
+                    ...(selectedModel?.images !== false
+                      ? [
+                          {
+                            label: capturing ? t("capturingScreenshot") : t("takeScreenshot"),
+                            icon: <Monitor size={15} />,
+                            onClick: () => {
+                              if (!capturing) void screenshot();
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(selectedModel?.images !== false
+                      ? [
+                          {
+                            label: t("attachImage"),
+                            icon: <ImagePlus size={15} />,
+                            onClick: () => fileInput.current?.click(),
+                          },
+                        ]
+                      : []),
+                    {
+                      label: ru ? "Прикрепить чат" : "Attach chat",
+                      icon: <MessageCircle size={15} />,
+                      onClick: () => {
+                        setText(compose(composerBody + " @", references));
+                        setMention({ q: "", hl: 0 });
+                        taRef.current?.focus();
+                      },
+                    },
+                    ...(root
+                      ? [
+                          {
+                            label: t("mentionFile"),
+                            icon: <AtSign size={15} />,
+                            onClick: () => (
+                              setText(
+                                compose(
+                                  composerBody + (composerBody && !composerBody.endsWith(" ") ? " @" : "@"),
+                                  references,
+                                ),
+                              ),
+                              setMention({ q: "", hl: 0 }),
+                              taRef.current?.focus()
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(hasMcp
+                      ? [
+                          {
+                            label: t("mcpPromptAttach"),
+                            icon: <Plug size={18} />,
+                            onClick: () => setPromptDialog(true),
+                          },
+                        ]
+                      : []),
+                    ...(p.knowledge ? knowledgeEntries(p.knowledge, t) : []),
+                    { sep: true },
+                    { heading: t("modeSwitch") },
+                    ...(["ask", "plan", "agent"] as const).map((m) => ({
+                      label: t(m === "ask" ? "modeAsk" : m === "plan" ? "modePlan" : "modeAgent"),
+                      description: t(m === "ask" ? "modeAskHint" : m === "plan" ? "modePlanHint" : "modeAgentHint"),
+                      icon:
+                        m === "ask" ? (
+                          <MessageCircle size={18} />
+                        ) : m === "plan" ? (
+                          <ListTodo size={18} />
+                        ) : (
+                          <Bot size={18} />
+                        ),
+                      checked: p.mode === m,
+                      onClick: () => p.onModeChange(m),
+                    })),
+                  ],
+                  { wide: true },
+                )
               }
             >
               <Plus size={16} />
             </button>
-            <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => (e.target.files && addImageFiles(e.target.files), (e.target.value = ""))} />
-            <span className="composer-mode" title={t("modeSwitch")}>{t(p.mode === "ask" ? "modeAsk" : p.mode === "plan" ? "modePlan" : "modeAgent")}</span>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => (e.target.files && addImageFiles(e.target.files), (e.target.value = ""))}
+            />
+            <span className="composer-mode" title={t("modeSwitch")}>
+              {t(p.mode === "ask" ? "modeAsk" : p.mode === "plan" ? "modePlan" : "modeAgent")}
+            </span>
             <button
               className="chip"
               aria-haspopup="menu"
               onClick={(e) =>
                 menu.open(e.currentTarget.getBoundingClientRect(), [
-                  { label: t("accessReadonly"), icon: <Lock size={15} />, kbd: app.access === "readonly" ? "✓" : "", onClick: () => app.setAccess("readonly") },
-                  { label: t("accessAuto"), icon: <ShieldCheck size={15} />, kbd: app.access === "auto" ? "✓" : "", onClick: () => app.setAccess("auto") },
-                  { label: t("accessFull"), icon: <Unlock size={15} />, kbd: app.access === "full" ? "✓" : "", onClick: () => app.setAccess("full") },
+                  {
+                    label: t("accessReadonly"),
+                    icon: <Lock size={15} />,
+                    kbd: app.access === "readonly" ? "✓" : "",
+                    onClick: () => app.setAccess("readonly"),
+                  },
+                  {
+                    label: t("accessAuto"),
+                    icon: <ShieldCheck size={15} />,
+                    kbd: app.access === "auto" ? "✓" : "",
+                    onClick: () => app.setAccess("auto"),
+                  },
+                  {
+                    label: t("accessFull"),
+                    icon: <Unlock size={15} />,
+                    kbd: app.access === "full" ? "✓" : "",
+                    onClick: () => app.setAccess("full"),
+                  },
                 ])
               }
               title={t("accessMode")}
@@ -380,10 +798,16 @@ export function Composer(p: Props) {
             </button>
             {p.workspace?.linkedBranch ? (
               <span className="chip workspace-chip" title={p.workspace.linkedBranch}>
-                <GitBranch size={14} aria-hidden="true" /> <span className="name">{t("workspaceChip", { branch: p.workspace.linkedBranch })}</span>
+                <GitBranch size={14} aria-hidden="true" />{" "}
+                <span className="name">{t("workspaceChip", { branch: p.workspace.linkedBranch })}</span>
               </span>
             ) : p.workspace?.available ? (
-              <button className={`chip${p.workspace.on ? " on" : ""}`} aria-pressed={p.workspace.on} onClick={p.workspace.onToggle} title={t("workspaceRunInHint")}>
+              <button
+                className={`chip${p.workspace.on ? " on" : ""}`}
+                aria-pressed={p.workspace.on}
+                onClick={p.workspace.onToggle}
+                title={t("workspaceRunInHint")}
+              >
                 <GitBranch size={14} /> {t("workspaceRunIn")}
               </button>
             ) : null}
@@ -404,38 +828,78 @@ export function Composer(p: Props) {
             <div className="composer-model" style={{ position: "relative" }}>
               {/* A model with effort levels opens a menu of its levels (weakest first) plus a way to the model list. */}
               <button
-                className="chip" title={accountTitle} aria-haspopup={p.supports.reasoning ? "menu" : "dialog"} aria-expanded={picker || effortMenu.isOpen}
+                className="chip"
+                title={accountTitle}
+                aria-haspopup={p.supports.reasoning ? "menu" : "dialog"}
+                aria-expanded={picker || effortMenu.isOpen}
                 onKeyDown={p.supports.reasoning ? effortMenu.onTriggerKeyDown : undefined}
-                onClick={(e) => (!app.providers.length ? app.openSettings("providers") : p.supports.reasoning ? (setPicker(false), effortMenu.open(e.currentTarget.getBoundingClientRect(), [
-                  { heading: t("effortTitle") },
-                  ...levels.map((r) => ({ label: t(`reasoning_${r}`), description: t(`effortHint_${r}`), checked: r === level, onClick: () => app.setReasoning(r) })),
-                  { sep: true },
-                  { label: t("chooseModel"), description: p.modelName, onClick: () => setPicker(true) },
-                ])) : setPicker(!picker))}
+                onClick={(e) =>
+                  !app.providers.length
+                    ? app.openSettings("providers")
+                    : p.supports.reasoning
+                      ? (setPicker(false),
+                        effortMenu.open(e.currentTarget.getBoundingClientRect(), [
+                          { heading: t("effortTitle") },
+                          ...levels.map((r) => ({
+                            label: t(`reasoning_${r}`),
+                            description: t(`effortHint_${r}`),
+                            checked: r === level,
+                            onClick: () => app.setReasoning(r),
+                          })),
+                          { sep: true },
+                          { label: t("chooseModel"), description: p.modelName, onClick: () => setPicker(true) },
+                        ]))
+                      : setPicker(!picker)
+                }
               >
                 {p.provider && <ModelIcon model={app.selection?.model ?? ""} provider={p.provider} size={15} />}
-                <span className="chip-label" title={fanModels.length > 1 ? fanModels.map((m) => m.name).join(", ") : undefined}>{fanModels.length > 1 ? t("fanOutModels", { count: fanModels.length }) : p.modelName ?? t("chooseModel")}</span>
-                {p.supports.reasoning && <> <span className="effort-chip-level">{t(`reasoning_${level}`)}</span></>}
+                <span
+                  className="chip-label"
+                  title={fanModels.length > 1 ? fanModels.map((m) => m.name).join(", ") : undefined}
+                >
+                  {fanModels.length > 1
+                    ? t("fanOutModels", { count: fanModels.length })
+                    : (p.modelName ?? t("chooseModel"))}
+                </span>
+                {p.supports.reasoning && (
+                  <>
+                    {" "}
+                    <span className="effort-chip-level">{t(`reasoning_${level}`)}</span>
+                  </>
+                )}
                 <ChevronDown size={13} className="chev" />
               </button>
-              {picker && <ModelPicker onClose={() => setPicker(false)} multi={fanAllowed ? { keys: fanKeys, toggle: toggleFan, max: FAN_OUT_MAX } : undefined} />}
+              {picker && (
+                <ModelPicker
+                  onClose={() => setPicker(false)}
+                  multi={fanAllowed ? { keys: fanKeys, toggle: toggleFan, max: FAN_OUT_MAX } : undefined}
+                />
+              )}
               {effortMenu.node}
             </div>
             <div className="composer-actions">
-            {p.running ? (
-              <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
-                <Square size={12} fill="currentColor" />
-              </button>
-            ) : (
-              <button className="send" disabled={!text.trim() && !images.length} onClick={() => send()} title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")} aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}>
-                <ArrowUp size={16} />
-              </button>
-            )}
+              {p.running ? (
+                <button className="send" onClick={p.onStop} title={t("stop")} aria-label={t("stop")}>
+                  <Square size={12} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  className="send"
+                  disabled={!text.trim() && !images.length}
+                  onClick={() => send()}
+                  title={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}
+                  aria-label={fanModels.length > 1 ? t("fanOutSend", { count: fanModels.length }) : t("send")}
+                >
+                  <ArrowUp size={16} />
+                </button>
+              )}
             </div>
             {p.running && p.followUp && (
               <div className="followup-hint" role="status" data-testid="followup-hint">
                 {p.followUp.other
-                  ? t(p.followUp.action === "steer" ? "followUpHintSteer" : "followUpHintQueue", { keys: shortcutDisplay(shortcut("followUpOpposite")) })
+                  ? t(p.followUp.action === "steer" ? "followUpHintSteer" : "followUpHintQueue", {
+                      keys: shortcutDisplay(shortcut("followUpOpposite")),
+                    })
                   : t("followUpHintQueueOnly")}
               </div>
             )}
@@ -448,7 +912,11 @@ export function Composer(p: Props) {
         <McpPromptDialog
           project={root ?? null}
           onClose={() => (setPromptDialog(false), taRef.current?.focus())}
-          onInsert={(rendered) => (setText(text.trim() ? `${text.replace(/\s+$/, "")}\n\n${rendered}` : rendered), setPromptDialog(false), taRef.current?.focus())}
+          onInsert={(rendered) => (
+            setText(text.trim() ? `${text.replace(/\s+$/, "")}\n\n${rendered}` : rendered),
+            setPromptDialog(false),
+            taRef.current?.focus()
+          )}
         />
       )}
     </>

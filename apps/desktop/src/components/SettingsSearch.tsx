@@ -39,10 +39,20 @@ export function SettingsSearch({ onActive }: { onActive: (active: boolean) => vo
     setQuery("");
   };
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown" && hits.length) { e.preventDefault(); setActive((active + 1) % hits.length); }
-    else if (e.key === "ArrowUp" && hits.length) { e.preventDefault(); setActive((active - 1 + hits.length) % hits.length); }
-    else if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); open(hits[active]); }
-    else if (e.key === "Escape" && query) { e.preventDefault(); e.stopPropagation(); setQuery(""); }
+    if (e.key === "ArrowDown" && hits.length) {
+      e.preventDefault();
+      setActive((active + 1) % hits.length);
+    } else if (e.key === "ArrowUp" && hits.length) {
+      e.preventDefault();
+      setActive((active - 1 + hits.length) % hits.length);
+    } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      open(hits[active]);
+    } else if (e.key === "Escape" && query) {
+      e.preventDefault();
+      e.stopPropagation();
+      setQuery("");
+    }
   };
   return (
     <div className="settings-search">
@@ -66,7 +76,16 @@ export function SettingsSearch({ onActive }: { onActive: (active: boolean) => vo
       {query.trim() && (
         <div id="settings-search-hits" role="listbox" aria-label={t("settingsSearch")} className="settings-search-hits">
           {hits.map((h, i) => (
-            <button key={h.id} id={`settings-hit-${i}`} role="option" aria-selected={i === active} tabIndex={-1} className={`row${i === active ? " active" : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={() => open(h)}>
+            <button
+              key={h.id}
+              id={`settings-hit-${i}`}
+              role="option"
+              aria-selected={i === active}
+              tabIndex={-1}
+              className={`row${i === active ? " active" : ""}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => open(h)}
+            >
               <span className="label">
                 {h.title}
                 <span className="d settings-hit-where">{h.detail}</span>
@@ -74,7 +93,11 @@ export function SettingsSearch({ onActive }: { onActive: (active: boolean) => vo
               {h.keys && <span className="kbd-chip">{h.keys}</span>}
             </button>
           ))}
-          {live && !hits.length && <div className="d settings-search-empty" role="status">{t("settingsSearchEmpty", { query: query.trim() })}</div>}
+          {live && !hits.length && (
+            <div className="d settings-search-empty" role="status">
+              {t("settingsSearchEmpty", { query: query.trim() })}
+            </div>
+          )}
           {!live && <div className="d settings-search-empty">{t("settingsSearchMin")}</div>}
         </div>
       )}

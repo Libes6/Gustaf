@@ -2,7 +2,15 @@ import { Bot, Keyboard, MessageSquare, Search, Settings as Gear, User } from "lu
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { chatSearch, type SearchHit } from "../lib/api";
-import { arrowDown, isSearchShortcut, mergeHits, moveHighlight, PAGE_SIZE, parseSnippet, searchableQuery } from "../lib/searchUtil";
+import {
+  arrowDown,
+  isSearchShortcut,
+  mergeHits,
+  moveHighlight,
+  PAGE_SIZE,
+  parseSnippet,
+  searchableQuery,
+} from "../lib/searchUtil";
 import { useApp, type SettingsPage } from "../state";
 import { PAGE_LABEL } from "../lib/settingsIndex";
 import { useSettingsHits } from "./SettingsSearch";
@@ -52,7 +60,10 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    chatSearch.models().then((m) => !cancelled && setModels(m)).catch(() => {});
+    chatSearch
+      .models()
+      .then((m) => !cancelled && setModels(m))
+      .catch(() => {});
     return () => {
       cancelled = true;
       requestRef.current++; // late answers are ignored once the palette is gone
@@ -81,7 +92,12 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
       .then((result) => {
         if (id !== requestRef.current) return;
         setHits(result.hits);
-        setMore({ hasMore: result.hasMore, total: result.total, capped: result.totalCapped, byRecency: result.byRecency });
+        setMore({
+          hasMore: result.hasMore,
+          total: result.total,
+          capped: result.totalCapped,
+          byRecency: result.byRecency,
+        });
         setActive(0);
         setError("");
         setStatus("done");
@@ -108,13 +124,23 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
     advanceRef.current = advanceTo ?? null;
     setLoadingMore(true);
     chatSearch
-      .messages(searched.q, { projectId: searched.projectId, model: searched.model, limit: PAGE_SIZE, offset: hits.length })
+      .messages(searched.q, {
+        projectId: searched.projectId,
+        model: searched.model,
+        limit: PAGE_SIZE,
+        offset: hits.length,
+      })
       .then((result) => {
         if (id !== requestRef.current) return;
         loadingMoreRef.current = false;
         setLoadingMore(false);
         setHits((prev) => mergeHits(prev, result.hits));
-        setMore({ hasMore: result.hasMore && result.hits.length > 0, total: result.total, capped: result.totalCapped, byRecency: result.byRecency });
+        setMore({
+          hasMore: result.hasMore && result.hits.length > 0,
+          total: result.total,
+          capped: result.totalCapped,
+          byRecency: result.byRecency,
+        });
         if (advanceRef.current !== null) setActive(advanceRef.current + jumpsRef.current);
         advanceRef.current = null;
       })
@@ -143,21 +169,50 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   // Jumps above the message hits: chats by title or #id, settings pages and keyboard shortcuts by name.
   const q = query.trim().toLowerCase();
   const settingHits = useSettingsHits(query);
-  const jumps: Jump[] = !q ? [] : [
-    ...app.chats.filter((c) => q === `#${c.id}` || (q.length >= 2 && c.title.toLowerCase().includes(q))).slice(0, 5).map((c): Jump => ({
-      key: `c${c.id}`, kind: "chat", label: c.title, detail: `#${c.id} · ${app.projects.find((p) => p.id === c.project_id)?.name ?? t("searchNoProject")}`,
-      go: () => app.openChat(c.id, c.project_id),
-    })),
-    ...(q.length >= 2 ? SETTINGS_PAGES.filter((p) => t(p.label).toLowerCase().includes(q) || p.id.includes(q)) : []).slice(0, 3).map((p): Jump => ({
-      key: `s${p.id}`, kind: "settings", label: t(p.label), detail: t("settings"), go: () => app.openSettings(p.id),
-    })),
-    ...(q.length >= 2 && app.activeChat !== null && app.view === "chat" && t("restartSession").toLowerCase().includes(q) ? [{
-      key: "restart", kind: "shortcut" as const, label: t("restartSession"), detail: t("restartSessionHint"), go: () => dispatchEvent(new Event(RESTART_SESSION_EVENT)),
-    }] : []),
-    ...settingHits.slice(0, 6).map((h): Jump => ({
-      key: `h${h.id}`, kind: h.keys ? "shortcut" : "settings", label: h.title, detail: h.keys ? `${h.keys} · ${h.detail}` : `${t("settings")} · ${h.detail}`, go: () => app.openSettings(h.page, h.id),
-    })),
-  ];
+  const jumps: Jump[] = !q
+    ? []
+    : [
+        ...app.chats
+          .filter((c) => q === `#${c.id}` || (q.length >= 2 && c.title.toLowerCase().includes(q)))
+          .slice(0, 5)
+          .map((c): Jump => ({
+            key: `c${c.id}`,
+            kind: "chat",
+            label: c.title,
+            detail: `#${c.id} · ${app.projects.find((p) => p.id === c.project_id)?.name ?? t("searchNoProject")}`,
+            go: () => app.openChat(c.id, c.project_id),
+          })),
+        ...(q.length >= 2 ? SETTINGS_PAGES.filter((p) => t(p.label).toLowerCase().includes(q) || p.id.includes(q)) : [])
+          .slice(0, 3)
+          .map((p): Jump => ({
+            key: `s${p.id}`,
+            kind: "settings",
+            label: t(p.label),
+            detail: t("settings"),
+            go: () => app.openSettings(p.id),
+          })),
+        ...(q.length >= 2 &&
+        app.activeChat !== null &&
+        app.view === "chat" &&
+        t("restartSession").toLowerCase().includes(q)
+          ? [
+              {
+                key: "restart",
+                kind: "shortcut" as const,
+                label: t("restartSession"),
+                detail: t("restartSessionHint"),
+                go: () => dispatchEvent(new Event(RESTART_SESSION_EVENT)),
+              },
+            ]
+          : []),
+        ...settingHits.slice(0, 6).map((h): Jump => ({
+          key: `h${h.id}`,
+          kind: h.keys ? "shortcut" : "settings",
+          label: h.title,
+          detail: h.keys ? `${h.keys} · ${h.detail}` : `${t("settings")} · ${h.detail}`,
+          go: () => app.openSettings(h.page, h.id),
+        })),
+      ];
   const J = jumps.length;
   const rows = J + shown.length;
   const jumpsRef = useRef(0);
@@ -193,18 +248,32 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   const roleLabel = (role: string) => (role === "user" ? t("searchYou") : t("searchAssistant"));
   const searching = live && !shown.length && status !== "done" && status !== "error";
   const footer =
-    status === "error" ? null
-    : !live ? t("searchHint")
-    : searching ? t("searchSearching")
-    : !shown.length ? null
-    : more.capped ? t("searchShowingCapped", { count: shown.length, total: more.total })
-    : more.hasMore ? t("searchShowing", { count: shown.length, total: more.total })
-    : t("searchResults", { count: shown.length });
+    status === "error"
+      ? null
+      : !live
+        ? t("searchHint")
+        : searching
+          ? t("searchSearching")
+          : !shown.length
+            ? null
+            : more.capped
+              ? t("searchShowingCapped", { count: shown.length, total: more.total })
+              : more.hasMore
+                ? t("searchShowing", { count: shown.length, total: more.total })
+                : t("searchResults", { count: shown.length });
   const currentProject = app.draftProject;
 
   return (
     <div className="overlay search-overlay" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
-      <div className="search-palette" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t("searchAllChats")} onKeyDown={onKeyDown}>
+      <div
+        className="search-palette"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("searchAllChats")}
+        onKeyDown={onKeyDown}
+      >
         <div className="search-input">
           <Search size={16} />
           <input
@@ -222,7 +291,11 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
           />
         </div>
         <div className="search-filters">
-          <select aria-label={t("searchProject")} value={projectId ?? ""} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}>
+          <select
+            aria-label={t("searchProject")}
+            value={projectId ?? ""}
+            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
+          >
             <option value="">{t("searchAllProjects")}</option>
             {app.projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -241,7 +314,11 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
           </select>
           {currentProject !== null && (
             <label className="search-only">
-              <input type="checkbox" checked={projectId === currentProject} onChange={(e) => setProjectId(e.target.checked ? currentProject : null)} />
+              <input
+                type="checkbox"
+                checked={projectId === currentProject}
+                onChange={(e) => setProjectId(e.target.checked ? currentProject : null)}
+              />
               {t("searchOnlyProject")}
             </label>
           )}
@@ -252,45 +329,67 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
               {t("searchFailed", { error })}
             </div>
           )}
-          {live && status === "done" && !shown.length && !J && <div className="search-empty">{t("searchNoResults", { query: query.trim() })}</div>}
+          {live && status === "done" && !shown.length && !J && (
+            <div className="search-empty">{t("searchNoResults", { query: query.trim() })}</div>
+          )}
           {jumps.map((j, i) => (
-            <div key={j.key} id={`search-hit-${i}`} role="option" aria-selected={i === active} className={`search-hit search-jump${i === active ? " hl" : ""}`}
-              onMouseMove={() => i !== active && setActive(i)} onClick={() => (onClose(), j.go())}>
+            <div
+              key={j.key}
+              id={`search-hit-${i}`}
+              role="option"
+              aria-selected={i === active}
+              className={`search-hit search-jump${i === active ? " hl" : ""}`}
+              onMouseMove={() => i !== active && setActive(i)}
+              onClick={() => (onClose(), j.go())}
+            >
               <div className="search-hit-head">
-                <span className="search-role">{j.kind === "chat" ? <MessageSquare size={13} /> : j.kind === "settings" ? <Gear size={13} /> : <Keyboard size={13} />}</span>
+                <span className="search-role">
+                  {j.kind === "chat" ? (
+                    <MessageSquare size={13} />
+                  ) : j.kind === "settings" ? (
+                    <Gear size={13} />
+                  ) : (
+                    <Keyboard size={13} />
+                  )}
+                </span>
                 <span className="search-title">{j.label}</span>
                 <span className="search-date">{j.detail}</span>
               </div>
             </div>
           ))}
-          {shown.map((hit, n) => { const i = n + J; return (
-            <div
-              key={hit.messageId}
-              id={`search-hit-${i}`}
-              role="option"
-              aria-selected={i === active}
-              className={`search-hit${i === active ? " hl" : ""}`}
-              onMouseMove={() => i !== active && setActive(i)}
-              onClick={() => open(hit)}
-            >
-              <div className="search-hit-head">
-                <span className="search-role" title={roleLabel(hit.role)}>
-                  {hit.role === "user" ? <User size={13} /> : <Bot size={13} />}
-                </span>
-                <span className="search-title">{hit.chatTitle}</span>
-                <span className="search-date">{t.date(hit.createdAt)}</span>
+          {shown.map((hit, n) => {
+            const i = n + J;
+            return (
+              <div
+                key={hit.messageId}
+                id={`search-hit-${i}`}
+                role="option"
+                aria-selected={i === active}
+                className={`search-hit${i === active ? " hl" : ""}`}
+                onMouseMove={() => i !== active && setActive(i)}
+                onClick={() => open(hit)}
+              >
+                <div className="search-hit-head">
+                  <span className="search-role" title={roleLabel(hit.role)}>
+                    {hit.role === "user" ? <User size={13} /> : <Bot size={13} />}
+                  </span>
+                  <span className="search-title">{hit.chatTitle}</span>
+                  <span className="search-date">{t.date(hit.createdAt)}</span>
+                </div>
+                <div className="search-snippet">
+                  {parseSnippet(hit.snippet).map((part, j) =>
+                    part.hit ? <mark key={j}>{part.text}</mark> : <span key={j}>{part.text}</span>,
+                  )}
+                </div>
+                <div className="search-meta">
+                  <span>{roleLabel(hit.role)}</span>
+                  <span>{hit.projectName ?? t("searchNoProject")}</span>
+                  {hit.model && <span>{hit.model}</span>}
+                  {hit.archived && <span className="search-badge">{t("searchArchived")}</span>}
+                </div>
               </div>
-              <div className="search-snippet">
-                {parseSnippet(hit.snippet).map((part, j) => (part.hit ? <mark key={j}>{part.text}</mark> : <span key={j}>{part.text}</span>))}
-              </div>
-              <div className="search-meta">
-                <span>{roleLabel(hit.role)}</span>
-                <span>{hit.projectName ?? t("searchNoProject")}</span>
-                {hit.model && <span>{hit.model}</span>}
-                {hit.archived && <span className="search-badge">{t("searchArchived")}</span>}
-              </div>
-            </div>
-          ); })}
+            );
+          })}
         </div>
         {live && status !== "error" && shown.length > 0 && more.hasMore && (
           <button type="button" className="search-more" disabled={loadingMore} onClick={() => loadMore()}>

@@ -11,18 +11,69 @@ vi.mock("../../src/components/AgentsPanel", () => ({ AgentsColumn: () => null, A
 const model = vi.hoisted(() => ({ turn: vi.fn() }));
 vi.mock("../../src/providers", async (orig) => ({
   ...(await orig<typeof import("../../src/providers")>()),
-  getAdapter: async () => ({ supportsComputer: false, supportsReasoning: () => false, listModels: async () => [], turn: model.turn }),
+  getAdapter: async () => ({
+    supportsComputer: false,
+    supportsReasoning: () => false,
+    listModels: async () => [],
+    turn: model.turn,
+  }),
 }));
 
-const gitStatus = { repo: true, toplevel: "/work/alpha", prefix: "", branch: "main", detached: false, head: "abc1234", files: [], total: 0, inProgress: null };
-const info = { taskId: "t1", path: "/store/abc/t1", branch: "gustaf/fix-login", baseCommit: "deadbeef", baseBranch: "main", createdAt: 1, provider: null, model: null, headSha: "cafe", changedFiles: 0, ahead: 2, behind: 0, dirty: false, existsOnDisk: true };
-const wsChat = chat({ id: 5, project_id: 1, title: "Fix login", workspace_task_id: "t1", workspace_branch: "gustaf/fix-login", workspace_base: "deadbeef" });
+const gitStatus = {
+  repo: true,
+  toplevel: "/work/alpha",
+  prefix: "",
+  branch: "main",
+  detached: false,
+  head: "abc1234",
+  files: [],
+  total: 0,
+  inProgress: null,
+};
+const info = {
+  taskId: "t1",
+  path: "/store/abc/t1",
+  branch: "gustaf/fix-login",
+  baseCommit: "deadbeef",
+  baseBranch: "main",
+  createdAt: 1,
+  provider: null,
+  model: null,
+  headSha: "cafe",
+  changedFiles: 0,
+  ahead: 2,
+  behind: 0,
+  dirty: false,
+  existsOnDisk: true,
+};
+const wsChat = chat({
+  id: 5,
+  project_id: 1,
+  title: "Fix login",
+  workspace_task_id: "t1",
+  workspace_branch: "gustaf/fix-login",
+  workspace_base: "deadbeef",
+});
 const session = { key: "k", chatId: 5, projectId: 1 };
 
-beforeEach(() => { resetWorkspaceStore(); clearComposerDrafts(); model.turn.mockReset(); });
+beforeEach(() => {
+  resetWorkspaceStore();
+  clearComposerDrafts();
+  model.turn.mockReset();
+});
 
 describe("composer draft bridge", () => {
-  const view = () => renderApp(<ChatView session={session} visible />, makeApp({ projects: [project()], chats: [wsChat], providers: [provider()], selection: { providerId: "p1", model: "m1" }, sessions: { active: "k", items: [session] } }));
+  const view = () =>
+    renderApp(
+      <ChatView session={session} visible />,
+      makeApp({
+        projects: [project()],
+        chats: [wsChat],
+        providers: [provider()],
+        selection: { providerId: "p1", model: "m1" },
+        sessions: { active: "k", items: [session] },
+      }),
+    );
 
   it("puts a requested draft into the message box and does not send it", async () => {
     mockInvoke({ git_status: gitStatus, worktree_list: [info], db_select: () => [] });
