@@ -1,7 +1,7 @@
-import { getSetting, rawLog, setSetting } from "./api";
+import { getSetting, rawLog } from "./api";
 import { redactSecrets, redactValue } from "./exportChats";
 
-// Opt-in debugging aid (Settings, General, "Record raw CLI events"): every stdout line of codex / claude / cursor-agent
+// Debugging aid, deliberately without a UI switch (it is only turned on by writing the `recordRawCliEvents` setting): every stdout line of codex / claude / cursor-agent
 // is appended, before any parsing, to a bounded file under the app data folder (src-tauri/src/rawlog.rs keeps one file
 // per day and at most 5 MB in total). Entries are scrubbed with the chat export's secret scrubber first.
 
@@ -11,7 +11,6 @@ export const MAX_ENTRY_CHARS = 64 * 1024;
 const FLUSH_MS = 400;
 
 export const rawLogEnabled = () => getSetting<boolean>(RAW_LOG_SETTING, false).catch(() => false);
-export const setRawLogEnabled = (on: boolean) => setSetting(RAW_LOG_SETTING, on);
 
 const two = (n: number) => String(n).padStart(2, "0");
 /** Local calendar day, the name of the day's file. */

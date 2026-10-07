@@ -6,7 +6,8 @@ export type Locale = "ru" | "en";
 export type Key = keyof typeof en;
 const dicts: Record<Locale, Record<string, string>> = { en, ru };
 
-export const detectLocale = (): Locale => (navigator.language.toLowerCase().startsWith("ru") ? "ru" : "en");
+/** English is the default on a clean profile; a saved choice (setting `locale`) overrides it. */
+export const detectLocale = (): Locale => "en";
 
 /**
  * `{name}` placeholders; plural keys use `_one`/`_few`/`_many`/`_other` suffixes picked by Intl.PluralRules on `{count}`.

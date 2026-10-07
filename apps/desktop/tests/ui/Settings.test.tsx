@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { detectLocale } from "../../src/i18n";
 import { Settings } from "../../src/components/Settings";
 import type { SettingsPage } from "../../src/state";
 import { chat, makeApp, project, provider, renderApp } from "./render";
@@ -8,6 +9,7 @@ import { mockInvoke, mockSettings } from "./tauri";
 
 const PAGES: [SettingsPage, string][] = [
   ["general", "General"],
+  ["shortcuts", "Keyboard shortcuts"],
   ["import", "Import"],
   ["providers", "Model providers"],
   ["usage", "Usage"],
@@ -29,6 +31,44 @@ describe("Settings", () => {
     expect(page()).toHaveTextContent(title);
     // Let the page's own effects (settings, permission and list loads) finish so nothing updates after the test.
     await waitFor(() => expect(page()).toBeInTheDocument());
+  });
+
+  it("keyboard shortcuts are their own menu item and no longer part of General", async () => {
+    mockSettings({});
+    const { app, unmount } = renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    expect(within(nav()).getByRole("button", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    expect(page()).toHaveTextContent("General");
+    expect(screen.queryByText("Keyboard shortcuts", { selector: "h1, h4" })).toBeNull();
+    await userEvent.click(within(nav()).getByRole("button", { name: "Keyboard shortcuts" }));
+    expect(app.openSettings).toHaveBeenCalledWith("shortcuts");
+    unmount();
+  });
+
+  it("General has no raw CLI events recorder (no developer block, no switch)", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    await waitFor(() => expect(page()).toHaveTextContent("General"));
+    expect(screen.queryByText("Developer")).toBeNull();
+    expect(screen.queryByText(/raw CLI events/i)).toBeNull();
+    expect(screen.queryByRole("switch", { name: /raw CLI/i })).toBeNull();
+  });
+
+  it("General has no voice input section; web tools checkbox is separate from the Brave key label", async () => {
+    mockSettings({});
+    renderApp(<Settings />, makeApp({ settingsPage: "general" }));
+    const box = await screen.findByRole("checkbox", { name: "Enable web tools" });
+    expect(screen.queryByText("Voice input")).toBeNull();
+    expect(screen.queryByLabelText("Transcription provider")).toBeNull();
+    expect(screen.queryByText("Transcription model")).toBeNull();
+    const key = screen.getByText("Brave API key");
+    expect(box.closest("label")).not.toBe(key.closest("label"));
+    expect(box.closest("label")).not.toContainElement(key);
+  });
+
+  it("English is the default UI language even when the system language is Russian", () => {
+    const spy = vi.spyOn(navigator, "language", "get").mockReturnValue("ru-RU");
+    expect(detectLocale()).toBe("en");
+    spy.mockRestore();
   });
 
   it("the archive page lists archived chats", async () => {

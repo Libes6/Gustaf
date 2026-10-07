@@ -133,7 +133,7 @@ function UpdaterContents({ updates: { status, controller, version } }: { updates
       <button className="btn-soft" disabled={active && !allowInterrupt} onClick={install}>{ru ? "Подтвердить перезапуск" : "Confirm restart"}</button>
       <button className="btn-soft" onClick={() => setConfirming(false)}>{ru ? "Отмена" : "Cancel"}</button>
     </div>}
-    <div className="d">{ru ? "Linux: обновление внутри приложения доступно только для AppImage. DEB/RPM обновляйте вручную." : "Linux: in-app updates require AppImage. Update DEB/RPM manually."}</div>
+    <div className="card-row"><div className="d">{ru ? "Linux: обновление внутри приложения доступно только для AppImage. DEB/RPM обновляйте вручную." : "Linux: in-app updates require AppImage. Update DEB/RPM manually."}</div></div>
     {status.kind === "error" && <div className="error-box" role="alert">{status.category === "signature" ? (ru ? "Подпись не прошла проверку. Установка заблокирована. " : "Signature verification failed. Installation blocked. ") : status.category === "network" ? (ru ? "Проверьте подключение и повторите проверку. " : "Check your connection and retry. ") : ""}{status.error}</div>}</div>
   </>;
 }
