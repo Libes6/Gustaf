@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Linking, ScrollView, TextInput, View } from "react-native";
+import { isPinningAvailable } from "../modules/gustaf-pinned";
 import { Body, Button, Card } from "../src/components/ui.tsx";
 import { useT } from "../src/i18n/index.ts";
 import { parsePairingPayload, shortFingerprint, type PairingErrorCode } from "../src/lib/pairing.ts";
@@ -57,7 +58,7 @@ export default function Pair() {
         <Card>
           <Body>{t("pairConfirm", { host: payload.host, port: payload.port })}</Body>
           <Body dim size={13}>{t("pairFingerprint")}: {shortFingerprint(payload.fingerprint)}</Body>
-          <Body dim size={13}>{t("pairWarnUnpinned")}</Body>
+          {!isPinningAvailable && <Body dim size={13}>{t("pairWarnUnpinned")}</Body>}
           <Button title={busy ? t("pairing") : t("connect")} disabled={busy} onPress={() => void confirm()} />
           <Button kind="soft" title={t("scanAgain")} onPress={() => { setPayload(null); lastScan.current = ""; }} />
         </Card>

@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["GustafPinnedModule"] },
+  "android": { "modules": ["io.github.libes6.gustaf.pinned.GustafPinnedModule"] }
+}
