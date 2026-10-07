@@ -128,6 +128,8 @@ function applyScan(actions: Map<string, Activity>, next: Activity, patch: Subage
  * repeated `wait` calls bump one counter, a spawn's call id and its later thread id are the same entry, and a Claude
  * `tool_result` completes the `Task` entry. Everything else merges by id as before.
  */
+/** "Command running in background with ID: bwx1y2z": the shell id in the launch result of a background `Bash` call. */
+const SHELL_LAUNCH_ID = /background with ID:\s*([\w-]+)/i;
 export function applyActivity(actions: Map<string, Activity>, next: Activity): Activity {
   const patch = next.subagent;
   const prev = actions.get(next.id);
@@ -153,6 +155,17 @@ export function applyActivity(actions: Map<string, Activity>, next: Activity): A
     return merged;
   }
   if (patch.action === 'scan') return applyScan(actions, next, patch);
+  if (patch.action === 'close' && patch.bgId) {
+    // The completion notice of a background SHELL command names its shell id, not an agent: close that command's own
+    // card instead of listing a phantom subagent.
+    const known = [...actions.values()].some((a) => a.subagent && (a.subagent.agentId === patch.agentId || a.subagent.agentPath === patch.agentId || a.subagent.bgId === patch.bgId));
+    const shell = known ? undefined : [...actions].find(([, a]) => !a.subagent && a.output?.match(SHELL_LAUNCH_ID)?.[1] === patch.bgId);
+    if (shell) {
+      const merged: Activity = { ...shell[1], status: statusOf(patch.state) };
+      actions.set(shell[0], merged);
+      return merged;
+    }
+  }
   let key = next.id;
   if (patch.action === 'spawn' && patch.agentId && !actions.has(next.id)) {
     // A spawn event for an agent the rollout scan already lists is the same entry.

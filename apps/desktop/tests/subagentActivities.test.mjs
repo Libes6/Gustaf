@@ -189,3 +189,20 @@ test('message delivery keeps an interrupted agent stopped; followup ignores an o
   applyActivity(map, { type: 'activity', id: 'scan-t1', name: 'subagent', args: {}, status: 'unknown', subagent: { provider: 'codex', agentId: 't1', title: '', action: 'scan', state: 'stopped', endedAt: 1, turnStartedAt: 0 } });
   assert.equal([...map.values()][0].subagent.state, 'running');
 });
+
+test('the completion notice of a background shell closes that command, not a phantom subagent', () => {
+  const actions = new Map();
+  applyActivity(actions, { type: 'activity', id: 'tu1', name: 'Bash', args: { command: 'sleep 30', run_in_background: true }, status: 'success', output: 'Command running in background with ID: bx9y8z' });
+  const notice = nativeActivities('claude', { type: 'user', message: { content: '<task-notification><task-id>bx9y8z</task-id><status>completed</status><summary>done</summary></task-notification>' } });
+  for (const n of notice) applyActivity(actions, n);
+  assert.equal(actions.size, 1);
+  assert.equal(actions.get('tu1').subagent, undefined);
+  assert.equal(actions.get('tu1').output, 'Command running in background with ID: bx9y8z');
+  // A notice for an agent we do know still updates that agent.
+  const agents = new Map();
+  for (const a of nativeActivities('claude', { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'tk1', name: 'Task', input: { description: 'x', subagent_type: 'general-purpose' } }] } })) applyActivity(agents, a);
+  applyActivity(agents, { type: 'activity', id: 'tk1', name: '', args: {}, status: 'success', output: 'Async agent launched successfully.\nagentId: a1b2c3' });
+  for (const n of nativeActivities('claude', { type: 'user', message: { content: '<task-notification><task-id>a1b2c3</task-id><status>completed</status><summary>ok</summary></task-notification>' } })) applyActivity(agents, n);
+  assert.equal(agents.size, 1);
+  assert.equal(agents.get('tk1').subagent.state, 'completed');
+});
