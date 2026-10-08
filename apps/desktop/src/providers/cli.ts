@@ -2,6 +2,7 @@ import { resolveKey, type KeySource } from "../lib/keys";
 import { nativeActivities, applyActivity, isBareCollabWait, type Activity } from "./activities";
 import { createRolloutTracker, rolloutEnabled } from "./codexRollout";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
+import { LiveSessionUnavailable, runClaudeLiveTurn } from "./claudeSession";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
@@ -217,6 +218,19 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
     },
 
     async turn(t: TurnInput) {
+      // Claude Code runs as a live session per chat (claudeSession.ts); the per-turn process below is its fallback.
+      if (id === "claude" && t.chatId) {
+        try {
+          return await runClaudeLiveTurn(t, {
+            providerId: cfg.id,
+            executable: claudeExecutable,
+            levels: (model) => spec.levels(model, listed),
+            attachments,
+          });
+        } catch (e) {
+          if (!(e instanceof LiveSessionUnavailable)) throw e;
+        }
+      }
       const point = resumePoint(t, cfg.id, false);
       const log = createRawLogger(await rawLogEnabled(), id, t.chatId ?? null);
       let session = point.session;
