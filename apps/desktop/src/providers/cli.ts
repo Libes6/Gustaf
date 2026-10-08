@@ -6,7 +6,9 @@ import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
-import { AppServerUnavailable, runAppServerTurn, type Connection } from "./codexAppServer";
+import { AppServerUnavailable, type Connection } from "./codexAppServer";
+import { codexLiveTurn } from "./codexLive";
+import { interrupted } from "./lifecycle";
 import { codexTransport } from "./codexTransport";
 import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
@@ -258,14 +260,24 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
               })
             : undefined;
         let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
-        // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
+        // Codex over its app-server, as the chat's live session (codexLive.ts): native subagent lifecycle, follow-ups steered
+        // into the running turn, Stop as a native interrupt. Falls back to `codex exec` only when the app-server failed before
+        // it accepted the turn and nothing was streamed, so a prompt never runs twice.
         let viaServer = false;
         if (id === "codex" && (await codexTransport()) === "app-server") {
+          let streamed = false;
+          const onActivity = (a: Activity) => {
+            streamed = true;
+            t.onActivity?.(applyActivity(actions, a));
+          };
           try {
-            const conn = await openAppServer(executable, { cwd: t.cwd, onRaw: log.raw });
-            const r = await runAppServerTurn(
-              conn,
-              {
+            const r = await codexLiveTurn({
+              open: () => openAppServer(executable, { cwd: t.cwd, onRaw: log.raw }),
+              executable,
+              providerId: cfg.id,
+              chatId: t.chatId,
+              cwd: t.cwd,
+              params: {
                 cwd: t.cwd,
                 model: t.model === "default" ? undefined : t.model,
                 session,
@@ -277,25 +289,41 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
                 approvals: !!t.approve,
                 goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined,
               },
-              {
+              handlers: {
                 signal: t.signal,
                 onApproval: t.approve,
                 onGoal: t.goal?.onUpdate,
-                onText: emit,
-                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onText: (s) => {
+                  streamed = true;
+                  emit(s);
+                },
+                onActivity,
                 onUsage: (u) => {
                   usage = u;
                 },
                 onDebug: log.debug,
+                followUp: t.followUp,
               },
-            );
+              onThread: (thread) => {
+                session = thread;
+              },
+            });
             viaServer = true;
             session = r.session;
             if (r.error) error = r.error;
             res = { code: 0, stderr: "", settled: false };
           } catch (e) {
-            if (t.signal.aborted) throw e;
-            if (!(e instanceof AppServerUnavailable)) throw e;
+            if (t.signal.aborted) {
+              // Stopped: the turn keeps what it produced (running cards read as unknown) and the thread to continue on.
+              const parts = [
+                ...[...actions.values()].map((a) =>
+                  a.status === "running" ? { ...a, status: "unknown" as const } : a,
+                ),
+                ...(text ? [{ type: "text" as const, text }] : []),
+              ];
+              throw interrupted({ parts, responseId: session, usage });
+            }
+            if (!(e instanceof AppServerUnavailable) || streamed) throw e;
             log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
           }
         }

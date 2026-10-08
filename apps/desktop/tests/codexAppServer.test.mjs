@@ -407,13 +407,14 @@ test('a crash mid-turn is an error and settles unreported children as stopped, n
   assert.deepEqual(r.unreported, ['ca']);
 });
 
-test('stop: the signal kills the process and rejects with AbortError', async () => {
+test('stop: an interrupt that does not end the turn in time stops the process; rejects with AbortError', async () => {
   const ac = new AbortController();
   const conn = fakeConn(base({ then: [] }));
-  const p = runAppServerTurn(conn, P, { ...handlers().h, signal: ac.signal });
+  const p = runAppServerTurn(conn, P, { ...handlers().h, signal: ac.signal, interruptWaitMs: 30 });
   await new Promise((r) => setTimeout(r, 20));
   ac.abort();
   await assert.rejects(p, (e) => e.name === 'AbortError');
+  assert.ok(conn.written.some((m) => m.method === 'turn/interrupt' && m.params.turnId === 't1'));
   assert.ok(conn.killed >= 1);
 });
 

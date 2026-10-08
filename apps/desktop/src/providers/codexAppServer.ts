@@ -1,5 +1,11 @@
-// Codex `app-server` (JSON-RPC over stdio) as the live transport of a Codex turn, instead of `codex exec --json`.
-// Pure and Tauri-free (unit-tested with recorded-style fixtures in tests/codexAppServer.test.mjs); cli.ts supplies the process.
+// Codex `app-server` (JSON-RPC over stdio) as the live transport of a Codex chat, instead of `codex exec --json`.
+// Pure and Tauri-free (unit-tested with recorded-style fixtures in tests/codexAppServer.test.mjs and
+// tests/codexLiveSession.test.mjs); cli.ts supplies the process, codexLive.ts keeps one session per chat.
+//
+// A session (`createAppServerSession`) is one process with one loaded thread serving many turns: the first turn
+// initializes and starts or resumes the thread, later ones only send `turn/start`. Follow-ups are `turn/steer` on the running
+// root turn; Stop is `turn/interrupt` on the root turn and on every running child, and the process is stopped only when
+// that does not end them within `INTERRUPT_WAIT_MS`.
 //
 // Modelled on how T3 Code's adapter works (apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts), reduced to what
 // this app needs:
@@ -13,8 +19,17 @@
 //    that never reported an end, `settle` closes them: `stopped` when the owning process is confirmed gone (exit, crash, our own
 //    kill after a failed/interrupted/aborted turn), `unknown` when observation merely ran out (the wait limit). Never `completed`,
 //    never left `running`.
-import { isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
-import type { NativeGoal, Reasoning, SubagentInfo, SubagentState, TokenUsage } from "./types.ts";
+import { applyActivity, isBareCollabWait, nativeActivities, type Activity } from "./activities.ts";
+import { followUpPump, type FollowUpChannel } from "./lifecycle.ts";
+import {
+  textOf,
+  type Msg,
+  type NativeGoal,
+  type Reasoning,
+  type SubagentInfo,
+  type SubagentState,
+  type TokenUsage,
+} from "./types.ts";
 
 type Json = Record<string, unknown>;
 const rec = (v: unknown): Json => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {});
@@ -173,7 +188,14 @@ const HELD = new Set([
   "thread/closed",
 ]);
 
-type Child = { activityId: string; state: SubagentState; lastText: string; tokens?: number };
+type Child = {
+  activityId: string;
+  state: SubagentState;
+  lastText: string;
+  tokens?: number;
+  /** The child's own running turn (from its `turn/started`), the target of `turn/interrupt` on Stop. */
+  turnId?: string;
+};
 
 /** "/root/list_files" to "list files": the last segment of an agent path, readable. */
 const humanTask = (path: string) => (path.split("/").filter(Boolean).pop() ?? "").replace(/[_-]+/g, " ").trim();
@@ -181,8 +203,13 @@ const humanTask = (path: string) => (path.split("/").filter(Boolean).pop() ?? ""
 const childState = (s: unknown): SubagentState =>
   s === "completed" ? "completed" : s === "interrupted" ? "stopped" : "failed";
 
-/** Per-turn state machine. Feed it every JSON-RPC message of the connection; apply the returned effects in order. */
+/**
+ * State machine of one loaded thread (a live session keeps one across turns, so children spawned by an earlier turn stay
+ * known). Feed it every JSON-RPC message of the connection; apply the returned effects in order. `beginTurn` resets what
+ * belongs to one turn (text separation, usage baseline, goal mode).
+ */
 export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) {
+  let goal = !!o.goal;
   let goalStatus = "";
   let turnEnded = false;
   const children = new Map<string, Child>();
@@ -252,6 +279,7 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
         // A new turn of a finished child is a resume (SendMessage): the one thing allowed to reopen a terminal entry.
         const reopen = c.state !== "running" && c.state !== "waiting";
         c.state = "running";
+        c.turnId = str(rec(p.turn).id) || undefined;
         push(info(threadId, c, { action: reopen ? "send" : "progress", state: "running", startedAt: Date.now() }));
         break;
       }
@@ -259,6 +287,7 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
         const turn = rec(p.turn);
         const state = childState(turn.status);
         c.state = state;
+        c.turnId = undefined;
         const result = c.lastText
           ? brief(c.lastText, 300)
           : str(rec(turn.error).message)
@@ -443,7 +472,7 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
       }
     } else if (method === "turn/started") {
       turnEnded = false;
-      if (o.goal) out.push({ kind: "busy" });
+      if (goal) out.push({ kind: "busy" });
     } else if (method === "thread/goal/updated") {
       const g = rec(p.goal);
       goalStatus = str(g.status);
@@ -457,14 +486,14 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
         },
       });
       // The goal finished after the last turn already ended: nothing more will come.
-      if (o.goal && goalStatus !== "active" && turnEnded) out.push({ kind: "done", status: "completed" });
+      if (goal && goalStatus !== "active" && turnEnded) out.push({ kind: "done", status: "completed" });
     } else if (method === "turn/completed") {
       const turn = rec(p.turn);
       const s = str(turn.status);
       const e = rec(turn.error);
       turnEnded = true;
       // A goal run continues in further server-started turns while the goal is active.
-      if (o.goal && s === "completed" && (goalStatus === "active" || goalStatus === "")) out.push({ kind: "idle" });
+      if (goal && s === "completed" && (goalStatus === "active" || goalStatus === "")) out.push({ kind: "idle" });
       else
         out.push({
           kind: "done",
@@ -516,7 +545,55 @@ export function createReducer(rootThreadId: string, o: { goal?: boolean } = {}) 
     ];
   };
 
+  /** History item of a resumed thread: registers the children it names, publishing nothing. */
+  function seedItem(item: Json) {
+    const sink: Effect[] = [];
+    const type = str(item.type);
+    if (type === "subAgentActivity") subAgentActivity(item, true, sink);
+    else if (
+      type === "collabAgentToolCall" &&
+      str(item.tool) === "spawnAgent" &&
+      list(item.receiverThreadIds).length > 1
+    )
+      root({ method: "item/completed", params: { threadId: rootThreadId, item } });
+    else if (type === "collabAgentToolCall")
+      register(nativeActivities("codex", { type: "item.completed", item: execItem(item) }), sink);
+  }
+
   return {
+    /** A new turn on this thread: per-turn state is reset, children (and what is known about them) are kept. */
+    beginTurn(t: { goal?: boolean } = {}) {
+      goal = !!t.goal;
+      goalStatus = "";
+      turnEnded = false;
+      streamed.clear();
+      lastMessage = "";
+      baseline = undefined;
+      latest = undefined;
+      usageSeen = 0;
+    },
+    /**
+     * The thread was resumed in a fresh process (`thread/resume` returns its turns): children named in the history become
+     * known again, so their frames are no longer held as strangers when the parent talks to them (SendMessage / resume).
+     * The process that ran them is gone, so any that never reported an end are `stopped`. Nothing is published.
+     */
+    seed(turns: unknown) {
+      for (const t of list(turns)) for (const it of list(rec(t).items)) seedItem(rec(it));
+      for (const c of children.values()) if (c.state === "running" || c.state === "waiting") c.state = "stopped";
+      held.clear();
+    },
+    /** Running children with a known turn id: what a Stop interrupts besides the root turn. */
+    activeChildTurns(): { threadId: string; turnId: string }[] {
+      return [...children]
+        .filter(([, c]) => (c.state === "running" || c.state === "waiting") && c.turnId)
+        .map(([threadId, c]) => ({ threadId, turnId: c.turnId! }));
+    },
+    /** Children whose end is not known: still running, or given up on (`unknown`) while their process lives on. */
+    unresolved(): string[] {
+      return [...children]
+        .filter(([, c]) => c.state === "running" || c.state === "waiting" || c.state === "unknown")
+        .map(([id]) => id);
+    },
     /** Processes one message (not a response to our own request). */
     onMessage(m: Json): Effect[] {
       const method = str(m.method);
@@ -598,7 +675,7 @@ const sub = (a: TokenUsage, b: TokenUsage): TokenUsage => ({
   reasoning: Math.max(0, a.reasoning - b.reasoning),
 });
 
-// ---- one turn over a transport --------------------------------------------------------------------------------------
+// ---- a live session over a transport --------------------------------------------------------------------------------
 
 export type Connection = {
   /** Writes one JSON line to the process. */
@@ -621,90 +698,147 @@ export type TurnHandlers = {
   onApproval?(ask: { kind: "command"; command: string; reason?: string }): Promise<boolean>;
   /** Goal updates (`thread/goal/updated`), in order. */
   onGoal?(g: NativeGoal): void;
+  /** Messages sent while the turn runs: steered into the running root turn (`turn/steer`). */
+  followUp?: FollowUpChannel;
   /** Goal run: how long an idle thread with a still-active goal is waited on before the turn ends (default `GOAL_IDLE_MS`). */
   goalIdleMs?: number;
-  /** How long to keep the connection for children still running after the parent turn completed (default `CHILD_WAIT_MS`). */
+  /** How long to keep the turn open for children still running after the parent turn completed (default `CHILD_WAIT_MS`). */
   childWaitMs?: number;
+  /** Stop: how long `turn/interrupt` may take before the process is stopped instead (default `INTERRUPT_WAIT_MS`). */
+  interruptWaitMs?: number;
 };
 
-/** `unreported`: children that never reported an end and were settled (`stopped` or `unknown`) when the connection or turn ended. */
-export type TurnResult = { session: string; error: string; unreported: string[]; usage?: TokenUsage };
+/**
+ * `unreported`: children that never reported an end and were settled (`stopped` or `unknown`) when the turn ended.
+ * `background`: children left running because the turn ended early for a waiting follow-up; the live session keeps
+ * following them and the next turn shows their updates.
+ */
+export type TurnResult = {
+  session: string;
+  error: string;
+  unreported: string[];
+  background: string[];
+  usage?: TokenUsage;
+};
 
-/** Thrown when the app-server could not be started or spoken to before any output: the caller may fall back to `exec`. */
+/**
+ * The app-server could not be started or spoken to before the turn was accepted (nothing ran, nothing streamed): the
+ * caller may fall back to `exec`. After `turn/start` (or `thread/goal/set`) was accepted, failures are plain errors.
+ */
 export class AppServerUnavailable extends Error {}
+/** The process exited while a request waited for its answer. */
+class Gone extends Error {}
 
 const REQUEST_TIMEOUT_MS = 20_000;
 /**
- * A parent turn can complete while its background children still work. The connection is kept (and the turn stays open, so the
- * stop button works) until they all report an end, the process exits, or this long passes. Hitting the limit is not a
- * verdict about the children: they stay "running" and the caller shows them as unknown.
+ * A parent turn can complete while its background children still work. The turn stays open (the chat card follows them and
+ * Stop interrupts them) until they all report an end, the process exits, a follow-up message waits (the turn then ends and
+ * the live session keeps following the children into the next turn), or this long passes. Hitting the limit is not a
+ * verdict about the children: they are shown as unknown and the session stays pinned while they may still run.
  */
 export const CHILD_WAIT_MS = 15 * 60_000;
 /** An active goal whose thread went idle and stayed idle: the server is not continuing (waiting for the user, or stuck). */
 export const GOAL_IDLE_MS = 30_000;
+/** Stop: `turn/interrupt` normally completes the turn within milliseconds (codex-cli 0.160); past this the process goes. */
+export const INTERRUPT_WAIT_MS = 5_000;
+
+export type AppServerSession = {
+  /** The loaded native thread (undefined before the first turn). */
+  readonly threadId: string | undefined;
+  /** False once the process is gone or the session was given up (failed start, interrupt timeout). */
+  alive(): boolean;
+  /** Children of earlier turns whose end is not known yet while the process lives (keeps the session pinned). */
+  backgroundWork(): boolean;
+  release(reason?: string): Promise<void>;
+  /** One turn: the first one initializes and starts or resumes the thread, later ones only `turn/start`. */
+  turn(p: TurnParams, h: TurnHandlers): Promise<TurnResult>;
+};
+
+type End = { status: string; error?: string };
+const aborted = () => new DOMException("Aborted", "AbortError");
+
+/** Text and images of follow-up messages as `turn/steer` input. */
+function steerInput(msgs: Msg[]): Json[] {
+  const text = msgs.map(textOf).filter(Boolean).join("\n\n");
+  const images = msgs.flatMap((m) =>
+    m.parts.flatMap((p) => (p.type === "image" && p.data.startsWith("data:") ? [{ type: "image", url: p.data }] : [])),
+  );
+  return [...(text ? [{ type: "text", text }] : []), ...images];
+}
 
 /**
- * initialize, thread/start|resume, turn/start, then reduce notifications until the root turn ends. Never reports an error
- * for a child: children failing is their own state. Rejects with AbortError when the signal aborts (the process is killed).
+ * One `codex app-server` process with one loaded thread, serving turn after turn (kept by `sessionManager.liveSessions`).
+ * Requests and notifications are routed here for the whole life of the process; the reducer is per session, so children of
+ * an earlier turn stay known. Between turns their updates are folded into `cards` and handed to the next turn.
  */
-export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnHandlers): Promise<TurnResult> {
+export function createAppServerSession(conn: Connection): AppServerSession {
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: Json) => void; reject: (e: Error) => void }>();
-  let reducer: ReturnType<typeof createReducer> | undefined;
-  let finish: (r: { status: string; error?: string }) => void = () => {};
-  const finished = new Promise<{ status: string; error?: string }>((resolve) => {
-    finish = resolve;
+  let gone = false;
+  let broken = false;
+  let busy = false;
+  const exit = conn.closed.then((code) => {
+    gone = true;
+    for (const w of pending.values()) w.reject(new Gone(stderrOr(`codex app-server exited`)));
+    pending.clear();
+    return code;
   });
+  const stderrOr = (fallback: string) => conn.stderr().trim().slice(-400) || fallback;
+  let ready: Promise<unknown> | undefined;
+  let threadId: string | undefined;
+  let reducer: ReturnType<typeof createReducer> | undefined;
+  /** The root turn in progress (from the turn/start answer or turn/started), cleared by its turn/completed. */
+  let rootTurn: string | undefined;
+  let lastRootDone = "";
   const early: Json[] = [];
+  /** Every subagent card of the session, folded; the base a later turn needs to show an update of an earlier child. */
+  const cards = new Map<string, Activity>();
+  /** Cards that changed while no turn ran. */
+  const dirty = new Set<string>();
+  /** Where effects go: the running turn, or `idle` between turns. */
+  let sink: ((effects: Effect[]) => void) | undefined;
 
-  let childrenSettled: (() => void) | undefined;
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-  const apply = (effects: Effect[]) => {
+  const send = (m: Json) => void conn.write(JSON.stringify({ jsonrpc: "2.0", ...m })).catch(() => {});
+  const fold = (a: Activity) => {
+    if (a.subagent) applyActivity(cards, a);
+  };
+  const idle = (effects: Effect[]) => {
     for (const e of effects) {
-      if (e.kind === "text") h.onText(e.text);
-      else if (e.kind === "activity") h.onActivity(e.activity);
-      else if (e.kind === "usage") h.onUsage?.(e.usage);
-      else if (e.kind === "goal") h.onGoal?.(e.goal);
-      else if (e.kind === "busy") {
-        clearTimeout(idleTimer);
-        idleTimer = undefined;
-      } else if (e.kind === "idle") {
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => finish({ status: "completed" }), h.goalIdleMs ?? GOAL_IDLE_MS);
-      } else if (e.kind === "approval") {
-        const answer = (ok: boolean) =>
-          void conn
-            .write(JSON.stringify({ jsonrpc: "2.0", id: e.id, result: { decision: ok ? "accept" : "decline" } }))
-            .catch(() => {});
-        if (!h.onApproval) answer(false);
-        else h.onApproval(e.ask).then(answer, () => answer(false));
-      } else if (e.kind === "reply") void conn.write(JSON.stringify({ jsonrpc: "2.0", ...e.reply })).catch(() => {});
-      else if (e.kind === "done") finish({ status: e.status, error: e.error });
+      if (e.kind === "activity" && e.activity.subagent) {
+        fold(e.activity);
+        dirty.add(e.activity.id);
+      } else if (e.kind === "approval") send({ id: e.id, result: { decision: "decline" } });
+      else if (e.kind === "reply") send(e.reply);
     }
-    if (childrenSettled && reducer && reducer.running().length === 0) childrenSettled();
   };
 
   conn.onMessage((m) => {
-    if (m.id !== undefined && m.id !== null && !m.method && pending.has(m.id as number)) {
-      const w = pending.get(m.id as number)!;
+    if (m.id !== undefined && m.id !== null && !m.method) {
+      const w = pending.get(m.id as number);
+      if (!w) return;
       pending.delete(m.id as number);
       if (m.error) w.reject(new Error(str(rec(m.error).message) || "app-server error"));
       else w.resolve(rec(m.result));
       return;
     }
+    const p = rec(m.params);
+    if (threadId && str(p.threadId) === threadId) {
+      const id = str(rec(p.turn).id);
+      if (m.method === "turn/started" && id) rootTurn = id;
+      else if (m.method === "turn/completed") {
+        lastRootDone = id;
+        if (!id || id === rootTurn) rootTurn = undefined;
+      }
+    }
     if (!reducer) {
-      early.push(m);
+      if (early.length < 500) early.push(m);
       return;
     }
-    apply(reducer.onMessage(m));
+    (sink ?? idle)(reducer.onMessage(m));
   });
 
-  const aborted = () => new DOMException("Aborted", "AbortError");
-  const onAbort = () => conn.kill();
-  h.signal?.addEventListener("abort", onAbort, { once: true });
-  const exit = conn.closed.then((code) => ({ status: "closed" as const, code }));
-
-  const request = (method: string, params: Json): Promise<Json> => {
+  const request = (method: string, params: Json, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Json> => {
+    if (gone) return Promise.reject(new Gone(stderrOr("codex app-server exited")));
     const id = nextId++;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const reply = new Promise<Json>((resolve, reject) => {
@@ -712,102 +846,311 @@ export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnH
       timer = setTimeout(() => {
         pending.delete(id);
         reject(new Error(`app-server did not answer ${method}`));
-      }, REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
     }).finally(() => clearTimeout(timer));
-    void conn.write(JSON.stringify({ jsonrpc: "2.0", id, method, params })).catch(() => {});
-    return Promise.race([
-      reply,
-      exit.then(() => {
-        throw new AppServerUnavailable(conn.stderr().trim().slice(-400) || "app-server exited");
-      }),
-    ]);
+    send({ id, method, params });
+    return reply;
   };
 
-  try {
-    if (h.signal?.aborted) throw aborted();
-    try {
-      await request("initialize", { clientInfo: { name: "gustaf", title: "Gustaf", version: "0.1.0" } });
-      await conn.write(JSON.stringify({ jsonrpc: "2.0", method: "initialized" }));
-    } catch (e) {
-      if (h.signal?.aborted) throw aborted();
-      throw e instanceof AppServerUnavailable
-        ? e
-        : new AppServerUnavailable(e instanceof Error ? e.message : String(e));
-    }
-    const t = threadRequest(p);
-    let thread: Json;
-    try {
-      thread = rec((await request(t.method, t.params)).thread);
-    } catch (e) {
-      if (h.signal?.aborted) throw aborted();
-      throw e;
-    }
-    const session = str(thread.id);
-    if (!session) throw new Error("app-server returned no thread id");
-    reducer = createReducer(session, { goal: !!p.goal });
-    for (const m of early.splice(0)) apply(reducer.onMessage(m));
-    try {
-      if (p.goal)
-        await request("thread/goal/set", {
-          threadId: session,
-          ...(p.goal.resume ? { status: "active" } : { objective: p.goal.objective }),
-        });
-      else await request("turn/start", turnRequest(session, p));
-    } catch (e) {
-      if (h.signal?.aborted) throw aborted();
-      throw e;
-    }
-    const end = await Promise.race([
-      finished,
-      exit.then((x) => ({
-        status: "lost",
-        error: conn.stderr().trim().slice(-600) || `codex app-server exited${x.code == null ? "" : ` with ${x.code}`}`,
-      })),
-    ]);
-    if (h.signal?.aborted) throw aborted();
-    let verdict: { state: "stopped" | "unknown"; note: string } = {
-      state: "stopped",
-      note: "Agent did not report a result before the Codex run ended",
-    };
-    if (end.status === "lost")
-      verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
-    if (end.status === "completed" && reducer.running().length) {
-      const wait = new Promise<void>((resolve) => {
-        childrenSettled = resolve;
-      });
+  const session: AppServerSession = {
+    get threadId() {
+      return threadId;
+    },
+    alive: () => !gone && !broken,
+    backgroundWork: () => !gone && !broken && !busy && !!reducer?.unresolved().length,
+    async release() {
+      broken = true;
+      conn.kill();
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const limit = new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, h.childWaitMs ?? CHILD_WAIT_MS);
+      await Promise.race([exit, new Promise((r) => (timer = setTimeout(r, 3000)))]);
+      clearTimeout(timer);
+    },
+    async turn(p, h) {
+      if (busy) throw new Error("This Codex session is already running a turn");
+      busy = true;
+      const seen = new Set<string>();
+      let finish: (r: End) => void = () => {};
+      const finished = new Promise<End>((resolve) => {
+        finish = resolve;
       });
-      const how = await Promise.race([
-        wait.then(() => "settled"),
-        limit.then(() => "limit"),
-        exit.then(() => "exit"),
-      ]).finally(() => {
-        clearTimeout(timer);
-        childrenSettled = undefined;
+      let rootDone = false;
+      /** Wakes the waits below: a batch of effects was applied (children may have ended, the root turn may be over). */
+      let changed: (() => void) | undefined;
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      let followUpWaits: (() => void) | undefined;
+      let followUpWaiting = false;
+      let closePump: () => Promise<void> = async () => {};
+      let abortListener: (() => void) | undefined;
+      const abort = new Promise<"abort">((resolve) => {
+        if (h.signal?.aborted) return resolve("abort");
+        abortListener = () => resolve("abort");
+        h.signal?.addEventListener("abort", abortListener, { once: true });
       });
-      if (h.signal?.aborted) throw aborted();
-      if (how === "limit")
-        verdict = { state: "unknown", note: "Lost track of this agent: no report within the wait limit" };
-      else if (how === "exit")
-        verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
-    }
-    // Whatever never reported an end is closed now, never left `running` and never called completed.
-    const unreported = reducer.running();
-    apply(reducer.settle(verdict.state, verdict.note));
-    const usage = reducer.usage();
-    if (usage) h.onUsage?.(usage);
-    const error =
-      end.status === "completed" ? "" : end.status === "interrupted" ? "" : end.error || "Codex turn failed";
-    return { session, error, unreported, usage };
-  } catch (e) {
-    // The user stopped the run: we killed the process, so its children are confirmed gone (they are "stopped", not running).
-    if (reducer && h.signal?.aborted) apply(reducer.settle("stopped", "Stopped with the Codex run"));
-    throw e;
+
+      const emit = (a: Activity) => {
+        // The first update this turn of a card from an earlier turn: its folded state goes first, so the card is whole.
+        if (!seen.has(a.id)) {
+          seen.add(a.id);
+          const base = cards.get(a.id);
+          if (base && a.subagent) h.onActivity(base);
+        }
+        fold(a);
+        h.onActivity(a);
+      };
+      const apply = (effects: Effect[]) => {
+        for (const e of effects) {
+          if (e.kind === "text") h.onText(e.text);
+          else if (e.kind === "activity") emit(e.activity);
+          else if (e.kind === "usage") h.onUsage?.(e.usage);
+          else if (e.kind === "goal") h.onGoal?.(e.goal);
+          else if (e.kind === "busy") {
+            clearTimeout(idleTimer);
+            idleTimer = undefined;
+          } else if (e.kind === "idle") {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => finishRoot({ status: "completed" }), h.goalIdleMs ?? GOAL_IDLE_MS);
+          } else if (e.kind === "approval") {
+            const answer = (ok: boolean) => send({ id: e.id, result: { decision: ok ? "accept" : "decline" } });
+            if (!h.onApproval) answer(false);
+            else h.onApproval(e.ask).then(answer, () => answer(false));
+          } else if (e.kind === "reply") send(e.reply);
+          else if (e.kind === "done") finishRoot({ status: e.status, error: e.error });
+        }
+        changed?.();
+      };
+      const finishRoot = (r: End) => {
+        rootDone = true;
+        finish(r);
+      };
+      /**
+       * Waits until `ok()` holds (checked after every applied batch): "ok", or "timeout" after `ms`, "exit" when the process
+       * exits, or whatever `cut` resolves with first.
+       */
+      const until = (ok: () => boolean, ms: number, cut?: Promise<string>) =>
+        new Promise<string>((resolve) => {
+          if (ok()) return resolve("ok");
+          let over = false;
+          const done = (v: string) => {
+            if (over) return;
+            over = true;
+            clearTimeout(timer);
+            changed = undefined;
+            resolve(v);
+          };
+          const timer = setTimeout(() => done("timeout"), ms);
+          changed = () => {
+            if (ok()) done("ok");
+          };
+          void exit.then(() => done("exit"));
+          void cut?.then(done);
+        });
+
+      /**
+       * Interrupts the root turn (if one runs) and every running child (T3 interrupts the whole lineage). True when all of them
+       * ended in time; otherwise the process is stopped (the session is broken), so what was running is confirmed gone.
+       */
+      const interruptAll = async (): Promise<boolean> => {
+        const rd = reducer!;
+        if (gone) return false;
+        const children = rd.activeChildTurns();
+        // A child whose turn id never arrived cannot be interrupted: only stopping the process ends it.
+        const unreachable = rd.running().length > children.length;
+        const targets = [...(rootTurn ? [{ threadId: threadId!, turnId: rootTurn }] : []), ...children];
+        for (const t of targets) void request("turn/interrupt", t).catch(() => {});
+        const quiet =
+          !unreachable &&
+          (await until(() => !rootTurn && rd.running().length === 0, h.interruptWaitMs ?? INTERRUPT_WAIT_MS)) === "ok";
+        if (!quiet) {
+          h.onDebug?.("codex app-server: the interrupt did not end the work in time, stopping the process");
+          broken = true;
+          conn.kill();
+        }
+        return quiet;
+      };
+
+      /** Stop: interrupt first; the session stays usable when everything ended in time. */
+      const halt = async (): Promise<never> => {
+        const rd = reducer!;
+        // A goal would start the next turn by itself: pause it (`/goal resume` re-activates it).
+        if (p.goal && !gone) void request("thread/goal/set", { threadId, status: "paused" }).catch(() => {});
+        await interruptAll();
+        apply(rd.settle("stopped", "Stopped with the Codex run"));
+        const usage = rd.usage();
+        if (usage) h.onUsage?.(usage);
+        throw aborted();
+      };
+
+      /** Before the turn is accepted a Stop needs no interrupt: the connection is given up (nothing ran on it yet). */
+      const orAbort = <T>(work: Promise<T>) => {
+        let over = false;
+        return Promise.race([
+          work.finally(() => {
+            over = true;
+          }),
+          abort.then((): never => {
+            if (!over) {
+              broken = true;
+              conn.kill();
+            }
+            throw aborted();
+          }),
+        ]);
+      };
+
+      try {
+        if (h.signal?.aborted) throw aborted();
+        if (gone || broken) throw new AppServerUnavailable(stderrOr("codex app-server exited"));
+        // 1. Connect: once per process.
+        try {
+          await orAbort(
+            (ready ??= request("initialize", {
+              clientInfo: { name: "gustaf", title: "Gustaf", version: "0.1.0" },
+            }).then(() => send({ method: "initialized" }))),
+          );
+        } catch (e) {
+          broken = true;
+          if (h.signal?.aborted) throw aborted();
+          throw new AppServerUnavailable(e instanceof Error ? e.message : String(e));
+        }
+        // 2. The thread: started or resumed once per process; later turns run on the loaded thread.
+        if (!threadId) {
+          const t = threadRequest(p);
+          let res: Json;
+          try {
+            res = await orAbort(request(t.method, t.params));
+          } catch (e) {
+            if (h.signal?.aborted) throw aborted();
+            if (e instanceof Gone) throw new AppServerUnavailable(e.message);
+            throw e;
+          }
+          const thread = rec(res.thread);
+          const id = str(thread.id);
+          if (!id) throw new Error("app-server returned no thread id");
+          threadId = id;
+          reducer = createReducer(id);
+          // A fresh process on an old thread: children named in its history are known again (their frames are not strangers).
+          if (p.session) reducer.seed(thread.turns);
+        } else if (p.session && p.session !== threadId) {
+          throw new Error("This Codex session holds another thread");
+        }
+        const rd = reducer!;
+        rd.beginTurn({ goal: !!p.goal });
+        sink = apply;
+        for (const m of early.splice(0)) apply(rd.onMessage(m));
+        // Earlier children that changed between turns: their cards come back with this turn.
+        for (const id of dirty) {
+          const card = cards.get(id);
+          if (card) {
+            seen.add(id);
+            h.onActivity(card);
+          }
+        }
+        dirty.clear();
+        if (h.signal?.aborted) throw aborted();
+
+        // 3. Start the turn (or the goal run). Accepted means the agent may act: no `exec` fallback from here on.
+        let started: Json;
+        try {
+          started = p.goal
+            ? await request("thread/goal/set", {
+                threadId,
+                ...(p.goal.resume ? { status: "active" } : { objective: p.goal.objective }),
+              })
+            : await request("turn/start", turnRequest(threadId, p));
+        } catch (e) {
+          if (e instanceof Gone) throw new AppServerUnavailable(e.message);
+          if (/did not answer/.test(String((e as Error)?.message))) broken = true;
+          if (h.signal?.aborted) throw aborted();
+          throw e;
+        }
+        const tid = str(rec(started.turn).id);
+        if (tid && tid !== lastRootDone) rootTurn = tid;
+
+        // 4. Follow-ups go into the running root turn; once it is over they wait for the next turn (and end the child wait).
+        closePump = followUpPump(h.followUp, async (msgs) => {
+          const turnId = rootTurn;
+          if (!rootDone && turnId && !gone) {
+            const input = steerInput(msgs);
+            if (!input.length) return true;
+            try {
+              await request("turn/steer", { threadId, expectedTurnId: turnId, input });
+              return true;
+            } catch (e) {
+              h.onDebug?.(`codex turn/steer rejected: ${(e as Error)?.message ?? e}`);
+            }
+          }
+          followUpWaiting = true;
+          followUpWaits?.();
+          return false;
+        });
+
+        const end = await Promise.race([
+          finished,
+          abort,
+          exit.then((code): End => ({
+            status: "lost",
+            error: conn.stderr().trim().slice(-600) || `codex app-server exited${code == null ? "" : ` with ${code}`}`,
+          })),
+        ]);
+        if (end === "abort") return await halt();
+        let verdict: { state: "stopped" | "unknown"; note: string } = {
+          state: "stopped",
+          note: "Agent did not report a result before the Codex run ended",
+        };
+        if (end.status === "lost")
+          verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
+        let background: string[] = [];
+        // 5. Children still running after a completed parent turn: follow them while the turn stays open.
+        if (end.status === "completed" && rd.running().length && !followUpWaiting) {
+          const cut = new Promise<string>((resolve) => {
+            followUpWaits = () => resolve("followUp");
+            void abort.then(resolve);
+          });
+          const how = await until(() => rd.running().length === 0, h.childWaitMs ?? CHILD_WAIT_MS, cut).finally(() => {
+            followUpWaits = undefined;
+          });
+          if (how === "abort") return await halt();
+          if (how === "timeout")
+            verdict = { state: "unknown", note: "Lost track of this agent: no report within the wait limit" };
+          else if (how === "exit")
+            verdict = { state: "stopped", note: "Codex process exited before the agent reported a result" };
+          else if (how === "followUp") background = rd.running();
+        } else if (end.status === "completed" && followUpWaiting) background = rd.running();
+        else if (end.status !== "completed" && rd.running().length) {
+          // The parent turn failed or was interrupted: its children are interrupted too (or the process goes), so "stopped" is true.
+          await interruptAll();
+        }
+        // Whatever never reported an end is closed now (never left `running`, never called completed), unless the live
+        // session goes on following it (`background`).
+        const unreported = background.length ? [] : rd.running();
+        if (!background.length) apply(rd.settle(verdict.state, verdict.note));
+        const usage = rd.usage();
+        if (usage) h.onUsage?.(usage);
+        const error =
+          end.status === "completed" || end.status === "interrupted" ? "" : end.error || "Codex turn failed";
+        if (end.status === "lost") broken = true;
+        return { session: threadId, error, unreported, background, usage };
+      } finally {
+        clearTimeout(idleTimer);
+        changed = undefined;
+        if (abortListener) h.signal?.removeEventListener("abort", abortListener);
+        await closePump();
+        sink = undefined;
+        busy = false;
+      }
+    },
+  };
+  return session;
+}
+
+/**
+ * One turn on a connection that is closed afterwards (tests, callers without a chat to keep a session for). Rejects with
+ * AbortError when the signal aborts.
+ */
+export async function runAppServerTurn(conn: Connection, p: TurnParams, h: TurnHandlers): Promise<TurnResult> {
+  try {
+    return await createAppServerSession(conn).turn(p, h);
   } finally {
-    clearTimeout(idleTimer);
-    h.signal?.removeEventListener("abort", onAbort);
     conn.kill();
   }
 }
