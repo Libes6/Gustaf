@@ -54,3 +54,18 @@ test('the system message is always part of the prompt (resumed sessions may pred
   assert.equal(resumePoint(turn([user('hello')]), 'x', false).prompt, 'SYS\n\nhello');
   assert.equal(resumePoint(turn([user('one'), bot('r', 'x', 's'), user('two')]), 'x', true).prompt, 'SYS\n\ntwo');
 });
+
+test('a reply cut short (Stop or a restart for a follow-up) is handed back to the resumed CLI', () => {
+  const cut = {
+    ...bot('half of the answer', 'acc-a', 'sess-a'),
+    meta: { provider: 'acc-a', responseId: 'sess-a', interrupted: true },
+  };
+  const p = resumePoint(turn([user('one'), cut, user('also do X')]), 'acc-a', false);
+  assert.equal(p.session, 'sess-a');
+  assert.equal(
+    p.prompt,
+    'SYS\n\n[Your previous reply was interrupted. What you had written so far:]\nhalf of the answer\n\nalso do X',
+  );
+  const whole = resumePoint(turn([user('one'), bot('done', 'acc-a', 'sess-a'), user('next')]), 'acc-a', false);
+  assert.equal(whole.prompt, 'SYS\n\nnext', 'a finished reply is not repeated');
+});

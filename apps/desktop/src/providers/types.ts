@@ -84,6 +84,8 @@ export type Msg = {
     durationMs?: number;
     usage?: TokenUsage;
     compacted?: boolean;
+    /** The turn was cut short (Stop or a restart for a follow-up); a per-turn CLI does not keep the text it was writing. */
+    interrupted?: boolean;
   };
 };
 
@@ -157,7 +159,13 @@ export type TurnInput = {
 export type NativeGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type NativeGoal = { status: NativeGoalStatus; objective: string; tokensUsed: number; timeUsedSeconds: number };
 
-export type TurnOutput = { parts: Part[]; responseId?: string; usage?: TokenUsage };
+export type TurnOutput = {
+  parts: Part[];
+  responseId?: string;
+  usage?: TokenUsage;
+  /** The turn ended early to take a follow-up (providers/lifecycle.ts, `restart`). */
+  interrupted?: boolean;
+};
 
 export interface Adapter {
   listModels(): Promise<ModelInfo[]>;

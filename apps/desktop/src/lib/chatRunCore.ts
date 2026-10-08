@@ -235,6 +235,7 @@ export async function runChatCore(
           model: target.model,
           ...(cut?.responseId ? { responseId: cut.responseId } : {}),
           ...(cut?.usage ? { usage: cut.usage } : {}),
+          ...(cut ? { interrupted: true } : {}),
         },
       };
       ui.onAccepted?.(partial);

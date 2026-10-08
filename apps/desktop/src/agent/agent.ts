@@ -646,6 +646,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
         responseId: out.responseId,
         usage: out.usage,
         durationMs: calls.length ? undefined : Date.now() - started,
+        ...(out.interrupted ? { interrupted: true } : {}),
       },
     };
     history.push(assistant);

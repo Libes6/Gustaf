@@ -367,7 +367,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
         });
         if (t.signal.aborted) throw interrupted(output());
         // Restarted for a follow-up: the exit code and errors of the stopped process say nothing about the work.
-        if (perTurn?.restarted()) return output();
+        if (perTurn?.restarted()) return { ...output(), interrupted: true };
         if (!error && res && res.code !== 0 && !res.settled)
           error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
         if (error) {
