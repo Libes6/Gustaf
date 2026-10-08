@@ -28,7 +28,7 @@ const STATE: Record<string, SubagentState> = {
   starting: "running",
   running: "running",
   completed: "completed",
-  shutdown: "completed",
+  shutdown: "stopped",
   failed: "failed",
   stopped: "stopped",
 };

@@ -897,9 +897,16 @@ export function Composer(p: Props) {
             {p.running && p.followUp && (
               <div className="followup-hint" role="status" data-testid="followup-hint">
                 {p.followUp.other
-                  ? t(p.followUp.action === "steer" ? "followUpHintSteer" : "followUpHintQueue", {
-                      keys: shortcutDisplay(shortcut("followUpOpposite")),
-                    })
+                  ? t(
+                      p.followUp.action === "steer"
+                        ? p.followUp.restart
+                          ? "followUpHintRestart"
+                          : "followUpHintSteer"
+                        : p.followUp.restart
+                          ? "followUpHintQueueRestart"
+                          : "followUpHintQueue",
+                      { keys: shortcutDisplay(shortcut("followUpOpposite")) },
+                    )
                   : t("followUpHintQueueOnly")}
               </div>
             )}

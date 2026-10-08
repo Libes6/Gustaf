@@ -28,7 +28,7 @@ type Over = {
   selectedModel?: ModelInfo | undefined;
   canCompact?: boolean;
   onSend?: (opposite?: boolean) => void;
-  followUp?: { action: "queue" | "steer"; other: "queue" | "steer" | null; canSteer: boolean };
+  followUp?: { action: "queue" | "steer"; other: "queue" | "steer" | null; canSteer: boolean; restart: boolean };
   onStop?: () => void;
   onCompact?: () => void;
   onRestore?: () => void;
@@ -587,10 +587,11 @@ it("⌘⌥↵ sends and opens a new chat; a plain Enter only sends", () => {
 
 describe("Composer follow-up while a run is going", () => {
   type Plan = NonNullable<Over["followUp"]>;
-  const plan = (action: "queue" | "steer", canSteer = true): Plan => ({
+  const plan = (action: "queue" | "steer", canSteer = true, restart = false): Plan => ({
     action,
     other: canSteer ? (action === "steer" ? "queue" : "steer") : null,
     canSteer,
+    restart,
   });
 
   it("tells before sending whether the message refines the work or becomes the next request", () => {
@@ -601,6 +602,17 @@ describe("Composer follow-up while a run is going", () => {
     rerenderApp(<Harness text="x" running followUp={plan("steer")} />);
     expect(screen.getByTestId("followup-hint")).toHaveTextContent(
       /^Refines the current work\. ⌘↵: queue as the next request instead/,
+    );
+  });
+
+  it("a per-turn agent (restart follow-ups) says the current step is interrupted and continues with the message", () => {
+    const { rerenderApp } = renderApp(<Harness text="x" running followUp={plan("steer", true, true)} />);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(
+      /^Interrupts the current step and continues with your message\. ⌘↵: queue as the next request instead/,
+    );
+    rerenderApp(<Harness text="x" running followUp={plan("queue", true, true)} />);
+    expect(screen.getByTestId("followup-hint")).toHaveTextContent(
+      /^Next request, runs after this one\. ⌘↵: interrupt the current step and continue with your message instead/,
     );
   });
 

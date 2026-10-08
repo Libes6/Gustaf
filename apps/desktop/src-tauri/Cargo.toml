@@ -1,6 +1,6 @@
 [package]
 name = "gustaf"
-version = "0.3.0"
+version = "0.4.0"
 description = "Gustaf"
 authors = ["Gustaf contributors"]
 edition = "2021"
@@ -12,7 +12,8 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "gustaf_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only: staticlib/cdylib are for Tauri mobile (the phone app is Expo) and cost ~1 GB per debug build.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -67,6 +68,13 @@ keyring = { version = "3", features = ["windows-native", "sync-secret-service", 
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+# Keeps target/ small: line numbers in our own backtraces, no debug info for dependencies.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 codegen-units = 1
 lto = true

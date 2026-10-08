@@ -68,7 +68,7 @@ import { getLiveChats, subscribeLiveRuns } from "../lib/liveRuns";
 import { runChatExport } from "./ImportPanel";
 import { useMenu } from "./Menu";
 import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
-import { AlarmClock, BellOff, Brain, CheckCheck, Flag, FolderPen } from "lucide-react";
+import { AlarmClock, BellOff, Brain, CheckCheck, CircleAlert, Flag, FolderPen } from "lucide-react";
 import { useMemoryDialogs } from "./MemoryDialogs";
 import { RailUpdateButton } from "./UpdaterPanel";
 import { ShareHtmlDialog } from "./ShareHtmlDialog";
@@ -97,6 +97,7 @@ import {
   workspaceEntry,
 } from "../lib/workspaceStore";
 import { parseWorktreeError, worktrees } from "../lib/worktrees";
+import { findInterruptedWork, linkedTaskIds } from "../lib/interruptedWork";
 
 function InlineEdit({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
   const t = useT();
@@ -303,6 +304,18 @@ export function Rail({ onCreateProject, onCompare }: { onCreateProject: () => vo
   );
 }
 
+/** A project with interrupted agent work (worktrees no chat owns that still hold changes); details in the chat's Agents column. */
+function InterruptedMark({ count }: { count: number }) {
+  const t = useT();
+  if (!count) return null;
+  const label = t("interruptedProjectMark", { count });
+  return (
+    <span className="chat-muted-mark" title={label} aria-label={label} role="img">
+      <CircleAlert size={11} aria-hidden />
+    </span>
+  );
+}
+
 export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => void; onSearch: () => void }) {
   const t = useT();
   const app = useApp();
@@ -379,6 +392,10 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
   }, [app.chats, q]);
   const match = (c: Chat) => !q || c.title.toLowerCase().includes(q);
   const chatsOf = (pid: number | null) => chatsByProject.get(pid) ?? [];
+  // Interrupted agent work per project, from the workspace scan made at startup and by the chat view (lib/interruptedWork.ts).
+  const linked = useMemo(() => linkedTaskIds(app.chats), [app.chats]);
+  const interruptedCount = (p: Project) =>
+    p.path ? findInterruptedWork(workspaceEntry(p.path).list, linked).length : 0;
   // Polled while a project is expanded (and again when a run starts or ends): only projects that have workspace chats.
   const workspaceRoots = useMemo(
     () =>
@@ -1029,6 +1046,7 @@ export function Sidebar({ onCreateProject, onSearch }: { onCreateProject: () => 
                       {open ? <FolderOpen size={15} /> : <Folder size={15} />}
                       <span className="label">{p.name}</span>
                       {!!p.pinned && <Pin size={11} color="var(--text-3)" aria-label={t("pin")} role="img" />}
+                      <InterruptedMark count={interruptedCount(p)} />
                     </button>
                     <span className="actions">
                       <button

@@ -79,7 +79,7 @@ test('three scanned agents become three subagent activities in scan order with s
   assert.equal(c.output, 'stream failed');
 });
 
-test('shutdown reads as completed, starting as running, an unknown state as running; entries without a key and a missing list are skipped', () => {
+test('shutdown reads as stopped (as on the stream), starting as running, an unknown state as running; entries without a key and a missing list are skipped', () => {
   const acts = rolloutActivities(
     scanOf(
       agent('a', { state: 'shutdown' }),
@@ -90,8 +90,9 @@ test('shutdown reads as completed, starting as running, an unknown state as runn
   );
   assert.deepEqual(
     acts.map((a) => a.subagent.state),
-    ['completed', 'running', 'running'],
+    ['stopped', 'running', 'running'],
   );
+  assert.equal(acts[0].status, 'unknown', 'a shut-down agent is neutral, not a success');
   assert.equal(acts[1].subagent.title, 'task b');
   assert.equal(acts[1].subagent.agentId, 'pending:p:x');
   assert.deepEqual(rolloutActivities({}), []);

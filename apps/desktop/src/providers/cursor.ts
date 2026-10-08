@@ -1,5 +1,8 @@
 import { resolveKey, type KeySource } from "../lib/keys";
 import { mergeActivity, type Activity } from "./activities";
+import { cursorActivity, cursorRunFailure, settleActivities } from "./cursorEvents";
+import { capabilitiesOf, interrupted } from "./lifecycle";
+import { restartableTurn } from "./turnRestart";
 import { resolveResource } from "@tauri-apps/api/path";
 import { resumePoint, runScript, spawnLines } from "./cli";
 import { sidecarFailure, withImagePaths } from "./cliArgs";
@@ -10,7 +13,7 @@ import { pickLevel, reportedEffort, sdkEffort, specLevels } from "./reasoning";
 declare const __SIDECAR__: string;
 
 async function sidecarPath() {
-  return import.meta.env.DEV ? __SIDECAR__ : resolveResource("sidecar/cursor-agent.mjs");
+  return import.meta.env?.DEV ? __SIDECAR__ : resolveResource("sidecar/cursor-agent.mjs");
 }
 
 // ponytail: runs the sidecar with the user's own `node` (>= 22.13) from a login shell; ship a bundled runtime if users lack Node.
@@ -72,29 +75,44 @@ export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
           text += s;
           t.onText(s);
         };
-        await call(
-          { type: "send", apiKey: await resolveKey(key), model: t.model, params, cwd: t.cwd, agentId, prompt },
-          (e) => {
-            if (e.type === "agent") agentId = e.agentId;
-            else if (e.type === "text") emit(e.text);
-            else if (e.type === "tool") {
-              const next: Activity = {
-                type: "activity",
-                id: e.id ?? `${e.name}:${JSON.stringify(e.args ?? {})}`,
-                name: e.name,
-                args: e.args ?? {},
-                status: e.status === "error" ? "error" : e.status === "running" ? "running" : "unknown",
-                output: e.output,
-              };
-              const merged = mergeActivity(activities.get(next.id), next);
-              activities.set(next.id, merged);
-              t.onActivity?.(merged);
-            } else if (e.type === "error") error = e.message;
-          },
-          t.signal,
-        );
-        if (error) throw new Error(error);
-        return { parts: [...activities.values(), { type: "text" as const, text }], responseId: agentId };
+        let status: string | undefined;
+        let runError = "";
+        // One sidecar per turn: a follow-up cancels the run softly and the loop resumes the agent with it (turnRestart.ts).
+        const turn = restartableTurn(t, {
+          enabled: capabilitiesOf(cfg).followUp === "restart",
+          ended: () => status !== undefined,
+        });
+        try {
+          await call(
+            { type: "send", apiKey: await resolveKey(key), model: t.model, params, cwd: t.cwd, agentId, prompt },
+            (e) => {
+              if (e.type === "agent") agentId = e.agentId;
+              else if (e.type === "text") emit(e.text);
+              else if (e.type === "tool") {
+                const next = cursorActivity(e);
+                const merged = mergeActivity(activities.get(next.id), next);
+                activities.set(next.id, merged);
+                t.onActivity?.(merged);
+              } else if (e.type === "done") {
+                status = e.status;
+                runError = e.error ?? "";
+              } else if (e.type === "error") error = e.message;
+            },
+            turn.signal,
+          );
+        } finally {
+          await turn.close();
+        }
+        const output = () => ({
+          parts: [...settleActivities(activities.values()), { type: "text" as const, text }],
+          responseId: agentId,
+        });
+        if (turn.stopped()) throw interrupted(output());
+        // Cancelled for a follow-up: what it produced so far is the turn's result.
+        if (turn.restarted()) return { ...output(), interrupted: true };
+        const failure = cursorRunFailure({ status, error, runError });
+        if (failure) throw new Error(failure);
+        return output();
       } finally {
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
       }

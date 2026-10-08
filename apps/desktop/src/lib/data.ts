@@ -1,5 +1,6 @@
 import { attachments, cursor, db, fsx, getSetting, setSetting } from "./api";
 import type { Msg } from "../providers/types";
+import { releaseChatSessions } from "../providers/sessionManager";
 import { createDraftSaver, parseDraft, parseScope, type Draft, type DraftWrite } from "./chatSessions";
 
 export type Project = { id: number; name: string; path: string | null; pinned: number; created_at: number };
@@ -151,14 +152,23 @@ export const listChatBranches = (sourceId: number) =>
 
 export const renameChat = (id: number, title: string) =>
   db.exec("update chats set title = ? where id = ?", [title, id]);
-export const archiveChat = (id: number, archived = true) =>
-  db.exec("update chats set archived = ? where id = ?", [archived ? 1 : 0, id]);
-export const archiveProjectChats = (projectId: number) =>
-  db.exec("update chats set archived = 1 where project_id = ?", [projectId]);
+/** Archiving a chat also ends its live agent sessions (providers/sessionManager.ts); unarchiving starts none. */
+export async function archiveChat(id: number, archived = true) {
+  await db.exec("update chats set archived = ? where id = ?", [archived ? 1 : 0, id]);
+  if (archived) await releaseChatSessions(id);
+}
+export async function archiveProjectChats(projectId: number) {
+  const chats = await db
+    .select<{ id: number }>("select id from chats where project_id = ? and archived = 0", [projectId])
+    .catch(() => []);
+  await db.exec("update chats set archived = 1 where project_id = ?", [projectId]);
+  await Promise.all(chats.map((c) => releaseChatSessions(c.id)));
+}
 export async function removeProject(id: number) {
-  // Chats are deleted with the project (cascade); drop any attachment files they left behind.
+  // Chats are deleted with the project (cascade); drop any attachment files and live agent sessions they left behind.
   const chats = await db.select<{ id: number }>("select id from chats where project_id = ?", [id]).catch(() => []);
   await db.exec("delete from projects where id = ?", [id]);
+  await Promise.all(chats.map((c) => releaseChatSessions(c.id)));
   await Promise.all(chats.map((c) => attachments.clear(c.id).catch(() => {})));
 }
 export const renameProject = (id: number, name: string) =>

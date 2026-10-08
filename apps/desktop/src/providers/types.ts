@@ -84,6 +84,8 @@ export type Msg = {
     durationMs?: number;
     usage?: TokenUsage;
     compacted?: boolean;
+    /** The turn was cut short (Stop or a restart for a follow-up); a per-turn CLI does not keep the text it was writing. */
+    interrupted?: boolean;
   };
 };
 
@@ -133,7 +135,7 @@ export type TurnInput = {
   access?: "readonly" | "auto" | "full";
   /** Chat mode: CLI adapters pass their native plan / read-only flags for "plan" and "ask". */
   mode?: "ask" | "plan" | "agent";
-  /** CLI adapters: on abort kill the CLI's whole process tree, not only the process itself (used by CLI subagents). */
+  /** Kept for older callers: CLI adapters always stop the whole process tree now (providers/processHost.ts). */
   killTree?: boolean;
   signal: AbortSignal;
   onText: (delta: string) => void;
@@ -147,6 +149,8 @@ export type TurnInput = {
   };
   /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
   approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
+  /** Messages the user sent while this turn runs (providers/lifecycle.ts). Absent: follow-ups wait for the next turn. */
+  followUp?: import("./lifecycle").FollowUpChannel;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
   onRetry?: (info: RetryInfo) => void;
 };
@@ -155,7 +159,13 @@ export type TurnInput = {
 export type NativeGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type NativeGoal = { status: NativeGoalStatus; objective: string; tokensUsed: number; timeUsedSeconds: number };
 
-export type TurnOutput = { parts: Part[]; responseId?: string; usage?: TokenUsage };
+export type TurnOutput = {
+  parts: Part[];
+  responseId?: string;
+  usage?: TokenUsage;
+  /** The turn ended early to take a follow-up (providers/lifecycle.ts, `restart`). */
+  interrupted?: boolean;
+};
 
 export interface Adapter {
   listModels(): Promise<ModelInfo[]>;

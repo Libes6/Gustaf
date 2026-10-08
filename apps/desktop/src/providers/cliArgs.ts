@@ -129,7 +129,13 @@ export function turnImages(
  * Cursor account took over and the pool wrapped back), resuming would silently drop those turns, so the
  * session is not resumed and the whole history is replayed as text into a fresh session instead.
  */
-export function resumePoint(t: TurnInput, providerId: string, withSystem: boolean) {
+/** `replayInterrupted` (default true): repeat the text of an interrupted reply, for CLIs whose session lost it. */
+export function resumePoint(
+  t: TurnInput,
+  providerId: string,
+  withSystem: boolean,
+  o: { replayInterrupted?: boolean } = {},
+) {
   let from = 0;
   let session: string | undefined;
   for (let i = t.messages.length - 1; i >= 0; i--) {
@@ -146,10 +152,14 @@ export function resumePoint(t: TurnInput, providerId: string, withSystem: boolea
     }
   }
   const rest = t.messages.slice(from);
+  // A per-turn CLI stopped mid-reply keeps its tool calls but not the text it was writing: hand it back.
+  const cutText =
+    o.replayInterrupted !== false && session && from > 0 && t.messages[from - 1].meta?.interrupted
+      ? textOf(t.messages[from - 1]).trim()
+      : "";
   const prompt = session
-    ? rest
-        .filter((m) => m.role === "user")
-        .map(textOf)
+    ? (cutText ? [`[Your previous reply was interrupted. What you had written so far:]\n${cutText.slice(-4000)}`] : [])
+        .concat(rest.filter((m) => m.role === "user").map(textOf))
         .join("\n\n")
     : (withSystem ? `${t.system}\n\n` : "") +
       (rest.length === 1

@@ -2,28 +2,28 @@ import { resolveKey, type KeySource } from "../lib/keys";
 import { nativeActivities, applyActivity, isBareCollabWait, type Activity } from "./activities";
 import { createRolloutTracker, rolloutEnabled } from "./codexRollout";
 import { claudeArgs, parseClaudeEvent } from "./claudeCli";
+import { LiveSessionUnavailable, runClaudeLiveTurn } from "./claudeSession";
 import { cursorAccountEnv } from "./cursorAccounts";
 import { resolveResource } from "@tauri-apps/api/path";
 declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
-import { AppServerUnavailable, runAppServerTurn, type Connection } from "./codexAppServer";
+import { AppServerUnavailable, type Connection } from "./codexAppServer";
+import { codexLiveTurn } from "./codexLive";
 import { codexTransport } from "./codexTransport";
 import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
-import { Command } from "@tauri-apps/plugin-shell";
+import { openJsonProcess, shellCommand, spawnLines, type JsonLine } from "./processHost";
+import { capabilitiesOf, interrupted } from "./lifecycle";
+import { restartableTurn } from "./turnRestart";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
 import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
 
 export { shq } from "./shell";
 
-/** Runs a script in the OS shell (zsh on macOS, bash on Linux, PowerShell on Windows; see shell.ts). */
-export function shellCommand(script: string, options?: Parameters<typeof Command.create>[2]) {
-  const sh = shellFor(currentPlatform());
-  return Command.create(sh.name, sh.args(script), options);
-}
+export { shellCommand, spawnLines } from "./processHost";
 
 /** Script running `executable` with the platform's quoting (see `invocationScript`). */
 export const runScript = (inv: Invocation) => invocationScript(shellFor(currentPlatform()).kind, inv);
@@ -51,137 +51,23 @@ export async function cursorExecutable() {
 
 async function claudeExecutable() {
   const probe = await shellCommand(findScript("claude")).execute();
-  if (!probe.stdout.trim())
+  if (probe.code !== 0 || !probe.stdout.trim())
     throw new Error("Claude CLI is unavailable. Install Claude Code and run claude auth login.");
   return probe.stdout.trim();
-}
-
-/** Kills a child process and everything below it (src-tauri/src/proc_tree.rs); never throws. */
-async function killProcessTree(pid: number) {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("process_kill_tree", { pid });
-  } catch {
-    /* the plain kill that follows still ends the process itself */
-  }
-}
-
-/** Runs a login-shell script and feeds each stdout JSON line to onLine; non-JSON lines are skipped. */
-export async function spawnLines(
-  script: string,
-  onLine: (e: any) => void,
-  o: {
-    signal?: AbortSignal;
-    cwd?: string;
-    stdin?: string;
-    env?: Record<string, string>;
-    /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void;
-    /** On abort kill the whole process tree, not only the child. */ killTree?: boolean;
-  } = {},
-) {
-  if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
-  let buf = "";
-  let stderr = "";
-  const line = (s: string) => {
-    s = s.trim();
-    if (!s) return;
-    try {
-      o.onRaw?.(s);
-    } catch {
-      /* debugging aid only */
-    }
-    try {
-      onLine(JSON.parse(s));
-    } catch {
-      /* banners and warnings */
-    }
-  };
-  const done = new Promise<number | null>((resolve) => cmd.on("close", (e) => resolve(e.code)));
-  cmd.stdout.on("data", (chunk: string) => {
-    buf += chunk;
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      line(buf.slice(0, i));
-      buf = buf.slice(i + 1);
-    }
-  });
-  cmd.stderr.on("data", (s: string) => (stderr += s));
-  const child = await cmd.spawn();
-  const kill = () => {
-    void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
-  };
-  o.signal?.addEventListener("abort", kill, { once: true });
-  if (o.signal?.aborted) kill();
-  if (o.stdin != null) await child.write(o.stdin);
-  let code: number | null;
-  try {
-    code = await done;
-  } finally {
-    o.signal?.removeEventListener("abort", kill);
-  }
-  line(buf);
-  return { code, stderr };
 }
 
 /** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
 async function openAppServer(
   executable: string,
-  o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void },
+  o: { cwd?: string; env?: Record<string, string>; onRaw?: (line: string) => void },
 ): Promise<Connection> {
-  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), {
-    cwd: o.cwd,
-    ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}),
-  });
-  let listener: ((m: Record<string, unknown>) => void) | undefined;
-  const queued: Record<string, unknown>[] = [];
-  let buf = "";
-  let stderr = "";
-  const line = (raw: string) => {
-    raw = raw.trim();
-    if (!raw) return;
-    try {
-      o.onRaw?.(raw);
-    } catch {
-      /* debugging aid only */
-    }
-    try {
-      const m = JSON.parse(raw);
-      if (m && typeof m === "object") listener ? listener(m) : queued.push(m);
-    } catch {
-      /* banners and warnings */
-    }
-  };
-  const closed = new Promise<number | null>((resolve) =>
-    cmd.on("close", (e) => {
-      line(buf);
-      buf = "";
-      resolve(e.code);
-    }),
-  );
-  cmd.stdout.on("data", (chunk: string) => {
-    buf += chunk;
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      line(buf.slice(0, i));
-      buf = buf.slice(i + 1);
-    }
-  });
-  cmd.stderr.on("data", (s: string) => {
-    stderr = (stderr + s).slice(-4000);
-  });
-  const child = await cmd.spawn();
+  const proc = await openJsonProcess(runScript({ executable, args: ["app-server"] }), o);
   return {
-    write: (l) => child.write(l + "\n"),
-    onMessage(cb) {
-      listener = cb;
-      for (const m of queued.splice(0)) cb(m);
-    },
-    closed,
-    kill: () => {
-      void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
-    },
-    stderr: () => stderr,
+    write: proc.write,
+    onMessage: proc.onMessage,
+    closed: proc.closed,
+    kill: () => void proc.stop(),
+    stderr: proc.stderr,
   };
 }
 
@@ -335,7 +221,22 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
     },
 
     async turn(t: TurnInput) {
-      const point = resumePoint(t, cfg.id, false);
+      // Claude Code runs as a live session per chat (claudeSession.ts); the per-turn process below is its fallback.
+      if (id === "claude" && t.chatId) {
+        try {
+          return await runClaudeLiveTurn(t, {
+            providerId: cfg.id,
+            executable: claudeExecutable,
+            levels: (model) => spec.levels(model, listed),
+            attachments,
+          });
+        } catch (e) {
+          if (!(e instanceof LiveSessionUnavailable)) throw e;
+        }
+      }
+      // A live session (Codex app-server) keeps the text of an interrupted turn in its thread; per-turn CLIs do not.
+      const live = id === "codex" && (await codexTransport()) === "app-server";
+      const point = resumePoint(t, cfg.id, false, { replayInterrupted: !live });
       const log = createRawLogger(await rawLogEnabled(), id, t.chatId ?? null);
       let session = point.session;
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
@@ -360,6 +261,11 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           text += s;
           t.onText(s);
         };
+        // Recorded for the turn's output even when nobody listens (`t.onActivity?.(...)` alone would skip the merge).
+        const track = (a: Activity) => {
+          const merged = applyActivity(actions, a);
+          t.onActivity?.(merged);
+        };
         const executable =
           id === "codex"
             ? await codexExecutable()
@@ -371,19 +277,29 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           id === "codex" && (await rolloutEnabled())
             ? createRolloutTracker({
                 startedAt: Date.now(),
-                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onActivity: track,
                 onDebug: log.debug,
               })
             : undefined;
         let res: Awaited<ReturnType<typeof spawnLines>> | undefined;
-        // Codex over its app-server (native subagent lifecycle); anything wrong before the first message falls back to `codex exec`.
+        // Codex over its app-server, as the chat's live session (codexLive.ts): native subagent lifecycle, follow-ups steered
+        // into the running turn, Stop as a native interrupt. Falls back to `codex exec` only when the app-server failed before
+        // it accepted the turn and nothing was streamed, so a prompt never runs twice.
         let viaServer = false;
         if (id === "codex" && (await codexTransport()) === "app-server") {
+          let streamed = false;
+          const onActivity = (a: Activity) => {
+            streamed = true;
+            track(a);
+          };
           try {
-            const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
-            const r = await runAppServerTurn(
-              conn,
-              {
+            const r = await codexLiveTurn({
+              open: () => openAppServer(executable, { cwd: t.cwd, onRaw: log.raw }),
+              executable,
+              providerId: cfg.id,
+              chatId: t.chatId,
+              cwd: t.cwd,
+              params: {
                 cwd: t.cwd,
                 model: t.model === "default" ? undefined : t.model,
                 session,
@@ -395,30 +311,57 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
                 approvals: !!t.approve,
                 goal: t.goal ? { objective: t.goal.objective, resume: t.goal.resume } : undefined,
               },
-              {
+              handlers: {
                 signal: t.signal,
                 onApproval: t.approve,
                 onGoal: t.goal?.onUpdate,
-                onText: emit,
-                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onText: (s) => {
+                  streamed = true;
+                  emit(s);
+                },
+                onActivity,
                 onUsage: (u) => {
                   usage = u;
                 },
                 onDebug: log.debug,
+                followUp: t.followUp,
               },
-            );
+              onThread: (thread) => {
+                session = thread;
+              },
+            });
             viaServer = true;
             session = r.session;
             if (r.error) error = r.error;
-            res = { code: 0, stderr: "" };
+            res = { code: 0, stderr: "", settled: false };
           } catch (e) {
-            if (t.signal.aborted) throw e;
-            if (!(e instanceof AppServerUnavailable)) throw e;
+            if (t.signal.aborted) {
+              // Stopped: the turn keeps what it produced (running cards read as unknown) and the thread to continue on.
+              const parts = [
+                ...[...actions.values()].map((a) =>
+                  a.status === "running" ? { ...a, status: "unknown" as const } : a,
+                ),
+                ...(text ? [{ type: "text" as const, text }] : []),
+              ];
+              throw interrupted({ parts, responseId: session, usage });
+            }
+            if (!(e instanceof AppServerUnavailable) || streamed) throw e;
             log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
           }
         }
+        // A per-turn process (cursor-agent, `codex exec`): a follow-up ends the turn softly and the agent loop resumes
+        // the session with it as the next turn (providers/turnRestart.ts). Stop still goes through `t.signal`.
+        let ended = false;
+        const isTerminal = (e: JsonLine) =>
+          e.type === "result" || e.type === "turn.completed" || e.type === "turn.failed";
+        const perTurn = viaServer
+          ? undefined
+          : restartableTurn(t, {
+              enabled: capabilitiesOf(cfg, { codexExec: id === "codex" }).followUp === "restart",
+              ended: () => ended,
+            });
         try {
-          if (!viaServer)
+          if (perTurn)
             res = await spawnLines(
               // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
               runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
@@ -434,15 +377,16 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
                 const acts = nativeActivities(id, e, log.unmapped);
                 // Waits that name no agent are held back: the rollout scan shows the agents, and a merged card replaces them if it finds none.
                 if (rollout && isBareCollabWait(e)) rollout.hold(acts);
-                else for (const action of acts) t.onActivity?.(applyActivity(actions, action));
+                else for (const action of acts) track(action);
                 if (ev.final) final = ev.final;
                 if (ev.error) error = ev.error;
+                if (isTerminal(e)) ended = true;
               },
               {
-                signal: t.signal,
+                signal: perTurn.signal,
                 cwd: t.cwd,
                 onRaw: log.raw,
-                killTree: t.killTree,
+                terminal: isTerminal,
                 env: cursorAccountEnv(
                   cfg,
                   await accountKey(),
@@ -451,25 +395,30 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
               },
             );
         } finally {
+          await perTurn?.close();
           // The turn is over: one last scan unless it was stopped, then the polling ends.
-          for (const action of (await rollout?.finish(!t.signal.aborted)) ?? [])
-            t.onActivity?.(applyActivity(actions, action));
+          for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) track(action);
         }
-        if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
-        if (error) {
-          const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
-          throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
-        }
-        if (!text.trim() && final) emit(final);
-        return {
+        // Running cards of a turn that is over (stopped, restarted, or the CLI never closed them) are `unknown`.
+        const output = () => ({
           parts: [
             ...[...actions.values()].map((a) => (a.status === "running" ? { ...a, status: "unknown" as const } : a)),
             ...(text ? [{ type: "text" as const, text }] : []),
           ],
           responseId: session,
           usage,
-        };
+        });
+        if (t.signal.aborted) throw interrupted(output());
+        // Restarted for a follow-up: the exit code and errors of the stopped process say nothing about the work.
+        if (perTurn?.restarted()) return { ...output(), interrupted: true };
+        if (!error && res && res.code !== 0 && !res.settled)
+          error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
+        if (error) {
+          const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
+          throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
+        }
+        if (!text.trim() && final) emit(final);
+        return output();
       } finally {
         await log.flush();
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
