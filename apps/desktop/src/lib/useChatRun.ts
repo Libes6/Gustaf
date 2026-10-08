@@ -46,6 +46,7 @@ import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
 import { capabilitiesOf } from "../providers/lifecycle";
 import { codexTransport } from "../providers/codexTransport";
+import { releaseChatSessions } from "../providers/sessionManager";
 import { textOf, type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
 import { db, fsx, review } from "./api";
@@ -771,6 +772,8 @@ export function useChatRun(o: Options) {
   async function restartSession() {
     if (running || !session.chatId) return false;
     try {
+      // Live agent processes of this chat (Claude, Codex app-server) go too: the next turn opens a fresh one.
+      await releaseChatSessions(session.chatId);
       for (const m of messages.filter((x) => x.meta?.responseId)) {
         const { role, parts, meta } = m;
         await db.exec("update messages set content = ? where chat_id = ? and id = ?", [
