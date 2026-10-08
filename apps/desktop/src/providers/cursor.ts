@@ -109,7 +109,7 @@ export function cursorAgent(cfg: ProviderConfig, key: KeySource): Adapter {
         });
         if (turn.stopped()) throw interrupted(output());
         // Cancelled for a follow-up: what it produced so far is the turn's result.
-        if (turn.restarted()) return output();
+        if (turn.restarted()) return { ...output(), interrupted: true };
         const failure = cursorRunFailure({ status, error, runError });
         if (failure) throw new Error(failure);
         return output();

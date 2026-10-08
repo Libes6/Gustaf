@@ -624,7 +624,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
             followUp: {
               onWake: o.followUpWake,
               take: o.takeClarifications,
-              // Sent into the running turn: stored now, so the chat shows it where the agent got it.
+              // Taken by the running turn: stored now, before that turn's reply (which is stored when the turn ends).
               delivered: async (msgs: Msg[]) => {
                 for (const msg of msgs) {
                   history.push(msg);

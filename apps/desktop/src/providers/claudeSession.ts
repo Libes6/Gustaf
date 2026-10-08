@@ -233,6 +233,13 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
     const actions = new Map<string, Activity>();
     /** Messages written in this turn that the CLI has not taken yet (uuid). */
     const pending = new Set<string>();
+    /** Follow-ups waiting for the CLI to take them: stored in the chat only then (a stop or crash first leaves them queued). */
+    const acks = new Map<string, (taken: boolean) => void>();
+    const taken = (id: string) => {
+      pending.delete(id);
+      acks.get(id)?.(true);
+      acks.delete(id);
+    };
     let ended = false;
     let stopping = false;
     let resolveEnd!: (how: "result" | "closed") => void;
@@ -240,6 +247,8 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
     const finish = (how: "result" | "closed") => {
       if (ended) return;
       ended = true;
+      for (const ack of acks.values()) ack(false);
+      acks.clear();
       resolveEnd(how);
     };
     const emit = (d: string) => {
@@ -256,17 +265,20 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
     s.sink = (e) => {
       if (ended) return;
       if (e.type === "user" && e.isReplay) {
-        pending.delete(e.uuid);
+        taken(e.uuid);
         return;
       }
       if (e.type === "system" && e.subtype === "status" && Array.isArray(e.user_message_uuids))
-        for (const id of e.user_message_uuids) pending.delete(id);
+        for (const id of e.user_message_uuids) taken(id);
       if (e.type === "control_response") return;
       const limit = claudeLimit(e);
       if (limit) t.onLimits?.([limit]);
       const ev = parseClaudeEvent(e);
       if (ev.text) emit(ev.text);
-      for (const a of nativeActivities("claude", e, log.unmapped)) t.onActivity?.(applyActivity(actions, a));
+      for (const a of nativeActivities("claude", e, log.unmapped)) {
+        const merged = applyActivity(actions, a);
+        t.onActivity?.(merged);
+      }
       if (e.type !== "result") return;
       usage = addUsage(usage, tokenUsage(e.usage, true));
       if (ev.final) final = ev.final;
@@ -295,8 +307,11 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
       if (ended || stopping || !s.alive()) return false;
       const id = uuid();
       pending.add(id);
+      const ack = new Promise<boolean>((r) => acks.set(id, r));
       await s.send(withImagePaths(msgs.map(textOf).join("\n\n"), files), id, "next");
-      return true;
+      // Stored once the CLI echoes it; a stop or crash before that leaves it queued for the next turn (the session is
+      // then not reused, so it never runs twice).
+      return ack;
     });
 
     // Stop: ask the CLI to end the run first; the session stays usable when it does so in time.

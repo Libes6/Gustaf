@@ -123,14 +123,20 @@ export async function openJsonProcess(script: string, o: OpenOptions = {}): Prom
             await signalTree(child.pid, "kill");
             await child.kill().catch(() => {});
             await Promise.race([closed, new Promise((r) => setTimeout(r, 1000))]);
+          } else {
+            // The root ended in time; descendants that ignored SIGTERM (a dev server trapping it) are killed now, before
+            // the ledger forgets the tree.
+            await signalTree(child.pid, "kill");
           }
         }
       })());
     },
   };
   live.add(proc);
-  void closed.then(() => {
+  void closed.then(async () => {
     live.delete(proc);
+    // A stop in progress still kills the tree's leftovers by the recorded members; only then is the pid forgotten.
+    await stopping;
     void invokeQuiet("process_ledger_remove", { pid: child.pid });
   });
   if (o.stdin != null) await child.write(o.stdin);

@@ -9,7 +9,11 @@ export const SHUTDOWN_BUDGET_MS = 2000;
 
 /** Releases all live sessions and stops all agent processes; resolves after at most `budgetMs`. Never throws. */
 export async function shutdownAgents(budgetMs = SHUTDOWN_BUDGET_MS) {
-  const all = Promise.all([liveSessions.releaseAll(), stopAllProcesses(Math.min(1500, budgetMs))]).then(
+  const all = Promise.all([
+    // Processes first: a session's release reuses the stop already under way, so this grace (not the default one) applies.
+    stopAllProcesses(Math.min(1500, budgetMs)),
+    liveSessions.releaseAll(),
+  ]).then(
     () => {},
     () => {},
   );

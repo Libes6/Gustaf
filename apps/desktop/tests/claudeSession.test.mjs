@@ -436,3 +436,35 @@ test('a one-off start failure falls back for that turn only', async () => {
   assert.equal(h.procs.length, 2, 'the next turn tried the live session again');
   await h.sessions.releaseAll();
 });
+
+test('a follow-up the CLI has not taken when Stop comes is not stored: it stays queued for the next turn', async () => {
+  const h = harness();
+  h.deps.interruptMs = 40;
+  let wake;
+  const queue = [];
+  const delivered = [];
+  const followUp = {
+    onWake: (cb) => ((wake = cb), () => (wake = undefined)),
+    take: async () => [...queue],
+    delivered: async (msgs) => void delivered.push(...msgs),
+  };
+  h.deps.onOpen = (p) => {
+    p.onWrite = async (m) => {
+      // The first message starts streaming; the follow-up is written but never echoed (the CLI is busy in a tool).
+      if (m.type === 'user' && userWrites(p).length === 1) await play(p, step('interrupt').slice(0, 3), [m.uuid]);
+    };
+  };
+  const t = h.turn('Count', { followUp });
+  await sleep(20);
+  queue.push({ role: 'user', parts: [{ type: 'text', text: 'and stop at 10' }] });
+  wake?.();
+  await sleep(20);
+  assert.equal(userWrites(h.procs[0]).length, 2, 'the follow-up was written to the CLI');
+  t.ac.abort();
+  const err = await t.run.catch((e) => e);
+  assert.equal(err.name, 'AbortError');
+  assert.deepEqual(delivered, [], 'not stored as sent');
+  assert.equal(queue.length, 1, 'still queued');
+  assert.equal(h.procs[0].stops >= 1, true, 'the session that holds it is not reused');
+  await h.sessions.releaseAll();
+});
