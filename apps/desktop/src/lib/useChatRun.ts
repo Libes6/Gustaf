@@ -204,14 +204,9 @@ export function useChatRun(o: Options) {
         draining.current = false;
       });
   }, [queue, running, coordinatorBusy, loaded]);
-  // A running turn can take a clarification only for providers whose agent loop reads them (not the CLI or Cursor agents) and tool-capable models.
-  const canClarify =
-    ownRunning &&
-    o.mode === "agent" &&
-    selectedModel?.tools !== false &&
-    !provider?.cli &&
-    provider?.kind !== "cli" &&
-    provider?.kind !== "cursor";
+  // A running turn can take a clarification in agent mode with a tool-capable model; how it reaches the agent (live
+  // into the turn, by a soft restart, or after the turn) is the provider's follow-up capability (providers/lifecycle.ts).
+  const canClarify = ownRunning && o.mode === "agent" && selectedModel?.tools !== false;
   async function enqueue(clarify = false) {
     if (!session.chatId || (!text.trim() && !images.length)) return;
     try {
@@ -516,25 +511,23 @@ export function useChatRun(o: Options) {
       await runChatCore(
         {
           chatId: cid,
-          takeClarifications:
-            !activeProvider.cli && activeProvider.kind !== "cli" && activeProvider.kind !== "cursor"
-              ? async () => {
-                  const q = getQueue(cid);
-                  if (!q || q.paused) return [];
-                  // Preserve FIFO: only a leading clarification may join this run.
-                  const pending = leadingClarifications(q.items);
-                  steeringIds = pending.map((i) => i.id);
-                  return Promise.all(
-                    pending.map(async (i) => ({
-                      role: "user" as const,
-                      parts: [
-                        { type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) },
-                        ...i.images.map((data) => ({ type: "image" as const, data })),
-                      ],
-                    })),
-                  );
-                }
-              : undefined,
+          takeClarifications: async () => {
+            const q = getQueue(cid);
+            if (!q || q.paused) return [];
+            // Preserve FIFO: only a leading clarification may join this run.
+            const pending = leadingClarifications(q.items);
+            steeringIds = pending.map((i) => i.id);
+            return Promise.all(
+              pending.map(async (i) => ({
+                role: "user" as const,
+                parts: [
+                  { type: "text" as const, text: await expandMentions(runRoot, o.files, i.text) },
+                  ...i.images.map((data) => ({ type: "image" as const, data })),
+                ],
+              })),
+            );
+          },
+          followUpWake: (cb) => subscribeQueue(cb),
           root: runRoot,
           project: o.projectRoot ?? undefined,
           history,

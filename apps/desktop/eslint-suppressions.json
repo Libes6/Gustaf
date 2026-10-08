@@ -702,10 +702,7 @@
   },
   "src/providers/cli.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unused-expressions": {
-      "count": 1
+      "count": 2
     }
   },
   "src/providers/computerBridge.ts": {

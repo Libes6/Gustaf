@@ -12,18 +12,14 @@ import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoni
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
-import { Command } from "@tauri-apps/plugin-shell";
+import { openJsonProcess, shellCommand, spawnLines } from "./processHost";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
 import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
 
 export { shq } from "./shell";
 
-/** Runs a script in the OS shell (zsh on macOS, bash on Linux, PowerShell on Windows; see shell.ts). */
-export function shellCommand(script: string, options?: Parameters<typeof Command.create>[2]) {
-  const sh = shellFor(currentPlatform());
-  return Command.create(sh.name, sh.args(script), options);
-}
+export { shellCommand, spawnLines } from "./processHost";
 
 /** Script running `executable` with the platform's quoting (see `invocationScript`). */
 export const runScript = (inv: Invocation) => invocationScript(shellFor(currentPlatform()).kind, inv);
@@ -56,132 +52,18 @@ async function claudeExecutable() {
   return probe.stdout.trim();
 }
 
-/** Kills a child process and everything below it (src-tauri/src/proc_tree.rs); never throws. */
-async function killProcessTree(pid: number) {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("process_kill_tree", { pid });
-  } catch {
-    /* the plain kill that follows still ends the process itself */
-  }
-}
-
-/** Runs a login-shell script and feeds each stdout JSON line to onLine; non-JSON lines are skipped. */
-export async function spawnLines(
-  script: string,
-  onLine: (e: any) => void,
-  o: {
-    signal?: AbortSignal;
-    cwd?: string;
-    stdin?: string;
-    env?: Record<string, string>;
-    /** Every non-empty stdout line, before it is parsed. */ onRaw?: (line: string) => void;
-    /** On abort kill the whole process tree, not only the child. */ killTree?: boolean;
-  } = {},
-) {
-  if (o.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const cmd = shellCommand(script, { cwd: o.cwd, ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}) });
-  let buf = "";
-  let stderr = "";
-  const line = (s: string) => {
-    s = s.trim();
-    if (!s) return;
-    try {
-      o.onRaw?.(s);
-    } catch {
-      /* debugging aid only */
-    }
-    try {
-      onLine(JSON.parse(s));
-    } catch {
-      /* banners and warnings */
-    }
-  };
-  const done = new Promise<number | null>((resolve) => cmd.on("close", (e) => resolve(e.code)));
-  cmd.stdout.on("data", (chunk: string) => {
-    buf += chunk;
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      line(buf.slice(0, i));
-      buf = buf.slice(i + 1);
-    }
-  });
-  cmd.stderr.on("data", (s: string) => (stderr += s));
-  const child = await cmd.spawn();
-  const kill = () => {
-    void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
-  };
-  o.signal?.addEventListener("abort", kill, { once: true });
-  if (o.signal?.aborted) kill();
-  if (o.stdin != null) await child.write(o.stdin);
-  let code: number | null;
-  try {
-    code = await done;
-  } finally {
-    o.signal?.removeEventListener("abort", kill);
-  }
-  line(buf);
-  return { code, stderr };
-}
-
 /** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
 async function openAppServer(
   executable: string,
-  o: { cwd?: string; env?: Record<string, string>; killTree?: boolean; onRaw?: (line: string) => void },
+  o: { cwd?: string; env?: Record<string, string>; onRaw?: (line: string) => void },
 ): Promise<Connection> {
-  const cmd = shellCommand(runScript({ executable, args: ["app-server"] }), {
-    cwd: o.cwd,
-    ...(o.env && Object.keys(o.env).length ? { env: o.env } : {}),
-  });
-  let listener: ((m: Record<string, unknown>) => void) | undefined;
-  const queued: Record<string, unknown>[] = [];
-  let buf = "";
-  let stderr = "";
-  const line = (raw: string) => {
-    raw = raw.trim();
-    if (!raw) return;
-    try {
-      o.onRaw?.(raw);
-    } catch {
-      /* debugging aid only */
-    }
-    try {
-      const m = JSON.parse(raw);
-      if (m && typeof m === "object") listener ? listener(m) : queued.push(m);
-    } catch {
-      /* banners and warnings */
-    }
-  };
-  const closed = new Promise<number | null>((resolve) =>
-    cmd.on("close", (e) => {
-      line(buf);
-      buf = "";
-      resolve(e.code);
-    }),
-  );
-  cmd.stdout.on("data", (chunk: string) => {
-    buf += chunk;
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      line(buf.slice(0, i));
-      buf = buf.slice(i + 1);
-    }
-  });
-  cmd.stderr.on("data", (s: string) => {
-    stderr = (stderr + s).slice(-4000);
-  });
-  const child = await cmd.spawn();
+  const proc = await openJsonProcess(runScript({ executable, args: ["app-server"] }), o);
   return {
-    write: (l) => child.write(l + "\n"),
-    onMessage(cb) {
-      listener = cb;
-      for (const m of queued.splice(0)) cb(m);
-    },
-    closed,
-    kill: () => {
-      void (o.killTree ? killProcessTree(child.pid) : Promise.resolve()).then(() => child.kill()).catch(() => {});
-    },
-    stderr: () => stderr,
+    write: proc.write,
+    onMessage: proc.onMessage,
+    closed: proc.closed,
+    kill: () => void proc.stop(),
+    stderr: proc.stderr,
   };
 }
 
@@ -380,7 +262,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
         let viaServer = false;
         if (id === "codex" && (await codexTransport()) === "app-server") {
           try {
-            const conn = await openAppServer(executable, { cwd: t.cwd, killTree: t.killTree, onRaw: log.raw });
+            const conn = await openAppServer(executable, { cwd: t.cwd, onRaw: log.raw });
             const r = await runAppServerTurn(
               conn,
               {
@@ -410,7 +292,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
             viaServer = true;
             session = r.session;
             if (r.error) error = r.error;
-            res = { code: 0, stderr: "" };
+            res = { code: 0, stderr: "", settled: false };
           } catch (e) {
             if (t.signal.aborted) throw e;
             if (!(e instanceof AppServerUnavailable)) throw e;
@@ -442,7 +324,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
                 signal: t.signal,
                 cwd: t.cwd,
                 onRaw: log.raw,
-                killTree: t.killTree,
+                terminal: (e) => e.type === "result" || e.type === "turn.completed" || e.type === "turn.failed",
                 env: cursorAccountEnv(
                   cfg,
                   await accountKey(),
@@ -456,7 +338,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
             t.onActivity?.(applyActivity(actions, action));
         }
         if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (!error && res && res.code !== 0) error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
+        if (!error && res && res.code !== 0 && !res.settled)
+          error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
         if (error) {
           const auth = /401|auth|login|unauthori[sz]ed|api key/i.test(error);
           throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);

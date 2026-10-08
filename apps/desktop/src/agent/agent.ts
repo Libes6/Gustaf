@@ -73,6 +73,8 @@ export type RunOptions = {
   /** Run this message as a native provider goal (`TurnInput.goal`); first step only. */
   goal?: import("../providers/types").TurnInput["goal"];
   takeClarifications?: () => Promise<Msg[]>;
+  /** Fires when a clarification may be waiting, so a live agent can take it during its turn (`TurnInput.followUp`). */
+  followUpWake?: (cb: () => void) => () => void;
   root: string | null;
   reviewMode?: boolean;
   /** Directories of the review workspace that are symlinks to the original project's dependencies. */
@@ -617,6 +619,21 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
       onRetry: o.onRetry,
       approve: async (req) => (await o.approve(req)) !== false,
       ...(step === 0 && o.goal ? { goal: o.goal } : {}),
+      ...(o.takeClarifications && o.followUpWake
+        ? {
+            followUp: {
+              onWake: o.followUpWake,
+              take: o.takeClarifications,
+              // Sent into the running turn: stored now, so the chat shows it where the agent got it.
+              delivered: async (msgs: Msg[]) => {
+                for (const msg of msgs) {
+                  history.push(msg);
+                  await o.onMessage(msg);
+                }
+              },
+            },
+          }
+        : {}),
     });
     if (o.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const calls = out.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
