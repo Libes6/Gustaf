@@ -10,6 +10,7 @@ import {
   type TokenUsage,
 } from "../providers/types";
 import { pickLevel } from "../providers/reasoning";
+import { partialOf } from "../providers/lifecycle";
 
 // The part of "run the agent in a chat" that interactive sends (lib/useChatRun.ts) and scheduled runs
 // (lib/scheduledRun.ts) share, without React or any app state: store the user message with its checkpoint, make the
@@ -83,6 +84,7 @@ export type ChatRunUi = {
 
 export type ChatRunInput = {
   takeClarifications?: RunOptions["takeClarifications"];
+  followUpWake?: RunOptions["followUpWake"];
   chatId: number;
   root: string | null;
   /** The project folder when `root` is a workspace checkout (settings such as the verification checks belong to the project). */
@@ -184,6 +186,7 @@ export async function runChatCore(
       signal: i.signal,
       source: i.source,
       takeClarifications: i.takeClarifications,
+      followUpWake: i.followUpWake,
       ...(i.goal ? { goal: i.goal } : {}),
       subagents: i.subagents,
       onLimits: (windows) => deps.onLimits?.(tg.providerId, windows),
@@ -217,12 +220,23 @@ export async function runChatCore(
       ...(outcome && outcome.verification ? { verification: outcome.verification } : {}),
     };
   } catch (e) {
-    // The interrupted step's tool cards are kept (still-running ones as "unknown") so the chat shows what happened.
-    if (target && activities.length) {
+    // The interrupted step is kept so the chat shows what happened: its tool cards (still-running ones as "unknown")
+    // and, when the provider reported them (lifecycle.ts `interrupted`), the text so far and the native session id, so
+    // the next message resumes the session that saw this step instead of an older one.
+    const cut = partialOf(e);
+    const cards = activities.map((a) => (a.status === "running" ? { ...a, status: "unknown" as const } : a));
+    const text = cut?.parts.filter((p) => p.type === "text") ?? [];
+    if (target && (cards.length || text.length)) {
       const partial: Msg = {
         role: "assistant",
-        parts: activities.map((a) => (a.status === "running" ? { ...a, status: "unknown" } : a)),
-        meta: { provider: target.providerId, model: target.model },
+        parts: [...cards, ...text],
+        meta: {
+          provider: target.providerId,
+          model: target.model,
+          ...(cut?.responseId ? { responseId: cut.responseId } : {}),
+          ...(cut?.usage ? { usage: cut.usage } : {}),
+          ...(cut ? { interrupted: true } : {}),
+        },
       };
       ui.onAccepted?.(partial);
       const id = await deps.addMessage(i.chatId, partial).catch(() => null);

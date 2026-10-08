@@ -1,6 +1,7 @@
 // What Enter does with a message sent while the agent is running in the same chat (pure: node tests cover it).
 //   "queue" - the message becomes the next request and runs after the current one ends (FIFO, one run per chat).
-//   "steer" - the message is handed to the running turn as a clarification (only providers that take one).
+//   "steer" - the message is handed to the running turn as a clarification (only providers that take one); per-turn
+//             agents take it by a soft restart: the turn ends, keeps its work, and the next one continues with the message.
 import type { PendingMessage, QueueState } from "./chatQueue.ts";
 
 export type FollowUpAction = "queue" | "steer";
@@ -19,11 +20,28 @@ export function resolveFollowUp(mode: FollowUpAction, opposite: boolean, canStee
   return opposite ? (mode === "steer" ? "queue" : "steer") : mode;
 }
 
-/** What the composer hint shows while a run is going. */
-export type FollowUpPlan = { action: FollowUpAction; other: FollowUpAction | null; canSteer: boolean };
-export function followUpPlan(mode: FollowUpAction, canSteer: boolean): FollowUpPlan {
+/**
+ * What the composer hint shows while a run is going. `restart`: a refinement reaches this provider by ending the current
+ * turn softly and continuing with the message (per-turn agents: Cursor, `codex exec`; providers/lifecycle.ts).
+ */
+export type FollowUpPlan = {
+  action: FollowUpAction;
+  other: FollowUpAction | null;
+  canSteer: boolean;
+  restart: boolean;
+};
+export function followUpPlan(
+  mode: FollowUpAction,
+  canSteer: boolean,
+  delivery: "steer" | "restart" = "steer",
+): FollowUpPlan {
   const action = resolveFollowUp(mode, false, canSteer);
-  return { action, other: canSteer ? (action === "steer" ? "queue" : "steer") : null, canSteer };
+  return {
+    action,
+    other: canSteer ? (action === "steer" ? "queue" : "steer") : null,
+    canSteer,
+    restart: canSteer && delivery === "restart",
+  };
 }
 
 /** Preserve FIFO: only the clarifications at the head of the queue may join the running turn; the first normal message stops the scan. */
