@@ -56,9 +56,11 @@ test('the opposite shortcut is registered, editable, Cmd+Enter by default, and c
 test('a provider without steering can only queue, whatever the setting or the shortcut says', () => {
   for (const mode of ['queue', 'steer'])
     for (const opposite of [false, true]) assert.equal(resolveFollowUp(mode, opposite, false), 'queue');
-  assert.deepEqual(followUpPlan('steer', false), { action: 'queue', other: null, canSteer: false });
-  assert.deepEqual(followUpPlan('steer', true), { action: 'steer', other: 'queue', canSteer: true });
-  assert.deepEqual(followUpPlan('queue', true), { action: 'queue', other: 'steer', canSteer: true });
+  assert.deepEqual(followUpPlan('steer', false), { action: 'queue', other: null, canSteer: false, restart: false });
+  assert.deepEqual(followUpPlan('steer', true), { action: 'steer', other: 'queue', canSteer: true, restart: false });
+  assert.deepEqual(followUpPlan('queue', true), { action: 'queue', other: 'steer', canSteer: true, restart: false });
+  assert.equal(followUpPlan('steer', true, 'restart').restart, true, 'per-turn agents refine by a soft restart');
+  assert.equal(followUpPlan('steer', false, 'restart').restart, false, 'no restart hint where nothing can be refined');
 });
 
 test('only leading clarifications join the running turn (FIFO)', () => {
