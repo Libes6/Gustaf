@@ -1,6 +1,7 @@
 import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { getAgentActivity, subscribeAgentActivity } from "../device/agentActivity";
 import { useT } from "../i18n";
 import { hasTerminalCommands, onTerminalCommand, takeTerminalOpen } from "../lib/terminalBridge";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
@@ -96,6 +97,7 @@ export function ChangesPanel({
   const [previewOpened, setPreviewOpened] = useState(false);
   const [deviceOpened, setDeviceOpened] = useState(false);
   const [tab, setTab] = useState<"changes" | "terminal" | "preview" | "device">("changes");
+  const agentDevices = useSyncExternalStore(subscribeAgentActivity, getAgentActivity);
   useEffect(() => {
     const show = () => {
       if (hasTerminalCommands(root) || takeTerminalOpen(root)) {
@@ -694,7 +696,12 @@ export function ChangesPanel({
             {deviceOpened && (
               <div hidden={tab !== "device"}>
                 <Suspense fallback={<div className="term">{t("deviceTab")}…</div>}>
-                  <DevicePanel visible={tab === "device"} />
+                  <DevicePanel
+                    visible={tab === "device"}
+                    agentActive={agentDevices.length > 0}
+                    agentLabel={agentDevices[0]?.name}
+                    onStopAgent={() => window.dispatchEvent(new Event("gustaf-stop"))}
+                  />
                 </Suspense>
               </div>
             )}
