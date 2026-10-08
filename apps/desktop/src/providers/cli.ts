@@ -8,7 +8,6 @@ declare const __SIDECAR__: string;
 import { codexArgs, cursorArgs, resumePoint, withImagePaths } from "./cliArgs";
 import { AppServerUnavailable, type Connection } from "./codexAppServer";
 import { codexLiveTurn } from "./codexLive";
-import { interrupted } from "./lifecycle";
 import { codexTransport } from "./codexTransport";
 import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoning";
 import { attachments, cursorProfiles } from "../lib/api";
@@ -221,7 +220,9 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
     },
 
     async turn(t: TurnInput) {
-      const point = resumePoint(t, cfg.id, false);
+      // A live session (Codex app-server) keeps the text of an interrupted turn in its thread; per-turn CLIs do not.
+      const live = id === "codex" && (await codexTransport()) === "app-server";
+      const point = resumePoint(t, cfg.id, false, { replayInterrupted: !live });
       const log = createRawLogger(await rawLogEnabled(), id, t.chatId ?? null);
       let session = point.session;
       // Attached images go to disk for the CLI to read; they are removed when the turn ends (also on error or stop).
@@ -275,7 +276,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           let streamed = false;
           const onActivity = (a: Activity) => {
             streamed = true;
-            t.onActivity?.(applyActivity(actions, a));
+            track(a);
           };
           try {
             const r = await codexLiveTurn({
