@@ -15,6 +15,7 @@ const { state } = await import('./helpers/apiStub.mjs');
 const { shell, fakeProcess, installSignals } = await import('./helpers/shellStub.mjs');
 installSignals();
 const { cliAdapter } = await import('../src/providers/cli.ts');
+const { cursorAgent } = await import('../src/providers/cursor.ts');
 const { runAgent } = await import('../src/agent/agent.ts');
 const { partialOf } = await import('../src/providers/lifecycle.ts');
 const { restartableTurn } = await import('../src/providers/turnRestart.ts');
@@ -222,6 +223,111 @@ test('restartableTurn: the run signal is a stop, a follow-up is a restart; a dis
   assert.equal(b.stopped(), true);
   assert.equal(b.restarted(), false);
   await b.close();
+});
+
+// --- Cursor SDK (sidecar/cursor-agent.mjs through providers/cursor.ts) ---
+
+const sdkCfg = { id: 'sdk', name: 'Cursor', kind: 'cursor' };
+const sdkTurn = (o = {}) =>
+  cursorAgent(sdkCfg, 'key').turn({
+    system: 'sys',
+    messages: [user('go')],
+    model: 'composer-1',
+    signal: o.signal ?? new AbortController().signal,
+    onText: () => {},
+    followUp: o.followUp,
+  });
+const sdkShell = (run, proc) => scriptShell([{ run, proc }]);
+const tool = (status, extra = {}) => ({
+  type: 'tool',
+  id: 'call-9',
+  name: 'edit',
+  status,
+  args: { path: 'a' },
+  ...extra,
+});
+
+test('Cursor SDK: completed tools are successes, leftover running cards are unknown, finished runs succeed', async () => {
+  sdkShell((p) => {
+    p.line({ type: 'agent', agentId: 'agent-1' });
+    p.line(tool('running'));
+    p.line(tool('completed', { output: 'ok' }));
+    p.line({ type: 'tool', id: 'call-10', name: 'shell', status: 'running', args: { cmd: 'ls' } });
+    p.line({ type: 'text', text: 'All set' });
+    p.line({ type: 'done', status: 'finished' });
+    p.exit(0);
+  });
+  const out = await sdkTurn();
+  const cards = out.parts.filter((p) => p.type === 'activity');
+  assert.deepEqual(
+    cards.map((c) => [c.id, c.status]),
+    [
+      ['call-9', 'success'],
+      ['call-10', 'unknown'],
+    ],
+  );
+  assert.equal(out.responseId, 'agent-1');
+  assert.equal(textOf(out), 'All set');
+});
+
+test('Cursor SDK: an error or cancelled run is a failure, not a success', async () => {
+  for (const [done, want] of [
+    [{ type: 'done', status: 'error', error: 'model overloaded' }, /model overloaded/],
+    [{ type: 'done', status: 'cancelled' }, /cancelled/],
+    [null, /without a result/],
+  ]) {
+    sdkShell((p) => {
+      p.line({ type: 'agent', agentId: 'agent-2' });
+      p.line({ type: 'text', text: 'partial' });
+      if (done) p.line(done);
+      p.exit(0);
+    });
+    await assert.rejects(sdkTurn(), want);
+  }
+});
+
+test('Cursor SDK: Stop sends SIGTERM and throws interrupted with the partial text and agent id', async () => {
+  const ac = new AbortController();
+  let p;
+  // The sidecar answers SIGTERM by cancelling the run: a `done cancelled` line, then exit.
+  sdkShell(
+    (proc) => {
+      p = proc;
+      proc.line({ type: 'agent', agentId: 'agent-3' });
+      proc.line({ type: 'text', text: 'Working' });
+      proc.line(tool('running'));
+    },
+    { onTerm: (proc) => (proc.line({ type: 'done', status: 'cancelled' }), proc.exit(143)) },
+  );
+  const turn = sdkTurn({ signal: ac.signal });
+  await sleep(10);
+  ac.abort();
+  const e = await turn.then(
+    () => assert.fail('a stopped turn throws'),
+    (err) => err,
+  );
+  assert.deepEqual(p.signals, ['term']);
+  const partial = partialOf(e);
+  assert.equal(partial.responseId, 'agent-3');
+  assert.equal(textOf(partial), 'Working');
+  assert.equal(partial.parts.find((x) => x.type === 'activity').status, 'unknown');
+});
+
+test('Cursor SDK: a follow-up cancels the run softly and returns its output as a normal turn', async () => {
+  const q = chatQueue();
+  sdkShell(
+    async (proc) => {
+      proc.line({ type: 'agent', agentId: 'agent-4' });
+      proc.line({ type: 'text', text: 'Step one' });
+      await sleep(5);
+      q.push('also update the docs');
+    },
+    { onTerm: (proc) => (proc.line({ type: 'done', status: 'cancelled' }), proc.exit(143)) },
+  );
+  const out = await sdkTurn({ followUp: q });
+  assert.equal(textOf(out), 'Step one');
+  assert.equal(out.responseId, 'agent-4');
+  assert.equal(q.items.length, 1, 'the clarification waits for the next turn');
 });
 
 test('codex exec: a clarification restarts the turn; the thread id and the finished messages are kept', async () => {
