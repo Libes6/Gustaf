@@ -22,6 +22,7 @@ import { startScratchChat } from "./lib/scratch";
 import { startPrWatchPoller } from "./lib/prWatch";
 import { startCleanupScheduler } from "./lib/storageCleanup";
 import { installAgentShutdown } from "./lib/agentShutdown";
+import { wireDeviceDriver } from "./device/realDriver";
 import { emptyNav, move, visit } from "./lib/navHistory";
 import { AppProvider, type AppState } from "./state";
 
@@ -36,6 +37,7 @@ function Shell({ app }: { app: AppState }) {
   useEffect(() => startCleanupScheduler(), []);
   // Agents end with the window (close, reload, update relaunch): lib/agentShutdown.ts.
   useEffect(() => installAgentShutdown(), []);
+  useEffect(() => wireDeviceDriver(), []);
   // Back / forward between chats (lib/navHistory.ts): every chat the user opens is recorded, except moves made by ⌘[ / ⌘].
   const nav = useRef(emptyNav);
   const navigating = useRef(false);
