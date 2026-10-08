@@ -185,7 +185,7 @@
   "deviceAgentTitle": "Devices",
   "deviceAgentLead": "Let agents see and drive iOS simulators and Android emulators on this computer.",
   "deviceAgentAccess": "Agent device access",
-  "deviceAgentAccessDesc": "Agents in your chats can read a simulator or emulator screen and tap, type, swipe and open apps. Claude Code, Codex and Cursor get a gustaf-device command on macOS and Linux. Scheduled, mobile-triggered and background agents never get access.",
+  "deviceAgentAccessDesc": "Agents in your chats can read a simulator or emulator screen and tap, type, swipe and open apps. Claude Code, Codex and Cursor get a gustaf-device command. Scheduled, mobile-triggered and background agents never get access.",
   "deviceAgentAsk": "Ask before the agent uses a device for the first time in a chat",
   "deviceAgentAskDesc": "Powering a device off always asks, whatever this says.",
   "deviceAgentApprove": "Let the agent use a device?",
