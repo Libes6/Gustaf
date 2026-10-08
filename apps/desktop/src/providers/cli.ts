@@ -47,7 +47,7 @@ export async function cursorExecutable() {
 
 async function claudeExecutable() {
   const probe = await shellCommand(findScript("claude")).execute();
-  if (!probe.stdout.trim())
+  if (probe.code !== 0 || !probe.stdout.trim())
     throw new Error("Claude CLI is unavailable. Install Claude Code and run claude auth login.");
   return probe.stdout.trim();
 }
