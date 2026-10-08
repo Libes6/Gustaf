@@ -11,6 +11,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-set-badge-count",
     "core:window:allow-request-user-attention",
+    "core:window:allow-destroy",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",
     "notification:allow-notify",

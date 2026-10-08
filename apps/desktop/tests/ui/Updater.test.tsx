@@ -38,7 +38,8 @@ describe("Signed updater UI", () => {
     expect(install).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Confirm restart" }));
     expect(install).toHaveBeenCalledTimes(1);
-    expect(native.relaunch).toHaveBeenCalledTimes(1);
+    // Agents are shut down first (lib/agentShutdown.ts), then the app relaunches.
+    await waitFor(() => expect(native.relaunch).toHaveBeenCalledTimes(1));
   });
   it("shows verification errors without enabling installation", async () => {
     mockInvoke({ updater_configured: true });

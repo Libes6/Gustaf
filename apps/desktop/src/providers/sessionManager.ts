@@ -131,3 +131,10 @@ export const liveSessions = createSessionManager();
 /** Key of a chat's session with one provider in one folder. */
 export const sessionKey = (o: { providerId: string; chatId?: number; cwd?: string }) =>
   `chat:${o.chatId ?? "none"}|${o.providerId}|${o.cwd ?? ""}`;
+
+/** Releases every live session of a chat ("Restart agent session", chat archived or deleted). Never throws. */
+export const releaseChatSessions = (chatId: number) =>
+  liveSessions.releaseMatching(`chat:${chatId}|`).then(
+    () => {},
+    () => {},
+  );

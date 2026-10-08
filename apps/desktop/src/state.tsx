@@ -9,6 +9,7 @@ import { listChats, listProjects, type Chat, type Project } from "./lib/data";
 import { getAdapter, listAllModels, loadProviders, type ModelRefresh } from "./providers";
 import { readSubscriptionLimits } from "./providers/limits";
 import { worktrees } from "./lib/worktrees";
+import { refreshWorkspaces } from "./lib/workspaceStore";
 import { removeLegacyReviewOverrides } from "./lib/reviewCopy";
 import { DEFAULT_FOLLOW_UP, normalizeFollowUp, type FollowUpAction } from "./lib/followUp";
 import type { TokenUsage, LimitWindow, ModelInfo, ProviderConfig, Reasoning } from "./providers/types";
@@ -253,11 +254,16 @@ function useAppState() {
     refreshModels({ refresh: "startup" });
     removeLegacyReviewOverrides();
     // Workspaces (git worktrees) whose folder was deleted behind our back: tidy the leftovers once per start; failures
-    // (not a git repository, git missing, a folder that moved) are of no interest here.
+    // (not a git repository, git missing, a folder that moved) are of no interest here. Then read every project's
+    // workspaces once (T3 reconcile-at-startup), so interrupted agent work shows in the sidebar before any chat opens;
+    // the shared store (lib/workspaceStore.ts) de-duplicates this with the reads of the chat view.
     listProjects()
       .then((ps) => {
         for (const root of new Set(ps.map((p) => p.path).filter((p): p is string => !!p)))
-          worktrees.prune(root).catch(() => {});
+          void worktrees
+            .prune(root)
+            .catch(() => {})
+            .then(() => refreshWorkspaces(root, { force: true }));
       })
       .catch(() => {});
   }, []);

@@ -124,6 +124,9 @@ export async function configuredUpdateTransport(): Promise<UpdateTransport | und
         },
         async install() {
           await update.install();
+          // Agents end gracefully before the relaunch (bounded; see lib/agentShutdown.ts).
+          const { shutdownAgents } = await import("./agentShutdown");
+          await shutdownAgents();
           const { relaunch } = await import("@tauri-apps/plugin-process");
           await relaunch();
         },

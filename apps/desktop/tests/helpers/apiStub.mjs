@@ -120,6 +120,21 @@ export const rawLog = {
     latest: state.rawLog.length ? '/stub/raw-cli/day.jsonl' : null,
   }),
 };
+/** Image attachments of a CLI turn (src-tauri attachments_save / _clear): nothing is written. */
+export const attachments = {
+  save: async (chatId, images) => ({
+    dir: `/stub/attachments/${chatId}`,
+    files: images.map((_, i) => `/stub/attachments/${chatId}/${i}.png`),
+  }),
+  clear: async () => {},
+};
+/** Cursor CLI profiles (src-tauri cursor_profile_*): a fixed folder per name. */
+export const cursorProfiles = {
+  create: async (name) => `/stub/cursor-profiles/${name}`,
+  dir: async (name) => `/stub/cursor-profiles/${name}`,
+  remove: async () => {},
+  status: async () => ({ email: null }),
+};
 /** Codex rollout scan (src-tauri/src/codex_agents.rs): nothing found unless a test sets `state.codexScan`. */
 export const codexAgents = {
   scan: async (threadId, startedAt) =>

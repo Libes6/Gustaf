@@ -44,6 +44,9 @@ import {
 } from "../providers/cursorAccounts";
 import { loadPool, updatePool } from "../providers/cursorPoolStore";
 import { retryNoticeVars } from "../providers/retry";
+import { capabilitiesOf } from "../providers/lifecycle";
+import { codexTransport } from "../providers/codexTransport";
+import { releaseChatSessions } from "../providers/sessionManager";
 import { textOf, type Msg, type ModelInfo, type Part, type ProviderConfig, type TokenUsage } from "../providers/types";
 import { useApp } from "../state";
 import { db, fsx, review } from "./api";
@@ -207,6 +210,18 @@ export function useChatRun(o: Options) {
   // A running turn can take a clarification in agent mode with a tool-capable model; how it reaches the agent (live
   // into the turn, by a soft restart, or after the turn) is the provider's follow-up capability (providers/lifecycle.ts).
   const canClarify = ownRunning && o.mode === "agent" && selectedModel?.tools !== false;
+  // Codex over `codex exec` runs one process per turn, so a refinement restarts the turn instead of steering it.
+  const [codexExec, setCodexExec] = useState(false);
+  useEffect(() => {
+    if (provider?.cli !== "codex") return;
+    let live = true;
+    void codexTransport().then((v) => live && setCodexExec(v === "exec"));
+    return () => {
+      live = false;
+    };
+  }, [provider?.cli, ownRunning]);
+  const clarifyDelivery =
+    provider && capabilitiesOf(provider, { codexExec }).followUp === "restart" ? "restart" : "steer";
   async function enqueue(clarify = false) {
     if (!session.chatId || (!text.trim() && !images.length)) return;
     try {
@@ -757,6 +772,8 @@ export function useChatRun(o: Options) {
   async function restartSession() {
     if (running || !session.chatId) return false;
     try {
+      // Live agent processes of this chat (Claude, Codex app-server) go too: the next turn opens a fresh one.
+      await releaseChatSessions(session.chatId);
       for (const m of messages.filter((x) => x.meta?.responseId)) {
         const { role, parts, meta } = m;
         await db.exec("update messages set content = ? where chat_id = ? and id = ?", [
@@ -968,7 +985,7 @@ export function useChatRun(o: Options) {
 
   return {
     canClarify,
-    followUp: followUpPlan(app.followUp, canClarify),
+    followUp: followUpPlan(app.followUp, canClarify, clarifyDelivery),
     queue,
     enqueue,
     changeQueue,
