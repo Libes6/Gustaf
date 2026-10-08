@@ -146,15 +146,22 @@ export type LiveDeps = {
     args: string[];
     cwd?: string;
     onRaw: (line: string) => void;
+    /** Environment and PATH folder for the `gustaf-device` command (Settings > Devices). */
+    device?: { env: Record<string, string>; binDir: string };
   }) => Promise<JsonProcess>;
   rawLogger?: (chatId: number | null) => Promise<RawLogger>;
   interruptMs?: number;
   uuid?: () => string;
 };
 
-const defaultOpen: NonNullable<LiveDeps["open"]> = ({ executable, args, cwd, onRaw }) =>
+const defaultOpen: NonNullable<LiveDeps["open"]> = ({ executable, args, cwd, onRaw, device }) =>
   openJsonProcess(
-    invocationScript(shellFor(currentPlatform()).kind, { executable, args, prependExecutableDir: true }),
+    invocationScript(shellFor(currentPlatform()).kind, {
+      executable,
+      args,
+      prependExecutableDir: true,
+      ...(device ? { env: device.env, prependPath: device.binDir } : {}),
+    }),
     { cwd, onRaw },
   );
 
@@ -201,7 +208,9 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
       mode: t.mode,
       addDir: attachDirs.get(chatId),
       reasoning: pickLevel(t.reasoning, ctx.levels(t.model)),
+      deviceCommand: !!t.device,
     } as const;
+    // The process is started with the device environment (or without): switching access on or off starts a new one.
     const signature = JSON.stringify({ executable, cwd: t.cwd ?? "", args: claudeLiveArgs(flags) });
     const key = sessionKey({ providerId: ctx.providerId, chatId, cwd: t.cwd });
     const start = async () => {
@@ -211,6 +220,7 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
         args: claudeLiveArgs({ ...flags, session: point.session }),
         cwd: t.cwd,
         onRaw: (line) => ref.session?.raw?.(line),
+        device: t.device,
       });
       return (ref.session = new ClaudeLiveSession(proc, { session: point.session, addDir: flags.addDir }));
     };

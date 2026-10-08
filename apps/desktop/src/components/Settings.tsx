@@ -35,6 +35,7 @@ import { archiveChat, listArchived, type Chat, type ImportRecord } from "../lib/
 import { SOURCE_LABELS } from "../lib/importers/common";
 import type { ProviderConfig } from "../providers/types";
 import { useApp, type SettingsPage } from "../state";
+import { DeviceSettings } from "./DeviceSettings";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { AppDiagnostics } from "./AppDiagnostics";
 import { AutoReviewSettings } from "./AutoReviewSettings";
@@ -451,6 +452,7 @@ function ComputerPage() {
           })}
         />
       </div>
+      <DeviceSettings />
     </>
   );
 }

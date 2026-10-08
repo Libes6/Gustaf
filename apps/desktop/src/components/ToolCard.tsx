@@ -7,6 +7,7 @@ import {
   Monitor,
   Plug,
   Search,
+  Smartphone,
   Sparkles,
   SquareTerminal,
   Wrench,
@@ -34,6 +35,7 @@ export const TOOL_ICONS: Record<ToolKind, typeof Wrench> = {
   web: Globe,
   mcp: Plug,
   computer: Monitor,
+  device: Smartphone,
   unknown: Wrench,
 };
 
@@ -71,7 +73,12 @@ export const callStatus = (call: Call, result?: Result): CallStatus =>
 export function describeCall(t: ReturnType<typeof useT>, call: Call, running: boolean, projectRoot?: string) {
   const kind = toolKind(call);
   const target = toolTarget(call, projectRoot) || (kind === "computer" ? summarize(call) : "");
-  const verb = kind === "unknown" ? call.name : t(`toolVerb_${kind}_${running ? "running" : "done"}`);
+  const verb =
+    kind === "unknown"
+      ? call.name
+      : kind === "device"
+        ? t("deviceAgentVerb")
+        : t(`toolVerb_${kind}_${running ? "running" : "done"}`);
   return { kind, verb, target };
 }
 

@@ -92,6 +92,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: "permScreen", page: "computer", title: "permScreen", desc: "permScreenDesc" },
   { id: "computerEnable", page: "computer", title: "computerEnable", desc: "computerEnableDesc" },
   { id: "computerSafety", page: "computer", title: "computerSafety" },
+  { id: "deviceAgentAccess", page: "computer", title: "deviceAgentAccess", desc: "deviceAgentAccessDesc" },
+  { id: "deviceAgentAsk", page: "computer", title: "deviceAgentAsk", desc: "deviceAgentAskDesc" },
   { id: "reviewCopy", page: "git", title: "reviewCopySetting", desc: "reviewCopySettingDesc" },
   { id: "autoReview", page: "git", title: "autoReviewSetting", desc: "autoReviewSettingDesc" },
   { id: "autoReviewTrigger", page: "git", title: "autoReviewTrigger" },
