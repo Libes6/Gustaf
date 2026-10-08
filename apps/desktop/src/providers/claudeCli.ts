@@ -6,6 +6,7 @@ export function claudeArgs({
   mode,
   addDir,
   reasoning,
+  deviceCommand,
 }: {
   model?: string;
   session?: string;
@@ -13,6 +14,8 @@ export function claudeArgs({
   mode?: "ask" | "plan" | "agent";
   addDir?: string;
   reasoning?: "low" | "medium" | "high" | "xhigh" | "max";
+  /** Agent device access is on: the `gustaf-device` command may run without a permission prompt. */
+  deviceCommand?: boolean;
 }) {
   // Claude Code has one read-only permission mode (`plan`); it serves the Ask and Plan chat modes too.
   const readonly = access === "readonly" || mode === "plan" || mode === "ask";
@@ -27,6 +30,7 @@ export function claudeArgs({
     readonly ? "plan" : access === "full" ? "bypassPermissions" : "acceptEdits",
     ...(model ? ["--model", model] : []),
     ...(reasoning ? ["--effort", reasoning] : []),
+    ...(deviceCommand && !readonly ? ["--allowedTools=Bash(gustaf-device:*)"] : []),
     ...(session ? ["--resume", session] : []),
   ];
 }

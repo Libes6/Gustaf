@@ -1,5 +1,7 @@
 import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
 import { DEVICE_PROMPT, DEVICE_TOOLS, deviceToolsEligible, isDeviceTool } from "./deviceCore";
+import { DEVICE_CLI_PROMPT } from "./deviceCli";
+import { startDeviceCli, type DeviceCliHandle } from "./deviceBridgeNative";
 import { DeviceDeclined, runDeviceTool, type DeviceToolResult } from "./deviceTools";
 import { loadDeviceSettings } from "./deviceSettingsStore";
 import { clearAgentDevice } from "../device/agentActivity";
@@ -125,6 +127,8 @@ export type RunOptions = {
    * mobile-triggered runs. Interactive agent-mode chats get them without this. Plan, Ask and read-only runs never do.
    */
   devices?: boolean;
+  /** Tests: replaces the local bridge that gives CLI agents the `gustaf-device` command. */
+  startDeviceCli?: typeof startDeviceCli;
   /** The project folder when `root` is a workspace checkout (the verification settings belong to the project, not to its worktree). */
   project?: string | null;
 };
@@ -502,16 +506,18 @@ export async function runAgent(o: RunOptions): Promise<RunOutcome> {
     if (!o.subagent) clearAgentDevice(o.chatId ?? 0);
   };
   o.signal.addEventListener("abort", releaseDevice, { once: true });
+  const cleanups: (() => void)[] = [];
   try {
-    return await runLoop(o);
+    return await runLoop(o, cleanups);
   } finally {
+    for (const c of cleanups) c();
     o.signal.removeEventListener("abort", releaseDevice);
     releaseDevice();
     if (o.root) endRun(o.root);
   }
 }
 
-async function runLoop(o: RunOptions): Promise<RunOutcome> {
+async function runLoop(o: RunOptions, cleanups: (() => void)[]): Promise<RunOutcome> {
   const history = [...o.history];
   const instructions = o.root
     ? await projectRootFor(o.root, !!o.reviewMode)
@@ -591,6 +597,25 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
   if (deviceAccess && o.supportsTools !== false) {
     tools = [...tools, ...DEVICE_TOOLS];
     system += "\n" + DEVICE_PROMPT;
+  }
+  // CLI agents (Claude Code, Codex, Cursor Agent) run their own shell: they get the `gustaf-device` command instead.
+  let deviceCli: DeviceCliHandle | null = null;
+  if (
+    deviceAccess &&
+    o.supportsTools === false &&
+    o.adapter.supportsDeviceCommand &&
+    o.root &&
+    o.chatId !== undefined
+  ) {
+    deviceCli = await (o.startDeviceCli ?? startDeviceCli)(o.chatId, {
+      signal: o.signal,
+      askFirst: deviceSettings.askFirst,
+      approve: (req) => o.approve(req),
+    }).catch(() => null);
+    if (deviceCli) {
+      cleanups.push(deviceCli.end);
+      system += "\n" + DEVICE_CLI_PROMPT;
+    }
   }
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   if (planning) tools = tools.filter((t) => t.name === "use_skill" || modeAllowsTool(o.mode, t.name));
@@ -675,6 +700,7 @@ async function runLoop(o: RunOptions): Promise<RunOutcome> {
       signal: o.signal,
       onText: o.onText,
       onActivity: o.onActivity,
+      ...(deviceCli ? { device: { env: deviceCli.env, binDir: deviceCli.binDir } } : {}),
       onLimits: o.onLimits,
       onRetry: o.onRetry,
       approve: async (req) => (await o.approve(req)) !== false,

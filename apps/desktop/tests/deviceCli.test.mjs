@@ -213,3 +213,39 @@ test(
     assert.match(down.stderr, /cannot reach Gustaf/);
   },
 );
+
+// ---- how the agent processes are started ----
+
+test('the launcher folder goes first on PATH and the bridge variables are set for the agent process', async () => {
+  const { invocationScript } = await import('../src/providers/shell.ts');
+  const s = invocationScript('posix', {
+    executable: '/usr/local/bin/claude',
+    args: ['-p'],
+    env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:5/v1/device', GUSTAF_DEVICE_TOKEN: 't' },
+    prependPath: "/data/it's/bin",
+    nullStdin: true,
+  });
+  assert.equal(
+    s,
+    `export PATH='/data/it'\\''s/bin':"$PATH"; exec env GUSTAF_DEVICE_URL='http://127.0.0.1:5/v1/device' GUSTAF_DEVICE_TOKEN='t' '/usr/local/bin/claude' '-p' < /dev/null`,
+  );
+  assert.equal(invocationScript('posix', { executable: '/x/codex', args: ['exec'] }), "exec '/x/codex' 'exec'");
+});
+
+test('Claude Code may run gustaf-device without a prompt, but not in read-only modes', async () => {
+  const { claudeArgs } = await import('../src/providers/claudeCli.ts');
+  const flag = '--allowedTools=Bash(gustaf-device:*)';
+  assert.equal(claudeArgs({ access: 'auto', deviceCommand: true }).includes(flag), true);
+  assert.equal(claudeArgs({ access: 'auto' }).includes(flag), false);
+  assert.equal(claudeArgs({ access: 'readonly', deviceCommand: true }).includes(flag), false);
+  assert.equal(claudeArgs({ access: 'auto', mode: 'plan', deviceCommand: true }).includes(flag), false);
+});
+
+test('a device setting saved after the first load is seen by the next load', async () => {
+  const store = await import('../src/agent/deviceSettingsStore.ts');
+  store.resetDeviceSettings();
+  assert.equal((await store.loadDeviceSettings()).access, false);
+  store.saveDeviceSettings({ access: true, askFirst: false });
+  assert.deepEqual(await store.loadDeviceSettings(), { access: true, askFirst: false });
+  store.resetDeviceSettings();
+});

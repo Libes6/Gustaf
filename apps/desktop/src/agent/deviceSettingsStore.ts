@@ -32,7 +32,8 @@ export function loadDeviceSettings(): Promise<DeviceSettings> {
       loading = undefined;
       return current;
     });
-  return loading;
+  // Always the latest value: a save after the first load must be seen by callers that load again.
+  return loading.then(() => current);
 }
 
 export const getDeviceSettings = () => current;

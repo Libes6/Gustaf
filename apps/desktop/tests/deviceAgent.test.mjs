@@ -265,3 +265,93 @@ test('Stop while the approval card is open denies it and ends the run', async ()
   assert.equal(r.log[0].status, 'cancelled');
   assert.deepEqual(activity.getAgentActivity(), []);
 });
+
+// ---- CLI agents: the gustaf-device command ----
+
+/** A scripted CLI-like adapter: runs its own tools (supportsTools false) and can use the device command. */
+async function runCli(o = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'device-cli-'));
+  const seen = [];
+  const started = [];
+  const ended = [];
+  const ctl = new AbortController();
+  await runAgent({
+    root,
+    chatId: o.chatId ?? 9,
+    supportsTools: false,
+    history: [{ role: 'user', parts: [{ type: 'text', text: 'go' }] }],
+    adapter: {
+      supportsComputer: false,
+      supportsDeviceCommand: o.supportsDeviceCommand ?? true,
+      supportsReasoning: () => false,
+      listModels: async () => [],
+      turn: async (input) => {
+        seen.push({ system: input.system, device: input.device, tools: input.tools });
+        return { parts: [{ type: 'text', text: 'done' }] };
+      },
+    },
+    providerId: 'p',
+    model: 'm',
+    access: o.access ?? 'auto',
+    computerUse: false,
+    allowlist: [],
+    signal: ctl.signal,
+    onText: () => {},
+    onMessage: async () => {},
+    approve: async () => true,
+    startDeviceCli:
+      o.start ??
+      (async (chatId, turn) => {
+        started.push({ chatId, askFirst: turn.askFirst });
+        return {
+          env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:1/v1/device', GUSTAF_DEVICE_TOKEN: 'tok' },
+          binDir: '/bin/dir',
+          end: () => ended.push(chatId),
+        };
+      }),
+    ...(o.run ?? {}),
+  });
+  return { seen, started, ended };
+}
+
+test('CLI agents get the environment, the PATH folder and the prompt paragraph only when access is on', async () => {
+  const off = await runCli();
+  assert.equal(off.seen[0].device, undefined);
+  assert.doesNotMatch(off.seen[0].system, /gustaf-device/);
+  assert.deepEqual(off.started, []);
+
+  await enable();
+  const on = await runCli();
+  assert.deepEqual(on.seen[0].device, {
+    env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:1/v1/device', GUSTAF_DEVICE_TOKEN: 'tok' },
+    binDir: '/bin/dir',
+  });
+  assert.match(on.seen[0].system, /gustaf-device list/);
+  assert.equal(hasDevice(on.seen[0].tools.map((t) => t.name)), false);
+  assert.deepEqual(on.started, [{ chatId: 9, askFirst: true }]);
+  assert.deepEqual(on.ended, [9], 'the bridge turn ends with the run');
+});
+
+test('CLI agents: no command for scheduled runs, subagents, read-only or Plan, or adapters without shell', async () => {
+  await enable();
+  for (const o of [
+    { run: { source: 'scheduled' } },
+    { run: { subagent: true } },
+    { access: 'readonly' },
+    { run: { mode: 'plan' } },
+    { supportsDeviceCommand: false },
+  ]) {
+    const r = await runCli(o);
+    assert.equal(r.seen[0].device, undefined, JSON.stringify(o));
+    assert.deepEqual(r.started, [], JSON.stringify(o));
+  }
+});
+
+test('CLI agents: an unavailable bridge (Windows) leaves the run without the command', async () => {
+  await enable();
+  const r = await runCli({ start: async () => null });
+  assert.equal(r.seen[0].device, undefined);
+  assert.doesNotMatch(r.seen[0].system, /gustaf-device/);
+  const broken = await runCli({ start: async () => Promise.reject(new Error('boom')) });
+  assert.equal(broken.seen[0].device, undefined);
+});
