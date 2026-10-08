@@ -12,7 +12,9 @@ import { claudeCliLevels, codexLevels, cursorLevels, pickLevel } from "./reasoni
 import { attachments, cursorProfiles } from "../lib/api";
 import { tokenUsage, claudeLimit } from "./usage";
 import { createRawLogger, rawLogEnabled } from "../lib/rawCliLog";
-import { openJsonProcess, shellCommand, spawnLines } from "./processHost";
+import { openJsonProcess, shellCommand, spawnLines, type JsonLine } from "./processHost";
+import { capabilitiesOf, interrupted } from "./lifecycle";
+import { restartableTurn } from "./turnRestart";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
 import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
@@ -242,6 +244,11 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           text += s;
           t.onText(s);
         };
+        // Recorded for the turn's output even when nobody listens (`t.onActivity?.(...)` alone would skip the merge).
+        const track = (a: Activity) => {
+          const merged = applyActivity(actions, a);
+          t.onActivity?.(merged);
+        };
         const executable =
           id === "codex"
             ? await codexExecutable()
@@ -253,7 +260,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           id === "codex" && (await rolloutEnabled())
             ? createRolloutTracker({
                 startedAt: Date.now(),
-                onActivity: (a) => t.onActivity?.(applyActivity(actions, a)),
+                onActivity: track,
                 onDebug: log.debug,
               })
             : undefined;
@@ -299,8 +306,19 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
             log.debug?.(`codex app-server unavailable, using exec: ${e.message}`);
           }
         }
+        // A per-turn process (cursor-agent, `codex exec`): a follow-up ends the turn softly and the agent loop resumes
+        // the session with it as the next turn (providers/turnRestart.ts). Stop still goes through `t.signal`.
+        let ended = false;
+        const isTerminal = (e: JsonLine) =>
+          e.type === "result" || e.type === "turn.completed" || e.type === "turn.failed";
+        const perTurn = viaServer
+          ? undefined
+          : restartableTurn(t, {
+              enabled: capabilitiesOf(cfg, { codexExec: id === "codex" }).followUp === "restart",
+              ended: () => ended,
+            });
         try {
-          if (!viaServer)
+          if (perTurn)
             res = await spawnLines(
               // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
               runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
@@ -316,15 +334,16 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
                 const acts = nativeActivities(id, e, log.unmapped);
                 // Waits that name no agent are held back: the rollout scan shows the agents, and a merged card replaces them if it finds none.
                 if (rollout && isBareCollabWait(e)) rollout.hold(acts);
-                else for (const action of acts) t.onActivity?.(applyActivity(actions, action));
+                else for (const action of acts) track(action);
                 if (ev.final) final = ev.final;
                 if (ev.error) error = ev.error;
+                if (isTerminal(e)) ended = true;
               },
               {
-                signal: t.signal,
+                signal: perTurn.signal,
                 cwd: t.cwd,
                 onRaw: log.raw,
-                terminal: (e) => e.type === "result" || e.type === "turn.completed" || e.type === "turn.failed",
+                terminal: isTerminal,
                 env: cursorAccountEnv(
                   cfg,
                   await accountKey(),
@@ -333,11 +352,22 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
               },
             );
         } finally {
+          await perTurn?.close();
           // The turn is over: one last scan unless it was stopped, then the polling ends.
-          for (const action of (await rollout?.finish(!t.signal.aborted)) ?? [])
-            t.onActivity?.(applyActivity(actions, action));
+          for (const action of (await rollout?.finish(!t.signal.aborted)) ?? []) track(action);
         }
-        if (t.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        // Running cards of a turn that is over (stopped, restarted, or the CLI never closed them) are `unknown`.
+        const output = () => ({
+          parts: [
+            ...[...actions.values()].map((a) => (a.status === "running" ? { ...a, status: "unknown" as const } : a)),
+            ...(text ? [{ type: "text" as const, text }] : []),
+          ],
+          responseId: session,
+          usage,
+        });
+        if (t.signal.aborted) throw interrupted(output());
+        // Restarted for a follow-up: the exit code and errors of the stopped process say nothing about the work.
+        if (perTurn?.restarted()) return output();
         if (!error && res && res.code !== 0 && !res.settled)
           error = res.stderr.trim().slice(-600) || `${id} exited with ${res.code}`;
         if (error) {
@@ -345,14 +375,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           throw new Error(auth ? `${error}\n\n${spec.name}: ${spec.loginHint}` : error);
         }
         if (!text.trim() && final) emit(final);
-        return {
-          parts: [
-            ...[...actions.values()].map((a) => (a.status === "running" ? { ...a, status: "unknown" as const } : a)),
-            ...(text ? [{ type: "text" as const, text }] : []),
-          ],
-          responseId: session,
-          usage,
-        };
+        return output();
       } finally {
         await log.flush();
         if (saved && t.chatId) await attachments.clear(t.chatId).catch(() => {});
