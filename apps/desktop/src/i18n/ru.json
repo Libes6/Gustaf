@@ -1762,6 +1762,7 @@
   "interruptedCommits": "Неслитых коммитов: {count}",
   "interruptedCommitsSome": "есть неслитые коммиты",
   "interruptedFiles": "Незакоммиченных файлов: {count}",
+  "interruptedProjectMark": "Прерванная работа агентов: {count}",
   "interruptedOpen": "Открыть",
   "interruptedDiscard": "Отбросить",
   "interruptedDiscardTitle": "Отбросить {branch}?",

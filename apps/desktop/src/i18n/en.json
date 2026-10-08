@@ -1714,6 +1714,7 @@
   "interruptedCommits": "{count} unmerged commits",
   "interruptedCommitsSome": "has unmerged commits",
   "interruptedFiles": "{count} uncommitted files",
+  "interruptedProjectMark": "Interrupted agent work: {count}",
   "interruptedOpen": "Open",
   "interruptedDiscard": "Discard",
   "interruptedDiscardTitle": "Discard {branch}?",
