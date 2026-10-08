@@ -75,6 +75,10 @@ async function play(proc, events, uuids) {
 }
 
 const userWrites = (p) => p.writes.filter((w) => w.type === 'user');
+/** Polls until `cond()` holds (slow CI runners make fixed pauses flaky). */
+async function until(cond, ms = 3000) {
+  for (let i = 0; i < ms / 10 && !cond(); i++) await sleep(10);
+}
 
 function harness() {
   const sessions = createSessionManager({ idleMs: 60_000 });
@@ -298,7 +302,8 @@ test('Stop interrupts softly: partial text and session id are kept and the proce
     };
   };
   const t = h.turn('Count from 1 to 80, one number per line, nothing else.');
-  await sleep(30);
+  // The recorded stream reached 28 before the interrupt; wait for it instead of a fixed delay (slow runners).
+  for (let i = 0; i < 200 && !t.out.text.endsWith('28'); i++) await sleep(10);
   t.ac.abort();
   const err = await t.run.catch((e) => e);
   assert.equal(err.name, 'AbortError');
@@ -325,7 +330,8 @@ test('Stop kills the process when the interrupt gets no result in time, and the 
     else h.answer(p, ['after-interrupt']);
   };
   const t = h.turn('Count');
-  await sleep(20);
+  await until(() => h.procs[0] && userWrites(h.procs[0]).length === 1);
+  await sleep(100); // the three recorded events are played right after the write
   t.ac.abort();
   const err = await t.run.catch((e) => e);
   assert.equal(err.name, 'AbortError');
@@ -455,10 +461,11 @@ test('a follow-up the CLI has not taken when Stop comes is not stored: it stays 
     };
   };
   const t = h.turn('Count', { followUp });
-  await sleep(20);
+  await until(() => h.procs[0] && userWrites(h.procs[0]).length === 1 && wake);
+  await sleep(100);
   queue.push({ role: 'user', parts: [{ type: 'text', text: 'and stop at 10' }] });
   wake?.();
-  await sleep(20);
+  await until(() => userWrites(h.procs[0]).length === 2);
   assert.equal(userWrites(h.procs[0]).length, 2, 'the follow-up was written to the CLI');
   t.ac.abort();
   const err = await t.run.catch((e) => e);
