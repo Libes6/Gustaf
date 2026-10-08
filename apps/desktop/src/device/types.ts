@@ -85,10 +85,10 @@ export interface DeviceDriver {
 
 /** Thrown by drivers; `code` lets callers show a specific message. */
 export class DeviceError extends Error {
-  constructor(
-    message: string,
-    readonly code: "toolchain" | "helper-missing" | "no-device" | "stale-ref" | "timeout" | "failed" = "failed",
-  ) {
+  // A plain field, not a constructor parameter property: node's type-stripping test runner cannot load those.
+  readonly code: "toolchain" | "helper-missing" | "no-device" | "stale-ref" | "timeout" | "failed";
+  constructor(message: string, code: DeviceError["code"] = "failed") {
     super(message);
+    this.code = code;
   }
 }
