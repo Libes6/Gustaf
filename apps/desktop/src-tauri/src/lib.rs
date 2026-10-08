@@ -19,6 +19,7 @@ mod mobile_server;
 mod oauth;
 mod pr_watch;
 mod preview;
+mod proc_ledger;
 mod proc_tree;
 mod quick_ask;
 mod rawlog;
@@ -52,6 +53,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 quick_ask::on_main_destroyed(window.app_handle());
+                // The UI that controlled the agent processes is gone: stop them (the exit path repeats this, harmlessly).
+                proc_ledger::shutdown(window.app_handle());
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -65,6 +68,7 @@ pub fn run() {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             app.manage(db::Db(Mutex::new(db::open(&dir.join("app.db"))?)));
+            proc_ledger::init(app, &dir);
             mcp::init(app);
             mobile_server::init(app);
             Ok(())
@@ -132,6 +136,8 @@ pub fn run() {
             hook_exec::run_hook,
             proc_tree::process_kill_tree,
             proc_tree::process_signal_tree,
+            proc_ledger::process_ledger_add,
+            proc_ledger::process_ledger_remove,
             proc_tree::process_snapshot,
             proc_tree::app_logs_dir,
             git::git,
@@ -212,6 +218,8 @@ pub fn run() {
         .run(|app, event| {
             // MCP servers are child processes: never leave them running after the app quits.
             if let tauri::RunEvent::Exit = event {
+                // Agent CLIs (and what they started) first: SIGTERM, a short grace, then SIGKILL.
+                proc_ledger::shutdown(app);
                 mcp::shutdown(app);
                 terminal::shutdown(app);
                 preview::shutdown(app);
