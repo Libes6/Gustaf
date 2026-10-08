@@ -83,12 +83,14 @@ export interface DeviceDriver {
   release(id: string): Promise<void>;
 }
 
+export type DeviceErrorCode = "toolchain" | "helper-missing" | "no-device" | "stale-ref" | "timeout" | "failed";
+
 /** Thrown by drivers; `code` lets callers show a specific message. */
 export class DeviceError extends Error {
-  constructor(
-    message: string,
-    readonly code: "toolchain" | "helper-missing" | "no-device" | "stale-ref" | "timeout" | "failed" = "failed",
-  ) {
+  // Declared as a field (not a constructor parameter property) so Node can run this file with type stripping in tests.
+  readonly code: DeviceErrorCode;
+  constructor(message: string, code: DeviceErrorCode = "failed") {
     super(message);
+    this.code = code;
   }
 }
