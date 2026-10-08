@@ -1,0 +1,88 @@
+/* Device panel. Colours come from the theme tokens so light and dark both work. */
+.dev-panel { container-type: inline-size; display: flex; flex-direction: column; gap: 8px; padding: 8px; min-width: 0; color: var(--text); font-size: calc(12px * var(--ui-scale, 1)); }
+.dev-panel * { box-sizing: border-box; }
+.dev-dim { color: var(--text-2); }
+.dev-pad { padding: 8px 4px; }
+.dev-state { padding: 16px 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.dev-state h3 { margin: 0; font-size: calc(13px * var(--ui-scale, 1)); }
+.dev-reasons { margin: 0; padding-inline-start: 18px; line-height: 1.5; }
+
+.dev-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); font-size: inherit; white-space: nowrap; cursor: pointer; }
+.dev-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.dev-btn:disabled { opacity: .45; cursor: default; }
+.dev-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 500; }
+.dev-btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.dev-btn.danger { color: var(--red); }
+.dev-btn:focus-visible, .dev-seg button:focus-visible, .dev-screen:focus-visible, .dev-row-main:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
+
+.dev-agent { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dev-note { padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+.dev-error { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--error-fg, var(--red)); background: color-mix(in srgb, var(--red) 12%, transparent); border: 1px solid color-mix(in srgb, var(--red) 40%, transparent); overflow-wrap: anywhere; }
+.dev-helper { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg-panel); }
+.dev-helper p { margin: 0; line-height: 1.4; }
+.dev-log { margin: 0; align-self: stretch; max-height: 120px; overflow: auto; padding: 6px; border-radius: 6px; background: var(--bg-code); font: 11px/1.4 var(--mono); white-space: pre-wrap; }
+
+.dev-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dev-name { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dev-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.dev-seg button { padding: 4px 10px; color: var(--text-2); }
+.dev-seg button[aria-pressed="true"] { background: var(--bg-active); color: var(--text); }
+.dev-keys { display: inline-flex; gap: 4px; }
+
+.dev-list ul, .dev-tree { list-style: none; margin: 0; padding: 0; }
+.dev-device { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.dev-device-info { display: flex; flex-direction: column; min-width: 0; }
+.dev-device-actions { display: flex; gap: 6px; }
+
+.dev-main { display: flex; gap: 10px; align-items: flex-start; }
+.dev-stage { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.dev-side { flex: 0 0 260px; width: 260px; min-width: 0; }
+.dev-hint { margin: 0; font-size: calc(11px * var(--ui-scale, 1)); }
+@container (max-width: 640px) {
+  .dev-main { flex-direction: column; align-items: stretch; }
+  .dev-side { flex: none; width: auto; }
+}
+
+.dev-screen { position: relative; width: 100%; height: min(70vh, 640px); min-height: 240px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-code); overflow: hidden; user-select: none; }
+.dev-screen-interact { cursor: pointer; }
+.dev-screen-inspect { cursor: crosshair; }
+.dev-screen.locked { cursor: not-allowed; }
+.dev-screen.locked::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 25%, transparent); pointer-events: none; }
+.dev-frame { position: absolute; display: block; image-rendering: auto; pointer-events: none; border-radius: 4px; }
+.dev-screen-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-2); }
+.dev-outline { position: absolute; pointer-events: none; border-radius: 3px; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dev-outline.pinned { border-color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.dev-chip { position: absolute; pointer-events: none; max-width: 220px; height: 18px; line-height: 18px; padding: 0 6px; border-radius: 4px; font: 11px/18px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--accent); color: var(--on-accent); }
+.dev-chip.pinned { background: var(--green); }
+.dev-trail { position: absolute; inset: 0; pointer-events: none; }
+.dev-trail line { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.dev-trail circle { fill: var(--accent); }
+.dev-busy { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 12px; background: var(--bg-pop); color: var(--text); border: 1px solid var(--border-strong); pointer-events: none; }
+.dev-spinner { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--text-3); border-top-color: var(--accent); animation: dev-spin .8s linear infinite; }
+@keyframes dev-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dev-spinner { animation: none; border-top-color: var(--text-3); } }
+
+.dev-details { border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-panel); padding: 8px; max-height: 260px; overflow: auto; }
+.dev-details header { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dev-details header strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-details .dev-close { margin-inline-start: auto; padding: 0 8px; }
+.dev-details dl { margin: 6px 0; display: grid; gap: 2px; }
+.dev-details dl > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px; }
+.dev-details dt { color: var(--text-2); }
+.dev-details dd { margin: 0; overflow-wrap: anywhere; }
+.dev-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.dev-map { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); display: flex; flex-direction: column; max-height: min(70vh, 640px); min-height: 160px; }
+.dev-map-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 8px; }
+.dev-map-app { min-width: 0; overflow-wrap: anywhere; }
+.dev-map-tools { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
+.dev-search { width: 100%; }
+.dev-check { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+.dev-tree { overflow: auto; flex: 1; padding: 4px 0; }
+.dev-row { display: flex; align-items: center; gap: 4px; padding-inline-end: 4px; border-radius: 4px; }
+.dev-row:hover, .dev-row.selected { background: var(--bg-hover); }
+.dev-row.selected { background: var(--bg-active); }
+.dev-row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 0; text-align: start; }
+.dev-role { flex: none; padding: 0 5px; border-radius: 4px; background: var(--bg-chip); color: var(--text-2); font: 10px/16px var(--mono); }
+.dev-row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-row-tap { padding: 1px 8px; }

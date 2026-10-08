@@ -31,6 +31,7 @@ import { useApp } from "../state";
 import { HunkDiff } from "./HunkDiff";
 import { FeedbackQueue, FindingsBlock, FindingsList, type NewComment } from "./ReviewFindings";
 const ProjectPreview = lazy(() => import("./ProjectPreview").then((module) => ({ default: module.ProjectPreview })));
+const DevicePanel = lazy(() => import("./device/DevicePanel").then((module) => ({ default: module.DevicePanel })));
 const TerminalPanel = lazy(() => import("./TerminalPanel").then((module) => ({ default: module.TerminalPanel })));
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
 import { WorkspaceChanges } from "./WorkspaceChanges";
@@ -93,7 +94,8 @@ export function ChangesPanel({
   const bumpViewed = () => setViewedTick((n) => n + 1);
   const [terminalOpened, setTerminalOpened] = useState(false);
   const [previewOpened, setPreviewOpened] = useState(false);
-  const [tab, setTab] = useState<"changes" | "terminal" | "preview">("changes");
+  const [deviceOpened, setDeviceOpened] = useState(false);
+  const [tab, setTab] = useState<"changes" | "terminal" | "preview" | "device">("changes");
   useEffect(() => {
     const show = () => {
       if (hasTerminalCommands(root) || takeTerminalOpen(root)) {
@@ -677,8 +679,25 @@ export function ChangesPanel({
             >
               {t.locale === "ru" ? "Предпросмотр" : "Preview"}
             </button>
+            <button
+              className={tab === "device" ? "active" : ""}
+              aria-pressed={tab === "device"}
+              onClick={() => {
+                setTab("device");
+                setDeviceOpened(true);
+              }}
+            >
+              {t("deviceTab")}
+            </button>
           </div>
           <div className="panel-body">
+            {deviceOpened && (
+              <div hidden={tab !== "device"}>
+                <Suspense fallback={<div className="term">{t("deviceTab")}…</div>}>
+                  <DevicePanel visible={tab === "device"} />
+                </Suspense>
+              </div>
+            )}
             {previewOpened && (
               <div hidden={tab !== "preview"}>
                 <Suspense fallback={<div className="term">Preview…</div>}>
