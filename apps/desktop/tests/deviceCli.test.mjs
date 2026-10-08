@@ -46,7 +46,7 @@ test('every command maps to a tool and passes the same validation as the API too
   assert.deepEqual(ok('fill', '10', '20', 'x').args, { x: 10, y: 20, text: 'x' });
   assert.deepEqual(ok('fill', '@e19').args, { ref: '@e19', text: '' });
   assert.deepEqual(ok('press', 'home').args, { key: 'home' });
-  assert.deepEqual(ok('scroll', 'down', '--amount', '2').args, { direction: 'down', amount: 2 });
+  assert.deepEqual(ok('scroll', 'down', '--amount', '0.5').args, { direction: 'down', amount: 0.5 });
   assert.deepEqual(ok('open-app', 'com.apple.Preferences').args, { app: 'com.apple.Preferences' });
   assert.deepEqual(ok('close', '--shutdown').args, { shutdown: true });
   for (const argv of [['tap', '@e1'], ['press', 'back'], ['close']]) {

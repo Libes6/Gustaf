@@ -137,7 +137,7 @@ export const DEVICE_TOOLS: ToolDef[] = [
     parameters: withDevice(
       {
         direction: { type: "string", enum: [...SCROLL_DIRECTIONS] },
-        amount: { type: "number", description: "Screens to scroll, 0.1-10. Default about one." },
+        amount: { type: "number", description: "Share of the screen to scroll, 0.05-0.8. Default: the driver's." },
       },
       ["direction"],
     ),
@@ -275,8 +275,8 @@ export function parseDeviceCall(toolName: string, args: unknown): Parsed {
           fail(`direction must be one of: ${SCROLL_DIRECTIONS.join(", ")}.`);
         let amount: number | undefined;
         if (a.amount !== undefined && a.amount !== null) {
-          if (typeof a.amount !== "number" || !Number.isFinite(a.amount) || a.amount < 0.1 || a.amount > 10)
-            fail("amount must be a number between 0.1 and 10.");
+          if (typeof a.amount !== "number" || !Number.isFinite(a.amount) || a.amount < 0.05 || a.amount > 0.8)
+            fail("amount must be a number between 0.05 and 0.8 (a share of the screen).");
           amount = a.amount as number;
         }
         return {

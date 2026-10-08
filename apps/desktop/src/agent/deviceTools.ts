@@ -55,11 +55,13 @@ type ChatState = {
   current?: string;
   approved: Set<string>;
   maps: Map<string, UiMap>;
+  /** Refs the agent has seen for a device: those of its last snapshot plus the new ones an action's diff listed. */
+  refs: Map<string, Set<string>>;
 };
 const chats = new Map<number, ChatState>();
 const stateOf = (chatId = 0): ChatState => {
   let s = chats.get(chatId);
-  if (!s) chats.set(chatId, (s = { approved: new Set(), maps: new Map() }));
+  if (!s) chats.set(chatId, (s = { approved: new Set(), maps: new Map(), refs: new Map() }));
   return s;
 };
 
@@ -143,6 +145,7 @@ export async function runDeviceTool(
       case "device_snapshot": {
         const map = await guard(driver.snapshot(info.id));
         st.maps.set(info.id, map);
+        st.refs.set(info.id, new Set(map.nodes.map((n) => n.ref)));
         const out: DeviceToolResult = { output: clipOutput(`${label}\n${renderMap(map)}`) };
         if (call.screenshot) {
           const frame = await guard(driver.frame(info.id));
@@ -155,6 +158,7 @@ export async function runDeviceTool(
         if (call.shutdown) await guard(driver.shutdown(info.id));
         else await guard(driver.release(info.id));
         st.maps.delete(info.id);
+        st.refs.delete(info.id);
         if (st.current === info.id) st.current = undefined;
         clearAgentDevice(ctx.chatId ?? 0);
         return { output: call.shutdown ? `${label} was powered off.` : `Closed the automation session with ${label}.` };
@@ -162,12 +166,16 @@ export async function runDeviceTool(
       default: {
         await checkTarget(call, info.id, st, driver, guard);
         const r = await guard(act(call, info.id, driver));
+        // The diff lists the new screen's elements with their refs: the agent may use them without another snapshot.
+        const seen = st.refs.get(info.id);
+        for (const m of r.diff.matchAll(/@([A-Za-z0-9][A-Za-z0-9_.-]*)/g)) seen?.add(m[1]);
         return { output: clipOutput(formatActionOutput(r)) };
       }
     }
   } catch (e) {
     if (e instanceof DeviceError && e.code === "stale-ref") {
       st.maps.delete(info.id);
+      st.refs.delete(info.id);
       throw staleRefError(e);
     }
     throw e;
@@ -239,12 +247,12 @@ async function checkTarget(
   const map = st.maps.get(id);
   if ("target" in call && "ref" in call.target) {
     const ref = call.target.ref;
-    if (!map)
+    const known = st.refs.get(id);
+    if (!known)
       throw new Error(
         `No snapshot of this screen yet: call device_snapshot first, then use its refs (@${ref} is unknown).`,
       );
-    if (!map.nodes.some((n) => n.ref === ref))
-      throw new Error(`@${ref} is not in the latest snapshot. ${STALE_REF_HINT}`);
+    if (!known.has(ref)) throw new Error(`@${ref} is not in the latest snapshot. ${STALE_REF_HINT}`);
     return;
   }
   const hasPoint = call.tool === "device_swipe" || ("target" in call && "x" in call.target);

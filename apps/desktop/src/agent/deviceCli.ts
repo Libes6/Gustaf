@@ -17,7 +17,7 @@ export const DEVICE_CLI_USAGE = [
   "  type <text>                           type into the focused field",
   "  fill <@ref | x y> <text>              replace a field's text",
   `  press <${PRESS_KEYS.join("|")}>`,
-  `  scroll <${SCROLL_DIRECTIONS.join("|")}> [--amount N]`,
+  `  scroll <${SCROLL_DIRECTIONS.join("|")}> [--amount 0.05-0.8]  (share of the screen)`,
   "  open-app <name or bundle id>          launch an app",
   "  close [--shutdown]                    end the session; --shutdown powers the device off (asks the user)",
   "Use -- before text that starts with a dash.",

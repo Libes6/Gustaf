@@ -128,7 +128,7 @@ test('invalid arguments are errors with a reason, never exceptions', () => {
   bad('device_fill', { ref: 'e1' }, /text/);
   bad('device_press', { key: 'power' }, /one of/);
   bad('device_scroll', { direction: 'sideways' }, /one of/);
-  bad('device_scroll', { direction: 'up', amount: 50 }, /between 0.1 and 10/);
+  bad('device_scroll', { direction: 'up', amount: 5 }, /between 0.05 and 0.8/);
   bad('device_open_app', {}, /app is required/);
   bad('device_open_app', { app: '-h' }, /option/);
   bad('device_open_app', { app: '/Applications/X' }, /path or command/);
@@ -330,7 +330,7 @@ test('every action tool reaches the driver with the right arguments', async () =
   await run('device_type', { text: 'hi' });
   await run('device_fill', { ref: 'e19', text: 'wifi' });
   await run('device_press', { key: 'enter' });
-  await run('device_scroll', { direction: 'down', amount: 2 });
+  await run('device_scroll', { direction: 'down', amount: 0.5 });
   await run('device_open_app', { app: 'com.apple.Preferences' });
   const seen = fake.calls.filter((c) => c.method !== 'list' && c.method !== 'snapshot');
   assert.deepEqual(seen, [
@@ -341,7 +341,7 @@ test('every action tool reaches the driver with the right arguments', async () =
     { method: 'type', args: ['SIM-1', 'hi'] },
     { method: 'fill', args: ['SIM-1', { ref: 'e19' }, 'wifi'] },
     { method: 'press', args: ['SIM-1', 'enter'] },
-    { method: 'scroll', args: ['SIM-1', 'down', 2] },
+    { method: 'scroll', args: ['SIM-1', 'down', 0.5] },
     { method: 'openApp', args: ['SIM-1', 'com.apple.Preferences'] },
   ]);
 });
@@ -592,4 +592,20 @@ test('the driver seam throws until a driver is installed', () => {
   const fake = createFakeDriver();
   seam.setDeviceDriver(fake.driver);
   assert.equal(seam.getDeviceDriver(), fake.driver);
+});
+
+test('refs listed in an action diff can be used without another snapshot', async () => {
+  const fake = createFakeDriver({ map: real });
+  const diff =
+    '1 removed, 1 added, 0 changed, 12 unchanged\n- @e7 [cell] "Основные"\n+ @e30 [cell] "Об этом устройстве"';
+  const driver = { ...fake.driver, tap: async () => ({ message: 'Tapped', diff, settled: true }) };
+  const { run } = setup({ driver });
+  await run('device_snapshot');
+  await run('device_tap', { ref: 'e7' });
+  await run('device_tap', { ref: '@e30' });
+  assert.equal(
+    fake.calls.some((c) => c.method === 'tap'),
+    false,
+  ); // the wrapped driver handled both
+  await assert.rejects(run('device_tap', { ref: 'e31' }), /not in the latest snapshot/);
 });
