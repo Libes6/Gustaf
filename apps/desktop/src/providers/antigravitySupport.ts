@@ -122,6 +122,20 @@ export function validBinary(path: string | undefined): boolean {
 }
 
 /**
+ * Which executable runs: an explicit Binary path always wins, then the managed runtime installed by the settings page,
+ * otherwise undefined (the launch script then looks for `agy_acp_server` on PATH).
+ */
+export function effectiveBinary(explicit: string | undefined, managed: string | undefined): string | undefined {
+  return explicit?.trim() || managed?.trim() || undefined;
+}
+
+/** Megabytes (10^6 bytes; one decimal below 100) for the install dialog and progress line. */
+export function formatMb(bytes: number): string {
+  const mb = bytes / 1_000_000;
+  return mb >= 100 ? String(Math.round(mb)) : mb.toFixed(1);
+}
+
+/**
  * The login-shell script that starts the agent. The scrub removes ambient credentials, then the binary is `exec`ed
  * (so the stored pid is the agent's own). Blank `binary`: `agy_acp_server`, or the `.par` name the registry ships on
  * macOS and Linux, from PATH. The shell exits 127 when it is not installed.

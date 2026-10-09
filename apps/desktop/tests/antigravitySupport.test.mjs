@@ -176,3 +176,24 @@ test('models and reasoning levels come from the session config options', () => {
   );
   assert.equal(S.safeMessage(new Error('bad key abcd1234 here'), ['abcd1234']), 'bad key *** here');
 });
+
+test('binary resolution: an explicit path wins, then the managed runtime, then PATH', () => {
+  assert.equal(S.effectiveBinary('/opt/agy', '/data/rt/agy'), '/opt/agy');
+  assert.equal(S.effectiveBinary('  /opt/agy  ', undefined), '/opt/agy');
+  assert.equal(S.effectiveBinary('', '/data/rt/agy'), '/data/rt/agy');
+  assert.equal(S.effectiveBinary(undefined, '/data/rt/agy'), '/data/rt/agy');
+  assert.equal(S.effectiveBinary('   ', undefined), undefined);
+  assert.equal(S.effectiveBinary(undefined, undefined), undefined);
+  // an unset binary falls back to PATH in the launch script, a set one is exec'ed directly
+  assert.match(S.launchScript('posix', S.effectiveBinary(undefined, undefined)), /command -v agy_acp_server/);
+  assert.match(
+    S.launchScript('posix', S.effectiveBinary('', '/data/rt/agy_acp_server.par')),
+    /exec .*agy_acp_server\.par/,
+  );
+});
+
+test('formatMb', () => {
+  assert.equal(S.formatMb(111_456_962), '111');
+  assert.equal(S.formatMb(50_000_000), '50.0');
+  assert.equal(S.formatMb(0), '0.0');
+});

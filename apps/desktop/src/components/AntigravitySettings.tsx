@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { providerKey, providerSecretId, secretPresence } from "../lib/keys";
 import {
+  antigravitySessionsInUse,
   authState,
   openAuthorizationUrl,
   probeAntigravity,
@@ -10,16 +11,25 @@ import {
   signOutAntigravity,
   type AuthState,
 } from "../providers/antigravity";
-import { RUNTIME_INSTALL_AVAILABLE, RUNTIME_SIZE_MB, RUNTIME_VERSION } from "../providers/antigravityRuntime";
+import {
+  cancelRuntimeInstall,
+  installRuntime,
+  removeRuntime,
+  runtimeStatus,
+  type InstallProgress,
+  type RuntimeStatus,
+} from "../providers/antigravityRuntime";
 import {
   AUTH_METHODS,
   configIssue,
+  formatMb,
   normalizeSettings,
   usesBrowser,
   type AntigravityAuthMethod,
 } from "../providers/antigravitySupport";
 import type { ProviderConfig } from "../providers/types";
 import { useApp } from "../state";
+import { AntigravityRuntimeDialog, type RuntimeDialogMode } from "./AntigravityRuntimeDialog";
 import { SettingRow } from "./SettingRow";
 
 type Probe =
@@ -28,6 +38,34 @@ type Probe =
   | { state: "missing" }
   | { state: "error"; message: string };
 type Flow = { phase: "idle" | "waiting"; url?: string; error?: string; done?: boolean };
+
+/** Where the managed runtime is in its life: idle, asking the user, working, or showing a failure. */
+type Install =
+  | { kind: "idle" }
+  | { kind: "confirm"; mode: RuntimeDialogMode }
+  | { kind: "running"; progress?: InstallProgress }
+  | { kind: "removing" }
+  | { kind: "error"; code: string; message: string };
+
+const RUNTIME_ERROR: Record<string, string> = {
+  unsupported: "antigravityUnsupported_platform",
+  "intel-mac": "antigravityUnsupported_intelMac",
+  platform: "antigravityUnsupported_platform",
+  busy: "antigravityErr_busy",
+  "no-space": "antigravityErr_noSpace",
+  offline: "antigravityErr_offline",
+  network: "antigravityErr_network",
+  http: "antigravityErr_http",
+  redirect: "antigravityErr_redirect",
+  size: "antigravityErr_mismatch",
+  hash: "antigravityErr_mismatch",
+  "bad-archive": "antigravityErr_archive",
+  verify: "antigravityErr_verify",
+  "in-use": "antigravityErr_inUse",
+  io: "antigravityErr_io",
+} as const;
+/** Codes whose English detail (sizes, status code, OS error) is worth showing after the translated sentence. */
+const WITH_DETAIL = new Set(["no-space", "http", "io", "internal"]);
 
 const ISSUE = {
   project: "antigravityIssue_project",
@@ -62,6 +100,10 @@ export function AntigravitySettings({
   const [flow, setFlow] = useState<Flow>({ phase: "idle" });
   const ctl = useRef<AbortController | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  const [rt, setRt] = useState<RuntimeStatus | undefined>();
+  const [install, setInstall] = useState<Install>({ kind: "idle" });
+  // Bumped after an install or removal so the probe and the status are read again.
+  const [rev, setRev] = useState(0);
   const issue = configIssue(s, hasKey);
 
   useEffect(() => {
@@ -79,7 +121,18 @@ export function AntigravitySettings({
     };
     // The probe depends on how the agent is launched, not on the display name.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.id, s.binary]);
+  }, [p.id, s.binary, rev]);
+  useEffect(() => {
+    let live = true;
+    // The deep read re-hashes the installed files against the manifest (a second or two, off the UI thread).
+    runtimeStatus(true).then(
+      (r) => live && setRt(r),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [rev]);
   useEffect(() => {
     void secretPresence(providerSecretId(p.id)).then((v) => setHasKey(v === true));
     void authState(p.id).then(setAuth);
@@ -116,6 +169,39 @@ export function AntigravitySettings({
     await app.refreshModels({ refresh: "startup" });
   };
 
+  const idsOfAgy = app.providers.filter((x) => x.kind === "antigravity").map((x) => x.id);
+  const startInstall = async () => {
+    setInstall({ kind: "running" });
+    try {
+      await installRuntime((progress) => setInstall({ kind: "running", progress }));
+      setInstall({ kind: "idle" });
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      setInstall(
+        err.code === "cancelled"
+          ? { kind: "idle" }
+          : { kind: "error", code: err.code ?? "internal", message: String(err.message ?? e) },
+      );
+    }
+    setRev((n) => n + 1);
+  };
+  const startRemove = async () => {
+    setInstall({ kind: "removing" });
+    try {
+      await removeRuntime({
+        inUse: antigravitySessionsInUse(idsOfAgy) || flow.phase === "waiting",
+        protectedPaths: app.providers
+          .filter((x) => x.kind === "antigravity")
+          .map((x) => normalizeSettings(x.antigravity).binary ?? "")
+          .filter(Boolean),
+      });
+      setInstall({ kind: "idle" });
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      setInstall({ kind: "error", code: err.code ?? "internal", message: String(err.message ?? e) });
+    }
+    setRev((n) => n + 1);
+  };
   const waiting = flow.phase === "waiting";
   const browser = usesBrowser(s.method);
   const needsGcp = s.method === "oauth-business" || s.method === "agent-platform";
@@ -128,8 +214,29 @@ export function AntigravitySettings({
       : auth?.state === "signedOut"
         ? t("antigravitySignedOut")
         : t("antigravitySignInUnknown");
-  const runtimeText =
-    probe.state === "checking"
+  const managed = rt?.installed ?? undefined;
+  const running = install.kind === "running";
+  const progressText =
+    install.kind !== "running"
+      ? ""
+      : !install.progress
+        ? t("antigravityPhase_starting")
+        : install.progress.phase === "verify"
+          ? t("antigravityPhase_verify")
+          : t(install.progress.phase === "download" ? "antigravityPhase_download" : "antigravityPhase_extract", {
+              received: formatMb(install.progress.received),
+              total: formatMb(install.progress.total),
+            });
+  const errorText =
+    install.kind === "error"
+      ? t((RUNTIME_ERROR[install.code] ?? "antigravityErr_internal") as "antigravityErr_internal") +
+        (WITH_DETAIL.has(install.code) || !RUNTIME_ERROR[install.code] ? ` ${install.message}` : "")
+      : "";
+  const runtimeText = managed
+    ? managed.modified
+      ? t("antigravityModified", { detail: managed.modified })
+      : t("antigravityInstalledManaged", { version: managed.version })
+    : probe.state === "checking"
       ? t("antigravityChecking")
       : probe.state === "ok"
         ? probe.version
@@ -141,6 +248,14 @@ export function AntigravitySettings({
 
   return (
     <>
+      {install.kind === "confirm" && rt && (
+        <AntigravityRuntimeDialog
+          mode={install.mode}
+          status={rt}
+          onClose={() => setInstall({ kind: "idle" })}
+          onConfirm={() => void (install.mode === "remove" ? startRemove() : startInstall())}
+        />
+      )}
       <h4 aria-level={2}>{t("antigravitySetup")}</h4>
       <div className="card">
         <SettingRow title={t("antigravityEnvTitle")} description={t("antigravityEnvDesc")}>
@@ -152,20 +267,81 @@ export function AntigravitySettings({
           description={
             <>
               <div>{t("antigravityRuntimeDesc")}</div>
-              <div>{t("antigravityDownload", { size: RUNTIME_SIZE_MB, version: RUNTIME_VERSION })}</div>
+              {rt?.supported && (
+                <div>{t("antigravityDownload", { size: formatMb(rt.archiveBytes), version: rt.version })}</div>
+              )}
+              {rt && !rt.supported && (
+                <div data-testid="agy-unsupported">
+                  {t(rt.reason === "intel-mac" ? "antigravityUnsupported_intelMac" : "antigravityUnsupported_platform")}
+                </div>
+              )}
               <div
-                className={probe.state === "missing" || probe.state === "error" ? "err" : undefined}
+                className={
+                  managed?.modified || (!managed && (probe.state === "missing" || probe.state === "error"))
+                    ? "err"
+                    : undefined
+                }
                 data-testid="agy-runtime-status"
               >
                 {runtimeText}
               </div>
-              {!RUNTIME_INSTALL_AVAILABLE && <div>{t("antigravityInstallSoon")}</div>}
+              {rt?.updateAvailable && !running && (
+                <div data-testid="agy-update">{t("antigravityUpdateAvailable", { version: rt.version })}</div>
+              )}
+              {running && (
+                <div role="status" data-testid="agy-progress">
+                  {progressText}
+                  {install.kind === "running" && install.progress && install.progress.phase !== "verify" && (
+                    <progress
+                      aria-label={progressText}
+                      value={install.progress.received}
+                      max={install.progress.total || 1}
+                      style={{ display: "block", width: "100%" }}
+                    />
+                  )}
+                </div>
+              )}
+              {install.kind === "error" && (
+                <div className="err" role="alert">
+                  {errorText}
+                </div>
+              )}
             </>
           }
         >
-          <button className="btn-soft" disabled={!RUNTIME_INSTALL_AVAILABLE}>
-            {t("antigravityInstall")}
-          </button>
+          {running ? (
+            <>
+              <button className="btn-soft" onClick={() => void cancelRuntimeInstall().catch(() => {})}>
+                {t("cancel")}
+              </button>
+              <Loader2 size={14} className="spin" aria-hidden="true" />
+            </>
+          ) : (
+            <>
+              {(!managed || rt?.updateAvailable || managed.modified) && (
+                <button
+                  className="btn-soft"
+                  disabled={!rt?.supported || rt.busy || install.kind === "removing" || p.disabled}
+                  onClick={() =>
+                    rt && setInstall({ kind: "confirm", mode: managed && !managed.modified ? "update" : "install" })
+                  }
+                >
+                  {managed && !managed.modified
+                    ? t("antigravityUpdate", { version: rt?.version ?? "" })
+                    : t("antigravityInstall")}
+                </button>
+              )}
+              {managed && (
+                <button
+                  className="btn-soft"
+                  disabled={install.kind === "removing"}
+                  onClick={() => setInstall({ kind: "confirm", mode: "remove" })}
+                >
+                  {t("antigravityRemove")}
+                </button>
+              )}
+            </>
+          )}
         </SettingRow>
         <SettingRow
           testId="agy-account"

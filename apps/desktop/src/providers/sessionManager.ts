@@ -122,6 +122,8 @@ export function createSessionManager(o: { idleMs?: number; maxPinMs?: number; no
       return Promise.all([...entries].map(([k, e]) => drop(k, e, reason)));
     },
     size: () => entries.size,
+    /** Keys of the live sessions (see `sessionKey`). */
+    keys: () => [...entries.keys()],
   };
 }
 

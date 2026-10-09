@@ -241,6 +241,8 @@ const KNOWN_HOSTS = new Set([
   // 127.0.0.1: the OAuth redirect URI string (mcp/oauth.ts); the listener is Rust and the webview never loads it.
   // accounts.google.com: the Antigravity sign-in link check (providers/antigravitySupport.ts); opened in the OS browser only.
   'accounts.google.com',
+  // antigravity.google: Google's terms link in the managed-install dialog (components/AntigravityRuntimeDialog.tsx); opener only.
+  'antigravity.google',
   'api.search.brave.com',
   'www.w3.org',
   'react.dev',
