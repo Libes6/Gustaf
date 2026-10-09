@@ -1,7 +1,8 @@
 import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
 import { DEVICE_PROMPT, DEVICE_TOOLS, deviceToolsEligible, isDeviceTool } from "./deviceCore";
 import { DEVICE_CLI_PROMPT } from "./deviceCli";
-import { startDeviceCli, type DeviceCliHandle } from "./deviceBridgeNative";
+import { AGENT_CLI_PROMPT } from "./agentCli";
+import { startAgentCli, startDeviceCli, type CliBridgeHandle } from "./cliBridgeNative";
 import { DeviceDeclined, runDeviceTool, type DeviceToolResult } from "./deviceTools";
 import { loadDeviceSettings } from "./deviceSettingsStore";
 import { clearAgentDevice } from "../device/agentActivity";
@@ -129,6 +130,8 @@ export type RunOptions = {
   devices?: boolean;
   /** Tests: replaces the local bridge that gives CLI agents the `gustaf-device` command. */
   startDeviceCli?: typeof startDeviceCli;
+  /** Tests: replaces the local bridge that gives CLI agents the `gustaf-agent` command. */
+  startAgentCli?: typeof startAgentCli;
   /** The project folder when `root` is a workspace checkout (the verification settings belong to the project, not to its worktree). */
   project?: string | null;
 };
@@ -594,32 +597,64 @@ async function runLoop(o: RunOptions, cleanups: (() => void)[]): Promise<RunOutc
     access: o.access,
     optIn: o.devices,
   });
-  if (deviceAccess && o.supportsTools !== false) {
+  // An agent CLI (Claude Code, Codex, Cursor Agent) runs its own shell and tools: it ignores our tool definitions and gets
+  // commands in its shell instead. (Its models are listed with tool support, so `supportsTools` cannot tell it apart.)
+  const cliShell = !!o.adapter.supportsDeviceCommand;
+  if (deviceAccess && o.supportsTools !== false && !cliShell) {
     tools = [...tools, ...DEVICE_TOOLS];
     system += "\n" + DEVICE_PROMPT;
   }
-  // CLI agents (Claude Code, Codex, Cursor Agent) run their own shell: they get the `gustaf-device` command instead.
-  let deviceCli: DeviceCliHandle | null = null;
-  if (
-    deviceAccess &&
-    o.supportsTools === false &&
-    o.adapter.supportsDeviceCommand &&
-    o.root &&
-    o.chatId !== undefined
-  ) {
-    deviceCli = await (o.startDeviceCli ?? startDeviceCli)(o.chatId, {
+  // `gustaf-device` and `gustaf-agent` share one bridge process, token and launcher folder.
+  const cliHandles: CliBridgeHandle[] = [];
+  const commands: ("device" | "agent")[] = [];
+  if (deviceAccess && cliShell && o.root && o.chatId !== undefined) {
+    const deviceCli = await (o.startDeviceCli ?? startDeviceCli)(o.chatId, {
       signal: o.signal,
       askFirst: deviceSettings.askFirst,
       approve: (req) => o.approve(req),
     }).catch(() => null);
     if (deviceCli) {
       cleanups.push(deviceCli.end);
+      cliHandles.push(deviceCli);
+      commands.push("device");
       system += "\n" + DEVICE_CLI_PROMPT;
     }
   }
+  // Subagents on any provider for a CLI main agent (docs/features/agents.md): same host and rules as `spawn_agent`, so
+  // not in Plan/Ask mode and not with read-only access, and only when the user's setting is on.
+  if (
+    cliShell &&
+    o.subagents &&
+    o.root &&
+    o.chatId !== undefined &&
+    o.access !== "readonly" &&
+    !planning &&
+    !o.subagent &&
+    !o.toolNames &&
+    (await o.subagents.cliCommandEnabled().catch(() => false))
+  ) {
+    const agentCli = await (o.startAgentCli ?? startAgentCli)(o.chatId, {
+      signal: o.signal,
+      host: o.subagents,
+      parent: o,
+    }).catch(() => null);
+    if (agentCli) {
+      cleanups.push(agentCli.end);
+      cliHandles.push(agentCli);
+      commands.push("agent");
+      system += "\n" + AGENT_CLI_PROMPT;
+    }
+  }
+  const cliEnv = cliHandles.length
+    ? {
+        env: Object.assign({}, ...cliHandles.map((h) => h.env)) as Record<string, string>,
+        binDir: cliHandles[0].binDir,
+        commands,
+      }
+    : undefined;
   if (o.toolNames) tools = tools.filter((t) => o.toolNames!.includes(t.name));
   if (planning) tools = tools.filter((t) => t.name === "use_skill" || modeAllowsTool(o.mode, t.name));
-  const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning;
+  const canSpawn = !!o.subagents && tools.length > 0 && o.access !== "readonly" && !planning && !cliShell;
   if (canSpawn) tools = [...tools, ...(await o.subagents!.tools({ providerId: o.providerId, model: o.model }))];
   const screen = o.computerUse && !planning && o.adapter.supportsComputer ? await computer.screenSize() : null;
   const started = Date.now();
@@ -700,7 +735,7 @@ async function runLoop(o: RunOptions, cleanups: (() => void)[]): Promise<RunOutc
       signal: o.signal,
       onText: o.onText,
       onActivity: o.onActivity,
-      ...(deviceCli ? { device: { env: deviceCli.env, binDir: deviceCli.binDir } } : {}),
+      ...(cliEnv ? { device: cliEnv } : {}),
       onLimits: o.onLimits,
       onRetry: o.onRetry,
       approve: async (req) => (await o.approve(req)) !== false,

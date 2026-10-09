@@ -1259,6 +1259,8 @@
   "agentAllowedProvidersDesc": "Провайдеры, которых могут указывать spawn_agent и delegate_tasks. CLI-агент работает в собственном git worktree на ветке gustaf/, которую вы вливаете сами; он никогда не вливает и не отправляет.",
   "agentAllowedProviderAdd": "Разрешить провайдера",
   "agentAllowedProviderRemove": "Больше не разрешать {provider}",
+  "agentCliSubagents": "Субагенты из CLI-агентов",
+  "agentCliSubagentsDesc": "Claude Code, Codex и Cursor Agent могут запускать субагентов на любом разрешённом выше провайдере командой gustaf-agent (инструменты агентов Gustaf им недоступны). Действует со следующего сообщения.",
   "agentCleanupWorktrees": "Удалять нетронутые worktree субагентов",
   "agentCleanupWorktreesDesc": "Если CLI-субагент завершился без изменений, удалить его worktree и ветку. Выключено: они всегда сохраняются.",
   "memoryScopeProject": "Этот проект",

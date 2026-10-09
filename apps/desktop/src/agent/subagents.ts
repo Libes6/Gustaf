@@ -47,6 +47,7 @@ import {
   type Outcome,
 } from "./orchestrator";
 import { Scheduler, isAbortError } from "./scheduler";
+import { buildTargets, type AgentTargets } from "./agentTargets";
 import {
   activityLabel,
   activityStep,
@@ -88,6 +89,12 @@ import {
 // with dependencies and write ownership (orchestrator.ts) and returns one merged summary. Pure parts are in
 // subagentCore.ts, agentSettings.ts, orchestrator.ts and scheduler.ts.
 
+/** Observers of one `spawn` or `delegate` call (the `gustaf-agent` bridge: it returns before the work is done). */
+export type RunHooks = {
+  /** A subagent run was created (queued): its id in the Agents panel. Called once per run, a plan calls it per task and retry. */
+  onRun?: (runId: string) => void;
+};
+
 export type SubagentHost = {
   /** The agent tools offered to the main loop (spawn_agent, delegate_tasks), with the allowed models named. */
   tools(parent: ModelRef): Promise<ToolDef[]>;
@@ -95,9 +102,13 @@ export type SubagentHost = {
   /** Runs an agent tool call. Rejects only for invalid arguments. */
   call(name: string, args: unknown, parent: RunOptions): Promise<string>;
   /** Runs one subagent to completion (waiting for a free slot first) and returns its report. Rejects only for invalid arguments. */
-  spawn(args: unknown, parent: RunOptions): Promise<string>;
+  spawn(args: unknown, parent: RunOptions, hooks?: RunHooks): Promise<string>;
   /** Runs a delegate_tasks plan and returns the merged summary. Rejects only for an invalid plan. */
-  delegate(args: unknown, parent: RunOptions): Promise<string>;
+  delegate(args: unknown, parent: RunOptions, hooks?: RunHooks): Promise<string>;
+  /** The providers, models and roles a task may request now (what the tool descriptions name for API agents). */
+  targets(parent: Pick<RunOptions, "providerId" | "model">): Promise<AgentTargets>;
+  /** Settings > Usage > Agents: CLI main agents may start subagents with the `gustaf-agent` command. */
+  cliCommandEnabled(): Promise<boolean>;
 };
 
 /** What a subagent needs to run on another model than the parent's. `null` = not usable for subagents. */
@@ -270,7 +281,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     return { ...args, prompt: continuationPrompt(prev, args.prompt) };
   }
 
-  async function spawn(rawArgs: unknown, parent: RunOptions): Promise<string> {
+  async function spawn(rawArgs: unknown, parent: RunOptions, hooks: RunHooks = {}): Promise<string> {
     const parsed = parseSpawnArgs(rawArgs);
     if (!parsed.ok) throw new Error(parsed.error);
     const settings = await settingsNow();
@@ -280,12 +291,14 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     if (args.fallbackProviders?.length)
       throw new Error("spawn_agent does not support `fallbackProviders`; use delegate_tasks with `retries`.");
     const chain = await chooseProviders(args, settings, parent);
-    if (chain) return (await runTask(args, parentRef(parent), settings, parent, { runner: chain[0] })).report;
+    if (chain)
+      return (await runTask(args, parentRef(parent), settings, parent, { runner: chain[0], onRun: hooks.onRun }))
+        .report;
     const ref = chooseModel(args, settings, parent);
-    return (await runTask(args, ref, settings, parent)).report;
+    return (await runTask(args, ref, settings, parent, { onRun: hooks.onRun })).report;
   }
 
-  async function delegate(rawArgs: unknown, parent: RunOptions): Promise<string> {
+  async function delegate(rawArgs: unknown, parent: RunOptions, hooks: RunHooks = {}): Promise<string> {
     const settings = await settingsNow();
     const parsed = parsePlanArgs(rawArgs, { cancelDependents: settings.cancelDependents });
     if (!parsed.ok) throw new Error(parsed.error);
@@ -324,7 +337,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
               refs.get(task.id) ?? parentRef(parent),
               settings,
               parent,
-              { discardIfFailed: !last, ...(runner ? { runner } : {}) },
+              { discardIfFailed: !last, onRun: hooks.onRun, ...(runner ? { runner } : {}) },
             );
             failures.push(r.failure);
             return {
@@ -352,6 +365,7 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     opts: {
       discardIfFailed?: boolean;
       /** A runner chosen by provider or role; else `ref` is resolved. */ runner?: Runner;
+      onRun?: (runId: string) => void;
     } = {},
   ): Promise<Result> {
     const { title, prompt, type, files } = args;
@@ -375,6 +389,11 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
       () => ctl.abort(),
     );
     recordMessage(id, "user", [{ type: "text", text: prompt }], now());
+    try {
+      opts.onRun?.(id);
+    } catch {
+      /* an observer never changes the run */
+    }
     if (runner.note) recordStep(id, { at: now(), kind: "note", text: runner.note });
     const finish = (status: RunStatus, patch: Parameters<typeof updateRun>[1] = {}) =>
       updateRun(id, { status, endedAt: now(), currentStep: "", ...patch });
@@ -918,6 +937,11 @@ export function createSubagentHost(cfg: HostConfig): SubagentHost {
     call: (name, args, parent) => (name === DELEGATE_TOOL_NAME ? delegate(args, parent) : spawn(args, parent)),
     spawn,
     delegate,
+    async targets(parent) {
+      const settings = await settingsNow();
+      return buildTargets(settings, parentRef(parent), cfg.providers?.list() ?? [], scheduler.concurrency);
+    },
+    cliCommandEnabled: async () => (await settingsNow()).cliSubagents && !!cfg.providers,
   };
 }
 

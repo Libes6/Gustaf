@@ -1219,6 +1219,8 @@
   "agentAllowedProvidersDesc": "Providers that spawn_agent and delegate_tasks may name. A CLI agent works in its own git worktree on a gustaf/ branch that is left for you to merge; it never merges or pushes.",
   "agentAllowedProviderAdd": "Allow a provider",
   "agentAllowedProviderRemove": "Stop allowing {provider}",
+  "agentCliSubagents": "Subagents from CLI agents",
+  "agentCliSubagentsDesc": "Claude Code, Codex and Cursor Agent can start subagents on any provider allowed above with the gustaf-agent command (they cannot see Gustaf's own agent tools). Takes effect on the next message.",
   "agentCleanupWorktrees": "Remove untouched subagent worktrees",
   "agentCleanupWorktreesDesc": "When a CLI subagent ends without changing anything, remove its worktree and branch. Off: they are always kept.",
   "memoryScopeProject": "This project",
