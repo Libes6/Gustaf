@@ -2,8 +2,21 @@
 // ("git status", "TASKS.md", a skill name) and how consecutive calls are folded into one summary.
 // Pure functions, no React, so the formatting is unit-testable.
 
+import { describeDeviceCall, isDeviceTool } from "../agent/deviceCore.ts";
+
 export type ToolKind =
-  "command" | "read" | "list" | "search" | "edit" | "write" | "skill" | "web" | "mcp" | "computer" | "unknown";
+  | "command"
+  | "read"
+  | "list"
+  | "search"
+  | "edit"
+  | "write"
+  | "skill"
+  | "web"
+  | "mcp"
+  | "computer"
+  | "device"
+  | "unknown";
 
 type CallLike = { name: string; args?: any; computer?: unknown };
 
@@ -43,7 +56,7 @@ const KINDS: Record<string, ToolKind> = {
 };
 
 export const toolKind = (call: CallLike): ToolKind =>
-  call.computer ? "computer" : (KINDS[call.name.toLowerCase()] ?? "unknown");
+  call.computer ? "computer" : isDeviceTool(call.name) ? "device" : (KINDS[call.name.toLowerCase()] ?? "unknown");
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -89,6 +102,8 @@ export function toolTarget(call: CallLike, projectRoot?: string): string {
       return str(a.skill) || str(a.name) || str(a.command);
     case "web":
       return str(a.url) || str(a.query);
+    case "device":
+      return describeDeviceCall(call.name, a);
     case "mcp":
       return [str(a.server), str(a.tool)].filter(Boolean).join(" · ");
     default:

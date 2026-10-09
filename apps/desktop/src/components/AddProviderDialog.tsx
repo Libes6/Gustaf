@@ -11,7 +11,17 @@ import { ProviderIcon } from "./ProviderIcon";
 
 /** Driver tiles of the "Add provider" wizard; `soon` tiles are visual placeholders only. */
 export type TileId =
-  "claude" | "codex" | "cursor" | "grok" | "openrouter" | "local" | "gemini" | "custom" | "copilot" | "opencode";
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "grok"
+  | "openrouter"
+  | "local"
+  | "gemini"
+  | "custom"
+  | "copilot"
+  | "opencode"
+  | "antigravity";
 type Method = { id: string; kind: ProviderKind; cli?: CliId; cliAuth?: "key"; browser?: boolean };
 type Clis = { id: CliId; version: string }[];
 
@@ -23,6 +33,7 @@ const TILES: { id: TileId; kind: ProviderKind; cli?: CliId; soon?: boolean }[] =
   { id: "openrouter", kind: "openrouter" },
   { id: "local", kind: "ollama" },
   { id: "gemini", kind: "gemini" },
+  { id: "antigravity", kind: "antigravity" },
   { id: "custom", kind: "custom" },
   { id: "copilot", kind: "custom", soon: true },
   { id: "opencode", kind: "custom", soon: true },
@@ -50,6 +61,7 @@ const METHODS: Record<TileId, Method[]> = {
     { id: "lmstudio", kind: "lmstudio" },
   ],
   gemini: [{ id: "api", kind: "gemini" }],
+  antigravity: [{ id: "agent", kind: "antigravity" }],
   custom: [{ id: "api", kind: "custom" }],
   copilot: [],
   opencode: [],
@@ -133,6 +145,11 @@ export function AddProviderWizard({
 
   const save = async () => {
     const c = cfg();
+    if (method.kind === "antigravity") {
+      await saveProvider({ ...c, antigravity: { method: "oauth-personal" } }, null);
+      onSaved(c, []);
+      return;
+    }
     const models = await test(c);
     if (!models) return;
     // CLIs keep their own sign-in: nothing goes to the Keychain unless the method uses a key.
@@ -143,7 +160,9 @@ export function AddProviderWizard({
   const cliInfo = method.cli && !method.browser && !method.cliAuth ? clis.find((c) => c.id === method.cli) : undefined;
   const cliMissing = !!method.cli && !method.browser && !method.cliAuth && !cliInfo;
   const keyOk = !needsKey(method) || !!key.trim();
-  const hasBaseUrl = method.kind !== "cli" && method.kind !== "cursor";
+  const hasBaseUrl = method.kind !== "cli" && method.kind !== "cursor" && method.kind !== "antigravity";
+  // These need no key and cannot be tested before sign-in: "Connect" saves the provider, the settings page signs in.
+  const direct = (method.kind === "cli" && !method.cliAuth) || method.kind === "antigravity";
   const canSave = keyOk && (method.kind !== "custom" || !!baseUrl.trim()) && !cliMissing;
   const methodLabel = (m: Method) =>
     m.browser
@@ -240,7 +259,11 @@ export function AddProviderWizard({
                 <span>{t("name")}</span>
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
               </label>
-              {method.kind === "cli" && !method.cliAuth ? (
+              {method.kind === "antigravity" ? (
+                <p className="hint" style={{ padding: 0 }}>
+                  {t("antigravityAbout")}
+                </p>
+              ) : method.kind === "cli" && !method.cliAuth ? (
                 <p className="hint" style={{ padding: 0 }}>
                   <SquareTerminal size={13} />{" "}
                   {cliMissing ? t("provCliMissing") : t("provCliSignIn", { command: signInCommand(method.cli!) })}
@@ -338,11 +361,13 @@ export function AddProviderWizard({
             {t("provBack")}
           </button>
         )}
-        {step === 1 && !method.browser && method.kind === "cli" && !method.cliAuth && (
+        {step === 1 && !method.browser && direct && (
           <>
-            <button className="btn-soft" onClick={() => setStep(2)}>
-              {t("provConfigureManually")}
-            </button>
+            {method.kind === "cli" && (
+              <button className="btn-soft" onClick={() => setStep(2)}>
+                {t("provConfigureManually")}
+              </button>
+            )}
             <button className="btn btn-primary" disabled={state.busy || cliMissing} onClick={save}>
               {state.busy ? <Loader2 size={13} className="spin" /> : null} {t("cliConnect")}
             </button>
@@ -353,7 +378,7 @@ export function AddProviderWizard({
             {t("provDone")}
           </button>
         )}
-        {step === 1 && !method.browser && (method.kind !== "cli" || method.cliAuth) && (
+        {step === 1 && !method.browser && !direct && (
           <button className="btn btn-primary" disabled={!keyOk} onClick={() => (setState({}), setStep(2))}>
             {t("provNext")}
           </button>

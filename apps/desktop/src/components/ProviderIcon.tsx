@@ -28,6 +28,27 @@ function GrokMark({ size }: { size: number }) {
   );
 }
 
+/** Neutral mark for Antigravity: an upward chevron over an orbit arc (not any vendor artwork). */
+function AntigravityMark({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0, color: "var(--text)" }}
+    >
+      <path d="M7 14 12 6l5 8" />
+      <path d="M4 19c4-2.5 12-2.5 16 0" />
+    </svg>
+  );
+}
+
 export function ProviderIcon({ kind, cli, size = 16 }: { kind: ProviderKind; cli?: CliId; size?: number }) {
   const family =
     kind === "gemini"
@@ -52,6 +73,7 @@ export function ProviderIcon({ kind, cli, size = 16 }: { kind: ProviderKind; cli
       />
     );
   if (kind === "xai") return <GrokMark size={size} />;
+  if (kind === "antigravity") return <AntigravityMark size={size} />;
   const color = COLORS[kind];
   const Icon =
     kind === "openai"

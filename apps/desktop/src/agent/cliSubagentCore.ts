@@ -26,6 +26,11 @@ export function cliSubagentSupport(p: { kind: string; cli?: string; name?: strin
       ? { ok: true, cli: p.cli as CliId }
       : { ok: false, reason: `${name} cannot run non-interactively, so it cannot be used for subagents.` };
   }
+  if (p.kind === "antigravity")
+    return {
+      ok: false,
+      reason: `${name} (Antigravity) asks for approvals interactively and has no read-only or sandboxed access level, so it cannot be used for subagents.`,
+    };
   if (p.kind === "cursor")
     return {
       ok: false,

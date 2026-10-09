@@ -8,6 +8,7 @@ import type { CliId, ProviderConfig, ProviderKind } from "../providers/types";
 import { diagnose } from "../lib/providerDiagnostics";
 import { modelKey, useApp } from "../state";
 import { AddProviderDialog, type TileId } from "./AddProviderDialog";
+import { AntigravitySettings } from "./AntigravitySettings";
 import { CursorAccounts } from "./CursorAccounts";
 import { ProviderIcon } from "./ProviderIcon";
 import { SettingRow } from "./SettingRow";
@@ -460,60 +461,63 @@ function ProviderDetail({
           </button>
         </SettingRow>
       </div>
-      <h4 aria-level={2}>{t("runtime")}</h4>
-      <div className="card">
-        {p.kind === "cli" ? (
-          <>
-            <SettingRow title={t("command")} description={t("cliCommandHint")}>
-              <code className="mono">{p.cli}</code>
-            </SettingRow>
-            {p.cliAuth === "key" && (
-              <SettingRow id="providerApiKey" title={t("apiKey")} description={t("cursorCliAccountHint")}>
+      {p.kind === "antigravity" && <AntigravitySettings p={p} update={update} />}
+      {p.kind !== "antigravity" && <h4 aria-level={2}>{t("runtime")}</h4>}
+      {p.kind !== "antigravity" && (
+        <div className="card">
+          {p.kind === "cli" ? (
+            <>
+              <SettingRow title={t("command")} description={t("cliCommandHint")}>
+                <code className="mono">{p.cli}</code>
+              </SettingRow>
+              {p.cliAuth === "key" && (
+                <SettingRow id="providerApiKey" title={t("apiKey")} description={t("cursorCliAccountHint")}>
+                  <input
+                    aria-label={t("apiKey")}
+                    className="input narrow"
+                    type="password"
+                    placeholder={t("keyUnchanged")}
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
+                  />
+                  <button
+                    className="btn-soft"
+                    disabled={!key.trim()}
+                    onClick={() => update(p, key.trim()).then(() => setKey(""))}
+                  >
+                    {t("save")}
+                  </button>
+                </SettingRow>
+              )}
+            </>
+          ) : (
+            <>
+              {p.kind !== "cursor" && (
+                <SettingRow id="providerBaseUrl" title={t("baseUrl")}>
+                  <input
+                    aria-label={t("baseUrl")}
+                    className="input narrow"
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })}
+                  />
+                </SettingRow>
+              )}
+              <SettingRow id="providerApiKey" title={t("apiKey")} description={t("keyUnchanged")}>
                 <input
                   aria-label={t("apiKey")}
                   className="input narrow"
                   type="password"
-                  placeholder={t("keyUnchanged")}
+                  placeholder="••••••••"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
-                />
-                <button
-                  className="btn-soft"
-                  disabled={!key.trim()}
-                  onClick={() => update(p, key.trim()).then(() => setKey(""))}
-                >
-                  {t("save")}
-                </button>
-              </SettingRow>
-            )}
-          </>
-        ) : (
-          <>
-            {p.kind !== "cursor" && (
-              <SettingRow id="providerBaseUrl" title={t("baseUrl")}>
-                <input
-                  aria-label={t("baseUrl")}
-                  className="input narrow"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  onBlur={() => baseUrl !== p.baseUrl && update({ ...p, baseUrl: baseUrl.trim() })}
+                  onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))}
                 />
               </SettingRow>
-            )}
-            <SettingRow id="providerApiKey" title={t("apiKey")} description={t("keyUnchanged")}>
-              <input
-                aria-label={t("apiKey")}
-                className="input narrow"
-                type="password"
-                placeholder="••••••••"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                onBlur={() => key.trim() && update(p, key.trim()).then(() => setKey(""))}
-              />
-            </SettingRow>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      )}
       {driver === "cursor" && <CursorAccounts />}
       <h4 aria-level={2}>{t("models")}</h4>
       <div className="card">

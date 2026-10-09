@@ -1,0 +1,1217 @@
+{
+ "_note": "Real output of agent-device 0.21.23 on an iOS 26.2 simulator (iPhone 17 Pro, Russian UI). Paths scrubbed, long lists cut.",
+ "open": {
+  "success": true,
+  "data": {
+   "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+   "sessionStateDir": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+   "runnerLogPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/runner.log",
+   "requestLogPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/800f56347d9126f5.ndjson",
+   "eventLogPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/events.ndjson",
+   "appName": "Settings",
+   "appBundleId": "com.apple.Preferences",
+   "selection": {
+    "reason": "explicit-selector",
+    "source": "local",
+    "candidateCount": 1,
+    "bootOccurred": false
+   },
+   "startup": {
+    "durationMs": 1639,
+    "measuredAt": "2026-10-08T13:29:56.472Z",
+    "method": "open-command-roundtrip",
+    "appTarget": "Settings",
+    "appBundleId": "com.apple.Preferences"
+   },
+   "platform": "ios",
+   "target": "mobile",
+   "device": "iPhone 17 Pro",
+   "id": "22144834-F40F-4063-A585-2C2BB11A88C5",
+   "device_udid": "22144834-F40F-4063-A585-2C2BB11A88C5",
+   "ios_simulator_device_set": null,
+   "snapshot": {
+    "nodes": [
+     {
+      "index": 0,
+      "type": "Other",
+      "role": "_TtC7SwiftUIP33_ACC2C5639A7D76F611E170E831FCA49118SwiftUIApplication",
+      "subrole": "UIApplication",
+      "label": "Настройки",
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 402,
+       "height": 874
+      },
+      "enabled": true,
+      "depth": 0,
+      "pid": 83494,
+      "hittable": false,
+      "ref": "e1",
+      "kind": "other"
+     },
+     {
+      "index": 1,
+      "parentIndex": 0,
+      "type": "NavigationBar",
+      "role": "SwiftUI.UIKitNavigationBar",
+      "subrole": "UINavigationBar",
+      "identifier": "Настройки",
+      "rect": {
+       "x": 0,
+       "y": 62,
+       "width": 402,
+       "height": 106
+      },
+      "enabled": true,
+      "depth": 1,
+      "pid": 83494,
+      "hittable": true,
+      "ref": "e2",
+      "kind": "navigation-bar"
+     },
+     {
+      "index": 2,
+      "parentIndex": 0,
+      "type": "CollectionView",
+      "role": "SwiftUI.UpdateCoalescingCollectionView",
+      "subrole": "UICollectionView",
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 402,
+       "height": 874
+      },
+      "enabled": true,
+      "depth": 1,
+      "pid": 83494,
+      "hittable": true,
+      "ref": "e3",
+      "kind": "collection"
+     }
+    ],
+    "truncated": false,
+    "appName": "Settings",
+    "appBundleId": "com.apple.Preferences",
+    "visibility": {
+     "partial": false,
+     "visibleNodeCount": 21,
+     "totalNodeCount": 21,
+     "reasons": []
+    },
+    "viewport": {
+     "width": 402,
+     "height": 874
+    },
+    "snapshotDiagnostics": {
+     "stats": {
+      "count": 1,
+      "p50Ms": 103,
+      "p95Ms": 103,
+      "maxMs": 103,
+      "slowThresholdMs": 1500,
+      "platform": "ios",
+      "backends": {
+       "xctest": 1
+      }
+     }
+    },
+    "refsGeneration": 560930
+   },
+   "message": "Opened: Settings"
+  }
+ },
+ "snapshot": {
+  "success": true,
+  "data": {
+   "nodes": [
+    {
+     "index": 0,
+     "type": "Other",
+     "role": "_TtC7SwiftUIP33_ACC2C5639A7D76F611E170E831FCA49118SwiftUIApplication",
+     "subrole": "UIApplication",
+     "label": "Настройки",
+     "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 402,
+      "height": 874
+     },
+     "enabled": true,
+     "depth": 0,
+     "pid": 83494,
+     "hittable": false,
+     "ref": "e1",
+     "kind": "other"
+    },
+    {
+     "index": 1,
+     "parentIndex": 0,
+     "type": "NavigationBar",
+     "role": "SwiftUI.UIKitNavigationBar",
+     "subrole": "UINavigationBar",
+     "identifier": "Настройки",
+     "rect": {
+      "x": 0,
+      "y": 62,
+      "width": 402,
+      "height": 106
+     },
+     "enabled": true,
+     "depth": 1,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e2",
+     "kind": "navigation-bar"
+    },
+    {
+     "index": 2,
+     "parentIndex": 0,
+     "type": "CollectionView",
+     "role": "SwiftUI.UpdateCoalescingCollectionView",
+     "subrole": "UICollectionView",
+     "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 402,
+      "height": 874
+     },
+     "enabled": true,
+     "depth": 1,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e3",
+     "kind": "collection"
+    },
+    {
+     "index": 3,
+     "parentIndex": 2,
+     "type": "Image",
+     "role": "UIImageView",
+     "identifier": "AdditionalDimmingOverlay",
+     "rect": {
+      "x": 0,
+      "y": 738,
+      "width": 402,
+      "height": 136
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": false,
+     "ref": "e4",
+     "kind": "image",
+     "interactionBlocked": "covered",
+     "presentationHints": [
+      "covered"
+     ]
+    },
+    {
+     "index": 4,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 168,
+      "width": 370,
+      "height": 126.33333333333331
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Аккаунт Apple",
+     "ref": "e5",
+     "kind": "cell"
+    },
+    {
+     "index": 5,
+     "parentIndex": 4,
+     "type": "Button",
+     "role": "SwiftUI.AccessibilityNode",
+     "subrole": "UIResponder",
+     "label": "Аккаунт Apple, Войдите, чтобы получить доступ к своим данным iCloud, настроить App Store, использовать сервисы Apple и многое другое.",
+     "identifier": "com.apple.settings.primaryAppleAccount",
+     "rect": {
+      "x": 16,
+      "y": 168,
+      "width": 370,
+      "height": 126.33333333333331
+     },
+     "enabled": true,
+     "depth": 3,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e6",
+     "kind": "button"
+    },
+    {
+     "index": 6,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 329.33333333333337,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Основные",
+     "identifier": "com.apple.settings.general",
+     "ref": "e7",
+     "kind": "cell"
+    },
+    {
+     "index": 7,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 381.33333333333337,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Универсальный доступ",
+     "identifier": "com.apple.settings.accessibility",
+     "ref": "e8",
+     "kind": "cell"
+    },
+    {
+     "index": 8,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 433.3333333333333,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Камера",
+     "identifier": "com.apple.settings.camera",
+     "ref": "e9",
+     "kind": "cell"
+    },
+    {
+     "index": 9,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 485.3333333333333,
+      "width": 370,
+      "height": 51.99999999999994
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Кнопка действия",
+     "identifier": "com.apple.settings.actionButton",
+     "ref": "e10",
+     "kind": "cell"
+    },
+    {
+     "index": 10,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 537.3333333333333,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Ожидание",
+     "identifier": "com.apple.settings.standBy",
+     "ref": "e11",
+     "kind": "cell"
+    },
+    {
+     "index": 11,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 589.3333333333333,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Поиск",
+     "identifier": "com.apple.settings.search",
+     "ref": "e12",
+     "kind": "cell"
+    },
+    {
+     "index": 12,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 641.3333333333333,
+      "width": 370,
+      "height": 72.33333333333337
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Экран «Домой» и библиотека приложений",
+     "identifier": "com.apple.settings.homeScreen",
+     "ref": "e13",
+     "kind": "cell"
+    },
+    {
+     "index": 13,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 713.6666666666666,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "label": "Apple Intelligence и Siri",
+     "identifier": "com.apple.settings.siri",
+     "ref": "e14",
+     "kind": "cell"
+    },
+    {
+     "index": 14,
+     "parentIndex": 2,
+     "type": "Cell",
+     "role": "SwiftUI.ListCollectionViewCell",
+     "subrole": "UICollectionViewListCell",
+     "rect": {
+      "x": 16,
+      "y": 800.6666666666666,
+      "width": 370,
+      "height": 52
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": false,
+     "label": "Экранное время",
+     "identifier": "com.apple.settings.screenTime",
+     "ref": "e15",
+     "kind": "cell",
+     "interactionBlocked": "covered",
+     "presentationHints": [
+      "covered"
+     ]
+    },
+    {
+     "index": 15,
+     "parentIndex": 2,
+     "type": "Other",
+     "role": "_UIScrollViewScrollIndicator",
+     "label": "Вертикальная полоса прокрутки, 2 страницы",
+     "value": "0 %",
+     "rect": {
+      "x": 369,
+      "y": 116,
+      "width": 30,
+      "height": 672
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e16",
+     "kind": "other"
+    },
+    {
+     "index": 16,
+     "parentIndex": 2,
+     "type": "Other",
+     "role": "_UIScrollViewScrollIndicator",
+     "label": "Вертикальная полоса прокрутки, 2 страницы",
+     "value": "0 %",
+     "rect": {
+      "x": 369,
+      "y": 116,
+      "width": 30,
+      "height": 672
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e17",
+     "kind": "other"
+    },
+    {
+     "index": 17,
+     "parentIndex": 0,
+     "type": "Toolbar",
+     "role": "SwiftUI._UIInheritedView",
+     "subrole": "UIView",
+     "label": "Панель инструментов",
+     "identifier": "Toolbar",
+     "rect": {
+      "x": 0,
+      "y": 788,
+      "width": 402,
+      "height": 86
+     },
+     "enabled": true,
+     "depth": 1,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e18",
+     "kind": "toolbar"
+    },
+    {
+     "index": 18,
+     "parentIndex": 17,
+     "type": "SearchField",
+     "role": "UISearchBarTextField",
+     "label": "Поиск",
+     "value": "Поиск",
+     "placeholder": "Поиск",
+     "rect": {
+      "x": 32.99999999999994,
+      "y": 803,
+      "width": 336,
+      "height": 38
+     },
+     "enabled": true,
+     "depth": 2,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e19",
+     "kind": "search"
+    },
+    {
+     "index": 19,
+     "parentIndex": 18,
+     "type": "Button",
+     "role": "UIDictationSearchButton",
+     "label": "Диктовать",
+     "identifier": "Dictate",
+     "rect": {
+      "x": 335.6666666666667,
+      "y": 811,
+      "width": 17.333333333333314,
+      "height": 22
+     },
+     "enabled": true,
+     "depth": 3,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e20",
+     "kind": "button"
+    },
+    {
+     "index": 20,
+     "parentIndex": 18,
+     "type": "Image",
+     "role": "UIImageView",
+     "label": "Поиск",
+     "identifier": "magnifyingglass",
+     "rect": {
+      "x": 45.99999999999994,
+      "y": 812.3333333333334,
+      "width": 20.33333333333333,
+      "height": 18.66666666666663
+     },
+     "enabled": true,
+     "depth": 3,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e21",
+     "kind": "image"
+    },
+    {
+     "index": 21,
+     "parentIndex": 18,
+     "type": "Button",
+     "role": "UIDictationSearchButton",
+     "label": "Диктовать",
+     "identifier": "Dictate",
+     "rect": {
+      "x": 335.6666666666667,
+      "y": 811,
+      "width": 17.333333333333314,
+      "height": 22
+     },
+     "enabled": true,
+     "depth": 3,
+     "pid": 83494,
+     "hittable": true,
+     "ref": "e22",
+     "kind": "button"
+    }
+   ],
+   "truncated": false,
+   "appName": "Settings",
+   "appBundleId": "com.apple.Preferences",
+   "visibility": {
+    "partial": false,
+    "visibleNodeCount": 22,
+    "totalNodeCount": 22,
+    "reasons": []
+   },
+   "viewport": {
+    "width": 402,
+    "height": 874
+   },
+   "snapshotDiagnostics": {
+    "stats": {
+     "count": 2,
+     "p50Ms": 103,
+     "p95Ms": 109,
+     "maxMs": 109,
+     "slowThresholdMs": 1500,
+     "platform": "ios",
+     "backends": {
+      "xctest": 2
+     }
+    }
+   },
+   "refsGeneration": 560931
+  }
+ },
+ "pressSettled": {
+  "success": true,
+  "data": {
+   "x": 201,
+   "y": 355,
+   "message": "Tapped @e7 (201, 355)",
+   "runnerMainThreadBusy": false,
+   "referenceWidth": 402,
+   "referenceHeight": 874,
+   "targetKind": "ref",
+   "ref": "e7",
+   "refLabel": "Основные",
+   "selectorChain": [
+    "id=\"com.apple.settings.general\"",
+    "role=\"cell\" label=\"Основные\"",
+    "label=\"Основные\""
+   ],
+   "settle": {
+    "settled": true,
+    "waitedMs": 2643,
+    "captures": 7,
+    "quietMs": 500,
+    "timeoutMs": 10000,
+    "diff": {
+     "summary": {
+      "additions": 13,
+      "removals": 20,
+      "unchanged": 2
+     },
+     "lines": [
+      {
+       "kind": "removed",
+       "text": "@e1 [other] \"Настройки\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e2 [navigation-bar] \"Настройки\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e3 [collection]"
+      },
+      {
+       "kind": "removed",
+       "text": "@e4 [image] \"AdditionalDimmingOverlay\" [covered]"
+      },
+      {
+       "kind": "removed",
+       "text": "@e5 [cell] \"Аккаунт Apple\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e6 [button] \"Аккаунт Apple, Войдите, чтобы получить доступ к своим данным iCloud, настроить App Store, использовать сервисы Apple и многое другое.\""
+      },
+      {
+       "kind": "added",
+       "text": "@e1 [navigation-bar] \"Основные\"",
+       "ref": "e1"
+      },
+      {
+       "kind": "added",
+       "text": "@e2 [button] \"Настройки\"",
+       "ref": "e2"
+      }
+     ]
+    },
+    "refsGeneration": 560939
+   },
+   "resolution": {
+    "source": "ref",
+    "phase": "pre-action",
+    "kind": "exact"
+   }
+  }
+ },
+ "back": {
+  "success": true,
+  "data": {
+   "action": "back",
+   "mode": "in-app",
+   "message": "Back",
+   "settle": {
+    "settled": true,
+    "waitedMs": 1873,
+    "captures": 5,
+    "quietMs": 500,
+    "timeoutMs": 10000,
+    "diff": {
+     "summary": {
+      "additions": 17,
+      "removals": 13,
+      "unchanged": 2
+     },
+     "lines": [
+      {
+       "kind": "removed",
+       "text": "@e1 [navigation-bar] \"Основные\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e2 [button] \"Настройки\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e3 [table]"
+      },
+      {
+       "kind": "added",
+       "text": "@e1 [application] \"Настройки\"",
+       "ref": "e1"
+      },
+      {
+       "kind": "added",
+       "text": "@e2 [other] \"Настройки\"",
+       "ref": "e2"
+      },
+      {
+       "kind": "added",
+       "text": "@e3 [navigation-bar] \"Настройки\"",
+       "ref": "e3"
+      },
+      {
+       "kind": "added",
+       "text": "@e4 [collection] \"Вертикальная полоса прокрутки, 2 страницы\"",
+       "ref": "e4"
+      },
+      {
+       "kind": "added",
+       "text": "@e5 [image] \"AdditionalDimmingOverlay\"",
+       "ref": "e5"
+      }
+     ]
+    },
+    "refsGeneration": 560945
+   }
+  }
+ },
+ "backUnavailable": {
+  "success": false,
+  "error": {
+   "code": "COMMAND_FAILED",
+   "message": "in-app back control is not available",
+   "hint": "Retry with --debug and inspect diagnostics log for details.",
+   "diagnosticId": "muzkq2dw-6f519a8c",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/runner.log",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "d1562bf18698d367"
+   },
+   "details": {
+    "runner": {
+     "ok": false,
+     "error": {
+      "message": "in-app back control is not available"
+     }
+    },
+    "dispatched": "unknown",
+    "xcodebuild": {
+     "exitCode": 1,
+     "stdout": "",
+     "stderr": ""
+    }
+   }
+  }
+ },
+ "fill": {
+  "success": true,
+  "data": {
+   "x": 201,
+   "y": 822,
+   "text": "VPN",
+   "message": "Filled 3 chars",
+   "delayMs": 0,
+   "referenceWidth": 402,
+   "referenceHeight": 874,
+   "targetKind": "ref",
+   "ref": "e18",
+   "refLabel": "Поиск",
+   "selectorChain": [
+    "role=\"searchfield\" label=\"Поиск\" editable=true",
+    "label=\"Поиск\" editable=true",
+    "value=\"Поиск\" editable=true"
+   ],
+   "settle": {
+    "settled": true,
+    "waitedMs": 1764,
+    "captures": 5,
+    "quietMs": 500,
+    "timeoutMs": 10000,
+    "diff": {
+     "summary": {
+      "additions": 60,
+      "removals": 7,
+      "unchanged": 14
+     },
+     "lines": [
+      {
+       "kind": "removed",
+       "text": "@e2 [navigation-bar] \"Настройки\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e4 [image] \"AdditionalDimmingOverlay\""
+      },
+      {
+       "kind": "added",
+       "text": "@e3 [image] \"AdditionalDimmingOverlay\"",
+       "ref": "e3"
+      },
+      {
+       "kind": "removed",
+       "text": "@e11 [cell] \"Ожидание\""
+      },
+      {
+       "kind": "added",
+       "text": "@e10 [cell] \"Ожидание\" [covered]",
+       "ref": "e10"
+      },
+      {
+       "kind": "removed",
+       "text": "@e16 [other] \"Вертикальная полоса прокрутки, 2 страницы\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e17 [other] \"Вертикальная полоса прокрутки, 2 страницы\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e18 [search] \"Поиск\""
+      }
+     ]
+    },
+    "refsGeneration": 560952
+   },
+   "resolution": {
+    "source": "ref",
+    "phase": "pre-action",
+    "kind": "exact"
+   }
+  }
+ },
+ "type": {
+  "success": true,
+  "data": {
+   "textEntryRoute": "synthesized-first-responder",
+   "text": " x",
+   "delayMs": 0,
+   "message": "Typed 2 chars"
+  }
+ },
+ "scroll": {
+  "success": true,
+  "data": {
+   "direction": "down",
+   "amount": 0.5,
+   "durationMs": 400,
+   "x1": 201,
+   "y1": 429,
+   "x2": 201,
+   "y2": 143,
+   "referenceWidth": 402,
+   "referenceHeight": 571,
+   "keyboardAvoided": true,
+   "keyboardMinY": 583,
+   "pixels": 286,
+   "message": "Scrolled down by 0.5 of the viewport (286px)",
+   "settle": {
+    "settled": true,
+    "waitedMs": 4304,
+    "captures": 2,
+    "quietMs": 500,
+    "timeoutMs": 10000,
+    "diff": {
+     "summary": {
+      "additions": 13,
+      "removals": 56,
+      "unchanged": 18
+     },
+     "lines": [
+      {
+       "kind": "removed",
+       "text": "@e1 [other] \"Настройки\""
+      },
+      {
+       "kind": "removed",
+       "text": "@e2 [collection]"
+      },
+      {
+       "kind": "added",
+       "text": "@e1 [application] \"Настройки\"",
+       "ref": "e1"
+      },
+      {
+       "kind": "added",
+       "text": "@e4 [other] \"Варианты ввода\"",
+       "ref": "e4"
+      },
+      {
+       "kind": "added",
+       "text": "@e5 [scroll-area]",
+       "ref": "e5"
+      },
+      {
+       "kind": "added",
+       "text": "@e7 [keyboard] \"Padding-Left\"",
+       "ref": "e7"
+      },
+      {
+       "kind": "added",
+       "text": "@e44 [other] \"inputView\"",
+       "ref": "e44"
+      },
+      {
+       "kind": "added",
+       "text": "@e45 [other] \"Панель инструментов\"",
+       "ref": "e45"
+      }
+     ]
+    },
+    "refsGeneration": 560955
+   }
+  }
+ },
+ "longpress": {
+  "success": true,
+  "data": {
+   "x": 200,
+   "y": 300,
+   "durationMs": 600,
+   "referenceHeight": 583,
+   "message": "Long pressed (200, 300)",
+   "referenceWidth": 402,
+   "runnerMainThreadBusy": false,
+   "targetKind": "point",
+   "settle": {
+    "settled": true,
+    "waitedMs": 757,
+    "captures": 2,
+    "quietMs": 500,
+    "timeoutMs": 10000,
+    "diff": {
+     "summary": {
+      "additions": 0,
+      "removals": 0,
+      "unchanged": 31
+     },
+     "lines": []
+    },
+    "tail": [
+     {
+      "ref": "e4",
+      "role": "other",
+      "label": "Варианты ввода"
+     },
+     {
+      "ref": "e5",
+      "role": "scroll-area"
+     },
+     {
+      "ref": "e44",
+      "role": "other",
+      "label": "inputView"
+     },
+     {
+      "ref": "e45",
+      "role": "other",
+      "label": "Панель инструментов"
+     },
+     {
+      "ref": "e46",
+      "role": "other",
+      "label": "Magnifying glass"
+     },
+     {
+      "ref": "e47",
+      "role": "collection",
+      "label": "Вертикальная полоса прокрутки, 3 страницы"
+     },
+     {
+      "ref": "e48",
+      "role": "image",
+      "label": "AdditionalDimmingOverlay"
+     },
+     {
+      "ref": "e49",
+      "role": "cell",
+      "label": "Аккаунт Apple, Войдите, чтобы получить доступ к своим данным iCloud, настроить App Store, использовать сервисы Apple и многое другое."
+     },
+     {
+      "ref": "e50",
+      "role": "cell",
+      "label": "Основные"
+     },
+     {
+      "ref": "e51",
+      "role": "cell",
+      "label": "Универсальный доступ"
+     },
+     {
+      "ref": "e52",
+      "role": "cell",
+      "label": "Камера"
+     },
+     {
+      "ref": "e53",
+      "role": "cell",
+      "label": "Кнопка действия"
+     },
+     {
+      "ref": "e55",
+      "role": "cell",
+      "label": "Поиск"
+     },
+     {
+      "ref": "e56",
+      "role": "cell",
+      "label": "Экран «Домой» и библиотека приложений"
+     },
+     {
+      "ref": "e57",
+      "role": "cell",
+      "label": "Apple Intelligence и Siri"
+     },
+     {
+      "ref": "e58",
+      "role": "cell",
+      "label": "Экранное время"
+     },
+     {
+      "ref": "e59",
+      "role": "cell",
+      "label": "Код‑пароль"
+     },
+     {
+      "ref": "e60",
+      "role": "cell",
+      "label": "Конфиденциальность и безопасность"
+     },
+     {
+      "ref": "e61",
+      "role": "other",
+      "label": "Вертикальная полоса прокрутки, 3 страницы"
+     },
+     {
+      "ref": "e62",
+      "role": "image",
+      "label": "Magnifying glass"
+     }
+    ],
+    "tailTruncated": true,
+    "refsGeneration": 560959
+   },
+   "gesture": "longpress"
+  }
+ },
+ "swipeOutOfBounds": {
+  "success": false,
+  "error": {
+   "code": "INVALID_ARGS",
+   "message": "Gesture trajectory does not fit inside the viewport",
+   "hint": "Move the gesture away from the edge or reduce its translation, scale, or rotation.",
+   "diagnosticId": "muzkqd6u-121c84b7",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/9f1ddfeab9df124c.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "9f1ddfeab9df124c"
+   },
+   "details": {
+    "intent": "fling",
+    "pointerId": 0,
+    "viewport": {
+     "x": 0,
+     "y": 0,
+     "width": 402,
+     "height": 583
+    },
+    "sample": {
+     "offsetMs": 0,
+     "point": {
+      "x": 200,
+      "y": 700
+     }
+    },
+    "reason": "GESTURE_TRAJECTORY_OUT_OF_BOUNDS",
+    "dispatched": "unknown"
+   }
+  }
+ },
+ "staleRef": {
+  "success": false,
+  "error": {
+   "code": "COMMAND_FAILED",
+   "message": "Ref @e999 needs a complete snapshot — the current frame only authorizes its emitted refs",
+   "hint": "Capture a fresh interactive snapshot (snapshot -i) or use a stable selector, then retry.",
+   "diagnosticId": "muzkqdc7-ad1d52b4",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/92745aaa03d72374.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "92745aaa03d72374"
+   },
+   "details": {
+    "reason": "plain_ref_requires_complete_frame",
+    "ref": "@e999",
+    "currentGeneration": 560959,
+    "scope": [
+     "e4",
+     "e5",
+     "e44",
+     "e45",
+     "e46"
+    ],
+    "dispatched": "no"
+   }
+  }
+ },
+ "home": {
+  "success": true,
+  "data": {
+   "action": "home",
+   "message": "Home"
+  }
+ },
+ "appNotInstalled": {
+  "success": false,
+  "error": {
+   "code": "APP_NOT_INSTALLED",
+   "message": "No app found matching \"Настройки\"",
+   "hint": "Run apps to discover the exact installed package or bundle id, or install the app before open.",
+   "diagnosticId": "muzkqdtl-bdc26b12",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/c13be489519555f6.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "c13be489519555f6"
+   },
+   "details": {
+    "dispatched": "unknown"
+   }
+  }
+ },
+ "appSwitcher": {
+  "success": true,
+  "data": {
+   "action": "app-switcher",
+   "message": "Opened app switcher"
+  }
+ },
+ "sessionNotFound": {
+  "success": false,
+  "error": {
+   "code": "SESSION_NOT_FOUND",
+   "message": "iOS snapshot requires an active app session on the target device. Run open first (for example: open --session sim --platform ios --device \"<name>\" <app>).",
+   "hint": "Run open first or pass an explicit device selector.",
+   "diagnosticId": "muzkqgeo-e0a741e0",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/22e79095f4296b4e.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "22e79095f4296b4e"
+   },
+   "details": {
+    "reason": "ios_app_session_required",
+    "dispatched": "no"
+   }
+  }
+ },
+ "deviceInUse": {
+  "success": false,
+  "error": {
+   "code": "DEVICE_IN_USE",
+   "message": "Device is already in use by session \"other-holder\".",
+   "hint": "Run agent-device session list to inspect active sessions. To reuse this device, rerun the command with --session other-holder. To open a new session on this device, first run agent-device close --session other-holder. To wait for the device to free up, run the same open with --wait <ms>.",
+   "diagnosticId": "muzkqh3i-7c88233c",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/ff2284f4826bfcbb.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "ff2284f4826bfcbb"
+   },
+   "retriable": true,
+   "details": {
+    "session": "other-holder",
+    "deviceId": "22144834-F40F-4063-A585-2C2BB11A88C5",
+    "deviceName": "iPhone 17 Pro",
+    "dispatched": "unknown"
+   }
+  }
+ },
+ "close": {
+  "success": false,
+  "error": {
+   "code": "SESSION_NOT_FOUND",
+   "message": "No active session",
+   "hint": "Run open first or pass an explicit device selector.",
+   "diagnosticId": "muzkqh9z-e2bae47f",
+   "logPath": "/Users/user/.agent-device/sessions/gustaf-22144834-F40F-4063-A585-2C2BB11A88C5/requests/eec6db6749904e02.ndjson",
+   "diagnosticsRecord": {
+    "session": "gustaf-22144834-F40F-4063-A585-2C2BB11A88C5",
+    "requestId": "eec6db6749904e02"
+   },
+   "details": {
+    "dispatched": "unknown"
+   }
+  }
+ }
+}

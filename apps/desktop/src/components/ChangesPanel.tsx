@@ -1,6 +1,7 @@
 import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { getAgentActivity, subscribeAgentActivity } from "../device/agentActivity";
 import { useT } from "../i18n";
 import { hasTerminalCommands, onTerminalCommand, takeTerminalOpen } from "../lib/terminalBridge";
 import { changesSince, fileDiff, projectGit, restoreAll, restoreFile, type FileChange } from "../lib/checkpoints";
@@ -31,6 +32,7 @@ import { useApp } from "../state";
 import { HunkDiff } from "./HunkDiff";
 import { FeedbackQueue, FindingsBlock, FindingsList, type NewComment } from "./ReviewFindings";
 const ProjectPreview = lazy(() => import("./ProjectPreview").then((module) => ({ default: module.ProjectPreview })));
+const DevicePanel = lazy(() => import("./device/DevicePanel").then((module) => ({ default: module.DevicePanel })));
 const TerminalPanel = lazy(() => import("./TerminalPanel").then((module) => ({ default: module.TerminalPanel })));
 import { ReviewSetupForm, ReviewTestRun } from "./ReviewSetupPanel";
 import { WorkspaceChanges } from "./WorkspaceChanges";
@@ -93,7 +95,9 @@ export function ChangesPanel({
   const bumpViewed = () => setViewedTick((n) => n + 1);
   const [terminalOpened, setTerminalOpened] = useState(false);
   const [previewOpened, setPreviewOpened] = useState(false);
-  const [tab, setTab] = useState<"changes" | "terminal" | "preview">("changes");
+  const [deviceOpened, setDeviceOpened] = useState(false);
+  const [tab, setTab] = useState<"changes" | "terminal" | "preview" | "device">("changes");
+  const agentDevices = useSyncExternalStore(subscribeAgentActivity, getAgentActivity);
   useEffect(() => {
     const show = () => {
       if (hasTerminalCommands(root) || takeTerminalOpen(root)) {
@@ -677,8 +681,30 @@ export function ChangesPanel({
             >
               {t.locale === "ru" ? "Предпросмотр" : "Preview"}
             </button>
+            <button
+              className={tab === "device" ? "active" : ""}
+              aria-pressed={tab === "device"}
+              onClick={() => {
+                setTab("device");
+                setDeviceOpened(true);
+              }}
+            >
+              {t("deviceTab")}
+            </button>
           </div>
           <div className="panel-body">
+            {deviceOpened && (
+              <div hidden={tab !== "device"}>
+                <Suspense fallback={<div className="term">{t("deviceTab")}…</div>}>
+                  <DevicePanel
+                    visible={tab === "device"}
+                    agentActive={agentDevices.length > 0}
+                    agentLabel={agentDevices[0]?.name}
+                    onStopAgent={() => window.dispatchEvent(new Event("gustaf-stop"))}
+                  />
+                </Suspense>
+              </div>
+            )}
             {previewOpened && (
               <div hidden={tab !== "preview"}>
                 <Suspense fallback={<div className="term">Preview…</div>}>

@@ -51,7 +51,9 @@ export function ApprovalCard({
               ? t("approveWeb")
               : req.kind === "memory"
                 ? t("approveMemory")
-                : t("approveComputer")
+                : req.kind === "device"
+                  ? t(req.destructive ? "deviceAgentApproveOff" : "deviceAgentApprove")
+                  : t("approveComputer")
       }
     >
       {req.agent && (
@@ -70,7 +72,9 @@ export function ApprovalCard({
                 ? t("approveMemory")
                 : req.kind === "mcp"
                   ? t("approveMcp", { tool: req.tool, server: req.server })
-                  : t("approveComputer")}
+                  : req.kind === "device"
+                    ? t(req.destructive ? "deviceAgentApproveOff" : "deviceAgentApprove")
+                    : t("approveComputer")}
       </div>
       <pre>
         {req.kind === "command"
@@ -81,7 +85,7 @@ export function ApprovalCard({
             ? req.text
             : req.kind === "web"
               ? req.text
-              : req.kind === "memory"
+              : req.kind === "memory" || req.kind === "device"
                 ? req.text
                 : req.kind === "mcp"
                   ? mcpArgs(req.args)
