@@ -5,9 +5,11 @@ Protocol ([agentclientprotocol.com](https://agentclientprotocol.com)): JSON-RPC 
 agent's stdio. Like Claude Code and Codex it runs its own tools in the project folder; Gustaf relays text, tool cards and
 approvals. The agent has its **own Google sign-in**, separate from the Antigravity IDE or CLI.
 
-**Status: built and tested against a synthetic ACP agent and synthetic archives only.** The real binary is proprietary and
-was never downloaded or run for this work, neither by the ACP client nor by the managed installer. Everything below
-marked "not verified" needs the manual steps at the end.
+**Status: built and tested against a synthetic ACP agent and synthetic archives, plus one live run on 2026-10-09:** the
+real archive was downloaded and installed through the managed-install code on an Apple Silicon Mac (macOS, `cargo test --
+--ignored live_real_install`), and the real agent answered an `initialize` request (recorded in
+`tests/fixtures/acp-antigravity-1.3.0-initialize.json`). Nothing else was run with the real agent: no sign-in, no prompt.
+Everything below marked "not verified" needs the manual steps at the end.
 
 ## What works
 
@@ -94,8 +96,9 @@ error instead).
 #### Integrity: what is and is not checked
 
 Google's registry entry does **not** publish checksums. The SHA-256 and byte sizes pinned in `antigravity_runtime.rs` were
-copied from T3 Code's release table (MIT, `antigravityRelease.ts`, "hashes and sizes were checked on 2026-10-05"). They were
-**not re-computed by us**, because the archives were never downloaded for this work. So the trust chain is: TLS to
+copied from T3 Code's release table (MIT, `antigravityRelease.ts`, "hashes and sizes were checked on 2026-10-05"). The
+darwin-arm64 pin was **confirmed live on 2026-10-09**: the downloaded file matched it (111,456,962 bytes, SHA-256
+`7cd97045...`); the other four platforms' pins are still not re-computed by us. So the trust chain is: TLS to
 `dl.google.com`, plus the downloaded bytes matching a hash someone else computed from Google's file. If a pinned value is
 wrong or Google replaces the file, the install fails closed ("did not match the expected size or checksum") and installs
 nothing; fix by re-pinning in the next release after checking the file. The pins are per platform and per version.
@@ -110,9 +113,9 @@ accidental or casual modification only: anyone who can write the folder can rewr
 The files are written by Gustaf itself through its own network client, so macOS never attaches a
 `com.apple.quarantine` attribute to them (that is added by browsers and some downloaders, not by a plain file write). Gustaf
 therefore does not run `xattr`, does not disable Gatekeeper, and does not change any system security setting; the files are
-exactly as trusted as anything an app downloads and runs. Whether the real `.par`/helper pair runs without a Gatekeeper
-prompt, or needs a signature, was **not verified**; if macOS blocks it the verify step reports "did not start" and nothing
-is kept.
+exactly as trusted as anything an app downloads and runs. On the live run (macOS, Apple Silicon) the files had mode 755,
+no `com.apple.quarantine` attribute (only the harmless `com.apple.provenance`), and the probe started `agy_acp_server.par`
+without a Gatekeeper prompt. If macOS blocks it elsewhere the verify step reports "did not start" and nothing is kept.
 
 ### Manual install
 
@@ -220,10 +223,17 @@ profile folders in Rust, and the managed install (`antigravity_runtime.rs` tests
 127.0.0.1 server: platform and URL mapping, host and redirect policy, size/hash/redirect/HTTP errors, resume, zip-slip, size cap,
 symlinks, executable bits, manifest tamper detection, cancel, temp cleanup, probe failure, update and remove. Fixtures are synthetic, written from the public ACP spec and T3 Code's schemas.
 
-Not verified: the real download (pinned hashes and sizes, redirect hosts, Gatekeeper behaviour, `initialize` probe on the real
-agent, free space needed) and everything else with the real `agy_acp_server`: its actual `initialize` answer (protocol version, auth method
-ids, `resume` support), the exact sign-in link format and where it is printed, `authenticate` behaviour for each method,
-model and thought-level option shapes, `logout`, WKWebView link opening, the macOS Keychain prompt.
+Verified live (2026-10-09, Apple Silicon Mac, outside the app window): the real download of the darwin-arm64 archive
+(directly from `dl.google.com`, no redirect; hash and size pin matched; about 100 s on this connection), unpack,
+executable bits, manifest, the `initialize` probe, and the real agent's `initialize` answer: `protocolVersion: 2` in a v1-shaped
+body (`agentInfo`, `agentCapabilities`: `loadSession`, `sessionCapabilities.resume`, `auth.logout`, image/audio/embeddedContext
+prompts, http/sse MCP), auth methods `oauth-personal`, `oauth-business`, `gemini-api-key`, `agent-platform` (the ids our
+settings use), answered in 1.4 s; our client reads it as v1 (`tests/acpClient.test.mjs`).
+
+Not verified: redirect hosts (none occurred), the pinned hashes of the other four platforms, free space needed on Linux and
+Windows, and everything else with the real `agy_acp_server`: the exact sign-in link format and where it is printed,
+`authenticate` behaviour for each method, session and prompt flow, model and thought-level option shapes, `logout`, the install
+dialog and link opening in WKWebView, the macOS Keychain prompt.
 
 ## Manual check on a Mac with the real runtime
 

@@ -926,3 +926,45 @@ fn remove_refuses_a_symlinked_runtime_folder() {
     assert!(remove(root.path(), false, &[]).is_err());
     assert!(target.path().exists());
 }
+
+/// LIVE, manual: downloads Google's real archive (about 111 MB) and installs it into a temporary folder through the same
+/// code the Install button uses. Never runs in `cargo test`; run it with
+/// `GUSTAF_LIVE_ROOT=<empty folder> cargo test --lib antigravity_runtime::tests::live_real_install -- --ignored --nocapture`.
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+#[ignore = "downloads the real archive from dl.google.com"]
+fn live_real_install() {
+    let root =
+        std::path::PathBuf::from(std::env::var("GUSTAF_LIVE_ROOT").expect("set GUSTAF_LIVE_ROOT"));
+    let asset = release_asset("macos", "aarch64").unwrap();
+    let mut last = (String::new(), 0u64);
+    let started = std::time::Instant::now();
+    let installed = install(
+        &root,
+        &asset,
+        &UrlPolicy::google(),
+        &Cancel::default(),
+        &mut |p| {
+            if p.phase != last.0 || p.received / 20_000_000 != last.1 / 20_000_000 {
+                eprintln!(
+                    "[{:>5.1}s] {} {}/{} bytes",
+                    started.elapsed().as_secs_f32(),
+                    p.phase,
+                    p.received,
+                    p.total
+                );
+                last = (p.phase.to_string(), p.received);
+            }
+        },
+    )
+    .expect("real install");
+    eprintln!(
+        "installed {} at {} (modified: {:?})",
+        installed.version, installed.dir, installed.modified
+    );
+    assert!(installed.modified.is_none());
+    assert!(
+        find_installed(&root, true).is_some_and(|i| i.modified.is_none()),
+        "deep re-check of the manifest"
+    );
+}

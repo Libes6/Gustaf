@@ -558,3 +558,23 @@ test('v2 updates: tool_call_update without tool_call, content chunks, plan_updat
   assert.deepEqual(m.map({ sessionUpdate: 'state_update', state: 'running' }), []);
   assert.equal(parseConfigOptions(v2Options([MODEL_OPTION, THOUGHT_OPTION]))[1].id, 'thought');
 });
+
+test('the REAL Antigravity 1.3.0 answer (recorded from agy_acp_server): version 2 in a v1-shaped body is read as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const real = JSON.parse(
+    readFileSync(new URL('./fixtures/acp-antigravity-1.3.0-initialize.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(real.result.protocolVersion, 2, 'the agent says 2 ...');
+  assert.equal('info' in real.result, false, '... but has the v1 agentInfo, not the v2 info');
+  const init = parseInitialize(real.result);
+  assert.equal(init.agentInfo.name, 'antigravity-acp');
+  assert.equal(init.agentInfo.version, '1.3.0');
+  assert.deepEqual(
+    init.authMethods.map((m) => m.id),
+    ['oauth-personal', 'oauth-business', 'gemini-api-key', 'agent-platform'],
+  );
+  assert.equal(init.capabilities.loadSession, true);
+  assert.equal(init.capabilities.resume, true);
+  assert.equal(init.capabilities.image, true);
+  assert.equal(init.capabilities.logout, true);
+});
