@@ -55,6 +55,8 @@ subtle = "2"
 getrandom = "0.3"
 pdf-extract = "0.12"
 globset = "0.4.20"
+# Reads the Antigravity runtime archive (src/antigravity_runtime.rs): read-only, pure-Rust deflate, no write/crypto features.
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
 tauri-plugin-updater = "2"
