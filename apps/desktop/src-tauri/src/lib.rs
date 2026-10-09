@@ -1,4 +1,5 @@
 mod antigravity_profile;
+mod antigravity_runtime;
 mod attachments;
 mod codex_agents;
 mod computer;
@@ -74,6 +75,7 @@ pub fn run() {
             proc_ledger::init(app, &dir);
             mcp::init(app);
             mobile_server::init(app);
+            antigravity_runtime::init(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -116,6 +118,11 @@ pub fn run() {
             secrets::secret_delete,
             antigravity_profile::antigravity_profile_prepare,
             antigravity_profile::antigravity_profile_remove,
+            antigravity_runtime::antigravity_runtime_status,
+            antigravity_runtime::antigravity_runtime_resolve,
+            antigravity_runtime::antigravity_runtime_install,
+            antigravity_runtime::antigravity_runtime_cancel,
+            antigravity_runtime::antigravity_runtime_remove,
             cursor_accounts::cursor_profile_create,
             cursor_accounts::cursor_profile_dir,
             cursor_accounts::cursor_profile_remove,
