@@ -81,4 +81,16 @@ describe("Settings: agent roles and providers", () => {
     fireEvent.click(sw);
     await waitFor(() => expect(saved()?.cleanupUntouchedWorktrees).toBe(true));
   });
+
+  it("switches subagents from CLI agents off and on", async () => {
+    mockSettings({});
+    renderApp(<AgentSettingsSection />, makeApp({ providers, models }));
+    const toggle = await screen.findByRole("switch", { name: "Subagents from CLI agents" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(saved()?.cliSubagents).toBe(false));
+    expect(screen.getByRole("switch", { name: "Subagents from CLI agents" })).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(screen.getByRole("switch", { name: "Subagents from CLI agents" }));
+    await waitFor(() => expect(saved().cliSubagents).toBe(true));
+  });
 });

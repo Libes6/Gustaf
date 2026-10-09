@@ -161,13 +161,19 @@ export type TurnInput = {
   };
   /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
   approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
-  /** Agent device access is on for this run: the environment and PATH folder that make the `gustaf-device` command work (CLI adapters only, see agent/deviceBridgeNative.ts). */
-  device?: { env: Record<string, string>; binDir: string };
+  /**
+   * The commands the app's local bridge offers this run (CLI adapters only, see agent/cliBridgeNative.ts): the environment and
+   * PATH folder that make them work, and which ones are on (`gustaf-device`, `gustaf-agent`). Absent `commands`: device only.
+   */
+  device?: { env: Record<string, string>; binDir: string; commands?: ("device" | "agent")[] };
   /** Messages the user sent while this turn runs (providers/lifecycle.ts). Absent: follow-ups wait for the next turn. */
   followUp?: import("./lifecycle").FollowUpChannel;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
   onRetry?: (info: RetryInfo) => void;
 };
+
+/** `gustaf-device` is on for the run (commands absent: the device command only, as before `gustaf-agent`). */
+export const deviceCommandOn = (d: TurnInput["device"]) => !!d && (d.commands ?? ["device"]).includes("device");
 
 /** A Codex thread goal (`thread/goal/*`). */
 export type NativeGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
@@ -187,7 +193,7 @@ export interface Adapter {
   nativeGoal?(): Promise<boolean>;
   turn(input: TurnInput): Promise<TurnOutput>;
   supportsComputer: boolean;
-  /** The agent runs its own shell and can use `TurnInput.device` to call the `gustaf-device` command. */
+  /** The agent runs its own tools and shell: it ignores tool definitions and can use `TurnInput.device` to call `gustaf-device` and `gustaf-agent`. */
   supportsDeviceCommand?: boolean;
   supportsReasoning(model: string): boolean;
   /** Effort levels this model offers, weakest first (empty: no control). Absent: `REASONING_LEVELS` when `supportsReasoning`. */

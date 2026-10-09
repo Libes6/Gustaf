@@ -37,7 +37,19 @@ export function subagentModelResolver(c: Catalog): (ref: ModelRef) => Promise<Re
 export function providerDirectory(c: Catalog): ProviderDirectory {
   const enabled = () => c.providers.filter((p) => !p.disabled);
   return {
-    list: () => enabled().map((p) => ({ id: p.id, name: p.name, ...(runsOwnTools(p) ? { cli: true } : {}) })),
+    list: () =>
+      enabled().map((p) => {
+        const support = cliSubagentSupport(p);
+        const own = c.models.filter((m) => m.providerId === p.id && (support || m.tools !== false));
+        return {
+          id: p.id,
+          name: p.name,
+          ...(runsOwnTools(p) ? { cli: true } : {}),
+          models: own.map((m) => ({ id: m.id, name: m.name || m.id })),
+          ...(support && !support.ok ? { unusable: support.reason } : {}),
+          ...(!support && !own.length ? { unusable: "it has no listed model with tool support." } : {}),
+        };
+      }),
     async resolve(providerId, model) {
       const p = enabled().find((x) => x.id === providerId);
       if (!p) return { ok: false, reason: "it is missing or disabled." };
