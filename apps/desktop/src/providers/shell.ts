@@ -77,6 +77,8 @@ export type Invocation = {
   env?: Record<string, string>;
   /** Put the executable's directory first on PATH (needed for Node-based shims that find `node` next to themselves). */
   prependExecutableDir?: boolean;
+  /** Folder put first on PATH (e.g. the one holding the `gustaf-device` launcher). */
+  prependPath?: string;
   /** Redirect stdin from the null device (CLIs that otherwise wait for piped input). */
   nullStdin?: boolean;
 };
@@ -100,6 +102,7 @@ export function invocationScript(kind: ShellKind, inv: Invocation): string {
     const parts = [...args, ...(inv.prompt != null ? [inv.prompt] : [])].map(shq).join(" ");
     const env = Object.entries(inv.env ?? {}).map(([k, v]) => `${k}=${shq(v)}`);
     return (
+      (inv.prependPath ? `export PATH=${shq(inv.prependPath)}:"$PATH"; ` : "") +
       (dir ? `export PATH=${shq(dir)}:"$PATH"; ` : "") +
       `exec ${env.length ? `env ${env.join(" ")} ` : ""}${shq(inv.executable)}${parts ? " " + parts : ""}${inv.nullStdin ? " < /dev/null" : ""}`
     );
@@ -108,6 +111,7 @@ export function invocationScript(kind: ShellKind, inv: Invocation): string {
   const viaStdin = shim && inv.prompt != null;
   const argv = [...args, ...(inv.prompt != null && !viaStdin ? [inv.prompt] : [])].map((a) => psq(winArg(a))).join(" ");
   let s = "";
+  if (inv.prependPath) s += `$env:PATH = ${psq(inv.prependPath)} + ';' + $env:PATH; `;
   if (dir) s += `$env:PATH = ${psq(dir)} + ';' + $env:PATH; `;
   for (const [k, v] of Object.entries(inv.env ?? {})) s += `$env:${k.replace(/[^A-Za-z0-9_]/g, "_")} = ${psq(v)}; `;
   const call = `& ${psq(inv.executable)}${argv ? " " + argv : ""}`;

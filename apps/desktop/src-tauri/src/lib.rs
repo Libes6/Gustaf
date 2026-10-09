@@ -1,9 +1,11 @@
+mod antigravity_profile;
 mod attachments;
 mod codex_agents;
 mod computer;
 mod cursor_accounts;
 mod cursor_import;
 mod db;
+mod device_bridge;
 mod git;
 mod git_branches;
 mod git_publish;
@@ -48,6 +50,7 @@ pub fn run() {
         .manage(terminal::Terminals::default())
         .manage(preview::Previews::default())
         .manage(mobile_server::MobileServer::default())
+        .manage(device_bridge::DeviceBridge::default())
         .manage(quick_ask::QuickAsk::default())
         .manage(webhooks::Webhooks::default())
         .on_window_event(|window, event| {
@@ -111,6 +114,8 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,
+            antigravity_profile::antigravity_profile_prepare,
+            antigravity_profile::antigravity_profile_remove,
             cursor_accounts::cursor_profile_create,
             cursor_accounts::cursor_profile_dir,
             cursor_accounts::cursor_profile_remove,
@@ -198,6 +203,9 @@ pub fn run() {
             oauth::oauth_loopback_cancel,
             mobile_server::mobile_server_start,
             mobile_server::mobile_server_stop,
+            device_bridge::device_bridge_prepare,
+            device_bridge::device_bridge_register,
+            device_bridge::device_bridge_reply,
             mobile_server::mobile_server_status,
             mobile_server::mobile_pairing_start,
             mobile_server::mobile_pairing_cancel,

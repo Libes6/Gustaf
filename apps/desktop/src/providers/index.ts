@@ -1,7 +1,8 @@
 import { withComputer } from "./computerBridge";
-import { cursorProfiles, db, getSetting, setSetting } from "../lib/api";
+import { antigravityProfiles, cursorProfiles, db, getSetting, setSetting } from "../lib/api";
 import { providerKey, providerSecretId, removeSecret, secretPresence, storeSecret, type KeySource } from "../lib/keys";
 import { anthropic } from "./anthropic";
+import { antigravityAdapter } from "./antigravity";
 import { cliAdapter } from "./cli";
 import { cursorAgent } from "./cursor";
 import { openaiCompatible } from "./openaiCompatible";
@@ -40,6 +41,8 @@ export const PRESETS: Record<ProviderKind, { name: string; baseUrl: string; need
   cursor: { name: "Cursor", baseUrl: "", needsKey: true, keyUrl: "https://cursor.com/dashboard/integrations" },
   cli: { name: "CLI", baseUrl: "", needsKey: false },
   xai: { name: "Grok", baseUrl: "https://api.x.ai/v1", needsKey: true, keyUrl: "https://console.x.ai" },
+  // Google's ACP agent: sign-in methods and the optional API key are set on its settings page.
+  antigravity: { name: "Antigravity", baseUrl: "", needsKey: false },
 };
 
 export const loadProviders = () => getSetting<ProviderConfig[]>("providers", []);
@@ -64,6 +67,8 @@ export async function deleteProvider(id: string) {
   // A browser-login Cursor account owns its isolated profile folder; it goes with the account.
   const profile = list.find((p) => p.id === id)?.cliProfile;
   if (profile) await cursorProfiles.remove(profile).catch(() => {});
+  // An Antigravity provider owns a private profile folder (its Google sign-in).
+  if (list.find((p) => p.id === id)?.kind === "antigravity") await antigravityProfiles.remove(id).catch(() => {});
   await setSetting(
     "providers",
     list.filter((p) => p.id !== id),
@@ -79,12 +84,13 @@ function rawAdapter(cfg: ProviderConfig, key: KeySource): Adapter {
   if (cfg.kind === "anthropic") return anthropic(cfg, key);
   if (cfg.kind === "cursor") return cursorAgent(cfg, key);
   if (cfg.kind === "cli") return cliAdapter(cfg, key);
+  if (cfg.kind === "antigravity") return antigravityAdapter(cfg, key);
   return openaiCompatible(cfg, key);
 }
 
 /** `key` is a fixed value (the "Test connection" form) or a lazy getter that reads the Keychain on first use. */
 export function makeAdapter(cfg: ProviderConfig, key: KeySource): Adapter {
-  return withComputer(rawAdapter(cfg, key), cfg.kind === "cli" || cfg.kind === "cursor");
+  return withComputer(rawAdapter(cfg, key), cfg.kind === "cli" || cfg.kind === "cursor" || cfg.kind === "antigravity");
 }
 
 const adapters = new Map<string, { cfg: string; adapter: Adapter }>();
@@ -178,6 +184,8 @@ export async function listAllModels(all: ProviderConfig[], refresh: ModelRefresh
   const cache = await readModelCache();
   const now = Date.now();
   const wantsFetch = async (p: ProviderConfig) => {
+    // Listing starts the agent process (about a gigabyte unpacked per launch): only an explicit refresh does it.
+    if (p.kind === "antigravity") return refresh === "force" && (!only || only.includes(p.id));
     if (refresh === "force" && (!only || only.includes(p.id))) return true;
     const mode = refresh === "force" ? "startup" : refresh;
     if (await listsWithoutKey(p)) return mode === "startup" || !cache[p.id] || now - cache[p.id].at >= MODEL_TTL_MS;

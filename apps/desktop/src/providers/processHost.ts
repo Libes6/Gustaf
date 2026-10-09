@@ -52,6 +52,8 @@ export type OpenOptions = {
   stdin?: string;
   /** Every non-empty stdout line, before it is parsed (raw CLI log). */
   onRaw?: (line: string) => void;
+  /** Every stderr chunk as it arrives (an agent that reports a sign-in link there). Must not log it. */
+  onStderr?: (chunk: string) => void;
 };
 
 const live = new Set<JsonProcess>();
@@ -100,6 +102,11 @@ export async function openJsonProcess(script: string, o: OpenOptions = {}): Prom
   });
   cmd.stderr.on("data", (s: string) => {
     stderr = (stderr + s).slice(-4000);
+    try {
+      o.onStderr?.(s);
+    } catch {
+      /* a listener must not break the stream */
+    }
   });
   const child = await cmd.spawn();
   void invokeQuiet("process_ledger_add", { pid: child.pid });

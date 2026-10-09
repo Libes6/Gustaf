@@ -2,6 +2,7 @@
 // Pure helpers (no Tauri, no React) so they are unit-tested in tests/actionLog.test.mjs.
 // Only what is needed to audit a run is stored: what was called, how it ended, what allowed or stopped it. Command text
 // is scrubbed of secrets like exported chats are; outputs and file contents are never stored here.
+import { describeDeviceCall, isDeviceTool } from "./deviceCore.ts";
 import { redactSecrets } from "../lib/exportChats.ts";
 import { isBlobId, type UndoRecord } from "../lib/fileUndo.ts";
 
@@ -116,6 +117,7 @@ export function summarizeCall(name: string, args: unknown, computer?: Computer):
       )
       .join(" · ");
   } else if (name === "run_command") text = str(a.command);
+  else if (isDeviceTool(name)) text = describeDeviceCall(name, a);
   else if (name === "search") text = [str(a.pattern), str(a.glob)].filter(Boolean).join(" · ");
   else if (name === "list_dir") text = str(a.path) || ".";
   else text = str(a.path) || str(a.command) || str(a.pattern) || (Object.keys(a).length ? JSON.stringify(a) : "");

@@ -34,6 +34,8 @@ export function capabilitiesOf(
   if (cfg.cli === "codex" && o.codexExec) return { liveSession: false, followUp: "restart", softInterrupt: true };
   if (cfg.cli) return CLI[cfg.cli];
   if (cfg.kind === "cursor") return { liveSession: false, followUp: "restart", softInterrupt: true };
+  // ACP has no steer: a follow-up cancels the running prompt softly (`session/cancel`) and the live session takes the message next.
+  if (cfg.kind === "antigravity") return { liveSession: true, followUp: "restart", softInterrupt: true };
   // API providers: the app's own loop reads clarifications between steps.
   return { liveSession: false, followUp: "steer", softInterrupt: false };
 }

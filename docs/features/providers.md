@@ -21,7 +21,7 @@ Only fields that exist in the provider config are shown: there is no per-provide
 Three steps (`AddProviderDialog.tsx`, also used by onboarding):
 
 1. **Driver**: Claude, Codex / OpenAI, Cursor, Grok, OpenRouter, Ollama / LM Studio, Gemini, Custom (OpenAI-compatible). GitHub Copilot and OpenCode are greyed "Coming soon" placeholders.
-2. **Identity**: name and sign-in method. CLIs (Claude Code, Codex, Cursor Agent) use their own sign-in and connect directly when installed; Cursor also offers browser sign-in into an isolated profile (see [Cursor accounts](cursor-accounts.md)), a CLI account with an API key, or the SDK with an API key; the other drivers take an API key. "Configure manually" goes to step 3.
+2. **Identity**: name and sign-in method. CLIs (Claude Code, Codex, Cursor Agent) use their own sign-in and connect directly when installed; Cursor also offers browser sign-in into an isolated profile (see [Cursor accounts](cursor-accounts.md)), a CLI account with an API key, or the SDK with an API key; the other drivers take an API key. "Configure manually" goes to step 3. Antigravity (Google's ACP agent) is added without a key; its settings page does the sign-in (see [Antigravity](antigravity.md)).
 3. **Config**: base URL (Ollama / LM Studio can detect their default ports), then "Test connection" and "Save", which lists the models and selects the first one when no model is selected yet.
 
 **Grok** is an OpenAI-compatible preset (`kind: "xai"`, base URL `https://api.x.ai/v1`, key from [console.x.ai](https://console.x.ai)); requests go through the Tauri http plugin, whose scope already allows any https host, so no CSP or capability change was needed.

@@ -91,7 +91,17 @@ export type Msg = {
 
 /** `xai` (Grok) is an OpenAI-compatible preset served by the generic OpenAI-compatible adapter. */
 export type ProviderKind =
-  "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
+  | "openai"
+  | "gemini"
+  | "anthropic"
+  | "openrouter"
+  | "ollama"
+  | "lmstudio"
+  | "custom"
+  | "cursor"
+  | "cli"
+  | "xai"
+  | "antigravity";
 export type CliId = "claude" | "cursor-agent" | "codex";
 export type ProviderConfig = {
   id: string;
@@ -102,6 +112,8 @@ export type ProviderConfig = {
   cliAuth?: "key";
   /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string;
   /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string;
+  /** Antigravity (ACP agent) settings; the API key is in the Keychain like other providers' keys. */
+  antigravity?: import("./antigravitySupport").AntigravitySettings;
   disabled?: boolean;
 };
 /** How a model takes an effort level when its provider reports that per model (Cursor SDK parameters, OpenRouter `reasoning`): level -> provider value. */
@@ -149,6 +161,8 @@ export type TurnInput = {
   };
   /** Asks the user before a native CLI runs something outside its sandbox (Codex app-server `on-request`). Absent: nothing is asked and such steps are declined. */
   approve?: (req: { kind: "command"; command: string; reason?: string }) => Promise<boolean>;
+  /** Agent device access is on for this run: the environment and PATH folder that make the `gustaf-device` command work (CLI adapters only, see agent/deviceBridgeNative.ts). */
+  device?: { env: Record<string, string>; binDir: string };
   /** Messages the user sent while this turn runs (providers/lifecycle.ts). Absent: follow-ups wait for the next turn. */
   followUp?: import("./lifecycle").FollowUpChannel;
   /** API providers call this before waiting to retry a transient failure (429/5xx/network) that happened before any output. */
@@ -173,6 +187,8 @@ export interface Adapter {
   nativeGoal?(): Promise<boolean>;
   turn(input: TurnInput): Promise<TurnOutput>;
   supportsComputer: boolean;
+  /** The agent runs its own shell and can use `TurnInput.device` to call the `gustaf-device` command. */
+  supportsDeviceCommand?: boolean;
   supportsReasoning(model: string): boolean;
   /** Effort levels this model offers, weakest first (empty: no control). Absent: `REASONING_LEVELS` when `supportsReasoning`. */
   reasoningLevels?(model: string, listed?: readonly string[]): readonly Reasoning[];
