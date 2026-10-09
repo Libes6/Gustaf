@@ -4,6 +4,7 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
 const AGENT: &[u8] = b"#!/bin/sh\nread line\necho '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":1}}'\nsleep 30\n";
+#[cfg(unix)] // only the Unix probe tests run a shell-script agent
 const BAD_AGENT: &[u8] = b"#!/bin/sh\nread line\necho 'not json'\n";
 
 fn zip_of(entries: &[(&str, &[u8], u32)]) -> Vec<u8> {

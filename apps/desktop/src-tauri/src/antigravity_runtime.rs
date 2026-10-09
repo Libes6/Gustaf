@@ -686,6 +686,7 @@ pub fn entry_name_ok(name: &str) -> bool {
     safe_relative(name) && !name.contains('/') && !name.contains('\\')
 }
 
+#[cfg_attr(not(unix), allow(dead_code))] // only `mark_executables` (Unix) uses it outside the tests
 pub fn is_executable_name(name: &str) -> bool {
     name.starts_with("agy_acp_server") || name.starts_with("localharness_external")
 }
