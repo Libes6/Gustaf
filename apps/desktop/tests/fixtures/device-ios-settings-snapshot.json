@@ -1,0 +1,475 @@
+{
+ "nodes": [
+  {
+   "index": 0,
+   "type": "Other",
+   "role": "_TtC7SwiftUIP33_ACC2C5639A7D76F611E170E831FCA49118SwiftUIApplication",
+   "subrole": "UIApplication",
+   "label": "Настройки",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "width": 402,
+    "height": 874
+   },
+   "enabled": true,
+   "depth": 0,
+   "pid": 72135,
+   "hittable": false,
+   "ref": "e1",
+   "kind": "other"
+  },
+  {
+   "index": 1,
+   "parentIndex": 0,
+   "type": "NavigationBar",
+   "role": "SwiftUI.UIKitNavigationBar",
+   "subrole": "UINavigationBar",
+   "identifier": "Настройки",
+   "rect": {
+    "x": 0,
+    "y": 62,
+    "width": 402,
+    "height": 106
+   },
+   "enabled": true,
+   "depth": 1,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e2",
+   "kind": "navigation-bar"
+  },
+  {
+   "index": 2,
+   "parentIndex": 0,
+   "type": "CollectionView",
+   "role": "SwiftUI.UpdateCoalescingCollectionView",
+   "subrole": "UICollectionView",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "width": 402,
+    "height": 874
+   },
+   "enabled": true,
+   "depth": 1,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e3",
+   "kind": "collection"
+  },
+  {
+   "index": 3,
+   "parentIndex": 2,
+   "type": "Image",
+   "role": "UIImageView",
+   "identifier": "AdditionalDimmingOverlay",
+   "rect": {
+    "x": 0,
+    "y": 738,
+    "width": 402,
+    "height": 136
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": false,
+   "ref": "e4",
+   "kind": "image",
+   "interactionBlocked": "covered",
+   "presentationHints": [
+    "covered"
+   ]
+  },
+  {
+   "index": 4,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 168,
+    "width": 370,
+    "height": 126.33333333333331
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Аккаунт Apple",
+   "ref": "e5",
+   "kind": "cell"
+  },
+  {
+   "index": 5,
+   "parentIndex": 4,
+   "type": "Button",
+   "role": "SwiftUI.AccessibilityNode",
+   "subrole": "UIResponder",
+   "label": "Аккаунт Apple, Войдите, чтобы получить доступ к своим данным iCloud, настроить App Store, использовать сервисы Apple и многое другое.",
+   "identifier": "com.apple.settings.primaryAppleAccount",
+   "rect": {
+    "x": 16,
+    "y": 168,
+    "width": 370,
+    "height": 126.33333333333331
+   },
+   "enabled": true,
+   "depth": 3,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e6",
+   "kind": "button"
+  },
+  {
+   "index": 6,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 329.33333333333337,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Основные",
+   "identifier": "com.apple.settings.general",
+   "ref": "e7",
+   "kind": "cell"
+  },
+  {
+   "index": 7,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 381.33333333333337,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Универсальный доступ",
+   "identifier": "com.apple.settings.accessibility",
+   "ref": "e8",
+   "kind": "cell"
+  },
+  {
+   "index": 8,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 433.3333333333333,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Камера",
+   "identifier": "com.apple.settings.camera",
+   "ref": "e9",
+   "kind": "cell"
+  },
+  {
+   "index": 9,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 485.3333333333333,
+    "width": 370,
+    "height": 51.99999999999994
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Кнопка действия",
+   "identifier": "com.apple.settings.actionButton",
+   "ref": "e10",
+   "kind": "cell"
+  },
+  {
+   "index": 10,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 537.3333333333333,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Ожидание",
+   "identifier": "com.apple.settings.standBy",
+   "ref": "e11",
+   "kind": "cell"
+  },
+  {
+   "index": 11,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 589.3333333333333,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Поиск",
+   "identifier": "com.apple.settings.search",
+   "ref": "e12",
+   "kind": "cell"
+  },
+  {
+   "index": 12,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 641.3333333333333,
+    "width": 370,
+    "height": 72.33333333333337
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Экран «Домой» и библиотека приложений",
+   "identifier": "com.apple.settings.homeScreen",
+   "ref": "e13",
+   "kind": "cell"
+  },
+  {
+   "index": 13,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 713.6666666666666,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "label": "Apple Intelligence и Siri",
+   "identifier": "com.apple.settings.siri",
+   "ref": "e14",
+   "kind": "cell"
+  },
+  {
+   "index": 14,
+   "parentIndex": 2,
+   "type": "Cell",
+   "role": "SwiftUI.ListCollectionViewCell",
+   "subrole": "UICollectionViewListCell",
+   "rect": {
+    "x": 16,
+    "y": 800.6666666666666,
+    "width": 370,
+    "height": 52
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": false,
+   "label": "Экранное время",
+   "identifier": "com.apple.settings.screenTime",
+   "ref": "e15",
+   "kind": "cell",
+   "interactionBlocked": "covered",
+   "presentationHints": [
+    "covered"
+   ]
+  },
+  {
+   "index": 15,
+   "parentIndex": 2,
+   "type": "Other",
+   "role": "_UIScrollViewScrollIndicator",
+   "label": "Вертикальная полоса прокрутки, 2 страницы",
+   "value": "0 %",
+   "rect": {
+    "x": 369,
+    "y": 116,
+    "width": 30,
+    "height": 672
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e16",
+   "kind": "other"
+  },
+  {
+   "index": 16,
+   "parentIndex": 2,
+   "type": "Other",
+   "role": "_UIScrollViewScrollIndicator",
+   "label": "Вертикальная полоса прокрутки, 2 страницы",
+   "value": "0 %",
+   "rect": {
+    "x": 369,
+    "y": 116,
+    "width": 30,
+    "height": 672
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e17",
+   "kind": "other"
+  },
+  {
+   "index": 17,
+   "parentIndex": 0,
+   "type": "Toolbar",
+   "role": "SwiftUI._UIInheritedView",
+   "subrole": "UIView",
+   "label": "Панель инструментов",
+   "identifier": "Toolbar",
+   "rect": {
+    "x": 0,
+    "y": 788,
+    "width": 402,
+    "height": 86
+   },
+   "enabled": true,
+   "depth": 1,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e18",
+   "kind": "toolbar"
+  },
+  {
+   "index": 18,
+   "parentIndex": 17,
+   "type": "SearchField",
+   "role": "UISearchBarTextField",
+   "label": "Поиск",
+   "value": "Поиск",
+   "placeholder": "Поиск",
+   "rect": {
+    "x": 32.99999999999994,
+    "y": 803,
+    "width": 336,
+    "height": 38
+   },
+   "enabled": true,
+   "depth": 2,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e19",
+   "kind": "search"
+  },
+  {
+   "index": 19,
+   "parentIndex": 18,
+   "type": "Button",
+   "role": "UIDictationSearchButton",
+   "label": "Диктовать",
+   "identifier": "Dictate",
+   "rect": {
+    "x": 335.6666666666667,
+    "y": 811,
+    "width": 17.333333333333314,
+    "height": 22
+   },
+   "enabled": true,
+   "depth": 3,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e20",
+   "kind": "button"
+  },
+  {
+   "index": 20,
+   "parentIndex": 18,
+   "type": "Image",
+   "role": "UIImageView",
+   "label": "Поиск",
+   "identifier": "magnifyingglass",
+   "rect": {
+    "x": 45.99999999999994,
+    "y": 812.3333333333334,
+    "width": 20.33333333333333,
+    "height": 18.66666666666663
+   },
+   "enabled": true,
+   "depth": 3,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e21",
+   "kind": "image"
+  },
+  {
+   "index": 21,
+   "parentIndex": 18,
+   "type": "Button",
+   "role": "UIDictationSearchButton",
+   "label": "Диктовать",
+   "identifier": "Dictate",
+   "rect": {
+    "x": 335.6666666666667,
+    "y": 811,
+    "width": 17.333333333333314,
+    "height": 22
+   },
+   "enabled": true,
+   "depth": 3,
+   "pid": 72135,
+   "hittable": true,
+   "ref": "e22",
+   "kind": "button"
+  }
+ ],
+ "truncated": false,
+ "appName": "Settings",
+ "appBundleId": "com.apple.Preferences",
+ "visibility": {
+  "partial": false,
+  "visibleNodeCount": 22,
+  "totalNodeCount": 22,
+  "reasons": []
+ },
+ "viewport": {
+  "width": 402,
+  "height": 874
+ },
+ "refsGeneration": 404398
+}

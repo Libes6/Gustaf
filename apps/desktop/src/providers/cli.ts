@@ -59,9 +59,18 @@ async function claudeExecutable() {
 /** A running `codex app-server`: JSON lines in both directions over stdio (see codexAppServer.ts). */
 async function openAppServer(
   executable: string,
-  o: { cwd?: string; env?: Record<string, string>; onRaw?: (line: string) => void },
+  o: {
+    cwd?: string;
+    env?: Record<string, string>;
+    onRaw?: (line: string) => void;
+    device?: TurnInput["device"];
+  },
 ): Promise<Connection> {
-  const proc = await openJsonProcess(runScript({ executable, args: ["app-server"] }), o);
+  const { device, ...rest } = o;
+  const proc = await openJsonProcess(
+    runScript({ executable, args: ["app-server"], ...(device ? { env: device.env, prependPath: device.binDir } : {}) }),
+    rest,
+  );
   return {
     write: proc.write,
     onMessage: proc.onMessage,
@@ -104,6 +113,8 @@ type Spec = {
     images?: string[];
     attachDir?: string;
     reasoning?: Reasoning;
+    /** Agent device access is on (`gustaf-device` may run unprompted). */
+    deviceCommand?: boolean;
   }): string[];
   /** Effort levels the CLI can pass for this model (providers/reasoning.ts); `listed`: ids of the provider's model list. */
   levels(model: string, listed?: readonly string[]): readonly Reasoning[];
@@ -187,6 +198,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
   let listed: string[] | undefined;
   return {
     supportsComputer: false,
+    supportsDeviceCommand: true,
     supportsReasoning: (model) => spec.levels(model, listed).length > 0,
     reasoningLevels: (model, ids) => {
       if (ids) listed = [...ids];
@@ -250,6 +262,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           images: saved?.files,
           attachDir: saved?.dir,
           reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)),
+          deviceCommand: !!t.device,
         });
         const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
         let text = "";
@@ -294,7 +307,7 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           };
           try {
             const r = await codexLiveTurn({
-              open: () => openAppServer(executable, { cwd: t.cwd, onRaw: log.raw }),
+              open: () => openAppServer(executable, { cwd: t.cwd, onRaw: log.raw, device: t.device }),
               executable,
               providerId: cfg.id,
               chatId: t.chatId,
@@ -364,7 +377,14 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           if (perTurn)
             res = await spawnLines(
               // Prompt goes last as one quoted argument; all three CLIs take it positionally (on Windows `.cmd` shims it is piped on stdin instead).
-              runScript({ executable, args, prompt, prependExecutableDir: id === "claude", nullStdin: true }),
+              runScript({
+                executable,
+                args,
+                prompt,
+                prependExecutableDir: id === "claude",
+                nullStdin: true,
+                ...(t.device ? { env: t.device.env, prependPath: t.device.binDir } : {}),
+              }),
               (e) => {
                 if (e.type === "result" || e.type === "turn.completed")
                   usage = tokenUsage(e.usage, id === "claude") ?? usage;
