@@ -19,5 +19,5 @@
     "version:check": "node scripts/version.mjs --check",
     "test:release": "node --test scripts/tests/*.test.mjs"
   },
-  "version": "0.5.0"
+  "version": "0.6.0"
 }
