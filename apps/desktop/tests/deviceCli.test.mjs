@@ -1,10 +1,7 @@
 // The `gustaf-device` command for CLI agents: argv parsing (src/agent/deviceCli.ts) and the real launcher script
-// (src-tauri/src/device_bridge/gustaf-device.sh) against a local HTTP server.
+// (src-tauri/src/device_bridge/bridge-launcher.sh) against a local HTTP server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync, spawn } from 'node:child_process';
-import { createServer } from 'node:http';
-import { fileURLToPath } from 'node:url';
 import { register } from 'node:module';
 
 register('./helpers/hooks.mjs', import.meta.url);
@@ -127,45 +124,14 @@ test('the prompt paragraph names the command and the verify-and-resnapshot rules
 
 // ---- the launcher script ----
 
-const script = fileURLToPath(new URL('../src-tauri/src/device_bridge/gustaf-device.sh', import.meta.url));
-const hasSh = process.platform !== 'win32' && spawnSync('sh', ['-c', 'command -v curl']).status === 0;
-
-/** A server that records requests and answers with `reply`. */
-async function server(reply) {
-  const seen = [];
-  const srv = createServer((req, res) => {
-    let body = '';
-    req.on('data', (d) => (body += d));
-    req.on('end', () => {
-      seen.push({
-        method: req.method,
-        url: req.url,
-        auth: req.headers.authorization,
-        args: new URLSearchParams(body).getAll('a'),
-      });
-      const r = reply(seen.at(-1));
-      res.writeHead(r.status, { 'content-type': 'text/plain; charset=utf-8' });
-      res.end(r.text);
-    });
-  });
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  return { seen, url: `http://127.0.0.1:${srv.address().port}/v1/device`, close: () => srv.close() };
-}
-const runShim = (env, ...args) =>
-  new Promise((resolve) => {
-    const p = spawn('sh', [script, ...args], { env: { PATH: process.env.PATH, ...env } });
-    let stdout = '';
-    let stderr = '';
-    p.stdout.on('data', (d) => (stdout += d));
-    p.stderr.on('data', (d) => (stderr += d));
-    p.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
+const { hasSh, server, runLauncher } = await import('./helpers/launcher.mjs');
+const runShim = (env, ...args) => runLauncher('gustaf-device', env, args);
 
 test('the launcher sends the arguments in order and prints the answer', { skip: !hasSh }, async () => {
   const s = await server(() => ({ status: 200, text: 'Tapped @e7 (201, 355)\nNo visible change on screen.' }));
   try {
     const r = await runShim(
-      { GUSTAF_DEVICE_URL: s.url, GUSTAF_DEVICE_TOKEN: 'tok' },
+      { GUSTAF_BRIDGE_URL: s.url, GUSTAF_BRIDGE_TOKEN: 'tok' },
       'fill',
       '@e19',
       'héllo & 100% $HOME \'q\' "d"\nline2',
@@ -189,7 +155,7 @@ test('the launcher sends the arguments in order and prints the answer', { skip: 
 test('the launcher exits non-zero and prints errors to stderr', { skip: !hasSh }, async () => {
   const s = await server(() => ({ status: 422, text: 'That element ref is no longer valid.' }));
   try {
-    const r = await runShim({ GUSTAF_DEVICE_URL: s.url, GUSTAF_DEVICE_TOKEN: 'tok' }, 'tap', '@e9');
+    const r = await runShim({ GUSTAF_BRIDGE_URL: s.url, GUSTAF_BRIDGE_TOKEN: 'tok' }, 'tap', '@e9');
     assert.equal(r.code, 1);
     assert.equal(r.stdout, '');
     assert.equal(r.stderr, 'That element ref is no longer valid.\n');
@@ -208,7 +174,7 @@ test(
     const s = await server(() => ({ status: 200, text: '' }));
     const url = s.url;
     s.close();
-    const down = await runShim({ GUSTAF_DEVICE_URL: url, GUSTAF_DEVICE_TOKEN: 'tok' }, 'list');
+    const down = await runShim({ GUSTAF_BRIDGE_URL: url, GUSTAF_BRIDGE_TOKEN: 'tok' }, 'list');
     assert.equal(down.code, 3);
     assert.match(down.stderr, /cannot reach Gustaf/);
   },
@@ -221,13 +187,13 @@ test('the launcher folder goes first on PATH and the bridge variables are set fo
   const s = invocationScript('posix', {
     executable: '/usr/local/bin/claude',
     args: ['-p'],
-    env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:5/v1/device', GUSTAF_DEVICE_TOKEN: 't' },
+    env: { GUSTAF_BRIDGE_URL: 'http://127.0.0.1:5/v1', GUSTAF_BRIDGE_TOKEN: 't' },
     prependPath: "/data/it's/bin",
     nullStdin: true,
   });
   assert.equal(
     s,
-    `export PATH='/data/it'\\''s/bin':"$PATH"; exec env GUSTAF_DEVICE_URL='http://127.0.0.1:5/v1/device' GUSTAF_DEVICE_TOKEN='t' '/usr/local/bin/claude' '-p' < /dev/null`,
+    `export PATH='/data/it'\\''s/bin':"$PATH"; exec env GUSTAF_BRIDGE_URL='http://127.0.0.1:5/v1' GUSTAF_BRIDGE_TOKEN='t' '/usr/local/bin/claude' '-p' < /dev/null`,
   );
   assert.equal(invocationScript('posix', { executable: '/x/codex', args: ['exec'] }), "exec '/x/codex' 'exec'");
 });
@@ -239,6 +205,14 @@ test('Claude Code may run gustaf-device without a prompt, but not in read-only m
   assert.equal(claudeArgs({ access: 'auto' }).includes(flag), false);
   assert.equal(claudeArgs({ access: 'readonly', deviceCommand: true }).includes(flag), false);
   assert.equal(claudeArgs({ access: 'auto', mode: 'plan', deviceCommand: true }).includes(flag), false);
+  // Both commands share one flag; the device-only value is unchanged.
+  const both = claudeArgs({ access: 'auto', deviceCommand: true, agentCommand: true });
+  assert.ok(both.includes('--allowedTools=Bash(gustaf-device:*),Bash(gustaf-agent:*)'));
+  assert.ok(claudeArgs({ access: 'auto', agentCommand: true }).includes('--allowedTools=Bash(gustaf-agent:*)'));
+  assert.equal(
+    claudeArgs({ access: 'auto' }).some((a) => a.startsWith('--allowedTools')),
+    false,
+  );
 });
 
 test('a device setting saved after the first load is seen by the next load', async () => {
