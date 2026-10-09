@@ -15,7 +15,7 @@ const findModel = (c: Catalog, ref: ModelRef) =>
 const findProvider = (c: Catalog, ref: ModelRef) => c.providers.find((p) => p.id === ref.providerId && !p.disabled);
 
 /** CLI agents run their own tools (and approvals) in the folder, so they cannot host a subagent loop. */
-export const runsOwnTools = (p: ProviderConfig) => p.kind === "cli" || p.kind === "cursor";
+export const runsOwnTools = (p: ProviderConfig) => p.kind === "cli" || p.kind === "cursor" || p.kind === "antigravity";
 
 /** A listed model of an enabled provider. */
 export const isUsable = (c: Catalog, ref: ModelRef) => !!findProvider(c, ref) && !!findModel(c, ref);

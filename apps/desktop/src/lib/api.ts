@@ -126,6 +126,13 @@ export const cursorProfiles = {
   status: (name: string) => invoke<CursorIdentity>("cursor_profile_status", { name }),
 };
 
+/** Private profile folders of Antigravity providers (src-tauri/src/antigravity_profile.rs); no credential passes through here. */
+export const antigravityProfiles = {
+  prepare: (name: string, settings: string) =>
+    invoke<{ geminiHome: string; tempDir: string }>("antigravity_profile_prepare", { name, settings }),
+  remove: (name: string) => invoke<void>("antigravity_profile_remove", { name }),
+};
+
 /** Summary of a session (Claude Code, Codex) or conversation (ChatGPT) found by the history scanners in `import_sources.rs`. */
 export type SourceSession = {
   id: string;

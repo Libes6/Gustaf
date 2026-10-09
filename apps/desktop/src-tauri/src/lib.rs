@@ -1,3 +1,4 @@
+mod antigravity_profile;
 mod attachments;
 mod codex_agents;
 mod computer;
@@ -111,6 +112,8 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,
+            antigravity_profile::antigravity_profile_prepare,
+            antigravity_profile::antigravity_profile_remove,
             cursor_accounts::cursor_profile_create,
             cursor_accounts::cursor_profile_dir,
             cursor_accounts::cursor_profile_remove,

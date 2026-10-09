@@ -91,7 +91,17 @@ export type Msg = {
 
 /** `xai` (Grok) is an OpenAI-compatible preset served by the generic OpenAI-compatible adapter. */
 export type ProviderKind =
-  "openai" | "gemini" | "anthropic" | "openrouter" | "ollama" | "lmstudio" | "custom" | "cursor" | "cli" | "xai";
+  | "openai"
+  | "gemini"
+  | "anthropic"
+  | "openrouter"
+  | "ollama"
+  | "lmstudio"
+  | "custom"
+  | "cursor"
+  | "cli"
+  | "xai"
+  | "antigravity";
 export type CliId = "claude" | "cursor-agent" | "codex";
 export type ProviderConfig = {
   id: string;
@@ -102,6 +112,8 @@ export type ProviderConfig = {
   cliAuth?: "key";
   /** Isolated cursor-agent profile (folder name under the app data dir) of a browser-login Cursor account. */ cliProfile?: string;
   /** Legacy single backup, migrated into the Cursor account pool (providers/cursorAccounts.ts). */ backupProviderId?: string;
+  /** Antigravity (ACP agent) settings; the API key is in the Keychain like other providers' keys. */
+  antigravity?: import("./antigravitySupport").AntigravitySettings;
   disabled?: boolean;
 };
 /** How a model takes an effort level when its provider reports that per model (Cursor SDK parameters, OpenRouter `reasoning`): level -> provider value. */
