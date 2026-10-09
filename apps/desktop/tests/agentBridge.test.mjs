@@ -102,6 +102,7 @@ test('the usage and the prompt name the commands and the loop', () => {
     assert.match(cli.AGENT_CLI_USAGE, new RegExp(`\\n  ${w} `));
   assert.match(cli.AGENT_CLI_PROMPT, /instead of your native Task or subagent tool/);
   assert.match(cli.AGENT_CLI_PROMPT, /do not end your turn/);
+  assert.match(cli.AGENT_CLI_PROMPT, /first and use the ids it prints \(never guess/);
   assert.match(cli.AGENT_CLI_PROMPT, /untrusted data/);
 });
 
@@ -527,6 +528,7 @@ test('providers that are not allowed or cannot run are refused with the reason, 
   const s = setup();
   const notAllowed = await s.call('spawn', '--provider', 'gem', 'x');
   assert.equal(notAllowed.ok, false);
+  assert.match(notAllowed.text, /Run `gustaf-agent list` to see the providers and models you may request\./);
   assert.match(notAllowed.text, /not allowed for subagents \(Settings > Usage > Agents > Allowed providers\)/);
   const unusable = await s.call('spawn', '--provider', 'ag', 'x');
   assert.equal(unusable.ok, false);

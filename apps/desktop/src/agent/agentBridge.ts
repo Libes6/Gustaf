@@ -228,7 +228,7 @@ export function createAgentBridge(deps: AgentBridgeDeps = {}) {
         const started = await launch(chatId, turn, "task", String(args.title), (p, hooks) =>
           turn.host.spawn(args, p, hooks),
         );
-        if ("error" in started) return fail(started.error);
+        if ("error" in started) return fail(withListHint(started.error));
         const job = started.job;
         const head = `Started task ${job.id} "${clip(job.title, 60)}" on ${where(job.runIds[0]) || "the chosen provider"}; it shows in the Agents panel.`;
         if (call.background) return ok(`${head}\nCall \`${AGENT_CLI_NAME} wait ${job.id}\` to wait for the report.`);
@@ -259,7 +259,7 @@ export function createAgentBridge(deps: AgentBridgeDeps = {}) {
         const started = await launch(chatId, turn, "plan", `plan of ${count} tasks`, (p, hooks) =>
           turn.host.delegate(plan, p, hooks),
         );
-        if ("error" in started) return fail(started.error);
+        if ("error" in started) return fail(withListHint(started.error));
         const job = started.job;
         return ok(
           `Started plan ${job.id} with ${count} tasks; the runs show in the Agents panel.\n\n${await waitText([job], DEFAULT_WAIT_S * 1000, turn.signal)}`,
@@ -346,6 +346,10 @@ export function createAgentBridge(deps: AgentBridgeDeps = {}) {
     },
   };
 }
+
+/** A refused start tells the agent where the valid ids are. */
+const withListHint = (error: string) =>
+  `${error}\nRun \`${AGENT_CLI_NAME} list\` to see the providers and models you may request.`;
 
 const summarize = (c: AgentCall): string =>
   c.op === "spawn"
