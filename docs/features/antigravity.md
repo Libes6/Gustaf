@@ -90,6 +90,31 @@ real-path check in the Rust file tools), but the adapter does **not** enable the
 line-numbered text, not raw content, and the agent works fine with its own file tools. Adapted from T3 Code (MIT,
 github.com/pingdotgg/t3code); attribution headers are in the files.
 
+## Protocol generations (ACP v1 and v2)
+
+Agents in the wild mix two generations of the protocol (Antigravity reports `protocolVersion: 2` with the v1 answer shape,
+as T3 Code notes). The client sends one `initialize` carrying both generations' fields (`protocolVersion: 2`, `info`,
+`capabilities` and `clientCapabilities`, `clientInfo`) and decides the generation from the **shape** of the answer: `info`
+present means v2, `agentInfo` means v1, whatever the number says. Differences, v1 to v2, all normalised inside
+`providers/acp/` so the session code does not care:
+
+| Area | v1 | v2 draft |
+| --- | --- | --- |
+| initialize answer | `agentInfo`, `agentCapabilities`, `authMethods[].id` | `info`, `capabilities.session`, `authMethods[].methodId` |
+| sign in / out | `authenticate`, `logout` | `auth/login`, `auth/logout` |
+| continue a session | `session/load` (replays history) or `session/resume` | only `session/resume` (`replayFrom: {type: "start"}` to replay) |
+| config options | `id` | `configId`; `session/set_config_option` needs `type: "id"` |
+| prompt | the response carries `stopReason` and `usage` | the response only acknowledges; the end is a `state_update` idle notification with `stopReason` and `usage` |
+| tool calls | `tool_call` then `tool_call_update` | `tool_call_update` (with `name`) plus `tool_call_content_chunk` |
+| plan | `plan` with `entries` | `plan_update` with `plan: {type: "items", entries}` |
+| messages | chunks | chunks and a final whole `agent_message` (shown only if no chunk of it was) |
+| permission request | `toolCall` | `title`, `description`, `subject` (`tool_call` or `command`) |
+| model / mode | `session/set_model`, `session/set_mode` | removed (method not found) |
+
+Cancel is the same `session/cancel` notification in both. Both generations are exercised **only against synthetic
+fixtures** modelled on T3 Code's effect-acp schemas (`tests/helpers/fakeAcp.mjs`, `tests/acpClient.test.mjs`), including a
+v2-numbered but v1-shaped initialize answer; no real agent was run.
+
 ## Limits
 
 - No managed install or update; manual install only.
