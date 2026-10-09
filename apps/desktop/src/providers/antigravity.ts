@@ -15,6 +15,7 @@ import {
 } from "./antigravitySession";
 import {
   authUrlFromLine,
+  effectiveBinary,
   launchEnv,
   launchScript,
   lineSplitter,
@@ -24,7 +25,9 @@ import {
   validBinary,
   type AntigravitySettings,
 } from "./antigravitySupport";
+import { managedExecutable } from "./antigravityRuntime";
 import { openJsonProcess } from "./processHost";
+import { liveSessions } from "./sessionManager";
 import { shellFor } from "./shell";
 import type { Adapter, ProviderConfig, Reasoning } from "./types";
 
@@ -94,7 +97,9 @@ async function prepared(cfg: ProviderConfig, key: KeySource) {
     apiKey,
     platform,
   });
-  const script = launchScript(shellFor(platform).kind, settings.binary);
+  // An explicit Binary path wins; otherwise the managed runtime (Settings, Install); otherwise PATH.
+  const binary = effectiveBinary(settings.binary, settings.binary ? undefined : await managedExecutable());
+  const script = launchScript(shellFor(platform).kind, binary);
   const deps: AgentDeps = {
     method: settings.method,
     secrets: () => (apiKey ? [apiKey] : []),
@@ -109,7 +114,7 @@ async function prepared(cfg: ProviderConfig, key: KeySource) {
       return proc;
     },
   };
-  return { deps, settings, profile, apiKey };
+  return { deps, settings, profile, apiKey, binary };
 }
 
 const fallbackCwd = (profile: { tempDir: string }) => profile.tempDir || PROBE_CWD_FALLBACK;
@@ -158,6 +163,11 @@ export async function signOutAntigravity(cfg: ProviderConfig, key: KeySource): P
   await recordAuth(cfg.id, "signedOut");
 }
 
+/** True while a chat holds a live agent session of one of these providers (the managed runtime cannot be removed then). */
+export function antigravitySessionsInUse(providerIds: string[]): boolean {
+  return liveSessions.keys().some((k) => providerIds.some((id) => k.includes(`|${id}|`)));
+}
+
 export function antigravityAdapter(cfg: ProviderConfig, key: KeySource): Adapter {
   const noteFailure = async (e: unknown, method: string) => {
     if (e instanceof AntigravityError && e.code === "signin-required") await recordAuth(cfg.id, "signedOut", method);
@@ -183,7 +193,7 @@ export function antigravityAdapter(cfg: ProviderConfig, key: KeySource): Adapter
     async turn(t) {
       const p = await prepared(cfg, key);
       const signature = JSON.stringify({
-        binary: p.settings.binary ?? "",
+        binary: p.binary ?? "",
         method: p.settings.method,
         project: p.settings.project ?? "",
         location: p.settings.location ?? "",

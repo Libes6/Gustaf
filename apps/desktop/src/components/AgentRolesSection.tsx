@@ -121,6 +121,19 @@ export function AgentRolesSection() {
         </div>
         <div className="card-row">
           <div className="grow">
+            <div className="t">{t("agentCliSubagents")}</div>
+            <div className="d">{t("agentCliSubagentsDesc")}</div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={s.cliSubagents}
+            aria-label={t("agentCliSubagents")}
+            className={`toggle${s.cliSubagents ? " on" : ""}`}
+            onClick={() => saveAgentSettings({ ...s, cliSubagents: !s.cliSubagents })}
+          />
+        </div>
+        <div className="card-row">
+          <div className="grow">
             <div className="t">{t("agentCleanupWorktrees")}</div>
             <div className="d">{t("agentCleanupWorktreesDesc")}</div>
           </div>

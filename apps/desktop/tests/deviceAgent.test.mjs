@@ -304,7 +304,7 @@ async function runCli(o = {}) {
       (async (chatId, turn) => {
         started.push({ chatId, askFirst: turn.askFirst });
         return {
-          env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:1/v1/device', GUSTAF_DEVICE_TOKEN: 'tok' },
+          env: { GUSTAF_BRIDGE_URL: 'http://127.0.0.1:1/v1', GUSTAF_BRIDGE_TOKEN: 'tok' },
           binDir: '/bin/dir',
           end: () => ended.push(chatId),
         };
@@ -323,8 +323,9 @@ test('CLI agents get the environment, the PATH folder and the prompt paragraph o
   await enable();
   const on = await runCli();
   assert.deepEqual(on.seen[0].device, {
-    env: { GUSTAF_DEVICE_URL: 'http://127.0.0.1:1/v1/device', GUSTAF_DEVICE_TOKEN: 'tok' },
+    env: { GUSTAF_BRIDGE_URL: 'http://127.0.0.1:1/v1', GUSTAF_BRIDGE_TOKEN: 'tok' },
     binDir: '/bin/dir',
+    commands: ['device'],
   });
   assert.match(on.seen[0].system, /gustaf-device list/);
   assert.equal(hasDevice(on.seen[0].tools.map((t) => t.name)), false);

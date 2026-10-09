@@ -36,6 +36,8 @@ export type AgentSettings = {
   allowedProviders: string[];
   /** Remove the worktree and branch of a CLI subagent when it ends without any change (committed or not). Off by default: worktrees are always kept. */
   cleanupUntouchedWorktrees: boolean;
+  /** CLI main agents (Claude Code, Codex, Cursor Agent) may start subagents through the `gustaf-agent` command (what they may request is limited by `allowedProviders` like for API agents). */
+  cliSubagents: boolean;
 };
 
 export const MAX_ALLOWED_PROVIDERS = 20;
@@ -50,6 +52,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   roles: {},
   allowedProviders: [],
   cleanupUntouchedWorktrees: false,
+  cliSubagents: true,
 };
 
 export const refKey = (r: ModelRef) => `${r.providerId}/${r.model}`;
@@ -116,6 +119,7 @@ export function normalizeAgentSettings(raw: unknown): AgentSettings {
     roles,
     allowedProviders,
     cleanupUntouchedWorktrees: r.cleanupUntouchedWorktrees === true,
+    cliSubagents: r.cliSubagents !== false,
   };
 }
 
@@ -168,7 +172,15 @@ export const cheapModelFor = (s: AgentSettings, fallback: ModelRef, usable: (r: 
 // ---- providers and roles ----
 
 /** A provider a task may be routed to, as the host's provider directory lists it (enabled providers only). */
-export type ProviderLite = { id: string; name: string; /** A CLI agent that runs its own tools. */ cli?: boolean };
+export type ProviderLite = {
+  id: string;
+  name: string;
+  /** A CLI agent that runs its own tools. */ cli?: boolean;
+  /** Models a task may name (API providers: those with tool support). Absent: not known. */
+  models?: { id: string; name: string }[];
+  /** Why no task can run on it (for example Antigravity cannot run non-interactively). Absent: usable. */
+  unusable?: string;
+};
 
 /** Provider ids a task may name: the chat's own, those of the type defaults and of the allowed models, and the allow-list. Roles are NOT included: a role's provider has to be allowed on its own. */
 export function allowedProviderIds(s: AgentSettings, parentProviderId: string): string[] {

@@ -6,7 +6,15 @@ import { openJsonProcess, type JsonLine, type JsonProcess } from "./processHost"
 import { pickLevel } from "./reasoning";
 import { liveSessions, sessionKey, type Lease, type ManagedSession } from "./sessionManager";
 import { invocationScript, shellFor } from "./shell";
-import { textOf, type Msg, type Reasoning, type TokenUsage, type TurnInput, type TurnOutput } from "./types";
+import {
+  deviceCommandOn,
+  textOf,
+  type Msg,
+  type Reasoning,
+  type TokenUsage,
+  type TurnInput,
+  type TurnOutput,
+} from "./types";
 import { claudeLimit, tokenUsage } from "./usage";
 import { currentPlatform } from "../lib/platform";
 import { createRawLogger, rawLogEnabled, type RawLogger } from "../lib/rawCliLog";
@@ -208,7 +216,8 @@ export async function runClaudeLiveTurn(t: TurnInput, ctx: LiveContext, deps: Li
       mode: t.mode,
       addDir: attachDirs.get(chatId),
       reasoning: pickLevel(t.reasoning, ctx.levels(t.model)),
-      deviceCommand: !!t.device,
+      deviceCommand: deviceCommandOn(t.device),
+      agentCommand: !!t.device?.commands?.includes("agent"),
     } as const;
     // The process is started with the device environment (or without): switching access on or off starts a new one.
     const signature = JSON.stringify({ executable, cwd: t.cwd ?? "", args: claudeLiveArgs(flags) });

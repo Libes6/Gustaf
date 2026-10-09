@@ -19,7 +19,14 @@ import { capabilitiesOf, interrupted } from "./lifecycle";
 import { restartableTurn } from "./turnRestart";
 import { currentPlatform } from "../lib/platform";
 import { detectScript, findCliScript, invocationScript, shellFor, type CliName, type Invocation } from "./shell";
-import type { Adapter, CliId, ProviderConfig, Reasoning, TurnInput } from "./types";
+import {
+  deviceCommandOn,
+  type Adapter,
+  type CliId,
+  type ProviderConfig,
+  type Reasoning,
+  type TurnInput,
+} from "./types";
 
 export { shq } from "./shell";
 
@@ -115,6 +122,8 @@ type Spec = {
     reasoning?: Reasoning;
     /** Agent device access is on (`gustaf-device` may run unprompted). */
     deviceCommand?: boolean;
+    /** Subagents from CLI agents are on (`gustaf-agent` may run unprompted). */
+    agentCommand?: boolean;
   }): string[];
   /** Effort levels the CLI can pass for this model (providers/reasoning.ts); `listed`: ids of the provider's model list. */
   levels(model: string, listed?: readonly string[]): readonly Reasoning[];
@@ -262,7 +271,8 @@ export function cliAdapter(cfg: ProviderConfig, key: KeySource = ""): Adapter {
           images: saved?.files,
           attachDir: saved?.dir,
           reasoning: pickLevel(t.reasoning, spec.levels(t.model, listed)),
-          deviceCommand: !!t.device,
+          deviceCommand: deviceCommandOn(t.device),
+          agentCommand: !!t.device?.commands?.includes("agent"),
         });
         const prompt = saved && !spec.imageFlag ? withImagePaths(point.prompt, saved.files) : point.prompt;
         let text = "";

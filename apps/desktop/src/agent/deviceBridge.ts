@@ -6,9 +6,9 @@ import { cliErrorText, parseDeviceArgv } from "./deviceCli";
 import { DEVICE_TOOL_NAMES, describeDeviceCall } from "./deviceCore";
 import { DeviceDeclined, runDeviceTool, type DeviceToolContext } from "./deviceTools";
 import type { DeviceSettings } from "./deviceSettings";
+import { createTokenRegistry, type BridgeReply, type BridgeRequest, type TokenRegistry } from "./bridgeTokens";
 
-export type BridgeRequest = { id: number; token: string; argv: string[] };
-export type BridgeReply = { ok: boolean; text: string; image?: string };
+export type { BridgeReply, BridgeRequest };
 
 /** What the running agent turn of a chat provides: its Stop signal and its approval card. */
 export type BridgeTurn = { signal: AbortSignal; approve: DeviceToolContext["approve"]; askFirst: boolean };
@@ -16,7 +16,8 @@ export type BridgeTurn = { signal: AbortSignal; approve: DeviceToolContext["appr
 export type BridgeDeps = {
   settings: () => Promise<DeviceSettings>;
   run?: typeof runDeviceTool;
-  newToken?: () => string;
+  /** Shared with the other bridge commands; default: this bridge's own. */
+  tokens?: TokenRegistry;
   /** Records the call in the action log; returns the function that closes the entry. */
   audit?: (
     tool: string,
@@ -31,23 +32,13 @@ export const cliWording = (text: string) =>
   text.replace(TOOL_NAME, (name) => `gustaf-device ${name.slice("device_".length).replace(/_/g, "-")}`);
 
 export function createDeviceBridge(deps: BridgeDeps) {
-  const tokenByChat = new Map<number, string>();
-  const chatByToken = new Map<string, number>();
+  const tokens = deps.tokens ?? createTokenRegistry();
   const turns = new Map<number, BridgeTurn>();
   const run = deps.run ?? runDeviceTool;
-  const newToken = deps.newToken ?? (() => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, ""));
 
   return {
     /** The chat's token (stable for the app session: a live CLI process keeps the one it was started with). */
-    tokenFor(chatId: number): string {
-      let t = tokenByChat.get(chatId);
-      if (!t) {
-        t = newToken();
-        tokenByChat.set(chatId, t);
-        chatByToken.set(t, chatId);
-      }
-      return t;
-    },
+    tokenFor: (chatId: number): string => tokens.tokenFor(chatId),
     /** The chat's agent run starts (or continues): requests with its token are served until the returned function runs. */
     beginTurn(chatId: number, turn: BridgeTurn): () => void {
       turns.set(chatId, turn);
@@ -57,7 +48,7 @@ export function createDeviceBridge(deps: BridgeDeps) {
     },
     async handle(req: BridgeRequest): Promise<BridgeReply> {
       const fail = (text: string): BridgeReply => ({ ok: false, text });
-      const chatId = chatByToken.get(req.token);
+      const chatId = tokens.chatFor(req.token);
       if (chatId === undefined) return fail("gustaf-device: unknown session. Start a new message in Gustaf.");
       if (!(await deps.settings()).access)
         return fail(

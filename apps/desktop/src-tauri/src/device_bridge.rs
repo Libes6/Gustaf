@@ -1,14 +1,18 @@
-//! Local bridge for agent CLIs (Claude Code, Codex, Cursor) that drive a simulator or emulator through the
-//! `gustaf-device` command. Design and threat model: docs/features/devices.md, "Agents".
+//! Local bridge for agent CLIs (Claude Code, Codex, Cursor) that use app features through shell commands:
+//! `gustaf-device` (drive a simulator or emulator, docs/features/devices.md "Agents") and `gustaf-agent` (start subagents
+//! on any provider, docs/features/agents.md "Subagents from CLI agents"). One server, one token per chat, one launcher
+//! script installed under both names.
 //!
-//! The CLI cannot call app tools, so the app puts a small launcher (`device_bridge/gustaf-device.sh`) on the agent's PATH.
-//! The launcher POSTs its arguments to this server; the server hands them to the webview (`device-bridge-request`), which
-//! runs the same device tools the API agents use (src/agent/deviceBridge.ts) and answers with `device_bridge_reply`.
+//! The CLI cannot call app tools, so the app puts a small launcher (`device_bridge/bridge-launcher.sh`) on the agent's PATH.
+//! The launcher POSTs its arguments to `/v1/<command>`; the server hands them to the webview (`device-bridge-request`,
+//! with the command name), which runs the same tools the API agents use (src/agent/deviceBridge.ts, agentBridge.ts) and
+//! answers with `device_bridge_reply`. The Tauri command names keep the `device_bridge_` prefix of the first command.
 //!
 //! * binds 127.0.0.1 only, random port, started on first use
 //! * every request needs `Authorization: Bearer <token>` for a token the webview registered (one per chat, handed to the
 //!   agent process in its environment only); requests with an `Origin` header (browsers) or a foreign `Host` are refused
 //! * bodies are capped; the answer is plain text, status 200 for success, 422 for a tool error
+//! * the body is a form: the repeated field `a` is argv, the optional field `i` is a text input (a plan file or stdin)
 //! * a screenshot from the webview is written to the app's own folder and the answer names the file
 
 use serde::Serialize;
@@ -25,8 +29,12 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// The launcher the agent runs (shared with the node tests, which run it against a local server).
-const SHIM: &str = include_str!("device_bridge/gustaf-device.sh");
-const SHIM_NAME: &str = "gustaf-device";
+const SHIM: &str = include_str!("device_bridge/bridge-launcher.sh");
+/// The commands this server answers: each is a path `/v1/<name>` and the launcher installed as `gustaf-<name>`.
+const COMMANDS: [&str; 2] = ["device", "agent"];
+fn shim_name(command: &str) -> String {
+    format!("gustaf-{command}")
+}
 const MAX_BODY: usize = 128 * 1024;
 const MAX_ARGS: usize = 16;
 /// Approval cards can stay open for a long time; the launcher's own curl limit is a little longer.
@@ -42,7 +50,8 @@ pub struct Reply {
     pub image: Option<String>,
 }
 
-type Emit = Arc<dyn Fn(u64, &str, &[String]) + Send + Sync>;
+/// (request id, command, token, argv, input)
+type Emit = Arc<dyn Fn(u64, &str, &str, &[String], Option<&str>) + Send + Sync>;
 
 #[derive(Default)]
 struct Shared {
@@ -75,8 +84,8 @@ impl Shared {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Info {
-    /// `http://127.0.0.1:<port>/v1/device`
-    pub url: String,
+    /// `http://127.0.0.1:<port>/v1`; the launcher appends the command name.
+    pub base_url: String,
     /// The folder holding the launcher: prepended to the agent's PATH.
     pub bin_dir: String,
 }
@@ -121,12 +130,25 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// The values of the repeated form field `a`, in order (what the launcher sends); other fields are ignored.
-fn parse_form_args(body: &str) -> Vec<String> {
-    body.split('&')
-        .filter_map(|pair| pair.strip_prefix("a="))
-        .map(percent_decode)
-        .collect()
+/// The values of the repeated form field `a`, in order (what the launcher sends), and the text of field `i`, if any
+/// (a plan file or stdin); other fields are ignored.
+fn parse_form(body: &str) -> (Vec<String>, Option<String>) {
+    let mut args = Vec::new();
+    let mut input = None;
+    for pair in body.split('&') {
+        if let Some(v) = pair.strip_prefix("a=") {
+            args.push(percent_decode(v));
+        } else if let Some(v) = pair.strip_prefix("i=") {
+            input.get_or_insert_with(|| percent_decode(v));
+        }
+    }
+    (args, input)
+}
+
+/// The command a request path names: `/v1/<command>` for a known command.
+fn command_of(path: &str) -> Option<&'static str> {
+    let name = path.strip_prefix("/v1/")?;
+    COMMANDS.iter().copied().find(|c| *c == name)
 }
 
 fn bearer(header: Option<&str>) -> Option<&str> {
@@ -185,9 +207,10 @@ fn handle(
     emit: &Emit,
     mut req: tiny_http::Request,
 ) {
-    if req.method() != &tiny_http::Method::Post || req.url() != "/v1/device" {
+    let command = command_of(req.url());
+    let Some(command) = command.filter(|_| req.method() == &tiny_http::Method::Post) else {
         return respond(req, 404, "Not found");
-    }
+    };
     // A browser page (DNS rebinding, a malicious site) must not reach this: no Origin, and our own Host only.
     let host = header(&req, "Host").unwrap_or_default();
     if header(&req, "Origin").is_some()
@@ -215,7 +238,7 @@ fn handle(
     {
         return respond(req, 400, "Invalid request body");
     }
-    let args = parse_form_args(&body);
+    let (args, input) = parse_form(&body);
     if args.len() > MAX_ARGS {
         return respond(req, 400, "Too many arguments");
     }
@@ -224,7 +247,7 @@ fn handle(
     if let Ok(mut p) = shared.pending.lock() {
         p.insert(id, tx);
     }
-    emit(id, &token, &args);
+    emit(id, command, &token, &args, input.as_deref());
     match rx.recv_timeout(wait) {
         Ok(reply) => {
             let mut text = reply.text;
@@ -266,31 +289,36 @@ fn serve(shared: Arc<Shared>, shots: PathBuf, wait: Duration, emit: Emit) -> Res
     Ok(port)
 }
 
+/// Writes the launcher once per command name (the script reads its own name to pick the path).
 fn install_shim(bin: &Path) -> Result<(), String> {
     std::fs::create_dir_all(bin).map_err(|e| e.to_string())?;
-    let path = bin.join(SHIM_NAME);
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(SHIM) {
-        std::fs::write(&path, SHIM).map_err(|e| e.to_string())?;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| e.to_string())?;
+    for command in COMMANDS {
+        let path = bin.join(shim_name(command));
+        if std::fs::read_to_string(&path).ok().as_deref() != Some(SHIM) {
+            std::fs::write(&path, SHIM).map_err(|e| e.to_string())?;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| e.to_string())?;
+        }
     }
     Ok(())
 }
 
 // ---- commands ----
 
-/// Starts the bridge (once) and installs the launcher. Errors on Windows: the launcher is a POSIX script.
+/// Starts the bridge (once) and installs the launchers. Errors on Windows: the launcher is a POSIX script.
 #[tauri::command]
 pub fn device_bridge_prepare(
     app: AppHandle,
     state: State<'_, DeviceBridge>,
 ) -> Result<Info, String> {
     if cfg!(windows) {
-        return Err("The gustaf-device command is not available on Windows.".into());
+        return Err(
+            "The gustaf-device and gustaf-agent commands are not available on Windows.".into(),
+        );
     }
     let mut running = state.running.lock().map_err(|e| e.to_string())?;
     if let Some(info) = running.as_ref() {
@@ -304,15 +332,15 @@ pub fn device_bridge_prepare(
     let bin = dir.join("bin");
     install_shim(&bin)?;
     let handle = app.clone();
-    let emit: Emit = Arc::new(move |id, token, argv| {
+    let emit: Emit = Arc::new(move |id, command, token, argv, input| {
         let _ = handle.emit(
             "device-bridge-request",
-            serde_json::json!({ "id": id, "token": token, "argv": argv }),
+            serde_json::json!({ "id": id, "command": command, "token": token, "argv": argv, "input": input }),
         );
     });
     let port = serve(state.shared.clone(), dir.join("shots"), WAIT, emit)?;
     let info = Info {
-        url: format!("http://127.0.0.1:{port}/v1/device"),
+        base_url: format!("http://127.0.0.1:{port}/v1"),
         bin_dir: bin.to_string_lossy().to_string(),
     };
     *running = Some(info.clone());
@@ -362,17 +390,33 @@ mod tests {
 
     #[test]
     fn form_args_keep_order_and_decode() {
+        let args = |b| parse_form(b).0;
         assert_eq!(
-            parse_form_args("a=fill&a=%40e19&a=h%C3%A9llo%20w%C3%B6rld%20%26%20100%25&a=-x&b=1"),
+            args("a=fill&a=%40e19&a=h%C3%A9llo%20w%C3%B6rld%20%26%20100%25&a=-x&b=1"),
             vec!["fill", "@e19", "héllo wörld & 100%", "-x"]
         );
-        assert_eq!(parse_form_args("a=a+b&a=%0Aline"), vec!["a b", "\nline"]);
-        assert_eq!(
-            parse_form_args("a=100%&a=%zz&a=%4"),
-            vec!["100%", "%zz", "%4"]
-        );
-        assert!(parse_form_args("").is_empty());
-        assert!(parse_form_args("b=1").is_empty());
+        assert_eq!(args("a=a+b&a=%0Aline"), vec!["a b", "\nline"]);
+        assert_eq!(args("a=100%&a=%zz&a=%4"), vec!["100%", "%zz", "%4"]);
+        assert!(args("").is_empty());
+        assert!(args("b=1").is_empty());
+    }
+
+    #[test]
+    fn form_input_is_the_first_i_field() {
+        let (args, input) = parse_form("a=delegate&a=-&i=%7B%22tasks%22%3A%5B%5D%7D&i=second");
+        assert_eq!(args, vec!["delegate", "-"]);
+        assert_eq!(input.as_deref(), Some("{\"tasks\":[]}"));
+        assert_eq!(parse_form("a=list").1, None);
+    }
+
+    #[test]
+    fn requests_name_a_known_command() {
+        assert_eq!(command_of("/v1/device"), Some("device"));
+        assert_eq!(command_of("/v1/agent"), Some("agent"));
+        assert_eq!(command_of("/v1/other"), None);
+        assert_eq!(command_of("/v1/agent/x"), None);
+        assert_eq!(command_of("/v1/"), None);
+        assert_eq!(command_of("/other"), None);
     }
 
     #[test]
@@ -399,25 +443,26 @@ mod tests {
     #[test]
     fn the_launcher_is_embedded_and_a_posix_script() {
         assert!(SHIM.starts_with("#!/bin/sh\n"));
-        assert!(SHIM.contains("GUSTAF_DEVICE_TOKEN"));
+        assert!(SHIM.contains("GUSTAF_BRIDGE_TOKEN"));
     }
 
     #[test]
-    fn install_writes_an_executable_launcher() {
+    fn install_writes_an_executable_launcher_per_command() {
         let dir = std::env::temp_dir().join(format!("gustaf-bridge-{}", std::process::id()));
         let bin = dir.join("bin");
         install_shim(&bin).unwrap();
         install_shim(&bin).unwrap();
-        assert_eq!(std::fs::read_to_string(bin.join(SHIM_NAME)).unwrap(), SHIM);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(bin.join(SHIM_NAME))
-                .unwrap()
-                .permissions()
-                .mode();
-            assert_eq!(mode & 0o111, 0o111);
+        for command in COMMANDS {
+            let path = bin.join(shim_name(command));
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), SHIM);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+                assert_eq!(mode & 0o111, 0o111);
+            }
         }
+        assert!(bin.join("gustaf-agent").exists() && bin.join("gustaf-device").exists());
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -439,7 +484,7 @@ mod tests {
 
     fn start(
         wait: Duration,
-        answer: impl Fn(u64, &[String]) -> Option<Reply> + Send + Sync + 'static,
+        answer: impl Fn(u64, &str, &[String], Option<&str>) -> Option<Reply> + Send + Sync + 'static,
     ) -> (u16, Arc<Shared>, PathBuf) {
         let shared = Arc::new(Shared::default());
         shared.tokens.lock().unwrap().insert(token());
@@ -453,8 +498,8 @@ mod tests {
         ));
         let s2 = shared.clone();
         let answer = Arc::new(answer);
-        let emit: Emit = Arc::new(move |id, _token, argv| {
-            if let Some(reply) = answer(id, argv) {
+        let emit: Emit = Arc::new(move |id, command, _token, argv, input| {
+            if let Some(reply) = answer(id, command, argv, input) {
                 // The webview answers from another thread, after the request started waiting.
                 let s3 = s2.clone();
                 std::thread::spawn(move || {
@@ -468,10 +513,14 @@ mod tests {
     }
 
     fn post(port: u16, auth: &str, body: &str) -> (u16, String) {
+        post_to(port, "device", auth, body)
+    }
+
+    fn post_to(port: u16, command: &str, auth: &str, body: &str) -> (u16, String) {
         http(
             port,
             &format!(
-                "POST /v1/device HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: {auth}\r\nContent-Type: application/x-www-form-urlencoded"
+                "POST /v1/{command} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: {auth}\r\nContent-Type: application/x-www-form-urlencoded"
             ),
             body,
         )
@@ -479,7 +528,7 @@ mod tests {
 
     #[test]
     fn serves_authenticated_requests_and_relays_the_answer() {
-        let (port, _s, _d) = start(Duration::from_secs(5), |_, argv| {
+        let (port, _s, _d) = start(Duration::from_secs(5), |_, _, argv, _| {
             Some(Reply {
                 ok: argv[0] != "fail",
                 text: format!("got {}", argv.join("|")),
@@ -504,8 +553,30 @@ mod tests {
     }
 
     #[test]
+    fn routes_each_command_with_its_name_and_input() {
+        let (port, _s, _d) = start(Duration::from_secs(5), |_, command, argv, input| {
+            Some(Reply {
+                ok: true,
+                text: format!("{command}:{}:{}", argv.join("|"), input.unwrap_or("-")),
+                image: None,
+            })
+        });
+        let bearer = format!("Bearer {}", token());
+        assert_eq!(
+            post_to(port, "agent", &bearer, "a=delegate&a=-&i=%7B%7D"),
+            (200, "agent:delegate|-:{}".into())
+        );
+        assert_eq!(
+            post_to(port, "device", &bearer, "a=list"),
+            (200, "device:list:-".into())
+        );
+        assert_eq!(post_to(port, "unknown", &bearer, "a=list").0, 404);
+        assert_eq!(post_to(port, "agent", "Bearer nope", "a=list").0, 401);
+    }
+
+    #[test]
     fn refuses_browsers_foreign_hosts_and_other_paths() {
-        let (port, _s, _d) = start(Duration::from_secs(5), |_, _| {
+        let (port, _s, _d) = start(Duration::from_secs(5), |_, _, _, _| {
             Some(Reply {
                 ok: true,
                 text: "x".into(),
@@ -529,7 +600,7 @@ mod tests {
 
     #[test]
     fn times_out_when_the_webview_never_answers() {
-        let (port, s, _d) = start(Duration::from_millis(150), |_, _| None);
+        let (port, s, _d) = start(Duration::from_millis(150), |_, _, _, _| None);
         let (status, _) = post(port, &format!("Bearer {}", token()), "a=list");
         assert_eq!(status, 504);
         assert!(s.pending.lock().unwrap().is_empty());
@@ -546,7 +617,7 @@ mod tests {
     #[test]
     fn saves_screenshots_and_names_the_file() {
         let png = "iVBORw0KGgo=";
-        let (port, _s, shots) = start(Duration::from_secs(5), move |_, _| {
+        let (port, _s, shots) = start(Duration::from_secs(5), move |_, _, _, _| {
             Some(Reply {
                 ok: true,
                 text: "snap".into(),
@@ -580,7 +651,7 @@ mod tests {
 
     #[test]
     fn a_bad_screenshot_does_not_fail_the_answer() {
-        let (port, _s, shots) = start(Duration::from_secs(5), |_, _| {
+        let (port, _s, shots) = start(Duration::from_secs(5), |_, _, _, _| {
             Some(Reply {
                 ok: true,
                 text: "snap".into(),
