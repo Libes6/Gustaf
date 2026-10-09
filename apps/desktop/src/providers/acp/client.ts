@@ -11,8 +11,26 @@
 import { confineToRoot } from "./fsPolicy.ts";
 import { AcpError, createConnection, isRecord, RPC, type Duplex, type Json } from "./rpc.ts";
 
-/** The protocol version this client speaks (ACP's stable major version). */
+/**
+ * Two protocol generations exist in the wild (ACP v1 and the v2 draft) and agents mix them: Google's Antigravity reports
+ * `protocolVersion: 2` with the v1 `agentInfo`/`agentCapabilities` response shape. So the client sends ONE `initialize`
+ * that carries the fields of both generations and decides the generation from the SHAPE of the answer (`info` present =
+ * v2), never from the number. Everything after that (method names, session setup, prompt completion, permission
+ * requests, config options) is normalised to one internal shape. Differences handled, v1 -> v2: `authenticate` ->
+ * `auth/login` (`logout` -> `auth/logout`); `session/load` -> `session/resume` with `replayFrom`; the prompt response
+ * only acknowledges and the end arrives as `state_update` idle (with stop reason and usage); config options use `configId`
+ * and `set_config_option` takes `type: "id"`; permission requests carry a `subject` instead of `toolCall`; `tool_call` is
+ * folded into `tool_call_update` plus `tool_call_content_chunk`; `plan` is `plan_update`. Modelled on T3 Code's effect-acp
+ * client (MIT, github.com/pingdotgg/t3code, packages/effect-acp/src/client.ts). Both generations are exercised only
+ * against synthetic fixtures (tests/acpClient.test.mjs), never against a real agent.
+ */
 export const PROTOCOL_VERSION = 1;
+/** The version number offered for the v2 side of the negotiating request. */
+export const PROTOCOL_VERSION_V2 = 2;
+export type Generation = 1 | 2;
+
+/** A v2 initialize answer has `info`; a v1 one has `agentInfo` (whatever its `protocolVersion` says). */
+export const isV2Initialize = (r: unknown): boolean => isRecord(r) && "info" in r && !("agentInfo" in r);
 
 export type AuthMethod = { id: string; name: string; description?: string };
 export type AgentCapabilities = {
@@ -92,8 +110,30 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
 const MAX_FILE = 5 * 1024 * 1024;
 
-export function parseInitialize(r: unknown): InitializeResult {
-  if (!isRecord(r)) throw new AcpError("protocol", "The agent sent an invalid initialize response");
+/** A v2 initialize answer rewritten in the v1 shape (so one parser serves both). */
+function v1Shape(r: Json): Json {
+  const caps = isRecord(r.capabilities) ? r.capabilities : {};
+  const session = isRecord(caps.session) ? caps.session : undefined;
+  const prompt = session && isRecord(session.prompt) ? session.prompt : {};
+  const methods = Array.isArray(r.authMethods) ? r.authMethods : [];
+  return {
+    protocolVersion: r.protocolVersion,
+    agentInfo: r.info,
+    agentCapabilities: {
+      loadSession: !!session,
+      promptCapabilities: { image: prompt.image != null, embeddedContext: prompt.embeddedContext != null },
+      sessionCapabilities: session ? { resume: {} } : {},
+      auth: methods.length ? { logout: {} } : {},
+    },
+    authMethods: methods.flatMap((m) =>
+      isRecord(m) ? [{ ...m, id: typeof m.methodId === "string" ? m.methodId : m.id }] : [],
+    ),
+  };
+}
+
+export function parseInitialize(raw: unknown): InitializeResult {
+  if (!isRecord(raw)) throw new AcpError("protocol", "The agent sent an invalid initialize response");
+  const r = isV2Initialize(raw) ? v1Shape(raw) : raw;
   const caps = isRecord(r.agentCapabilities) ? r.agentCapabilities : {};
   const prompt = isRecord(caps.promptCapabilities) ? caps.promptCapabilities : {};
   const session = isRecord(caps.sessionCapabilities) ? caps.sessionCapabilities : {};
@@ -136,7 +176,9 @@ export function parseInitialize(r: unknown): InitializeResult {
 export function parseConfigOptions(raw: unknown): ConfigOption[] {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, 50).flatMap((o): ConfigOption[] => {
-    if (!isRecord(o) || typeof o.id !== "string" || !o.id) return [];
+    const id =
+      typeof o.id === "string" && o.id ? o.id : isRecord(o) && typeof o.configId === "string" ? o.configId : "";
+    if (!isRecord(o) || !id) return [];
     if (o.type !== undefined && o.type !== "select") return [];
     const flat: ConfigChoice[] = [];
     const add = (c: unknown) => {
@@ -153,8 +195,8 @@ export function parseConfigOptions(raw: unknown): ConfigOption[] {
     }
     return [
       {
-        id: o.id,
-        name: str(o.name) || o.id,
+        id,
+        name: str(o.name) || id,
         ...(typeof o.category === "string" ? { category: o.category } : {}),
         currentValue: str(o.currentValue),
         options: flat,
@@ -188,7 +230,43 @@ function parseSession(r: unknown, sessionId?: string): SessionSetup {
   };
 }
 
-function parsePermission(p: unknown): PermissionRequest {
+/** v2 permission request (`subject` instead of `toolCall`) rewritten in the v1 shape. */
+function v1Permission(p: Json, requestId: string | number): Json {
+  const subject = isRecord(p.subject) ? p.subject : {};
+  const call = isRecord(subject.toolCall) ? subject.toolCall : undefined;
+  const command = subject.type === "command";
+  return {
+    sessionId: p.sessionId,
+    options: p.options,
+    toolCall: {
+      toolCallId:
+        call && typeof call.toolCallId === "string"
+          ? call.toolCallId
+          : typeof subject.toolCallId === "string"
+            ? subject.toolCallId
+            : String(requestId),
+      title: str(call?.title) || str(p.title),
+      kind: call?.kind ?? (command ? "execute" : "other"),
+      content: [
+        ...(Array.isArray(call?.content) ? call.content : []),
+        ...(command
+          ? [
+              {
+                type: "content",
+                content: { type: "text", text: `${str(subject.command)}\n${str(subject.cwd)}`.trim() },
+              },
+            ]
+          : []),
+        ...(typeof p.description === "string" && p.description
+          ? [{ type: "content", content: { type: "text", text: p.description } }]
+          : []),
+      ],
+    },
+  };
+}
+
+function parsePermission(raw: unknown, requestId: string | number): PermissionRequest {
+  const p = isRecord(raw) && !("toolCall" in raw) && isRecord(raw.subject) ? v1Permission(raw, requestId) : raw;
   const bad = () => new AcpError("rpc", "Invalid permission request", { code: RPC.params });
   if (!isRecord(p) || typeof p.sessionId !== "string" || !isRecord(p.toolCall) || !Array.isArray(p.options))
     throw bad();
@@ -242,10 +320,10 @@ function parsePromptResult(r: unknown): PromptResult {
 export function createAcpClient(o: ClientOptions) {
   const fsHost = o.fs;
 
-  const onRequest = async (method: string, params: unknown): Promise<unknown> => {
+  const onRequest = async (method: string, params: unknown, requestId: string | number): Promise<unknown> => {
     switch (method) {
       case "session/request_permission": {
-        const req = parsePermission(params);
+        const req = parsePermission(params, requestId);
         try {
           const a = await o.permission(req);
           // Only an option the agent offered can be selected.
@@ -276,11 +354,23 @@ export function createAcpClient(o: ClientOptions) {
     throw new AcpError("rpc", `Method not supported: ${method.slice(0, 80)}`, { code: RPC.notFound });
   };
 
+  let generation: Generation = 1;
+  // v2: a prompt is acknowledged by its response and finished by a `state_update` idle notification.
+  const completions = new Map<string, (r: PromptResult) => void>();
+  const finishV2 = (sessionId: string, update: Json) => {
+    if (update.sessionUpdate !== "state_update" || update.state !== "idle") return;
+    const done = completions.get(sessionId);
+    if (!done) return;
+    completions.delete(sessionId);
+    done(parsePromptResult({ stopReason: update.stopReason ?? "end_turn", usage: update.usage }));
+  };
+
   const conn = createConnection(o.duplex, {
     onRequest,
     onNotification(method, params) {
       if (method !== "session/update" || !isRecord(params) || typeof params.sessionId !== "string") return;
       if (!isRecord(params.update)) return;
+      finishV2(params.sessionId, params.update);
       o.onUpdate(params.sessionId, params.update);
     },
     requestTimeoutMs: o.requestTimeoutMs,
@@ -288,38 +378,49 @@ export function createAcpClient(o: ClientOptions) {
   });
 
   const mcp: unknown[] = []; // MCP servers are not forwarded: the agent uses its own configuration
+  const v2 = () => generation === 2;
 
   return {
+    /** The negotiated generation (decided by the shape of the `initialize` answer). */
+    get generation(): Generation {
+      return generation;
+    },
     async initialize(): Promise<InitializeResult> {
-      return parseInitialize(
-        await conn.request("initialize", {
-          protocolVersion: PROTOCOL_VERSION,
-          clientCapabilities: {
-            fs: { readTextFile: !!fsHost, writeTextFile: !!fsHost },
-            terminal: false,
-          },
-          clientInfo: o.clientInfo ?? { name: "gustaf", title: "Gustaf", version: "0" },
-        }),
-      );
+      const info = o.clientInfo ?? { name: "gustaf", title: "Gustaf", version: "0" };
+      const clientCapabilities = { fs: { readTextFile: !!fsHost, writeTextFile: !!fsHost }, terminal: false };
+      // One request, both generations' fields: a v1 agent ignores `info`/`capabilities`, a v2 agent ignores the rest.
+      const raw = await conn.request("initialize", {
+        protocolVersion: PROTOCOL_VERSION_V2,
+        info: { name: info.name, version: info.version },
+        capabilities: {},
+        clientCapabilities,
+        clientInfo: info,
+      });
+      generation = isV2Initialize(raw) ? 2 : 1;
+      return parseInitialize(raw);
     },
     /** `timeoutMs`: a browser sign-in waits for the user (the caller picks the limit and may abort with `signal`). */
     async authenticate(methodId: string, opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<void> {
       await conn.request(
-        "authenticate",
+        v2() ? "auth/login" : "authenticate",
         { methodId },
         { timeoutMs: opts.timeoutMs ?? o.requestTimeoutMs ?? 60_000, signal: opts.signal },
       );
+    },
+    async logout(): Promise<void> {
+      await conn.request(v2() ? "auth/logout" : "logout", {});
     },
     async newSession(cwd: string): Promise<SessionSetup> {
       return parseSession(
         await conn.request("session/new", { cwd, mcpServers: mcp }, { timeoutMs: o.requestTimeoutMs ?? 60_000 }),
       );
     },
+    /** v2 has no `session/load`: the same call is `session/resume` replaying from the start. */
     async loadSession(sessionId: string, cwd: string): Promise<SessionSetup> {
       return parseSession(
         await conn.request(
-          "session/load",
-          { sessionId, cwd, mcpServers: mcp },
+          v2() ? "session/resume" : "session/load",
+          { sessionId, cwd, mcpServers: mcp, ...(v2() ? { replayFrom: { type: "start" } } : {}) },
           { timeoutMs: o.requestTimeoutMs ?? 120_000 },
         ),
         sessionId,
@@ -336,12 +437,33 @@ export function createAcpClient(o: ClientOptions) {
       );
     },
     async setConfigOption(sessionId: string, configId: string, value: string): Promise<ConfigOption[]> {
-      const r = await conn.request("session/set_config_option", { sessionId, configId, value });
+      const r = await conn.request("session/set_config_option", {
+        sessionId,
+        configId,
+        value,
+        ...(v2() ? { type: "id" } : {}),
+      });
       return parseConfigOptions(isRecord(r) ? r.configOptions : undefined);
     },
-    /** Runs until the agent answers (no timeout); `content` are ACP content blocks. */
+    /** Runs until the agent is done (no timeout); `content` are ACP content blocks. */
     async prompt(sessionId: string, content: Json[]): Promise<PromptResult> {
-      return parsePromptResult(await conn.request("session/prompt", { sessionId, prompt: content }, { timeoutMs: 0 }));
+      if (!v2())
+        return parsePromptResult(
+          await conn.request("session/prompt", { sessionId, prompt: content }, { timeoutMs: 0 }),
+        );
+      const finished = new Promise<PromptResult>((resolve, reject) => {
+        completions.set(sessionId, resolve);
+        void o.duplex.closed.then(() => reject(conn.closedError ?? new AcpError("closed", "The agent process ended")));
+      });
+      finished.catch(() => {});
+      try {
+        const ack = await conn.request("session/prompt", { sessionId, prompt: content }, { timeoutMs: 0 });
+        // An agent that answers with a stop reason (a v1-style answer) needs no `state_update`.
+        if (isRecord(ack) && typeof ack.stopReason === "string") return parsePromptResult(ack);
+        return await finished;
+      } finally {
+        completions.delete(sessionId);
+      }
     },
     /** `session/cancel` is a notification: the pending `prompt` then ends with `stopReason: "cancelled"`. */
     cancel(sessionId: string) {

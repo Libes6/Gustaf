@@ -386,7 +386,7 @@ export async function signOutAgent(deps: AgentDeps, cwd: string): Promise<boolea
   try {
     const init = await session.client.initialize();
     if (!init.capabilities.logout) return false;
-    await session.client.request("logout", {});
+    await session.client.logout();
     return true;
   } catch (e) {
     throw startFailure(e, deps.secrets?.());

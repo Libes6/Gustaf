@@ -145,13 +145,34 @@ function keepRaw(v: unknown): unknown {
  */
 export function createUpdateMapper() {
   const tools = new Map<string, ToolState>();
+  // v2 sends both streamed chunks and a final whole message; the whole message is shown only when no chunk of it was.
+  const streamed = new Set<string>();
   return {
     map(update: unknown): UpdateEvent[] {
       if (!isRecord(update)) return [];
       switch (update.sessionUpdate) {
         case "agent_message_chunk": {
           const text = blockText(update.content);
+          if (typeof update.messageId === "string") streamed.add(update.messageId);
           return text ? [{ type: "text", text }] : [];
+        }
+        case "agent_message": {
+          const id = str(update.messageId);
+          if (id && streamed.has(id)) return [];
+          if (id) streamed.add(id);
+          const text = Array.isArray(update.content) ? update.content.slice(0, 20).map(blockText).join("") : "";
+          return text ? [{ type: "text", text }] : [];
+        }
+        case "tool_call_content_chunk": {
+          const old = tools.get(str(update.toolCallId));
+          if (!old) return [];
+          // A v2 chunk carries one ToolCallContent (`content` or `diff`) to append.
+          const known =
+            isRecord(update.content) && (update.content.type === "content" || update.content.type === "diff");
+          const before = Array.isArray(old.content) ? old.content.slice(-39) : [];
+          const next = { ...old, content: known ? [...before, update.content] : before };
+          tools.set(old.id, next);
+          return [{ type: "tool", card: card(next) }];
         }
         case "agent_thought_chunk": {
           const text = blockText(update.content);
@@ -165,7 +186,10 @@ export function createUpdateMapper() {
           if (!old && tools.size >= 500) return []; // an agent that never stops inventing calls
           const next: ToolState = {
             id,
-            title: update.title !== undefined ? head(str(update.title), MAX_TITLE) : (old?.title ?? ""),
+            title:
+              update.title !== undefined
+                ? head(str(update.title), MAX_TITLE)
+                : (old?.title ?? head(str(update.name), MAX_TITLE)),
             kind: update.kind !== undefined ? str(update.kind) : (old?.kind ?? ""),
             status: toolStatus(
               update.status,
@@ -179,9 +203,13 @@ export function createUpdateMapper() {
           tools.set(id, next);
           return [{ type: "tool", card: card(next) }];
         }
-        case "plan": {
-          if (!Array.isArray(update.entries)) return [];
-          const entries = update.entries.slice(0, MAX_ENTRIES).flatMap((e): PlanEntry[] => {
+        case "plan":
+        case "plan_update": {
+          // v2: `plan_update` carries `plan: { type: "items", entries }` (file and markdown plans have no entries).
+          const list =
+            update.sessionUpdate === "plan_update" && isRecord(update.plan) ? update.plan.entries : update.entries;
+          if (!Array.isArray(list)) return [];
+          const entries = list.slice(0, MAX_ENTRIES).flatMap((e): PlanEntry[] => {
             if (!isRecord(e) || typeof e.content !== "string") return [];
             const st = e.status === "in_progress" || e.status === "completed" ? e.status : "pending";
             return [{ content: head(e.content, 300), status: st, priority: str(e.priority) || undefined }];

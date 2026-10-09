@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { fakeAgent } from './helpers/fakeAcp.mjs';
+import { fakeAgent, v2Options, MODEL_OPTION, THOUGHT_OPTION } from './helpers/fakeAcp.mjs';
 
 register('./helpers/hooks.mjs', import.meta.url);
 const { createAcpClient, parseConfigOptions, parseInitialize } = await import('../src/providers/acp/client.ts');
@@ -24,7 +24,10 @@ test('initialize sends the client capabilities and parses the agent answer', asy
   const agent = fakeAgent();
   const init = await client(agent).initialize();
   const sent = agent.calls('initialize')[0].params;
-  assert.equal(sent.protocolVersion, 1);
+  assert.equal(sent.protocolVersion, 2);
+  assert.deepEqual(sent.info, { name: 'gustaf', version: '0' }); // v2 fields
+  assert.deepEqual(sent.capabilities, {});
+  assert.equal(sent.clientInfo.name, 'gustaf'); // v1 fields travel in the same request
   assert.deepEqual(sent.clientCapabilities, { fs: { readTextFile: false, writeTextFile: false }, terminal: false });
   assert.equal(init.agentInfo.version, '1.3.0');
   assert.deepEqual(
@@ -342,4 +345,216 @@ test('update mapper: text, tool calls merged by id, plan, thoughts, unknown kind
     rawOutput: 'y'.repeat(50000),
   })[0].card;
   assert.ok(huge.name.length <= 200 && huge.output.length < 8100);
+});
+
+// ---- the two protocol generations -----------------------------------------------------------------------------------
+
+const ready = async (script, o = {}) => {
+  const agent = fakeAgent(script);
+  const updates = [];
+  const c = client(agent, { onUpdate: (s, u) => updates.push([s, u]), ...o });
+  const init = await c.initialize();
+  return { agent, c, init, updates };
+};
+
+test('generation follows the SHAPE of the initialize answer, not the number: v2-numbered but v1-shaped is v1', async () => {
+  const mixed = {
+    protocolVersion: 2,
+    agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, sessionCapabilities: { resume: {} } },
+    authMethods: [{ id: 'oauth-personal', name: 'Google account' }],
+    agentInfo: { name: 'agy', version: '1.3.0' },
+  };
+  const { agent, c, init } = await ready({ initialize: mixed });
+  assert.equal(c.generation, 1);
+  assert.equal(init.agentInfo.version, '1.3.0');
+  await c.authenticate('oauth-personal');
+  assert.deepEqual(agent.methods().slice(0, 2), ['initialize', 'authenticate']);
+  await c.loadSession('old', '/w');
+  assert.equal(agent.calls('session/load').length, 1);
+  assert.equal(agent.calls('session/load')[0].params.replayFrom, undefined);
+  await c.setConfigOption('s1', 'model', 'agy-pro');
+  assert.equal(agent.calls('session/set_config_option')[0].params.type, undefined);
+});
+
+test('v2 initialize is normalised: info, capabilities.session, methodId', async () => {
+  const { c, init } = await ready({ v2: true });
+  assert.equal(c.generation, 2);
+  assert.equal(init.protocolVersion, 2);
+  assert.equal(init.agentInfo.version, '2.0.0');
+  assert.deepEqual(init.authMethods, [{ id: 'oauth-personal', name: 'Google account' }]);
+  assert.equal(init.capabilities.image, true);
+  assert.equal(init.capabilities.resume, true);
+  assert.equal(init.capabilities.loadSession, true);
+  assert.equal(init.capabilities.logout, true);
+  assert.equal(init.capabilities.embeddedContext, false);
+});
+
+test('v2: auth/login and auth/logout, session/new with configId options, resume with replayFrom, config option type', async () => {
+  const { agent, c } = await ready({ v2: true });
+  await c.authenticate('oauth-personal');
+  await c.logout();
+  const s = await c.newSession('/w');
+  assert.deepEqual(
+    s.configOptions.map((o) => [o.id, o.currentValue, o.options.map((x) => x.value)]),
+    [
+      ['model', 'agy-fast', ['agy-fast', 'agy-pro']],
+      ['thought', 'low', ['low', 'high']],
+    ],
+  );
+  const loaded = await c.loadSession('s1', '/w');
+  assert.equal(loaded.sessionId, 's1');
+  assert.deepEqual(agent.calls('session/resume')[0].params.replayFrom, { type: 'start' });
+  await c.resumeSession('s1', '/w');
+  assert.equal(agent.calls('session/resume')[1].params.replayFrom, undefined);
+  await c.setConfigOption('s1', 'model', 'agy-pro');
+  assert.deepEqual(agent.calls('session/set_config_option')[0].params, {
+    sessionId: 's1',
+    configId: 'model',
+    value: 'agy-pro',
+    type: 'id',
+  });
+  assert.deepEqual(
+    agent.methods().filter((m) => m !== 'initialize'),
+    ['auth/login', 'auth/logout', 'session/new', 'session/resume', 'session/resume', 'session/set_config_option'],
+  );
+  assert.deepEqual(parseInitialize({ info: { name: 'x' }, authMethods: [{ methodId: 'a', name: 'A' }] }).authMethods, [
+    { id: 'a', name: 'A' },
+  ]);
+});
+
+test('v2 prompt: the response only acknowledges; the end is the idle state_update (either order)', async () => {
+  for (const ackFirst of [false, true]) {
+    const { c, updates } = await ready({
+      v2: true,
+      ackFirst,
+      onPrompt: (p, a) => (
+        a.text(p.sessionId, 'hi'),
+        { stopReason: 'max_tokens', usage: { totalTokens: 7, inputTokens: 5, outputTokens: 2, thoughtTokens: 1 } }
+      ),
+    });
+    const r = await c.prompt('s1', [{ type: 'text', text: 'x' }]);
+    assert.equal(r.stopReason, 'max_tokens', `ackFirst=${ackFirst}`);
+    assert.deepEqual(r.usage, {
+      inputTokens: 5,
+      outputTokens: 2,
+      thoughtTokens: 1,
+      cachedReadTokens: undefined,
+      cachedWriteTokens: undefined,
+    });
+    assert.ok(
+      updates.some(([, u]) => u.sessionUpdate === 'state_update'),
+      'the state update is still delivered',
+    );
+  }
+});
+
+test('v2 prompt: process exit before the idle update fails the prompt; an ack with a stop reason is accepted', async () => {
+  const dead = await ready({ v2: true, onPrompt: () => new Promise(() => {}) });
+  const p = dead.c.prompt('s1', []);
+  setTimeout(() => dead.agent.exit(2), 5);
+  await assert.rejects(p, (e) => e.kind === 'closed' && /exit 2/.test(e.message));
+  const hybrid = await ready({
+    v2: true,
+    onRequest: (m, r) => (m.method === 'session/prompt' ? (r.reply({ stopReason: 'end_turn' }), 'handled') : undefined),
+  });
+  assert.equal((await hybrid.c.prompt('s1', [])).stopReason, 'end_turn');
+});
+
+test('v2 cancel is the same notification and ends the prompt as cancelled', async () => {
+  const { agent, c } = await ready({
+    v2: true,
+    onPrompt: (p, a) => new Promise((res) => (a.pendingPrompt = () => res({ stopReason: 'cancelled' }))),
+  });
+  const p = c.prompt('s1', []);
+  await sleep(10);
+  await c.cancel('s1');
+  assert.equal((await p).stopReason, 'cancelled');
+  assert.equal(agent.calls('session/cancel')[0].params.sessionId, 's1');
+});
+
+test('v2 permission request: subject tool_call and subject command become the internal shape', async () => {
+  const seen = [];
+  const { agent } = await ready(
+    { v2: true },
+    { permission: async (req) => (seen.push(req), { outcome: 'selected', optionId: 'allow' }) },
+  );
+  const options = [
+    { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+    { optionId: 'no', name: 'No', kind: 'reject_once' },
+  ];
+  const a = await agent.request('session/request_permission', {
+    sessionId: 's1',
+    title: 'Permission needed',
+    description: 'writes a file',
+    subject: {
+      type: 'tool_call',
+      toolCall: {
+        toolCallId: 'tc1',
+        title: 'Edit a.ts',
+        kind: 'edit',
+        content: [{ type: 'diff', path: '/w/a.ts', oldText: 'a', newText: 'b' }],
+      },
+    },
+    options,
+  });
+  assert.deepEqual(a.result, { outcome: { outcome: 'selected', optionId: 'allow' } });
+  assert.deepEqual([seen[0].toolCallId, seen[0].title, seen[0].kind], ['tc1', 'Edit a.ts', 'edit']);
+  assert.match(seen[0].detail, /\/w\/a\.ts/);
+  assert.match(seen[0].detail, /writes a file/);
+  await agent.request('session/request_permission', {
+    sessionId: 's1',
+    title: 'Run a command',
+    subject: { type: 'command', command: 'rm -rf build', cwd: '/w' },
+    options,
+  });
+  assert.deepEqual([seen[1].title, seen[1].kind], ['Run a command', 'execute']);
+  assert.match(seen[1].detail, /rm -rf build/);
+  assert.match(seen[1].toolCallId, /^a\d+$/); // falls back to the JSON-RPC request id
+  const bad = await agent.request('session/request_permission', { sessionId: 's1', subject: 5, options });
+  assert.equal(bad.error.code, -32602);
+});
+
+test('v2 updates: tool_call_update without tool_call, content chunks, plan_update, whole messages, config by configId', () => {
+  const m = createUpdateMapper();
+  const first = m.map({
+    sessionUpdate: 'tool_call_update',
+    toolCallId: 'c1',
+    name: 'run_command',
+    kind: 'execute',
+    status: 'in_progress',
+    rawInput: { CommandLine: 'ls' },
+  })[0].card;
+  assert.deepEqual([first.name, first.args.command, first.status], ['shell', 'ls', 'running']);
+  const chunk = m.map({
+    sessionUpdate: 'tool_call_content_chunk',
+    toolCallId: 'c1',
+    content: { type: 'content', content: { type: 'text', text: 'a.txt' } },
+  })[0].card;
+  assert.equal(chunk.output, 'a.txt');
+  assert.deepEqual(m.map({ sessionUpdate: 'tool_call_content_chunk', toolCallId: 'unknown', content: {} }), []);
+  assert.equal(
+    m.map({ sessionUpdate: 'tool_call_update', toolCallId: 'c1', status: 'completed' })[0].card.status,
+    'success',
+  );
+  const plan = m.map({
+    sessionUpdate: 'plan_update',
+    plan: { type: 'items', planId: 'p', entries: [{ content: 'one', status: 'in_progress' }] },
+  })[0];
+  assert.equal(planText(plan.entries), '[~] one');
+  assert.deepEqual(m.map({ sessionUpdate: 'plan_update', plan: { type: 'file', planId: 'p', uri: 'file:///x' } }), []);
+  // chunks, then the whole message: shown once; a whole message alone is shown
+  assert.equal(
+    m.map({ sessionUpdate: 'agent_message_chunk', messageId: 'm1', content: { type: 'text', text: 'Hel' } })[0].text,
+    'Hel',
+  );
+  assert.deepEqual(
+    m.map({ sessionUpdate: 'agent_message', messageId: 'm1', content: [{ type: 'text', text: 'Hello' }] }),
+    [],
+  );
+  assert.deepEqual(
+    m.map({ sessionUpdate: 'agent_message', messageId: 'm2', content: [{ type: 'text', text: 'Solo' }] }),
+    [{ type: 'text', text: 'Solo' }],
+  );
+  assert.deepEqual(m.map({ sessionUpdate: 'state_update', state: 'running' }), []);
+  assert.equal(parseConfigOptions(v2Options([MODEL_OPTION, THOUGHT_OPTION]))[1].id, 'thought');
 });

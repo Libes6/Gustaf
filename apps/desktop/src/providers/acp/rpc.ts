@@ -78,7 +78,7 @@ export function classify(m: unknown): Inbound {
   return { kind: "ignored" };
 }
 
-export type RequestHandler = (method: string, params: unknown) => Promise<unknown>;
+export type RequestHandler = (method: string, params: unknown, id: string | number) => Promise<unknown>;
 export type NotificationHandler = (method: string, params: unknown) => void;
 
 export type ConnectionOptions = {
@@ -133,7 +133,7 @@ export function createConnection(duplex: Duplex, o: ConnectionOptions) {
 
   const answer = async (id: string | number, method: string, params: unknown) => {
     try {
-      const result = await o.onRequest(method, params);
+      const result = await o.onRequest(method, params, id);
       await send({ id, result: result ?? null });
     } catch (e) {
       const code = isAcpError(e) && e.code !== undefined ? e.code : RPC.internal;

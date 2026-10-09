@@ -550,3 +550,59 @@ test('decide / answerFor policy table', async () => {
     optionId: 'reject_once',
   });
 });
+
+// ---- the same flows on the ACP v2 draft shapes (synthetic) ------------------------------------------------------------
+
+test('v2 agent: start, stream, tool card, reuse, resume, Stop and sign out work through the unchanged session code', async () => {
+  const w = world({
+    v2: true,
+    onPrompt: (p, a) => {
+      a.update(p.sessionId, {
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'c1',
+        name: 'run',
+        kind: 'execute',
+        status: 'completed',
+        rawInput: { command: 'ls' },
+      });
+      a.update(p.sessionId, {
+        sessionUpdate: 'agent_message_chunk',
+        messageId: 'm',
+        content: { type: 'text', text: 'v2 hello' },
+      });
+      return { stopReason: 'end_turn', usage: { totalTokens: 3, inputTokens: 2, outputTokens: 1 } };
+    },
+  });
+  const { run, out } = w.turn('hi');
+  const r = await run;
+  const a = w.agents[0];
+  assert.deepEqual(a.methods().slice(0, 4), ['initialize', 'auth/login', 'session/new', 'session/prompt']);
+  assert.equal(out.text, 'v2 hello');
+  assert.equal(r.parts.find((p) => p.name === 'shell').args.command, 'ls');
+  assert.equal(r.usage.input, 2);
+  await w.turn('again').run;
+  assert.equal(w.agents.length, 1);
+  assert.equal(a.calls('session/prompt').length, 2);
+  await w.turn('model', { model: 'agy-pro' }).run;
+  assert.equal(a.calls('session/set_config_option')[0].params.type, 'id');
+  await w.sessions.releaseAll();
+  // new process resumes the same agent session with session/resume
+  w.ctx.signature = 'other';
+  await w.turn('after restart').run;
+  assert.equal(w.agents[1].calls('session/resume')[0].params.sessionId, 's1');
+  await w.sessions.releaseAll();
+  // sign out uses auth/logout
+  const so = world({ v2: true });
+  assert.equal(await S.signOutAgent(so.deps, '/t'), true);
+  assert.deepEqual(so.agents[0].methods(), ['initialize', 'auth/logout']);
+});
+
+test('v2 agent: Stop cancels softly and keeps the partial output', async () => {
+  const w = world({ v2: true, onPrompt: hangingPrompt(['partial v2']) });
+  const { run, ac } = w.turn('long');
+  await sleep(30);
+  ac.abort();
+  await assert.rejects(run, (e) => partialOf(e).parts.at(-1).text === 'partial v2');
+  assert.equal(w.agents[0].stops, 0);
+  await w.sessions.releaseAll();
+});

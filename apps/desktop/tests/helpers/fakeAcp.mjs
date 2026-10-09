@@ -25,7 +25,12 @@ export const THOUGHT_OPTION = {
   ],
 };
 
+const v2Option = (o) => ({ ...o, configId: o.id, id: undefined });
+/** Config options as a v2 agent sends them (`configId` instead of `id`). */
+export const v2Options = (list) => list.map(v2Option);
+
 export function fakeAgent(script = {}) {
+  const v2 = script.v2 === true;
   let listener;
   const queued = [];
   let close;
@@ -97,6 +102,51 @@ export function fakeAgent(script = {}) {
       }
       const custom = script.onRequest?.(m, { reply, fail, agent: a });
       if (custom === 'silent' || custom === 'handled') return;
+      if (v2) {
+        // ACP v2 draft shapes (schema-v2.0.0-alpha, as in T3 Code's effect-acp): synthetic, not recorded from an agent.
+        if (['authenticate', 'logout', 'session/load', 'session/set_model', 'session/set_mode'].includes(m.method))
+          return fail(-32601, `v2 has no ${m.method}`);
+        if (m.method === 'auth/login') return reply({});
+        if (m.method === 'auth/logout') return reply({});
+        if (m.method === 'initialize' && !script.initialize)
+          return reply({
+            protocolVersion: 2,
+            info: { name: 'fake-v2', version: '2.0.0' },
+            capabilities: { session: { prompt: { image: {} } } },
+            authMethods: [{ methodId: 'oauth-personal', name: 'Google account', type: 'agent' }],
+          });
+        if (m.method === 'session/set_config_option')
+          return m.params.type === 'id' ? reply({ configOptions: [] }) : fail(-32602, 'type is required');
+        if (m.method === 'session/new' || m.method === 'session/resume') {
+          const configOptions = v2Options(script.configOptions ?? [MODEL_OPTION, THOUGHT_OPTION]);
+          if (m.method === 'session/resume') return reply({ configOptions });
+          a.sessionCounter++;
+          return reply({ sessionId: `s${a.sessionCounter}`, configOptions });
+        }
+        if (m.method === 'session/prompt') {
+          const finish = (res = { stopReason: 'end_turn' }) => {
+            const idle = { sessionUpdate: 'state_update', state: 'idle', stopReason: res.stopReason, usage: res.usage };
+            if (script.ackFirst) {
+              reply({});
+              a.update(m.params.sessionId, idle);
+            } else {
+              a.update(m.params.sessionId, idle);
+              reply({});
+            }
+          };
+          if (script.onPrompt)
+            Promise.resolve(script.onPrompt(m.params, a)).then((res) => res !== undefined && finish(res));
+          else {
+            a.update(m.params.sessionId, {
+              sessionUpdate: 'agent_message_chunk',
+              messageId: 'm1',
+              content: { type: 'text', text: 'ok' },
+            });
+            finish();
+          }
+          return;
+        }
+      }
       switch (m.method) {
         case 'initialize':
           return reply(
