@@ -248,7 +248,9 @@ describe("SearchPalette", () => {
       fireEvent.keyDown(input(), { key: "ArrowDown" });
       expect(selected()).toBe(0);
       expect(calls).toHaveLength(2);
-    });
+      // About 30 key presses re-render 60 rows in jsdom: over the 5 s default on the slow macOS Intel CI runner (release run
+      // 37795680356 failed twice here), so this test gets a generous limit.
+    }, 30_000);
 
     it("does not request the same page twice while one is loading", async () => {
       const calls: { offset: number }[] = [];
