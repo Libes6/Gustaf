@@ -4,18 +4,18 @@ Desktop AI chat and coding assistant built with Tauri 2, React and TypeScript. I
 
 ## Install
 
-> **Status:** no Gustaf release has been published yet. Installers are built by CI ([release notes](docs/release.md)), but the first public release is still waiting for the manual checks in the [release checklist](docs/release-checklist.md). Until then, build from source (see [Development](#development)). The instructions below describe the published release once it exists.
+> **Latest release:** [v0.6.0](https://github.com/Libes6/Gustaf/releases/tag/v0.6.0) (2026-10-09). Release history and notes are on [GitHub Releases](https://github.com/Libes6/Gustaf/releases); how releases are built is in the [release notes](docs/release.md). The Windows and Linux installers are built and tested in CI but have not been installed by hand yet, so treat them as experimental (see [Platforms](#platforms)). To run unreleased changes, build from source (see [Development](#development)).
 
 Download the latest release from [GitHub Releases](https://github.com/Libes6/Gustaf/releases/latest) and pick the file for your system:
 
 | System | File | Notes |
 | --- | --- | --- |
-| macOS 13 or newer, Apple Silicon | `.dmg` for `aarch64` | |
-| macOS 13 or newer, Intel | `.dmg` for `x64` | |
-| Windows x64 | NSIS installer (`.exe`) or `.msi` | Use the `.exe` unless you deploy with MSI tooling. |
-| Linux x64 | `.AppImage`, `.deb` or `.rpm` | Only the AppImage updates itself in the app. |
+| macOS 13 or newer, Apple Silicon | `Gustaf-<version>-macOS-arm64.dmg` | |
+| macOS 13 or newer, Intel | `Gustaf-<version>-macOS-x64.dmg` | |
+| Windows x64 | `Gustaf-<version>-Windows-x64-setup.exe` or `Gustaf-<version>-Windows-x64.msi` | Use the `-setup.exe` unless you deploy with MSI tooling. |
+| Linux x64 | `Gustaf-<version>-Linux-x64.AppImage`, `.deb` or `.rpm` | Only the AppImage updates itself in the app. |
 
-Windows on ARM, Linux on ARM, Flatpak, Snap and package repositories are not provided.
+The `.app.tar.gz`, `.sig` and `latest.json` files on a release are for the in-app updater; you do not need them. Windows on ARM, Linux on ARM, Flatpak, Snap and package repositories are not provided.
 
 Some features need tools installed separately: Node.js on `PATH` for the Cursor SDK provider, Codex usage limits and the bundled TypeScript language server; the `codex`, `claude` or `cursor-agent` CLI for those providers; `gh` for creating pull requests.
 
