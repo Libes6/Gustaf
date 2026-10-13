@@ -9,6 +9,7 @@
 //   baseline  CLI helper per call, verified tap (settle + snapshots), simctl screenshots   (what shipped before)
 //   host      the same verified calls through the long-lived helper host
 //   human     host + the no-settle / no-snapshot input path (`driver.human`), simctl screenshots
+//   human-cli the no-settle input path through the CLI helper (no host): isolates what the host saves
 //   native    host + the native helper (CoreSimulator HID + framebuffer stream)
 //
 // SAFETY: it taps and opens Settings, so it only runs on a simulator whose name contains "Bench" (create a throwaway
@@ -115,7 +116,7 @@ async function writeHostScript() {
 
 async function makeDriver(mode) {
   const common = { run, appDataDir: appData, sleep };
-  if (mode === 'baseline') return { driver: createDriver(common), cleanup: async () => {} };
+  if (mode === 'baseline' || mode === 'human-cli') return { driver: createDriver(common), cleanup: async () => {} };
   const hostFile = await writeHostScript();
   const host = createHelperHost({
     spawn: async () => lineTransport('node', [hostFile, `${helperDir}/node_modules/agent-device`]),
