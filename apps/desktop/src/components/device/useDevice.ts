@@ -178,7 +178,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
       const f = await driver.frame(id);
       if (!mounted.current || selectedRef.current !== id) return;
       live.current.failing = false;
-      setFrame(f);
+      setFrame((prev) => (prev && prev.data === f.data && prev.mime === f.mime ? prev : f));
       setError((e) => (e?.source === "frame" ? null : e));
     } catch (e) {
       if (!mounted.current || selectedRef.current !== id) return;

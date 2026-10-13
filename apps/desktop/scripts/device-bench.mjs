@@ -18,7 +18,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { readFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir, homedir, loadavg } from 'node:os';
 import { join } from 'node:path';
 import { register } from 'node:module';
 
@@ -41,6 +41,7 @@ if (!udid) {
   process.exit(2);
 }
 const runs = Number(opt('runs', 8));
+const verbose = args.includes('--verbose');
 const modes = String(opt('modes', 'baseline,host,human,native')).split(',');
 const appData = opt('app-data', join(homedir(), 'Library/Application Support/io.github.libes6.gustaf'));
 const stateDir = mkdtempSync(join(tmpdir(), 'gustaf-bench-state-'));
@@ -154,6 +155,7 @@ function watchFrames(driver) {
       const t = performance.now();
       captures++;
       const changed = last !== undefined && f.data !== last;
+      if (verbose && changed) process.stderr.write(`  frame changed at ${Math.round(t)} (${f.data.length} chars)\n`);
       if (changed) distinct++;
       last = f.data;
       for (const s of [...subs]) s({ t, changed });
@@ -179,10 +181,12 @@ function watchFrames(driver) {
         subs.add(cb);
       }),
     /** Resolves when no frame changed for `quietMs`. */
-    async quiet(quietMs = 700, maxMs = 6000) {
+    /** Resolves when at least two frames in a row were identical and nothing changed for `quietMs`. */
+    async quiet(quietMs = 700, maxMs = 12000) {
       const end = performance.now() + maxMs;
       while (performance.now() < end) {
-        if ((await this.nextChange(quietMs)) === null) return true;
+        const seen = captures;
+        if ((await this.nextChange(quietMs)) === null && captures - seen >= 2) return true;
       }
       return false;
     },
@@ -202,12 +206,24 @@ async function measure(mode) {
     const verified = mode === 'baseline' || mode === 'host';
     resetSettings();
     await sleep(1500);
+    // Binds the helper session to Settings (an app opened by simctl alone is not followed by the helper).
+    await driver.openApp(udid, 'com.apple.Preferences');
     const w = watchFrames(driver);
     await sleep(2500); // the native helper opens in the background; frames start flowing
     await w.quiet();
     // The element to tap: the first hittable row of the Settings list, found through the real map (not timed).
-    const map = await driver.snapshot(udid);
-    const row = map.nodes.find((n) => n.hittable && n.label && n.rect.y > 300 && n.rect.y < 700 && n.rect.height > 30);
+    let row;
+    for (let attempt = 0; attempt < 6 && !row; attempt++) {
+      const map = await driver.snapshot(udid);
+      // A static destination (no spinner, no loading): "General" in the simulator's language.
+      row = map.nodes.find(
+        (n) =>
+          n.hittable &&
+          /^(General|Основные|Accessibility|Универсальный доступ)$/.test(n.label ?? '') &&
+          n.rect.height > 30,
+      );
+      if (!row) await sleep(800);
+    }
     if (!row) throw new Error('no tappable row found in Settings');
     const at = { x: Math.round(row.rect.x + row.rect.width / 2), y: Math.round(row.rect.y + row.rect.height / 2) };
 
@@ -216,9 +232,10 @@ async function measure(mode) {
     const dispatched = [];
     for (let i = 0; i < runs; i++) {
       resetSettings();
-      await sleep(900);
+      await sleep(1500);
       await w.quiet();
       const t0 = performance.now();
+      if (verbose) process.stderr.write(`tap at ${Math.round(t0)}\n`);
       const change = w.nextChange(5000);
       const call = (verified ? driver.tap(udid, at) : driver.human.tap(udid, at))
         .then(() => performance.now() - t0)
@@ -229,6 +246,34 @@ async function measure(mode) {
     }
     out.tapToFrame = stats(toFrame);
     out.tapCall = stats(dispatched);
+
+    // 1b. a drag that scrolls the list: input -> first changed frame. Unlike a tap on a row this does not depend on how
+    // fast the app reacts (UIKit delays row highlights, pushes animate later): it is the input + display pipeline.
+    // Native: raw touches (down, a pause, then the first moves). Other modes: the swipe the panel would send.
+    const toScroll = [];
+    for (let i = 0; i < runs; i++) {
+      resetSettings();
+      await sleep(1500);
+      await w.quiet();
+      const raw = !verified && driver.human.touch && driver.streaming?.(udid);
+      if (raw) driver.human.touch(udid, 'down', { x: 200, y: 650 });
+      if (raw) await sleep(150);
+      const t0 = performance.now();
+      const change = w.nextChange(5000);
+      let call;
+      if (raw) {
+        driver.human.touch(udid, 'move', { x: 200, y: 610 });
+        driver.human.touch(udid, 'move', { x: 200, y: 540 });
+      } else
+        call = verified
+          ? driver.swipe(udid, { x: 200, y: 650 }, { x: 200, y: 350 }, 250)
+          : driver.human.swipe(udid, { x: 200, y: 650 }, { x: 200, y: 350 }, 250);
+      const t = await change;
+      toScroll.push(t === null ? null : t - t0);
+      if (raw) driver.human.touch(udid, 'up', { x: 200, y: 540 });
+      await call?.catch(() => undefined);
+    }
+    out.scrollToFrame = stats(toScroll);
 
     // 2. a moving screen: back-to-back drags while frames are consumed
     resetSettings();
@@ -291,7 +336,8 @@ for (const m of modes) {
 const rows = [
   [
     'mode',
-    'tap -> changed frame',
+    'drag start -> changed frame',
+    'tap on a row -> changed frame',
     'tap call returns',
     'frame captures/s',
     'changed frames/s (moving)',
@@ -300,10 +346,11 @@ const rows = [
   ],
 ];
 for (const r of results) {
-  if (r.error) rows.push([r.mode, `ERROR: ${r.error}`, '', '', '', '', '']);
+  if (r.error) rows.push([r.mode, `ERROR: ${r.error}`, '', '', '', '', '', '']);
   else
     rows.push([
       r.mode + (r.streaming ? ' (streaming)' : ''),
+      fmt(r.scrollToFrame),
       fmt(r.tapToFrame),
       fmt(r.tapCall),
       r.captureFps.toFixed(1),
@@ -317,5 +364,9 @@ for (const [i, r] of rows.entries()) {
   console.log('| ' + r.map((c, j) => String(c).padEnd(widths[j])).join(' | ') + ' |');
   if (i === 0) console.log('|' + widths.map((w) => '-'.repeat(w + 2)).join('|') + '|');
 }
-console.log(`\nsimulator: ${found.name}, runs: ${runs}, state dir: ${stateDir}`);
+console.log(
+  `\nsimulator: ${found.name}, runs: ${runs}, load average at the end: ${loadavg()
+    .map((x) => x.toFixed(1))
+    .join(' ')}, state dir: ${stateDir}`,
+);
 process.exit(0);
