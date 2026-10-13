@@ -33,6 +33,10 @@ const handlers: Record<string, (req: BridgeRequest) => Promise<BridgeReply>> = {
 };
 
 let started: Promise<{ baseUrl: string; binDir: string } | null> | undefined;
+let failure = "";
+
+/** Why the bridge could not start the last time (empty when it did, or was never asked). */
+export const bridgeFailure = () => failure;
 
 function start() {
   started ??= (async () => {
@@ -49,8 +53,9 @@ function start() {
           .catch(() => {});
       });
       return info;
-    } catch {
-      // Windows, or a build without the bridge: CLI agents get no commands.
+    } catch (e) {
+      // Windows, a build without the bridge, or an older Rust backend after an update: CLI agents get no commands.
+      failure = String((e as { message?: unknown })?.message ?? e).slice(0, 200);
       started = undefined;
       return null;
     }
@@ -69,7 +74,8 @@ async function prepare(chatId: number): Promise<CliBridgeEnv | null> {
   const token = tokens.tokenFor(chatId);
   try {
     await invoke("device_bridge_register", { token });
-  } catch {
+  } catch (e) {
+    failure = String((e as { message?: unknown })?.message ?? e).slice(0, 200);
     return null;
   }
   return { env: { GUSTAF_BRIDGE_URL: info.baseUrl, GUSTAF_BRIDGE_TOKEN: token }, binDir: info.binDir };

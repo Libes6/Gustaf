@@ -2082,5 +2082,7 @@
   "deviceCopyRef": "Copy ref",
   "deviceCopyLabel": "Copy label",
   "deviceCopied": "Copied",
-  "deviceCopyFailed": "Could not copy"
+  "deviceCopyFailed": "Could not copy",
+  "cliBridgeUnavailable": "The commands for agents (gustaf-agent, gustaf-device) could not start: {reason}. Restart Gustaf and try again; until then the CLI agent works without them.",
+  "cliBridgeUnknownReason": "no reason was reported"
 }

@@ -2,7 +2,7 @@ import { TERMINAL_READ_TOOL, readTerminal } from "./terminalTools";
 import { DEVICE_PROMPT, DEVICE_TOOLS, deviceToolsEligible, isDeviceTool } from "./deviceCore";
 import { DEVICE_CLI_PROMPT } from "./deviceCli";
 import { AGENT_CLI_PROMPT } from "./agentCli";
-import { startAgentCli, startDeviceCli, type CliBridgeHandle } from "./cliBridgeNative";
+import { bridgeFailure, startAgentCli, startDeviceCli, type CliBridgeHandle } from "./cliBridgeNative";
 import { DeviceDeclined, runDeviceTool, type DeviceToolResult } from "./deviceTools";
 import { loadDeviceSettings } from "./deviceSettingsStore";
 import { clearAgentDevice } from "../device/agentActivity";
@@ -103,6 +103,8 @@ export type RunOptions = {
   signal: AbortSignal;
   onLimits?: (windows: import("../providers/types").LimitWindow[]) => void;
   onRetry?: import("../providers/types").TurnInput["onRetry"];
+  /** A CLI agent was meant to get the `gustaf-device` / `gustaf-agent` commands but the local bridge could not start (`reason`). */
+  onBridgeUnavailable?: (reason: string) => void;
   onText: (delta: string) => void;
   onActivity?: import("../providers/types").TurnInput["onActivity"];
   onToolResult?: (result: Extract<Part, { type: "tool_result" }>) => void;
@@ -618,7 +620,7 @@ async function runLoop(o: RunOptions, cleanups: (() => void)[]): Promise<RunOutc
       cliHandles.push(deviceCli);
       commands.push("device");
       system += "\n" + DEVICE_CLI_PROMPT;
-    }
+    } else o.onBridgeUnavailable?.(bridgeFailure());
   }
   // Subagents on any provider for a CLI main agent (docs/features/agents.md): same host and rules as `spawn_agent`, so
   // not in Plan/Ask mode and not with read-only access, and only when the user's setting is on.
@@ -643,7 +645,7 @@ async function runLoop(o: RunOptions, cleanups: (() => void)[]): Promise<RunOutc
       cliHandles.push(agentCli);
       commands.push("agent");
       system += "\n" + AGENT_CLI_PROMPT;
-    }
+    } else o.onBridgeUnavailable?.(bridgeFailure());
   }
   const cliEnv = cliHandles.length
     ? {
