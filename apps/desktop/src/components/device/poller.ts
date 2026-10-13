@@ -65,7 +65,14 @@ export function createPoller(o: {
   };
 }
 
-export type FrameRateInput = { visible: boolean; focused: boolean; sinceActivityMs: number; failing?: boolean };
+export type FrameRateInput = {
+  visible: boolean;
+  focused: boolean;
+  sinceActivityMs: number;
+  failing?: boolean;
+  /** The driver pushes frames and `frame()` waits for the next one: ask again at once, whatever the activity. */
+  streaming?: boolean;
+};
 
 export type FrameIntervals = {
   /** Gap between frames right after input: 0 = the next capture starts as the previous one ends. */
@@ -92,6 +99,7 @@ export const FRAME_INTERVALS: Required<FrameIntervals> = {
  */
 export function frameDelay(i: FrameRateInput, r: FrameIntervals = FRAME_INTERVALS): number | null {
   if (!i.visible || !i.focused) return null;
+  if (i.streaming) return i.failing ? r.idle * 2 : 0;
   const burst = r.burst !== undefined && r.burstWindowMs !== undefined && i.sinceActivityMs < r.burstWindowMs;
   const base = burst ? (r.burst as number) : i.sinceActivityMs < r.activeWindowMs ? r.active : r.idle;
   return i.failing ? Math.max(base, r.idle) * 2 : base;

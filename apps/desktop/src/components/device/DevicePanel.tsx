@@ -194,6 +194,7 @@ function DeviceWorkspace({
                 highlight={highlight}
                 pinned={pinned}
                 onGesture={onGesture}
+                onTouch={dev.touch}
                 onText={(text) => {
                   dev.noteActivity();
                   void dev.run(t("deviceActType"), (d, id) => d.type(id, text));

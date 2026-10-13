@@ -9,6 +9,7 @@ import {
   type DeviceInfo,
   type DeviceToolchain,
   type Frame,
+  type Point,
 } from "../../device/types";
 import type { UiMap } from "../../device/uiMap";
 import { createDebouncer, createPoller, frameDelay, FRAME_INTERVALS, type FrameIntervals, type Poller } from "./poller";
@@ -197,6 +198,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
             focused: live.current.focused,
             sinceActivityMs: Date.now() - live.current.activity,
             failing: live.current.failing,
+            streaming: driver.streaming?.(selectedRef.current ?? "") === true,
           },
           intervals,
         ),
@@ -244,6 +246,24 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
       return job;
     },
     [driver, helperReady],
+  );
+
+  // ---- raw touch: a drag that follows the pointer (drivers that support it) ----
+  /** One touch event at a device point; false means the driver cannot stream touches, so use the gesture path. */
+  const touch = useCallback(
+    (phase: "down" | "move" | "up", at: Point): boolean => {
+      const id = selectedRef.current;
+      const fn = driver?.human?.touch;
+      if (!driver || !id || !fn) return false;
+      const handled = fn.call(driver.human, id, phase, at);
+      if (handled) {
+        live.current.activity = Date.now();
+        poller.current?.wake();
+        if (phase === "up" && helperReadyRef.current) mapDebouncer.current?.trigger();
+      }
+      return handled;
+    },
+    [driver],
   );
 
   // ---- power ----
@@ -328,6 +348,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
     shutdown,
     installHelper,
     run,
+    touch,
     noteActivity,
   };
 }
