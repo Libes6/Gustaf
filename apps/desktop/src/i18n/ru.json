@@ -2130,5 +2130,7 @@
   "deviceCopyRef": "Копировать ref",
   "deviceCopyLabel": "Копировать подпись",
   "deviceCopied": "Скопировано",
-  "deviceCopyFailed": "Не удалось скопировать"
+  "deviceCopyFailed": "Не удалось скопировать",
+  "cliBridgeUnavailable": "Команды для агентов (gustaf-agent, gustaf-device) не запустились: {reason}. Перезапустите Gustaf и повторите; до этого CLI-агент работает без них.",
+  "cliBridgeUnknownReason": "причина не сообщена"
 }

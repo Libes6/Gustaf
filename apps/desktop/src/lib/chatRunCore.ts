@@ -76,6 +76,8 @@ export type ChatRunUi = {
   /** The complete list of running/finished activities of the current step. */
   onActivity?(activities: Activity[]): void;
   onRetry?: RunOptions["onRetry"];
+  /** The commands for CLI agents (`gustaf-agent`, `gustaf-device`) could not start; `reason` is the backend's message. */
+  onBridgeUnavailable?: RunOptions["onBridgeUnavailable"];
   /** A message is about to be stored (retry bookkeeping). */
   onAccepted?(msg: Msg): void;
   /** A message was stored. Also called for the partial message of an interrupted run. */
@@ -191,6 +193,7 @@ export async function runChatCore(
       subagents: i.subagents,
       onLimits: (windows) => deps.onLimits?.(tg.providerId, windows),
       onRetry: ui.onRetry,
+      onBridgeUnavailable: ui.onBridgeUnavailable,
       onText: (d) => ui.onText?.(d),
       onToolResult: (r) => ui.onToolResult?.(r),
       onActivity: (a) => {

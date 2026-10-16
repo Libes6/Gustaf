@@ -153,6 +153,22 @@ test('an unavailable bridge (Windows) leaves the run without the command', async
   assert.equal(broken.seen[0].device, undefined);
 });
 
+test('an unavailable bridge is reported (once per start attempt), a working one is not', async () => {
+  const reasons = [];
+  const r = await run({ start: async () => null, run: { onBridgeUnavailable: (reason) => reasons.push(reason) } });
+  assert.equal(r.seen[0].device, undefined, 'the run goes on without the command');
+  assert.equal(reasons.length, 1, 'the user is told, instead of the agent silently using its own Task tool');
+  assert.equal(typeof reasons[0], 'string');
+
+  const ok = [];
+  await run({ run: { onBridgeUnavailable: (reason) => ok.push(reason) } });
+  assert.deepEqual(ok, [], 'nothing to report when the commands started');
+
+  const off = [];
+  await run({ settings: { cliSubagents: false }, run: { onBridgeUnavailable: (reason) => off.push(reason) } });
+  assert.deepEqual(off, [], 'no notice when the setting is off: the command was never wanted');
+});
+
 test('an API main agent keeps spawn_agent and may name CLI providers the settings allow', async () => {
   const r = await run({ cli: false });
   assert.deepEqual(r.started, [], 'an API model gets the tool, not the command');

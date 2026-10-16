@@ -79,6 +79,9 @@ import {
 import { branchCutoff, branchTitle, editableText, messageImages, messagesBefore } from "./messageActions";
 import type { useComposerDraft } from "./useComposerDraft";
 
+/** Chats that were already told that the CLI agent commands could not start (this app session). */
+const bridgeNoticed = new Set<number>();
+
 type Approval = { req: ApprovalRequest; resolve: (ok: boolean, always?: boolean) => void };
 /** An open `request_secret` (T10): the private card resolves with the typed value or null. */
 export type SecretRequest = { name: string; reason: string; resolve: (value: string | null) => void };
@@ -648,6 +651,12 @@ export function useChatRun(o: Options) {
             reviewRef.current = r;
           },
           onNotice: setError,
+          onBridgeUnavailable: (reason) => {
+            // Once per chat: the same failure would repeat on every message.
+            if (bridgeNoticed.has(cid)) return;
+            bridgeNoticed.add(cid);
+            setError(t("cliBridgeUnavailable", { reason: reason || t("cliBridgeUnknownReason") }));
+          },
           onReady: (h) => {
             retryRef.current = { chatId: cid, history: [...h] };
             setStream("");
