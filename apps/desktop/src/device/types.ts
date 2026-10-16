@@ -56,7 +56,36 @@ export type Frame = {
   points: Size;
 };
 
+export type SnapshotOptions = {
+  /**
+   * A refresh for the interface pane, not something a person or an agent waits for: if an action is queued first and
+   * this snapshot has not started yet, it is skipped and the last known map is returned.
+   */
+  background?: boolean;
+};
+
+/**
+ * The input calls of a person at the panel: dispatched at once, without waiting for the screen to settle and without
+ * a snapshot afterwards (`diff` is empty, `settled` is true). The agent tools use the verified methods of
+ * `DeviceDriver` itself. Same order guarantees: calls for one device run one after another.
+ */
+export type HumanInput = Pick<DeviceDriver, "tap" | "longPress" | "swipe" | "type" | "fill" | "press" | "scroll"> & {
+  /**
+   * One raw touch event (down, move, up) at a device point, so a drag follows the pointer like a finger. Returns true
+   * when the event was handed to the device; false means "not supported here, use tap / swipe at the end of the
+   * gesture instead" (then nothing was sent). Never waits for the device.
+   */
+  touch?(id: string, phase: "down" | "move" | "up", at: Point): boolean;
+};
+
 export interface DeviceDriver {
+  /** Fast input for the Device panel; a driver without it is used as is. */
+  human?: HumanInput;
+  /**
+   * The device pushes frames and `frame()` returns the next changed one (waiting for it): the caller should ask again
+   * at once instead of polling on a timer.
+   */
+  streaming?(id: string): boolean;
   toolchain(): Promise<DeviceToolchain>;
   /** Installs the pinned helper into the app's own folder. Only ever called after an explicit user action. */
   installHelper(onProgress?: (line: string) => void): Promise<void>;
@@ -67,7 +96,7 @@ export interface DeviceDriver {
   /** A fast picture for the live view (no accessibility work). */
   frame(id: string): Promise<Frame>;
   /** The interface map of the foreground app. */
-  snapshot(id: string): Promise<UiMap>;
+  snapshot(id: string, opts?: SnapshotOptions): Promise<UiMap>;
   tap(id: string, target: Target): Promise<ActionResult>;
   longPress(id: string, target: Target, ms?: number): Promise<ActionResult>;
   swipe(id: string, from: Point, to: Point, ms?: number): Promise<ActionResult>;

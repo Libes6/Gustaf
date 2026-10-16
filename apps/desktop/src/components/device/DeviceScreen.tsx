@@ -22,6 +22,11 @@ type Props = {
   highlight: UiNode | null;
   pinned: UiNode | null;
   onGesture: (g: Gesture) => void;
+  /**
+   * Raw touch events for drivers that can follow the pointer (down, move, up as they happen). Returns false when the
+   * driver cannot: the gesture is then classified at mouse up and sent through `onGesture` as before.
+   */
+  onTouch?: (phase: "down" | "move" | "up", at: Point) => boolean;
   onText: (text: string) => void;
   onEnter: () => void;
   onPin: (node: UiNode | null) => void;
@@ -128,8 +133,15 @@ export function DeviceScreen(p: Props) {
     if (!boxToDevice(device, sizeNow(), view)) return; // in the letterbox bars
     if (p.locked) return p.onBlocked();
     down.current = { view, at: Date.now() };
-    setDrag({ from: view, to: view });
-    const move = (ev: MouseEvent) => setDrag((d) => (d ? { ...d, to: local(ev) } : d));
+    const first = boxToDevice(device, sizeNow(), view);
+    const live = !!first && !!p.onTouch?.("down", first);
+    if (!live) setDrag({ from: view, to: view });
+    const move = (ev: MouseEvent) => {
+      if (live) {
+        const at = boxToDeviceClamped(device, sizeNow(), local(ev));
+        if (at) p.onTouch?.("move", at);
+      } else setDrag((d) => (d ? { ...d, to: local(ev) } : d));
+    };
     const up = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
@@ -141,6 +153,11 @@ export function DeviceScreen(p: Props) {
       const size = sizeNow();
       const from = boxToDevice(device, size, start.view);
       const to = boxToDeviceClamped(device, size, end);
+      if (live) {
+        // The device saw the whole drag as it happened; only the lift is left.
+        if (to) p.onTouch?.("up", to);
+        return;
+      }
       if (!from || !to) return;
       p.onGesture(classifyGesture({ viewDown: start.view, viewUp: end, from, to, durationMs: Date.now() - start.at }));
     };

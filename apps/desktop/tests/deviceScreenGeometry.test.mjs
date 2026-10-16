@@ -98,9 +98,28 @@ test('rematchNode finds a pinned element in a refreshed map, or drops it', () =>
 
 test('frameDelay: fast when active, slow when idle, null when nobody looks', () => {
   const v = { visible: true, focused: true, sinceActivityMs: 0 };
-  assert.equal(poll.frameDelay(v), 250);
+  assert.equal(poll.frameDelay(v), 0, 'right after input: back to back');
+  assert.equal(poll.frameDelay({ ...v, sinceActivityMs: 3000 }), 150, 'pointer still active: steady rate');
   assert.equal(poll.frameDelay({ ...v, sinceActivityMs: 60_000 }), 1500);
+  assert.equal(poll.frameDelay({ ...v, sinceActivityMs: 100 }, { active: 20, idle: 40, activeWindowMs: 1000 }), 20);
   assert.equal(poll.frameDelay({ ...v, visible: false }), null);
   assert.equal(poll.frameDelay({ ...v, focused: false }), null);
   assert.ok(poll.frameDelay({ ...v, failing: true }) > 1500);
+});
+
+test('createDebouncer: a burst runs once, after the last trigger; cancel drops it', async () => {
+  let n = 0;
+  const d = poll.createDebouncer(() => n++, 30);
+  d.trigger();
+  await new Promise((r) => setTimeout(r, 15));
+  d.trigger();
+  await new Promise((r) => setTimeout(r, 15));
+  d.trigger();
+  assert.equal(d.pending, true);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(n, 1);
+  d.trigger();
+  d.cancel();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(n, 1);
 });

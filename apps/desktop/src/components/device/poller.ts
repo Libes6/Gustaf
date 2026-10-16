@@ -65,16 +65,66 @@ export function createPoller(o: {
   };
 }
 
-export type FrameRateInput = { visible: boolean; focused: boolean; sinceActivityMs: number; failing?: boolean };
+export type FrameRateInput = {
+  visible: boolean;
+  focused: boolean;
+  sinceActivityMs: number;
+  failing?: boolean;
+  /** The driver pushes frames and `frame()` waits for the next one: ask again at once, whatever the activity. */
+  streaming?: boolean;
+};
 
-export const FRAME_INTERVALS = { active: 250, idle: 1500, activeWindowMs: 4000 };
+export type FrameIntervals = {
+  /** Gap between frames right after input: 0 = the next capture starts as the previous one ends. */
+  burst?: number;
+  /** How long after the last input the burst rate lasts. */
+  burstWindowMs?: number;
+  active: number;
+  idle: number;
+  activeWindowMs: number;
+};
 
-/** ~4 fps while the pointer was active in the last few seconds, ~0.7 fps otherwise, paused when nobody looks. */
-export function frameDelay(
-  i: FrameRateInput,
-  r: { active: number; idle: number; activeWindowMs: number } = FRAME_INTERVALS,
-): number | null {
+export const FRAME_INTERVALS: Required<FrameIntervals> = {
+  burst: 0,
+  burstWindowMs: 2000,
+  active: 150,
+  idle: 1500,
+  activeWindowMs: 4000,
+};
+
+/**
+ * Frames as fast as capture allows for a couple of seconds after input (the screen is changing and a person is
+ * watching it), a steady rate while the pointer stays active, about 0.7 fps when idle, nothing when nobody looks.
+ * Capture never overlaps itself (the Poller), so a slow frame only lowers the rate and never queues.
+ */
+export function frameDelay(i: FrameRateInput, r: FrameIntervals = FRAME_INTERVALS): number | null {
   if (!i.visible || !i.focused) return null;
-  const base = i.sinceActivityMs < r.activeWindowMs ? r.active : r.idle;
+  if (i.streaming) return i.failing ? r.idle * 2 : 0;
+  const burst = r.burst !== undefined && r.burstWindowMs !== undefined && i.sinceActivityMs < r.burstWindowMs;
+  const base = burst ? (r.burst as number) : i.sinceActivityMs < r.activeWindowMs ? r.active : r.idle;
   return i.failing ? Math.max(base, r.idle) * 2 : base;
+}
+
+/**
+ * Runs `fn` once, `ms` after the LAST `trigger()` (each trigger restarts the wait); `cancel()` drops a pending run.
+ * Used for the interface-map refresh: a burst of taps costs one snapshot, taken when the person stopped.
+ */
+export function createDebouncer(fn: () => void, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    trigger() {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        fn();
+      }, ms);
+    },
+    cancel() {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+    },
+    get pending() {
+      return timer !== undefined;
+    },
+  };
 }

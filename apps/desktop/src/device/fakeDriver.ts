@@ -63,7 +63,7 @@ export function createFakeDriver(
         if (d) d.state = "shutdown";
       }),
     frame: (id) => rec("frame", [id], () => frame),
-    snapshot: (id) => rec("snapshot", [id], () => state.map),
+    snapshot: (id, opts) => rec("snapshot", opts ? [id, opts] : [id], () => state.map),
     tap: (id, t) => rec("tap", [id, t], () => ok("Tapped")),
     longPress: (id, t, ms) => rec("longPress", [id, t, ms], () => ok("Long pressed")),
     swipe: (id, a, b, ms) => rec("swipe", [id, a, b, ms], () => ok("Swiped")),

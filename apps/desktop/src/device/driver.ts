@@ -17,6 +17,8 @@ import { KeyedQueue } from "./keyed";
 import { helperDiffText, mapDiffText } from "./actionText";
 import { helperFailure, parseHelperReply, type HelperData } from "./helperOutput";
 import { androidDevices, avdName, parseAdbDevices, parseAvdList, parseSimctlList, sortDevices } from "./lists";
+import { HostError, type HelperHost } from "./helperHost";
+import type { NativeSession, NativeSim } from "./nativeSim";
 import type { CommandRunner, RunOptions, RunResult } from "./runner";
 import {
   DeviceError,
@@ -26,7 +28,9 @@ import {
   type DeviceToolchain,
   type Frame,
   type Point,
+  type HumanInput,
   type PressKey,
+  type SnapshotOptions,
   type Target,
 } from "./types";
 import { hitTest, parseSnapshot, type Size, type UiMap } from "./uiMap";
@@ -56,6 +60,17 @@ export type DriverOptions = {
   /** Now in ms; replaced in tests. */
   now?: () => number;
   nodeBin?: string;
+  /**
+   * The long-lived helper host (helperHost.ts). When given, iOS helper calls go through it instead of starting
+   * `node agent-device.mjs` per call; any host failure falls back to the CLI. Absent: the CLI is always used.
+   */
+  host?: HelperHost;
+  /**
+   * The native simulator helper (nativeSim.ts): iOS touch, the home button and a pushed frame stream through
+   * CoreSimulator, about 10x faster than simctl screenshots and the XCTest runner. Absent or unavailable: simctl
+   * frames and the agent-device helper do everything, as before.
+   */
+  native?: NativeSim;
 };
 
 type Bound = string | undefined; // bundle id / package the helper session is open on
@@ -69,8 +84,16 @@ type DeviceState = {
   points?: Size;
   /** Bumped when an action is queued: a snapshot may be shared only with callers that saw the same value. */
   seq: number;
-  snap?: { seq: number; promise: Promise<UiMap> };
+  snap?: { seq: number; promise: Promise<UiMap>; background: boolean };
+  /** A lookup of the app behind a tapped home-screen icon, still running after a fast tap returned. */
+  iconFollow?: Promise<void>;
   frame?: Promise<Frame>;
+  /** The native helper is being opened for this device (never awaited by frame(): simctl frames cover the wait). */
+  nativeOpening?: Promise<void>;
+  /** The session whose frame stream was started, and the last frame number handed out from it. */
+  nativeStream?: { session: NativeSession; seq: number };
+  /** A raw touch is down (streamed from the panel): where, and the timer that lifts it if the `up` never comes. */
+  touchDown?: { from: Point; last: Point; timer: ReturnType<typeof setTimeout> };
 };
 
 const IOS_ID = /^[0-9A-F]{8}-(?:[0-9A-F]{4}-){3}[0-9A-F]{12}$/i;
@@ -158,9 +181,34 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
   const select = (id: string) =>
     isIosId(id) ? ["--udid", id, "--platform", "ios"] : ["--serial", id, "--platform", "android"];
 
+  /** Commands that may be repeated through the CLI after the host died mid-call (they change nothing on the device). */
+  const REPLAYABLE = new Set(["snapshot", "open", "close"]);
+
   async function helperRaw(id: string, args: string[], timeoutMs: number) {
     await ensureHelper();
-    const cmd = [node, bin, ...args, "--session", sessionName(id), ...select(id), "--json"].map(shq).join(" ");
+    const argv = [...args, "--session", sessionName(id), ...select(id), "--json"];
+    const host = o.host;
+    if (host?.available && isIosId(id)) {
+      try {
+        const r = await host.call(argv, timeoutMs);
+        if (!r.unsupported) {
+          const viaHost = parseHelperReply(r.reply);
+          if (viaHost) return viaHost;
+        }
+      } catch (e) {
+        if (e instanceof HostError && e.dispatched && !REPLAYABLE.has(args[0])) {
+          // The request may have reached the helper: running it again could tap twice.
+          throw new DeviceError(
+            e.code === "host-timeout"
+              ? "The device did not answer in time."
+              : "The device helper stopped during the action.",
+            e.code === "host-timeout" ? "timeout" : "failed",
+          );
+        }
+        // Not started, or harmless to repeat: the CLI below does it.
+      }
+    }
+    const cmd = [node, bin, ...argv].map(shq).join(" ");
     const r = await sh(`${isIosId(id) ? "" : ANDROID_PATH}${cmd}`, { timeoutMs });
     const reply = parseHelperReply(r.stdout);
     if (!reply) {
@@ -182,6 +230,7 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
   /** One helper call. A lost session (the helper's daemon went idle) is reopened once; errors become DeviceError. */
   async function helper(id: string, args: string[], timeoutMs = 30_000, reopen = true): Promise<HelperData> {
     const s = st(id);
+    await s.iconFollow;
     if (s.wanted) await bind(id);
     const reply = await helperRaw(id, args, timeoutMs);
     if (reply.ok) return reply.data;
@@ -384,9 +433,57 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
 
   // ---------- frame ----------
 
+  /** The native session of an iOS simulator when one is open and healthy. Never starts anything. */
+  const nativeFor = (id: string): NativeSession | undefined => (isIosId(id) ? o.native?.peek(id) : undefined);
+
+  /** Starts opening the native helper in the background (compiling it the first time); at most one attempt at a time. */
+  function kickNative(id: string) {
+    const s = st(id);
+    if (!o.native || !isIosId(id) || s.nativeOpening) return;
+    s.nativeOpening = o.native
+      .open(id)
+      .then((ns) => {
+        if (ns && !s.nativeStream) {
+          ns.startFrames();
+          s.nativeStream = { session: ns, seq: 0 };
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        s.nativeOpening = undefined;
+      });
+  }
+
+  /** The next changed frame from the native stream (waits for it); undefined when the stream is not usable. */
+  async function nativeFrame(id: string): Promise<Frame | undefined> {
+    const s = st(id);
+    const ns = nativeFor(id);
+    if (!ns) {
+      s.nativeStream = undefined;
+      kickNative(id);
+      return undefined;
+    }
+    if (s.nativeStream?.session !== ns) {
+      ns.startFrames();
+      s.nativeStream = { session: ns, seq: 0 };
+    }
+    const f = await ns.nextFrame(s.nativeStream.seq, 1000);
+    if (!f) return undefined;
+    s.nativeStream.seq = f.seq;
+    const full = { width: f.pixelWidth, height: f.pixelHeight };
+    return {
+      data: f.data,
+      mime: "image/jpeg",
+      pixels: { width: f.width, height: f.height },
+      points: s.points && sameAspect(s.points, full) ? s.points : guessPoints(full),
+    };
+  }
+
   function frame(id: string): Promise<Frame> {
     const s = st(id);
     return (s.frame ??= (async () => {
+      const viaNative = await nativeFrame(id).catch(() => undefined);
+      if (viaNative) return viaNative;
       const ios = isIosId(id);
       const fmt = o.frameFormat ?? "jpeg";
       const script = ios
@@ -435,10 +532,21 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
   const settling = (data: HelperData) =>
     Array.isArray(data.nodes) && data.nodes.length <= 8 && JSON.stringify(data.warnings ?? "").includes("unverified");
 
-  function snapshot(id: string): Promise<UiMap> {
+  function snapshot(id: string, opts?: SnapshotOptions): Promise<UiMap> {
     const s = st(id);
-    if (s.snap && s.snap.seq === s.seq) return s.snap.promise;
-    const entry = { seq: s.seq, promise: queue.run(id, () => snapshotNow(id)) };
+    if (s.snap && s.snap.seq === s.seq) {
+      // A caller that waits for the map keeps a shared background snapshot alive.
+      if (!opts?.background) s.snap.background = false;
+      return s.snap.promise;
+    }
+    const entry: NonNullable<DeviceState["snap"]> = {
+      seq: s.seq,
+      background: !!opts?.background,
+      // An action queued after this snapshot (seq moved on) makes a still-waiting background snapshot pointless.
+      promise: queue.run(id, () =>
+        entry.background && s.seq !== entry.seq && s.map ? Promise.resolve(s.map) : snapshotNow(id),
+      ),
+    };
     s.snap = entry;
     const clear = () => {
       if (s.snap === entry) s.snap = undefined;
@@ -559,6 +667,14 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
       }),
     );
 
+  async function volumeKey(id: string, key: "volume-up" | "volume-down"): Promise<ActionResult> {
+    if (isIosId(id)) throw new DeviceError("The iOS simulator has no volume buttons.", "failed");
+    await tool(`${ANDROID_PATH}adb -s ${shq(id)} shell input keyevent ${key === "volume-up" ? 24 : 25}`, {
+      timeoutMs: 10_000,
+    });
+    return { message: key === "volume-up" ? "Volume up" : "Volume down", diff: "", settled: true };
+  }
+
   const press = (id: string, key: PressKey) =>
     act(id, async () => {
       const ios = isIosId(id);
@@ -578,11 +694,7 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
           return action(id, ["app-switcher"], { pause: true });
         case "volume-up":
         case "volume-down":
-          if (ios) throw new DeviceError("The iOS simulator has no volume buttons.", "failed");
-          await tool(`${ANDROID_PATH}adb -s ${shq(id)} shell input keyevent ${key === "volume-up" ? 24 : 25}`, {
-            timeoutMs: 10_000,
-          });
-          return { message: key === "volume-up" ? "Volume up" : "Volume down", diff: "", settled: true };
+          return volumeKey(id, key);
       }
     });
 
@@ -606,9 +718,168 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
       } satisfies ActionResult;
     });
 
+  // ---------- fast input for a person at the panel ----------
+
+  /** One helper call for a person: no settle, no snapshot before or after. The cached map is marked old. */
+  async function quick(id: string, args: string[], timeoutMs = 20_000): Promise<ActionResult> {
+    const s = st(id);
+    const data = await helper(id, args, timeoutMs);
+    s.mapAt = 0;
+    return { message: typeof data.message === "string" ? data.message : args[0], diff: "", settled: true };
+  }
+
+  /** A tap on a home-screen icon moves the foreground; find the app in the background, the next helper call waits for it. */
+  function followIcon(id: string, t: Target) {
+    const s = st(id);
+    const hit = s.bound === SPRINGBOARD && s.map ? targetNode(s.map, t) : undefined;
+    if (!hit?.label) return;
+    s.iconFollow = bundleForIcon(id, hit.label)
+      .then((bundle) => void (bundle && (s.wanted = bundle)))
+      .catch(() => undefined);
+  }
+
+  /** The drag a person made, replayed as one timed pan: 80..400 ms, so a flick stays a flick. */
+  const panDuration = (ms?: number) => Math.min(400, Math.max(80, Math.round(ms ?? 120)));
+
+  /** The screen in points, for the native helper: the snapshot's viewport, else guessed from the framebuffer. */
+  const screenOf = (id: string, ns: NativeSession) => {
+    const p = st(id).points ?? guessPoints({ width: ns.pixelWidth, height: ns.pixelHeight });
+    return { sw: p.width, sh: p.height };
+  };
+
+  /** Where a target is on screen: a point as given, a ref as the centre of its element in the last map. */
+  function targetPoint(id: string, t: Target): Point | undefined {
+    if (!("ref" in t)) return t;
+    const n = st(id).map?.nodes.find((x) => x.ref === normRef(t.ref));
+    return n ? { x: n.rect.x + n.rect.width / 2, y: n.rect.y + n.rect.height / 2 } : undefined;
+  }
+
+  /** Runs `fn` on the native session; any failure of the native path means "use the helper instead" (undefined). */
+  async function viaNative(
+    id: string,
+    t: Target | undefined,
+    fn: (ns: NativeSession, at: Point | undefined) => Promise<string>,
+  ): Promise<ActionResult | undefined> {
+    const ns = nativeFor(id);
+    if (!ns) return undefined;
+    const at = t ? targetPoint(id, t) : undefined;
+    if (t && !at) return undefined;
+    try {
+      const message = await fn(ns, at);
+      st(id).mapAt = 0;
+      return { message, diff: "", settled: true };
+    } catch {
+      return undefined;
+    }
+  }
+
+  const where = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
+
+  const human: HumanInput = {
+    tap: (id, t) =>
+      act(id, async () => {
+        followIcon(id, t);
+        return (
+          (await viaNative(id, t, async (ns, at) => {
+            await ns.tap(at!.x, at!.y, screenOf(id, ns));
+            return `Tapped ${where(at!)}`;
+          })) ?? quick(id, ["press", ...targetArgs(t)])
+        );
+      }),
+    longPress: (id, t, ms) =>
+      act(id, async () => {
+        followIcon(id, t);
+        return (
+          (await viaNative(id, t, async (ns, at) => {
+            await ns.tap(at!.x, at!.y, screenOf(id, ns), Math.min(5000, Math.max(400, ms ?? 600)));
+            return `Long-pressed ${where(at!)}`;
+          })) ?? quick(id, ["longpress", ...targetArgs(t), ...(ms ? [String(Math.round(ms))] : [])])
+        );
+      }),
+    swipe: (id, from, to, ms) =>
+      act(id, async () => {
+        return (
+          (await viaNative(id, undefined, async (ns) => {
+            await ns.swipe(from, to, Math.min(600, Math.max(60, Math.round(ms ?? 140))), screenOf(id, ns));
+            return `Swiped ${where(from)} to ${where(to)}`;
+          })) ??
+          quick(id, [
+            "gesture",
+            "pan",
+            num(from.x),
+            num(from.y),
+            num(to.x - from.x),
+            num(to.y - from.y),
+            String(panDuration(ms)),
+          ])
+        );
+      }),
+    type: (id, text) => act(id, () => quick(id, ["type", text])),
+    fill: (id, t, text) => act(id, () => quick(id, ["fill", ...targetArgs(t), text])),
+    scroll: (id, direction, amount) =>
+      act(id, () =>
+        quick(id, ["scroll", direction, ...(amount != null ? [String(Math.min(0.8, Math.max(0.05, amount)))] : [])]),
+      ),
+    press: (id, key) =>
+      act(id, async () => {
+        const ios = isIosId(id);
+        switch (key) {
+          case "home": {
+            const r =
+              (await viaNative(id, undefined, async (ns) => {
+                await ns.button("home");
+                return "Home";
+              })) ?? (await quick(id, ["home"]));
+            if (ios) st(id).wanted = SPRINGBOARD;
+            return r;
+          }
+          case "back":
+            return quick(id, ios ? ["back"] : ["back", "--system"]);
+          case "enter":
+            return (
+              (await viaNative(id, undefined, async (ns) => {
+                await ns.key(40);
+                return "Enter";
+              })) ?? quick(id, ios ? ["type", "\n"] : ["keyboard", "enter"])
+            );
+          case "app-switcher":
+            return quick(id, ["app-switcher"]);
+          default:
+            return volumeKey(id, key);
+        }
+      }),
+    touch(id, phase, at) {
+      const ns = nativeFor(id);
+      if (!ns) return false;
+      const s = st(id);
+      const screen = screenOf(id, ns);
+      if (phase === "down") {
+        if (s.touchDown) clearTimeout(s.touchDown.timer);
+        s.touchDown = {
+          from: at,
+          last: at,
+          timer: setTimeout(() => human.touch?.(id, "up", s.touchDown?.last ?? at), 8000),
+        };
+      } else if (!s.touchDown) {
+        return false; // a move or an up without a down that we sent: not ours
+      } else s.touchDown.last = at;
+      ns.touch(phase, at.x, at.y, screen);
+      if (phase === "up") {
+        const from = s.touchDown?.from;
+        if (s.touchDown) clearTimeout(s.touchDown.timer);
+        s.touchDown = undefined;
+        s.mapAt = 0;
+        if (from) followIcon(id, from);
+      }
+      return true;
+    },
+  };
+
   async function release(id: string) {
     const s = states.get(id);
     states.delete(id);
+    if (s?.touchDown) clearTimeout(s.touchDown.timer);
+    void o.native?.close(id);
     if (!s?.bound && !s?.wanted) return;
     await queue.run(id, async () => {
       if (!(await sh(`test -f ${shq(bin)} && echo yes || echo no`)).stdout.includes("yes")) return;
@@ -617,6 +888,8 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
   }
 
   return {
+    human,
+    streaming: (id: string) => !!nativeFor(id) && !!st(id).nativeStream,
     helperPath: bin,
     toolchain,
     installHelper,

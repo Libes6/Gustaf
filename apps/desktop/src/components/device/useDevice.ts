@@ -9,16 +9,21 @@ import {
   type DeviceInfo,
   type DeviceToolchain,
   type Frame,
+  type Point,
 } from "../../device/types";
 import type { UiMap } from "../../device/uiMap";
-import { createPoller, frameDelay, FRAME_INTERVALS, type Poller } from "./poller";
+import { createDebouncer, createPoller, frameDelay, FRAME_INTERVALS, type FrameIntervals, type Poller } from "./poller";
 
 export type DeviceErrorState = { message: string; code?: DeviceError["code"]; source: "frame" | "action" | "other" };
 
 export type UseDeviceOptions = {
   /** The panel is on screen (its tab is selected). */
   visible: boolean;
-  intervals?: typeof FRAME_INTERVALS;
+  intervals?: FrameIntervals;
+  /** The interface map is on screen (its pane is open or Inspect mode is on). Default true. Off: no map refreshes. */
+  mapOpen?: boolean;
+  /** Wait after the last input before the map is read again. Default 400 ms. */
+  mapDebounceMs?: number;
 };
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -47,6 +52,10 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   const [windowVisible, setWindowVisible] = useState(true);
 
   const intervals = opts.intervals ?? FRAME_INTERVALS;
+  const mapOpen = opts.mapOpen ?? true;
+  const mapDebounceMs = opts.mapDebounceMs ?? 400;
+  const mapOpenRef = useRef(mapOpen);
+  mapOpenRef.current = mapOpen;
   const live = useRef({ visible: opts.visible, focused: true, windowVisible: true, failing: false, activity: 0 });
   const poller = useRef<Poller | null>(null);
   const selectedRef = useRef<string | null>(null);
@@ -112,6 +121,8 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   const selected = useMemo(() => devices?.find((d) => d.id === selectedId) ?? null, [devices, selectedId]);
   const booted = selected?.state === "booted";
   const helperReady = toolchain?.helper.installed === true;
+  const helperReadyRef = useRef(helperReady);
+  helperReadyRef.current = helperReady;
   selectedRef.current = selectedId;
 
   const select = useCallback((id: string | null) => {
@@ -124,22 +135,40 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   }, []);
 
   // ---- the interface map ----
-  const refreshMap = useCallback(async () => {
-    const id = selectedRef.current;
-    if (!driver || !id) return;
-    setMapLoading(true);
-    try {
-      const next = await driver.snapshot(id);
-      if (mounted.current && selectedRef.current === id) setMap(next);
-    } catch (e) {
-      if (mounted.current && selectedRef.current === id) setError(toError(e, "other"));
-    } finally {
-      if (mounted.current) setMapLoading(false);
-    }
-  }, [driver]);
+  const loadMap = useCallback(
+    async (background: boolean) => {
+      const id = selectedRef.current;
+      if (!driver || !id) return;
+      setMapLoading(true);
+      try {
+        const next = await driver.snapshot(id, background ? { background: true } : undefined);
+        if (mounted.current && selectedRef.current === id) setMap(next);
+      } catch (e) {
+        if (mounted.current && selectedRef.current === id) setError(toError(e, "other"));
+      } finally {
+        if (mounted.current) setMapLoading(false);
+      }
+    },
+    [driver],
+  );
+  const refreshMap = useCallback(() => loadMap(false), [loadMap]);
   useEffect(() => {
-    if (booted && helperReady && selectedId) void refreshMap();
-  }, [booted, helperReady, selectedId, refreshMap]);
+    if (booted && helperReady && selectedId && mapOpen) void refreshMap();
+  }, [booted, helperReady, selectedId, mapOpen, refreshMap]);
+
+  // After input the map is read once, a moment after the LAST action (a burst of taps costs one snapshot), and only
+  // while somebody can see it. It is a background snapshot: the next action overtakes it.
+  const mapDebouncer = useRef<ReturnType<typeof createDebouncer> | null>(null);
+  useEffect(() => {
+    const d = createDebouncer(() => {
+      if (mounted.current && mapOpenRef.current && helperReadyRef.current && pending.current === 0) void loadMap(true);
+    }, mapDebounceMs);
+    mapDebouncer.current = d;
+    return () => {
+      d.cancel();
+      if (mapDebouncer.current === d) mapDebouncer.current = null;
+    };
+  }, [loadMap, mapDebounceMs]);
 
   // ---- the frame loop ----
   const grabFrame = useCallback(async () => {
@@ -149,7 +178,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
       const f = await driver.frame(id);
       if (!mounted.current || selectedRef.current !== id) return;
       live.current.failing = false;
-      setFrame(f);
+      setFrame((prev) => (prev && prev.data === f.data && prev.mime === f.mime ? prev : f));
       setError((e) => (e?.source === "frame" ? null : e));
     } catch (e) {
       if (!mounted.current || selectedRef.current !== id) return;
@@ -160,8 +189,8 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   useEffect(() => {
     if (!driver || !selectedId || !booted) return;
     const p = createPoller({
-      // An action in flight takes the device: skip this round rather than queue behind it.
-      run: () => (pending.current > 0 ? Promise.resolve() : grabFrame()),
+      // Frames never wait for actions (they only call simctl/adb), so the picture keeps moving while one runs.
+      run: () => grabFrame(),
       delay: () =>
         frameDelay(
           {
@@ -169,6 +198,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
             focused: live.current.focused,
             sinceActivityMs: Date.now() - live.current.activity,
             failing: live.current.failing,
+            streaming: driver.streaming?.(selectedRef.current ?? "") === true,
           },
           intervals,
         ),
@@ -182,23 +212,30 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   }, [driver, selectedId, booted, grabFrame, intervals]);
 
   // ---- actions: strictly one after another ----
+  // Input goes through the driver's fast `human` calls when it has them (no settle, no snapshot afterwards). The chain
+  // waits only for the action itself: the new picture and the map are requested afterwards, without blocking the next
+  // click, and the frame loop switches to its burst rate.
   const run = useCallback(
     (label: string, fn: (d: DeviceDriver, id: string) => Promise<ActionResult | void>) => {
       const id = selectedRef.current;
       if (!driver || !id) return Promise.resolve(null);
       pending.current++;
       setQueue((q) => [...q, label]);
+      const target: DeviceDriver = driver.human
+        ? Object.assign(Object.create(driver) as DeviceDriver, driver.human)
+        : driver;
       const job = chain.current.then(async (): Promise<ActionResult | null> => {
         let result: ActionResult | null = null;
         try {
-          result = (await fn(driver, id)) ?? null;
+          result = (await fn(target, id)) ?? null;
           if (mounted.current) setError((e) => (e?.source === "action" ? null : e));
         } catch (e) {
           if (mounted.current) setError(toError(e, "action"));
         }
-        // What the action changed: a new picture and a fresh map, even after a failure (a stale ref means the map is old).
         if (mounted.current && selectedRef.current === id) {
-          await Promise.allSettled([grabFrame(), helperReady ? refreshMap() : Promise.resolve()]);
+          live.current.activity = Date.now();
+          poller.current?.wake();
+          if (helperReady) mapDebouncer.current?.trigger();
         }
         return result;
       });
@@ -208,7 +245,25 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
       });
       return job;
     },
-    [driver, grabFrame, refreshMap, helperReady],
+    [driver, helperReady],
+  );
+
+  // ---- raw touch: a drag that follows the pointer (drivers that support it) ----
+  /** One touch event at a device point; false means the driver cannot stream touches, so use the gesture path. */
+  const touch = useCallback(
+    (phase: "down" | "move" | "up", at: Point): boolean => {
+      const id = selectedRef.current;
+      const fn = driver?.human?.touch;
+      if (!driver || !id || !fn) return false;
+      const handled = fn.call(driver.human, id, phase, at);
+      if (handled) {
+        live.current.activity = Date.now();
+        poller.current?.wake();
+        if (phase === "up" && helperReadyRef.current) mapDebouncer.current?.trigger();
+      }
+      return handled;
+    },
+    [driver],
   );
 
   // ---- power ----
@@ -293,6 +348,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
     shutdown,
     installHelper,
     run,
+    touch,
     noteActivity,
   };
 }
