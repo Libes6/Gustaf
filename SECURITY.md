@@ -13,7 +13,7 @@ This is a small project maintained in spare time. Expect an acknowledgement with
 
 Only the **latest published release** receives security fixes. Older versions are not patched; update through the in-app updater or by installing the latest release. Builds from `dev` or from source are not supported releases.
 
-At the time of writing no release has been published yet (see [docs/release.md](docs/release.md)).
+The latest release is listed on [GitHub Releases](https://github.com/Libes6/Gustaf/releases/latest).
 
 ## What Gustaf stores and where
 
