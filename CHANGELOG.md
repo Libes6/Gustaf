@@ -4,6 +4,69 @@ All notable user-visible changes to Gustaf are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-10
+
+### Added
+
+- `gustaf-agent`: Claude Code, Codex and Cursor Agent can start Gustaf subagents on any allowed provider (for example a Composer or GPT subagent from a Claude Code chat), with the same roles, budgets, approvals, worktrees and Agents panel as API subagents. Settings → Usage → Agents → "Subagents from CLI agents" (on by default).
+- Antigravity can be installed, updated and removed from its settings page: a pinned download from Google, checked by SHA-256 and size before it is used.
+
+### Security
+
+- Added the `zip` crate (read-only, pure-Rust deflate) to unpack the Antigravity runtime archive.
+
+## [0.5.0] - 2026-10-09
+
+### Added
+
+- **Devices**: a Device panel for iOS simulators (macOS) and Android emulators with a live view, an inspector and an interface map; agents get device tools (API providers) or the `gustaf-device` command (CLI agents), controlled under Settings → Devices.
+- **Antigravity** provider: Google's Antigravity ACP agent with its own Google sign-in, a settings page and a wizard tile. Gustaf now has a generic Agent Client Protocol client that speaks both protocol generations.
+
+## [0.4.0] - 2026-10-09
+
+### Changed
+
+- Claude Code and Codex keep one live session per chat instead of starting a process per turn; follow-ups are written into the running turn, and Stop interrupts without losing the session.
+- Per-turn CLI agents restart with your follow-up, and the composer says when a refinement restarts the current turn.
+- Interrupted agent work is found at startup and marked in the sidebar before any chat is opened; an interrupted reply is handed back to the resumed CLI.
+
+### Fixed
+
+- Agent processes no longer outlive the app: they are stopped on quit, window close and archive, and leftovers from a crash are cleaned up on the next start.
+- Cursor SDK runs honour the run status, tool statuses and Stop.
+- A shut-down Codex subagent is shown as stopped; the Claude CLI probe requires a successful exit.
+
+## [0.3.0] - 2026-10-08
+
+### Added
+
+- Settings search across every page (also from Cmd+K), with settings regrouped on their own pages (Keyboard shortcuts, Storage, Web tools, Agents & budgets).
+- Shortcut editor with search, key recording, per-shortcut reset and conflict warnings.
+- Custom theme editor with Import theme / Export theme; Appearance options for fonts, sizes, code wrap and animation speed with a live preview.
+- App diagnostics page (processes, providers, errors, logs) and provider connection checks with last-check time, outdated markers, a missing-CLI reason and a "Check all" action.
+- Branch switcher under the composer; switching branches keeps your work.
+- Daily usage chart; reasoning effort for the Cursor SDK and OpenRouter, shown in usage rows.
+- Separate retention for worktrees and logs, with a preview before anything is deleted.
+- One import flow for Cursor, Claude Code, Codex and ChatGPT history.
+- Mobile: redesigned app (side menu, borderless chat, floating composer); send messages, stop runs and start chats from the phone over the `/v1` API with certificate pinning.
+
+### Changed
+
+- Tool calls are grouped into compact rows with readable labels and the current action.
+- English is the default UI language.
+- Interrupted agent worktrees are listed, and stopping a running agent asks for confirmation first.
+
+### Removed
+
+- Voice input, including the microphone permission.
+- The raw CLI events recorder.
+
+### Fixed
+
+- Cmd+K works again.
+- Background shell commands appear under "Background tasks" and their completion notice no longer shows up as a phantom subagent; Codex native subagents settle on disconnect.
+- The running-agent timer keeps counting seconds past the hour.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added
@@ -109,5 +172,10 @@ First public release. Installers: macOS (Apple Silicon and Intel, DMG), Windows 
 - The canvas needs `'unsafe-eval'` in the app CSP, and a runaway canvas loop can still freeze its renderer.
 - The mobile companion app is a skeleton and is not shipped.
 
-[Unreleased]: https://github.com/Libes6/Gustaf/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Libes6/Gustaf/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Libes6/Gustaf/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/Libes6/Gustaf/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Libes6/Gustaf/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Libes6/Gustaf/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Libes6/Gustaf/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Libes6/Gustaf/releases/tag/v0.1.0
