@@ -1,48 +1,52 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
 node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+.bun
+.turbo
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Bundled isolated canvas runtime
-apps/desktop/src/canvas/generated/
-apps/desktop/public/canvas/
-
-# Local tooling artifacts
-.playwright-mcp/
-*.playwright-mcp.log
-.claude/worktrees/
-
-# End-to-end failure artifacts (screenshots, traces)
-apps/desktop/tests/e2e/artifacts/
-
-# Local credentials and signing material
+*.log
+*.tsbuildinfo
+apps/*/dist
+apps/*/dist-exe
+infra/*/dist
+.astro
+packages/*/dist
 .env
-.env.*
+.env.local
+build/
+.logs/
+release/
+release-mock/
+.t3
+.idea/
+apps/web/.playwright
+apps/web/playwright-report
+apps/web/src/components/__screenshots__
+.vitest-*
+__screenshots__/
+.tanstack
+squashfs-root/
+.vercel
+.gstack/
+.plans/
+/audits/
+dist-electron/
+.electron-runtime/
+.showcase/
+apps/mobile/.showcase/
+apps/mobile/.generated/
+apps/mobile/.android-cache/
+/.generated/
+artifacts/app-store/screenshots/
+artifacts/mobile-e2e/
+artifacts/mobile-behavior/
+.github/pr-assets/
+native/**/target/
+apps/shell/src-tauri/target/
+apps/shell/src-tauri/runtime/
+node_modules/
+.alchemy/
+*.log
+.env*
 !.env.example
-!.env.*.example
-*.pem
-*.p12
-*.pfx
 
-# Local task backlog
-/TASKS.md
+# pnpm content-addressable store; never belongs in the repo.
+.pnpm-store/
