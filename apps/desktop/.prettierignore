@@ -1,7 +1,0 @@
-dist
-node_modules
-sidecar/node_modules
-src-tauri
-public
-src/canvas/generated
-package-lock.json

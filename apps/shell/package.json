@@ -1,0 +1,12 @@
+{
+  "name": "@gustaf/shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cargo run --manifest-path src-tauri/Cargo.toml",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
