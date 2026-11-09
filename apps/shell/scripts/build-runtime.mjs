@@ -67,12 +67,18 @@ try {
   run(tar, ["-xf", archive, "-C", stage]);
   const extracted = NodePath.join(stage, stem);
   if (platform === "linux") {
-    // The AppImage bundler runs ldd on every ELF library. The Tauri runtime
-    // targets glibc, so the CLI archive's musl fallback is unnecessary here.
-    NodeFS.rmSync(
-      NodePath.join(extracted, "node_modules/@ff-labs", `fff-bin-linux-${architecture}-musl`),
-      { recursive: true, force: true },
-    );
+    // linuxdeploy runs ldd on every ELF file. Runtime packages sometimes
+    // ship both libc variants, even though this installer targets glibc.
+    const modules = NodePath.join(extracted, "node_modules");
+    const entries = NodeFS.readdirSync(modules, { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (/(?:^|[-_])musl(?:$|[-_.])/.test(entry.name)) {
+        NodeFS.rmSync(NodePath.join(entry.parentPath, entry.name), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
   }
   const runtime = NodePath.join(shellDir, "runtime");
   NodeFS.rmSync(runtime, { recursive: true, force: true });

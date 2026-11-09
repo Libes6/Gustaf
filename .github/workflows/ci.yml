@@ -73,6 +73,7 @@ jobs:
           fi
           pnpm --filter @gustaf/shell build --bundles "$BUNDLES" "$@"
       - name: Collect installers
+        shell: bash
         env:
           PLATFORM: ${{ matrix.platform }}
         run: node apps/shell/scripts/stage-release.mjs "$PLATFORM"
