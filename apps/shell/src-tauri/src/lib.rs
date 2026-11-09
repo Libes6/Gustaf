@@ -1,83 +1,96 @@
 mod updater;
 
-use std::fs::{self, File};
-use std::io::Write;
+use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use tauri::{RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
-fn repo_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+struct Server(Child);
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        if !matches!(self.0.try_wait(), Ok(None)) {
+            return;
+        }
+        #[cfg(unix)]
+        if let Ok(pid) = i32::try_from(self.0.id()) {
+            unsafe { libc::kill(-pid, libc::SIGTERM) };
+        }
+        #[cfg(not(unix))]
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
 }
 
-fn spawn_stack() -> (Child, std::path::PathBuf) {
-    let log_path = repo_root().join(".t3/shell.log");
-    fs::create_dir_all(log_path.parent().expect("shell log directory")).expect("create .t3");
-    let log = File::create(&log_path).expect("create shell log");
-    let log_err = log.try_clone().expect("clone shell log");
+#[cfg(debug_assertions)]
+fn server_command(_app: &tauri::App) -> tauri::Result<Command> {
+    let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let mut command = Command::new("node");
     command
         .args(["scripts/dev-runner.ts", "dev", "--no-seed"])
-        .current_dir(repo_root())
-        .env("T3CODE_DEV_SEED", "0")
-        .stdout(Stdio::from(log))
-        .stderr(Stdio::from(log_err));
-    #[cfg(unix)]
-    command.process_group(0);
-    let child = command.spawn().expect("start the Gustaf server");
-    (child, log_path)
+        .current_dir(repo);
+    Ok(command)
+}
+
+#[cfg(not(debug_assertions))]
+fn server_command(app: &tauri::App) -> tauri::Result<Command> {
+    let runtime = app.path().resource_dir()?.join("runtime");
+    let executable = if cfg!(windows) { "t3.exe" } else { "t3" };
+    let data_dir = app.path().app_local_data_dir()?;
+    let mut command = Command::new(runtime.join(executable));
+    command
+        .current_dir(runtime)
+        .args(["--mode", "web", "--host", "127.0.0.1", "--no-browser"])
+        .arg("--no-auto-bootstrap-project-from-cwd")
+        .arg("--base-dir")
+        .arg(data_dir)
+        .env_remove("VITE_DEV_SERVER_URL");
+    Ok(command)
 }
 
 fn pairing_url_from_line(line: &str) -> Option<&str> {
     let rest = line.split_once("pairingUrl:")?.1.trim();
     let url = rest.trim_end_matches([',', '"', '\'']);
-    url.starts_with("http").then_some(url)
+    url.starts_with("http://").then_some(url)
 }
 
-fn wait_for_pairing_url(child: &mut Child, log_path: &std::path::Path) -> String {
-    let deadline = Instant::now() + Duration::from_secs(120);
-    let mut seen = 0usize;
-    while Instant::now() < deadline {
-        if let Ok(text) = fs::read_to_string(log_path) {
-            if text.len() > seen {
-                let _ = std::io::stderr().write_all(&text.as_bytes()[seen..]);
-                let _ = std::io::stderr().flush();
-                seen = text.len();
-            }
-            for line in text.lines() {
-                if let Some(url) = pairing_url_from_line(line) {
-                    return url.to_string();
-                }
-            }
-        }
-        if let Some(status) = child.try_wait().ok().flatten() {
-            panic!("Gustaf server exited before pairing ({status})");
-        }
-        thread::sleep(Duration::from_millis(200));
-    }
-    panic!("Gustaf server did not print a pairing URL");
-}
-
-fn stop_stack(child: &mut Child) {
-    let Ok(pid) = i32::try_from(child.id()) else {
-        let _ = child.kill();
-        return;
-    };
+fn start_server(app: &tauri::App) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
+    let mut command = server_command(app)?;
+    command.stdin(Stdio::null()).stdout(Stdio::piped());
     #[cfg(unix)]
-    {
-        unsafe { libc::kill(-pid, libc::SIGTERM) };
+    command.process_group(0);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
+
+    let mut server = Server(command.spawn()?);
+    let stdout = server.0.stdout.take().expect("piped server stdout");
+    let (send_url, receive_url) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let mut send_url = Some(send_url);
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if let Some(url) = pairing_url_from_line(&line) {
+                if let Some(sender) = send_url.take() {
+                    let _ = sender.send(url.to_owned());
+                }
+            } else {
+                eprintln!("{line}");
+            }
+        }
+    });
+
+    let url: tauri::Url = receive_url
+        .recv_timeout(Duration::from_secs(120))?
+        .parse()?;
+    if !matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")) {
+        return Err("Gustaf server did not report a local pairing URL".into());
     }
-    #[cfg(not(unix))]
-    {
-        let _ = child.kill();
-    }
-    let _ = child.wait();
+    Ok((server, url))
 }
 
 fn set_dock_icon() {
@@ -103,29 +116,25 @@ fn set_dock_icon() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let (mut child, log_path) = spawn_stack();
-    let pairing_url = wait_for_pairing_url(&mut child, &log_path);
-    let child = Arc::new(Mutex::new(child));
-    let child_for_exit = Arc::clone(&child);
-    let pairing_url = pairing_url.parse().expect("pairing URL");
-
     tauri::Builder::default()
-        .setup(move |app| {
+        .setup(|app| {
             updater::initialize(app)?;
             set_dock_icon();
+            let (server, pairing_url) = start_server(app)?;
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(pairing_url))
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
                 .build()?;
+            app.manage(Mutex::new(Some(server)));
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while running Gustaf")
-        .run(move |_app, event| {
+        .run(|app, event| {
             if matches!(event, RunEvent::Exit) {
-                if let Ok(mut child) = child_for_exit.lock() {
-                    stop_stack(&mut child);
+                if let Some(server) = app.try_state::<Mutex<Option<Server>>>() {
+                    let _ = server.lock().map(|mut server| server.take());
                 }
             }
         });
