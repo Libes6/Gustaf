@@ -43,7 +43,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf libatomic1 xvfb rpm
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libdbus-1-dev libxcb1-dev libxrandr-dev libgbm-dev libegl-dev libwayland-dev \
+            libpipewire-0.3-dev libspa-0.2-dev patchelf libatomic1 xvfb rpm
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/provider-ollama/src/http.test.ts
       - run: cargo test --locked --manifest-path apps/shell/src-tauri/Cargo.toml
@@ -51,6 +54,7 @@ jobs:
         shell: bash
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: ${{ runner.os == 'Linux' && 'true' || '' }}
           BUNDLES: ${{ matrix.bundles }}
           GUSTAF_UPDATER_PUBLIC_KEY: ${{ vars.GUSTAF_UPDATER_PUBLIC_KEY || vars.M_CODE_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
@@ -63,6 +67,9 @@ jobs:
             test -n "$GUSTAF_UPDATER_PUBLIC_KEY"
             node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:process.env.GUSTAF_UPDATER_PUBLIC_KEY}}}))' "$RUNNER_TEMP/gustaf-release.json"
             set -- --config "$RUNNER_TEMP/gustaf-release.json"
+          fi
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            set -- "$@" --verbose
           fi
           pnpm --filter @gustaf/shell build --bundles "$BUNDLES" "$@"
       - name: Collect installers
