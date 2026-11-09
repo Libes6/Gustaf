@@ -25,8 +25,9 @@ import {
   createStagePatchedDependencies,
   createStageWorkspaceConfig,
   resolveFffNativeDependencies,
+  StageWorkspaceConfig,
   STAGE_INSTALL_ARGS,
-} from "./build-desktop-artifact.ts";
+} from "./lib/stage-runtime.ts";
 import { assertLinuxArm64PageCompatibility } from "./lib/linux-arm64-sea.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
 import { signWithJsign } from "./lib/windows-jsign.ts";
@@ -46,17 +47,6 @@ const WorkspaceConfig = Schema.Struct({
 });
 const decodeWorkspaceConfig = Schema.decodeEffect(fromYaml(WorkspaceConfig));
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const StageWorkspaceConfig = Schema.Struct({
-  supportedArchitectures: Schema.Struct({
-    os: Schema.Array(Schema.String),
-    cpu: Schema.Array(Schema.String),
-    libc: Schema.optional(Schema.Array(Schema.String)),
-  }),
-  allowBuilds: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
-  patchedDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  overrides: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  nodeLinker: Schema.optional(Schema.Literals(["hoisted"])),
-});
 const encodeStageWorkspaceConfig = Schema.encodeEffect(fromYaml(StageWorkspaceConfig));
 
 const RepoRoot = Effect.service(Path.Path).pipe(

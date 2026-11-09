@@ -41,6 +41,7 @@ artifacts/mobile-behavior/
 .github/pr-assets/
 native/**/target/
 apps/shell/src-tauri/target/
+apps/shell/src-tauri/runtime/
 node_modules/
 .alchemy/
 *.log

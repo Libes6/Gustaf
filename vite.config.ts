@@ -13,15 +13,8 @@ const TEST_EXCLUDE = [
   "**/.{idea,git,cache,output,temp}/**",
 ];
 
-// Directories whose tests belong to a package's own test config. desktop also
-// owns the kde-snap-shot tests through its `include`.
-const TEST_CONFIG_PACKAGES = [
-  "apps/desktop",
-  "apps/mobile",
-  "apps/server",
-  "apps/web",
-  "packages/client-runtime",
-];
+// Directories whose tests belong to a package's own test config.
+const TEST_CONFIG_PACKAGES = ["apps/server", "apps/web", "packages/client-runtime"];
 
 // `vp test run <file>` from the repo root hands each file to its package's
 // config. Packages that borrow this config (`--config ../../vite.config.ts`) run
