@@ -783,7 +783,6 @@ const layerMakeRoutes = Layer.mergeAll(
     HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
       Layer.provide(AuthHttp.layer),
       Layer.provide(McpOAuthHttp.layer.pipe(Layer.provide(McpOAuth.layer))),
-      Layer.provide(CloudHttp.layer),
       Layer.provide(OrchestrationHttp.layer),
       Layer.provide(PullRequestHttp.layer),
       Layer.provide(ProjectHttp.layer),
@@ -795,7 +794,6 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerOtlpTracesProxyRoute,
     ServerHttp.layerAssetRoute,
     ServerHttp.layerAttachmentUploadRoute,
-    GuestHttp.layer,
     DeviceHubProxy.layer,
     ServerBrowserStream.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
@@ -990,190 +988,9 @@ const layerMakeServer = Layer.unwrap(
         )
       : Layer.empty;
     const layerCloudDesiredLinkReconcile = Layer.effectDiscard(
-      Effect.gen(function* () {
-        const cloudLink = yield* CloudLink.CloudLink;
-        // CloudLink unlinks on startup when the policy turns Connect off; nothing to restore.
-        if (!ManagedLimits.allowsConnect(yield* ManagedPolicy.ManagedPolicy)) {
-          yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);
-          return;
-        }
-        const releaseManagedTunnel = cloudLink.releaseManagedTunnelOnShutdown().pipe(
-          Effect.timeout("10 seconds"),
-          Effect.tap((released) =>
-            released ? Effect.logInfo("Released the managed tunnel on shutdown") : Effect.void,
-          ),
-          Effect.catchCause((cause) =>
-            Effect.logWarning(
-              "Failed to release the managed tunnel on shutdown; the next link reuses it",
-              { errors: Cause.prettyErrors(cause).map((error) => error.message) },
-            ),
-          ),
-          Effect.asVoid,
-        );
-        // Trials own cleanup immediately after the old server exits, retaining tunnels for commit/rollback unless explicitly stopped.
-        // Other runtimes wait for activation so failed standbys cannot tear down active tunnels.
-        const cleanupBeforeActivation = yield* pendingServiceUpdateExists;
-        if (cleanupBeforeActivation) {
-          yield* Effect.addFinalizer(() => releaseManagedTunnel);
-        }
-        yield* ServerActivation.forkParked(
-          Effect.gen(function* () {
-            if (!cleanupBeforeActivation) {
-              yield* Effect.addFinalizer(() => releaseManagedTunnel);
-            }
-            const server = yield* HttpServer.HttpServer;
-            const address = server.address;
-            if (typeof address === "string" || !("port" in address)) return;
-            const localOrigin = `http://${loopbackUrlHostForAddress(address)}:${address.port}`;
-            const endpointRuntime = yield* CloudManagedEndpointRuntime.CloudManagedEndpointRuntime;
-            const runManagedTunnelRecovery = yield* makeManagedTunnelRecovery({
-              recover: (config: RelayManagedEndpointRuntimeConfig) =>
-                cloudLink.recoverManagedTunnel(localOrigin, config, {
-                  retryRuntimeFailures: true,
-                }),
-              isRetryable: (error) =>
-                CloudLink.shouldRetryCloudLink(error) &&
-                error._tag !== "CloudLinkEndpointUnavailableError",
-            });
-            const recoverManagedTunnel = (config: RelayManagedEndpointRuntimeConfig) =>
-              runManagedTunnelRecovery(config).pipe(
-                Effect.tap((recovered) =>
-                  recovered ? Effect.logInfo("T3 Connect managed tunnel recovered") : Effect.void,
-                ),
-                Effect.catchCause((cause) =>
-                  Cause.hasInterrupts(cause)
-                    ? Effect.interrupt
-                    : Effect.logWarning("Failed to recover the T3 Connect managed tunnel", {
-                        cause,
-                      }),
-                ),
-              );
-            yield* endpointRuntime.recoveryRequests.pipe(
-              Stream.runForEach(recoverManagedTunnel),
-              Effect.forkScoped,
-            );
-            const wantsCliLink = hasCloudPublicConfig
-              ? yield* CloudCliState.readCliDesiredCloudLink.pipe(
-                  Effect.catch((cause) =>
-                    Effect.logWarning("Failed to read the desired T3 Connect link", { cause }).pipe(
-                      Effect.as(false),
-                    ),
-                  ),
-                )
-              : false;
-            // Recover reads so this fiber still registers and consumes recovery requests.
-            const desiredCliLinkMode = wantsCliLink
-              ? yield* CloudCliState.readCliDesiredLinkMode.pipe(
-                  Effect.catch((cause) =>
-                    Effect.logWarning("Failed to read the desired T3 Connect link mode", {
-                      cause,
-                    }).pipe(Effect.as("managed" as const)),
-                  ),
-                )
-              : null;
-            // Publish-only links must not expose the host through old managed configs.
-            const startedConfirmed =
-              desiredCliLinkMode === "publish_only"
-                ? false
-                : yield* cloudLink.startManagedTunnelIfOriginConfirmed(localOrigin).pipe(
-                    Effect.catch((cause) =>
-                      Effect.logWarning("Failed to start the confirmed T3 Connect tunnel", {
-                        cause,
-                      }).pipe(Effect.as(false)),
-                    ),
-                  );
-            const startStoredManagedTunnel = cloudLink
-              .startManagedTunnelIfOriginConfirmed(localOrigin, {
-                requireConfirmedOrigin: false,
-              })
-              .pipe(
-                Effect.tap((started) =>
-                  started
-                    ? Effect.logWarning(
-                        "T3 Connect started the stored tunnel without relay confirmation",
-                      )
-                    : Effect.void,
-                ),
-                Effect.catch((cause) =>
-                  Effect.logWarning("Failed to start the stored T3 Connect tunnel", { cause }),
-                ),
-                Effect.asVoid,
-              );
-            const registerManagedTunnel = retryManagedTunnelRegistration(
-              cloudLink.registerManagedTunnelRecovery(localOrigin, {
-                retryRuntimeFailures: true,
-              }),
-              (error) =>
-                CloudLink.shouldRetryCloudLink(error) &&
-                error._tag !== "CloudLinkEndpointUnavailableError",
-              startedConfirmed ? Effect.void : startStoredManagedTunnel,
-            ).pipe(
-              Effect.tap((result) =>
-                result.status === "ready"
-                  ? Effect.logInfo("T3 Connect managed tunnel recovery registered")
-                  : Effect.void,
-              ),
-              Effect.catchCause((cause) =>
-                Cause.hasInterrupts(cause)
-                  ? Effect.interrupt
-                  : Effect.logWarning("Failed to register T3 Connect managed tunnel recovery", {
-                      cause,
-                    }).pipe(Effect.as({ status: "unavailable" as const })),
-              ),
-            );
-            // Jitter registrations so update waves do not hit the relay simultaneously.
-            if (!startedConfirmed && desiredCliLinkMode !== "publish_only") {
-              const jitter = yield* Random.nextIntBetween(
-                0,
-                Duration.toMillis(MANAGED_TUNNEL_FIRST_REGISTRATION_JITTER),
-              );
-              yield* Effect.sleep(Duration.millis(jitter));
-            }
-            const registration =
-              desiredCliLinkMode === "publish_only"
-                ? { status: "not_linked" as const }
-                : yield* registerManagedTunnel;
-            if (registration.status === "unavailable" && !startedConfirmed) {
-              yield* startStoredManagedTunnel;
-            }
-            const startupAction = managedTunnelStartupAction({ wantsCliLink, registration });
-            if (startupAction.action === "request_recovery") {
-              yield* endpointRuntime.requestRecovery(startupAction.config);
-            }
-            if (startupAction.action === "reconcile_link") {
-              const reconciledMode = yield* cloudLink
-                .reconcileDesiredLinkIfStillDesired(localOrigin)
-                .pipe(
-                  (reconcile) =>
-                    retryDesiredLinkReconcile(reconcile, CloudLink.shouldRetryCloudLink, (cause) =>
-                      Effect.logWarning(
-                        "T3 Connect relay is still unavailable; retrying the desired link in the background",
-                        { cause },
-                      ),
-                    ),
-                  Effect.tap((mode) =>
-                    mode === null
-                      ? Effect.void
-                      : Effect.logInfo("T3 Connect desired link reconciled on startup"),
-                  ),
-                  Effect.catch((cause) =>
-                    Effect.logWarning("Failed to reconcile T3 Connect desired link on startup", {
-                      cause,
-                    }).pipe(Effect.as(null)),
-                  ),
-                );
-              if (reconciledMode === "managed") {
-                const afterReconcile = yield* registerManagedTunnel;
-                if (afterReconcile.status === "recovery_required") {
-                  yield* endpointRuntime.requestRecovery(afterReconcile.config);
-                }
-              }
-            }
-          }),
-        );
-        yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);
-      }),
+      Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie),
     );
+
 
     const layerRuntimeServices = ServerRuntimeStartup.layerWithOptions({
       activate: Deferred.succeed(activation, undefined).pipe(Effect.asVoid),
@@ -1206,7 +1023,6 @@ const layerMakeServer = Layer.unwrap(
     );
 
     return layerServerApplication.pipe(
-      Layer.provide(CloudLink.layer.pipe(Layer.provideMerge(ConnectReachability.layer))),
       Layer.provideMerge(layerRuntimeServices),
       Layer.provideMerge(
         McpSessionRegistry.layer.pipe(
@@ -1214,9 +1030,6 @@ const layerMakeServer = Layer.unwrap(
         ),
       ),
       Layer.provide(layerActivation),
-      Layer.provideMerge(
-        RelayTracing.layerServerRelayBroker.pipe(Layer.provide(ManagedPolicy.layer)),
-      ),
       Layer.provideMerge(layerHttpServer),
       Layer.provide(layerApplicationObservability),
       Layer.provideMerge(FetchHttpClient.layer),
