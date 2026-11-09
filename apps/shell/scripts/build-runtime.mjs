@@ -65,9 +65,24 @@ try {
 
   const tar = windows ? NodePath.join(process.env.SystemRoot, "System32", "tar.exe") : "tar";
   run(tar, ["-xf", archive, "-C", stage]);
+  const extracted = NodePath.join(stage, stem);
+  if (platform === "linux") {
+    // linuxdeploy runs ldd on every ELF file. Runtime packages sometimes
+    // ship both libc variants, even though this installer targets glibc.
+    const modules = NodePath.join(extracted, "node_modules");
+    const entries = NodeFS.readdirSync(modules, { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (/(?:^|[-_])musl(?:$|[-_.])/.test(entry.name)) {
+        NodeFS.rmSync(NodePath.join(entry.parentPath, entry.name), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
+  }
   const runtime = NodePath.join(shellDir, "runtime");
   NodeFS.rmSync(runtime, { recursive: true, force: true });
-  NodeFS.cpSync(NodePath.join(stage, stem), runtime, { recursive: true, verbatimSymlinks: true });
+  NodeFS.cpSync(extracted, runtime, { recursive: true, verbatimSymlinks: true });
 } finally {
   NodeFS.rmSync(stage, { recursive: true, force: true });
 }
