@@ -44,7 +44,7 @@ if (
   const assets = {};
   for (const platform of targets) {
     const dir = NodePath.join(directory, platform.endsWith("-msi") ? "windows-x86_64" : platform);
-    const candidates = fs
+    const candidates = NodeFS
       .readdirSync(dir)
       .filter((name) =>
         name.endsWith(
