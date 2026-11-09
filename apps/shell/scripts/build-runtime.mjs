@@ -65,9 +65,18 @@ try {
 
   const tar = windows ? NodePath.join(process.env.SystemRoot, "System32", "tar.exe") : "tar";
   run(tar, ["-xf", archive, "-C", stage]);
+  const extracted = NodePath.join(stage, stem);
+  if (platform === "linux") {
+    // The AppImage bundler runs ldd on every ELF library. The Tauri runtime
+    // targets glibc, so the CLI archive's musl fallback is unnecessary here.
+    NodeFS.rmSync(
+      NodePath.join(extracted, "node_modules/@ff-labs", `fff-bin-linux-${architecture}-musl`),
+      { recursive: true, force: true },
+    );
+  }
   const runtime = NodePath.join(shellDir, "runtime");
   NodeFS.rmSync(runtime, { recursive: true, force: true });
-  NodeFS.cpSync(NodePath.join(stage, stem), runtime, { recursive: true, verbatimSymlinks: true });
+  NodeFS.cpSync(extracted, runtime, { recursive: true, verbatimSymlinks: true });
 } finally {
   NodeFS.rmSync(stage, { recursive: true, force: true });
 }
