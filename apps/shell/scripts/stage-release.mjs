@@ -11,19 +11,22 @@ if (host !== platform)
 const source = "apps/shell/src-tauri/target/release/bundle";
 const { version } = JSON.parse(NodeFS.readFileSync("apps/shell/src-tauri/tauri.conf.json", "utf8"));
 NodeFS.mkdirSync("release-assets", { recursive: true });
-const staged = new Set();
-function walk(dir) {
-  for (const entry of NodeFS.readdirSync(dir, { withFileTypes: true })) {
-    const file = NodePath.join(dir, entry.name);
-    if (entry.isDirectory()) walk(file);
-    else {
-      const name = releaseAssetName(platform, version, entry.name);
-      if (name === null) continue;
-      // Rename payload and signature together; bytes and signatures stay unchanged.
-      if (staged.has(name)) throw Error(`Duplicate release asset: ${name}`);
-      staged.add(name);
-      NodeFS.copyFileSync(file, NodePath.join("release-assets", name));
-    }
+const directories = platform.startsWith("darwin")
+  ? ["macos", "dmg"]
+  : platform.startsWith("windows")
+    ? ["nsis", "msi"]
+    : ["appimage", "deb", "rpm"];
+
+for (const directory of directories) {
+  const bundle = NodePath.join(source, directory);
+  for (const entry of NodeFS.readdirSync(bundle, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = releaseAssetName(platform, version, entry.name);
+    if (name === null) continue;
+    NodeFS.copyFileSync(
+      NodePath.join(bundle, entry.name),
+      NodePath.join("release-assets", name),
+      NodeFS.constants.COPYFILE_EXCL,
+    );
   }
 }
-walk(source);
