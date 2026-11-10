@@ -1,5 +1,6 @@
 import { DeviceHostUpdates } from "../device/DeviceHostUpdates";
 import { DeviceToolVersions } from "../device/DeviceToolVersions";
+import { useLocalizedSettingLookup } from "../../useUiLanguage";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { DeviceSourcesSettings } from "./DeviceSourcesSettings";
@@ -779,13 +780,13 @@ function BrowserSearchEngineSetting() {
 }
 
 export function PullRequestLinksOpenInAppSetting() {
+  const row = useLocalizedSettingLookup();
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
   const updateSettings = useUpdatePrimarySettings();
 
   return (
     <SettingsRow
-      {...searchableSetting("pull-request-links-open-in-app")}
-      description="Clicking a pull request link opens it in Gustaf. Turn off to open pull request links like any other link, on your git host."
+      {...row("pull-request-links-open-in-app")}
       resetAction={
         openInApp ? null : (
           <SettingResetButton
@@ -800,7 +801,7 @@ export function PullRequestLinksOpenInAppSetting() {
           onCheckedChange={(checked) =>
             updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
           }
-          aria-label="Open pull requests in Gustaf"
+          aria-label={row("pull-request-links-open-in-app").title}
         />
       }
     />
