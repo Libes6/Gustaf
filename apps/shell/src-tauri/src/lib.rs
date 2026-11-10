@@ -180,6 +180,9 @@ pub fn run() {
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
+                // Tauri's own drop handler swallows Finder drags before the page sees them.
+                // The composer handles drops itself, so the web view has to receive them.
+                .disable_drag_drop_handler()
                 // WKWebView drops window.open. ChatGPT sign-in uses it.
                 .on_new_window(|url, _features| {
                     open_external_url(&url);
