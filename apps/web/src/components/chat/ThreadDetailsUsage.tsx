@@ -12,7 +12,7 @@ import {
   type LimitPace,
   limitsNotice,
   paceOf,
-  remainingPercent,
+  usedPercentOf,
 } from "@t3tools/shared/usageLimits";
 import type { ReactNode } from "react";
 
@@ -41,7 +41,7 @@ export interface ThreadDetailsUsageInput {
 
 type UsageTone = "error" | "warning" | null;
 
-/** The selected provider's limit windows. Each row reads as room left. */
+/** The selected provider's limit windows. Each row reads as quota used. */
 export function ThreadDetailsUsage({
   providerInstanceId,
   providers,
@@ -151,20 +151,20 @@ function LimitRow({
 }) {
   const t = useT();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const left = remainingPercent(window);
+  const used = usedPercentOf(window);
   const pace = paceOf(window, now);
   const resetsAt = window.resetsAt ? Date.parse(window.resetsAt) : Number.NaN;
   return (
     <UsageRow
       label={window.label}
-      fill={left}
-      tone={left <= 10 ? "error" : left <= 20 ? "warning" : null}
-      value={`${left}%`}
-      ariaValue={`${left}% left`}
+      fill={used}
+      tone={used >= 90 ? "error" : used >= 80 ? "warning" : null}
+      value={`${used}%`}
+      ariaValue={`${used}% used`}
       tooltip={
         <>
           <span className="text-foreground">
-            {window.label}: {left}% left
+            {window.label}: {used}% used
           </span>
           {window.resetsAt && resetsAt > now ? (
             <span className="text-muted-foreground">

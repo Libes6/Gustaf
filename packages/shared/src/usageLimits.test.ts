@@ -20,7 +20,7 @@ import {
   elapsedShare,
   exhaustedUsageWindow,
   paceOf,
-  paceRemainingPercent,
+  paceElapsedPercent,
   usesChatGptSharing,
   resolveNewThreadModelSelection,
 } from "./usageLimits.ts";
@@ -156,7 +156,7 @@ describe("new thread model fallback", () => {
 describe("pace", () => {
   it("places the clock three fifths through a five-hour window with two hours left", () => {
     expect(elapsedShare(window, now)).toBeCloseTo(0.6);
-    expect(paceRemainingPercent(window, now)).toBe(40);
+    expect(paceElapsedPercent(window, now)).toBe(60);
     expect(paceOf(window, now)).toBe("under");
     expect(paceOf({ ...window, usedPercent: 62 }, now)).toBe("on");
     expect(paceOf({ ...window, usedPercent: 80 }, now)).toBe("ahead");
