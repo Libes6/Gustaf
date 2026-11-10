@@ -16,6 +16,7 @@ import { deviceEnvironment, deviceHostProbeAtom, NO_DEVICE_PROBE_ATOM } from "~/
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { cn } from "~/lib/utils";
+import { useT } from "../../useUiLanguage";
 
 const platformName = (platform: DevicePlatform) => (platform === "ios" ? "iOS" : "Android");
 
@@ -152,6 +153,7 @@ export function DeviceSetup(props: {
   readonly state: DeviceServiceState;
   readonly onComplete?: () => void;
 }) {
+  const t = useT();
   const canConfigure = useEnvironmentScope(props.environmentId, AuthSettingsWriteScope);
   const configure = useAtomCommand(deviceEnvironment.configure);
   const list = useAtomCommand(deviceEnvironment.list, { reportFailure: false });
@@ -179,11 +181,15 @@ export function DeviceSetup(props: {
   return (
     <>
       <WizardHeader
-        title="Set up devices"
-        description="Review what runs on this environment before using simulators and emulators."
+        title={t("misc.deviceSetup.setUpDevices")}
+        description={t("misc.deviceSetup.setupDescription")}
       >
         <WizardSteps
-          steps={["Device hub", "Simulators", "Agent access"]}
+          steps={[
+            t("misc.deviceSetup.stepHub"),
+            t("misc.deviceSetup.stepSimulators"),
+            t("misc.deviceSetup.stepAgentAccess"),
+          ]}
           currentStep={step}
           onStepChange={setStep}
           isStepDisabled={(requested) => busy || pending !== null || requested > step}
@@ -194,13 +200,13 @@ export function DeviceSetup(props: {
         <DeviceHostUpdates state={props.state} environmentId={props.environmentId} />
         {step === 0 ? (
           <section className="space-y-3 text-sm">
-            <h3 className="font-medium">Enable the device hub</h3>
+            <h3 className="font-medium">{t("misc.deviceSetup.enableHub")}</h3>
             <div className="flex items-start justify-between gap-4">
               <p className="text-muted-foreground">{deviceHubDescription}</p>
               <Switch
                 checked={enabled}
                 disabled={!canConfigure || busy || pending !== null}
-                aria-label="Enable device hub"
+                aria-label={t("misc.deviceSetup.enableHubLabel")}
                 onCheckedChange={(checked) =>
                   void update("hub", {
                     enabled: Boolean(checked),
@@ -218,7 +224,7 @@ export function DeviceSetup(props: {
 
         {step === 1 || (step === 0 && enabled && localPlatformsUnavailable) ? (
           <section className={cn("space-y-3 text-sm", step === 0 && "mt-4")}>
-            <h3 className="font-medium">Check simulator support</h3>
+            <h3 className="font-medium">{t("misc.deviceSetup.checkSimulators")}</h3>
             <DevicePlatformSetup
               state={props.state}
               checking={pending === "check"}
@@ -235,13 +241,13 @@ export function DeviceSetup(props: {
 
         {step === 2 ? (
           <section className="space-y-3 text-sm">
-            <h3 className="font-medium">Allow agent control</h3>
+            <h3 className="font-medium">{t("misc.deviceSetup.allowAgentControl")}</h3>
             <div className="flex items-start justify-between gap-4">
               <p className="text-muted-foreground">{agentDeviceDescription}</p>
               <Switch
                 checked={props.state.agentAccessEnabled}
                 disabled={!canConfigure || !enabled || busy || pending !== null}
-                aria-label="Allow agents to control devices"
+                aria-label={t("misc.deviceSetup.allowAgentsLabel")}
                 onCheckedChange={(checked) =>
                   void update("agent", { agentAccessEnabled: Boolean(checked) })
                 }
@@ -262,7 +268,9 @@ export function DeviceSetup(props: {
 
       <WizardFooter>
         {step === 0 ? (
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>
+            {t("misc.deviceSetup.cancel")}
+          </DialogClose>
         ) : (
           <Button
             variant="outline"
@@ -281,7 +289,7 @@ export function DeviceSetup(props: {
             disabled={!canConfigure || !ready || pending !== null}
             onClick={() => void update("complete", { onboardingCompleted: true })}
           >
-            {pending === "complete" ? "Saving…" : "Done"}
+            {pending === "complete" ? t("misc.deviceSetup.saving") : t("misc.deviceSetup.done")}
           </Button>
         )}
       </WizardFooter>
@@ -298,6 +306,7 @@ export function DeviceHubSetupStatus({
   readonly pending: boolean;
   readonly compact?: boolean;
 }) {
+  const t = useT();
   if (!pending && !deviceHubReadiness(state).ready) return null;
   return (
     <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -305,16 +314,16 @@ export function DeviceHubSetupStatus({
       {pending
         ? state.hostStatus === "installing"
           ? compact
-            ? "Installing…"
-            : "Installing device hub…"
+            ? t("misc.deviceSetup.installing")
+            : t("misc.deviceSetup.installingHub")
           : state.hostStatus === "starting"
             ? compact
-              ? "Starting…"
-              : "Starting device hub…"
+              ? t("misc.deviceSetup.starting")
+              : t("misc.deviceSetup.startingHub")
             : compact
-              ? "Updating…"
-              : "Updating device hub…"
-        : "Device hub is ready."}
+              ? t("misc.deviceSetup.updating")
+              : t("misc.deviceSetup.updatingHub")
+        : t("misc.deviceSetup.hubReady")}
     </p>
   );
 }
@@ -325,6 +334,7 @@ function DevicePlatformSetup(props: {
   readonly disabled: boolean;
   readonly onCheck: () => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <PlatformStatus platform="iOS" status={platformSetupStatus(props.state, "ios")} />
@@ -335,7 +345,7 @@ function DevicePlatformSetup(props: {
       </p>
       <Button size="compact" variant="outline" disabled={props.disabled} onClick={props.onCheck}>
         {props.checking ? <Spinner size="xs" /> : null}
-        {props.checking ? "Checking…" : "Check again"}
+        {props.checking ? t("misc.deviceSetup.checking") : t("misc.deviceSetup.checkAgain")}
       </Button>
     </div>
   );
@@ -346,19 +356,20 @@ export function AgentDeviceSetupStatus(props: {
   readonly pending: boolean;
   readonly compact?: boolean;
 }) {
+  const t = useT();
   if (props.pending) {
     const label =
       props.state.hostStatus === "installing"
         ? props.compact
-          ? "Installing…"
-          : "Installing agent tools…"
+          ? t("misc.deviceSetup.installing")
+          : t("misc.deviceSetup.installingTools")
         : props.state.hostStatus === "starting"
           ? props.compact
-            ? "Starting…"
-            : "Starting agent tools…"
+            ? t("misc.deviceSetup.starting")
+            : t("misc.deviceSetup.startingTools")
           : props.compact
-            ? "Updating…"
-            : "Updating agent access…";
+            ? t("misc.deviceSetup.updating")
+            : t("misc.deviceSetup.updatingAccess");
     return (
       <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
         <Spinner size="xs" />
@@ -386,6 +397,7 @@ function PlatformStatus(props: {
   readonly status: { readonly ready: boolean; readonly message: string };
   readonly compact?: boolean;
 }) {
+  const t = useT();
   return (
     <div
       className={cn("flex gap-2", !props.compact && "rounded-md border border-border/60 px-3 py-2")}
@@ -400,7 +412,7 @@ function PlatformStatus(props: {
       <div className={cn(props.compact && props.status.ready && "flex items-center gap-2")}>
         <p className="font-medium">{props.platform}</p>
         <p className="text-xs text-muted-foreground">
-          {props.compact && props.status.ready ? "Ready" : props.status.message}
+          {props.compact && props.status.ready ? t("misc.deviceSetup.ready") : props.status.message}
         </p>
       </div>
     </div>

@@ -4,14 +4,19 @@ import type { SidebarProjectSnapshot } from "~/sidebarProjectGrouping";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
+import { useT } from "../useUiLanguage";
 export function ProjectEnvironmentBadge(props: {
   readonly group: Pick<SidebarProjectSnapshot, "memberProjects">;
   readonly primaryEnvironmentId: EnvironmentId | null;
   readonly machineByEnvironmentId: ReadonlyMap<EnvironmentId, EnvironmentMachineKind>;
 }) {
+  const t = useT();
   const remoteMembers = props.group.memberProjects
     .filter((member) => member.environmentId !== props.primaryEnvironmentId)
-    .map((member) => ({ ...member, environmentLabel: member.environmentLabel ?? "Remote" }))
+    .map((member) => ({
+      ...member,
+      environmentLabel: member.environmentLabel ?? t("shell.smallUi.remote"),
+    }))
     .sort((a, b) => a.environmentLabel.localeCompare(b.environmentLabel));
   const first = remoteMembers[0];
   if (!first) return null;
@@ -20,7 +25,7 @@ export function ProjectEnvironmentBadge(props: {
     .filter((label, index, all) => all.indexOf(label) === index)
     .join(", ");
   const alsoHere = remoteMembers.length < props.group.memberProjects.length;
-  const description = `${alsoHere ? "Also on" : "On"} ${labels}`;
+  const description = `${alsoHere ? t("shell.smallUi.alsoOn") : t("shell.smallUi.on")} ${labels}`;
   return (
     <Tooltip>
       <TooltipTrigger

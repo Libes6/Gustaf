@@ -17,14 +17,18 @@ import {
   MenuTrigger,
 } from "~/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { useT } from "../../useUiLanguage";
 
 const COLOR_SCHEME_OPTIONS: ReadonlyArray<{
   value: DesktopPreviewColorScheme;
-  label: string;
+  labelKey:
+    | "misc.previewMoreMenu.appearanceSystem"
+    | "misc.previewMoreMenu.appearanceLight"
+    | "misc.previewMoreMenu.appearanceDark";
 }> = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  { value: "system", labelKey: "misc.previewMoreMenu.appearanceSystem" },
+  { value: "light", labelKey: "misc.previewMoreMenu.appearanceLight" },
+  { value: "dark", labelKey: "misc.previewMoreMenu.appearanceDark" },
 ];
 
 export interface PreviewMoreMenuActions {
@@ -51,18 +55,24 @@ interface Props {
   move?: { readonly label: string; readonly onMove: () => void };
 }
 
-const MenuTriggerButton = () => (
+const MenuTriggerButton = ({
+  menuLabel,
+  moreLabel,
+}: {
+  readonly menuLabel: string;
+  readonly moreLabel: string;
+}) => (
   <Tooltip>
     <TooltipTrigger
       render={
         <MenuTrigger
-          render={<Button variant="ghost" size="icon-xs" type="button" aria-label="Preview menu" />}
+          render={<Button variant="ghost" size="icon-xs" type="button" aria-label={menuLabel} />}
         />
       }
     >
       <MoreVertical />
     </TooltipTrigger>
-    <TooltipPopup>More</TooltipPopup>
+    <TooltipPopup>{moreLabel}</TooltipPopup>
   </Tooltip>
 );
 
@@ -77,33 +87,41 @@ export function PreviewMoreMenu({
   profileName,
   move,
 }: Props) {
+  const t = useT();
   const zoomLabel = `${Math.round(zoomFactor * 100)}%`;
   const disabled = !enabled;
   return (
     <Menu>
-      <MenuTriggerButton />
+      <MenuTriggerButton
+        menuLabel={t("misc.previewMoreMenu.previewMenu")}
+        moreLabel={t("misc.previewMoreMenu.more")}
+      />
       <MenuPopup align="end" sideOffset={6}>
         <MenuItem onClick={actions.hardReload} disabled={disabled}>
-          Hard reload
+          {t("misc.previewMoreMenu.hardReload")}
         </MenuItem>
         {actions.openDevTools ? (
           <MenuItem onClick={actions.openDevTools} disabled={disabled}>
-            Open DevTools
+            {t("misc.previewMoreMenu.openDevTools")}
           </MenuItem>
         ) : null}
         {actions.toggleNativePictureInPicture ? (
           <MenuItem onClick={actions.toggleNativePictureInPicture} disabled={disabled}>
             {nativePictureInPicture
-              ? "Close separate preview window"
-              : "Open separate preview window"}
+              ? t("misc.previewMoreMenu.closeSeparateWindow")
+              : t("misc.previewMoreMenu.openSeparateWindow")}
           </MenuItem>
         ) : null}
         {move ? <MenuItem onClick={move.onMove}>{move.label}</MenuItem> : null}
         <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
-          {deviceToolbarVisible ? "Hide device toolbar" : "Show device toolbar"}
+          {deviceToolbarVisible
+            ? t("misc.previewMoreMenu.hideDeviceToolbar")
+            : t("misc.previewMoreMenu.showDeviceToolbar")}
         </MenuItem>
         <MenuSub>
-          <MenuSubTrigger disabled={disabled}>Appearance</MenuSubTrigger>
+          <MenuSubTrigger disabled={disabled}>
+            {t("misc.previewMoreMenu.appearance")}
+          </MenuSubTrigger>
           <MenuSubPopup>
             <MenuRadioGroup
               value={colorScheme}
@@ -111,7 +129,7 @@ export function PreviewMoreMenu({
             >
               {COLOR_SCHEME_OPTIONS.map((option) => (
                 <MenuRadioItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </MenuRadioItem>
               ))}
             </MenuRadioGroup>
@@ -124,14 +142,14 @@ export function PreviewMoreMenu({
           className="justify-between"
           disabled={disabled}
         >
-          <span>Zoom</span>
+          <span>{t("misc.previewMoreMenu.zoom")}</span>
           <span className="flex items-center gap-1">
             <Button
               variant="outline"
               size="icon-xs"
               type="button"
               onClick={actions.zoomOut}
-              aria-label="Zoom out"
+              aria-label={t("misc.previewMoreMenu.zoomOut")}
               disabled={disabled}
             >
               <Minus />
@@ -144,7 +162,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.zoomIn}
-              aria-label="Zoom in"
+              aria-label={t("misc.previewMoreMenu.zoomIn")}
               disabled={disabled}
             >
               <PlusIcon />
@@ -154,7 +172,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.resetZoom}
-              aria-label="Reset zoom"
+              aria-label={t("misc.previewMoreMenu.resetZoom")}
               disabled={disabled}
             >
               <RotateCcw />
@@ -165,11 +183,15 @@ export function PreviewMoreMenu({
         <MenuGroup>
           {profileName ? (
             <MenuGroupLabel className="max-w-64">
-              <span className="block truncate">Profile: {profileName}</span>
+              <span className="block truncate">
+                {t("misc.previewMoreMenu.profileLabel").replace("{name}", profileName)}
+              </span>
             </MenuGroupLabel>
           ) : null}
-          <MenuItem onClick={actions.clearCookies}>Clear cookies</MenuItem>
-          <MenuItem onClick={actions.clearCache}>Clear cache</MenuItem>
+          <MenuItem onClick={actions.clearCookies}>
+            {t("misc.previewMoreMenu.clearCookies")}
+          </MenuItem>
+          <MenuItem onClick={actions.clearCache}>{t("misc.previewMoreMenu.clearCache")}</MenuItem>
         </MenuGroup>
       </MenuPopup>
     </Menu>

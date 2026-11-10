@@ -1,3 +1,5 @@
+import { useT } from "../../useUiLanguage";
+import type { MessageKey } from "~/i18n";
 import {
   FULL_ACCESS_OVERRIDE_QUESTION,
   fullAccessOverrideExplanation,
@@ -13,22 +15,34 @@ import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
 
 const APPROVAL_PRESENTATION = {
-  command: { icon: "terminal", label: "Command approval", detailLabel: "Command" },
-  "file-change": { icon: "square-pen", label: "File change approval", detailLabel: "File change" },
-  "file-read": { icon: "eye", label: "File read approval", detailLabel: "File to read" },
+  command: {
+    icon: "terminal",
+    label: "chatB.TimelinePendingApprovalRow.commandApproval",
+    detailLabel: "chatB.TimelinePendingApprovalRow.command",
+  },
+  "file-change": {
+    icon: "square-pen",
+    label: "chatB.TimelinePendingApprovalRow.fileChangeApproval",
+    detailLabel: "chatB.TimelinePendingApprovalRow.fileChange",
+  },
+  "file-read": {
+    icon: "eye",
+    label: "chatB.TimelinePendingApprovalRow.fileReadApproval",
+    detailLabel: "chatB.TimelinePendingApprovalRow.fileToRead",
+  },
   permission: {
     icon: "wrench",
-    label: "App permission approval",
-    detailLabel: "Permission request",
+    label: "chatB.TimelinePendingApprovalRow.appPermissionApproval",
+    detailLabel: "chatB.TimelinePendingApprovalRow.permissionRequest",
   },
   "mcp-elicitation": {
     icon: "hammer",
-    label: "App access approval",
-    detailLabel: "App access request",
+    label: "chatB.TimelinePendingApprovalRow.appAccessApproval",
+    detailLabel: "chatB.TimelinePendingApprovalRow.appAccessRequest",
   },
 } satisfies Record<
   PendingApproval["requestKind"],
-  { icon: WorkEntryIconName; label: string; detailLabel: string }
+  { icon: WorkEntryIconName; label: MessageKey; detailLabel: MessageKey }
 >;
 
 export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
@@ -36,13 +50,14 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
 }: {
   approval: PendingApproval;
 }) {
+  const t = useT();
   const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (
     <WorkLogRow
       role="group"
-      aria-label={presentation.label}
+      aria-label={t(presentation.label)}
       data-v2-item-type="approval_request"
       wrapLabel
       icon={
@@ -55,12 +70,12 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
       }
       label={
         <code
-          aria-label={presentation.detailLabel}
+          aria-label={t(presentation.detailLabel)}
           className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
           data-approval-detail="complete"
           tabIndex={0}
         >
-          {approval.detail || presentation.label}
+          {approval.detail || t(presentation.label)}
         </code>
       }
     >
@@ -76,7 +91,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             <>
               <span className="inline-flex items-center gap-1 text-warning">
                 <ShieldIcon aria-hidden className="size-3 shrink-0" />
-                Waiting for approval
+                {t("chatB.TimelinePendingApprovalRow.waitingForApproval")}
               </span>
               {onRespondToApproval ? (
                 <>
@@ -97,7 +112,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             </>
           ) : (
             <span className="text-warning">
-              Provider process is gone. Interrupt or restart the run to respond.
+              {t("chatB.TimelinePendingApprovalRow.providerProcessGone")}
             </span>
           )}
           {approval.fullAccessOverride ? (

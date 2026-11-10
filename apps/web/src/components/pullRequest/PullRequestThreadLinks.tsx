@@ -31,6 +31,7 @@ import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { MenuItem } from "../ui/menu";
 import { toastManager } from "../ui/toast";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { useT } from "~/useUiLanguage";
 
 interface PullRequestThreadLinksProps {
   environmentId: EnvironmentId;
@@ -60,6 +61,7 @@ function EnabledPullRequestThreadLinks({
   display,
   onPickerOpenChange,
 }: PullRequestThreadLinksProps) {
+  const t = useT();
   const parsedUrl = sourceControlClients.parseChangeRequestUrl(url);
   const parsed = parsedUrl?.link ?? null;
   const term = (parsedUrl?.definition ?? sourceControlClients.get(undefined)).changeRequest
@@ -172,10 +174,10 @@ function EnabledPullRequestThreadLinks({
             <PullRequestGlyph.link aria-hidden className="size-3.5" />
           )}
           {linkedHere
-            ? "Unlink from this thread"
+            ? t("misc.pullRequestThreadLinks.unlinkFromThread")
             : currentThreadRef
-              ? "Link to this thread"
-              : "Link to thread"}
+              ? t("misc.pullRequestThreadLinks.linkToThread")
+              : t("misc.pullRequestThreadLinks.linkToThreadShort")}
         </MenuItem>
       ) : null}
       {display === "picker" ? (
@@ -206,6 +208,7 @@ function ThreadPicker({
   pending: boolean;
   onSelect: (threadId: ThreadId) => void;
 }) {
+  const t = useT();
   const threads = useVisibleThreadShells();
   const linking = usePullRequestLinking(environmentId);
   const projects = useProjects();
@@ -229,8 +232,16 @@ function ThreadPicker({
     )
     .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
-    <Command mode="none" value={query} onValueChange={setQuery} aria-label="Choose a thread">
-      <CommandInput placeholder="Search threads or projects..." disabled={pending} />
+    <Command
+      mode="none"
+      value={query}
+      onValueChange={setQuery}
+      aria-label={t("misc.pullRequestThreadLinks.chooseThread")}
+    >
+      <CommandInput
+        placeholder={t("misc.pullRequestThreadLinks.searchThreads")}
+        disabled={pending}
+      />
       <CommandList className="max-h-80 overflow-y-auto">
         {candidates.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -248,7 +259,9 @@ function ThreadPicker({
               >
                 <MessageSquareIcon aria-hidden className="size-4 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{thread.title || "Untitled thread"}</span>
+                  <span className="truncate">
+                    {thread.title || t("misc.pullRequestThreadLinks.untitledThread")}
+                  </span>
                   <span className="truncate text-xs text-muted-foreground">
                     {projectNames.get(thread.projectId)}
                   </span>
@@ -256,7 +269,9 @@ function ThreadPicker({
                 {linked ? (
                   <>
                     <CheckIcon aria-hidden className="size-3.5" />
-                    <span className="text-xs text-muted-foreground">Linked</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("misc.pullRequestThreadLinks.linked")}
+                    </span>
                   </>
                 ) : null}
               </CommandItem>

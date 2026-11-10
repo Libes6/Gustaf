@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
 import type { EnvironmentId, OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 import {
@@ -98,6 +99,7 @@ function useFetchedTurnItem(
   source: TurnItemSource | undefined,
   skip = false,
 ) {
+  const t = useT();
   const wireItem = projectedItem.item;
   const fetches = !skip && turnItemNeedsDetailFetch(wireItem);
   const detail = useTurnItemDetail(
@@ -124,7 +126,7 @@ function useFetchedTurnItem(
         item !== wireItem
           ? null
           : detail.data?.item === null
-            ? "Output is no longer available."
+            ? t("chatB.V2ItemInspector.outputUnavailable")
             : detail.error,
       empty: fetches && item !== wireItem,
     },
@@ -142,12 +144,13 @@ interface ToolOutputState {
 }
 
 function ToolOutputImages(props: ToolOutputState) {
+  const t = useT();
   return props.images.map((resource) => (
     <ChatMarkdownAssetImage
       key={resource.index}
       environmentId={props.environmentId}
       resource={resource}
-      alt="Tool output image"
+      alt={t("chatB.V2ItemInspector.toolOutputImage")}
       maxHeightRem={16}
       onImageExpand={props.onImageExpand}
     />
@@ -155,14 +158,17 @@ function ToolOutputImages(props: ToolOutputState) {
 }
 
 function ToolOutput(props: ToolOutputState) {
+  const t = useT();
   return props.output ? (
     <StructuredValue value={props.output} highlightJson />
   ) : props.pending ? (
-    <div className="text-muted-foreground italic">Loading output…</div>
+    <div className="text-muted-foreground italic">{t("chatB.V2ItemInspector.loadingOutput")}</div>
   ) : props.error ? (
-    <div className="text-destructive">Couldn&apos;t load output: {props.error}</div>
+    <div className="text-destructive">
+      {t("chatB.V2ItemInspector.couldntLoadOutput").replace("{error}", props.error)}
+    </div>
   ) : props.empty && props.images.length === 0 ? (
-    <div className="text-muted-foreground italic">No output.</div>
+    <div className="text-muted-foreground italic">{t("chatB.V2ItemInspector.noOutput")}</div>
   ) : null;
 }
 
@@ -224,6 +230,7 @@ function ToolCallBody(
 }
 
 export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspectorProps) {
+  const t = useT();
   // Command rows stream their output, including the final output, from the server.
   const environmentStreamsOutput = useCommandOutputStreaming(props.environmentId);
   const streamsOutput =
@@ -296,7 +303,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   })
                 }
               >
-                Open diff
+                {t("chatB.V2ItemInspector.openDiff")}
               </Button>
             ) : null}
           </div>
@@ -362,7 +369,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   </a>
                 ) : (
                   <p className="font-medium text-foreground">
-                    {result.title ?? result.url ?? "Search result"}
+                    {result.title ?? result.url ?? t("chatB.V2ItemInspector.searchResult")}
                   </p>
                 )}
                 {result.snippet ? <p className="text-muted-foreground">{result.snippet}</p> : null}

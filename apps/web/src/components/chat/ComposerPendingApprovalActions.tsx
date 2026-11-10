@@ -9,6 +9,8 @@ import { Button, InlineButton } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { composerFloatingLayerProps } from "./composerEventScope";
+import type { MessageKey } from "~/i18n";
+import { useT } from "~/useUiLanguage";
 
 interface ComposerPendingApprovalActionsProps {
   presentation?: "composer" | "inline";
@@ -22,6 +24,19 @@ interface ComposerPendingApprovalActionsProps {
     decision: ProviderApprovalDecision,
   ) => Promise<unknown>;
 }
+
+// English default labels map to message keys; provider-supplied labels are shown as sent.
+const DEFAULT_APPROVAL_LABEL_KEYS = new Map<string, MessageKey>([
+  ["Cancel", "chatA.composerPendingApprovalActions.cancel"],
+  ["Decline", "chatA.composerPendingApprovalActions.decline"],
+  ["Always allow this session", "chatA.composerPendingApprovalActions.alwaysAllowSession"],
+  ["Approve", "chatA.composerPendingApprovalActions.approve"],
+]);
+
+const approvalOptionLabel = (label: string, t: (key: MessageKey) => string): string => {
+  const key = DEFAULT_APPROVAL_LABEL_KEYS.get(label);
+  return key ? t(key) : label;
+};
 
 const DEFAULT_APPROVAL_OPTIONS = [
   { decision: "cancel", label: "Cancel" },
@@ -39,6 +54,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
   options = DEFAULT_APPROVAL_OPTIONS,
   onRespondToApproval,
 }: ComposerPendingApprovalActionsProps) {
+  const t = useT();
   const primaryOptions = options.filter(
     (option) => option.decision === "decline" || option.decision === "accept",
   );
@@ -62,7 +78,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
           <>
             {option.warning ? <TriangleAlertIcon className="size-3 shrink-0" /> : null}
             <span className={presentation === "inline" ? "whitespace-normal" : "max-w-40 truncate"}>
-              {option.label}
+              {approvalOptionLabel(option.label, t)}
             </span>
           </>
         );
@@ -100,13 +116,24 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             disabled={disabled || isResponding || !canRespond}
             render={
               presentation === "inline" ? (
-                <InlineButton tone="muted" aria-label="More approval options" />
+                <InlineButton
+                  tone="muted"
+                  aria-label={t("chatA.composerPendingApprovalActions.moreOptions")}
+                />
               ) : (
-                <Button size="icon-xs" variant="outline" aria-label="More approval options" />
+                <Button
+                  size="icon-xs"
+                  variant="outline"
+                  aria-label={t("chatA.composerPendingApprovalActions.moreOptions")}
+                />
               )
             }
           >
-            {presentation === "inline" ? "More" : <EllipsisIcon />}
+            {presentation === "inline" ? (
+              t("chatA.composerPendingApprovalActions.more")
+            ) : (
+              <EllipsisIcon />
+            )}
           </MenuTrigger>
           <MenuPopup {...composerFloatingLayerProps} side="top" align="end" width="content">
             {moreOptions.map((option) => {
@@ -121,7 +148,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
                   }}
                 >
                   {option.warning ? <TriangleAlertIcon className="size-3 text-warning" /> : null}
-                  <span className="min-w-0 whitespace-normal wrap-break-word">{option.label}</span>
+                  <span className="min-w-0 whitespace-normal wrap-break-word">
+                    {approvalOptionLabel(option.label, t)}
+                  </span>
                 </MenuItem>
               );
               return option.warning ? (

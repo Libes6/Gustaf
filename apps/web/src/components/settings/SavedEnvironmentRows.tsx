@@ -65,6 +65,8 @@ import {
   ServerUpdateAction,
   ServerUpdateProgress,
 } from "../ServerUpdateAction";
+import type { MessageKey } from "../../i18n";
+import { useT } from "../../useUiLanguage";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
 import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 
@@ -76,34 +78,47 @@ type SavedBackendListRowProps = {
   onAddRoute: (environment: EnvironmentPresentation) => void;
 };
 
-function savedBackendStatus(environment: EnvironmentPresentation): {
+function savedBackendStatus(
+  environment: EnvironmentPresentation,
+  t: (key: MessageKey) => string,
+): {
   readonly text: string;
   readonly tone: "muted" | "error";
 } {
   if (!environment.entry.enabled && environment.connection.phase !== "unsupported")
-    return { text: "Off", tone: "muted" };
+    return { text: t("settingsD.savedEnvironmentRows.statusOff"), tone: "muted" };
   const { connection } = environment;
   switch (connection.phase) {
     case "connected":
-      return { text: "Connected", tone: "muted" };
+      return { text: t("settingsD.savedEnvironmentRows.connected"), tone: "muted" };
     case "connecting":
-      return { text: "Connecting", tone: "muted" };
+      return { text: t("settingsD.savedEnvironmentRows.connecting"), tone: "muted" };
     case "reconnecting":
       return {
-        text: connection.error ? `Reconnecting: ${connection.error}` : "Reconnecting",
+        text: connection.error
+          ? t("settingsD.savedEnvironmentRows.reconnectingWithError").replace(
+              "{error}",
+              connection.error,
+            )
+          : t("settingsD.savedEnvironmentRows.reconnecting"),
         tone: "error",
       };
     case "unsupported":
-      return { text: "Client not supported", tone: "muted" };
+      return { text: t("settingsD.savedEnvironmentRows.clientNotSupported"), tone: "muted" };
     case "error":
       return {
-        text: connection.error ? `Connection failed: ${connection.error}` : "Connection failed",
+        text: connection.error
+          ? t("settingsD.savedEnvironmentRows.connectionFailedWithError").replace(
+              "{error}",
+              connection.error,
+            )
+          : t("settingsD.savedEnvironmentRows.connectionFailed"),
         tone: "error",
       };
     case "offline":
-      return { text: "Offline", tone: "muted" };
+      return { text: t("settingsD.savedEnvironmentRows.offline"), tone: "muted" };
     case "available":
-      return { text: "Not connected", tone: "muted" };
+      return { text: t("settingsD.savedEnvironmentRows.notConnected"), tone: "muted" };
   }
 }
 
@@ -114,6 +129,7 @@ export function SavedBackendListRow({
   onRemove,
   onAddRoute,
 }: SavedBackendListRowProps) {
+  const t = useT();
   const [routesOpen, setRoutesOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [diagnosisOpen, setDiagnosisOpen] = useState(false);
@@ -129,7 +145,7 @@ export function SavedBackendListRow({
     onCopy: ({ traceId }) => {
       toastManager.add({
         type: "success",
-        title: "Trace ID copied",
+        title: t("settingsD.savedEnvironmentRows.traceIdCopied"),
         description: traceId,
       });
     },
@@ -137,7 +153,7 @@ export function SavedBackendListRow({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy trace ID",
+          title: t("settingsD.savedEnvironmentRows.couldNotCopyTraceId"),
           description: error.message,
         }),
       );
@@ -151,15 +167,15 @@ export function SavedBackendListRow({
     onCopy: ({ url }) => {
       toastManager.add({
         type: "success",
-        title: "MCP URL copied",
-        description: `Add it to an agent, e.g. claude mcp add --transport http t3 ${url}`,
+        title: t("settingsD.savedEnvironmentRows.mcpUrlCopied"),
+        description: t("settingsD.savedEnvironmentRows.mcpUrlHint").replace("{url}", url),
       });
     },
     onError: (error) => {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy MCP URL",
+          title: t("settingsD.savedEnvironmentRows.couldNotCopyMcpUrl"),
           description: error.message,
         }),
       );
@@ -169,7 +185,7 @@ export function SavedBackendListRow({
   const serverUpdateState = useAtomValue(serverEnvironment.updateStateAtom(environmentId));
   const resumingServerUpdate =
     serverUpdateState.status === "running" && serverUpdateState.stage === "resuming";
-  const status = savedBackendStatus(environment);
+  const status = savedBackendStatus(environment, t);
   const serverVersion = environment.serverConfig?.environment.serverVersion ?? null;
   // Discovery empties its map on every refresh, so hold the last descriptor
   // seen or the glyph would blink back to the generic one each time.
@@ -212,7 +228,11 @@ export function SavedBackendListRow({
   const subtitleText = [
     environmentTransportLabel(environment, connectedTarget),
     // The headline below names the failure in full.
-    diagnosis ? null : resumingServerUpdate ? "Restarting" : status.text,
+    diagnosis
+      ? null
+      : resumingServerUpdate
+        ? t("settingsD.savedEnvironmentRows.restarting")
+        : status.text,
     enabled && versionMismatch ? serverVersion : null,
   ]
     .filter((value): value is string => value !== null)
@@ -229,10 +249,12 @@ export function SavedBackendListRow({
       ? (environment.connection.error ?? connectionStatusText(environment.connection))
       : enabled
         ? connectionStatusText(environment.connection)
-        : "Switched off"
+        : t("settingsD.savedEnvironmentRows.switchedOff")
   }${
     versionMismatch
-      ? `\nUpdate available: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
+      ? t("settingsD.savedEnvironmentRows.updateAvailable")
+          .replace("{server}", versionMismatch.serverVersion)
+          .replace("{client}", versionMismatch.clientVersion)
       : ""
   }`;
 
@@ -295,7 +317,7 @@ export function SavedBackendListRow({
             onClick={() => setPermissionsOpen((open) => !open)}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            Permissions
+            {t("settingsD.savedEnvironmentRows.permissions")}
             <ChevronRightIcon
               aria-hidden
               className={cn(
@@ -360,21 +382,35 @@ export function SavedBackendListRow({
       serverUpdateState.status !== "running" ? (
         <OutdatedServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={t("settingsD.savedEnvironmentRows.serverLabel").replace(
+            "{label}",
+            environment.label,
+          )}
           fromVersion={lastDescriptor?.serverVersion}
           targetVersion={APP_VERSION}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={
+            serverUpdateState.status === "failed"
+              ? t("settingsD.savedEnvironmentRows.retryUpdate")
+              : t("settingsD.savedEnvironmentRows.update")
+          }
         />
       ) : null}
       {showUpdateAction ? (
         <ServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={t("settingsD.savedEnvironmentRows.serverLabel").replace(
+            "{label}",
+            environment.label,
+          )}
           selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
           desktopAppUpdate={supportsDesktopAppUpdate(environment.serverConfig)}
           targetVersion={versionMismatch.clientVersion}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={
+            serverUpdateState.status === "failed"
+              ? t("settingsD.savedEnvironmentRows.retryUpdate")
+              : t("settingsD.savedEnvironmentRows.update")
+          }
           appearance="icon"
         />
       ) : null}
@@ -385,13 +421,27 @@ export function SavedBackendListRow({
               size="sm"
               checked={enabled}
               disabled={isRemoving || blocked}
-              aria-label={`${enabled ? "Switch off" : "Switch on"} ${environment.label}`}
+              aria-label={
+                enabled
+                  ? t("settingsD.savedEnvironmentRows.switchOffFor").replace(
+                      "{label}",
+                      environment.label,
+                    )
+                  : t("settingsD.savedEnvironmentRows.switchOnFor").replace(
+                      "{label}",
+                      environment.label,
+                    )
+              }
               onCheckedChange={(checked) => onSetEnabled(environmentId, checked)}
             />
           }
         />
         <TooltipPopup side="top">
-          {blocked ? "Client not supported" : enabled ? "Switch off" : "Switch on"}
+          {blocked
+            ? t("settingsD.savedEnvironmentRows.clientNotSupported")
+            : enabled
+              ? t("settingsD.savedEnvironmentRows.switchOff")
+              : t("settingsD.savedEnvironmentRows.switchOn")}
         </TooltipPopup>
       </Tooltip>
       <Menu>
@@ -402,7 +452,10 @@ export function SavedBackendListRow({
               variant="ghost-muted"
               size="icon-xs"
               disabled={isRemoving}
-              aria-label={`More actions for ${environment.label}`}
+              aria-label={t("settingsD.savedEnvironmentRows.moreActionsFor").replace(
+                "{label}",
+                environment.label,
+              )}
             />
           }
         >
@@ -415,17 +468,25 @@ export function SavedBackendListRow({
           />
           <MenuItem onClick={() => setRoutesOpen((open) => !open)}>
             <RouteIcon />
-            {routesOpen ? "Hide routes" : "Routes"}
+            {routesOpen
+              ? t("settingsD.savedEnvironmentRows.hideRoutes")
+              : t("settingsD.savedEnvironmentRows.routes")}
           </MenuItem>
           {mcpUrl ? (
-            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>Copy MCP URL</MenuItem>
+            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>
+              {t("settingsD.savedEnvironmentRows.copyMcpUrl")}
+            </MenuItem>
           ) : null}
           {errorTraceId ? (
-            <MenuItem onClick={() => copyTraceId(errorTraceId)}>Copy trace ID</MenuItem>
+            <MenuItem onClick={() => copyTraceId(errorTraceId)}>
+              {t("settingsD.savedEnvironmentRows.copyTraceId")}
+            </MenuItem>
           ) : null}
           <MenuSeparator />
           <MenuItem variant="destructive" onClick={() => onRemove(environment)}>
-            {isRemoving ? "Removing…" : "Remove from this device…"}
+            {isRemoving
+              ? t("settingsD.savedEnvironmentRows.removing")
+              : t("settingsD.savedEnvironmentRows.removeFromDevice")}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -438,7 +499,7 @@ function CloudLinkSwitch({
   disabled,
   disabledReason,
   onCheckedChange,
-  ariaLabel = "Enable T3 Connect",
+  ariaLabel,
 }: {
   readonly checked: boolean;
   readonly disabled: boolean;
@@ -446,9 +507,10 @@ function CloudLinkSwitch({
   readonly onCheckedChange?: (enabled: boolean) => void;
   readonly ariaLabel?: string;
 }) {
+  const t = useT();
   const control = (
     <Switch
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t("settingsD.savedEnvironmentRows.enableT3Connect")}
       checked={checked}
       disabled={disabled}
       {...(onCheckedChange ? { onCheckedChange } : {})}
@@ -466,6 +528,7 @@ function CloudLinkSwitch({
 
 /** Tunnel meter, plus the upgrade prompt after the relay refuses a tunnel at the cap. */
 function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | null }) {
+  const t = useT();
   const usage = useManagedTunnelUsage();
   const accountPage = useT3ConnectAccountPage();
   const openAccountPage = accountPage.open;
@@ -489,7 +552,9 @@ function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | 
         action={
           // At the cap the alert below carries the same action.
           usage.upgrade && openAccountPage && !showLimitAlert ? (
-            <InlineButton onClick={() => openAccountPage("t3-chat")}>Get more tunnels</InlineButton>
+            <InlineButton onClick={() => openAccountPage("t3-chat")}>
+              {t("settingsD.savedEnvironmentRows.getMoreTunnels")}
+            </InlineButton>
           ) : null
         }
       />
@@ -533,6 +598,7 @@ function ConfiguredCloudLinkRow({
     tunnelLimit,
     reconcileCloudState,
   } = useCloudLinkController(environmentId);
+  const t = useT();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   // The server unlinks and refuses relay changes under such a policy; unlinking stays possible.
   const connectDenial = managedCapabilityDenial(useManagedPolicy(environmentId), "connect");
@@ -541,7 +607,7 @@ function ConfiguredCloudLinkRow({
 
   const disabledReason = canManageRelay
     ? null
-    : "Your session does not have permission to manage T3 Connect access.";
+    : t("settingsD.savedEnvironmentRows.noConnectPermission");
   const isBusy = isUpdating || isUpdatingPreference;
   const switchDisabled =
     !canManageRelay ||
@@ -555,7 +621,7 @@ function ConfiguredCloudLinkRow({
   const signedOut = isSignedIn === false;
   const signInButton = (
     <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-      Sign in
+      {t("settingsD.savedEnvironmentRows.signIn")}
     </Button>
   );
   const refreshLinkState = useEffectEvent(cloudLinkState.refresh);
@@ -572,7 +638,11 @@ function ConfiguredCloudLinkRow({
       formatConnectReachable(reachability)
     ) : reachability?.status === "unreachable" ? (
       <span className="block text-destructive">
-        {[reachability.reason, reachability.hint, `Fix: ${reachability.fix}`]
+        {[
+          reachability.reason,
+          reachability.hint,
+          t("settingsD.savedEnvironmentRows.fix").replace("{fix}", reachability.fix),
+        ]
           .filter(Boolean)
           .join(" ")}{" "}
         <a
@@ -581,7 +651,7 @@ function ConfiguredCloudLinkRow({
           rel="noreferrer"
           className="underline underline-offset-2"
         >
-          More info
+          {t("settingsD.savedEnvironmentRows.moreInfo")}
         </a>
       </span>
     ) : null;
@@ -594,15 +664,15 @@ function ConfiguredCloudLinkRow({
       toastManager.add({
         type: "success",
         title: enabled
-          ? "T3 Connect linked"
+          ? t("settingsD.savedEnvironmentRows.t3ConnectLinked")
           : publishAgentActivity
-            ? "T3 Connect tunnel disabled"
-            : "T3 Connect unlinked",
+            ? t("settingsD.savedEnvironmentRows.t3ConnectTunnelDisabled")
+            : t("settingsD.savedEnvironmentRows.t3ConnectUnlinked"),
         description: enabled
-          ? "This environment is available through T3 Connect."
+          ? t("settingsD.savedEnvironmentRows.linkedDescription")
           : publishAgentActivity
-            ? "The managed tunnel was removed. Agent activity publishing stays on."
-            : "This environment is no longer available through T3 Connect.",
+            ? t("settingsD.savedEnvironmentRows.tunnelRemovedDescription")
+            : t("settingsD.savedEnvironmentRows.unlinkedDescription"),
       });
     }
     setIsUpdating(false);
@@ -615,10 +685,12 @@ function ConfiguredCloudLinkRow({
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Agent activity enabled" : "Agent activity disabled",
+        title: enabled
+          ? t("settingsD.savedEnvironmentRows.agentActivityEnabled")
+          : t("settingsD.savedEnvironmentRows.agentActivityDisabled"),
         description: enabled
-          ? "This environment publishes agent activity to your mobile clients."
-          : "This environment will stop publishing agent activity.",
+          ? t("settingsD.savedEnvironmentRows.publishingDescription")
+          : t("settingsD.savedEnvironmentRows.stopPublishingDescription"),
       });
     }
     setIsUpdatingPreference(false);
@@ -634,10 +706,12 @@ function ConfiguredCloudLinkRow({
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Webhooks held while offline" : "Webhooks no longer held",
+        title: enabled
+          ? t("settingsD.savedEnvironmentRows.webhooksHeld")
+          : t("settingsD.savedEnvironmentRows.webhooksNoLongerHeld"),
         description: enabled
-          ? "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline."
-          : "Requests to an offline environment now fail. Anything already held is still delivered.",
+          ? t("settingsD.savedEnvironmentRows.webhooksHeldDescription")
+          : t("settingsD.savedEnvironmentRows.webhooksNotHeldDescription"),
       });
     }
     setIsUpdatingPreference(false);
@@ -652,18 +726,18 @@ function ConfiguredCloudLinkRow({
             connectDenial !== undefined && !managedTunnelActive
               ? connectDenial
               : signedOut
-                ? "Sign in to make this environment available to your other devices through T3 Connect."
+                ? t("settingsD.savedEnvironmentRows.signInToMakeAvailable")
                 : linkRevoked
-                  ? "This environment was removed from T3 Connect. Turn it on to link it again."
+                  ? t("settingsD.savedEnvironmentRows.removedFromConnect")
                   : managedTunnelActive
                     ? reachability?.status === "unreachable"
-                      ? "T3 Connect is on, but other devices cannot reach this environment."
+                      ? t("settingsD.savedEnvironmentRows.reachabilityUnreachable")
                       : reachability?.status === "reachable"
-                        ? "This environment is available to your other devices through T3 Connect."
-                        : "T3 Connect is on. Reachability has not been checked yet."
+                        ? t("settingsD.savedEnvironmentRows.reachableDescription")
+                        : t("settingsD.savedEnvironmentRows.reachabilityNotChecked")
                     : managedTunnelOutOfSync
-                      ? "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it."
-                      : "Make this environment available to your other devices through T3 Connect."
+                      ? t("settingsD.savedEnvironmentRows.outOfSyncDescription")
+                      : t("settingsD.savedEnvironmentRows.makeAvailableDescription")
           }
           status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
           managed={managedTunnelActive ? undefined : connectDenial}
@@ -687,7 +761,7 @@ function ConfiguredCloudLinkRow({
       ) : linkRevoked ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again."
+          description={t("settingsD.savedEnvironmentRows.removedRunLinkCommand")}
         />
       ) : null}
       {signedOut && isElectron ? null : (
@@ -695,8 +769,8 @@ function ConfiguredCloudLinkRow({
           title={searchableSetting("publish-agent-activity").title}
           description={
             signedOut
-              ? "Sign in to send activity to mobile notifications and Live Activities."
-              : "Send activity to mobile notifications and Live Activities without T3 Connect."
+              ? t("settingsD.savedEnvironmentRows.publishSignInDescription")
+              : t("settingsD.savedEnvironmentRows.publishDescription")
           }
           managed={connectDenial}
           control={
@@ -704,7 +778,7 @@ function ConfiguredCloudLinkRow({
               signInButton
             ) : (
               <CloudLinkSwitch
-                ariaLabel="Publish agent activity to mobile clients"
+                ariaLabel={t("settingsD.savedEnvironmentRows.publishAriaLabel")}
                 checked={publishAgentActivity}
                 disabled={switchDisabled}
                 disabledReason={disabledReason}
@@ -717,11 +791,11 @@ function ConfiguredCloudLinkRow({
       {managedTunnelActive && !signedOut ? (
         <SettingsRow
           title={searchableSetting("hold-webhooks-while-offline").title}
-          description="Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing."
+          description={t("settingsD.savedEnvironmentRows.holdDescription")}
           managed={connectDenial}
           control={
             <CloudLinkSwitch
-              ariaLabel="Hold webhook requests while this environment is offline"
+              ariaLabel={t("settingsD.savedEnvironmentRows.holdAriaLabel")}
               checked={holdWebhooksWhileOffline}
               disabled={switchDisabled}
               disabledReason={disabledReason}
@@ -743,12 +817,13 @@ export function CloudLinkRow({
   readonly canReadRelay: boolean;
   readonly canManageRelay: boolean;
 }) {
+  const t = useT();
   if (!hasCloudPublicConfig()) return null;
   if (!canReadRelay) {
     return (
       <SettingsRow
         title="T3 Connect"
-        description="To edit these settings, pair this connection with both View relay and Manage relay permissions."
+        description={t("settingsD.savedEnvironmentRows.editPermissionsDescription")}
       />
     );
   }
@@ -756,17 +831,18 @@ export function CloudLinkRow({
 }
 
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
+  const t = useT();
   return (
     <Empty className="min-h-52">
       <EmptyMedia variant="icon">
         <ChevronsLeftRightEllipsisIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>No saved remote environments</EmptyTitle>
+        <EmptyTitle>{t("settingsD.savedEnvironmentRows.noRemoteEnvironments")}</EmptyTitle>
         <EmptyDescription>
           {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
-            : "Click “Add environment” to pair another environment."}
+            ? t("settingsD.savedEnvironmentRows.addEnvironmentCloud")
+            : t("settingsD.savedEnvironmentRows.addEnvironment")}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

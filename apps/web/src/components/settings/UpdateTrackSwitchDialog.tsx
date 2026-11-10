@@ -30,6 +30,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import { useT } from "../../useUiLanguage";
 
 /** Moves this app and every connected machine to `channel`. */
 export function UpdateTrackSwitchDialog({
@@ -39,6 +40,7 @@ export function UpdateTrackSwitchDialog({
   readonly channel: DesktopUpdateChannel;
   readonly onClose: () => void;
 }) {
+  const t = useT();
   // npm dist-tags match the desktop channel names.
   const release = useAtomValue(npmReleaseAtom(channel));
   if (AsyncResult.isSuccess(release) && release.value !== null) {
@@ -49,17 +51,21 @@ export function UpdateTrackSwitchDialog({
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Switch to {label}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t("settingsE.updateTrackSwitchDialog.switchTo").replace("{label}", label)}
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {AsyncResult.isFailure(release)
               ? npmReleaseFailureMessage(release.cause)
               : AsyncResult.isSuccess(release)
-                ? `Could not find the latest ${label} release in this environment's npm registry.`
-                : "Checking releases…"}
+                ? t("settingsE.updateTrackSwitchDialog.notFound").replace("{label}", label)
+                : t("settingsE.updateTrackSwitchDialog.checking")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t("settingsE.updateTrackSwitchDialog.cancel")}
+          </AlertDialogClose>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -73,6 +79,7 @@ function SwitchPlan({
   readonly release: ChannelSwitchRelease;
   readonly onClose: () => void;
 }) {
+  const t = useT();
   const updateState = useDesktopUpdateState();
   const { environments } = useEnvironments();
   const crossesLocal = desktopUpdateChannelOf(APP_VERSION) !== release.channel;
@@ -100,7 +107,11 @@ function SwitchPlan({
     setChecking(true);
     const fail = (description: string) =>
       toastManager.add(
-        stackedThreadToast({ type: "error", title: `Could not switch to ${label}`, description }),
+        stackedThreadToast({
+          type: "error",
+          title: t("settingsE.updateTrackSwitchDialog.switchFailed").replace("{label}", label),
+          description,
+        }),
       );
     const prepared = await prepareLocalTrackSwitch(bridge, {
       channel: release.channel,
@@ -132,8 +143,13 @@ function SwitchPlan({
                   !acceptsTrackSwitchRelease(downloadedVersion, release.channel, release.version)
                 ) {
                   reportError(
-                    "Could not install update",
-                    `This app downloaded ${downloadedVersion ?? "nothing"}, not ${release.version} or newer.`,
+                    t("settingsE.updateTrackSwitchDialog.installFailed"),
+                    t("settingsE.updateTrackSwitchDialog.downloadedOther")
+                      .replace(
+                        "{downloaded}",
+                        downloadedVersion ?? t("settingsE.updateTrackSwitchDialog.nothing"),
+                      )
+                      .replace("{version}", release.version),
                   );
                   return false;
                 }
@@ -144,7 +160,11 @@ function SwitchPlan({
     );
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      fail(error instanceof Error ? error.message : "An unexpected error occurred.");
+      fail(
+        error instanceof Error
+          ? error.message
+          : t("settingsE.updateTrackSwitchDialog.unexpectedError"),
+      );
     }
   };
 
@@ -152,26 +172,30 @@ function SwitchPlan({
     <UpdateEverythingDialog
       open
       onOpenChange={(open) => !open && !checking && onClose()}
-      title={`Switch to ${label}?`}
+      title={t("settingsE.updateTrackSwitchDialog.switchToTitle").replace("{label}", label)}
       version={release.version}
       providerCount={0}
       rows={everything.rows}
       notes={[
         ...(everything.rows.length === 0 && !crossesLocal
-          ? [`Every connected machine is already on ${label}. This only saves the track.`]
+          ? [t("settingsE.updateTrackSwitchDialog.alreadyOn").replace("{label}", label)]
           : []),
-        ...(crossesLocal && updatesOff
-          ? ["This app's updates are off here, so reinstall it yourself to switch."]
-          : []),
+        ...(crossesLocal && updatesOff ? [t("settingsE.updateTrackSwitchDialog.updatesOff")] : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If Gustaf does not reopen after it restarts, open it again."]
+          ? [t("settingsE.updateTrackSwitchDialog.reopen")]
           : []),
       ]}
       restarts={everything.restarts}
-      confirmLabel={checking ? "Checking…" : `Switch to ${label}`}
+      confirmLabel={
+        checking
+          ? t("settingsE.updateTrackSwitchDialog.checkingShort")
+          : t("settingsE.updateTrackSwitchDialog.switchTo").replace("{label}", label)
+      }
       busy={checking}
       disabledReason={
-        !switchesLocal || localBlocked === null ? null : `This app cannot switch: ${localBlocked}.`
+        !switchesLocal || localBlocked === null
+          ? null
+          : t("settingsE.updateTrackSwitchDialog.cannotSwitch").replace("{reason}", localBlocked)
       }
       onConfirm={() => void run()}
     />

@@ -36,6 +36,7 @@ import {
   pullRequestChecksStatePresentation,
   resolvePullRequestState,
 } from "./pullRequestPresentation";
+import { useT } from "../../useUiLanguage";
 
 function GhostBar({ className }: { className?: string | undefined }) {
   return <span aria-hidden className={cn("block h-3 rounded bg-muted-foreground/15", className)} />;
@@ -50,8 +51,13 @@ const DEFAULT_DETAIL_TABS = [
 ] as const;
 
 export function PullRequestListGhost({ rows = 7, caption }: { rows?: number; caption?: string }) {
+  const t = useT();
   return (
-    <div role="status" aria-label={caption ?? "Loading pull requests"} className="space-y-0.5">
+    <div
+      role="status"
+      aria-label={caption ?? t("misc.pullRequestGhosts.loadingPulls")}
+      className="space-y-0.5"
+    >
       {/* Outside the pulse so the explanation stays readable. */}
       {caption ? (
         <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">{caption}</p>
@@ -101,6 +107,7 @@ export function PullRequestDetailGhost({
   onClose?: (() => void) | undefined;
   onCheckoutError?: ((error: Error) => void) | undefined;
 }) {
+  const t = useT();
   const seed = summary
     ? {
         ...entry,
@@ -143,7 +150,7 @@ export function PullRequestDetailGhost({
                 variant="ghost-muted"
                 className="-ml-1.5"
                 onClick={onBack}
-                aria-label="Back to this thread's pull requests"
+                aria-label={t("misc.pullRequestGhosts.backToPulls")}
               >
                 <ArrowLeftIcon aria-hidden className="size-3.5" />
               </Button>
@@ -226,8 +233,8 @@ export function PullRequestDetailGhost({
                     key={checkout}
                     value={checkout}
                     target={`${terminology.singular} checkout command`}
-                    copyLabel="Copy checkout command"
-                    copiedLabel="Checkout command copied"
+                    copyLabel={t("misc.pullRequestGhosts.copyCheckoutCommand")}
+                    copiedLabel={t("misc.pullRequestGhosts.checkoutCommandCopied")}
                     className="ml-auto font-mono"
                     tooltipSide="bottom"
                     {...(onCheckoutError ? { onError: onCheckoutError } : {})}
@@ -252,7 +259,7 @@ export function PullRequestDetailGhost({
                     value={seed.headBranch}
                     target="branch name"
                     copyLabel={`Copy ${terminology.singular} branch`}
-                    copiedLabel="Branch name copied"
+                    copiedLabel={t("misc.pullRequestGhosts.branchNameCopied")}
                     className="min-w-0 font-mono"
                   />
                 ) : (
@@ -307,7 +314,12 @@ export function PullRequestDetailGhost({
               </span>
               <span className="flex min-w-0 items-center gap-1.5 text-foreground">
                 <GhostBar className="h-3 w-10" />
-                <Button size="icon-xs" variant="ghost" disabled aria-label="Reviewers loading">
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  disabled
+                  aria-label={t("misc.pullRequestGhosts.reviewersLoading")}
+                >
                   <UserPlusIcon aria-hidden className="size-3.5" />
                 </Button>
               </span>
@@ -329,7 +341,9 @@ export function PullRequestDetailGhost({
                       />
                     ))
                   ) : (
-                    <span className="text-muted-foreground">None</span>
+                    <span className="text-muted-foreground">
+                      {t("misc.pullRequestGhosts.none")}
+                    </span>
                   )
                 ) : (
                   <>
@@ -337,7 +351,12 @@ export function PullRequestDetailGhost({
                     <GhostBar className="h-4.5 w-20" />
                   </>
                 )}
-                <Button size="icon-xs" variant="ghost" disabled aria-label="Labels loading">
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  disabled
+                  aria-label={t("misc.pullRequestGhosts.labelsLoading")}
+                >
                   <TagIcon aria-hidden className="size-3.5" />
                 </Button>
               </span>
@@ -348,7 +367,7 @@ export function PullRequestDetailGhost({
         <section>
           <div className="sticky top-0 z-10 flex w-full items-center bg-background pr-4">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-              <span>Description</span>
+              <span>{t("misc.pullRequestGhosts.description")}</span>
               <ChevronRightIcon
                 aria-hidden
                 className="size-3.5 rotate-90 text-muted-foreground/60"
@@ -371,10 +390,11 @@ export function PullRequestDetailGhost({
 }
 
 export function PullRequestPeopleGhost({ rows = 4 }: { rows?: number }) {
+  const t = useT();
   return (
     <div
       role="status"
-      aria-label="Loading people"
+      aria-label={t("misc.pullRequestGhosts.loadingPeople")}
       className="motion-safe:animate-skeleton space-y-1 p-1"
     >
       {Array.from({ length: rows }, (_, index) => (
@@ -388,10 +408,11 @@ export function PullRequestPeopleGhost({ rows = 4 }: { rows?: number }) {
 }
 
 export function PullRequestTimelineGhost({ rows = 6 }: { rows?: number }) {
+  const t = useT();
   return (
     <div
       role="status"
-      aria-label="Loading timeline"
+      aria-label={t("misc.pullRequestGhosts.loadingTimeline")}
       className="motion-safe:animate-skeleton px-4 py-5"
     >
       <div className="relative ml-2 border-l border-border/70 pl-5">

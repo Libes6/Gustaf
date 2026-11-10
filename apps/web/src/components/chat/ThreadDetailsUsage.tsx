@@ -1,3 +1,5 @@
+import type { MessageKey } from "~/i18n";
+import { useT } from "../../useUiLanguage";
 import type {
   ProviderInstanceId,
   ServerProvider,
@@ -24,10 +26,10 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatContextWindowCompactionMessage } from "./compaction.logic";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 
-const PACE_LABEL: Record<LimitPace, string> = {
-  ahead: "Ahead of pace",
-  on: "On pace",
-  under: "Under pace",
+const PACE_LABEL: Record<LimitPace, MessageKey> = {
+  ahead: "chatB.ThreadDetailsUsage.paceAhead",
+  on: "chatB.ThreadDetailsUsage.paceOn",
+  under: "chatB.ThreadDetailsUsage.paceUnder",
 };
 
 export interface ThreadDetailsUsageInput {
@@ -45,6 +47,7 @@ export function ThreadDetailsUsage({
   providers,
   sources,
 }: Omit<ThreadDetailsUsageInput, "contextWindow">) {
+  const t = useT();
   const nowMinute = useNowMinute();
   const now = Date.parse(`${nowMinute}:00Z`);
   const report =
@@ -62,16 +65,16 @@ export function ThreadDetailsUsage({
   return (
     <ThreadDetailsSection
       headingId="thread-details-usage-heading"
-      title="Usage limits"
+      title={t("chatB.ThreadDetailsUsage.usageLimits")}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         {notice ? (
           <UsageRow
-            label="Limits"
+            label={t("chatB.ThreadDetailsUsage.limits")}
             fill={null}
             tone={null}
-            value="Unavailable"
+            value={t("chatB.ThreadDetailsUsage.unavailable")}
             tooltip={<span className="text-foreground">{notice}</span>}
           />
         ) : (
@@ -84,6 +87,7 @@ export function ThreadDetailsUsage({
 
 /** The thread's context window. The bar fills as context is used; the tick marks auto-compaction. */
 export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowSnapshot }) {
+  const t = useT();
   const maxTokens = usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
   const used =
     maxTokens !== null && usage.usedPercentage !== null
@@ -98,12 +102,12 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
-      title="Context window"
+      title={t("chatB.ThreadDetailsUsage.contextWindow")}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         <UsageRow
-          label="Context"
+          label={t("chatB.ThreadDetailsUsage.context")}
           fill={used}
           tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
           tick={tick}
@@ -145,6 +149,7 @@ function LimitRow({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
+  const t = useT();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const left = remainingPercent(window);
   const pace = paceOf(window, now);
@@ -167,7 +172,7 @@ function LimitRow({
               {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
             </span>
           ) : null}
-          {pace ? <span className="text-muted-foreground">{PACE_LABEL[pace]}</span> : null}
+          {pace ? <span className="text-muted-foreground">{t(PACE_LABEL[pace])}</span> : null}
         </>
       }
     />

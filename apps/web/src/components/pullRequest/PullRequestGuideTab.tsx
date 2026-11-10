@@ -18,6 +18,7 @@ import {
   usePullRequestReviewStore,
 } from "./pullRequestReviewStore";
 import type { PullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
+import { useT } from "../../useUiLanguage";
 
 export function PullRequestGuideTab({
   environmentId,
@@ -50,6 +51,7 @@ export function PullRequestGuideTab({
   onOpenFile: (path: string) => void;
   onTourShown?: (() => void) | undefined;
 }) {
+  const t = useT();
   const { query, data, running, canWrite, write } = useReviewGuideWriter({
     environmentId,
     reference,
@@ -95,7 +97,7 @@ export function PullRequestGuideTab({
     canWrite ? (
       <Button size={size} variant="outline" disabled={running} onClick={() => void write()}>
         {running ? <Spinner /> : <SparklesIcon aria-hidden className="size-3.5" />}
-        {running ? "Reading the change..." : label}
+        {running ? t("misc.pullRequestGuideTab.readingChange") : label}
       </Button>
     ) : null;
 
@@ -111,20 +113,24 @@ export function PullRequestGuideTab({
       <div className="scrollbar-gutter-both flex h-full flex-col items-center justify-center-safe gap-2 overflow-y-auto px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
           {running
-            ? "Writing a review guide"
+            ? t("misc.pullRequestGuideTab.writingGuide")
             : failure === null
-              ? "No review guide yet"
-              : "Could not write a review guide"}
+              ? t("misc.pullRequestGuideTab.noGuideYet")
+              : t("misc.pullRequestGuideTab.couldNotWrite")}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {running
-            ? "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready."
+            ? t("misc.pullRequestGuideTab.agentReading")
             : failure === null
-              ? (query.error ??
-                "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.")
+              ? (query.error ?? t("misc.pullRequestGuideTab.guideExplainer"))
               : FAILURE_HINT}
         </p>
-        {writeButton(failure === null ? "Write guide" : "Try again", "sm")}
+        {writeButton(
+          failure === null
+            ? t("misc.pullRequestGuideTab.writeGuide")
+            : t("misc.pullRequestGuideTab.tryAgain"),
+          "sm",
+        )}
         {failure === null || running ? null : <FailureDetails detail={failure} />}
       </div>
     );
@@ -136,9 +142,9 @@ export function PullRequestGuideTab({
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
           {running ? (
-            "Rewriting this guide. You will be told when the new one is ready."
+            t("misc.pullRequestGuideTab.rewriting")
           ) : failure === null ? (
-            "Written before the latest push."
+            t("misc.pullRequestGuideTab.writtenBeforePush")
           ) : (
             <>
               {`Could not rewrite this guide. ${FAILURE_HINT}`}
@@ -146,7 +152,9 @@ export function PullRequestGuideTab({
             </>
           )}
         </AlertDescription>
-        {!running && canWrite ? <AlertAction>{writeButton("Rewrite", "xs")}</AlertAction> : null}
+        {!running && canWrite ? (
+          <AlertAction>{writeButton(t("misc.pullRequestGuideTab.rewrite"), "xs")}</AlertAction>
+        ) : null}
       </Alert>
     ) : null;
 

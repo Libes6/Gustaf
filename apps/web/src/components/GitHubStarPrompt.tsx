@@ -10,6 +10,11 @@ import { sourceControlEnvironment } from "../state/sourceControl";
 import { toastManager } from "./ui/toast";
 
 // Separate keys so a count written by another tab can never undo a dismissal.
+import { getClientSettings } from "../hooks/useSettings";
+import { translate, type MessageKey } from "../i18n";
+
+const tNow = (key: MessageKey) => translate(getClientSettings().uiLanguage, key);
+
 const SENT_KEY = "t3code:github-star-prompt:sent";
 const DISMISSED_KEY = "t3code:github-star-prompt:dismissed";
 const REPOSITORY = "pingdotgg/t3code";
@@ -36,14 +41,16 @@ function showStarPrompt(environmentId: EnvironmentId) {
       .catch(() => undefined);
   };
   const starInPlace = async () => {
-    toastManager.update(id, { actionProps: { children: "Starring…", disabled: true } });
+    toastManager.update(id, {
+      actionProps: { children: tNow("shell.toasts.starring"), disabled: true },
+    });
     if (await starRepository(environmentId)) {
       // Thank them in place: a closing and opening toast would slide under the confetti.
       dismiss();
       toastManager.update(id, {
         type: "success",
-        title: "Thanks for the star!",
-        description: "It really helps Gustaf grow.",
+        title: tNow("shell.toasts.thanksForStar"),
+        description: tNow("shell.toasts.helpsGrow"),
         timeout: 5_000,
         actionProps: undefined,
         data: {},
@@ -54,18 +61,20 @@ function showStarPrompt(environmentId: EnvironmentId) {
     // Browsers block new tabs once the click's activation expires; desktop opens through its bridge.
     if (window.desktopBridge || navigator.userActivation?.isActive !== false)
       return openInBrowser();
-    toastManager.update(id, { actionProps: { children: "Open GitHub", onClick: openInBrowser } });
+    toastManager.update(id, {
+      actionProps: { children: tNow("shell.toasts.openGitHub"), onClick: openInBrowser },
+    });
   };
   const id = toastManager.add({
-    title: "Enjoying Gustaf?",
-    description: "Give us a star on GitHub to let us know!",
+    title: tNow("shell.toasts.enjoying"),
+    description: tNow("shell.toasts.giveStar"),
     timeout: 0,
     onClose: dismiss,
-    actionProps: { children: "Star on GitHub", onClick: () => void starInPlace() },
+    actionProps: { children: tNow("shell.toasts.starOnGitHub"), onClick: () => void starInPlace() },
     data: {
       actionLayout: "stacked-end",
       leadingIcon: <StarIcon aria-hidden className="size-4 text-warning-foreground" />,
-      secondaryActionProps: { children: "Dismiss", onClick: close },
+      secondaryActionProps: { children: tNow("shell.toasts.dismiss"), onClick: close },
       secondaryActionVariant: "ghost",
     },
   });

@@ -9,6 +9,7 @@ import { Kbd, KbdGroup } from "./ui/kbd";
  * left there by the removed input. Claim it so typing cannot reach the composer
  * behind the modal. On first open the dialog's own initial focus handles it.
  */
+import { useT } from "../useUiLanguage";
 function claimFocusInOpenDialog(input: HTMLInputElement) {
   const active = input.ownerDocument.activeElement;
   if (
@@ -53,7 +54,7 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
 
 export function CommandPaletteContent({
   children,
-  escapeLabel = "Close",
+  escapeLabel,
   footerActionLabel,
   footerTrailing,
   inputAccessory,
@@ -64,6 +65,7 @@ export function CommandPaletteContent({
   testId,
   ...commandProps
 }: CommandPaletteContentProps) {
+  const t = useT();
   return (
     <div className="contents" data-testid={testId}>
       <Command {...commandProps}>
@@ -99,7 +101,7 @@ export function CommandPaletteContent({
               <Kbd>
                 <ArrowDownIcon />
               </Kbd>
-              <span>Navigate</span>
+              <span>{t("shell.misc.navigate")}</span>
             </KbdGroup>
             {footerActionLabel !== undefined ? (
               <KbdGroup>
@@ -110,12 +112,12 @@ export function CommandPaletteContent({
             {showBackHint ? (
               <KbdGroup>
                 <Kbd>Backspace</Kbd>
-                <span>Back</span>
+                <span>{t("shell.misc.back")}</span>
               </KbdGroup>
             ) : null}
             <KbdGroup>
               <Kbd>Esc</Kbd>
-              <span>{escapeLabel}</span>
+              <span>{escapeLabel ?? t("shell.misc.close")}</span>
             </KbdGroup>
           </div>
           {footerTrailing}

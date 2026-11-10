@@ -7,6 +7,8 @@ import {
 } from "../desktopUpdate.logic";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { openDesktopUpdateReleaseNotes } from "../desktopUpdate.toast";
+import { useT } from "../../useUiLanguage";
+import type { MessageKey } from "../../i18n";
 
 type DesktopUpdateShell = Pick<DesktopBridge, "openExternal">;
 
@@ -20,7 +22,7 @@ function keyReleaseNoteItems(items: ReadonlyArray<string>) {
 }
 
 /** Feed times read "3h ago"; build days from a prerelease version read "today" or "2d ago". */
-function formatReleaseAge(releasedAt: string): string {
+function formatReleaseAge(releasedAt: string, t: (key: MessageKey) => string): string {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(releasedAt);
   if (!day) return formatRelativeTimeLabel(releasedAt);
   const now = new Date();
@@ -28,7 +30,9 @@ function formatReleaseAge(releasedAt: string): string {
   const days = Math.round(
     (today - Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]))) / 86_400_000,
   );
-  return days <= 0 ? "today" : `${days}d ago`;
+  return days <= 0
+    ? t("sidebar.SidebarUpdateReleaseNotes.today")
+    : t("sidebar.SidebarUpdateReleaseNotes.daysAgo").replace("{days}", String(days));
 }
 
 function ReleaseLink({
@@ -64,6 +68,7 @@ export function SidebarUpdateReleaseNotes({
   readonly state: DesktopUpdateState;
   readonly tooltip: string;
 }) {
+  const t = useT();
   if (state.releaseNotes.length === 0) {
     return <>{tooltip}</>;
   }
@@ -82,7 +87,7 @@ export function SidebarUpdateReleaseNotes({
             {state.availableVersion ? (
               <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                 {releasedAt
-                  ? `${state.availableVersion} · ${formatReleaseAge(releasedAt)}`
+                  ? `${state.availableVersion} · ${formatReleaseAge(releasedAt, t)}`
                   : state.availableVersion}
               </div>
             ) : null}
@@ -98,7 +103,7 @@ export function SidebarUpdateReleaseNotes({
           const linkLabel =
             releaseNote.stats ??
             (omittedItemCount === 0
-              ? "View release on GitHub"
+              ? t("sidebar.SidebarUpdateReleaseNotes.viewReleaseOnGitHub")
               : `${omittedItemCount} more ${omittedItemCount === 1 ? "change" : "changes"} on GitHub`);
 
           const generated = releaseNote.stats !== undefined || releaseNote.intro !== undefined;
@@ -108,13 +113,18 @@ export function SidebarUpdateReleaseNotes({
                 releaseNote.version !== state.availableVersion && (
                   <h3 className="mb-1 text-xs leading-4 font-medium text-muted-foreground">
                     {releaseNote.releasedAt
-                      ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt)}`
+                      ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt, t)}`
                       : releaseNote.version}
                   </h3>
                 )
               ) : (
                 <h3 className="mb-2 text-foreground text-xs leading-4 font-semibold">
-                  {index === 0 ? "What's changed" : `Changes in ${releaseNote.version}`}
+                  {index === 0
+                    ? t("sidebar.SidebarUpdateReleaseNotes.whatsChanged")
+                    : t("sidebar.SidebarUpdateReleaseNotes.changesIn").replace(
+                        "{version}",
+                        releaseNote.version,
+                      )}
                 </h3>
               )}
               {releaseNote.intro ? (

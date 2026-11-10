@@ -17,12 +17,17 @@ import {
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 
+import { useT } from "../useUiLanguage";
+import type { MessageKey } from "../i18n";
 type ConfirmationCopy = {
   readonly title: string;
   readonly description: string | null;
 };
 
-function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
+function resolveConfirmDialogCopy(
+  message: string,
+  t: (key: MessageKey) => string,
+): ConfirmationCopy {
   const normalizedMessage = message.trim();
   const lines = normalizedMessage.split("\n");
   const questionLineIndex = lines.findIndex((line) => line.trim().endsWith("?"));
@@ -45,19 +50,20 @@ function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
   }
 
   return {
-    title: "Confirm action",
-    description: normalizedMessage || "This action requires your confirmation.",
+    title: t("shell.smallUi.confirmAction"),
+    description: normalizedMessage || t("shell.smallUi.confirmationRequired"),
   };
 }
 
 export function ConfirmDialogHost() {
+  const t = useT();
   const state = useSyncExternalStore(
     subscribeConfirmDialogHost,
     readConfirmDialogState,
     readConfirmDialogState,
   );
 
-  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
+  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message, t);
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
@@ -82,9 +88,11 @@ export function ConfirmDialogHost() {
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t("shell.smallUi.cancel")}
+          </AlertDialogClose>
           <Button variant={confirmVariant} onClick={onConfirm}>
-            Confirm
+            {t("shell.smallUi.confirm")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

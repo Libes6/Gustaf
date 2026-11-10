@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { useT } from "~/useUiLanguage";
 
 // Host in chat to survive command palette dismissal.
 const linkPullRequestDialogThreadAtom = Atom.make<ScopedThreadRef | null>(null).pipe(
@@ -63,6 +64,7 @@ function LinkPullRequestDialog({
   projectId,
   onOpenChange,
 }: LinkPullRequestDialogProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -103,7 +105,9 @@ function LinkPullRequestDialog({
     setPending(false);
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      setSubmitError(error instanceof Error ? error.message : "Could not link the pull request.");
+      setSubmitError(
+        error instanceof Error ? error.message : t("misc.linkPullRequestDialog.notLinked"),
+      );
       return;
     }
     onOpenChange(false);
@@ -112,9 +116,9 @@ function LinkPullRequestDialog({
   const validation = !dirty
     ? null
     : reference.trim().length === 0
-      ? "Paste a pull request URL or enter 123 / #123."
+      ? t("misc.linkPullRequestDialog.pasteHint")
       : resolved === null
-        ? "Use a pull request URL, 123, or #123."
+        ? t("misc.linkPullRequestDialog.useHint")
         : "error" in resolved
           ? resolved.error
           : null;
@@ -123,7 +127,7 @@ function LinkPullRequestDialog({
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
       <DialogPopup className="max-w-xl" initialFocus={inputRef}>
         <DialogHeader>
-          <DialogTitle>Link pull request</DialogTitle>
+          <DialogTitle>{t("misc.linkPullRequestDialog.title")}</DialogTitle>
           <DialogDescription>
             Attach a pull request to this thread by its URL, or by its number for this thread's
             repository.
@@ -132,7 +136,7 @@ function LinkPullRequestDialog({
         <DialogPanel>
           <Input
             ref={inputRef}
-            placeholder="Pull request URL or #42"
+            placeholder={t("misc.linkPullRequestDialog.placeholder")}
             value={reference}
             onChange={(event) => {
               setDirty(true);
@@ -169,7 +173,9 @@ function LinkPullRequestDialog({
             onClick={() => void submit()}
             disabled={pending || resolved === null || "error" in resolved}
           >
-            {pending ? "Linking..." : "Link"}
+            {pending
+              ? t("misc.linkPullRequestDialog.linking")
+              : t("misc.linkPullRequestDialog.link")}
           </Button>
         </DialogFooter>
       </DialogPopup>

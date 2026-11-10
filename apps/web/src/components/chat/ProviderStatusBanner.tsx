@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   type EnvironmentId,
   type ProviderInstanceId,
@@ -104,6 +105,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   onOpenProviderSetup?: (instanceId: ProviderInstanceId) => void;
   status: ServerProvider | null;
 }) {
+  const t = useT();
   const canRefresh = useAtomValue(serverEnvironment.refreshProviders.permissionAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     label: "Refresh provider status",
@@ -160,18 +162,23 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
             <div className="flex flex-wrap items-center justify-end gap-3">
               {onOpenProviderSetup && hasProviderSetup(status) ? (
                 <InlineButton onClick={() => onOpenProviderSetup(status.instanceId)}>
-                  Open provider setup
+                  {t("chatB.ProviderStatusBanner.openProviderSetup")}
                 </InlineButton>
               ) : null}
               <Button
-                aria-label={`Refresh ${providerName} provider status`}
+                aria-label={t("chatB.ProviderStatusBanner.refreshProviderAria").replace(
+                  "{name}",
+                  providerName,
+                )}
                 disabled={!canRefresh || isRefreshing}
                 onClick={() => void refresh()}
                 size="xs"
                 variant="outline"
               >
                 <RefreshIcon />
-                {isRefreshing ? "Refreshing..." : "Refresh"}
+                {isRefreshing
+                  ? t("chatB.ProviderStatusBanner.refreshing")
+                  : t("chatB.ProviderStatusBanner.refresh")}
               </Button>
             </div>
           </div>

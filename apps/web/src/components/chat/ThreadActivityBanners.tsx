@@ -32,6 +32,11 @@ import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import type { ThreadNowItem } from "./ThreadNow";
+import { translate, type MessageKey } from "~/i18n";
+
+// The UI translator, passed in by the hook that builds these items. Without one, the items read English.
+type Translate = (key: MessageKey) => string;
+const englishT: Translate = (key) => translate("en", key);
 
 export function extensionStatusBannerItem(
   statuses: NonNullable<OrchestrationV2ProviderSession["extensionStatuses"]>,
@@ -51,8 +56,10 @@ export function childInputNowItem(input: {
   readonly parentAwaitingUser: boolean;
   // A task delegated to a linked environment lives there, not where the parent runs.
   readonly onOpenThread: (threadId: ThreadId, environmentId: EnvironmentId) => void;
+  readonly t?: Translate;
 }): (ThreadNowItem & { readonly waitingLabel: string }) | null {
   const { childThreadInputs, onOpenThread } = input;
+  const t = input.t ?? englishT;
   const first = childThreadInputs[0];
   if (!first || input.parentAwaitingUser) return null;
   return {
@@ -65,8 +72,8 @@ export function childInputNowItem(input: {
     ),
     title: childThreadInputsTitle(childThreadInputs),
     waitingLabel: childThreadInputs.every((child) => child.lineage.sideChat === true)
-      ? "Side chat waiting"
-      : "Subagent waiting",
+      ? t("chatB.ThreadActivityBanners.sideChatWaiting")
+      : t("chatB.ThreadActivityBanners.subagentWaiting"),
     description: childThreadInputs.map((child, index) => (
       <Fragment key={child.id}>
         {index > 0 ? " " : null}
@@ -80,7 +87,9 @@ export function childInputNowItem(input: {
     )),
     actions: (
       <InlineButton onClick={() => onOpenThread(first.id, first.environmentId)}>
-        {first.hasPendingApprovals ? "Open approval" : "Open question"}
+        {first.hasPendingApprovals
+          ? t("chatB.ThreadActivityBanners.openApproval")
+          : t("chatB.ThreadActivityBanners.openQuestion")}
       </InlineButton>
     ),
   };
@@ -92,8 +101,10 @@ export function goalNowItem(input: {
   readonly goal: OrchestrationV2ProviderGoal;
   readonly isWorking: boolean;
   readonly onSendCommand: (text: string, failureMessage: string) => Promise<void>;
+  readonly t?: Translate;
 }): ThreadNowItem {
   const { isWorking, onSendCommand } = input;
+  const t = input.t ?? englishT;
   const presentation = presentProviderGoal(input.goal, isWorking);
   return {
     id: `goal:${input.threadId}`,
@@ -109,18 +120,25 @@ export function goalNowItem(input: {
         {presentation.canResume && !isWorking ? (
           <>
             <InlineButton
-              onClick={() => void onSendCommand("/goal resume", "Failed to resume goal.")}
+              onClick={() =>
+                void onSendCommand(
+                  "/goal resume",
+                  t("chatB.ThreadActivityBanners.failedResumeGoal"),
+                )
+              }
             >
-              Resume
+              {t("chatB.ThreadActivityBanners.resumeGoal")}
             </InlineButton>
             <span aria-hidden>·</span>
           </>
         ) : null}
         <InlineButton
           tone="muted"
-          onClick={() => void onSendCommand("/goal clear", "Failed to clear goal.")}
+          onClick={() =>
+            void onSendCommand("/goal clear", t("chatB.ThreadActivityBanners.failedClearGoal"))
+          }
         >
-          Clear
+          {t("chatB.ThreadActivityBanners.clearGoal")}
         </InlineButton>
       </>
     ),
@@ -134,7 +152,9 @@ export function runStopNowItem(input: {
   readonly canForceStop: boolean;
   readonly forceStopping: boolean;
   readonly onForceStop: () => void;
+  readonly t?: Translate;
 }): ThreadNowItem {
+  const t = input.t ?? englishT;
   const unresponsive = input.stop.state === "unresponsive";
   const requestedAtMs = Date.parse(input.stop.requestedAt);
   return {
@@ -144,10 +164,10 @@ export function runStopNowItem(input: {
     ) : (
       <CircleStopIcon />
     ),
-    title: unresponsive ? "Agent not responding to Stop" : "Stopping",
-    description: unresponsive
-      ? "It may be short on memory. Force stop kills its processes."
-      : undefined,
+    title: unresponsive
+      ? t("chatB.ThreadActivityBanners.notRespondingToStop")
+      : t("chatB.ThreadActivityBanners.stopping"),
+    description: unresponsive ? t("chatB.ThreadActivityBanners.memoryHint") : undefined,
     actions: (
       <>
         <span
@@ -159,7 +179,9 @@ export function runStopNowItem(input: {
         />
         {unresponsive && input.canForceStop ? (
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
-            {input.forceStopping ? "Force stopping..." : "Force stop"}
+            {input.forceStopping
+              ? t("chatB.ThreadActivityBanners.forceStopping")
+              : t("chatB.ThreadActivityBanners.forceStop")}
           </InlineButton>
         ) : null}
       </>
@@ -177,8 +199,10 @@ export function backgroundWorkNowItem(input: {
   readonly stopping: boolean;
   readonly onStop: () => Promise<void>;
   readonly onOpenThread: (threadId: ThreadId) => void;
+  readonly t?: Translate;
 }): ThreadNowItem | null {
   const { onOpenThread } = input;
+  const t = input.t ?? englishT;
   const presentation = presentPendingBackgroundWork(input.tasks);
   if (presentation === null) return null;
   const rows = presentation.items.map((task) => {
@@ -218,7 +242,10 @@ export function backgroundWorkNowItem(input: {
     title:
       only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
         <>
-          {presentation.waiting ? "Waiting" : "Running"} · {only.label}
+          {presentation.waiting
+            ? t("chatB.ThreadActivityBanners.waiting")
+            : t("chatB.ThreadActivityBanners.running")}{" "}
+          · {only.label}
         </>
       ) : (
         presentation.title
@@ -257,11 +284,13 @@ export function backgroundWorkNowItem(input: {
         />
         {onlyThreadId === undefined ? null : (
           <InlineButton tone="muted" onClick={() => onOpenThread(onlyThreadId)}>
-            Open
+            {t("chatB.ThreadActivityBanners.open")}
           </InlineButton>
         )}
         <InlineButton disabled={input.stopDisabled} onClick={() => void input.onStop()}>
-          {input.stopping ? "Stopping..." : "Stop"}
+          {input.stopping
+            ? t("chatB.ThreadActivityBanners.stoppingEllipsis")
+            : t("chatB.ThreadActivityBanners.stop")}
         </InlineButton>
       </>
     ),

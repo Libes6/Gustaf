@@ -128,6 +128,7 @@ import {
   setProjectFileQueryData,
   useProjectFileQuery,
 } from "./projectFilesQueryState";
+import { useT } from "~/useUiLanguage";
 
 const NO_FILE_REVISION_ATOM = Atom.make(null);
 
@@ -347,6 +348,7 @@ function WorkspaceAudioPreview(props: {
   readonly name: string;
   readonly workspaceMutationId: string | null;
 }) {
+  const t = useT();
   const resource = workspaceAssetResource({
     kind: "media-file",
     threadRef: props.threadRef,
@@ -371,7 +373,7 @@ function WorkspaceAudioPreview(props: {
   if (assetUrl._tag === "Failure" || (url !== null && failedUrl === url)) {
     return (
       <FileSurfaceFailure
-        message="Unable to load audio."
+        message={t("misc.filePreviewPanel.unableLoadAudio")}
         onRetry={() => {
           setFailedUrl(null);
           void refreshAssetUrl().catch(() => undefined);
@@ -1018,6 +1020,7 @@ export default function FilePreviewPanel({
   selectedFilePending,
   workspaceMutationId,
 }: FilePreviewPanelProps) {
+  const t = useT();
   const relativePath =
     attachment === undefined ? resolveFilePreviewPath(requestedPath, cwd) : requestedPath;
   const draft = typeof composerDraftTarget === "string";
@@ -1234,8 +1237,9 @@ export default function FilePreviewPanel({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to open file in browser",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t("misc.filePreviewPanel.openInBrowserFailed"),
+          description:
+            error instanceof Error ? error.message : t("misc.filePreviewPanel.errorOccurred"),
         }),
       );
     })();
@@ -1252,7 +1256,7 @@ export default function FilePreviewPanel({
     }
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        {fileAccess.error ?? "This connection cannot read host files."}
+        {fileAccess.error ?? t("misc.filePreviewPanel.cannotReadHost")}
       </div>
     );
   }
@@ -1317,7 +1321,11 @@ export default function FilePreviewPanel({
           ) : null}
           {showsRawText ? (
             <FileSurfaceAction
-              label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+              label={
+                wordWrap
+                  ? t("misc.filePreviewPanel.disableWrap")
+                  : t("misc.filePreviewPanel.enableWrap")
+              }
               pressed={wordWrap}
               onPress={() => setWordWrapOverride(!wordWrap)}
             >
@@ -1325,13 +1333,20 @@ export default function FilePreviewPanel({
             </FileSurfaceAction>
           ) : null}
           {canOpenInBrowser ? (
-            <FileSurfaceAction label="Open file in preview browser" onPress={handleOpenInBrowser}>
+            <FileSurfaceAction
+              label={t("misc.filePreviewPanel.openInPreviewBrowser")}
+              onPress={handleOpenInBrowser}
+            >
               <Globe2 className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
           {!isHostFile && previewPath !== null ? (
             <FileSurfaceAction
-              label={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+              label={
+                explorerOpen
+                  ? t("misc.filePreviewPanel.hideExplorer")
+                  : t("misc.filePreviewPanel.showExplorer")
+              }
               pressed={explorerOpen}
               onPress={toggleExplorer}
             >
@@ -1453,7 +1468,7 @@ export default function FilePreviewPanel({
                         ...(isDocument ? {} : { disposition: "attachment" as const }),
                       },
               }}
-              origin="File"
+              origin={t("misc.filePreviewPanel.file")}
             />
           ) : relativePath && file.error && file.data === null ? (
             <div
@@ -1583,6 +1598,7 @@ export function WorkspaceLargeTextPreview(props: {
   revealRequestId: number;
   wordWrap: boolean;
 }) {
+  const t = useT();
   const resource = {
     _tag: "media-file",
     threadId: props.threadRef.threadId,
@@ -1596,8 +1612,8 @@ export function WorkspaceLargeTextPreview(props: {
   const showError = (cause: unknown) => {
     toastManager.add({
       type: "error",
-      title: "Could not read file",
-      description: cause instanceof Error ? cause.message : "Try again.",
+      title: t("misc.filePreviewPanel.couldNotRead"),
+      description: cause instanceof Error ? cause.message : t("misc.filePreviewPanel.tryAgain"),
     });
   };
   // Each workspace mutation re-mints the URL, so an edited file loads its new bytes.
@@ -1620,7 +1636,7 @@ export function WorkspaceLargeTextPreview(props: {
   if (assetUrl._tag === "Failure")
     return (
       <FileSurfaceFailure
-        message="Unable to load file preview."
+        message={t("misc.filePreviewPanel.unableLoadPreview")}
         onRetry={() => {
           setRevision((value) => value + 1);
           void refreshAssetUrl().catch(showError);
@@ -1628,14 +1644,20 @@ export function WorkspaceLargeTextPreview(props: {
       />
     );
   if (assetUrl._tag !== "Success" || loaded === null)
-    return <div className="p-6 text-xs text-muted-foreground">Loading…</div>;
+    return (
+      <div className="p-6 text-xs text-muted-foreground">{t("misc.filePreviewPanel.loading")}</div>
+    );
   const src = `${loaded.url}${loaded.url.includes("?") ? "&" : "?"}revision=${encodeURIComponent(loaded.revision)}`;
   return (
     <>
       <div className={FILE_SURFACE_SUBHEADER_CLASS}>
-        <span className="min-w-0 flex-1 text-xs text-muted-foreground">Full file</span>
+        <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+          {t("misc.filePreviewPanel.fullFile")}
+        </span>
         <FileSurfaceAction
-          label={isCopied ? "Copied" : "Copy contents"}
+          label={
+            isCopied ? t("misc.filePreviewPanel.copied") : t("misc.filePreviewPanel.copyContents")
+          }
           onPress={() => {
             const copy = copyContents.current;
             if (!copy) return;
@@ -1647,7 +1669,9 @@ export function WorkspaceLargeTextPreview(props: {
           {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
         </FileSurfaceAction>
         <FileSurfaceAction
-          label={saving ? "Preparing file…" : "Save file"}
+          label={
+            saving ? t("misc.filePreviewPanel.preparingFile") : t("misc.filePreviewPanel.saveFile")
+          }
           disabled={saving}
           onPress={() => {
             setSaving(true);
@@ -1670,7 +1694,13 @@ export function WorkspaceLargeTextPreview(props: {
           <DownloadIcon className="size-3.5" />
         </FileSurfaceAction>
       </div>
-      <Suspense fallback={<div className="p-6 text-xs text-muted-foreground">Loading…</div>}>
+      <Suspense
+        fallback={
+          <div className="p-6 text-xs text-muted-foreground">
+            {t("misc.filePreviewPanel.loading")}
+          </div>
+        }
+      >
         <LargeTextViewer
           key={`${src}:${revision}`}
           name={props.name}

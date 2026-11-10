@@ -43,6 +43,7 @@ import {
 } from "../threadRoutes";
 import { toastManager } from "./ui/toast";
 
+import { useT } from "../useUiLanguage";
 const PREVIEW_FORWARDED_COMMANDS = [
   "workspace.focusNext",
   "workspace.focusPrevious",
@@ -56,6 +57,7 @@ const isGlobalPullRequests = (ref: ScopedThreadRef) =>
   scopedThreadKey(ref) === scopedThreadKey(PULL_REQUESTS_PANEL_REF);
 
 export function ReopenClosedViewShortcut() {
+  const t = useT();
   const navigate = useNavigate();
   const params = useParams({ strict: false });
   const target = resolveThreadRouteTarget(params);
@@ -146,7 +148,7 @@ export function ReopenClosedViewShortcut() {
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",
-          title: "Could not reopen view",
+          title: t("shell.smallUi.couldNotReopenView"),
           description: error instanceof Error ? error.message : String(error),
         });
       });

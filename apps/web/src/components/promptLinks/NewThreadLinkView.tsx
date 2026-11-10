@@ -49,6 +49,7 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { suggestAppAccessForRemote } from "../sourceControlAppAccessToast";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { placeLinkedPrompt, warnAboutHiddenCharacters } from "./linkedPrompt";
+import { useT } from "~/useUiLanguage";
 
 type LinkState =
   | { readonly status: "opening" }
@@ -102,6 +103,7 @@ const pullRequestThreadLookupAtom = Atom.family((key: string) => {
 const NO_PULL_REQUEST_THREAD_LOOKUP = Atom.make(null);
 
 export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
+  const t = useT();
   const locationKey = useLocation({ select: (location) => location.state.__TSR_key ?? "" });
   const navigate = useNavigate();
   const ready = useAtomValue(allReachableShellsLiveAtom);
@@ -141,7 +143,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       replace: true,
     }).catch(() => null);
     if (opened === null) {
-      setState({ status: "failed", message: "Gustaf could not open a new thread." });
+      setState({ status: "failed", message: t("misc.newThreadLinkView.couldNotOpenThread") });
       return;
     }
     setState({ status: "opened" });
@@ -184,7 +186,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (project === null) {
       setState({
         status: "failed",
-        message: "None of your machines can start a thread without a project right now.",
+        message: t("misc.newThreadLinkView.noMachineCanStart"),
       });
       return;
     }
@@ -237,8 +239,9 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Clone failed",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t("misc.newThreadLinkView.cloneFailed"),
+            description:
+              error instanceof Error ? error.message : t("misc.newThreadLinkView.errorOccurred"),
           }),
         );
       }
@@ -253,14 +256,14 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       () => null,
     );
     if (project === null) {
-      setState({ status: "failed", message: "The clone started, but its project did not appear." });
+      setState({ status: "failed", message: t("misc.newThreadLinkView.cloneNoProject") });
       return;
     }
     if (link.kind === "pull-request") {
       setState({
         status: "failed",
         title: `Cloning ${repository.owner}/${repository.name}`,
-        message: "Open this link again when the clone finishes.",
+        message: t("misc.newThreadLinkView.openAgainWhenDone"),
       });
       return;
     }
@@ -346,10 +349,10 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
 
   switch (state.status) {
     case "opening":
-      return <LinkPage title="Opening the link..." />;
+      return <LinkPage title={t("misc.newThreadLinkView.openingLink")} />;
     case "opened":
       return (
-        <LinkPage title="This link is open">
+        <LinkPage title={t("misc.newThreadLinkView.linkIsOpen")}>
           <Button
             size="sm"
             variant="outline"
@@ -365,14 +368,17 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       );
     case "failed":
       return (
-        <LinkPage title={state.title ?? "Could not open the link"} description={state.message} />
+        <LinkPage
+          title={state.title ?? t("misc.newThreadLinkView.couldNotOpenLink")}
+          description={state.message}
+        />
       );
     case "missing-repository": {
       const name = `${state.repository.owner}/${state.repository.name}`;
       return (
         <LinkPage
           title={`You don't have ${name}`}
-          description="Clone it to work on it here, or start without a project."
+          description={t("misc.newThreadLinkView.cloneToWork")}
         >
           <Button size="sm" onClick={() => void cloneRepository(state.repository)}>
             Clone {name}
@@ -398,6 +404,7 @@ function PullRequestLinkCheckout({
   readonly link: Extract<NewThreadLink, { kind: "pull-request" }>;
   readonly project: EnvironmentProject;
 }) {
+  const t = useT();
   const { handoff, startHandoff } = usePullRequestHandoffs({
     environmentId: project.environmentId,
     detail: {
@@ -417,7 +424,7 @@ function PullRequestLinkCheckout({
   return (
     <LinkPage
       title={`Check out ${owner}/${name}#${number}?`}
-      description="This puts the pull request's code in a new worktree and runs your project's setup script on it."
+      description={t("misc.newThreadLinkView.checkoutDescription")}
     >
       <Button
         size="sm"
@@ -429,7 +436,9 @@ function PullRequestLinkCheckout({
           )
         }
       >
-        {handoff !== null ? "Checking out..." : "Check out"}
+        {handoff !== null
+          ? t("misc.newThreadLinkView.checkingOut")
+          : t("misc.newThreadLinkView.checkOut")}
       </Button>
     </LinkPage>
   );

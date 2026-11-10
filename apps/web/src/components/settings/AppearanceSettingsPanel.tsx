@@ -31,44 +31,45 @@ import {
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
+import type { MessageKey } from "../../i18n";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 
-const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
-  artwork: "Artwork",
-  "nightly-artwork": "Nightly artwork",
-  "dev-artwork": "Dev artwork",
-  pill: "Version pill",
-  none: "None",
+const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, MessageKey> = {
+  artwork: "settingsA.appearance.artwork",
+  "nightly-artwork": "settingsA.appearance.nightlyArtwork",
+  "dev-artwork": "settingsA.appearance.devArtwork",
+  pill: "settingsA.appearance.versionPill",
+  none: "settingsA.appearance.none",
 };
 
 // The default "artwork" follows the running channel, so it is labeled as that channel's art,
 // or as "None" on Latest. The other channel's art is offered as a fixed choice.
 function environmentIdentificationOptions(
   stageVariant: SidebarStageBackdropVariant | null,
-): ReadonlyArray<readonly [EnvironmentIdentificationMode, string]> {
+): ReadonlyArray<readonly [EnvironmentIdentificationMode, MessageKey]> {
   if (stageVariant === "dev") {
     return [
-      ["artwork", "Dev artwork"],
-      ["nightly-artwork", "Nightly artwork"],
-      ["pill", "Version pill"],
-      ["none", "None"],
+      ["artwork", "settingsA.appearance.devArtwork"],
+      ["nightly-artwork", "settingsA.appearance.nightlyArtwork"],
+      ["pill", "settingsA.appearance.versionPill"],
+      ["none", "settingsA.appearance.none"],
     ];
   }
   if (stageVariant === "nightly") {
     return [
-      ["artwork", "Nightly artwork"],
-      ["dev-artwork", "Dev artwork"],
-      ["pill", "Version pill"],
-      ["none", "None"],
+      ["artwork", "settingsA.appearance.nightlyArtwork"],
+      ["dev-artwork", "settingsA.appearance.devArtwork"],
+      ["pill", "settingsA.appearance.versionPill"],
+      ["none", "settingsA.appearance.none"],
     ];
   }
   return [
-    ["artwork", "None"],
-    ["nightly-artwork", "Nightly artwork"],
-    ["dev-artwork", "Dev artwork"],
+    ["artwork", "settingsA.appearance.none"],
+    ["nightly-artwork", "settingsA.appearance.nightlyArtwork"],
+    ["dev-artwork", "settingsA.appearance.devArtwork"],
   ];
 }
 
@@ -134,7 +135,12 @@ export function AppearanceSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="appearance" title="Colors & themes" variant="plain" hideTitle>
+      <SettingsSection
+        id="appearance"
+        title={t("settingsA.appearance.colorsThemes")}
+        variant="plain"
+        hideTitle
+      >
         <div id={searchableSetting("theme").id}>
           <ThemeLibrary
             appearanceMode={appearanceMode}
@@ -185,7 +191,7 @@ export function AppearanceSettingsPanel() {
           resetAction={
             settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast ? (
               <SettingResetButton
-                label="contrast"
+                label={t("settingsA.appearance.contrastReset")}
                 onClick={() =>
                   updateSettings({
                     appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
@@ -232,7 +238,7 @@ export function AppearanceSettingsPanel() {
           resetAction={
             settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? (
               <SettingResetButton
-                label="glass opacity"
+                label={t("settingsA.appearance.glassReset")}
                 onClick={() =>
                   updateSettings({ glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity })
                 }
@@ -277,7 +283,7 @@ export function AppearanceSettingsPanel() {
           resetAction={
             settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? (
               <SettingResetButton
-                label="chat width"
+                label={t("settingsA.appearance.chatWidthReset")}
                 onClick={() => updateSettings({ chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth })}
               />
             ) : null
@@ -321,7 +327,7 @@ export function AppearanceSettingsPanel() {
           resetAction={
             settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay ? (
               <SettingResetButton
-                label="effort display"
+                label={t("settingsA.appearance.effortReset")}
                 onClick={() =>
                   updateSettings({ effortDisplay: DEFAULT_UNIFIED_SETTINGS.effortDisplay })
                 }
@@ -363,7 +369,7 @@ export function AppearanceSettingsPanel() {
           resetAction={
             settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled ? (
               <SettingResetButton
-                label="math rendering"
+                label={t("settingsA.appearance.mathReset")}
                 onClick={() =>
                   updateSettings({
                     mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
@@ -431,7 +437,7 @@ export function AppearanceSettingsPanel() {
               settings.panelAnimationDurationMs !==
               DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs ? (
                 <SettingResetButton
-                  label="panel animations"
+                  label={t("settingsA.appearance.panelAnimationsReset")}
                   onClick={() =>
                     updateSettings({
                       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
@@ -447,7 +453,7 @@ export function AppearanceSettingsPanel() {
             resetAction={
               settings.environmentIdentificationMode !== DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE ? (
                 <SettingResetButton
-                  label="environment identification"
+                  label={t("settingsA.appearance.environmentIdentificationReset")}
                   onClick={() =>
                     updateSettings({
                       environmentIdentificationMode: DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
@@ -471,12 +477,12 @@ export function AppearanceSettingsPanel() {
                   className="w-full sm:w-40"
                   aria-label={t("setting.environment-identification.title")}
                 >
-                  <SelectValue>{environmentIdentificationLabel}</SelectValue>
+                  <SelectValue>{t(environmentIdentificationLabel)}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   {environmentIdentificationOptionList.map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -489,7 +495,7 @@ export function AppearanceSettingsPanel() {
               settings.persistComposerContextStrip !==
               DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip ? (
                 <SettingResetButton
-                  label="composer context"
+                  label={t("settingsA.appearance.composerContextReset")}
                   onClick={() =>
                     updateSettings({
                       persistComposerContextStrip:

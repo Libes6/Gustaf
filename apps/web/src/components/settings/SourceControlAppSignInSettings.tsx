@@ -18,6 +18,7 @@ import { cn } from "../../lib/utils";
 import { serverEnvironment } from "../../state/server";
 import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useT } from "../../useUiLanguage";
 import { Button, InlineButton } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
@@ -96,6 +97,7 @@ export function SourceControlAppSignInSettings({
   readonly account: string | null;
   readonly onChanged: () => void;
 }) {
+  const t = useT();
   const host = appSignIn.hosts[0] ?? "";
   const { signIns, tokens } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
@@ -162,26 +164,26 @@ export function SourceControlAppSignInSettings({
     subtitle =
       account !== null && !tokenOverrides ? (
         <span className="flex min-w-0 items-center gap-1">
-          Signed in as
+          {t("settingsD.sourceControlAppSignIn.signedInAs")}
           <RedactedSensitiveText
             value={account}
-            ariaLabel="Signed-in GitHub account"
-            revealTooltip="Show account"
-            hideTooltip="Hide account"
+            ariaLabel={t("settingsD.sourceControlAppSignIn.accountAria")}
+            revealTooltip={t("settingsD.sourceControlAppSignIn.showAccount")}
+            hideTooltip={t("settingsD.sourceControlAppSignIn.hideAccount")}
           />
         </span>
       ) : tokenOverrides ? (
-        "Signed in, but the token saved below is used while it can be read."
+        t("settingsD.sourceControlAppSignIn.signedInWithSavedToken")
       ) : (
-        "Signed in"
+        t("settingsD.sourceControlAppSignIn.signedIn")
       );
     action = (
       <Button size="xs" variant="outline" disabled={!canSignIn} onClick={() => void signOut()}>
-        Sign out
+        {t("settingsD.sourceControlAppSignIn.signOut")}
       </Button>
     );
   } else if (waiting !== null) {
-    subtitle = "Approve the app on GitHub to finish signing in.";
+    subtitle = t("settingsD.sourceControlAppSignIn.approveApp");
     action = (
       <Button
         size="xs"
@@ -191,7 +193,7 @@ export function SourceControlAppSignInSettings({
           void cancel({ environmentId, input: { provider: definition.kind, host } });
         }}
       >
-        Cancel
+        {t("settingsD.sourceControlAppSignIn.cancel")}
       </Button>
     );
   } else {
@@ -203,7 +205,9 @@ export function SourceControlAppSignInSettings({
         onClick={() => void signIn()}
       >
         {state.status === "starting" ? <Spinner /> : null}
-        {state.status === "failed" ? "Try again" : "Sign in with GitHub"}
+        {state.status === "failed"
+          ? t("settingsD.sourceControlAppSignIn.tryAgain")
+          : t("settingsD.sourceControlAppSignIn.signInWithGitHub")}
       </Button>
     );
   }
@@ -231,7 +235,7 @@ export function SourceControlAppSignInSettings({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label="Copy code"
+              aria-label={t("settingsD.sourceControlAppSignIn.copyCodeAria")}
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
               <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />
@@ -245,7 +249,7 @@ export function SourceControlAppSignInSettings({
               }
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
-              Copy code & open GitHub
+              {t("settingsD.sourceControlAppSignIn.copyCodeAndOpen")}
               <ExternalLinkIcon aria-hidden className="size-3.5" />
             </Button>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -259,10 +263,14 @@ export function SourceControlAppSignInSettings({
       {signedIn ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 flex-1">
-            Reaches repositories in accounts and organizations that installed the app.
+            {t("settingsD.sourceControlAppSignIn.reachesRepositories")}
           </span>
-          <ExternalLink href={appSignIn.installUrl}>Install on an organization</ExternalLink>
-          <ExternalLink href={appSignIn.revokeUrl}>Manage on GitHub</ExternalLink>
+          <ExternalLink href={appSignIn.installUrl}>
+            {t("settingsD.sourceControlAppSignIn.installOnOrganization")}
+          </ExternalLink>
+          <ExternalLink href={appSignIn.revokeUrl}>
+            {t("settingsD.sourceControlAppSignIn.manageOnGitHub")}
+          </ExternalLink>
         </div>
       ) : null}
 

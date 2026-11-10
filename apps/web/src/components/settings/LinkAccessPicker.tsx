@@ -3,6 +3,7 @@ import { useId } from "react";
 
 import { accessConfig } from "../auth/ConnectAgentSurface";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { useT } from "../../useUiLanguage";
 
 /** What agents here may do in an environment being linked, with what that does not allow. */
 export function LinkAccessPicker({
@@ -14,12 +15,13 @@ export function LinkAccessPicker({
   readonly onChange: (access: AuthMcpClientAccess) => void;
   readonly disabled?: boolean;
 }) {
+  const t = useT();
   const labelId = useId();
   const selected = accessConfig[value];
   return (
     <div className="space-y-1.5">
       <span id={labelId} className="block text-xs font-medium">
-        What agents here may do there
+        {t("settingsB.LinkAccessPicker.label")}
       </span>
       <Select
         value={value}
@@ -54,9 +56,7 @@ export function LinkAccessPicker({
         </SelectPopup>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {selected.description} An agent never gets more access there than its own mode here. Below
-        full access, it can change only threads this link started, not that machine's own threads,
-        projects or settings.
+        {selected.description} {t("settingsB.LinkAccessPicker.limits")}
       </p>
     </div>
   );

@@ -1,6 +1,11 @@
 import { type SlowRpcAckRequest, subscribeSlowRpcAckRequests } from "../rpc/requestLatencyState";
 import { toastManager } from "./ui/toast";
 
+import { getClientSettings } from "../hooks/useSettings";
+import { translate, type MessageKey } from "../i18n";
+
+const tNow = (key: MessageKey) => translate(getClientSettings().uiLanguage, key);
+
 function describeSlowRequests(requests: ReadonlyArray<SlowRpcAckRequest>): string {
   const count = requests.length;
   const thresholdSeconds = Math.round(
@@ -45,11 +50,14 @@ export function startSlowRpcRequestToasts(): () => void {
       data: {
         expandableContent: <SlowRequestDetails requests={slowRequests} />,
         expandableDescriptionTrigger: true,
-        expandableLabels: { collapse: "Hide requests", expand: "Show requests" },
+        expandableLabels: {
+          collapse: tNow("shell.toasts.hideRequests"),
+          expand: tNow("shell.toasts.showRequests"),
+        },
       },
       description: describeSlowRequests(slowRequests),
       timeout: 0,
-      title: "Some requests are slow",
+      title: tNow("shell.toasts.someRequestsSlow"),
       type: "warning" as const,
     };
 

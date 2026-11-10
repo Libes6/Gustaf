@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsRow } from "./settingsLayout";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
+import { useT } from "../../useUiLanguage";
 
 interface ProviderSetupSectionProps {
   readonly environmentId: EnvironmentId;
@@ -46,15 +47,16 @@ export function readAntigravityAuthMethod(config: unknown): AntigravityAuthMetho
 }
 
 export function ProviderSetupSection(props: ProviderSetupSectionProps) {
+  const t = useT();
   return (
     <section
-      aria-label="Antigravity setup"
+      aria-label={t("settingsC.providerSetupSection.setupAria")}
       className="@container/setup divide-y divide-border/50 text-xs [&_[data-slot=settings-row]]:rounded-none"
     >
       <SettingsRow
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        title="Environment"
-        description="Device that runs this provider."
+        title={t("settingsC.providerSetupSection.environment")}
+        description={t("settingsC.providerSetupSection.deviceRuns")}
         control={
           <div className="flex min-w-0 flex-col gap-2 sm:items-end">
             <span className="text-muted-foreground [overflow-wrap:anywhere]">
@@ -62,18 +64,21 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
             </span>
             {!props.enabled && !props.readOnly ? (
               <Button size="sm" variant="outline" onClick={props.onEnable}>
-                Enable Antigravity
+                {t("settingsC.providerSetupSection.enableAntigravity")}
               </Button>
             ) : null}
           </div>
         }
       />
       {props.readOnly ? (
-        <SettingsRow title="Setup unavailable" description="Provider setup is read-only." />
+        <SettingsRow
+          title={t("settingsC.providerSetupSection.setupUnavailable")}
+          description={t("settingsC.providerSetupSection.setupReadOnly")}
+        />
       ) : props.provider?.setup === undefined ? (
         <SettingsRow
-          title="Update required"
-          description="Update this environment to manage Antigravity."
+          title={t("settingsC.providerSetupSection.updateRequired")}
+          description={t("settingsC.providerSetupSection.updateEnvToManage")}
         />
       ) : (
         <ProviderSetupActions
@@ -105,6 +110,7 @@ function ProviderSetupActions({
   readonly provider: ServerProvider;
   readonly authMethod: AntigravityAuthMethod;
 }) {
+  const t = useT();
   const target = { environmentId, input: { instanceId } };
   const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const installQuery = useEnvironmentQuery(serverEnvironment.providerInstallState(target));
@@ -162,14 +168,18 @@ function ProviderSetupActions({
     pendingRef.current = false;
     setPendingLabel(null);
     if (settled._tag === "Failure") {
-      setError("Provider setup failed. Try again.");
+      setError(t("settingsC.providerSetupSection.setupFailedRetry"));
       return false;
     }
     const result = settled.value;
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const failure = squashAtomCommandFailure(result);
-        setError(failure instanceof Error ? failure.message : "Provider setup failed.");
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : t("settingsC.providerSetupSection.setupFailed"),
+        );
       }
       return false;
     }
@@ -178,10 +188,15 @@ function ProviderSetupActions({
 
   async function removeRuntime() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `Remove the downloaded Antigravity runtime from ${environmentLabel}? Google sign-in and thread history are kept.`,
+      t("settingsC.providerSetupSection.removeRuntimeConfirm").replace(
+        "{environment}",
+        environmentLabel,
+      ),
     );
     if (confirmed) {
-      await runCommand("Removing runtime", () => removeInstall(target));
+      await runCommand(t("settingsC.providerSetupSection.removingRuntime"), () =>
+        removeInstall(target),
+      );
     }
   }
 
@@ -193,19 +208,19 @@ function ProviderSetupActions({
         {pendingLabel ? `${pendingLabel}.` : null}
       </p>
       <SettingsRow
-        title="Runtime"
+        title={t("settingsC.providerSetupSection.runtime")}
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        description="Install and manage Antigravity."
+        description={t("settingsC.providerSetupSection.runtimeDesc")}
         status={
           <div className="space-y-2">
             {usesCustomBinary ? (
               <p className="text-muted-foreground">
-                Uses the custom binary path below. Installation keeps that path.
+                {t("settingsC.providerSetupSection.customBinaryNote")}
               </p>
             ) : null}
             {!installed && !provider.setup?.canInstall ? (
               <p className="text-muted-foreground">
-                Automatic installation unavailable. Set a binary path or use another environment.
+                {t("settingsC.providerSetupSection.autoInstallUnavailable")}
               </p>
             ) : null}
           </div>
@@ -220,7 +235,7 @@ function ProviderSetupActions({
               installation.totalBytes !== null &&
               installation.totalBytes > 0 ? (
                 <progress
-                  aria-label="Antigravity download"
+                  aria-label={t("settingsC.providerSetupSection.downloadAria")}
                   // Forced-colors mode repaints the track and fill as Canvas, and
                   // appearance:auto cannot bring the native widget back: the
                   // preflight border reset marks every <progress> as author-styled,
@@ -248,12 +263,12 @@ function ProviderSetupActions({
                     onClick={() => {
                       const operationId = installation.operationId;
                       if (!operationId) return;
-                      void runCommand("Cancelling installation", () =>
+                      void runCommand(t("settingsC.providerSetupSection.cancellingInstall"), () =>
                         cancelInstall({ environmentId, input: { instanceId, operationId } }),
                       );
                     }}
                   >
-                    Cancel installation
+                    {t("settingsC.providerSetupSection.cancelInstall")}
                   </Button>
                 ) : !installActive && provider.setup?.canInstall ? (
                   <Button
@@ -261,19 +276,21 @@ function ProviderSetupActions({
                     variant="outline"
                     disabled={actionsDisabled || authActive}
                     onClick={() =>
-                      void runCommand("Starting installation", () => startInstall(target))
+                      void runCommand(t("settingsC.providerSetupSection.startingInstall"), () =>
+                        startInstall(target),
+                      )
                     }
                   >
                     {installation?.installedVersion
                       ? installation.version &&
                         installation.version !== installation.installedVersion
-                        ? "Update Antigravity"
-                        : "Reinstall Antigravity"
+                        ? t("settingsC.providerSetupSection.updateAntigravity")
+                        : t("settingsC.providerSetupSection.reinstallAntigravity")
                       : installation?.phase === "failed" || installation?.phase === "cancelled"
-                        ? "Retry installation"
+                        ? t("settingsC.providerSetupSection.retryInstall")
                         : installed
-                          ? "Install managed runtime"
-                          : "Install Antigravity"}
+                          ? t("settingsC.providerSetupSection.installManaged")
+                          : t("settingsC.providerSetupSection.installAntigravity")}
                   </Button>
                 ) : null}
               </div>
@@ -285,7 +302,7 @@ function ProviderSetupActions({
                         size="icon-sm"
                         variant="ghost"
                         className="col-start-1 row-start-1"
-                        aria-label="Remove downloaded runtime"
+                        aria-label={t("settingsC.providerSetupSection.removeDownloadedAria")}
                         disabled={actionsDisabled || authActive}
                         onClick={() => void removeRuntime()}
                       />
@@ -293,7 +310,9 @@ function ProviderSetupActions({
                   >
                     <Trash2Icon className="size-3.5" />
                   </TooltipTrigger>
-                  <TooltipPopup>Remove downloaded runtime</TooltipPopup>
+                  <TooltipPopup>
+                    {t("settingsC.providerSetupSection.removeDownloadedAria")}
+                  </TooltipPopup>
                 </Tooltip>
               ) : null}
             </div>
@@ -324,7 +343,7 @@ function ProviderSetupActions({
                 installQuery.refresh();
               }}
             >
-              Retry setup status
+              {t("settingsC.providerSetupSection.retrySetupStatus")}
             </Button>
           ) : null}
         </div>

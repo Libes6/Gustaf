@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import {
   makeMcpAppHost,
@@ -87,6 +88,7 @@ export function McpAppFrame(props: {
   readonly awaitingUser?: boolean;
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
+  const t = useT();
   const { app } = props;
   const theme = useHtmlRenderTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -277,7 +279,10 @@ export function McpAppFrame(props: {
           throw new McpAppHostRefusal({ message: "This app cannot call that tool." });
         if (!info.value.readOnly) {
           const approved = await ask(
-            `Allow ${app.server} to run ${info.value.title ?? name}?\n${JSON.stringify(args, null, 2)}`,
+            t("chatB.McpAppFrame.allowRunTool")
+              .replace("{server}", app.server)
+              .replace("{tool}", info.value.title ?? name)
+              .replace("{args}", JSON.stringify(args, null, 2)),
           );
           if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
         }
@@ -307,7 +312,11 @@ export function McpAppFrame(props: {
         const send = readLive().props.onSendMessage;
         if (send === undefined)
           throw new McpAppHostRefusal({ message: "Messages are not available here." });
-        const approved = await ask(`Send this message from ${app.server}?\n${text}`);
+        const approved = await ask(
+          t("chatB.McpAppFrame.sendFromApp")
+            .replace("{server}", app.server)
+            .replace("{text}", text),
+        );
         if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
         await send(text);
       },
@@ -342,7 +351,11 @@ export function McpAppFrame(props: {
       },
       downloadFile: async (files) => {
         const names = files.map((file) => file.name).join(", ");
-        const approved = await ask(`Save ${names} from ${app.server}?`);
+        const approved = await ask(
+          t("chatB.McpAppFrame.saveFromApp")
+            .replace("{names}", names)
+            .replace("{server}", app.server),
+        );
         if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
         for (const file of files) {
           let bytes: Uint8Array | undefined;
@@ -420,7 +433,7 @@ export function McpAppFrame(props: {
             setClosed(false);
           }}
         >
-          Show app
+          {t("chatB.McpAppFrame.showApp")}
         </Button>
       </div>
     );
@@ -452,7 +465,7 @@ export function McpAppFrame(props: {
           >
             <span className="truncate">{app.server}</span>
             <Button
-              aria-label="Exit full screen"
+              aria-label={t("chatB.McpAppFrame.exitFullScreen")}
               size="icon-sm"
               variant="ghost"
               onClick={() => setDisplayMode("inline")}

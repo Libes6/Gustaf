@@ -6,6 +6,7 @@ import { Menu, MenuTrigger, MenuPopup, MenuGroup, MenuGroupLabel, MenuItem } fro
 import { PullRequestStackLayers } from "./PullRequestStackLayers";
 import { PullRequestStackHeader } from "./PullRequestStackHeader";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { useT } from "../../useUiLanguage";
 
 // Mount only on open to avoid per-row stack fetches.
 function StackBody({
@@ -19,6 +20,7 @@ function StackBody({
   onSelect: (reference: PullRequestRef) => void;
   stackNumber: number;
 }) {
+  const t = useT();
   const query = usePullRequestStack(environmentId, reference);
   if (query.data !== null) {
     return (
@@ -28,7 +30,11 @@ function StackBody({
           notice={query.notice}
           stale={!!query.error}
         />
-        {query.error ? <MenuItem onClick={query.refresh}>Retry stack refresh</MenuItem> : null}
+        {query.error ? (
+          <MenuItem onClick={query.refresh}>
+            {t("misc.pullRequestStackPopover.retryRefresh")}
+          </MenuItem>
+        ) : null}
         <PullRequestStackLayers stack={query.data} reference={reference} onSelect={onSelect} />
       </>
     );
@@ -38,7 +44,9 @@ function StackBody({
       <PullRequestStackHeader number={stackNumber} />
       <MenuGroupLabel>
         {query.error ??
-          (query.isPending ? "Loading stack…" : "This pull request is no longer in a stack.")}
+          (query.isPending
+            ? t("misc.pullRequestStackPopover.loadingStack")
+            : t("misc.pullRequestStackPopover.noLongerStack"))}
       </MenuGroupLabel>
     </>
   );

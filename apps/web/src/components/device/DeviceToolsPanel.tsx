@@ -3,6 +3,7 @@ import type { DevicePermission, DeviceSummary, DeviceTextSize } from "@t3tools/c
 import { ChevronDown, X } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { useState } from "react";
+import type { MessageKey } from "~/i18n";
 
 import { Button } from "~/components/ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
@@ -20,53 +21,61 @@ import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import type { DeviceControls } from "./useDeviceControls";
 import { deviceEventLogAtom } from "./deviceHubAtoms";
+import { useT } from "../../useUiLanguage";
 
-const TEXT_SIZES: ReadonlyArray<{ value: DeviceTextSize; label: string }> = [
-  { value: "small", label: "Small" },
-  { value: "default", label: "Default" },
-  { value: "large", label: "Large" },
-  { value: "extra-large", label: "Extra large" },
+const TEXT_SIZE_SPECS: ReadonlyArray<{ value: DeviceTextSize; key: MessageKey }> = [
+  { value: "small", key: "misc.deviceToolsPanel.textSizeSmall" },
+  { value: "default", key: "misc.deviceToolsPanel.textSizeDefault" },
+  { value: "large", key: "misc.deviceToolsPanel.textSizeLarge" },
+  { value: "extra-large", key: "misc.deviceToolsPanel.textSizeExtraLarge" },
 ];
 
-const COLOR_FILTERS = [
-  { value: "none", label: "None" },
-  { value: "grayscale", label: "Grayscale" },
-  { value: "red-green", label: "Red / green (protanopia)" },
-  { value: "green-red", label: "Green / red (deuteranopia)" },
-  { value: "blue-yellow", label: "Blue / yellow (tritanopia)" },
+const COLOR_FILTER_SPECS = [
+  { value: "none", key: "misc.deviceToolsPanel.colorNone" },
+  { value: "grayscale", key: "misc.deviceToolsPanel.colorGrayscale" },
+  { value: "red-green", key: "misc.deviceToolsPanel.colorRedGreen" },
+  { value: "green-red", key: "misc.deviceToolsPanel.colorGreenRed" },
+  { value: "blue-yellow", key: "misc.deviceToolsPanel.colorBlueYellow" },
 ] as const;
 
-const ORIENTATIONS = [
-  { value: "portrait", label: "Portrait" },
-  { value: "landscape_left", label: "Landscape left" },
-  { value: "portrait_upside_down", label: "Upside down" },
-  { value: "landscape_right", label: "Landscape right" },
+const ORIENTATION_SPECS = [
+  { value: "portrait", key: "misc.deviceToolsPanel.orientationPortrait" },
+  { value: "landscape_left", key: "misc.deviceToolsPanel.landscapeLeft" },
+  { value: "portrait_upside_down", key: "misc.deviceToolsPanel.orientationUpsideDown" },
+  { value: "landscape_right", key: "misc.deviceToolsPanel.landscapeRight" },
 ] as const;
 
-const IOS_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
-  { value: "camera", label: "Camera" },
-  { value: "microphone", label: "Microphone" },
-  { value: "photos", label: "Photos" },
-  { value: "contacts", label: "Contacts" },
-  { value: "calendar", label: "Calendar" },
-  { value: "reminders", label: "Reminders" },
-  { value: "location", label: "Location" },
-  { value: "notifications", label: "Notifications" },
-  { value: "motion", label: "Motion" },
-  { value: "media-library", label: "Media library" },
-  { value: "faceid", label: "Face ID" },
+const IOS_PERMISSION_SPECS: ReadonlyArray<{ value: DevicePermission; key: MessageKey }> = [
+  { value: "camera", key: "misc.deviceToolsPanel.permissionCamera" },
+  { value: "microphone", key: "misc.deviceToolsPanel.permissionMicrophone" },
+  { value: "photos", key: "misc.deviceToolsPanel.permissionPhotos" },
+  { value: "contacts", key: "misc.deviceToolsPanel.permissionContacts" },
+  { value: "calendar", key: "misc.deviceToolsPanel.permissionCalendar" },
+  { value: "reminders", key: "misc.deviceToolsPanel.permissionReminders" },
+  { value: "location", key: "misc.deviceToolsPanel.permissionLocation" },
+  { value: "notifications", key: "misc.deviceToolsPanel.permissionNotifications" },
+  { value: "motion", key: "misc.deviceToolsPanel.permissionMotion" },
+  { value: "media-library", key: "misc.deviceToolsPanel.permissionMediaLibrary" },
+  { value: "faceid", key: "misc.deviceToolsPanel.permissionFaceId" },
 ];
 
-const ANDROID_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
-  { value: "camera", label: "Camera" },
-  { value: "microphone", label: "Microphone" },
-  { value: "photos", label: "Photos" },
-  { value: "contacts", label: "Contacts" },
-  { value: "calendar", label: "Calendar" },
-  { value: "location", label: "Location" },
-  { value: "notifications", label: "Notifications" },
-  { value: "motion", label: "Physical activity" },
+const ANDROID_PERMISSION_SPECS: ReadonlyArray<{ value: DevicePermission; key: MessageKey }> = [
+  { value: "camera", key: "misc.deviceToolsPanel.permissionCamera" },
+  { value: "microphone", key: "misc.deviceToolsPanel.permissionMicrophone" },
+  { value: "photos", key: "misc.deviceToolsPanel.permissionPhotos" },
+  { value: "contacts", key: "misc.deviceToolsPanel.permissionContacts" },
+  { value: "calendar", key: "misc.deviceToolsPanel.permissionCalendar" },
+  { value: "location", key: "misc.deviceToolsPanel.permissionLocation" },
+  { value: "notifications", key: "misc.deviceToolsPanel.permissionNotifications" },
+  { value: "motion", key: "misc.deviceToolsPanel.permissionPhysicalActivity" },
 ];
+
+function labeledOptions<V extends string>(
+  t: ReturnType<typeof useT>,
+  specs: ReadonlyArray<{ value: V; key: MessageKey }>,
+): ReadonlyArray<{ value: V; label: string }> {
+  return specs.map((spec) => ({ value: spec.value, label: t(spec.key) }));
+}
 
 const LOCATION_PRESETS = [
   { label: "San Francisco", latitude: 37.7749, longitude: -122.4194 },
@@ -86,22 +95,33 @@ export function DeviceToolsPanel(props: {
   readonly onClose: () => void;
   readonly className?: string;
 }) {
+  const t = useT();
   const { device, controls } = props;
   const { detail, pending, error, foregroundApp, disabled, act } = controls;
   const settings = detail?.settings;
   const isIos = device.platform === "ios";
+  const textSizes = labeledOptions(t, TEXT_SIZE_SPECS);
+  const colorFilters = COLOR_FILTER_SPECS.map((spec) => ({
+    value: spec.value,
+    label: t(spec.key),
+  }));
+  const orientations = ORIENTATION_SPECS.map((spec) => ({
+    value: spec.value,
+    label: t(spec.key),
+  }));
+  const permissions = labeledOptions(t, isIos ? IOS_PERMISSION_SPECS : ANDROID_PERMISSION_SPECS);
 
   return (
     <div
       className={cn("flex min-h-0 flex-col border-border bg-background text-sm", props.className)}
     >
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
-        <span className="font-medium">Tools</span>
+        <span className="font-medium">{t("misc.deviceToolsPanel.tools")}</span>
         {pending ? <Spinner size="sm" /> : null}
         <Button
           size="icon-xs"
           variant="ghost-muted"
-          aria-label="Close tools"
+          aria-label={t("misc.deviceToolsPanel.closeTools")}
           className="ml-auto"
           onClick={props.onClose}
         >
@@ -114,20 +134,20 @@ export function DeviceToolsPanel(props: {
         ) : null}
         {detail === null && !error ? (
           <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-            <Spinner size="sm" /> Reading device settings…
+            <Spinner size="sm" /> {t("misc.deviceToolsPanel.readingSettings")}
           </div>
         ) : null}
 
         {props.hostDiagnostics ? (
-          <Section title="Host diagnostics">
+          <Section title={t("misc.deviceToolsPanel.hostDiagnostics")}>
             <p className="whitespace-pre-line text-xs text-muted-foreground">
               {props.hostDiagnostics}
             </p>
           </Section>
         ) : null}
 
-        <Section title="App">
-          <Row label="Foreground">
+        <Section title={t("misc.deviceToolsPanel.app")}>
+          <Row label={t("misc.deviceToolsPanel.foreground")}>
             <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "-"}</span>
           </Row>
           {foregroundApp ? (
@@ -138,7 +158,7 @@ export function DeviceToolsPanel(props: {
                 disabled={disabled}
                 onClick={() => void act({ type: "terminateApp", appId: foregroundApp.id })}
               >
-                Terminate
+                {t("misc.deviceToolsPanel.terminate")}
               </Button>
               <Button
                 size="xs"
@@ -146,28 +166,34 @@ export function DeviceToolsPanel(props: {
                 disabled={disabled}
                 onClick={() => void act({ type: "launchApp", appId: foregroundApp.id })}
               >
-                Relaunch
+                {t("misc.deviceToolsPanel.relaunch")}
               </Button>
             </div>
           ) : null}
           <SubmitRow
-            placeholder="https://… or myapp://"
-            action="Open"
+            placeholder={t("misc.deviceToolsPanel.urlPlaceholder")}
+            action={t("misc.deviceToolsPanel.open")}
             disabled={disabled}
             onSubmit={(url) => act({ type: "openUrl", url })}
           />
           <SubmitRow
-            placeholder={isIos ? "Bundle ID to launch" : "Package name to launch"}
-            action="Launch"
+            placeholder={
+              isIos
+                ? t("misc.deviceToolsPanel.bundleIdPlaceholder")
+                : t("misc.deviceToolsPanel.packagePlaceholder")
+            }
+            action={t("misc.deviceToolsPanel.launch")}
             disabled={disabled}
             onSubmit={(appId) => act({ type: "launchApp", appId })}
           />
         </Section>
 
-        <Section title={isIos ? "Simulator" : "Emulator"}>
-          <Row label="Appearance">
+        <Section
+          title={isIos ? t("misc.deviceToolsPanel.simulator") : t("misc.deviceToolsPanel.emulator")}
+        >
+          <Row label={t("misc.deviceToolsPanel.appearance")}>
             <ToggleGroup
-              aria-label="Appearance"
+              aria-label={t("misc.deviceToolsPanel.appearance")}
               value={settings?.appearance ? [settings.appearance] : []}
               disabled={disabled}
               onValueChange={(value) => {
@@ -176,15 +202,15 @@ export function DeviceToolsPanel(props: {
                   void act({ type: "setAppearance", value: next });
               }}
             >
-              <Toggle value="light">Light</Toggle>
-              <Toggle value="dark">Dark</Toggle>
+              <Toggle value="light">{t("misc.deviceToolsPanel.light")}</Toggle>
+              <Toggle value="dark">{t("misc.deviceToolsPanel.dark")}</Toggle>
             </ToggleGroup>
           </Row>
-          <Row label="Text size">
+          <Row label={t("misc.deviceToolsPanel.textSize")}>
             <ChoiceSelect
-              ariaLabel="Text size"
+              ariaLabel={t("misc.deviceToolsPanel.textSize")}
               value={settings?.textSize ?? null}
-              options={TEXT_SIZES}
+              options={textSizes}
               disabled={disabled}
               onChange={(value) => act({ type: "setTextSize", value })}
             />
@@ -203,34 +229,34 @@ export function DeviceToolsPanel(props: {
                     }
                   }}
                 >
-                  <Toggle value="clear">Clear</Toggle>
-                  <Toggle value="tinted">Tinted</Toggle>
+                  <Toggle value="clear">{t("misc.deviceToolsPanel.clear")}</Toggle>
+                  <Toggle value="tinted">{t("misc.deviceToolsPanel.tinted")}</Toggle>
                 </ToggleGroup>
               </Row>
-              <Row label="Color filter">
+              <Row label={t("misc.deviceToolsPanel.colorFilter")}>
                 <ChoiceSelect
-                  ariaLabel="Color filter"
+                  ariaLabel={t("misc.deviceToolsPanel.colorFilter")}
                   value={settings?.colorFilter ?? null}
-                  options={COLOR_FILTERS}
+                  options={colorFilters}
                   disabled={disabled}
                   onChange={(value) => act({ type: "setColorFilter", value })}
                 />
               </Row>
             </>
           ) : (
-            <Row label="Orientation">
+            <Row label={t("misc.deviceToolsPanel.orientation")}>
               <ChoiceSelect
-                ariaLabel="Orientation"
+                ariaLabel={t("misc.deviceToolsPanel.orientation")}
                 value={null}
-                placeholder="Rotate to…"
-                options={ORIENTATIONS}
+                placeholder={t("misc.deviceToolsPanel.rotateTo")}
+                options={orientations}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setOrientation", value })}
               />
             </Row>
           )}
           <SwitchRow
-            label="Reduce Motion"
+            label={t("misc.deviceToolsPanel.reduceMotion")}
             checked={settings?.reduceMotion}
             disabled={disabled}
             onChange={(value) => act({ type: "setToggle", setting: "reduceMotion", value })}
@@ -238,13 +264,13 @@ export function DeviceToolsPanel(props: {
           {isIos ? (
             <>
               <SwitchRow
-                label="Increase Contrast"
+                label={t("misc.deviceToolsPanel.increaseContrast")}
                 checked={settings?.increaseContrast}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setToggle", setting: "increaseContrast", value })}
               />
               <SwitchRow
-                label="Reduce Transparency"
+                label={t("misc.deviceToolsPanel.reduceTransparency")}
                 checked={settings?.reduceTransparency}
                 disabled={disabled}
                 onChange={(value) =>
@@ -252,7 +278,7 @@ export function DeviceToolsPanel(props: {
                 }
               />
               <SwitchRow
-                label="Show Borders"
+                label={t("misc.deviceToolsPanel.showBorders")}
                 checked={settings?.showBorders}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setToggle", setting: "showBorders", value })}
@@ -266,7 +292,7 @@ export function DeviceToolsPanel(props: {
             </>
           ) : (
             <SwitchRow
-              label="Network"
+              label={t("misc.deviceToolsPanel.network")}
               checked={settings?.networkEnabled}
               disabled={disabled}
               onChange={(value) => act({ type: "setToggle", setting: "networkEnabled", value })}
@@ -274,9 +300,9 @@ export function DeviceToolsPanel(props: {
           )}
         </Section>
 
-        <Section title="Accessibility">
+        <Section title={t("misc.deviceToolsPanel.accessibility")}>
           <SwitchRow
-            label="Overlay element frames"
+            label={t("misc.deviceToolsPanel.overlayFrames")}
             checked={props.axOverlay}
             disabled={props.access === null}
             onChange={(value) => {
@@ -294,7 +320,7 @@ export function DeviceToolsPanel(props: {
         />
 
         <PermissionsSection
-          permissions={isIos ? IOS_PERMISSIONS : ANDROID_PERMISSIONS}
+          permissions={permissions}
           canReset={isIos}
           defaultAppId={foregroundApp?.id ?? ""}
           disabled={disabled}
@@ -304,10 +330,10 @@ export function DeviceToolsPanel(props: {
         />
 
         {isIos ? (
-          <Section title="Push notification">
+          <Section title={t("misc.deviceToolsPanel.pushNotification")}>
             <SubmitRow
-              placeholder="Alert text"
-              action="Send"
+              placeholder={t("misc.deviceToolsPanel.alertText")}
+              action={t("misc.deviceToolsPanel.send")}
               disabled={disabled || !foregroundApp}
               onSubmit={(payload) =>
                 foregroundApp
@@ -316,7 +342,9 @@ export function DeviceToolsPanel(props: {
               }
             />
             {!foregroundApp ? (
-              <p className="text-xs text-muted-foreground">Open an app first.</p>
+              <p className="text-xs text-muted-foreground">
+                {t("misc.deviceToolsPanel.openAppFirst")}
+              </p>
             ) : null}
           </Section>
         ) : null}
@@ -372,6 +400,7 @@ function ChoiceSelect<V extends string>(props: {
   readonly placeholder?: string;
   readonly onChange: (value: V) => Promise<unknown>;
 }) {
+  const t = useT();
   const current = props.options.find((option) => option.value === props.value);
   return (
     <Select
@@ -386,7 +415,9 @@ function ChoiceSelect<V extends string>(props: {
           {current ? (
             current.label
           ) : (
-            <span className="text-muted-foreground">{props.placeholder ?? "Unknown"}</span>
+            <span className="text-muted-foreground">
+              {props.placeholder ?? t("misc.deviceToolsPanel.unknown")}
+            </span>
           )}
         </SelectValue>
       </SelectTrigger>
@@ -450,6 +481,7 @@ function LocationSection(props: {
   readonly onSet: (latitude: number, longitude: number) => Promise<unknown>;
   readonly onClear: () => Promise<unknown>;
 }) {
+  const t = useT();
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const parsed = { latitude: Number(latitude), longitude: Number(longitude) };
@@ -459,13 +491,13 @@ function LocationSection(props: {
     Math.abs(parsed.latitude) <= 90 &&
     Math.abs(parsed.longitude) <= 180;
   return (
-    <Section title="Location">
+    <Section title={t("misc.deviceToolsPanel.location")}>
       <div className="flex gap-1.5">
         <Input
           size="compact"
           font="mono"
           className="min-w-0 flex-1"
-          placeholder="Latitude"
+          placeholder={t("misc.deviceToolsPanel.latitude")}
           inputMode="decimal"
           value={latitude}
           disabled={props.disabled}
@@ -475,7 +507,7 @@ function LocationSection(props: {
           size="compact"
           font="mono"
           className="min-w-0 flex-1"
-          placeholder="Longitude"
+          placeholder={t("misc.deviceToolsPanel.longitude")}
           inputMode="decimal"
           value={longitude}
           disabled={props.disabled}
@@ -494,9 +526,13 @@ function LocationSection(props: {
             void props.onSet(preset.latitude, preset.longitude);
           }}
         >
-          <SelectTrigger size="xs" className="w-32" aria-label="Location preset">
+          <SelectTrigger
+            size="xs"
+            className="w-32"
+            aria-label={t("misc.deviceToolsPanel.locationPreset")}
+          >
             <SelectValue>
-              <span className="text-muted-foreground">Preset…</span>
+              <span className="text-muted-foreground">{t("misc.deviceToolsPanel.preset")}</span>
             </SelectValue>
           </SelectTrigger>
           <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -513,7 +549,7 @@ function LocationSection(props: {
           disabled={props.disabled || !valid}
           onClick={() => void props.onSet(parsed.latitude, parsed.longitude)}
         >
-          Set
+          {t("misc.deviceToolsPanel.setLocation")}
         </Button>
         {props.canClear ? (
           <Button
@@ -526,7 +562,7 @@ function LocationSection(props: {
               void props.onClear();
             }}
           >
-            Clear
+            {t("misc.deviceToolsPanel.clearLocation")}
           </Button>
         ) : null}
       </div>
@@ -545,24 +581,25 @@ function PermissionsSection(props: {
     decision: "grant" | "revoke" | "reset",
   ) => Promise<unknown>;
 }) {
+  const t = useT();
   const [appId, setAppId] = useState("");
   const [permission, setPermission] = useState<DevicePermission>("camera");
   const resolvedAppId = appId.trim() || props.defaultAppId;
   const decide = (decision: "grant" | "revoke" | "reset") =>
     void props.onDecide(resolvedAppId, permission, decision);
   return (
-    <Section title="Permissions">
+    <Section title={t("misc.deviceToolsPanel.permissions")}>
       <Input
         size="compact"
         font="mono"
-        placeholder={props.defaultAppId || "App ID"}
+        placeholder={props.defaultAppId || t("misc.deviceToolsPanel.appId")}
         value={appId}
         disabled={props.disabled}
         onChange={(event) => setAppId(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-1.5">
         <ChoiceSelect
-          ariaLabel="Permission"
+          ariaLabel={t("misc.deviceToolsPanel.permission")}
           value={permission}
           options={props.permissions}
           disabled={props.disabled}
@@ -577,7 +614,7 @@ function PermissionsSection(props: {
           disabled={props.disabled || !resolvedAppId}
           onClick={() => decide("grant")}
         >
-          Grant
+          {t("misc.deviceToolsPanel.grant")}
         </Button>
         <Button
           size="xs"
@@ -585,7 +622,7 @@ function PermissionsSection(props: {
           disabled={props.disabled || !resolvedAppId}
           onClick={() => decide("revoke")}
         >
-          Revoke
+          {t("misc.deviceToolsPanel.revoke")}
         </Button>
         {props.canReset ? (
           <Button
@@ -594,7 +631,7 @@ function PermissionsSection(props: {
             disabled={props.disabled || !resolvedAppId}
             onClick={() => decide("reset")}
           >
-            Reset
+            {t("misc.deviceToolsPanel.reset")}
           </Button>
         ) : null}
       </div>
@@ -606,12 +643,13 @@ function EventLogSection(props: {
   readonly access: DeviceHubAccess;
   readonly device: DeviceSummary;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 border-b px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
-        Event log
+        {t("misc.deviceToolsPanel.eventLog")}
         <ChevronDown
           className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
         />
@@ -628,6 +666,7 @@ function EventLogEntries(props: {
   readonly access: DeviceHubAccess;
   readonly device: DeviceSummary;
 }) {
+  const t = useT();
   const entries = useAtomValue(
     deviceEventLogAtom({
       access: props.access,
@@ -638,7 +677,7 @@ function EventLogEntries(props: {
   return (
     <ol className="max-h-64 overflow-y-auto px-3 py-2 font-mono text-2xs leading-relaxed">
       {entries.length === 0 ? (
-        <li className="text-muted-foreground">No events yet.</li>
+        <li className="text-muted-foreground">{t("misc.deviceToolsPanel.noEvents")}</li>
       ) : (
         entries.map((entry) => (
           <li key={entry.id} className="flex gap-2">

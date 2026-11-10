@@ -11,6 +11,7 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { ChatGptConnectionButton } from "./ChatGptConnectionButton";
+import { useT } from "../../useUiLanguage";
 
 export function ChatGptAccountPicker({
   open,
@@ -31,6 +32,7 @@ export function ChatGptAccountPicker({
   canRemove: boolean;
   error: string | null;
 }) {
+  const t = useT();
   const profiles = methods.filter((method) => method.id.startsWith("chatgpt-profile:"));
   const [selection, setSelection] = useState<string | null>(null);
   const selectedMethodId =
@@ -48,14 +50,12 @@ export function ChatGptAccountPicker({
     >
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Reconnect ChatGPT</DialogTitle>
-          <DialogDescription>
-            On OpenAI, sign in with the account you choose here.
-          </DialogDescription>
+          <DialogTitle>{t("settingsA.chatGptPicker.title")}</DialogTitle>
+          <DialogDescription>{t("settingsA.chatGptPicker.description")}</DialogDescription>
         </DialogHeader>
         <div className="px-6 pb-6">
           <RadioGroup
-            aria-label="ChatGPT account to connect"
+            aria-label={t("settingsA.chatGptPicker.accountLabel")}
             disabled={disabled}
             value={selectedMethodId}
             onValueChange={(value) => setSelection(value)}
@@ -71,7 +71,7 @@ export function ChatGptAccountPicker({
             ))}
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-3 text-sm">
               <Radio value="chatgpt-change-account" />
-              <span className="font-medium">Use a different account</span>
+              <span className="font-medium">{t("settingsA.chatGptPicker.useDifferent")}</span>
             </label>
           </RadioGroup>
         </div>
@@ -87,7 +87,7 @@ export function ChatGptAccountPicker({
               disabled={disabled || !canRemove}
               onClick={() => onRemove(selectedMethodId)}
             >
-              Remove connection
+              {t("settingsA.chatGptPicker.removeConnection")}
             </Button>
           ) : null}
           <ChatGptConnectionButton disabled={disabled} onClick={() => onSelect(selectedMethodId)} />

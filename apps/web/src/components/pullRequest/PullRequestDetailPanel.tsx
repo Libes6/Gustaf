@@ -158,6 +158,7 @@ import {
 import { PullRequestGuideTab } from "./PullRequestGuideTab";
 import { guideRunKey, useGuideRunStore } from "./guide/guideRunStore";
 import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
+import { useT } from "../../useUiLanguage";
 
 const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
   merge: `Could not merge this ${term}`,
@@ -300,6 +301,7 @@ export function PullRequestDetailPanel({
   initialTab?: PullRequestDetailTab;
   onTabChange?: ((tab: PullRequestDetailTab) => void) | undefined;
 }) {
+  const t = useT();
   const environmentConfigs = useServerConfigs();
   const projects = useProjects();
   const project = projects.find(
@@ -691,7 +693,7 @@ export function PullRequestDetailPanel({
       toastManager.add({ type: "success", title: `Revert ${terminology.singular} opened` });
     }
     if (action === "delete-branch") {
-      toastManager.add({ type: "success", title: "Branch deleted" });
+      toastManager.add({ type: "success", title: t("misc.pullRequestDetailPanel.branchDeleted") });
     }
     if (pullRequestActionNeedsHostRefresh(action)) {
       void refreshFromHost();
@@ -723,7 +725,10 @@ export function PullRequestDetailPanel({
     });
     if (commentResult._tag === "Failure") {
       setPendingAction(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({
+        type: "error",
+        title: t("misc.pullRequestDetailPanel.couldNotPostComment"),
+      });
       return { commentPosted: false };
     }
     const actionSucceeded = await finishAction(action);
@@ -778,10 +783,10 @@ export function PullRequestDetailPanel({
       writeHandoffToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
+        title: t("misc.pullRequestDetailPanel.addedToComposer"),
         description:
           task.prompt.length > 0
-            ? "The question is in the composer. Read it over, then send."
+            ? t("misc.pullRequestDetailPanel.questionInComposer")
             : `The ${terminology.singular} is in the composer. Type your question, then send.`,
       });
       return;
@@ -809,17 +814,17 @@ export function PullRequestDetailPanel({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: t("misc.pullRequestDetailPanel.couldNotOpenThread"),
+        description: t("misc.pullRequestDetailPanel.tryAgainFromProject"),
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: t("misc.pullRequestDetailPanel.askedInThread"),
       description:
         task.prompt.length > 0
-          ? "The question is in the composer. Read it over, then send."
+          ? t("misc.pullRequestDetailPanel.questionInComposer")
           : `The ${terminology.singular} is in the composer. Type your question, then send.`,
     });
   };
@@ -834,8 +839,8 @@ export function PullRequestDetailPanel({
       writeHandoffToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
-        description: "The task is in the composer. Read it over, then send.",
+        title: t("misc.pullRequestDetailPanel.addedToComposer"),
+        description: t("misc.pullRequestDetailPanel.taskInComposer"),
       });
       return;
     }
@@ -870,8 +875,8 @@ export function PullRequestDetailPanel({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: t("misc.pullRequestDetailPanel.couldNotOpenCheckoutThread"),
+        description: t("misc.pullRequestDetailPanel.tryAgainFromProject"),
       });
       return;
     }
@@ -904,7 +909,7 @@ export function PullRequestDetailPanel({
       // Sending after failed rebinding would use the previous checkout.
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
+        title: t("misc.pullRequestDetailPanel.checkedOutThreadStayed"),
         description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
       });
       return;
@@ -932,8 +937,8 @@ export function PullRequestDetailPanel({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: t("misc.pullRequestDetailPanel.checkoutReady"),
+            description: t("misc.pullRequestDetailPanel.taskInComposer"),
           }
         : offHeadPullRequestCheckoutToast(terminology),
     );
@@ -1050,7 +1055,7 @@ export function PullRequestDetailPanel({
     // The active editor may be answering a provider question rather than editing this draft.
     if (!hasReference) store.addReviewComment(attachTarget, reference, { insertAtCaret: false });
     store.addReviewComment(attachTarget, comment, { insertAtCaret: false });
-    toastManager.add({ type: "success", title: "Added to the composer" });
+    toastManager.add({ type: "success", title: t("misc.pullRequestDetailPanel.addedToComposer") });
   };
 
   const startCheckout = (mode: "worktree" | "local") => {
@@ -1211,7 +1216,7 @@ export function PullRequestDetailPanel({
     workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows");
   const checksSummary = checksStale
     ? checksState === null
-      ? "No checks reported"
+      ? t("misc.pullRequestDetailPanel.noChecksReported")
       : pullRequestChecksStatePresentation(checksState).label
     : detail
       ? summarizePullRequestChecks(detail.checks)
@@ -1455,7 +1460,7 @@ export function PullRequestDetailPanel({
                       iconClassName="size-3"
                     />
                     <ArrowLeftIcon
-                      aria-label="receives changes from"
+                      aria-label={t("misc.pullRequestDetailPanel.receivesChangesFrom")}
                       className="size-3 shrink-0 opacity-60"
                     />
                     <Tooltip>
@@ -1538,8 +1543,8 @@ export function PullRequestDetailPanel({
                       key={checkoutCommand}
                       value={checkoutCommand}
                       target={`${terminology.singular} checkout command`}
-                      copyLabel="Copy checkout command"
-                      copiedLabel="Checkout command copied"
+                      copyLabel={t("misc.pullRequestDetailPanel.copyCheckoutCommand")}
+                      copiedLabel={t("misc.pullRequestDetailPanel.checkoutCommandCopied")}
                       className="ml-auto font-mono"
                       tooltipSide="bottom"
                       onError={reportCheckoutCommandError}
@@ -1561,7 +1566,7 @@ export function PullRequestDetailPanel({
                     value={detail.headBranch}
                     target="branch name"
                     copyLabel={`Copy ${terminology.singular} branch`}
-                    copiedLabel="Branch name copied"
+                    copiedLabel={t("misc.pullRequestDetailPanel.branchNameCopied")}
                   />
                 }
                 files={`${detail.changedFiles.toLocaleString()} ${detail.changedFiles === 1 ? "file" : "files"}`}
@@ -1627,7 +1632,7 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Comments unavailable"
+                        ? t("misc.pullRequestDetailPanel.commentsUnavailable")
                         : `${detail.commentCount.toLocaleString()} ${
                             detail.commentCount === 1 ? "comment" : "comments"
                           }`
@@ -1644,7 +1649,7 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Commits unavailable"
+                        ? t("misc.pullRequestDetailPanel.commitsUnavailable")
                         : `${detail.commits.length.toLocaleString()} ${
                             detail.commits.length === 1 ? "commit" : "commits"
                           }`
@@ -1677,15 +1682,17 @@ export function PullRequestDetailPanel({
                   variant="ghost-muted"
                   aria-label={
                     timelineOrder === "newest"
-                      ? "Show oldest activity first"
-                      : "Show newest activity first"
+                      ? t("misc.pullRequestDetailPanel.showOldestActivity")
+                      : t("misc.pullRequestDetailPanel.showNewestActivity")
                   }
                   onClick={() =>
                     setTimelineOrder((value) => (value === "newest" ? "oldest" : "newest"))
                   }
                 >
                   <ArrowDownUpIcon aria-hidden className="size-3" />
-                  {timelineOrder === "newest" ? "Newest first" : "Oldest first"}
+                  {timelineOrder === "newest"
+                    ? t("misc.pullRequestDetailPanel.newestFirst")
+                    : t("misc.pullRequestDetailPanel.oldestFirst")}
                 </Button>
               </div>
             ) : null}

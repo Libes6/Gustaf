@@ -26,6 +26,8 @@ import { Input } from "../ui/input";
 import { RadioGroup } from "../ui/radio-group";
 import { Spinner } from "../ui/spinner";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
+import type { MessageKey } from "~/i18n";
+import { useT } from "~/useUiLanguage";
 
 export const accessConfig: Record<
   AuthMcpClientAccess,
@@ -37,6 +39,32 @@ export const accessConfig: Record<
     icon: EyeIcon,
   },
   ...runtimeModeConfig,
+};
+
+const ACCESS_I18N: Record<
+  AuthMcpClientAccess,
+  { readonly label: MessageKey; readonly description: MessageKey }
+> = {
+  "read-only": {
+    label: "misc.connectAgentSurface.readOnlyLabel",
+    description: "misc.connectAgentSurface.readOnlyDescription",
+  },
+  "approval-required": {
+    label: "misc.connectAgentSurface.runtimeApprovalRequiredLabel",
+    description: "misc.connectAgentSurface.runtimeApprovalRequiredDescription",
+  },
+  "auto-accept-edits": {
+    label: "misc.connectAgentSurface.runtimeAutoAcceptEditsLabel",
+    description: "misc.connectAgentSurface.runtimeAutoAcceptEditsDescription",
+  },
+  auto: {
+    label: "misc.connectAgentSurface.runtimeAutoLabel",
+    description: "misc.connectAgentSurface.runtimeAutoDescription",
+  },
+  "full-access": {
+    label: "misc.connectAgentSurface.runtimeFullAccessLabel",
+    description: "misc.connectAgentSurface.runtimeFullAccessDescription",
+  },
 };
 
 function redirectsToThisComputer(redirectHost: string): boolean {
@@ -91,6 +119,7 @@ function oneClickApproves(details: AuthMcpApprovalDetails, access: AuthMcpClient
 }
 
 export function ConnectAgentSurface() {
+  const t = useT();
   const [authorization] = useState(readAuthorizationRequest);
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
   const [requestedAccess, setAccess] = useState<AuthMcpClientAccess>("auto");
@@ -143,15 +172,20 @@ export function ConnectAgentSurface() {
       return;
     }
     setPending(null);
-    setErrorMessage(answer.kind === "error" ? answer.message : "The sign-in could not continue.");
+    setErrorMessage(
+      answer.kind === "error"
+        ? answer.message
+        : t("misc.connectAgentSurface.signInCouldNotContinue"),
+    );
   };
 
   if (loaded.status === "loading") {
     return (
       <StandalonePage>
         <ConnectAgentHeading
-          title="Checking the sign-in request"
-          description="One moment while this environment verifies the agent's request."
+          context={t("misc.connectAgentSurface.agentSignIn")}
+          title={t("misc.connectAgentSurface.checkingTitle")}
+          description={t("misc.connectAgentSurface.checkingDescription")}
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
       </StandalonePage>
@@ -161,9 +195,17 @@ export function ConnectAgentSurface() {
   if (loaded.status === "invalid") {
     return (
       <StandalonePage>
-        <ConnectAgentHeading title="This sign-in cannot continue" description={loaded.message} />
+        <ConnectAgentHeading
+          context={t("misc.connectAgentSurface.agentSignIn")}
+          title={t("misc.connectAgentSurface.invalidTitle")}
+          description={
+            loaded.message === UNREACHABLE
+              ? t("misc.connectAgentSurface.unreachable")
+              : loaded.message
+          }
+        />
         <p className="mt-4 text-sm text-muted-foreground">
-          Close this page and start the sign-in again from your agent.
+          {t("misc.connectAgentSurface.closeAndRestart")}
         </p>
       </StandalonePage>
     );
@@ -176,7 +218,11 @@ export function ConnectAgentSurface() {
   return (
     <StandalonePage>
       <ConnectAgentHeading
-        title={`Connect ${details.clientName}`}
+        context={t("misc.connectAgentSurface.agentSignIn")}
+        title={t("misc.connectAgentSurface.connectTitle").replace(
+          "{clientName}",
+          details.clientName,
+        )}
         description={
           <>
             This agent wants to use the threads in every project on{" "}
@@ -208,7 +254,7 @@ export function ConnectAgentSurface() {
       >
         <div className="space-y-2">
           <span id="connect-agent-access-label" className="text-sm font-medium">
-            What it may do
+            {t("misc.connectAgentSurface.whatItMayDo")}
           </span>
           <RadioGroup
             aria-labelledby="connect-agent-access-label"
@@ -225,15 +271,14 @@ export function ConnectAgentSurface() {
             ))}
           </RadioGroup>
           <p className="text-xs text-muted-foreground">
-            Beyond read only, it can start, message and stop threads, and none of them can run with
-            more than the mode you pick.
+            {t("misc.connectAgentSurface.beyondReadOnly")}
           </p>
         </div>
 
         {oneClick ? null : (
           <div className="space-y-2">
             <label className="text-sm font-medium" htmlFor="connect-agent-pairing-code">
-              Pairing code
+              {t("misc.connectAgentSurface.pairingCode")}
             </label>
             <Input
               id="connect-agent-pairing-code"
@@ -243,7 +288,7 @@ export function ConnectAgentSurface() {
               disabled={pending !== null}
               nativeInput
               onChange={(event) => setPairingCode(event.currentTarget.value)}
-              placeholder="Paste a one-time pairing code"
+              placeholder={t("misc.connectAgentSurface.pairingCodePlaceholder")}
               spellCheck={false}
               value={pairingCode}
             />
@@ -262,7 +307,9 @@ export function ConnectAgentSurface() {
 
         <div className="flex flex-wrap gap-2">
           <Button disabled={!canApprove} type="submit">
-            {pending === "approve" ? "Approving…" : "Approve"}
+            {pending === "approve"
+              ? t("misc.connectAgentSurface.approving")
+              : t("misc.connectAgentSurface.approve")}
           </Button>
           <Button
             disabled={pending !== null}
@@ -270,7 +317,9 @@ export function ConnectAgentSurface() {
             type="button"
             variant="outline"
           >
-            {pending === "deny" ? "Denying…" : "Deny"}
+            {pending === "deny"
+              ? t("misc.connectAgentSurface.denying")
+              : t("misc.connectAgentSurface.deny")}
           </Button>
         </div>
       </form>
@@ -279,13 +328,15 @@ export function ConnectAgentSurface() {
 }
 
 function ConnectAgentHeading({
+  context,
   title,
   description,
 }: {
+  readonly context: string;
   readonly title: string;
   readonly description: ReactNode;
 }) {
-  return <StandalonePageHeader context="Agent sign-in" title={title} description={description} />;
+  return <StandalonePageHeader context={context} title={title} description={description} />;
 }
 
 /** Why a managed policy keeps `access` from being granted, or undefined when it may be. */
@@ -307,7 +358,11 @@ function AccessOption({
   readonly selected: boolean;
   readonly managedReason: string | undefined;
 }) {
-  const { label, description, icon: Icon } = accessConfig[access];
+  const t = useT();
+  const { icon: Icon } = accessConfig[access];
+  const i18n = ACCESS_I18N[access];
+  const label = t(i18n.label);
+  const description = managedReason ?? t(i18n.description);
   return (
     <RadioPrimitive.Root
       value={access}
@@ -329,7 +384,7 @@ function AccessOption({
       />
       <span className="min-w-0">
         <span className="block text-sm font-medium text-foreground">{label}</span>
-        <span className="block text-xs text-muted-foreground">{managedReason ?? description}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
       </span>
     </RadioPrimitive.Root>
   );

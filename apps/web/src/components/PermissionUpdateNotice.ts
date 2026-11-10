@@ -9,6 +9,11 @@ import { environmentSummaries } from "../state/presentation";
 import { environmentSession } from "../state/session";
 import { toastManager } from "./ui/toast";
 
+import { getClientSettings } from "../hooks/useSettings";
+import { translate, type MessageKey } from "../i18n";
+
+const tNow = (key: MessageKey) => translate(getClientSettings().uiLanguage, key);
+
 interface LegacyPermissionEnvironment {
   readonly environmentId: EnvironmentId;
   readonly label: string;
@@ -42,13 +47,12 @@ function showPermissionNotice(
     toastManager.close(id);
   };
   const id = toastManager.add({
-    title: `Permissions have changed for ${label}`,
-    description:
-      "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+    title: tNow("shell.toasts.permissionsChanged").replace("{label}", label),
+    description: tNow("shell.toasts.oldPermissions"),
     timeout: 0,
     onClose: persistDismissal,
     actionProps: {
-      children: "Open Sharing & access",
+      children: tNow("shell.toasts.openSharingAccess"),
       onClick: () => {
         dismiss();
         void router.navigate({ to: "/settings/access" });
@@ -56,7 +60,7 @@ function showPermissionNotice(
     },
     data: {
       actionLayout: "stacked-end",
-      secondaryActionProps: { children: "Dismiss", onClick: dismiss },
+      secondaryActionProps: { children: tNow("shell.toasts.dismiss"), onClick: dismiss },
       secondaryActionVariant: "ghost",
     },
   });

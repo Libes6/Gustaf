@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
+import { useT } from "~/useUiLanguage";
 
 const OPENER_STORAGE_KEY = "t3code:prompt-link-opener";
 const Opener = Schema.NullOr(Schema.Literals(["app", "browser"]));
@@ -29,14 +30,14 @@ interface LinkSummary {
   readonly details: ReadonlyArray<string>;
 }
 
-const PROMPT_HEADER = {
-  title: "Open this prompt",
-  description: "It opens as a draft. Nothing runs until you press Send.",
-};
-
 function summarize(
   appPath: string,
+  t: ReturnType<typeof useT>,
 ): { ok: true; value: LinkSummary } | { ok: false; error: string } {
+  const promptHeader = {
+    title: t("misc.hostedPromptLinkLanding.openThisPrompt"),
+    description: t("misc.hostedPromptLinkLanding.promptDescription"),
+  };
   const url = new URL(appPath, window.location.origin);
   if (url.pathname !== "/new") {
     const prompt = parseThreadLinkPrompt(url.search);
@@ -46,12 +47,16 @@ function summarize(
       value:
         prompt.value === null
           ? {
-              title: "Open this thread",
-              description: "It opens in Gustaf if you're connected to the machine it runs on.",
+              title: t("misc.hostedPromptLinkLanding.openThisThread"),
+              description: t("misc.hostedPromptLinkLanding.threadDescription"),
               prompt: null,
               details: [],
             }
-          : { ...PROMPT_HEADER, prompt: prompt.value, details: ["Opens one of your threads."] },
+          : {
+              ...promptHeader,
+              prompt: prompt.value,
+              details: [t("misc.hostedPromptLinkLanding.detailOpensThread")],
+            },
     };
   }
   const link = parseNewThreadLink(url.search);
@@ -61,9 +66,14 @@ function summarize(
     return {
       ok: true,
       value: {
-        ...PROMPT_HEADER,
+        ...promptHeader,
         prompt: link.value.prompt,
-        details: [`Pull request ${owner}/${name}#${number}`],
+        details: [
+          t("misc.hostedPromptLinkLanding.detailPullRequest")
+            .replace("{owner}", owner)
+            .replace("{name}", name)
+            .replace("{number}", String(number)),
+        ],
       },
     };
   }
@@ -71,11 +81,26 @@ function summarize(
   return {
     ok: true,
     value: {
-      ...PROMPT_HEADER,
+      ...promptHeader,
       prompt: link.value.prompt,
       details: [
-        repository ? `Repository ${repository.owner}/${repository.name}` : "No project",
-        ...(provider ? [`Model ${model ? `${provider} ${model}` : provider}`] : []),
+        repository
+          ? t("misc.hostedPromptLinkLanding.detailRepository")
+              .replace("{owner}", repository.owner)
+              .replace("{name}", repository.name)
+          : t("misc.hostedPromptLinkLanding.detailNoProject"),
+        ...(provider
+          ? [
+              model
+                ? t("misc.hostedPromptLinkLanding.detailModelProviderAndName")
+                    .replace("{provider}", provider)
+                    .replace("{model}", model)
+                : t("misc.hostedPromptLinkLanding.detailModelProvider").replace(
+                    "{provider}",
+                    provider,
+                  ),
+            ]
+          : []),
       ],
     },
   };
@@ -120,7 +145,8 @@ function HostedPromptLinkLanding({
   readonly openInAppRemembered: boolean;
   readonly onChoose: (choice: "app" | "browser", remember: boolean) => void;
 }) {
-  const summary = summarize(appPath);
+  const t = useT();
+  const summary = summarize(appPath, t);
   const [remember, setRemember] = useState(false);
   const deepLink = promptLinkDeepLink(appPath);
   const onPhone = /android|iphone|ipad/i.test(navigator.userAgent);
@@ -136,7 +162,10 @@ function HostedPromptLinkLanding({
   if (!summary.ok) {
     return (
       <StandalonePage>
-        <StandalonePageHeader title="Could not open the link" description={summary.error} />
+        <StandalonePageHeader
+          title={t("misc.hostedPromptLinkLanding.couldNotOpenLink")}
+          description={summary.error}
+        />
       </StandalonePage>
     );
   }
@@ -164,20 +193,22 @@ function HostedPromptLinkLanding({
       ) : null}
       <div className="mt-6 flex flex-wrap gap-2">
         <Button render={<a href={deepLink} />} onClick={() => onChoose("app", remember)}>
-          {onPhone ? "Open in app" : "Open in desktop app"}
+          {onPhone
+            ? t("misc.hostedPromptLinkLanding.openInApp")
+            : t("misc.hostedPromptLinkLanding.openDesktopApp")}
         </Button>
         {canContinue ? (
           <Button variant="outline" onClick={() => onChoose("browser", remember)}>
-            Continue here
+            {t("misc.hostedPromptLinkLanding.continueHere")}
           </Button>
         ) : null}
         <Button variant="ghost" render={<a href={DESKTOP_DOWNLOAD_URL} />}>
-          Get Gustaf
+          {t("misc.hostedPromptLinkLanding.getGustaf")}
         </Button>
       </div>
       <label className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
-        Remember my choice
+        {t("misc.hostedPromptLinkLanding.rememberChoice")}
       </label>
     </StandalonePage>
   );

@@ -12,6 +12,7 @@ import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
+import { useT } from "~/useUiLanguage";
 
 export type RuntimeModeOption = {
   mode: RuntimeMode;
@@ -108,6 +109,7 @@ export function ComposerPermissionsSection(props: {
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
   // Hover or keyboard focus previews a mode's name and description before a pick.
+  const t = useT();
   const [previewMode, setPreviewMode] = useState<RuntimeMode | null>(null);
   const shownMode = previewMode ?? props.runtimeMode;
   const shown =
@@ -116,9 +118,11 @@ export function ComposerPermissionsSection(props: {
   const descriptionId = useId();
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
-      <div className="font-medium text-muted-foreground text-xs">Permissions</div>
+      <div className="font-medium text-muted-foreground text-xs">
+        {t("chatA.composerFooterControls.permissions")}
+      </div>
       <MenuPrimitive.RadioGroup
-        aria-label="Permissions"
+        aria-label={t("chatA.composerFooterControls.permissions")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);

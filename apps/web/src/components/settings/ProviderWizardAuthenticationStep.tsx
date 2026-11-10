@@ -8,6 +8,7 @@ import { WizardFooter, WizardPanel } from "../ui/wizard";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsRow } from "./settingsLayout";
+import { useT } from "../../useUiLanguage";
 
 export function ProviderWizardAuthenticationStep({
   environmentId,
@@ -20,6 +21,7 @@ export function ProviderWizardAuthenticationStep({
   readonly instanceId: ProviderInstanceId;
   readonly onFinish: () => void;
 }) {
+  const t = useT();
   const providers =
     useAtomValue(serverEnvironment.providersValueAtom(environmentId)) ?? EMPTY_SERVER_PROVIDERS;
   const provider = providers.find((candidate) => candidate.instanceId === instanceId);
@@ -56,18 +58,16 @@ export function ProviderWizardAuthenticationStep({
             />
           ) : (
             <SettingsRow
-              title="Account"
+              title={t("settingsC.smallSettings.account")}
               description={
                 isDiscovering
-                  ? "Discovering sign-in methods…"
-                  : (query.error ??
-                    auth?.message ??
-                    "No in-app sign-in advertised. Follow the provider's docs to finish setup.")
+                  ? t("settingsC.smallSettings.discoveringMethods")
+                  : (query.error ?? auth?.message ?? t("settingsC.smallSettings.noInAppSignIn"))
               }
               control={
                 isDiscovering ? (
                   <Button disabled size="sm" variant="outline">
-                    Sign in
+                    {t("settingsC.smallSettings.signIn")}
                   </Button>
                 ) : provider?.setup?.documentationUrl ? (
                   <Button
@@ -77,7 +77,7 @@ export function ProviderWizardAuthenticationStep({
                       <a href={provider.setup.documentationUrl} target="_blank" rel="noreferrer" />
                     }
                   >
-                    Open docs
+                    {t("settingsC.smallSettings.openDocs")}
                   </Button>
                 ) : undefined
               }
@@ -92,7 +92,7 @@ export function ProviderWizardAuthenticationStep({
           disabled={active}
           onClick={onFinish}
         >
-          {signedIn ? "Done" : "Skip for now"}
+          {signedIn ? t("settingsC.smallSettings.done") : t("settingsC.smallSettings.skipForNow")}
         </Button>
       </WizardFooter>
     </>

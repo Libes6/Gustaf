@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
+import { useT } from "../../useUiLanguage";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -18,6 +19,7 @@ import { searchableSetting } from "./settingsSearch";
 
 // Toggling relaunches desktop; the switch reflects startup state.
 export function LocalEnvironmentSetting() {
+  const t = useT();
   const setEnabled = window.desktopBridge?.setLocalEnvironmentEnabled;
   const [enabled] = useState(() => !isLocalEnvironmentDisabled());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -31,7 +33,11 @@ export function LocalEnvironmentSetting() {
     try {
       await setEnabled(!enabled);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't change this setting.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t("settingsB.LocalEnvironmentSetting.changeFailed"),
+      );
       setIsUpdating(false);
     }
   };
@@ -42,15 +48,15 @@ export function LocalEnvironmentSetting() {
         {...searchableSetting("local-environment")}
         description={
           enabled
-            ? "Run agents on this computer. Turn off to use Gustaf only with remote environments."
-            : "Turned off. Agents only run in remote environments."
+            ? t("settingsB.LocalEnvironmentSetting.onDescription")
+            : t("settingsB.LocalEnvironmentSetting.offDescription")
         }
         control={
           <Switch
             checked={enabled}
             disabled={isUpdating}
             onCheckedChange={() => setConfirmOpen(true)}
-            aria-label="Local environment"
+            aria-label={t("settingsB.LocalEnvironmentSetting.ariaLabel")}
           />
         }
       />
@@ -65,18 +71,20 @@ export function LocalEnvironmentSetting() {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {enabled ? "Turn off local environment?" : "Turn on local environment?"}
+              {enabled
+                ? t("settingsB.LocalEnvironmentSetting.turnOffTitle")
+                : t("settingsB.LocalEnvironmentSetting.turnOnTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {enabled
-                ? "Gustaf will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected."
-                : "Gustaf will restart and start running a server on this computer again."}
+                ? t("settingsB.LocalEnvironmentSetting.turnOffBody")
+                : t("settingsB.LocalEnvironmentSetting.turnOnBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
             <AlertDialogClose disabled={isUpdating} render={<Button variant="outline" />}>
-              Cancel
+              {t("settingsB.LocalEnvironmentSetting.cancel")}
             </AlertDialogClose>
             <Button
               variant={enabled ? "destructive" : "default"}
@@ -86,12 +94,12 @@ export function LocalEnvironmentSetting() {
               {isUpdating ? (
                 <>
                   <Spinner size="sm" />
-                  Restarting…
+                  {t("settingsB.LocalEnvironmentSetting.restarting")}
                 </>
               ) : enabled ? (
-                "Restart and turn off"
+                t("settingsB.LocalEnvironmentSetting.restartAndOff")
               ) : (
-                "Restart and turn on"
+                t("settingsB.LocalEnvironmentSetting.restartAndOn")
               )}
             </Button>
           </AlertDialogFooter>

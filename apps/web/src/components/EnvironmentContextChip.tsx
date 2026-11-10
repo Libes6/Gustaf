@@ -9,10 +9,12 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
  * Inline chip for a mentioned machine, in the composer and in sent messages. Prefers the
  * name this client knows the machine by, and draws it with its machine icon.
  */
+import { useT } from "../useUiLanguage";
 export function EnvironmentContextChip(props: {
   record: Pick<EnvironmentContextRecord, "environmentId" | "label">;
   copyMarkdown?: string;
 }) {
+  const t = useT();
   const environment = useEnvironment(props.record.environmentId);
   const label = environment?.label.trim() || props.record.label;
   return (
@@ -33,7 +35,7 @@ export function EnvironmentContextChip(props: {
         }
       />
       <TooltipPopup side="top">
-        {environment ? "Gustaf environment" : "Machine not in this app"}
+        {environment ? t("shell.smallUi.gustafEnvironment") : t("shell.smallUi.machineNotInApp")}
       </TooltipPopup>
     </Tooltip>
   );

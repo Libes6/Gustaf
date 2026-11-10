@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { Check, Copy } from "lucide";
 import { PlayIcon, WrapTextIcon } from "lucide-react";
 import { toHtml } from "hast-util-to-html";
@@ -151,6 +152,7 @@ export function MarkdownCodeBlock({
   diagram?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard({
     timeout: 1200,
     onError: (cause) =>
@@ -164,8 +166,12 @@ export function MarkdownCodeBlock({
       ),
   });
   const [wrapped, setWrapped] = useState(() => getClientSettings().wordWrap);
-  const wrapLabel = wrapped ? "Disable line wrap" : "Wrap lines";
-  const copyLabel = copied ? "Copied" : "Copy code";
+  const wrapLabel = wrapped
+    ? t("chatB.MarkdownCodeBlock.disableLineWrap")
+    : t("chatB.MarkdownCodeBlock.wrapLines");
+  const copyLabel = copied
+    ? t("chatB.MarkdownCodeBlock.copied")
+    : t("chatB.MarkdownCodeBlock.copyCode");
   const command = code.trim();
   const canRun =
     onRunShellCommand !== undefined &&
@@ -248,13 +254,13 @@ export function MarkdownCodeBlock({
                     variant="ghost-muted"
                     size="icon-xs"
                     onClick={() => onRunShellCommand(command)}
-                    aria-label="Run in terminal"
+                    aria-label={t("chatB.MarkdownCodeBlock.runInTerminal")}
                   />
                 }
               >
                 <PlayIcon className="size-3" />
               </TooltipTrigger>
-              <TooltipPopup side="top">Run in terminal</TooltipPopup>
+              <TooltipPopup side="top">{t("chatB.MarkdownCodeBlock.runInTerminal")}</TooltipPopup>
             </Tooltip>
           ) : null}
           {viewToggle}

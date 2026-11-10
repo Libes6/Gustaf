@@ -19,6 +19,8 @@ import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collaps
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { ScrollArea } from "../ui/scroll-area";
 import type { RestartingMachine, UpdateEverythingRow } from "./updateEverything.logic";
+import { useT } from "../../useUiLanguage";
+import type { MessageKey } from "../../i18n";
 
 const isRunning = (status: string) =>
   status === "preparing" || status === "starting" || status === "running";
@@ -85,10 +87,10 @@ export function UpdateEverythingDialog({
 }
 
 const APP_LABELS = {
-  "this-app": "This app",
-  server: "Server",
-  "desktop-app": "Desktop app",
-} as const;
+  "this-app": "sidebar.UpdateEverythingDialog.appThisApp",
+  server: "sidebar.UpdateEverythingDialog.appServer",
+  "desktop-app": "sidebar.UpdateEverythingDialog.appDesktopApp",
+} as const satisfies Record<string, MessageKey>;
 
 function UpdateEverythingDialogContent({
   version,
@@ -119,6 +121,7 @@ function UpdateEverythingDialogContent({
         .join("\n"),
     ),
   );
+  const t = useT();
   const running = stopped + continuing;
   const threads = `${running} running ${running === 1 ? "thread" : "threads"}`;
   const restarting = new Set(restarts.map((machine) => machine.environmentId));
@@ -153,9 +156,9 @@ function UpdateEverythingDialogContent({
           {/* Machine names truncate first. Provider lists wrap between names, never inside one. */}
           <div className="grid grid-cols-[minmax(4rem,max-content)_max-content_minmax(min-content,1fr)_max-content] gap-x-4 text-sm">
             <div className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs">
-              <span>Machine</span>
+              <span>{t("sidebar.UpdateEverythingDialog.machine")}</span>
               <span>Gustaf</span>
-              <span>Providers</span>
+              <span>{t("sidebar.UpdateEverythingDialog.providers")}</span>
               <span />
             </div>
             {updating.map((row) => (
@@ -167,12 +170,16 @@ function UpdateEverythingDialogContent({
                   <MiddleTruncate value={row.label} />
                 </span>
                 <span>
-                  {row.app !== null ? APP_LABELS[row.app] : null}
+                  {row.app !== null ? t(APP_LABELS[row.app]) : null}
                   {row.app === null && row.skipped !== null ? (
-                    <span className="text-muted-foreground">Skipped</span>
+                    <span className="text-muted-foreground">
+                      {t("sidebar.UpdateEverythingDialog.skipped")}
+                    </span>
                   ) : null}
                   {row.app === "this-app" ? (
-                    <span className="block text-muted-foreground text-xs">restarts last</span>
+                    <span className="block text-muted-foreground text-xs">
+                      {t("sidebar.UpdateEverythingDialog.restartsLast")}
+                    </span>
                   ) : null}
                 </span>
                 <span>
@@ -195,7 +202,10 @@ function UpdateEverythingDialogContent({
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-1 text-muted-foreground text-xs hover:text-foreground data-panel-open:[&_svg]:rotate-90">
                 <ChevronRightIcon className="size-3.5 transition-transform" aria-hidden />
-                {skipped.length} skipped
+                {t("sidebar.UpdateEverythingDialog.skippedCount").replace(
+                  "{count}",
+                  String(skipped.length),
+                )}
               </CollapsibleTrigger>
               <CollapsiblePanel>
                 <div className="grid grid-cols-[minmax(0,max-content)_1fr] gap-x-3 gap-y-0.5 pt-1.5 ps-4.5 text-muted-foreground text-xs">
@@ -228,7 +238,7 @@ function UpdateEverythingDialogContent({
           </p>
         ) : null}
         <AlertDialogClose ref={cancelRef} render={<Button variant="outline" disabled={busy} />}>
-          Cancel
+          {t("sidebar.UpdateEverythingDialog.cancel")}
         </AlertDialogClose>
         <Button disabled={disabledReason !== null || busy} onClick={onConfirm}>
           {confirmLabel}
@@ -240,5 +250,10 @@ function UpdateEverythingDialogContent({
 
 function RunningThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const count = useAtomValue(runningThreadCountAtom(environmentId));
-  return count > 0 ? <span className="whitespace-nowrap text-warning">{count} running</span> : null;
+  const t = useT();
+  return count > 0 ? (
+    <span className="whitespace-nowrap text-warning">
+      {t("sidebar.UpdateEverythingDialog.runningCount").replace("{count}", String(count))}
+    </span>
+  ) : null;
 }

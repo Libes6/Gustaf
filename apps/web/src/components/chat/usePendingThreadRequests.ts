@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
   AuthOrchestrationOperateScope,
@@ -123,6 +124,7 @@ export function usePendingThreadRequests(input: {
   readonly composerRef: RefObject<ChatComposerHandle | null>;
   readonly setThreadError: (threadId: ThreadId, error: string | null) => void;
 }) {
+  const t = useT();
   const {
     environmentId,
     activeThreadId,
@@ -288,7 +290,9 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to submit approval decision.",
+        error instanceof Error
+          ? error.message
+          : t("chatB.usePendingThreadRequests.failedApprovalDecision"),
       );
     }
     setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -325,10 +329,7 @@ export function usePendingThreadRequests(input: {
       if (attachments.length === 0) continue;
       const uploaded = getUploadedAttachments({ environmentId, images: attachments });
       if (!uploaded) {
-        setThreadError(
-          activeThreadId,
-          "Wait for attachments to finish uploading, or remove failed uploads.",
-        );
+        setThreadError(activeThreadId, t("chatB.usePendingThreadRequests.waitForAttachments"));
         return;
       }
       attachmentsByQuestionId.set(question.id, uploaded as UserInputAttachments[string]);
@@ -353,7 +354,9 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to submit user input.",
+        error instanceof Error
+          ? error.message
+          : t("chatB.usePendingThreadRequests.failedUserInput"),
       );
     }
     userInputResponsesInFlight.current.delete(responseKey);
@@ -375,7 +378,9 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to dismiss the question.",
+        error instanceof Error
+          ? error.message
+          : t("chatB.usePendingThreadRequests.failedDismissQuestion"),
       );
     }
     setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -407,8 +412,8 @@ export function usePendingThreadRequests(input: {
       setComposerDraftPrompt(composerDraftTarget, nextPrompt);
       toastManager.add({
         type: "info",
-        title: "Your typed text was set aside",
-        description: "It will be back in the composer once the question is answered.",
+        title: t("chatB.usePendingThreadRequests.typedTextSetAside"),
+        description: t("chatB.usePendingThreadRequests.typedTextBackLater"),
         data: { threadRef: activeThreadId ? { environmentId, threadId: activeThreadId } : null },
       });
       if (activeThreadId) {

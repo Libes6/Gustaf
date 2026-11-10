@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { Image as ImageGlyph, Text as TextGlyph } from "lucide";
 import { Button } from "../ui/button";
+import { useT } from "~/useUiLanguage";
 import { MorphIcon } from "~/components/MorphIcon";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import type { ExpandedImageItem, ExpandedImagePreview } from "./ExpandedImagePreview";
@@ -83,6 +84,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   preview,
   onClose,
 }: ExpandedImageDialogProps) {
+  const t = useT();
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
@@ -153,10 +155,10 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const showingAccessibilityDetails =
     Boolean(accessibilityDetails) && accessibilityDetailsSrc === item.src;
   const contentsLabel = showingAccessibilityDetails
-    ? "Show screenshot"
+    ? t("chatA.expandedImageDialog.showScreenshot")
     : accessibilityDetails?.format === "json"
-      ? "Show accessibility JSON"
-      : "Show extracted text";
+      ? t("chatA.expandedImageDialog.showAccessibilityJson")
+      : t("chatA.expandedImageDialog.showExtractedText");
 
   return (
     <Dialog
@@ -192,7 +194,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           variant="media-close"
           className="absolute right-0 top-0 z-20"
           onClick={close}
-          aria-label={`Close ${mediaLabel} preview`}
+          aria-label={t("chatA.expandedImageDialog.closePreview").replace("{label}", mediaLabel)}
         >
           <XIcon />
         </Button>
@@ -202,7 +204,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Previous media"
+            aria-label={t("chatA.expandedImageDialog.previousMedia")}
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
@@ -223,8 +225,8 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               <ExpandedMediaFailure>
                 <p>
                   {openOriginalLink
-                    ? "This image could not be loaded."
-                    : "Image unavailable. The file may have been moved or deleted."}
+                    ? t("chatA.expandedImageDialog.imageLoadFailed")
+                    : t("chatA.expandedImageDialog.imageUnavailable")}
                 </p>
                 {openOriginalLink}
               </ExpandedMediaFailure>
@@ -278,7 +280,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Next media"
+            aria-label={t("chatA.expandedImageDialog.nextMedia")}
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />

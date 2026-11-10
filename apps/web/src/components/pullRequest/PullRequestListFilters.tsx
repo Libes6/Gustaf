@@ -57,6 +57,7 @@ import {
 } from "./pullRequestList.logic";
 import { PullRequestActorAvatar } from "./pullRequestPresentation";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { useT } from "../../useUiLanguage";
 
 export interface PullRequestFilterOption<Value extends string> {
   readonly value: Value;
@@ -104,6 +105,7 @@ export function PullRequestSearchInput({
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8">
@@ -127,8 +129,8 @@ export function PullRequestSearchInput({
             onSubmit(event.currentTarget.value);
           }
         }}
-        placeholder="Search pull requests, or label:bug"
-        aria-label="Search pull requests"
+        placeholder={t("misc.pullRequestListFilters.searchPlaceholder")}
+        aria-label={t("misc.pullRequestListFilters.searchPulls")}
       />
     </InputGroup>
   );
@@ -280,6 +282,7 @@ function PullRequestAuthorChoices({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (author: string | undefined) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "authors", query);
   const login = value?.toLowerCase() ?? "";
@@ -298,8 +301,8 @@ function PullRequestAuthorChoices({
         busy={hosted.isPending}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder="Search authors"
-        aria-label="Search authors"
+        placeholder={t("misc.pullRequestListFilters.searchAuthors")}
+        aria-label={t("misc.pullRequestListFilters.searchAuthors")}
       />
       <MenuRadioGroup value={selected?.actor.login ?? value ?? ""} onValueChange={select}>
         <MenuRadioItem value="">
@@ -323,7 +326,9 @@ function PullRequestAuthorChoices({
         ))}
         {visible.length === 0 && !hosted.isPending ? (
           <MenuItem disabled>
-            {hosted.error === null ? "No authors found" : "Couldn't search authors on the host"}
+            {hosted.error === null
+              ? t("misc.pullRequestListFilters.noAuthors")
+              : t("misc.pullRequestListFilters.authorSearchFailed")}
           </MenuItem>
         ) : null}
       </MenuRadioGroup>
@@ -342,13 +347,14 @@ function PullRequestAuthorFilter({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (author: string | undefined) => void;
 }) {
+  const t = useT();
   return (
     <MenuSub>
       <MenuSubTrigger>
         <UserRoundIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">Author</span>
+        <span className="flex-1">{t("misc.pullRequestListFilters.author")}</span>
         <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {value ?? "Anyone"}
+          {value ?? t("misc.pullRequestListFilters.anyone")}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>
@@ -374,6 +380,7 @@ function PullRequestLabelChoices({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (labels: ReadonlyArray<string>) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "labels", query);
   const selected = new Set(value.map((name) => name.toLowerCase()));
@@ -391,12 +398,14 @@ function PullRequestLabelChoices({
         busy={hosted.isPending}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder="Search labels"
-        aria-label="Search labels"
+        placeholder={t("misc.pullRequestListFilters.searchLabels")}
+        aria-label={t("misc.pullRequestListFilters.searchLabels")}
       />
       {visible.length === 0 && !hosted.isPending ? (
         <MenuItem disabled>
-          {hosted.error === null ? "No labels found" : "Couldn't search labels on the host"}
+          {hosted.error === null
+            ? t("misc.pullRequestListFilters.noLabels")
+            : t("misc.pullRequestListFilters.labelSearchFailed")}
         </MenuItem>
       ) : null}
       {visible.map((option) => {
@@ -445,11 +454,12 @@ function PullRequestLabelFilter({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (labels: ReadonlyArray<string>) => void;
 }) {
+  const t = useT();
   return (
     <MenuSub>
       <MenuSubTrigger>
         <TagIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">Labels</span>
+        <span className="flex-1">{t("misc.pullRequestListFilters.labels")}</span>
         <span className="text-xs text-muted-foreground">
           {value.length === 0 ? "Any" : `${value.length} selected`}
         </span>
@@ -515,6 +525,7 @@ export function PullRequestFiltersMenu({
   unavailable: ReadonlyMap<string, string>;
   onProject: (projectId: ProjectId | undefined, environmentId: EnvironmentId | undefined) => void;
 }) {
+  const t = useT();
   const selectedLabels = (filters.labels ?? []).flatMap((group) => group);
   const filterCount = [
     state !== "open",
@@ -543,7 +554,11 @@ export function PullRequestFiltersMenu({
       ? ALL_PROJECTS_VALUE
       : pullRequestProjectKey({ id: projectId, environmentId: projectEnvironmentId });
   const projectOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: ALL_PROJECTS_VALUE, label: "All projects", Icon: LayersIcon },
+    {
+      value: ALL_PROJECTS_VALUE,
+      label: t("misc.pullRequestListFilters.allProjects"),
+      Icon: LayersIcon,
+    },
     ...projects
       .toSorted(
         (left, right) =>
@@ -564,7 +579,7 @@ export function PullRequestFiltersMenu({
     <Menu onOpenChange={onOpenChange}>
       <MenuTrigger render={<Button variant="outline" />}>
         <ListFilterIcon className="size-4" />
-        <span>Filters</span>
+        <span>{t("misc.pullRequestListFilters.filters")}</span>
         {filterCount > 0 ? (
           <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
             {filterCount}
@@ -573,13 +588,13 @@ export function PullRequestFiltersMenu({
       </MenuTrigger>
       <MenuPopup align="end" side="bottom">
         <PullRequestFilterRadioSubmenu
-          label="State"
+          label={t("misc.pullRequestListFilters.state")}
           value={state}
           options={stateOptions}
           onChange={onState}
         />
         <PullRequestFilterRadioSubmenu
-          label="Involvement"
+          label={t("misc.pullRequestListFilters.involvement")}
           value={involvement}
           options={involvementOptions}
           onChange={onInvolvement}
@@ -602,19 +617,19 @@ export function PullRequestFiltersMenu({
           }
         />
         <PullRequestFilterRadioSubmenu
-          label="Draft"
+          label={t("misc.pullRequestListFilters.draft")}
           value={filters.draft ?? UNFILTERED_VALUE}
           options={DRAFT_OPTIONS}
           onChange={(draft) => updateFilter("draft", draft)}
         />
         <PullRequestFilterRadioSubmenu
-          label="Review"
+          label={t("misc.pullRequestListFilters.review")}
           value={filters.review ?? UNFILTERED_VALUE}
           options={REVIEW_OPTIONS}
           onChange={(review) => updateFilter("review", review)}
         />
         <PullRequestFilterRadioSubmenu
-          label="Checks"
+          label={t("misc.pullRequestListFilters.checks")}
           value={filters.checks ?? UNFILTERED_VALUE}
           options={CHECKS_OPTIONS}
           onChange={(checks) => updateFilter("checks", checks)}
@@ -623,7 +638,7 @@ export function PullRequestFiltersMenu({
           <>
             <MenuSeparator />
             <PullRequestFilterRadioSubmenu
-              label="Host"
+              label={t("misc.pullRequestListFilters.host")}
               value={host ?? ALL_HOSTS_VALUE}
               options={hostOptions}
               onChange={(next) => onHost(next === ALL_HOSTS_VALUE ? undefined : next)}
@@ -634,7 +649,7 @@ export function PullRequestFiltersMenu({
           <>
             <MenuSeparator />
             <PullRequestFilterRadioSubmenu
-              label="Server"
+              label={t("misc.pullRequestListFilters.server")}
               value={server ?? ALL_SERVERS_VALUE}
               options={serverOptions}
               onChange={(next) =>
@@ -645,7 +660,7 @@ export function PullRequestFiltersMenu({
         ) : null}
         <MenuSeparator />
         <PullRequestFilterRadioSubmenu
-          label="Project"
+          label={t("misc.pullRequestListFilters.project")}
           value={projectValue}
           options={projectOptions}
           onChange={(next) => {

@@ -20,6 +20,7 @@ import {
 } from "./guideRunStore";
 import { stepTourPosition, stopFilePaths } from "@t3tools/client-runtime/review-guide-tour";
 import { useGuideDiffFiles } from "./useGuideDiffFiles";
+import { useT } from "../../../useUiLanguage";
 
 export function GuideTour({
   environmentId,
@@ -42,6 +43,7 @@ export function GuideTour({
   onFinish: (() => void) | null;
   onOpenFile: (path: string) => void;
 }) {
+  const t = useT();
   const key = guideProgressKey(guideRunKey(environmentId, reference), guide.headSha);
   const tour = useGuideProgress(key);
   const update = (change: (current: GuideProgress) => Partial<GuideProgress>) =>
@@ -108,7 +110,7 @@ export function GuideTour({
             </p>
           ) : null}
           {stop === null ? (
-            <p className="text-sm text-muted-foreground">This change has no files to tour.</p>
+            <p className="text-sm text-muted-foreground">{t("misc.guideTour.noFiles")}</p>
           ) : (
             <GuideStop
               key={position}
