@@ -2,7 +2,7 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 const semver = /^\d+\.\d+\.\d+$/;
-export const platforms = ["darwin-aarch64", "darwin-x86_64", "windows-x86_64", "linux-x86_64"];
+export const platforms = ["darwin-aarch64", "windows-x86_64", "linux-x86_64"];
 export const targets = [...platforms, "windows-x86_64-msi"];
 export function manifest(version, assets, notes = "", date = new Date().toISOString()) {
   if (!semver.test(version) || Number.isNaN(Date.parse(date)))
@@ -44,19 +44,17 @@ if (
   const assets = {};
   for (const platform of targets) {
     const dir = NodePath.join(directory, platform.endsWith("-msi") ? "windows-x86_64" : platform);
-    const candidates = NodeFS
-      .readdirSync(dir)
-      .filter((name) =>
-        name.endsWith(
-          platform.startsWith("darwin")
-            ? ".app.tar.gz"
-            : platform.endsWith("-msi")
-              ? ".msi"
-              : platform.startsWith("windows")
-                ? ".exe"
-                : ".AppImage",
-        ),
-      );
+    const candidates = NodeFS.readdirSync(dir).filter((name) =>
+      name.endsWith(
+        platform.startsWith("darwin")
+          ? ".app.tar.gz"
+          : platform.endsWith("-msi")
+            ? ".msi"
+            : platform.startsWith("windows")
+              ? ".exe"
+              : ".AppImage",
+      ),
+    );
     if (candidates.length !== 1) throw Error(`Expected one updater artifact: ${platform}`);
     const name = candidates[0];
     assets[platform] = {

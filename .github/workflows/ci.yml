@@ -1,9 +1,10 @@
 name: Gustaf Tauri
 
+# A pull request builds one platform. The full set runs only for a release tag
+# or a manual run, so a release no longer pays for it on dev and main as well.
 on:
   pull_request:
   push:
-    branches: [dev, main]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -22,11 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { runner: macos-15, platform: darwin-aarch64, bundles: "app,dmg" }
-          - { runner: macos-15-intel, platform: darwin-x86_64, bundles: "app,dmg" }
-          - { runner: windows-2025, platform: windows-x86_64, bundles: "nsis,msi" }
-          - { runner: ubuntu-24.04, platform: linux-x86_64, bundles: "deb,appimage,rpm" }
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"macos-15","platform":"darwin-aarch64","bundles":"app,dmg"}]' || '[{"runner":"macos-15","platform":"darwin-aarch64","bundles":"app,dmg"},{"runner":"windows-2025","platform":"windows-x86_64","bundles":"nsis,msi"},{"runner":"ubuntu-24.04","platform":"linux-x86_64","bundles":"deb,appimage,rpm"}]') }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -83,6 +80,9 @@ jobs:
           cd "$RUNNER_TEMP"
           "$appimage" --appimage-extract >/dev/null
           find squashfs-root -path '*gstreamer-1.0/libgstapp.so' | grep -q .
+      # Only a browser sees a client that dies while its modules load.
+      - name: Check the bundled web app starts
+        run: node apps/shell/scripts/smoke-runtime.mjs
       - name: Collect installers
         shell: bash
         env:
@@ -121,7 +121,7 @@ jobs:
           version=$(jq -er .version apps/shell/src-tauri/tauri.conf.json)
           test "$GITHUB_REF_NAME" = "v$version"
           mapfile -t installers < <(find release-assets -type f -print | sort)
-          test "${#installers[@]}" -eq 16
+          test "${#installers[@]}" -eq 13
           node apps/shell/scripts/release-manifest.mjs release-assets "$version"
           mkdir publish
           cp "${installers[@]}" release-assets/latest.json publish/

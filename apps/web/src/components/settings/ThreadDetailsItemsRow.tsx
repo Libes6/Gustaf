@@ -11,7 +11,8 @@ import {
 import { Button } from "../ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "../ui/menu";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
-import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
+import { useT } from "../../useUiLanguage";
+import { useLocalizedSettingLookup } from "./useLocalizedSettingLookup";
 
 export function ThreadDetailsItemsRow() {
   const visibility = useClientSettings(resolveThreadDetailsVisibility);
