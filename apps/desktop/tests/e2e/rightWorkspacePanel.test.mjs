@@ -63,7 +63,12 @@ test('right tools shrink the chat, resize and close without covering the compose
       assert.ok(Math.abs((await panel.boundingBox()).width - initialWidth) < 1);
       await panel.getByRole('button', { name: 'Close panel', exact: true }).click();
       assert.equal(await panel.isVisible(), false);
-      assert.equal(await tools.getByRole('button', { name: 'Changes', exact: true }).evaluate((el) => el === document.activeElement), true);
+      assert.equal(
+        await tools
+          .getByRole('button', { name: 'Changes', exact: true })
+          .evaluate((el) => el === document.activeElement),
+        true,
+      );
       await tools.getByRole('button', { name: 'Changes', exact: true }).click();
       await shown(panel);
       await tools.getByRole('button', { name: 'Changes', exact: true }).click();
