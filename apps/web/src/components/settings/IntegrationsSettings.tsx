@@ -1,6 +1,7 @@
 import { DeviceHostUpdates } from "../device/DeviceHostUpdates";
 import { DeviceToolVersions } from "../device/DeviceToolVersions";
-import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
+import { useT } from "../../useUiLanguage";
+import { useLocalizedSettingLookup } from "./useLocalizedSettingLookup";
 import type { MessageKey } from "../../i18n";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { ScopedSwitch } from "./ScopedSwitch";

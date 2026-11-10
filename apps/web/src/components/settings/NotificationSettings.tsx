@@ -8,7 +8,8 @@ import {
 } from "../../threadNotifications";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
-import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
+import { useT } from "../../useUiLanguage";
+import { useLocalizedSettingLookup } from "./useLocalizedSettingLookup";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 export function NotificationSettings() {

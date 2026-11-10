@@ -1195,7 +1195,7 @@ dependencies = [
 
 [[package]]
 name = "gustaf"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "libc",
  "objc2",

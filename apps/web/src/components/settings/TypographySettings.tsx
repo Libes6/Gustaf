@@ -42,7 +42,8 @@ import {
   revealSettingsSearchTarget,
   searchableSetting,
 } from "./settingsSearch";
-import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
+import { useT } from "../../useUiLanguage";
+import { useLocalizedSettingLookup } from "./useLocalizedSettingLookup";
 
 function useFontDefaultFamilies() {
   const t = useT();
