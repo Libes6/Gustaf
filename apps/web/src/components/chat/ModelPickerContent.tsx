@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -205,6 +206,7 @@ function ModelPickerProviderNotices({
   onRequestClose: (() => void) | undefined;
   onOpenProviderSetup: ((instanceId: ProviderInstanceId) => void) | undefined;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   return (
     <>
@@ -222,7 +224,9 @@ function ModelPickerProviderNotices({
                   onOpenProviderSetup?.(entry.instanceId);
                 }}
               >
-                {setupEntries.length > 1 ? `Set up ${entry.displayName}` : "Open provider setup"}
+                {setupEntries.length > 1
+                  ? t("chatB.ModelPickerContent.setUpProvider").replace("{name}", entry.displayName)
+                  : t("chatB.ModelPickerContent.openProviderSetup")}
               </InlineButton>
             </div>
           ))}
@@ -242,7 +246,7 @@ function ModelPickerProviderNotices({
               void navigate({ to: "/settings/providers" });
             }}
           >
-            Provider settings
+            {t("chatB.ModelPickerContent.providerSettings")}
           </InlineButton>
         </p>
       ))}
@@ -369,6 +373,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   /** Closes the list column, inside the popup's fixed height. */
   listFooter?: ReactNode;
 }) {
+  const t = useT();
   const {
     searchInputRef,
     keybindings: providedKeybindings,
@@ -805,7 +810,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
       setSearchQuery("");
       handleSelectInstance(next);
       announce(
-        next === "favorites" ? "Favorites" : (entryByInstanceId.get(next)?.displayName ?? next),
+        next === "favorites"
+          ? t("chatB.ModelPickerContent.favorites")
+          : (entryByInstanceId.get(next)?.displayName ?? next),
         "model-picker",
       );
       return;
@@ -830,7 +837,10 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     const name = flatModels.find(
       (item) => item.slug === selectedSlug && item.instanceId === model.instanceId,
     )?.name;
-    announce(`Model: ${name ?? selectedSlug}`, "model-picker");
+    announce(
+      t("chatB.ModelPickerContent.modelAnnounce").replace("{name}", name ?? selectedSlug),
+      "model-picker",
+    );
   };
 
   return (
@@ -922,7 +932,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           >
             <ComboboxSearchInput
               ref={searchInputRef}
-              placeholder="Search models..."
+              placeholder={t("chatB.ModelPickerContent.searchModelsPlaceholder")}
               value={searchQuery}
               onChange={(e) => {
                 if (!isSearching) setSearchHeight(pickerContentRef.current?.offsetHeight ?? 0);
@@ -1023,7 +1033,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                       className="group w-full cursor-pointer"
                     >
                       <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground group-data-highlighted:text-foreground">
-                        {legacySection.isExpanded ? "Show less" : "Show more"}
+                        {legacySection.isExpanded
+                          ? t("chatB.ModelPickerContent.showLess")
+                          : t("chatB.ModelPickerContent.showMore")}
                       </span>
                     </ComboboxItem>
                   );
@@ -1069,8 +1081,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               updateRequiredNotices={updateRequiredNotices}
               emptyLabel={
                 selectedInstanceId === "favorites" && !isSearching
-                  ? "No favorites yet"
-                  : "No models found"
+                  ? t("chatB.ModelPickerContent.noFavoritesYet")
+                  : t("chatB.ModelPickerContent.noModelsFound")
               }
               onRequestClose={onRequestClose}
               onOpenProviderSetup={onOpenProviderSetup}

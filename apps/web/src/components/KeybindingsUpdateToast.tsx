@@ -1,3 +1,5 @@
+import { getClientSettings } from "../hooks/useSettings";
+import { translate, type MessageKey } from "../i18n";
 import { appAtomRegistry, subscribeAtomChanges } from "../rpc/atomRegistry";
 import { primaryEnvironmentIdAtom } from "../state/primaryEnvironment";
 import { primaryServerConfigAtom, primaryServerConfigEventAtom } from "../state/server";
@@ -7,6 +9,7 @@ import { stackedThreadToast, toastManager } from "./ui/toast";
 
 /** Toasts each keybindings reload the primary server reports. */
 export function startKeybindingsUpdateToasts(): () => void {
+  const t = (key: MessageKey) => translate(getClientSettings().uiLanguage, key);
   const controller = createKeybindingsUpdateToastController({});
   return subscribeAtomChanges(primaryServerConfigEventAtom, (event) => {
     const decision = controller.handle(event);
@@ -15,8 +18,8 @@ export function startKeybindingsUpdateToasts(): () => void {
     if (decision._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: "Keybindings updated",
-        description: "Keybindings configuration reloaded successfully.",
+        title: t("shell.smallUi.keybindingsUpdated"),
+        description: t("shell.smallUi.keybindingsReloaded"),
       });
       return;
     }
@@ -25,7 +28,7 @@ export function startKeybindingsUpdateToasts(): () => void {
     toastManager.add(
       stackedThreadToast({
         type: "warning",
-        title: "Invalid keybindings configuration",
+        title: t("shell.smallUi.invalidKeybindings"),
         description: (
           <KeybindingsConfigWarning
             message={decision.message}

@@ -11,6 +11,7 @@ import { MiddleTruncate } from "./ui/middle-truncate";
 import { Button } from "./ui/button";
 import { ComboboxTrigger } from "./ui/combobox";
 
+import { useT } from "../useUiLanguage";
 export function WorktreeBaseBranchPicker({
   environmentId,
   cwd,
@@ -30,6 +31,7 @@ export function WorktreeBaseBranchPicker({
   disabled?: boolean;
   id?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const branches = usePaginatedBranches({
@@ -61,9 +63,9 @@ export function WorktreeBaseBranchPicker({
   const statusText =
     branches.error ??
     (branches.isPending && branches.data === null
-      ? "Loading refs..."
+      ? t("shell.misc.loadingRefs")
       : branches.isFetchingNextPage
-        ? "Loading more refs..."
+        ? t("shell.misc.loadingMoreRefs")
         : hasNextPage
           ? `Showing ${branches.refs.length} of ${branches.data?.totalCount} refs`
           : null);

@@ -45,6 +45,7 @@ import {
   readableFailure,
 } from "./pullRequestDetail.logic";
 import { pullRequestEntryKey, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
+import { useT } from "../../useUiLanguage";
 
 export function usePullRequestDefaultMergeMethodResolver(
   environmentId: EnvironmentId,
@@ -270,6 +271,7 @@ export function usePullRequestHandoffs({
   environmentId: EnvironmentId;
   detail: PullRequestHandoffDetail | null;
 }) {
+  const t = useT();
   const newThread = useNewThreadHandler();
   const prepareThread = usePreparePullRequestThreadAction({
     environmentId,
@@ -310,8 +312,8 @@ export function usePullRequestHandoffs({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: t("misc.usePullRequestHandoffs.couldNotOpenThread"),
+        description: t("misc.usePullRequestHandoffs.tryAgainFromProject"),
       });
       return;
     }
@@ -348,7 +350,7 @@ export function usePullRequestHandoffs({
       toastManager.update(toastId, {
         type: "error",
         title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        description: t("misc.usePullRequestHandoffs.tryAgainFromProject"),
       });
       return;
     }

@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogButton, WorkLogList, WorkLogRow } from "./WorkLog";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
@@ -68,6 +69,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   isExpandedToolGroup: boolean;
   displayLabel?: string | undefined;
 }) {
+  const t = useT();
   const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
     use(TimelineRowCtx);
   const onToggleStandaloneEntry = (collapsed: boolean) =>
@@ -97,7 +99,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   }
 
   return (
-    <section aria-label="Activity">
+    <section aria-label={t("chatB.TimelineWorkGroupRows.activity")}>
       {nonEmptyEntries.map((workEntry) => (
         <SimpleWorkEntryRow
           key={workEntry.id}
@@ -133,6 +135,7 @@ function ExpandedWorkGroupEntries({
   entries: TimelineWorkEntry[];
   workspaceRoot: string | undefined;
 }) {
+  const t = useT();
   const { workGroupViewState: viewState, onToggleWorkEntry } = use(TimelineRowCtx);
   const [initialScrollIndex] = useState(() =>
     resolveWorkGroupScrollIndex(entries, viewState.scrollPositions.get(anchorKey)),
@@ -260,7 +263,7 @@ function ExpandedWorkGroupEntries({
           onItemSizeChanged={updateExpandedContentHeight}
           tabIndex={0}
           role="region"
-          aria-label="Tool calls"
+          aria-label={t("chatB.TimelineWorkGroupRows.toolCalls")}
           data-tool-group-scroll
           style={{ maxHeight: `calc(min(18rem, 50dvh) + ${expandedContentHeight}px)` }}
           className={cn(
@@ -276,12 +279,13 @@ function ExpandedWorkGroupEntries({
 const workEntryKey = (entry: TimelineWorkEntry) => entry.id;
 
 export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
+  const t = useT();
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    t("chatB.TimelineWorkGroupRows.settingUpWorktree")
   ) : compacting ? (
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
@@ -289,7 +293,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
       Working for <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    t("chatB.TimelineWorkGroupRows.working")
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -310,11 +314,12 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
 }
 
 function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
+  const t = useT();
   const ctx = use(TimelineRowCtx);
   const terminalId = snapshot.setupScript?.terminalId ?? null;
   const openTerminal = ctx.onOpenWorktreeSetupTerminal;
   const onOpenTerminal = openTerminal && terminalId ? () => openTerminal(terminalId) : null;
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? t("chatB.TimelineWorkGroupRows.setupScript");
   return (
     <Popover>
       <PopoverTrigger
@@ -323,7 +328,10 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={`Background setup is still running: ${scriptName}. Show setup progress.`}
+            aria-label={t("chatB.TimelineWorkGroupRows.backgroundSetupRunning").replace(
+              "{name}",
+              scriptName,
+            )}
           />
         }
       >
@@ -344,6 +352,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
 }
 
 function CompactingLabel({ createdAt }: { createdAt: string | null }) {
+  const t = useT();
   return (
     <span className="inline-flex items-center gap-1.5">
       <Minimize2Icon aria-hidden="true" className="size-3" />
@@ -352,13 +361,14 @@ function CompactingLabel({ createdAt }: { createdAt: string | null }) {
           Compacting for <WorkingTimer createdAt={createdAt} />
         </span>
       ) : (
-        "Compacting…"
+        t("chatB.TimelineWorkGroupRows.compacting")
       )}
     </span>
   );
 }
 
 export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "thinking" }> }) {
+  const t = useT();
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree, liveAnswerPreview } = use(TimelineRowActivityCtx);
   if (isPreparingWorktree || isCompacting) return <WorkLogRow label="" />;
@@ -366,7 +376,7 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   const live = ctx.pendingApprovals.size === 0;
   const activity = (
     <LiveActivityRow
-      label={liveAnswerPreview ?? "Thinking"}
+      label={liveAnswerPreview ?? t("chatB.TimelineWorkGroupRows.thinking")}
       iconName="brain"
       active={live}
       shimmer={live}
@@ -442,6 +452,7 @@ function LiveActivityContent({
   active?: boolean;
   highlighted?: boolean;
 }) {
+  const t = useT();
   const showTrailingFailureMark =
     failed && iconName !== undefined && !toolIconAcceptsTint(toolIcon);
 
@@ -459,7 +470,9 @@ function LiveActivityContent({
                   : "text-icon-muted",
             )}
             role={announceFailure ? "img" : undefined}
-            aria-label={announceFailure ? "Tool call failed" : undefined}
+            aria-label={
+              announceFailure ? t("chatB.TimelineWorkGroupRows.toolCallFailed") : undefined
+            }
           >
             <ToolActivityIconView
               icon={toolIcon}
@@ -495,6 +508,7 @@ export function LiveWorkEntryTimelineRow({
 }: {
   row: Extract<TimelineRow, { kind: "work-live" }>;
 }) {
+  const t = useT();
   const ctx = use(TimelineRowCtx);
   const threadTarget = useThreadReadTarget(row.entry, ctx.activeThreadEnvironmentId);
   const label = liveWorkEntryLabel(row.entry, ctx.workspaceRoot, row.active);
@@ -554,9 +568,9 @@ export function LiveWorkEntryTimelineRow({
         label={
           thoughtIsStatus ? (
             row.active ? (
-              "Thinking"
+              t("chatB.TimelineWorkGroupRows.thinking")
             ) : (
-              "Thought"
+              t("chatB.TimelineWorkGroupRows.thought")
             )
           ) : row.entry.itemType === "reasoning" ? (
             <ChatMarkdown

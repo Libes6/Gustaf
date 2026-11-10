@@ -624,8 +624,8 @@ export function limitsNotice(limits: ServerProviderUsageLimits): string | null {
   return limits.windows.length === 0 ? "No limits reported." : null;
 }
 
-export function remainingPercent(window: ServerProviderUsageWindow): number {
-  return Math.round(100 - Math.max(0, Math.min(100, window.usedPercent)));
+export function usedPercentOf(window: ServerProviderUsageWindow): number {
+  return Math.round(Math.max(0, Math.min(100, window.usedPercent)));
 }
 
 function resetMillis(window: ServerProviderUsageWindow): number | null {
@@ -642,13 +642,10 @@ export function elapsedShare(window: ServerProviderUsageWindow, now: number): nu
   return Math.max(0, Math.min(1, (length - (resetsAt - now)) / length));
 }
 
-// Bars show quota remaining, so even pace tracks time remaining.
-export function paceRemainingPercent(
-  window: ServerProviderUsageWindow,
-  now: number,
-): number | null {
+// Bars show quota used, so even pace tracks time elapsed.
+export function paceElapsedPercent(window: ServerProviderUsageWindow, now: number): number | null {
   const elapsed = elapsedShare(window, now);
-  return elapsed === null ? null : Math.round((1 - elapsed) * 100);
+  return elapsed === null ? null : Math.round(elapsed * 100);
 }
 
 export type LimitPace = "ahead" | "on" | "under";

@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { useNavigate } from "@tanstack/react-router";
@@ -61,6 +62,7 @@ export function ThreadAutomationsPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
 }) {
+  const t = useT();
   const canOperate = useAtomValue(
     serverEnvironment.runScheduledTaskNow.permissionAtom(props.environmentId),
   );
@@ -105,7 +107,10 @@ export function ThreadAutomationsPanel(props: {
     });
     setBusyTaskId(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Could not update automation", squashAtomCommandFailure(result));
+      reportFailure(
+        t("chatB.ThreadAutomationsPanel.couldNotUpdate"),
+        squashAtomCommandFailure(result),
+      );
     }
   };
 
@@ -122,14 +127,17 @@ export function ThreadAutomationsPanel(props: {
     });
     setBusyTaskId(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Could not run automation", squashAtomCommandFailure(result));
+      reportFailure(
+        t("chatB.ThreadAutomationsPanel.couldNotRun"),
+        squashAtomCommandFailure(result),
+      );
     }
   };
 
   return (
     <ThreadDetailsSection
       headingId="thread-details-automations-heading"
-      title="Automations"
+      title={t("chatB.ThreadAutomationsPanel.automations")}
       data-thread-automations-panel
       actions={
         <Tooltip>
@@ -139,7 +147,7 @@ export function ThreadAutomationsPanel(props: {
                 size="icon-xs"
                 variant="ghost"
                 part="icon"
-                aria-label="Manage scheduled tasks"
+                aria-label={t("chatB.ThreadAutomationsPanel.manageScheduledTasks")}
                 onClick={() =>
                   void navigate({
                     to: "/settings/scheduled-tasks",
@@ -151,7 +159,7 @@ export function ThreadAutomationsPanel(props: {
               </ThreadDetailsControl>
             }
           />
-          <TooltipPopup>Manage scheduled tasks</TooltipPopup>
+          <TooltipPopup>{t("chatB.ThreadAutomationsPanel.manageScheduledTasks")}</TooltipPopup>
         </Tooltip>
       }
     >
@@ -193,7 +201,10 @@ export function ThreadAutomationsPanel(props: {
                     size="icon-xs"
                     variant="ghost"
                     part="icon"
-                    aria-label={`Edit ${task.title}`}
+                    aria-label={t("chatB.ThreadAutomationsPanel.editNamed").replace(
+                      "{title}",
+                      task.title,
+                    )}
                     onClick={() =>
                       void navigate({
                         to: "/settings/scheduled-tasks",
@@ -205,7 +216,7 @@ export function ThreadAutomationsPanel(props: {
                   </ThreadDetailsControl>
                 }
               />
-              <TooltipPopup>Edit automation</TooltipPopup>
+              <TooltipPopup>{t("chatB.ThreadAutomationsPanel.editAutomation")}</TooltipPopup>
             </Tooltip>
             {/* Webhook tasks need a request from their URL. */}
             {task.schedule.type === "webhook" ? null : (
@@ -216,7 +227,10 @@ export function ThreadAutomationsPanel(props: {
                       size="icon-xs"
                       variant="ghost"
                       part="icon"
-                      aria-label={`Run ${task.title} now`}
+                      aria-label={t("chatB.ThreadAutomationsPanel.runNamedNow").replace(
+                        "{title}",
+                        task.title,
+                      )}
                       disabled={
                         !canOperate || busyTaskId !== null || task.lastRunStatus === "running"
                       }
@@ -226,7 +240,7 @@ export function ThreadAutomationsPanel(props: {
                     </ThreadDetailsControl>
                   }
                 />
-                <TooltipPopup>Run now</TooltipPopup>
+                <TooltipPopup>{t("chatB.ThreadAutomationsPanel.runNow")}</TooltipPopup>
               </Tooltip>
             )}
             <Switch

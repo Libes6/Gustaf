@@ -29,6 +29,7 @@ import {
   isListableHostFolder,
 } from "./filePath";
 import { useProjectEntriesQuery } from "./projectFilesQueryState";
+import { useT } from "~/useUiLanguage";
 
 interface FileBreadcrumbsProps {
   readonly cwd: string;
@@ -84,6 +85,7 @@ function BreadcrumbMenuContent(props: {
   readonly rootPath: string;
   readonly workspaceMutationId: string | null;
 }) {
+  const t = useT();
   const entriesQuery = useProjectEntriesQuery(
     props.environmentId,
     props.cwd,
@@ -132,15 +134,15 @@ function BreadcrumbMenuContent(props: {
         ) : entriesQuery.error && entriesQuery.data === null ? (
           <MenuItem closeOnClick={false} onClick={entriesQuery.refresh}>
             <RefreshIcon refreshing={entriesQuery.isPending} />
-            <span className="min-w-0 flex-1 truncate">Retry loading folder</span>
+            <span className="min-w-0 flex-1 truncate">{t("misc.fileBreadcrumbs.retryFolder")}</span>
           </MenuItem>
         ) : !directoryAvailable && !entriesTruncated ? (
-          <MenuItem disabled>This folder is no longer available.</MenuItem>
+          <MenuItem disabled>{t("misc.fileBreadcrumbs.folderUnavailable")}</MenuItem>
         ) : children.length === 0 ? (
           <MenuItem disabled>
             {entriesTruncated
-              ? "No entries from this folder are available in the partial workspace index."
-              : "This folder is empty."}
+              ? t("misc.fileBreadcrumbs.partialIndex")
+              : t("misc.fileBreadcrumbs.folderEmpty")}
           </MenuItem>
         ) : (
           <MenuRadioGroup
@@ -207,7 +209,7 @@ function BreadcrumbMenuContent(props: {
       {entriesTruncated ? (
         <>
           <MenuSeparator />
-          <MenuItem disabled>Some workspace entries are not shown.</MenuItem>
+          <MenuItem disabled>{t("misc.fileBreadcrumbs.someNotShown")}</MenuItem>
         </>
       ) : null}
     </MenuPopup>
@@ -293,13 +295,14 @@ function FolderBreadcrumb(props: {
 
 /** Host paths outside the workspace omit contents menus; the browser already lists their destination. */
 export function FileBreadcrumbs(props: FileBreadcrumbsProps) {
+  const t = useT();
   const hostPath = isHostPath(props.relativePath);
   const breadcrumbs = fileBreadcrumbs(props.projectName, props.trail);
   const currentPath = breadcrumbPathOf(props.relativePath);
   const currentIndex = breadcrumbs.findIndex((crumb) => crumb.path === currentPath);
 
   return (
-    <nav aria-label="File path" className="flex h-full">
+    <nav aria-label={t("misc.fileBreadcrumbs.filePath")} className="flex h-full">
       <ol className="flex items-center">
         {breadcrumbs.map((crumb, index) => {
           const current = index === currentIndex;

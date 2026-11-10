@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { RefreshCwIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -33,6 +34,7 @@ function ThreadNowLine({
   /** Announces the line when it appears; only for something that needs the user. */
   readonly announce?: boolean;
 }) {
+  const t = useT();
   return (
     <div
       role={announce ? "alert" : undefined}
@@ -46,7 +48,9 @@ function ThreadNowLine({
           reachable; when it is cut, its details button shows all of it. */}
       <NoticeText
         detailsLabel={
-          typeof item.title === "string" ? `Show details: ${item.title}` : "Show details"
+          typeof item.title === "string"
+            ? t("chatB.ThreadNow.showDetailsNamed").replace("{title}", item.title)
+            : t("chatB.ThreadNow.showDetails")
         }
         className="min-w-0 truncate"
       >

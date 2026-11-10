@@ -102,19 +102,22 @@ export function SidebarThreadHeader({
         {hasProjects ? (
           <>
             {projectScope}
-            <SidebarHeaderIconButton label="Add project" onClick={onNewProject}>
+            <SidebarHeaderIconButton
+              label={t("sidebar.SidebarThreadHeader.addProject")}
+              onClick={onNewProject}
+            >
               <FolderPlusIcon />
             </SidebarHeaderIconButton>
           </>
         ) : null}
         <SidebarHeaderIconButton
-          label="New thread"
+          label={t("sidebar.newThread")}
           tooltip={
             showNewThreadInProjectHint ? (
               <span className="flex flex-col gap-0.5">
                 <span>{newThreadLabel}</span>
                 <span className="text-muted-foreground">
-                  New thread in current project: Shift+click
+                  {t("sidebar.SidebarThreadHeader.newThreadInProject")}
                   {newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}
                 </span>
               </span>

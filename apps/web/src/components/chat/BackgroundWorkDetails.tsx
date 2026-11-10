@@ -17,6 +17,7 @@ import {
 } from "../ui/dialog";
 import { CommandOutputPanel, useCommandOutputStreaming } from "./CommandOutputPanel";
 import { ShellCommandBlock } from "./ShellCommandBlock";
+import { useT } from "~/useUiLanguage";
 
 export function BackgroundWorkDetails(props: {
   readonly environmentId: EnvironmentId;
@@ -26,13 +27,16 @@ export function BackgroundWorkDetails(props: {
   readonly onOpenThread: (threadId: ThreadId) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   const streamsOutput = useCommandOutputStreaming(props.environmentId);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<InlineButton />}>Details</DialogTrigger>
+      <DialogTrigger render={<InlineButton />}>
+        {t("chatA.backgroundWorkDetails.details")}
+      </DialogTrigger>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Background work</DialogTitle>
+          <DialogTitle>{t("chatA.backgroundWorkDetails.title")}</DialogTitle>
         </DialogHeader>
         <DialogPanel>
           <div className="space-y-5">
@@ -49,7 +53,7 @@ export function BackgroundWorkDetails(props: {
                 description && description !== command?.trim()
                   ? description
                   : command
-                    ? "Command"
+                    ? t("chatA.backgroundWorkDetails.command")
                     : task.kind.replaceAll("_", " ");
               const itemId =
                 task.itemId ?? (item?.type === "command_execution" ? item.id : undefined);
@@ -59,7 +63,9 @@ export function BackgroundWorkDetails(props: {
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="font-medium">{title}</h3>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {task.awaited ? "Waiting" : "Running"}
+                      {task.awaited
+                        ? t("chatA.backgroundWorkDetails.waiting")
+                        : t("chatA.backgroundWorkDetails.running")}
                     </span>
                   </div>
                   {command ? (

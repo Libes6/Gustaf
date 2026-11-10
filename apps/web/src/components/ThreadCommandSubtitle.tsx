@@ -5,6 +5,7 @@ import { ProviderInstanceIcon } from "./chat/ProviderInstanceIcon";
 import { cn } from "~/lib/utils";
 
 import { MiddleTruncate } from "./ui/middle-truncate";
+import { useT } from "~/useUiLanguage";
 
 export type ThreadCommandSubtitleVariant =
   | "favicon-workspace-harness"
@@ -43,6 +44,7 @@ export function ThreadCommandSubtitle(props: {
   variant?: ThreadCommandSubtitleVariant;
   className?: string;
 }) {
+  const t = useT();
   const variant = props.variant ?? THREAD_COMMAND_SUBTITLE_VARIANT;
   const isWorktree = props.worktreePath != null && props.worktreePath.trim().length > 0;
   const showHarness =
@@ -103,7 +105,7 @@ export function ThreadCommandSubtitle(props: {
       {props.isCurrent ? (
         <>
           {projectLabel || branchLabel || showHarness ? <CommandPaletteMetaDot /> : null}
-          <span className="shrink-0">Current thread</span>
+          <span className="shrink-0">{t("shell.threadCommand.currentThread")}</span>
         </>
       ) : null}
     </span>

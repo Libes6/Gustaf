@@ -16,6 +16,7 @@ import {
 
 import { FileSurfaceAction, FileSurfaceLoading, FileSurfaceNotice } from "./fileSurfaceChrome";
 import { OFFICE_PREVIEW_MAX_BYTES, type OfficeWorkerResult } from "./officePreviewProtocol";
+import { useT } from "../../useUiLanguage";
 
 const DocumentPages = lazy(() => import("./DocumentPages"));
 const NotebookPreview = lazy(() => import("./NotebookPreview"));
@@ -68,6 +69,7 @@ function ExtendedOfficeViewer(props: {
   readonly kind: OfficePreviewKind;
   readonly sizeBytes?: number;
 }) {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [sheetPages, setSheetPages] = useState(new Map<string, string[][]>());
   const pendingPages = useRef(new Set<string>());
@@ -160,7 +162,7 @@ function ExtendedOfficeViewer(props: {
         role="alert"
         className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center"
       >
-        <p className="text-sm font-medium">No preview for this file</p>
+        <p className="text-sm font-medium">{t("misc.officeViewer.noPreview")}</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
           {error} Save it or open it in another app.
         </p>
@@ -199,7 +201,7 @@ function ExtendedOfficeViewer(props: {
                   if (value !== null) selectPage(value);
                 }}
               >
-                <SelectTrigger aria-label="Sheet" size="xs">
+                <SelectTrigger aria-label={t("misc.officeViewer.sheet")} size="xs">
                   <SelectValue>{sheet?.name}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
@@ -219,7 +221,7 @@ function ExtendedOfficeViewer(props: {
                   if (value !== null) selectPage(value);
                 }}
               >
-                <SelectTrigger aria-label="Chapter" size="xs">
+                <SelectTrigger aria-label={t("misc.officeViewer.chapter")} size="xs">
                   <SelectValue>{documentPage?.title}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
@@ -233,7 +235,8 @@ function ExtendedOfficeViewer(props: {
             </div>
           ) : (
             <span className="flex-1 text-center tabular-nums" aria-live="polite">
-              {navigation === "slide" ? "Slide" : "Page"} {page + 1} of {count}
+              {navigation === "slide" ? t("misc.officeViewer.slide") : t("misc.officeViewer.page")}{" "}
+              {page + 1} {t("misc.officeViewer.pageOf")} {count}
             </span>
           )}
           <FileSurfaceAction
@@ -283,7 +286,7 @@ function ExtendedOfficeViewer(props: {
               : ""}
           </FileSurfaceNotice>
           {sheet.rowCount === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">This sheet is empty.</p>
+            <p className="p-6 text-xs text-muted-foreground">{t("misc.officeViewer.sheetEmpty")}</p>
           ) : (
             <VirtualTablePreview
               key={page}

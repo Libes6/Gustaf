@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { ComposerBanner, type ComposerBannerVariant } from "./ComposerBanner";
 import { observeResize } from "~/lib/observeResize";
+import { useT } from "~/useUiLanguage";
 
 /**
  * Where a notice sits in the stack. The machine comes first, then what needs you; the
@@ -70,6 +71,7 @@ export function NoticeText({
   readonly className: string;
   readonly detailsLabel: string;
 }) {
+  const t = useT();
   const textRef = useRef<HTMLSpanElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
   const [detailsAtWidth, setDetailsAtWidth] = useState<number | null>(null);
@@ -150,7 +152,7 @@ export function NoticeText({
             <InfoIcon />
           </PopoverTrigger>
           <PopoverPopup
-            aria-label="Notice details"
+            aria-label={t("chatA.composerBannerStack.noticeDetails")}
             tooltipStyle
             side="top"
             className="max-w-[min(30rem,calc(100vw-2rem))] whitespace-normal wrap-anywhere [--inline-button-text-align:start] [--inline-button-white-space:normal] [&_[data-slot=inline-button]]:max-w-full"
@@ -170,6 +172,7 @@ function NoticeCard({
   readonly item: ComposerBannerStackItem;
   readonly detached?: boolean;
 }) {
+  const t = useT();
   return (
     <ComposerBanner.Root
       role={item.variant === "error" || item.variant === "warning" ? "alert" : undefined}
@@ -186,8 +189,8 @@ function NoticeCard({
           <NoticeText
             detailsLabel={
               typeof item.title === "string"
-                ? `Show full title: ${item.title}`
-                : "Show title details"
+                ? t("chatA.composerBannerStack.showFullTitle").replace("{title}", item.title)
+                : t("chatA.composerBannerStack.showTitleDetails")
             }
             className="min-w-0 truncate font-medium leading-7 sm:leading-6"
           >
@@ -197,8 +200,8 @@ function NoticeCard({
             <NoticeText
               detailsLabel={
                 typeof item.title === "string"
-                  ? `Show details: ${item.title}`
-                  : "Show notice details"
+                  ? t("chatA.composerBannerStack.showDetails").replace("{title}", item.title)
+                  : t("chatA.composerBannerStack.showNoticeDetails")
               }
               className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
             >
@@ -211,7 +214,7 @@ function NoticeCard({
             {item.actions}
             {item.onDismiss ? (
               <ComposerBanner.Dismiss
-                aria-label={item.dismissLabel ?? "Dismiss warning"}
+                aria-label={item.dismissLabel ?? t("chatA.composerBannerStack.dismissWarning")}
                 onClick={item.onDismiss}
               />
             ) : null}

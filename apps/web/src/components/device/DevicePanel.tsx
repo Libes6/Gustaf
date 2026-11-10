@@ -40,6 +40,7 @@ import {
 } from "./DeviceSetup";
 import { DeviceWorkspace } from "./DeviceWorkspace";
 import { PreviewPanelShell, type PreviewPanelMode } from "../preview/PreviewPanelShell";
+import { useT } from "../../useUiLanguage";
 
 const platformLabel = (platform: DevicePlatform) =>
   platform === "ios" ? "iOS Simulators" : "Android Emulators";
@@ -54,6 +55,7 @@ export function DevicePanel(props: {
   readonly visible: boolean;
   readonly onDismissSetup: () => void;
 }) {
+  const t = useT();
   const { environmentId, threadId } = props.threadRef;
   const { state, loaded, error: stateError, refresh: refreshState } = useDeviceState(environmentId);
   const list = useAtomCommand(deviceEnvironment.list, { reportFailure: false });
@@ -252,7 +254,7 @@ export function DevicePanel(props: {
               key={`${environmentId}\u0000${deviceKey(activeDevice)}`}
               environmentId={environmentId}
               device={activeDevice}
-              hostLabel={activeHost?.label ?? "Device host"}
+              hostLabel={activeHost?.label ?? t("misc.devicePanel.deviceHost")}
               hostKind={activeHost?.kind}
               hostDiagnostics={
                 diagnostics.find(({ hostId }) => hostId === activeDevice.hostId)?.detail
@@ -264,10 +266,10 @@ export function DevicePanel(props: {
             />
           ) : loading ? (
             <DeviceLoadingView
-              name={pendingDevice?.name ?? "Devices"}
+              name={pendingDevice?.name ?? t("misc.devicePanel.devices")}
               description={
                 pendingDevice
-                  ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? "Device host"} · ${pendingDevice.version}`
+                  ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? t("misc.devicePanel.deviceHost")} · ${pendingDevice.version}`
                   : ""
               }
               stage="opening"
@@ -275,11 +277,11 @@ export function DevicePanel(props: {
                 loadError ??
                 (pendingDevice
                   ? pendingDevice.booted
-                    ? "Opening device…"
-                    : "Starting device…"
+                    ? t("misc.devicePanel.openingDevice")
+                    : t("misc.devicePanel.startingDevice")
                   : state.hostStatus === "installing"
-                    ? (state.hostStatusDetail ?? "Installing device support…")
-                    : "Finding devices…")
+                    ? (state.hostStatusDetail ?? t("misc.devicePanel.installingSupport"))
+                    : t("misc.devicePanel.findingDevices"))
               }
               error={loadError !== null}
             >
@@ -305,8 +307,8 @@ export function DevicePanel(props: {
                       tabIndex={state.hostStatus === "failed" ? 0 : undefined}
                     >
                       {state.hostStatus === "failed"
-                        ? (state.hostStatusDetail ?? "The device hub failed to start.")
-                        : "No simulators or emulators were found on this environment."}
+                        ? (state.hostStatusDetail ?? t("misc.devicePanel.hubFailed"))
+                        : t("misc.devicePanel.noDevices")}
                     </p>
                   </>
                 ) : null}
@@ -339,7 +341,7 @@ export function DevicePanel(props: {
                                 variant="outline"
                                 size="sm"
                                 disabled={pendingDeviceKey !== null}
-                                aria-label={`${device.booted ? "Open" : "Start"} ${device.name}`}
+                                aria-label={`${device.booted ? t("misc.devicePanel.open") : t("misc.devicePanel.start")} ${device.name}`}
                                 onClick={() => void selectDevice(deviceKey(device))}
                               >
                                 {pendingDeviceKey === deviceKey(device) ? (
@@ -349,7 +351,9 @@ export function DevicePanel(props: {
                                 ) : (
                                   <Play />
                                 )}
-                                {device.booted ? "Open" : "Start"}
+                                {device.booted
+                                  ? t("misc.devicePanel.open")
+                                  : t("misc.devicePanel.start")}
                               </Button>
                             </div>
                           ))}
@@ -387,6 +391,7 @@ export function DevicePanel(props: {
 }
 
 function DeviceNotice(props: { readonly onDismiss: () => void; readonly children: ReactNode }) {
+  const t = useT();
   return (
     <div
       role="alert"
@@ -402,7 +407,7 @@ function DeviceNotice(props: { readonly onDismiss: () => void; readonly children
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="Dismiss device error"
+        aria-label={t("misc.devicePanel.dismissError")}
         onClick={props.onDismiss}
       >
         <X />
@@ -417,6 +422,7 @@ function DeviceDiscoveryWarning(props: {
   readonly incompletePlatforms: readonly DevicePlatform[];
   readonly onRetry: () => Promise<unknown>;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [dismissedCause, setDismissedCause] = useState<string | null>(null);
@@ -452,7 +458,7 @@ function DeviceDiscoveryWarning(props: {
               void props.onRetry().finally(() => setRetrying(false));
             }}
           >
-            {retrying ? "Retrying…" : "Retry"}
+            {retrying ? t("misc.devicePanel.retrying") : t("misc.devicePanel.retry")}
           </Button>
         ) : null}
         <Popover open={open} onOpenChange={setOpen}>

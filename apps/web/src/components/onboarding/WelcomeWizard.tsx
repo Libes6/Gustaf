@@ -106,6 +106,7 @@ import { Dialog } from "../ui/dialog";
 import { toastManager } from "../ui/toast";
 import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
+import { useT } from "../../useUiLanguage";
 
 type WizardStep = "connection" | "agents" | "import";
 const NO_ENVIRONMENTS: readonly EnvironmentId[] = [];
@@ -123,6 +124,7 @@ export function WelcomeWizard({
   readonly resumeEnvironmentId?: EnvironmentId | undefined;
   readonly onDone: (projectRef?: ScopedProjectRef) => void | Promise<void>;
 }) {
+  const t = useT();
   const [step, setStep] = useState<WizardStep>(resumeEnvironmentId ? "agents" : "connection");
   const { environments } = useEnvironments();
   const [selection, setSelection] = useState<ReadonlySet<EnvironmentId> | null>(null);
@@ -205,8 +207,8 @@ export function WelcomeWizard({
       .catch(() => {
         const errorToast = {
           type: "error",
-          title: "Could not finish setup",
-          description: "Your settings could not be saved. Try again.",
+          title: t("misc.welcomeWizard.setupFailedTitle"),
+          description: t("misc.welcomeWizard.settingsNotSaved"),
         } as const;
         if (completionErrorToastIdRef.current === null) {
           completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -239,7 +241,7 @@ export function WelcomeWizard({
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
         <WizardHeader
-          title="Set up Gustaf"
+          title={t("misc.welcomeWizard.setUpGustaf")}
           identity={
             <div className="flex items-center gap-2" role="img" aria-label="Gustaf">
               <img src="/gustaf-icon.png" alt="" className="size-6 shrink-0 rounded-md" />
@@ -316,6 +318,7 @@ function ConnectionStep({
   readonly onContinue: () => void;
   readonly onPaired: (environmentId: EnvironmentId) => void;
 }) {
+  const t = useT();
   const { environments } = useEnvironments();
   const telemetryOff = managedTelemetryOffMessage(usePrimaryManagedPolicy());
   const cloudEnabled = hasCloudPublicConfig();
@@ -349,7 +352,7 @@ function ConnectionStep({
       </p>
       {directEnvironments.length > 0 ? (
         <fieldset className="mt-5 space-y-2">
-          <legend className="sr-only">Computers to set up</legend>
+          <legend className="sr-only">{t("misc.welcomeWizard.computersToSetUp")}</legend>
           {directEnvironments.map((environment) => (
             <label
               key={environment.environmentId}
@@ -372,7 +375,7 @@ function ConnectionStep({
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {!environment.entry.enabled && environment.connection.phase !== "unsupported"
-                      ? "Off"
+                      ? t("misc.welcomeWizard.off")
                       : presentSavedCloudEnvironmentConnection(environment.connection).buttonLabel}
                   </span>
                 </span>
@@ -413,7 +416,7 @@ function ConnectionStep({
               }
             >
               <LinkIcon className="size-4 text-muted-foreground" />
-              <span className="flex-1 text-left">Add a computer</span>
+              <span className="flex-1 text-left">{t("misc.welcomeWizard.addComputer")}</span>
               <ChevronRightIcon
                 className={cn("size-4 text-muted-foreground", pairingOpen && "rotate-90")}
               />
@@ -481,6 +484,7 @@ function ConnectAccountOption({
   readonly selectedIds: ReadonlySet<EnvironmentId>;
   readonly onToggleEnvironment: (environmentId: EnvironmentId, checked: boolean) => void;
 }) {
+  const t = useT();
   const { environments } = useEnvironments();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
@@ -508,11 +512,11 @@ function ConnectAccountOption({
           <span className="flex-1 text-left">T3 Connect</span>
           <span className="text-xs text-muted-foreground">
             {!isLoaded
-              ? "Loading sign-in…"
+              ? t("misc.welcomeWizard.loadingSignIn")
               : !isSignedIn
-                ? "Sign in"
+                ? t("misc.welcomeWizard.signIn")
                 : !discoveryReady
-                  ? "Loading computers…"
+                  ? t("misc.welcomeWizard.loadingComputers")
                   : null}
           </span>
           <ChevronRightIcon
@@ -531,7 +535,9 @@ function ConnectAccountOption({
                   selection={{ selectedIds, onChange: onToggleEnvironment, autoSelectedComputers }}
                   refreshWhileEmpty
                   empty={
-                    <p className="py-3 text-sm text-muted-foreground">No computers linked yet.</p>
+                    <p className="py-3 text-sm text-muted-foreground">
+                      {t("misc.welcomeWizard.noComputersLinked")}
+                    </p>
                   }
                 />
               ) : null}
@@ -559,6 +565,7 @@ function PairingForm({
   readonly setIsPairing: (value: boolean) => void;
   readonly onPaired: (environmentId: EnvironmentId) => void;
 }) {
+  const t = useT();
   const connectPairingEnvironment = useAtomCommand(connectPairing, { reportFailure: false });
   const [pairingUrl, setPairingUrl] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -585,7 +592,7 @@ function PairingForm({
     }
     if (isAtomCommandInterrupted(result)) return;
     const cause = squashAtomCommandFailure(result);
-    setErrorMessage(cause instanceof Error ? cause.message : "Pairing failed.");
+    setErrorMessage(cause instanceof Error ? cause.message : t("misc.welcomeWizard.pairingFailed"));
   };
 
   return (
@@ -642,11 +649,13 @@ function PairingForm({
               Need a pairing link?
             </CollapsibleTrigger>
             <Button type="submit" disabled={isPairing || pairingUrl.trim().length === 0}>
-              {isPairing ? "Pairing..." : "Pair"}
+              {isPairing ? t("misc.welcomeWizard.pairing") : t("misc.welcomeWizard.pair")}
             </Button>
           </div>
           <CollapsiblePanel>
-            <p className="pt-3 text-sm text-muted-foreground">On the computer with your code:</p>
+            <p className="pt-3 text-sm text-muted-foreground">
+              {t("misc.welcomeWizard.onComputerWithCode")}
+            </p>
             <InstallT3Commands command="t3 pair" className="mt-2" />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               Start Gustaf or run <code className="font-mono">t3 serve</code> there before{" "}
@@ -679,11 +688,12 @@ function AgentsStep({
   readonly environmentIds: readonly EnvironmentId[];
   readonly onContinue: () => void;
 }) {
+  const t = useT();
   const { environments } = useEnvironments();
   return (
     <StepShell
-      title="Connect your agents"
-      description="Choose an agent to start coding. You can add more later."
+      title={t("misc.welcomeWizard.connectAgents")}
+      description={t("misc.welcomeWizard.chooseAgent")}
     >
       <ScrollArea scrollFade className="mt-5 h-auto max-h-[min(32rem,55dvh)]">
         <div className="space-y-5 pr-3">
@@ -693,7 +703,7 @@ function AgentsStep({
               environmentId={environmentId}
               machineLabel={
                 environments.find((environment) => environment.environmentId === environmentId)
-                  ?.label ?? "Computer"
+                  ?.label ?? t("misc.welcomeWizard.computer")
               }
             />
           ))}
@@ -980,6 +990,7 @@ function AgentCard({
   readonly terminalAvailable: boolean;
   readonly onOpenTerminal: () => void;
 }) {
+  const t = useT();
   const meta = providerClients.get(ProviderDriverKind.make(driver));
   const displayName =
     provider?.displayName || (driver === "claudeAgent" ? "Claude Code" : (meta?.label ?? driver));
@@ -996,7 +1007,7 @@ function AgentCard({
       <div className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-foreground">{displayName}</span>
         <p className="mt-0.5 text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
-          {providerState === "ready" ? "Ready to code." : summary.headline}
+          {providerState === "ready" ? t("misc.welcomeWizard.readyToCode") : summary.headline}
           {providerState !== "ready" && summary.detail ? ` · ${summary.detail}` : ""}
         </p>
       </div>
@@ -1007,9 +1018,9 @@ function AgentCard({
             Ready
           </span>
         ) : providerState === "checking" ? (
-          <span className="text-xs text-muted-foreground">Checking...</span>
+          <span className="text-xs text-muted-foreground">{t("misc.welcomeWizard.checking")}</span>
         ) : providerState === "disabled" ? (
-          <span className="text-xs text-muted-foreground">Disabled</span>
+          <span className="text-xs text-muted-foreground">{t("misc.welcomeWizard.disabled")}</span>
         ) : providerState === "attention" ? (
           <span className="text-xs text-muted-foreground">{summary.headline}</span>
         ) : (
@@ -1020,7 +1031,9 @@ function AgentCard({
             disabled={terminalOpen || !terminalAvailable}
           >
             <TerminalIcon className="size-3.5" />
-            {providerState === "signIn" ? "Sign in" : "Install"}
+            {providerState === "signIn"
+              ? t("misc.welcomeWizard.signIn")
+              : t("misc.welcomeWizard.install")}
           </Button>
         )}
       </div>
@@ -1035,6 +1048,7 @@ function AgentInstallTerminal({
   readonly session: AgentTerminalSession;
   readonly onClose: () => void;
 }) {
+  const t = useT();
   const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const [advancedTypography] = useLocalStorage(
@@ -1134,18 +1148,18 @@ function AgentInstallTerminal({
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
           {!canOperateTerminal ? (
-            "This connection cannot control terminals."
+            t("misc.welcomeWizard.cannotControlTerminals")
           ) : setupState === "writeFailed" ? (
             <>
               Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
               terminal.
             </>
           ) : setupState === "ready" ? (
-            "Review the command, then press Enter to run it."
+            t("misc.welcomeWizard.reviewCommand")
           ) : setupState === "openFailed" ? (
-            "Could not open the setup terminal."
+            t("misc.welcomeWizard.couldNotOpenTerminal")
           ) : (
-            "Preparing command..."
+            t("misc.welcomeWizard.preparingCommand")
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -1216,6 +1230,7 @@ function ImportStep({
     importedThreadCount?: number,
   ) => Promise<boolean>;
 }) {
+  const t = useT();
   const { environments } = useEnvironments();
   const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
@@ -1439,7 +1454,9 @@ function ImportStep({
   if (scans.every((scan) => scan.data === null) && scans.some((scan) => scan.isPending)) {
     return (
       <div className="flex h-full min-h-40 flex-col">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your projects</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {t("misc.welcomeWizard.yourProjects")}
+        </h1>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner size="lg" tone="muted" />
           <p className="text-center text-sm text-muted-foreground">
@@ -1457,8 +1474,8 @@ function ImportStep({
 
   return (
     <StepShell
-      title="Import your projects"
-      description="Import projects and conversations from Claude Code and Codex on your selected computers."
+      title={t("misc.welcomeWizard.importYourProjects")}
+      description={t("misc.welcomeWizard.importDescription")}
     >
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -1493,7 +1510,7 @@ function ImportStep({
             );
             const label =
               environments.find((environment) => environment.environmentId === scan.environmentId)
-                ?.label ?? "Computer";
+                ?.label ?? t("misc.welcomeWizard.computer");
             return (
               <fieldset
                 key={scan.environmentId}
@@ -1551,7 +1568,7 @@ function ImportStep({
           onClick={() => void runImport(selected)}
         >
           {isImporting
-            ? "Importing…"
+            ? t("misc.welcomeWizard.importing")
             : `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"}`}
         </Button>
       </div>
@@ -1573,6 +1590,7 @@ function ImportCandidateList({
   readonly selectedKeys: ReadonlySet<string>;
   readonly onSelectionChange: (next: ReadonlySet<string>) => void;
 }) {
+  const t = useT();
   const { repositories, other } = groupOnboardingProjects(candidates);
   const setKeys = (keys: ReadonlyArray<string>, checked: boolean) => {
     const next = new Set(selectedKeys);
@@ -1609,7 +1627,9 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">Other folders</span>
+              <span className="truncate text-sm text-muted-foreground">
+                {t("misc.welcomeWizard.otherFolders")}
+              </span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
                 {other.length} {other.length === 1 ? "folder" : "folders"}
               </span>

@@ -5,6 +5,7 @@ import { cn } from "~/lib/utils";
 
 import { Badge } from "../../ui/badge";
 import { stopSubline } from "@t3tools/client-runtime/review-guide-tour";
+import { useT } from "../../../useUiLanguage";
 
 export function GuideRail({
   stops,
@@ -17,6 +18,7 @@ export function GuideRail({
   seen: ReadonlySet<number>;
   onSelect: (position: number) => void;
 }) {
+  const t = useT();
   const reviewed = seen.size;
   const renderStop = (stop: PullRequestReviewGuideStop, index: number) => (
     <li key={index}>
@@ -40,7 +42,7 @@ export function GuideRail({
   );
 
   return (
-    <nav aria-label="Review tour" className="flex min-h-0 flex-col gap-4">
+    <nav aria-label={t("misc.guideRail.reviewTour")} className="flex min-h-0 flex-col gap-4">
       <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
         {reviewed} of {stops.length} read
       </p>

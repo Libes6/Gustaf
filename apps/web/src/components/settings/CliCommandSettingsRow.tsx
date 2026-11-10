@@ -10,15 +10,17 @@ import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { useT } from "../../useUiLanguage";
 
 const FAILURE_TITLES = {
-  install: "Could not install t3",
-  uninstall: "Could not remove t3",
-  addToPath: "Could not add t3 to PATH",
+  install: "settingsA.cliCommand.couldNotInstall",
+  uninstall: "settingsA.cliCommand.couldNotRemove",
+  addToPath: "settingsA.cliCommand.couldNotAddToPath",
 } as const;
 
 /** The desktop `t3` command's state, and its actions with a toast on failure. */
 export function useDesktopCliCommand() {
+  const t = useT();
   const bridge = getDesktopCliCommandBridge();
   const query = useEnvironmentQuery(bridge ? desktopCliCommandStateAtom : null);
   const [pending, setPending] = useState(false);
@@ -32,8 +34,9 @@ export function useDesktopCliCommand() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: FAILURE_TITLES[action],
-            description: error instanceof Error ? error.message : "Something went wrong.",
+            title: t(FAILURE_TITLES[action]),
+            description:
+              error instanceof Error ? error.message : t("settingsA.cliCommand.somethingWrong"),
           }),
         );
       })
@@ -48,19 +51,25 @@ export function useDesktopCliCommand() {
 }
 
 export function CliCommandSettingsRow() {
+  const t = useT();
   const { state, busy, run } = useDesktopCliCommand();
 
   if (!state?.supported) return null;
   const installed = state.installedPath !== null;
   const description = state.shadowedBy
-    ? `Another t3 at ${state.shadowedBy} runs first in a new terminal. Remove it to use Gustaf's.`
+    ? t("settingsA.cliCommand.shadowed").replace("{path}", state.shadowedBy)
     : !installed
-      ? "Run Gustaf's CLI as `t3` from any terminal."
+      ? t("settingsA.cliCommand.runHint")
       : state.onPath
-        ? `Installed at ${state.installedPath}. Open a new terminal to use it.`
+        ? t("settingsA.cliCommand.installedOpenTerminal").replace(
+            "{path}",
+            state.installedPath ?? "",
+          )
         : state.pathSetup?.added
-          ? `Installed at ${state.installedPath} and added to PATH in ${state.pathSetup.file}. Open a new terminal to use it.`
-          : `Installed at ${state.installedPath}, which is not on your PATH yet.${state.pathSetup ? "" : " Add its folder to your PATH to run `t3`."}`;
+          ? t("settingsA.cliCommand.installedAddedToPath")
+              .replace("{path}", state.installedPath ?? "")
+              .replace("{file}", state.pathSetup.file)
+          : `${t("settingsA.cliCommand.notOnPath").replace("{path}", state.installedPath ?? "")}${state.pathSetup ? "" : ` ${t("settingsA.cliCommand.addToPathHint")}`}`;
 
   return (
     <SettingsRow
@@ -70,7 +79,7 @@ export function CliCommandSettingsRow() {
         <div className="flex gap-2">
           {state.pathSetup && !state.pathSetup.added ? (
             <Button size="sm" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
-              Add to PATH
+              {t("settingsA.cliCommand.addToPath")}
             </Button>
           ) : null}
           <Button
@@ -79,7 +88,7 @@ export function CliCommandSettingsRow() {
             disabled={busy || (!installed && Boolean(state.shadowedBy))}
             onClick={() => run(installed ? "uninstall" : "install")}
           >
-            {installed ? "Remove" : "Install"}
+            {installed ? t("settingsA.cliCommand.remove") : t("settingsA.cliCommand.install")}
           </Button>
         </div>
       }

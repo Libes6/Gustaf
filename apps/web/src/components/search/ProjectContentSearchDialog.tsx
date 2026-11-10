@@ -16,6 +16,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HighlightedSearchLine } from "./HighlightedSearchLine";
+import { useT } from "~/useUiLanguage";
 
 interface ProjectContentSearchDialogProps {
   readonly onOpenChange: (open: boolean) => void;
@@ -79,12 +80,16 @@ function SearchOptionButton(props: {
 }
 
 function EmptyContentSearchDialog() {
+  const t = useT();
   return (
     <CommandPaletteContent
-      aria-label="Search project contents"
-      escapeLabel="Back"
-      footerActionLabel="Open file"
-      inputProps={{ disabled: true, placeholder: "Search project contents…" }}
+      aria-label={t("misc.projectContentSearch.searchContents")}
+      escapeLabel={t("misc.projectContentSearch.back")}
+      footerActionLabel={t("misc.projectContentSearch.openFile")}
+      inputProps={{
+        disabled: true,
+        placeholder: t("misc.projectContentSearch.searchContentsPlaceholder"),
+      }}
       mode="none"
       panelSize="fill"
       testId="project-content-search"
@@ -105,6 +110,7 @@ function OpenContentSearchDialog(props: {
   readonly onOpenChange: (open: boolean) => void;
   readonly target: ActiveProjectTarget;
 }) {
+  const t = useT();
   const { target } = props;
   const { resolvedTheme } = useTheme();
   const renderedAppearance = useRenderedAppearance();
@@ -164,14 +170,14 @@ function OpenContentSearchDialog(props: {
   return (
     <CommandPaletteContent
       aria-label={`Search file contents in ${target.projectName}`}
-      escapeLabel="Back"
-      footerActionLabel="Open file"
+      escapeLabel={t("misc.projectContentSearch.back")}
+      footerActionLabel={t("misc.projectContentSearch.openFile")}
       inputAccessory={
         <div className="absolute inset-e-2.5 top-1/2 flex shrink-0 -translate-y-1/2 items-center gap-0.5 rounded-lg border bg-muted/30 p-0.5">
           <SearchOptionButton
             active={caseSensitive}
             disabled={!search.canReadFiles}
-            label="Match case"
+            label={t("misc.projectContentSearch.matchCase")}
             onClick={() => setCaseSensitive((current) => !current)}
           >
             Aa
@@ -179,7 +185,7 @@ function OpenContentSearchDialog(props: {
           <SearchOptionButton
             active={wholeWord}
             disabled={!search.canReadFiles}
-            label="Match whole word"
+            label={t("misc.projectContentSearch.matchWholeWord")}
             onClick={() => setWholeWord((current) => !current)}
           >
             <span className="underline decoration-2 underline-offset-2">ab</span>
@@ -187,7 +193,7 @@ function OpenContentSearchDialog(props: {
           <SearchOptionButton
             active={useRegex}
             disabled={!search.canReadFiles}
-            label="Use regular expression"
+            label={t("misc.projectContentSearch.useRegex")}
             onClick={() => setUseRegex((current) => !current)}
           >
             .*
@@ -233,7 +239,7 @@ function OpenContentSearchDialog(props: {
           ) : search.error ? (
             <span className="text-destructive">{search.error}</span>
           ) : search.invalidRegex ? (
-            <span className="text-destructive">Invalid regular expression</span>
+            <span className="text-destructive">{t("misc.projectContentSearch.invalidRegex")}</span>
           ) : (
             `${matches.length.toLocaleString()}${search.truncated ? "+" : ""} results in ${fileCount.toLocaleString()} files`
           )}
@@ -243,12 +249,12 @@ function OpenContentSearchDialog(props: {
       {matches.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
           {search.isCheckingAccess
-            ? "Checking file access…"
+            ? t("misc.projectContentSearch.checkingAccess")
             : !search.canReadFiles
               ? search.error
               : search.hasQuery && !search.isPending && !search.error
-                ? "No results found."
-                : "Type to search across your project."}
+                ? t("misc.projectContentSearch.noResults")
+                : t("misc.projectContentSearch.typeToSearch")}
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1" scrollFade>

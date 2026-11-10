@@ -15,6 +15,7 @@ import {
 
 import { useAssetUrlRefresh, useAssetUrlState } from "../../assets/assetUrls";
 import { cn } from "../../lib/utils";
+import { useT } from "../../useUiLanguage";
 import { useRightPanelStore } from "../../rightPanelStore";
 import { MediaActions, type MediaActionSource } from "../media/MediaActions";
 import { MediaVideoPlayer } from "../media/MediaVideoPlayer";
@@ -104,12 +105,13 @@ function ChatMarkdownMediaUnavailableLabel(props: {
   readonly kind?: "image" | "video" | "audio" | undefined;
   readonly detail?: string | undefined;
 }) {
+  const t = useT();
   const label =
     props.kind === "audio"
-      ? "Audio unavailable"
+      ? t("chatA.chatMarkdownMedia.audioUnavailable")
       : props.kind === "video"
-        ? "Video unavailable"
-        : "Image unavailable";
+        ? t("chatA.chatMarkdownMedia.videoUnavailable")
+        : t("chatA.chatMarkdownMedia.imageUnavailable");
   return (
     <span data-thread-find-ignore className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -170,6 +172,7 @@ export function ChatMarkdownImage(props: {
   readonly originalUrl?: string | undefined;
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
 }) {
+  const t = useT();
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = props.src ?? loadedSrc;
@@ -234,7 +237,7 @@ export function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label={t("chatA.chatMarkdownMedia.loadingImage")}
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -252,7 +255,10 @@ export function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : {
+              role: "status" as const,
+              "aria-label": t("chatA.chatMarkdownMedia.loadingImage"),
+            })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">

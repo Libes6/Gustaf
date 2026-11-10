@@ -11,6 +11,7 @@ import {
   ClerkUserProfileRow,
 } from "./ClerkUserProfilePage";
 import { useT3ChatLink } from "./useT3ChatLink";
+import { useT } from "../../useUiLanguage";
 
 const upgradeLink = (
   <a className="underline" href={T3CHAT_SUBSCRIPTION_URL} target="_blank" rel="noopener noreferrer">
@@ -36,6 +37,7 @@ function planLabel(link: RelayT3ChatLink): ReactNode {
 
 /** Links a T3 Chat account so paid subscribers get more tunnels. */
 export function T3ChatUserProfilePage() {
+  const t = useT();
   const { linkState, pending, linkUrl, link: handleLink, unlink: handleUnlink } = useT3ChatLink();
   const usage = useManagedTunnelUsage();
 
@@ -56,12 +58,14 @@ export function T3ChatUserProfilePage() {
     >
       {linkState.error ? (
         <div className="border-t py-3 text-xs" role="alert">
-          <p className="font-medium text-destructive-foreground">Could not load T3 Chat link</p>
+          <p className="font-medium text-destructive-foreground">
+            {t("misc.t3ChatProfile.couldNotLoadLink")}
+          </p>
           <p className="mt-0.5 text-muted-foreground">{linkState.error}</p>
         </div>
       ) : data === null ? null : !data.available ? (
         <p className="border-t py-4 text-xs text-muted-foreground">
-          This T3 Connect server does not support T3 Chat linking.
+          {t("misc.t3ChatProfile.serverNoSupport")}
         </p>
       ) : (
         <ul className="border-t">
@@ -69,7 +73,7 @@ export function T3ChatUserProfilePage() {
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm leading-4.5 font-medium text-foreground">
-                  {link ? link.email : "Not linked"}
+                  {link ? link.email : t("misc.t3ChatProfile.notLinked")}
                 </h3>
                 <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
                   {link ? (

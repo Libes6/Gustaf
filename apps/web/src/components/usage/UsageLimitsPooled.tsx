@@ -11,8 +11,8 @@ import {
   type LimitPool,
   type LimitPoolMember,
   type LimitPoolWindow,
-  paceRemainingPercent,
-  remainingPercent,
+  paceElapsedPercent,
+  usedPercentOf,
 } from "@t3tools/shared/usageLimits";
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
@@ -29,6 +29,7 @@ import {
 } from "react";
 
 import { ensureLocalApi } from "../../localApi";
+import { useT } from "../../useUiLanguage";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
@@ -62,11 +63,15 @@ function accountHue(email: string): number {
 }
 
 function AccountChip({ email }: { readonly email: string }) {
+  const t = useT();
   const hue = accountHue(email);
   return (
     <span
       role="img"
-      aria-label={`Account ${accountInitials(email)}`}
+      aria-label={t("misc.usageLimitsPooled.accountChip").replace(
+        "{initials}",
+        accountInitials(email),
+      )}
       className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-3xs leading-none font-semibold"
       style={{ backgroundColor: `oklch(0.85 0.08 ${hue})`, color: `oklch(0.35 0.1 ${hue})` }}
     >
@@ -148,9 +153,10 @@ function SegmentPopover({
   readonly redeem: ReturnType<typeof useResetCredit> | null;
   readonly onRedeem: () => void;
 }) {
+  const t = useT();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const remaining = remainingPercent(window);
-  const timeLeft = paceRemainingPercent(window, now);
+  const used = usedPercentOf(window);
+  const elapsed = paceElapsedPercent(window, now);
   const resetsIn = formatResetsIn(window, now);
   const where =
     account.environments.length > 0
@@ -170,36 +176,53 @@ function SegmentPopover({
         {account.email ? (
           <RedactedSensitiveText
             value={account.email}
-            ariaLabel="Toggle account email visibility"
-            revealTooltip="Click to reveal email"
-            hideTooltip="Click to hide email"
+            ariaLabel={t("misc.usageLimitsPooled.toggleEmailVisibility")}
+            revealTooltip={t("misc.usageLimitsPooled.revealEmail")}
+            hideTooltip={t("misc.usageLimitsPooled.hideEmail")}
             className="w-fit"
           />
         ) : null}
       </div>
       <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
-        {account.plan ? <Row label="Plan">{account.plan}</Row> : null}
+        {account.plan ? <Row label={t("misc.usageLimitsPooled.plan")}>{account.plan}</Row> : null}
         {where ? (
-          <Row label={account.environments.length > 0 ? "Signed in" : "Via"}>{where}</Row>
+          <Row
+            label={
+              account.environments.length > 0
+                ? t("misc.usageLimitsPooled.signedIn")
+                : t("misc.usageLimitsPooled.via")
+            }
+          >
+            {where}
+          </Row>
         ) : null}
       </div>
       <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
-        <Row label="Left">{remaining}%</Row>
+        <Row label={t("misc.usageLimitsPooled.used")}>{used}%</Row>
         {window.resetsAt ? (
-          <Row label="Resets">
+          <Row label={t("misc.usageLimitsPooled.resets")}>
             {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
             {resetsIn ? ` · ${resetsIn.replace("resets in ", "in ")}` : ""}
           </Row>
         ) : null}
-        {timeLeft !== null ? <Row label="Even pace">{timeLeft}% left by now</Row> : null}
+        {elapsed !== null ? (
+          <Row label={t("misc.usageLimitsPooled.evenPace")}>
+            {t("misc.usageLimitsPooled.evenPaceValue").replace("{elapsed}", String(elapsed))}
+          </Row>
+        ) : null}
         {reset && reset.restoresPercent > 0 ? (
-          <Row label="Restores">+{reset.restoresPercent}% of pool</Row>
+          <Row label={t("misc.usageLimitsPooled.restores")}>
+            {t("misc.usageLimitsPooled.restoresValue").replace(
+              "{percent}",
+              String(reset.restoresPercent),
+            )}
+          </Row>
         ) : null}
       </div>
       {credits && redeem ? (
         <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
-            <span className="tabular-nums">{resetCreditsSummary(credits, now, true)}</span>
+            <span className="tabular-nums">{resetCreditsSummary(credits, now, true, t)}</span>
             <Button
               size="xs"
               variant="outline"
@@ -207,7 +230,7 @@ function SegmentPopover({
               className="ms-auto"
               onClick={onRedeem}
             >
-              {redeem.busy ? "Using…" : "Use reset"}
+              {redeem.busy ? t("misc.usageLimits.using") : t("misc.usageLimits.useReset")}
             </Button>
           </span>
         </div>
@@ -303,6 +326,7 @@ function RedeemableSegment({
 }: Omit<Parameters<typeof SegmentTriggers>[0], "redeem"> & {
   readonly redeemAt: NonNullable<LimitAccount["redeem"]>;
 }) {
+  const t = useT();
   const redeem = useResetCredit(redeemAt.environmentId, redeemAt.input);
   return (
     <>
@@ -317,7 +341,7 @@ function RedeemableSegment({
       {redeem.busy || redeem.status ? (
         <span role="status" className="col-span-full text-xs text-muted-foreground">
           <AccountName account={props.account} className="font-medium text-foreground" />{" "}
-          {redeem.busy ? "Using reset credit…" : redeem.status}
+          {redeem.busy ? t("misc.usageLimitsPooled.usingResetCredit") : redeem.status}
         </span>
       ) : null}
     </>
@@ -343,9 +367,11 @@ function SegmentTriggers({
 }) {
   const popover = use(SegmentPopoverContext) ?? undefined;
   const payload: SegmentPayload = { account, window, reset, redeem };
-  const remaining = remainingPercent(window);
-  const timeLeft = paceRemainingPercent(window, now);
-  const [segmentRef, paceMark] = usePaceMark(timeLeft);
+  const used = usedPercentOf(window);
+  const elapsed = paceElapsedPercent(window, now);
+  const [segmentRef, paceMark] = usePaceMark(elapsed);
+  // The stretch of the used fill that the next reset hands back.
+  const refill = reset && refillPercent > 0 ? Math.min(used, refillPercent) : 0;
   const resetsIn = formatResetsIn(window, now);
   const credits = account.limits.resetCredits?.availableCount ?? 0;
   return (
@@ -359,7 +385,7 @@ function SegmentTriggers({
             ref={segmentRef}
             type="button"
             style={{ gridColumn: index, gridRow: 1, ...paceMark?.gappedTrack }}
-            aria-label={`${account.displayName ?? (account.email ? accountInitials(account.email) : account.driver)}: ${remaining}% left${resetsIn ? `, ${resetsIn}` : ""}${timeLeft === null ? "" : `, ${timeLeft}% of the window left`}${credits ? `, ${credits} reset ${credits === 1 ? "credit" : "credits"} banked` : ""}`}
+            aria-label={`${account.displayName ?? (account.email ? accountInitials(account.email) : account.driver)}: ${used}% used${resetsIn ? `, ${resetsIn}` : ""}${elapsed === null ? "" : `, ${elapsed}% of the window elapsed`}${credits ? `, ${credits} reset ${credits === 1 ? "credit" : "credits"} banked` : ""}`}
             className="relative h-5 min-w-0 cursor-pointer rounded-md bg-muted text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[popup-open]:ring-1 data-[popup-open]:ring-inset data-[popup-open]:ring-border @2xl/pool:h-8"
           />
         }
@@ -370,14 +396,15 @@ function SegmentTriggers({
             <div
               aria-hidden
               className="absolute inset-y-0 left-0 rounded-md opacity-35"
-              style={{ width: `${remaining}%`, backgroundColor: color }}
+              style={{ width: `${used}%`, backgroundColor: color }}
             />
-            {remaining < 100 && reset && refillPercent > 0 ? (
+            {refill > 0 ? (
               <div
                 aria-hidden
-                className="absolute inset-y-0 right-0 opacity-20"
+                className="absolute inset-y-0 opacity-20"
                 style={{
-                  width: `${Math.min(100 - remaining, refillPercent)}%`,
+                  left: `${used - refill}%`,
+                  width: `${refill}%`,
                   backgroundImage: `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 5px)`,
                 }}
               />
@@ -406,9 +433,7 @@ function SegmentTriggers({
           ) : null}
           {/* A single-account bar repeats the headline percentage. */}
           {showAccountName ? (
-            <span className="shrink-0 font-semibold text-foreground tabular-nums">
-              {remaining}%
-            </span>
+            <span className="shrink-0 font-semibold text-foreground tabular-nums">{used}%</span>
           ) : null}
           {resetsIn || credits ? (
             <span className="ms-auto flex min-w-0 items-center gap-1.5 overflow-hidden rounded-sm bg-background/85 px-1.5 py-0.5 text-2xs whitespace-nowrap text-foreground tabular-nums">
@@ -446,9 +471,10 @@ function LegendRow({
   readonly now: number;
   readonly index: number;
 }) {
+  const t = useT();
   const popover = use(SegmentPopoverContext) ?? undefined;
   const { account, window } = payload;
-  const remaining = remainingPercent(window);
+  const used = usedPercentOf(window);
   const resetsIn = formatResetsIn(window, now);
   const credits = account.limits.resetCredits?.availableCount ?? 0;
   return (
@@ -465,11 +491,11 @@ function LegendRow({
           className="absolute inset-0 rounded-sm opacity-35"
           style={{ backgroundColor: color }}
         />
-        <span className="sr-only">Segment </span>
+        <span className="sr-only">{t("misc.usageLimitsPooled.segment")}</span>
         <span className="relative">{index}</span>
       </span>
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
-      <span className="shrink-0 font-semibold text-foreground tabular-nums">{remaining}%</span>
+      <span className="shrink-0 font-semibold text-foreground tabular-nums">{used}%</span>
       <span className="ms-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
         {resetsIn?.replace("resets in ", "↻ ") ?? ""}
         {credits ? (
@@ -483,7 +509,14 @@ function LegendRow({
               {credits}
             </span>
             <span className="sr-only">
-              {credits} reset {credits === 1 ? "credit" : "credits"} banked
+              {t("misc.usageLimitsPooled.resetCreditBanked")
+                .replace("{count}", String(credits))
+                .replace(
+                  "{unit}",
+                  credits === 1
+                    ? t("misc.usageLimitsPooled.credit")
+                    : t("misc.usageLimitsPooled.credits"),
+                )}
             </span>
           </>
         ) : null}
@@ -541,6 +574,7 @@ function PoolWindowCard({
   readonly label?: string | undefined;
   readonly description?: string | undefined;
 }) {
+  const t = useT();
   const nextRefill = pool.resets.find((reset) => reset.restoresPercent > 0);
   return (
     <div className="grid items-center gap-x-6 gap-y-3 rounded-lg border border-border/60 p-4 md:grid-cols-[11rem_minmax(0,1fr)]">
@@ -548,16 +582,16 @@ function PoolWindowCard({
         <span className="text-sm font-medium text-foreground">{label ?? pool.label}</span>
         <span className="flex items-baseline gap-2">
           <span className="text-3xl font-semibold text-foreground tabular-nums">
-            {pool.remainingPercent}%
+            {pool.usedPercent}%
           </span>
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <span>left</span>
+            <span>{t("misc.usageLimitsPooled.usedLabel")}</span>
             {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
           </span>
         </span>
         {nextRefill && pool.columns.length > 1 ? (
           <span className="text-xs font-medium text-foreground tabular-nums">
-            ↻ +{nextRefill.restoresPercent}%
+            ↻ −{nextRefill.restoresPercent}%
           </span>
         ) : null}
       </div>
@@ -609,6 +643,7 @@ export function UsageLimitsPooled({
   readonly presentations: Parameters<typeof collectLimitAccounts>[0];
   readonly now: number;
 }) {
+  const t = useT();
   const [segmentPopover] = useState(() => PopoverCreateHandle<SegmentPayload>());
   const segmentPopoverActions = useRef<PopoverPrimitive.Root.Actions | null>(null);
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
@@ -617,9 +652,7 @@ export function UsageLimitsPooled({
   return (
     <div className="flex flex-col gap-8">
       {pools.length === 0 && notices.length === 0 && externalLinks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No provider on the selected environments reports subscription limits.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("misc.usageLimitsPooled.noLimits")}</p>
       ) : null}
       <SegmentPopoverContext value={segmentPopover}>
         {pools.map((pool) => (
@@ -657,7 +690,7 @@ export function UsageLimitsPooled({
               </p>
               {link.url === CHATGPT_USAGE_URL ? (
                 <p className="text-xs text-muted-foreground">
-                  View usage in ChatGPT with your connected account.
+                  {t("misc.usageLimitsPooled.viewUsageInChatGpt")}
                 </p>
               ) : link.message ? (
                 <p className="max-w-xl text-xs text-muted-foreground">{link.message}</p>
@@ -669,7 +702,7 @@ export function UsageLimitsPooled({
             size="xs"
             onClick={() => void ensureLocalApi().shell.openExternal(link.url)}
           >
-            Manage usage
+            {t("misc.usageLimitsPooled.manageUsage")}
             <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
           </Button>
         </section>

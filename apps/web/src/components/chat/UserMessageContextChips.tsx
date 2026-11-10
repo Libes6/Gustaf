@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { documentChipKindForFileName } from "~/pierre-icons";
 import { isSvgAttachment } from "@t3tools/shared/image";
 import { useRenderedAppearance } from "../../hooks/useTheme";
@@ -66,6 +67,7 @@ function UserMessageMentionChip(props: {
   record: Extract<KnownComposerContextRecord, { kind: "mention" }>;
   copyMarkdown: string;
 }) {
+  const t = useT();
   const ctx = use(TimelineRowCtx);
   return (
     <Tooltip>
@@ -74,7 +76,10 @@ function UserMessageMentionChip(props: {
           <ContextChip
             kind={documentChipKindForFileName(props.record.path) ?? "mention"}
             render={<button type="button" />}
-            aria-label={`Preview ${props.record.path}`}
+            aria-label={t("chatB.UserMessageContextChips.previewNamed").replace(
+              "{name}",
+              props.record.path,
+            )}
             data-markdown-copy={props.copyMarkdown}
             onClick={() => {
               if (ctx.threadRef)
@@ -143,6 +148,7 @@ function UserMessagePreviewAnnotationDetails(props: {
   record: Extract<KnownComposerContextRecord, { kind: "preview-annotation" }>;
   image: ChatImageAttachment | null;
 }) {
+  const t = useT();
   const ctx = use(TimelineRowCtx);
   const visibleElements = props.record.elements ?? [];
   return (
@@ -151,7 +157,10 @@ function UserMessagePreviewAnnotationDetails(props: {
         <button
           type="button"
           className="block max-h-64 w-full cursor-zoom-in overflow-hidden border-b border-border/70 bg-muted"
-          aria-label={`Preview ${props.image.name}`}
+          aria-label={t("chatB.UserMessageContextChips.previewNamed").replace(
+            "{name}",
+            props.image.name,
+          )}
           onClick={() => {
             if (!props.image) return;
             const preview = buildExpandedImagePreview([props.image], props.image.id);
@@ -160,18 +169,20 @@ function UserMessagePreviewAnnotationDetails(props: {
         >
           <img
             src={props.image.previewUrl}
-            alt="Annotated preview crop"
+            alt={t("chatB.UserMessageContextChips.annotatedPreviewCrop")}
             className="max-h-64 w-full object-contain"
           />
         </button>
       ) : (
         <div className="border-b border-border/70 bg-muted/40 px-3 py-2 text-secondary-label text-xs">
-          Screenshot unavailable
+          {t("chatB.UserMessageContextChips.screenshotUnavailable")}
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
         <div className="text-message-foreground text-xs font-medium">
-          {props.record.pageTitle?.trim() || props.record.pageUrl || "Preview annotation"}
+          {props.record.pageTitle?.trim() ||
+            props.record.pageUrl ||
+            t("chatB.UserMessageContextChips.previewAnnotation")}
         </div>
         {props.record.comment ? (
           <div className="mt-1 whitespace-pre-wrap wrap-break-word text-sm">
@@ -277,11 +288,12 @@ interface UserMessageContextRenderContext {
 }
 
 function UnavailableUserMessageContextChip(props: UserMessageContextRenderContext) {
+  const t = useT();
   return (
     <UnresolvedChip
       label={props.reference.label}
       copyMarkdown={props.copyMarkdown}
-      tooltip="This context is no longer available."
+      tooltip={t("chatB.UserMessageContextChips.contextNoLongerAvailable")}
     />
   );
 }

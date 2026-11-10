@@ -40,6 +40,7 @@ import {
 import type { PullRequestCompletionScope } from "../PullRequestMarkdownTextarea";
 import { GuideNoteMarker } from "./GuideNotes";
 import { GuideProse } from "./GuideProse";
+import { useT } from "~/useUiLanguage";
 
 const EXCERPT_UNSAFE_CSS = `${DIFF_VIEW_UNSAFE_CSS}
 [data-code]::-webkit-scrollbar-thumb {
@@ -205,6 +206,7 @@ function ExcerptDiff({
   commenting: ExcerptCommenting | null;
   onOpenFile: (path: string) => void;
 }) {
+  const t = useT();
   const resolvedTheme = useRenderedAppearance();
   const loadExcerptFiles = excerptLoader(excerpt, slice.rows, loadDiffFiles);
 
@@ -267,7 +269,7 @@ function ExcerptDiff({
     const comment = buildDiffReviewComment({
       id: `pull-request-guide:${excerpt.path}:${draft.range.start}:${draft.range.end}`,
       sectionId: `pull-request-guide:${excerpt.path}`,
-      sectionTitle: "Review guide",
+      sectionTitle: t("misc.guideExcerpt.reviewGuide"),
       filePath: excerpt.path,
       fileDiff: file,
       range: draft.range,
@@ -327,13 +329,19 @@ function ExcerptDiff({
                 text=""
                 completionScope={commenting.canComment ? commenting.completionScope : null}
                 placeholder={
-                  commenting.canComment ? "Add a comment…" : "Ask the agent about these lines…"
+                  commenting.canComment
+                    ? t("misc.guideExcerpt.addCommentPlaceholder")
+                    : t("misc.guideExcerpt.askAboutLines")
                 }
-                submitLabel={commenting.canComment ? "Add to review" : "Ask agent"}
+                submitLabel={
+                  commenting.canComment
+                    ? t("misc.guideExcerpt.addToReview")
+                    : t("misc.guideExcerpt.askAgent")
+                }
                 {...(commenting.canComment && onAskAgent !== null
                   ? {
                       secondaryAction: {
-                        label: "Ask agent",
+                        label: t("misc.guideExcerpt.askAgent"),
                         onAction: (text: string) => askAgent(text),
                       },
                     }

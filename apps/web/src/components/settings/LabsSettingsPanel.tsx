@@ -9,15 +9,17 @@ import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { useT } from "../../useUiLanguage";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
 import { firstManagedDenial, usePrimaryManagedPolicy } from "~/state/managedPolicy";
 
 /** Features still settling in. */
 export function LabsSettingsPanel() {
+  const t = useT();
   return (
     <SettingsPageContainer>
-      <SettingsSection id="beta" title="Beta">
+      <SettingsSection id="beta" title={t("settingsB.LabsSettingsPanel.beta")}>
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
@@ -31,17 +33,18 @@ export function LabsSettingsPanel() {
 }
 
 function BoringSidebarRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
     <SettingsRow
       {...searchableSetting("boring-sidebar")}
-      description="Group sidebar threads into project folders. Pinned threads stay on top, and Snoozed and Settled stay below the folders."
+      description={t("settingsB.LabsSettingsPanel.boringSidebarDescription")}
       control={
         <Switch
           checked={settings.boringSidebarEnabled}
           onCheckedChange={(checked) => updateSettings({ boringSidebarEnabled: Boolean(checked) })}
-          aria-label="Boring sidebar (group by project)"
+          aria-label={t("settingsB.LabsSettingsPanel.boringSidebarAria")}
         />
       }
     >
@@ -55,20 +58,21 @@ function BoringSidebarRow() {
 }
 
 function BoringSidebarMultilineRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
     <SettingsRow
       {...searchableSetting("boring-sidebar-multiline")}
       className="px-0 py-2 sm:px-0"
-      description="Show folder threads on two lines: the title, then the branch, pull request, and agent."
+      description={t("settingsB.LabsSettingsPanel.multilineDescription")}
       control={
         <Switch
           checked={settings.boringSidebarMultilineRows}
           onCheckedChange={(checked) =>
             updateSettings({ boringSidebarMultilineRows: Boolean(checked) })
           }
-          aria-label="Two-line folder rows"
+          aria-label={t("settingsB.LabsSettingsPanel.multilineAria")}
         />
       }
     />
@@ -77,6 +81,7 @@ function BoringSidebarMultilineRow() {
 
 /** Signed out of T3 Connect, the row offers to sign in instead of its switch. */
 function GuestLinksRowWithSignIn() {
+  const t = useT();
   const { isSignedIn } = useAuth();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   // `isSignedIn` is undefined until Clerk loads.
@@ -84,10 +89,10 @@ function GuestLinksRowWithSignIn() {
   return (
     <SettingsRow
       {...searchableSetting("guest-links")}
-      description="Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links."
+      description={t("settingsB.LabsSettingsPanel.guestSignInDescription")}
       control={
         <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-          Sign in
+          {t("settingsB.LabsSettingsPanel.signIn")}
         </Button>
       }
     />
@@ -95,6 +100,7 @@ function GuestLinksRowWithSignIn() {
 }
 
 function GuestLinksRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const scope = useOptionalSettingsScope();
@@ -128,7 +134,7 @@ function GuestLinksRow() {
           settingKeys={["guestSharingEnabled"]}
           checked={settings.guestSharingEnabled}
           onCheckedChange={(checked) => updateSettings({ guestSharingEnabled: Boolean(checked) })}
-          aria-label="Guest links"
+          aria-label={t("settingsB.LabsSettingsPanel.guestLinksAria")}
         />
       }
     />
@@ -136,6 +142,7 @@ function GuestLinksRow() {
 }
 
 function LinkedEnvironmentsRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -160,7 +167,7 @@ function LinkedEnvironmentsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ linkedEnvironmentsEnabled: Boolean(checked) })
           }
-          aria-label="Linked environments"
+          aria-label={t("settingsB.LabsSettingsPanel.linkedEnvironmentsAria")}
         />
       }
     />
@@ -168,6 +175,7 @@ function LinkedEnvironmentsRow() {
 }
 
 function PromptSuggestionsRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -175,7 +183,7 @@ function PromptSuggestionsRow() {
       serverScoped
       {...searchableSetting("prompt-suggestions-beta")}
       settingKeys={["promptSuggestionsEnabled"]}
-      description="Show a predicted next message in the empty composer after a Claude or Codex turn. Tab uses it. Each is an extra cached request on your plan. Needs Codex 0.165+. Claude threads update on restart."
+      description={t("settingsB.LabsSettingsPanel.promptSuggestionsDescription")}
       control={
         <ScopedSwitch
           settingKeys={["promptSuggestionsEnabled"]}
@@ -183,7 +191,7 @@ function PromptSuggestionsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ promptSuggestionsEnabled: Boolean(checked) })
           }
-          aria-label="Suggest next prompt"
+          aria-label={t("settingsB.LabsSettingsPanel.suggestPromptAria")}
         />
       }
     />
@@ -191,6 +199,7 @@ function PromptSuggestionsRow() {
 }
 
 function SimlockHostsRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -223,7 +232,7 @@ function SimlockHostsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ simlockDeviceHostsEnabled: Boolean(checked) })
           }
-          aria-label="Simlock device hosts"
+          aria-label={t("settingsB.LabsSettingsPanel.simlockAria")}
         />
       }
     />
@@ -232,6 +241,7 @@ function SimlockHostsRow() {
 
 /** Shows only when every machine in scope is a Mac, since only macOS servers honor it. */
 function FastWorktreeCheckoutRow() {
+  const t = useT();
   const { scope, connectedEnvironments } = useSettingsScope();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -250,13 +260,13 @@ function FastWorktreeCheckoutRow() {
       serverScoped
       {...searchableSetting("worktree-fast-checkout")}
       settingKeys={["fastWorktreeCheckout"]}
-      description="On a Mac, clone new worktrees from a checkout cached in the T3 home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache."
+      description={t("settingsB.LabsSettingsPanel.fastCheckoutDescription")}
       control={
         <ScopedSwitch
           settingKeys={["fastWorktreeCheckout"]}
           checked={settings.fastWorktreeCheckout}
           onCheckedChange={(checked) => updateSettings({ fastWorktreeCheckout: Boolean(checked) })}
-          aria-label="Fast worktree checkout"
+          aria-label={t("settingsB.LabsSettingsPanel.fastCheckoutAria")}
         />
       }
     />

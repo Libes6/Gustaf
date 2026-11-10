@@ -10,7 +10,9 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
+import { useT } from "../useUiLanguage";
 export function NoProjectsHero() {
+  const t = useT();
   const contentArea = workspaceAreaProps("home", 1, "Home");
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
@@ -28,16 +30,16 @@ export function NoProjectsHero() {
         <Empty size="hero" className="flex-1">
           <div className="w-full max-w-lg px-8 py-12">
             <EmptyHeader className="max-w-none">
-              <EmptyTitle>What should we work on?</EmptyTitle>
+              <EmptyTitle>{t("shell.smallUi.whatToWorkOn")}</EmptyTitle>
               <EmptyDescription>
                 {scratchTargetEnvironmentId === null
-                  ? "Add a project to start your first thread."
-                  : "Add a project, or start without one."}
+                  ? t("shell.smallUi.addProjectToStart")
+                  : t("shell.smallUi.addProjectOrStartWithout")}
               </EmptyDescription>
               <div className="mt-6 flex justify-center gap-2">
                 <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
                   <PlusIcon className="size-4" />
-                  Add project
+                  {t("shell.smallUi.addProject")}
                 </Button>
                 {scratchTargetEnvironmentId === null ? null : (
                   <Button
@@ -46,7 +48,7 @@ export function NoProjectsHero() {
                     onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
                   >
                     <MessageSquareDashedIcon className="size-4" />
-                    Start without a project
+                    {t("shell.smallUi.startWithoutProject")}
                   </Button>
                 )}
               </div>

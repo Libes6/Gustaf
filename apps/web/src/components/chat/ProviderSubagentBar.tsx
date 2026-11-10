@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   formatProviderSubagentStatus,
   type ProviderSubagentStatus,
@@ -20,6 +21,7 @@ export function ProviderSubagentBar(props: {
   readonly onOpenParent: (() => void) | null;
   readonly actions?: ReactNode;
 }) {
+  const t = useT();
   const { status } = props;
   const live = status !== null && isOrchestrationV2WorkActive(status.status);
   const modelDescription =
@@ -64,7 +66,7 @@ export function ProviderSubagentBar(props: {
         {`${modelDescription} subagent: ${announcement}`}
       </span>
       <span className="shrink-0 text-muted-foreground @max-[640px]/composer-surface:sr-only">
-        Runs on its own
+        {t("chatB.ProviderSubagentBar.runsOnItsOwn")}
       </span>
       {props.actions}
       {props.onOpenParent ? (

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 
 import { describePreviewError } from "./errorCodeMessages";
+import { useT } from "../../useUiLanguage";
 
 interface Props {
   url: string;
@@ -52,6 +53,7 @@ export function PreviewFileNotShown({
 }
 
 export function PreviewUnreachable({ url, code, description, onReload, move }: Props) {
+  const t = useT();
   const [showDetails, setShowDetails] = useState(false);
   const host = safeHost(url) ?? url;
   const friendly = describePreviewError(description);
@@ -70,14 +72,14 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
 
         {showDetails ? (
           <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-sm">
-            <p className="mb-2 font-medium text-foreground">Try:</p>
+            <p className="mb-2 font-medium text-foreground">
+              {t("misc.previewUnreachable.tryLabel")}
+            </p>
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-              <li>Checking your connection</li>
-              <li>Confirming the dev server is running</li>
-              {move ? (
-                <li>Opening it in the environment&rsquo;s browser, which reaches its network</li>
-              ) : null}
-              <li>Checking the proxy and the firewall</li>
+              <li>{t("misc.previewUnreachable.checkConnection")}</li>
+              <li>{t("misc.previewUnreachable.confirmDevServer")}</li>
+              {move ? <li>{t("misc.previewUnreachable.openInEnvBrowser")}</li> : null}
+              <li>{t("misc.previewUnreachable.checkProxy")}</li>
             </ul>
           </div>
         ) : null}
@@ -93,7 +95,9 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
             size="sm"
             onClick={() => setShowDetails((value) => !value)}
           >
-            {showDetails ? "Hide details" : "Details"}
+            {showDetails
+              ? t("misc.previewUnreachable.hideDetails")
+              : t("misc.previewUnreachable.details")}
           </Button>
           <div className="flex-1" />
           {move ? (

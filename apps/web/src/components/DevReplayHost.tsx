@@ -17,6 +17,7 @@ import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "./u
 import { toastManager } from "./ui/toast";
 
 // Dev servers register this free ACP agent; see ProviderInstanceRegistryHydration.ts.
+import { useT } from "../useUiLanguage";
 const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");
 
 /**
@@ -24,6 +25,7 @@ const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");
  * opens a picker, and `window.t3dev.replay(scenario)` does the same from the console.
  */
 export function DevReplayHost() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const environmentId = usePrimaryEnvironmentId();
@@ -113,7 +115,7 @@ export function DevReplayHost() {
     replay(scenario).catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "Replay failed",
+        title: t("shell.misc.replayFailed"),
         description: error instanceof Error ? error.message : String(error),
       }),
     );
@@ -124,7 +126,9 @@ export function DevReplayHost() {
       <DialogPopup className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {project === undefined ? "Replay a recorded turn" : `Replay in ${project.title}`}
+            {project === undefined
+              ? t("shell.misc.replayRecordedTurn")
+              : t("shell.misc.replayIn").replace("{title}", project.title)}
           </DialogTitle>
         </DialogHeader>
         <DialogPanel>

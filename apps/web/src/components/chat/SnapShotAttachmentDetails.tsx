@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { SnapShotSource } from "@t3tools/contracts";
 import { ImageIcon, TextIcon } from "lucide-react";
 import { Suspense } from "react";
@@ -80,10 +81,13 @@ export function SnapShotContentsButton({
   className?: string;
   side?: "top" | "right" | "bottom" | "left";
 }) {
+  const t = useT();
   const includesAccessibility = snapShotIncludesAccessibility(source);
   const ContentsIcon = includesAccessibility ? TextIcon : ImageIcon;
   const accessibilityDetails = snapShotAccessibilityDetails(source);
-  const tooltip = includesAccessibility ? "Accessibility data" : "No accessibility data";
+  const tooltip = includesAccessibility
+    ? t("chatB.SnapShotAttachmentDetails.accessibilityData")
+    : t("chatB.SnapShotAttachmentDetails.noAccessibilityData");
 
   return (
     <Popover>
@@ -94,7 +98,9 @@ export function SnapShotContentsButton({
               render={
                 <Button
                   aria-label={
-                    includesAccessibility ? "View accessibility data" : "No accessibility data"
+                    includesAccessibility
+                      ? t("chatB.SnapShotAttachmentDetails.viewAccessibilityData")
+                      : t("chatB.SnapShotAttachmentDetails.noAccessibilityData")
                   }
                   className={className}
                   onClick={(event) => event.stopPropagation()}
@@ -111,7 +117,7 @@ export function SnapShotContentsButton({
       </Tooltip>
       <PopoverPopup side={side} align="center" width="md">
         <div className="max-h-[min(28rem,70vh)] space-y-2 overflow-y-auto">
-          <PopoverTitle>Accessibility data</PopoverTitle>
+          <PopoverTitle>{t("chatB.SnapShotAttachmentDetails.accessibilityData")}</PopoverTitle>
           {accessibilityDetails ? (
             <SnapShotAccessibilityData
               details={accessibilityDetails}
@@ -140,6 +146,7 @@ export function SnapShotAttachmentDetails({
   source: SnapShotSource;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -160,7 +167,7 @@ export function SnapShotAttachmentDetails({
           <SnapShotContentsButton source={source} className="pointer-events-auto" />
         </div>
         <div className="truncate text-3xs leading-3.5 text-white/70">
-          {source.windowTitle || "Captured window"}
+          {source.windowTitle || t("chatB.SnapShotAttachmentDetails.capturedWindow")}
         </div>
       </div>
     </div>

@@ -1,6 +1,17 @@
 import type { UiLanguage } from "@t3tools/contracts/settings";
 
-const messages = {
+import { sidebarMessages } from "./i18nMessages/sidebar";
+import { chatAMessages } from "./i18nMessages/chatA";
+import { chatBMessages } from "./i18nMessages/chatB";
+import { shellMessages } from "./i18nMessages/shell";
+import { settingsAMessages } from "./i18nMessages/settingsA";
+import { settingsBMessages } from "./i18nMessages/settingsB";
+import { settingsCMessages } from "./i18nMessages/settingsC";
+import { settingsDMessages } from "./i18nMessages/settingsD";
+import { settingsEMessages } from "./i18nMessages/settingsE";
+import { miscMessages } from "./i18nMessages/misc";
+
+const baseMessages = {
   en: {
     "settings.language": "Language",
     "settings.languageDescription":
@@ -212,25 +223,25 @@ const messages = {
     "settings.languageDescription":
       "Язык интерфейса Gustaf. Экраны, которые ещё не переведены, остаются на английском.",
     "settings.nav.general": "Общие",
-    "settings.nav.appearance": "Оформление",
+    "settings.nav.appearance": "Внешний вид",
     "settings.nav.chat": "Чат",
-    "settings.nav.diffs": "Диффы и запросы",
-    "settings.nav.keybindings": "Клавиши",
+    "settings.nav.diffs": "Диффы и пул-реквесты",
+    "settings.nav.keybindings": "Сочетания клавиш",
     "settings.nav.voice": "Голос",
-    "settings.nav.snapShot": "Снимки",
+    "settings.nav.snapShot": "SnapShots",
     "settings.nav.providers": "Провайдеры",
     "settings.nav.threads": "Треды",
     "settings.nav.browser": "Браузер",
     "settings.nav.devices": "Устройства",
-    "settings.nav.scheduledTasks": "Расписание",
+    "settings.nav.scheduledTasks": "Запланированные задачи",
     "settings.nav.projects": "Проекты",
-    "settings.nav.sourceControl": "Версии",
-    "settings.nav.worktrees": "Worktree",
+    "settings.nav.sourceControl": "Контроль версий",
+    "settings.nav.worktrees": "Worktrees",
     "settings.nav.connections": "Окружения",
-    "settings.nav.access": "Доступ",
+    "settings.nav.access": "Общий доступ",
     "settings.nav.secrets": "Секреты",
     "settings.nav.maintenance": "Обслуживание",
-    "settings.nav.labs": "Лаборатория",
+    "settings.nav.labs": "Labs",
     "settings.nav.about": "О программе",
     "settings.nav.archived": "Архив",
     "settings.nav.diagnostics": "Диагностика",
@@ -238,7 +249,7 @@ const messages = {
     "settings.group.code": "Код",
     "settings.group.connections": "Подключения",
     "settings.section.notifications": "Уведомления",
-    "settings.section.sidebar": "Сайдбар",
+    "settings.section.sidebar": "Боковая панель",
     "settings.section.confirmations": "Подтверждения",
     "settings.section.display": "Отображение",
     "settings.section.interface": "Интерфейс",
@@ -259,13 +270,13 @@ const messages = {
     "option.notifications.denied":
       "Разрешите уведомления в браузере или системе и выберите пункт снова. Только звук всё равно доступен.",
     "option.sort.lastMessage": "Последнее сообщение",
-    "option.sort.created": "По дате создания",
+    "option.sort.created": "Дата создания",
     "option.sort.manual": "Вручную",
     "option.time.system": "Как в системе",
-    "option.time.12": "12 часов",
-    "option.time.24": "24 часа",
-    "option.quit.direct": "Сразу",
-    "option.quit.hold": "Удерживать",
+    "option.time.12": "12-часовой",
+    "option.time.24": "24-часовой",
+    "option.quit.direct": "Одно нажатие",
+    "option.quit.hold": "Удержание",
     "option.quit.double": "Двойное нажатие",
     "option.width.comfortable": "Обычная (по умолчанию)",
     "option.width.wide": "Широкая",
@@ -299,26 +310,29 @@ const messages = {
       "Системные оповещения, когда тред закончился, упал или ждёт ввод или разрешение. Действует на этом устройстве, пока Gustaf открыт.",
     "setting.in-app-notifications.title": "Уведомления в приложении",
     "setting.in-app-notifications.description":
-      "Показывать всплывающее сообщение, когда другой тред закончился, упал или ждёт ввод или разрешение, пока это окно в фокусе.",
+      "Показывает всплывающее уведомление, если другой тред завершился, столкнулся с ошибкой или ждёт ввода либо подтверждения, пока приложение в фокусе.",
     "setting.project-grouping.title": "Группировка проектов",
-    "setting.project-grouping.description": "Объединять одинаковые репозитории с разных машин.",
+    "setting.project-grouping.description":
+      "Объединяет одинаковые репозитории из разных окружений.",
     "setting.project-order.title": "Порядок проектов",
-    "setting.project-order.description": "Порядок проектов в выборе проекта и в палитре команд.",
-    "setting.working-shelf.title": "Раздел «В работе»",
+    "setting.project-order.description":
+      "Порядок проектов в меню выбора проекта на боковой панели и в палитре команд.",
+    "setting.working-shelf.title": "Раздел Working",
     "setting.working-shelf.description":
       "Складывать работающие треды в раздел «В работе». Они поднимаются наверх, когда нужно ваше внимание. В сайдбаре с папками проектов этого раздела нет.",
     "setting.unpin-confirmation.title": "Подтверждение открепления",
-    "setting.unpin-confirmation.description": "Спрашивать перед снятием треда с закреплённых.",
-    "setting.archive-confirmation.title": "Подтверждение архива",
+    "setting.unpin-confirmation.description": "Запрашивает подтверждение перед откреплением треда.",
+    "setting.archive-confirmation.title": "Подтверждение архивации",
     "setting.archive-confirmation.description":
-      "Требовать второй клик по кнопке архива, прежде чем тред уйдёт в архив.",
+      "Требует повторного нажатия на кнопку архивации в строке, прежде чем тред будет архивирован.",
     "setting.delete-confirmation.title": "Подтверждение удаления",
-    "setting.delete-confirmation.description": "Спрашивать перед удалением треда и его истории.",
-    "setting.quit-confirmation.title": "Закрытие приложения",
+    "setting.delete-confirmation.description":
+      "Запрашивает подтверждение перед удалением треда и его истории.",
+    "setting.quit-confirmation.title": "Сочетание клавиш для выхода",
     "setting.quit-confirmation.description":
-      "В режиме удержания приложение также закрывается двумя быстрыми нажатиями.",
+      "В режиме удержания выход также срабатывает по двойному нажатию.",
     "setting.time-format.title": "Формат времени",
-    "setting.time-format.description": "«Как в системе» берёт настройку часов браузера или ОС.",
+    "setting.time-format.description": "«Как в системе» использует формат времени браузера или ОС.",
     "setting.setting-appearance-contrast.title": "Контраст",
     "setting.setting-appearance-contrast.description":
       "Контраст цветов и границ по всему интерфейсу.",
@@ -413,10 +427,39 @@ const messages = {
   },
 } as const satisfies Record<UiLanguage, Record<string, string>>;
 
+const messages = {
+  en: {
+    ...baseMessages.en,
+    ...sidebarMessages.en,
+    ...chatAMessages.en,
+    ...chatBMessages.en,
+    ...shellMessages.en,
+    ...settingsAMessages.en,
+    ...settingsBMessages.en,
+    ...settingsCMessages.en,
+    ...settingsDMessages.en,
+    ...settingsEMessages.en,
+    ...miscMessages.en,
+  },
+  ru: {
+    ...baseMessages.ru,
+    ...sidebarMessages.ru,
+    ...chatAMessages.ru,
+    ...chatBMessages.ru,
+    ...shellMessages.ru,
+    ...settingsAMessages.ru,
+    ...settingsBMessages.ru,
+    ...settingsCMessages.ru,
+    ...settingsDMessages.ru,
+    ...settingsEMessages.ru,
+    ...miscMessages.ru,
+  },
+} satisfies Record<UiLanguage, Record<string, string>>;
+
 export type MessageKey = keyof (typeof messages)["en"];
 
 export function translate(language: UiLanguage, key: MessageKey): string {
-  return messages[language][key] ?? messages.en[key];
+  return (messages[language] as Record<string, string>)[key] ?? messages.en[key];
 }
 
 const settingsNavKeys = {

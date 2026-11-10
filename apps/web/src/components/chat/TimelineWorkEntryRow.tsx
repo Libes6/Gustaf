@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogDetails, WorkLogRow } from "./WorkLog";
 import {
@@ -172,6 +173,7 @@ export const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: WorkEn
 });
 
 function WorkEntryLogRow(props: WorkEntryRowProps) {
+  const t = useT();
   const { workEntry, workspaceRoot, displayLabel } = props;
   const ctx = use(TimelineRowCtx);
   const { threadRef, onImageExpand, timestampFormat } = ctx;
@@ -216,7 +218,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? `${formatUpcomingTimestamp(resetAt, timestampFormat, undefined, timeZone)} (${timeZone})`
       : null;
     const label = warning
-      ? `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`
+      ? `${t("chatB.TimelineWorkEntryRow.usageLimitReached")}${resetTime ? ` ${t("chatB.TimelineWorkEntryRow.retryAfter").replace("{time}", resetTime)}` : ""}`
       : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
@@ -263,7 +265,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               onClick={() => onRetryWorkspacePreparation(retryRunId)}
             >
               <RotateCcwIcon aria-hidden />
-              Retry
+              {t("chatB.TimelineWorkEntryRow.retry")}
             </Button>
           </div>
         ) : null}
@@ -291,8 +293,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
+        ? t("chatB.TimelineWorkEntryRow.thinking")
+        : t("chatB.TimelineWorkEntryRow.thought")
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
@@ -405,7 +407,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         <span
           className={iconWrapperClass}
           role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
+          aria-label={
+            showFailedIndicator ? t("chatB.TimelineWorkEntryRow.toolCallFailed") : undefined
+          }
         >
           <ToolActivityIconView
             icon={entryToolIcon}
@@ -466,26 +470,29 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <button
               type="button"
               className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
+              aria-label={t("chatB.TimelineWorkEntryRow.openCreatedThread").replace(
+                "{title}",
+                createdThread.title ?? t("chatB.TimelineWorkEntryRow.createdThreadFallback"),
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(createdThread.targetThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open chat
+              {t("chatB.TimelineWorkEntryRow.openChat")}
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (
             <InlineButton
-              aria-label="Open subagent thread"
+              aria-label={t("chatB.TimelineWorkEntryRow.openSubagentThread")}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(notifiedSubagentThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open subagent
+              {t("chatB.TimelineWorkEntryRow.openSubagent")}
             </InlineButton>
           ) : null}
           {showFailedIndicator &&

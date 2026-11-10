@@ -5,6 +5,7 @@ import { commandForProjectScript } from "../../projectScripts";
 import { ScriptIcon } from "../projectScriptEditor";
 import { Button } from "../ui/button";
 import { SettingsRow } from "./settingsLayout";
+import { useT } from "../../useUiLanguage";
 
 export function ProjectActionsList({
   scripts,
@@ -17,10 +18,11 @@ export function ProjectActionsList({
   disabled: boolean;
   onEdit: (script: ProjectScript) => void;
 }) {
+  const t = useT();
   if (scripts.length === 0)
     return (
       <p className="px-3 py-2 text-base text-muted-foreground sm:px-4 sm:text-sm">
-        No actions configured.
+        {t("settingsC.smallSettings.noActions")}
       </p>
     );
   return scripts.map((script) => {
@@ -60,7 +62,7 @@ export function ProjectActionsList({
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={`Edit ${script.name}`}
+                aria-label={t("settingsC.smallSettings.editAction").replace("{name}", script.name)}
                 disabled={disabled}
                 onClick={() => onEdit(script)}
               >

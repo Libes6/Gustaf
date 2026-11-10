@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import {
   makeQueuedRunEditStore,
@@ -186,6 +187,7 @@ export function useQueuedRunEdit(input: {
   readonly promptRef: { current: string };
   readonly composerRef: RefObject<ChatComposerHandle | null>;
 }) {
+  const t = useT();
   const {
     environmentId,
     routeThreadRef,
@@ -274,11 +276,11 @@ export function useQueuedRunEdit(input: {
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
-              title: "Queued message is no longer queued",
+              title: t("chatB.useQueuedRunEdit.queuedMessageNoLonger"),
               description:
                 recovery === "kept"
-                  ? `Your unsaved edit${where} was kept in the composer.`
-                  : `Your unsaved edit${where} was discarded.`,
+                  ? t("chatB.useQueuedRunEdit.unsavedEditKept").replace("{where}", where)
+                  : t("chatB.useQueuedRunEdit.unsavedEditDiscarded").replace("{where}", where),
             }),
           );
         },
@@ -313,7 +315,10 @@ export function useQueuedRunEdit(input: {
     ) {
       setThreadError(
         editing.threadId,
-        `A message can have at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
+        t("chatB.useQueuedRunEdit.atMostAttachments").replace(
+          "{count}",
+          String(PROVIDER_SEND_TURN_MAX_ATTACHMENTS),
+        ),
       );
       return;
     }

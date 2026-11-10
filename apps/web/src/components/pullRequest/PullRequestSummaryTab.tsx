@@ -93,6 +93,7 @@ import {
 import { PullRequestReactionBar } from "./PullRequestReactions";
 import { PullRequestConversationGhost } from "./PullRequestGhosts";
 import { sectionCollapseAnchorScrollTop } from "./pullRequestSummaryScroll.logic";
+import { useT } from "../../useUiLanguage";
 
 function reviewerKey(login: string): string {
   return login.toLowerCase();
@@ -147,6 +148,7 @@ function CommentLocation({
   comment: PullRequestComment;
   thread: PullRequestReviewThread | undefined;
 }) {
+  const t = useT();
   const path = thread?.path ?? comment.path;
   if (!path) return null;
   const label = `${path}${thread?.line ? `:${thread.line}` : ""}`;
@@ -156,7 +158,9 @@ function CommentLocation({
         <TooltipTrigger render={<span className="truncate font-mono" />}>{label}</TooltipTrigger>
         <TooltipPopup>{label}</TooltipPopup>
       </Tooltip>
-      {thread?.isOutdated ? <span className="shrink-0">Outdated</span> : null}
+      {thread?.isOutdated ? (
+        <span className="shrink-0">{t("misc.pullRequestSummaryTab.outdated")}</span>
+      ) : null}
     </div>
   );
 }
@@ -187,6 +191,7 @@ function CommentBody({
   editing: CommentEditing;
   className?: string | undefined;
 }) {
+  const t = useT();
   if (editing.editingId === comment.id) {
     return (
       <PullRequestMarkdownEditor
@@ -196,7 +201,7 @@ function CommentBody({
         environmentId={editing.environmentId}
         completionScope={editing.completionScope}
         threadRef={editing.threadRef}
-        label="Edit comment"
+        label={t("misc.pullRequestSummaryTab.editComment")}
         saving={editing.saving}
         onSave={(body) => editing.onSave(comment, body)}
         onCancel={() => editing.onEdit(null)}
@@ -214,7 +219,10 @@ function CommentBody({
         threadRef={editing.threadRef}
       />
       {editing.canEdit(comment) ? (
-        <PullRequestEditButton aria-label="Edit comment" onClick={() => editing.onEdit(comment)} />
+        <PullRequestEditButton
+          aria-label={t("misc.pullRequestSummaryTab.editComment")}
+          onClick={() => editing.onEdit(comment)}
+        />
       ) : null}
     </div>
   );
@@ -237,12 +245,13 @@ function chatSubject(
 }
 
 function AddToChatButton({ onClick }: { onClick: () => void }) {
+  const t = useT();
   return (
     <Button size="xs" variant="ghost" className="shrink-0" onClick={onClick}>
       {/* Wrapped like Fix's label so both sit on the header's baseline. */}
       <span className="inline-flex items-baseline gap-1">
         <MessageSquarePlusIcon className="size-3 self-center" />
-        <span>Add to chat</span>
+        <span>{t("misc.pullRequestSummaryTab.addToChat")}</span>
       </span>
     </Button>
   );
@@ -455,6 +464,7 @@ export function PullRequestSummaryTab({
   onRefresh: () => void;
   onRefreshChecks?: () => void;
 }) {
+  const t = useT();
   const terminology = sourceControlClients.get(detail.provider).changeRequest;
   const [shown, setShown] = useState({ url: detail.url, count: COMMENT_PAGE });
   const shownConversations = shown.url === detail.url ? shown.count : COMMENT_PAGE;
@@ -529,7 +539,7 @@ export function PullRequestSummaryTab({
   const openCheck = (url: string) => {
     void openLink(url).catch((error: unknown) => {
       console.error(error);
-      toastManager.add({ type: "error", title: "Unable to open check details" });
+      toastManager.add({ type: "error", title: t("misc.pullRequestSummaryTab.unableCheck") });
     });
   };
 
@@ -571,7 +581,11 @@ export function PullRequestSummaryTab({
     descriptionSavesRunning.current -= 1;
     const saved = result._tag === "Success";
     setDescriptionDraft((draft) => settleDescriptionSave(draft, key, saved));
-    if (!saved) toastManager.add({ type: "error", title: "Could not save the description" });
+    if (!saved)
+      toastManager.add({
+        type: "error",
+        title: t("misc.pullRequestSummaryTab.saveDescriptionFailed"),
+      });
     if (descriptionSavesRunning.current === 0) onRefresh();
     return saved;
   };
@@ -604,7 +618,10 @@ export function PullRequestSummaryTab({
       });
       setCommentSaving(false);
       if (result._tag === "Failure") {
-        toastManager.add({ type: "error", title: "Could not save the comment" });
+        toastManager.add({
+          type: "error",
+          title: t("misc.pullRequestSummaryTab.saveCommentFailed"),
+        });
         return;
       }
       setCommentScope(null);
@@ -669,7 +686,7 @@ export function PullRequestSummaryTab({
                 <HammerIcon className="size-3 self-center" />
                 <span>
                   {pendingFinding === pullRequestFindingKey(finding)
-                    ? "Preparing..."
+                    ? t("misc.pullRequestSummaryTab.preparing")
                     : fixFindingLabel}
                 </span>
               </span>
@@ -712,7 +729,11 @@ export function PullRequestSummaryTab({
           editing={commentEditing}
           detail={detail}
           thread={thread}
-          label={thread?.isResolved ? "Resolved" : "Review dismissed"}
+          label={
+            thread?.isResolved
+              ? t("misc.pullRequestSummaryTab.resolved")
+              : t("misc.pullRequestSummaryTab.reviewDismissed")
+          }
           body={visibleBody(comment.body)}
           replyCount={item.kind === "thread" ? item.replies.length + item.moreReplies : 0}
           replies={replies}
@@ -736,10 +757,15 @@ export function PullRequestSummaryTab({
     <div ref={scrollerRef} className="h-full overflow-y-auto" data-pull-request-summary-scroll>
       <section className="px-4 pt-2.5 pb-1">
         <div className="space-y-2">
-          <MetaRow icon={<UsersIcon className="size-3.5" />} label="Reviewers">
+          <MetaRow
+            icon={<UsersIcon className="size-3.5" />}
+            label={t("misc.pullRequestSummaryTab.reviewers")}
+          >
             <span className="flex min-w-0 flex-wrap items-center gap-1.5">
               {reviewerEntries.length === 0 ? (
-                <span className="text-muted-foreground">None</span>
+                <span className="text-muted-foreground">
+                  {t("misc.pullRequestSummaryTab.none")}
+                </span>
               ) : (
                 <span className="flex items-center -space-x-1">
                   {reviewerEntries.map((entry) => {
@@ -811,10 +837,15 @@ export function PullRequestSummaryTab({
             </span>
           </MetaRow>
           {detail.labels.length > 0 || detail.capabilities.labels === true ? (
-            <MetaRow icon={<TagIcon className="size-3.5" />} label="Labels">
+            <MetaRow
+              icon={<TagIcon className="size-3.5" />}
+              label={t("misc.pullRequestSummaryTab.labels")}
+            >
               <span className="flex min-w-0 flex-wrap items-center gap-1">
                 {detail.labels.length === 0 ? (
-                  <span className="text-muted-foreground">None</span>
+                  <span className="text-muted-foreground">
+                    {t("misc.pullRequestSummaryTab.none")}
+                  </span>
                 ) : (
                   detail.labels.map((label) => (
                     <PullRequestLabelChip
@@ -838,7 +869,11 @@ export function PullRequestSummaryTab({
         </div>
       </section>
 
-      <Section key={`description:${detail.url}`} title="Description" keepMounted>
+      <Section
+        key={`description:${detail.url}`}
+        title={t("misc.pullRequestSummaryTab.description")}
+        keepMounted
+      >
         <div className="group">
           {bodyScope?.url === detail.url ? (
             <PullRequestMarkdownEditor
@@ -866,7 +901,7 @@ export function PullRequestSummaryTab({
               />
               {canEditDescription ? (
                 <PullRequestEditButton
-                  aria-label="Edit description"
+                  aria-label={t("misc.pullRequestSummaryTab.editDescription")}
                   onClick={() => setBodyScope({ url: detail.url, body: description })}
                 />
               ) : null}
@@ -875,16 +910,22 @@ export function PullRequestSummaryTab({
         </div>
       </Section>
 
-      <Section key={`checks:${detail.url}`} title="Checks" defaultOpen={false}>
+      <Section
+        key={`checks:${detail.url}`}
+        title={t("misc.pullRequestSummaryTab.checks")}
+        defaultOpen={false}
+      >
         {checksStale ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Check details are out of date.</span>
+            <span>{t("misc.pullRequestSummaryTab.checksOutdated")}</span>
             <Button size="xs" variant="ghost" onClick={onRefreshChecks}>
               Refresh
             </Button>
           </div>
         ) : detail.checks.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No checks reported.</p>
+          <p className="text-xs text-muted-foreground">
+            {t("misc.pullRequestSummaryTab.noChecks")}
+          </p>
         ) : (
           detail.checks.map(
             (
@@ -923,7 +964,7 @@ export function PullRequestSummaryTab({
                       >
                         <HammerIcon className="size-3" />
                         {pendingFinding === pullRequestFindingKey(finding)
-                          ? "Preparing..."
+                          ? t("misc.pullRequestSummaryTab.preparing")
                           : fixCheckLabel}
                       </Button>
                     ) : null}
@@ -935,20 +976,23 @@ export function PullRequestSummaryTab({
       </Section>
 
       <Section
-        title={`Comments (${detail.commentCount})`}
+        title={t("misc.pullRequestSummaryTab.commentsTitle").replace(
+          "{count}",
+          String(detail.commentCount),
+        )}
         actions={
           <div className="flex shrink-0 items-center gap-1">
             <Menu>
               <MenuTrigger
                 render={<Button size="xs" variant="ghost-muted" />}
-                aria-label="Filter comments"
+                aria-label={t("misc.pullRequestSummaryTab.filterComments")}
               >
                 <ListFilterIcon aria-hidden className="size-3" />
                 {filteredOutCount > 0 ? `${filteredOutCount} hidden` : "Filter"}
               </MenuTrigger>
               <MenuPopup align="end">
                 <MenuGroup>
-                  <MenuGroupLabel>Show</MenuGroupLabel>
+                  <MenuGroupLabel>{t("misc.pullRequestSummaryTab.show")}</MenuGroupLabel>
                   <MenuCheckboxItem
                     checked={commentFilter.bots}
                     closeOnClick={false}
@@ -973,13 +1017,15 @@ export function PullRequestSummaryTab({
               variant="ghost-muted"
               aria-label={
                 commentOrder === "newest"
-                  ? "Show oldest comments first"
-                  : "Show newest comments first"
+                  ? t("misc.pullRequestSummaryTab.showOldestFirst")
+                  : t("misc.pullRequestSummaryTab.showNewestFirst")
               }
               onClick={() => setCommentOrder((value) => (value === "newest" ? "oldest" : "newest"))}
             >
               <ArrowDownUpIcon aria-hidden className="size-3" />
-              {commentOrder === "newest" ? "Newest first" : "Oldest first"}
+              {commentOrder === "newest"
+                ? t("misc.pullRequestSummaryTab.newestFirst")
+                : t("misc.pullRequestSummaryTab.oldestFirst")}
             </Button>
           </div>
         }
@@ -1002,7 +1048,9 @@ export function PullRequestSummaryTab({
               </p>
             ) : null}
             {items.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">No comments yet.</p>
+              <p className="py-2 text-xs text-muted-foreground">
+                {t("misc.pullRequestSummaryTab.noComments")}
+              </p>
             ) : filteredItems.length === 0 ? (
               <p className="py-2 text-xs text-muted-foreground">
                 {filteredOutCount === 1

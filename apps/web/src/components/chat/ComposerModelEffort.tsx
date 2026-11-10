@@ -11,6 +11,7 @@ import { CheckIcon, ChevronRightIcon, ChevronUpIcon, WorkflowIcon } from "lucide
 import { type KeyboardEvent, type ReactNode, use, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
+import { useT } from "~/useUiLanguage";
 import {
   Menu,
   MenuPopup,
@@ -191,6 +192,7 @@ function ColumnRow(props: {
   disabled?: boolean;
   onPick: () => void;
 }) {
+  const t = useT();
   const rowProps = {
     type: "button",
     role: "radio",
@@ -209,11 +211,15 @@ function ColumnRow(props: {
       <span className="min-w-0 flex-1 truncate">{props.label}</span>
       {props.selected ? (
         <>
-          {props.isDefault ? <span className="sr-only">Default</span> : null}
+          {props.isDefault ? (
+            <span className="sr-only">{t("chatA.composerModelEffort.default")}</span>
+          ) : null}
           <CheckIcon aria-hidden="true" className="size-3.5" />
         </>
       ) : props.isDefault ? (
-        <span className="text-muted-foreground/70 text-xs">Default</span>
+        <span className="text-muted-foreground/70 text-xs">
+          {t("chatA.composerModelEffort.default")}
+        </span>
       ) : null}
     </>
   );
@@ -367,6 +373,7 @@ function OptionMenuRow(props: {
   /** Holds the column's tab stop when the model has no levels. */
   tabStop: boolean;
 }) {
+  const t = useT();
   const { descriptor, traits } = props;
   const [open, setOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -448,7 +455,9 @@ function OptionMenuRow(props: {
                   ) : null}
                 </span>
                 {choice.isDefault ? (
-                  <span className="text-muted-foreground/70 text-xs">Default</span>
+                  <span className="text-muted-foreground/70 text-xs">
+                    {t("chatA.composerModelEffort.default")}
+                  </span>
                 ) : null}
                 <MenuRadioItemIndicator />
               </span>
@@ -484,8 +493,11 @@ function OptionSwitchRow(props: {
 }
 
 function NoEffortRow() {
+  const t = useT();
   return (
-    <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">No effort levels</div>
+    <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">
+      {t("chatA.composerModelEffort.noEffortLevels")}
+    </div>
   );
 }
 

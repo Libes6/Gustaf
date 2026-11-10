@@ -9,6 +9,7 @@ import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
+import { useT } from "../../useUiLanguage";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
@@ -80,6 +81,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   errorCode?: string | null;
   onDismiss?: () => void;
 }) {
+  const t = useT();
   if (!error) return null;
   const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
   const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
@@ -118,7 +120,12 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
               <ChatGptUsageButton variant="default" size="sm" />
             ) : null}
             {onDismiss ? (
-              <Button variant="ghost" size="icon-xs" aria-label="Dismiss error" onClick={onDismiss}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t("chatB.ThreadErrorBanner.dismissError")}
+                onClick={onDismiss}
+              >
                 <XIcon />
               </Button>
             ) : null}

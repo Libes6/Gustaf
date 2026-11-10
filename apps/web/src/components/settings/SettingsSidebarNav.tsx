@@ -56,7 +56,7 @@ import {
   type SettingsPath,
   type SettingsSearchItem,
 } from "./settingsSearch";
-import { useSettingsGroupLabel, useSettingsNavLabel } from "../../useUiLanguage";
+import { useSettingsGroupLabel, useSettingsNavLabel, useT } from "../../useUiLanguage";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { useSettingsSectionNavigation } from "./useSettingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
@@ -129,9 +129,14 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
+  const t = useT();
   const sectionLabel = useSettingsNavLabel();
   const groupLabel = useSettingsGroupLabel();
-  const navArea = workspaceAreaProps("settings-nav", 0, "Settings sections");
+  const navArea = workspaceAreaProps(
+    "settings-nav",
+    0,
+    t("settingsD.settingsSidebarNav.sectionsAria"),
+  );
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
@@ -289,8 +294,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 onBlur={() => {
                   if (!isSearching) setCompactSearchOpen(false);
                 }}
-                placeholder="Search"
-                aria-label="Search settings"
+                placeholder={t("settingsD.settingsSidebarNav.search")}
+                aria-label={t("settingsD.settingsSidebarNav.searchSettings")}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={isSearching && hasResults}
@@ -308,7 +313,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   size="icon-micro"
                   variant="ghost-muted"
                   className="shrink-0"
-                  aria-label="Clear settings search"
+                  aria-label={t("settingsD.settingsSidebarNav.clearSearch")}
                   onClick={() => {
                     clearSearch();
                     searchInputRef.current?.focus();
@@ -325,14 +330,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                No settings found
+                {t("settingsD.settingsSidebarNav.noSettingsFound")}
               </p>
             ) : null}
             {isSearching ? (
               <SidebarMenu
                 id={hasResults ? "settings-search-results" : undefined}
                 role={hasResults ? "listbox" : undefined}
-                aria-label={hasResults ? "Settings search results" : undefined}
+                aria-label={
+                  hasResults ? t("settingsD.settingsSidebarNav.searchResults") : undefined
+                }
               >
                 {results.map((item, index) => (
                   <SidebarMenuItem
@@ -370,7 +377,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <SidebarMenu className="md:hidden">
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        aria-label="Search settings"
+                        aria-label={t("settingsD.settingsSidebarNav.searchSettings")}
                         onClick={() => setCompactSearchOpen(true)}
                       >
                         <SearchIcon />
@@ -381,7 +388,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 <div
                   {...sectionNavigation.containerProps}
                   role="tree"
-                  aria-label="Settings sections"
+                  aria-label={t("settingsD.settingsSidebarNav.sectionsAria")}
                   className="flex flex-col gap-4"
                 >
                   {SETTINGS_NAV_GROUPS.map((group, index) => (

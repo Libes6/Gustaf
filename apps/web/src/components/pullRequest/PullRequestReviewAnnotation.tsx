@@ -34,6 +34,7 @@ import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
 } from "./PullRequestMarkdownTextarea";
+import { useT } from "~/useUiLanguage";
 
 const CARD_CLASS =
   "mx-3 my-2 rounded-xl border border-border/70 bg-background p-3 text-sm shadow-sm";
@@ -85,6 +86,7 @@ export function PendingReviewCommentCard({
   comment: PendingReviewComment;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     <div
       className={cn(CARD_CLASS, "border-dashed")}
@@ -93,12 +95,12 @@ export function PendingReviewCommentCard({
     >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <MessageSquareIcon className="size-3.5" />
-        <span>Pending. Sent when you submit the review</span>
+        <span>{t("misc.pullRequestReviewAnnotation.pendingSent")}</span>
         <Button
           size="icon-xs"
           variant="ghost"
           className="ml-auto"
-          aria-label="Discard this comment"
+          aria-label={t("misc.pullRequestReviewAnnotation.discardComment")}
           onClick={onRemove}
         >
           <Trash2Icon className="size-3.5" />
@@ -154,6 +156,7 @@ export function ReviewThreadCard({
   onToggleResolved: () => void;
   onReacted: () => void;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(!thread.isResolved);
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
@@ -244,10 +247,12 @@ export function ReviewThreadCard({
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {thread.isResolved ? "Resolved" : "Open"} · {commentCount}{" "}
-          {commentCount === 1 ? "comment" : "comments"}
+          {thread.isResolved
+            ? t("misc.pullRequestReviewAnnotation.resolvedOpen")
+            : t("misc.pullRequestReviewAnnotation.open")}{" "}
+          · {commentCount} {commentCount === 1 ? "comment" : "comments"}
         </button>
-        {thread.isOutdated ? <span>outdated</span> : null}
+        {thread.isOutdated ? <span>{t("misc.pullRequestReviewAnnotation.outdated")}</span> : null}
         {onFix ? (
           <Button
             size="xs"
@@ -257,7 +262,7 @@ export function ReviewThreadCard({
             onClick={onFix}
           >
             <HammerIcon className="size-3" />
-            {fixPending ? "Preparing..." : fixLabel}
+            {fixPending ? t("misc.pullRequestReviewAnnotation.preparing") : fixLabel}
           </Button>
         ) : null}
         {onAddToChat && comments.some((comment) => visibleBody(comment.body) !== null) ? (
@@ -279,7 +284,9 @@ export function ReviewThreadCard({
             disabled={pending}
             onClick={onToggleResolved}
           >
-            {thread.isResolved ? "Unresolve" : "Resolve"}
+            {thread.isResolved
+              ? t("misc.pullRequestReviewAnnotation.unresolve")
+              : t("misc.pullRequestReviewAnnotation.resolve")}
           </Button>
         ) : null}
       </div>
@@ -311,7 +318,7 @@ export function ReviewThreadCard({
                     cwd={workspaceRoot}
                     environmentId={environmentId}
                     completionScope={completionScope}
-                    label="Edit comment"
+                    label={t("misc.pullRequestReviewAnnotation.editComment")}
                     saving={savingEdit}
                     onSave={(body) => void saveEdit(comment.id, body)}
                     onCancel={() => setEditingId(null)}
@@ -326,7 +333,7 @@ export function ReviewThreadCard({
                     />
                     {canEditComment(comment) ? (
                       <PullRequestEditButton
-                        aria-label="Edit comment"
+                        aria-label={t("misc.pullRequestReviewAnnotation.editComment")}
                         onClick={() => setEditingId(comment.id)}
                       />
                     ) : null}
@@ -343,7 +350,9 @@ export function ReviewThreadCard({
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? "Loading..." : "Load more comments"}
+                {loadingMore
+                  ? t("misc.pullRequestReviewAnnotation.loading")
+                  : t("misc.pullRequestReviewAnnotation.loadMoreComments")}
               </Button>
             </div>
           ) : null}
@@ -368,8 +377,8 @@ export function ReviewThreadCard({
                       size="sm"
                       completionScope={completionScope}
                       value={reply}
-                      placeholder="Reply"
-                      aria-label="Reply to this conversation"
+                      placeholder={t("misc.pullRequestReviewAnnotation.replyPlaceholder")}
+                      aria-label={t("misc.pullRequestReviewAnnotation.replyLabel")}
                       onValueChange={setReply}
                       onKeyDown={submitKeys({
                         value: reply,

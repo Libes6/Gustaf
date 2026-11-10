@@ -12,6 +12,7 @@ import { shortcutLabelForCommand } from "~/keybindings";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useOrderWhileOpen } from "~/hooks/useOrderWhileOpen";
+import { useT } from "~/useUiLanguage";
 import { useProjectPin } from "~/hooks/useProjectGroupUpdate";
 import { useScratchProject } from "~/hooks/useScratchProject";
 import { isTriagePrompt } from "~/hooks/useStartTriage";
@@ -124,6 +125,7 @@ export function DraftHeroHeadline({
         ] as const,
     ),
   );
+  const t = useT();
   const projectPickerEntries = buildSidebarProjectPickerEntries({
     groups: pickableProjectGroups(projectGroups),
     preferredProjectRef: activeProjectRef,
@@ -165,7 +167,7 @@ export function DraftHeroHeadline({
   const pickerItems: readonly PickerItem[] = useOrderWhileOpen(
     [
       ...menuEntries.map(({ group }) => ({ value: group.projectKey, label: group.displayName })),
-      { value: ADD_PROJECT_VALUE, label: "Add project" },
+      { value: ADD_PROJECT_VALUE, label: t("chatA.draftHeroHeadline.addProject") },
     ],
     (item) => item.value,
     pickerOpen,
@@ -301,7 +303,11 @@ export function DraftHeroHeadline({
           }
         >
           <DraftProjectName
-            value={isScratchDraft ? "No project" : (activeProjectTitle ?? "Choose a project")}
+            value={
+              isScratchDraft
+                ? t("chatA.draftHeroHeadline.noProject")
+                : (activeProjectTitle ?? t("chatA.draftHeroHeadline.chooseProject"))
+            }
             singleLine
           />
         </TooltipTrigger>
@@ -311,8 +317,8 @@ export function DraftHeroHeadline({
       </Tooltip>
       <ComboboxPopup align="center" className="w-72 overflow-hidden">
         <ComboboxSearchInput
-          aria-label="Search projects"
-          placeholder="Search projects..."
+          aria-label={t("chatA.draftHeroHeadline.searchProjects")}
+          placeholder={t("chatA.draftHeroHeadline.searchProjectsPlaceholder")}
           value={pickerQuery}
           onChange={(event) => setPickerQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -326,7 +332,7 @@ export function DraftHeroHeadline({
             toggleProjectGroupPin(group);
           }}
         />
-        <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+        <ComboboxEmpty>{t("chatA.draftHeroHeadline.noMatchingProjects")}</ComboboxEmpty>
         <ComboboxList>
           {(item: PickerItem) => {
             const entry = projectEntryByKey.get(item.value);
@@ -370,7 +376,10 @@ export function DraftHeroHeadline({
       onClick={openAddProject}
       className="pointer-events-auto inline min-w-0 max-w-full cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <DraftProjectName value={activeProjectTitle ?? "Add a project"} singleLine />
+      <DraftProjectName
+        value={activeProjectTitle ?? t("chatA.draftHeroHeadline.addAProject")}
+        singleLine
+      />
     </button>
   );
 
@@ -393,7 +402,7 @@ export function DraftHeroHeadline({
             />
           }
         >
-          or start without a project
+          {t("chatA.draftHeroHeadline.startWithoutProject")}
         </TooltipTrigger>
         {noProjectShortcut ? <TooltipPopup side="bottom">{noProjectShortcut}</TooltipPopup> : null}
       </Tooltip>
@@ -414,17 +423,19 @@ export function DraftHeroHeadline({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
       {hasResolvedProject && !isScratchDraft ? (
-        <DraftHeroProjectHeading projectName={activeProjectTitle ?? "Choose a project"}>
+        <DraftHeroProjectHeading
+          projectName={activeProjectTitle ?? t("chatA.draftHeroHeadline.chooseProject")}
+        >
           {projectSelector}
         </DraftHeroProjectHeading>
       ) : (
         <h1 className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
           {isScratchDraft ? (
-            <>What should we work on?</>
+            <>{t("chatA.draftHeroHeadline.whatToWorkOn")}</>
           ) : canChooseProject ? (
             <>{projectSelector} to start</>
           ) : (
-            <>Add a project to start</>
+            <>{t("chatA.draftHeroHeadline.addProjectToStart")}</>
           )}
         </h1>
       )}

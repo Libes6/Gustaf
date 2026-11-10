@@ -16,6 +16,7 @@ import { PullRequestDetailTitleRow } from "./PullRequestDetailLayout";
 import { PullRequestEditButton } from "./PullRequestEditButton";
 import { readableFailure } from "./pullRequestDetail.logic";
 import { canEditPullRequestChangeRequest } from "@t3tools/client-runtime/pull-request-editing";
+import { useT } from "../../useUiLanguage";
 
 /** The pull request title, which the reader can rename in place when the host allows it. */
 export function PullRequestTitleEditor({
@@ -33,6 +34,7 @@ export function PullRequestTitleEditor({
   canWriteSourceControl: boolean;
   onSaved: () => void;
 }) {
+  const t = useT();
   const update = useAtomCommand(pullRequestEnvironment.update, { reportFailure: false });
   const [titleScope, setTitleScope] = useState<{
     readonly pullRequestKey: string;
@@ -54,10 +56,10 @@ export function PullRequestTitleEditor({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "The title could not be saved",
+        title: t("misc.pullRequestTitleEditor.saveFailed"),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused the new title.",
+          t("misc.pullRequestTitleEditor.refusedTitle"),
         ),
       });
       return;
@@ -81,7 +83,7 @@ export function PullRequestTitleEditor({
         </Tooltip>
         {canEditPullRequestChangeRequest(detail) ? (
           <PullRequestEditButton
-            aria-label="Edit title"
+            aria-label={t("misc.pullRequestTitleEditor.editTitle")}
             onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
           />
         ) : null}
@@ -123,7 +125,9 @@ export function PullRequestTitleEditor({
           disabled={!canWriteSourceControl || titleSaving || titleDraft.trim().length === 0}
           onClick={() => void saveTitle(titleDraft)}
         >
-          {titleSaving ? "Saving..." : "Save"}
+          {titleSaving
+            ? t("misc.pullRequestTitleEditor.saving")
+            : t("misc.pullRequestTitleEditor.save")}
         </Button>
       </div>
     </div>

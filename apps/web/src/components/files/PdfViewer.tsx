@@ -28,6 +28,7 @@ import {
   visiblePdfPages,
 } from "./pdfLayout";
 import "./pdfViewer.css";
+import { useT } from "../../useUiLanguage";
 
 const MAX_PAGES = 2000;
 const MAX_FIND_TEXT = 4 * 1024 * 1024;
@@ -136,6 +137,7 @@ export default function PdfViewer(props: {
   initialView?: PdfViewState;
   onViewChange?: (view: PdfViewState) => void;
 }) {
+  const t = useT();
   const [savedPosition] = useState(() =>
     props.positionKey === undefined ? undefined : positions.get(props.positionKey),
   );
@@ -348,38 +350,38 @@ export default function PdfViewer(props: {
           {pdf ? `${current + 1} / ${pdf.numPages} pages` : "PDF"}
         </span>
         <FileSurfaceAction
-          label="Previous page"
+          label={t("misc.pdfViewer.previousPage")}
           disabled={!pdf || current === 0}
           onPress={() => showPage(current - 1)}
         >
           <ChevronUpIcon className="size-3.5" />
         </FileSurfaceAction>
         <FileSurfaceAction
-          label="Next page"
+          label={t("misc.pdfViewer.nextPage")}
           disabled={!pdf || current + 1 >= pdf.numPages}
           onPress={() => showPage(current + 1)}
         >
           <ChevronDownIcon className="size-3.5" />
         </FileSurfaceAction>
         <FileSurfaceAction
-          label="Zoom out"
+          label={t("misc.pdfViewer.zoomOut")}
           disabled={scale <= PDF_MIN_ZOOM}
           onPress={() => changeZoom(stepPdfZoom(scale, -1))}
         >
           <MinusIcon className="size-3.5" />
         </FileSurfaceAction>
         <span className="min-w-14 text-center tabular-nums">
-          {zoom === null ? "Fit width" : `${Math.round(scale * 100)}%`}
+          {zoom === null ? t("misc.pdfViewer.fitWidth") : `${Math.round(scale * 100)}%`}
         </span>
         <FileSurfaceAction
-          label="Zoom in"
+          label={t("misc.pdfViewer.zoomIn")}
           disabled={scale >= PDF_MAX_ZOOM}
           onPress={() => changeZoom(stepPdfZoom(scale, 1))}
         >
           <PlusIcon className="size-3.5" />
         </FileSurfaceAction>
         <FileSurfaceAction
-          label="Fit width"
+          label={t("misc.pdfViewer.fitWidth")}
           onPress={() => {
             changeZoom(null);
             scroll.current?.scrollTo({ left: 0 });
@@ -392,8 +394,8 @@ export default function PdfViewer(props: {
             ref={find}
             size="compact"
             type="search"
-            aria-label="Find in PDF"
-            placeholder="Find in PDF"
+            aria-label={t("misc.pdfViewer.findInPdf")}
+            placeholder={t("misc.pdfViewer.findPlaceholder")}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -406,11 +408,11 @@ export default function PdfViewer(props: {
           <>
             <span role="status">
               {finding
-                ? "Searching…"
+                ? t("misc.pdfViewer.searching")
                 : (findError ?? `${matches.length ? match + 1 : 0}/${matches.length}`)}
             </span>
             <FileSurfaceAction
-              label="Next matching page"
+              label={t("misc.pdfViewer.nextMatchingPage")}
               disabled={!matches.length}
               onPress={() => {
                 const next = (match + 1) % matches.length;

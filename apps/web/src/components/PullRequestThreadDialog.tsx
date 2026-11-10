@@ -36,6 +36,7 @@ import { Input } from "./ui/input";
 import { Spinner } from "./ui/spinner";
 import { toastManager } from "./ui/toast";
 
+import { useT } from "../useUiLanguage";
 interface PullRequestThreadDialogProps {
   open: boolean;
   environmentId: EnvironmentId;
@@ -68,6 +69,7 @@ export function PullRequestThreadDialog({
   onOpenChange,
   onPrepared,
 }: PullRequestThreadDialogProps) {
+  const t = useT();
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState(initialReference ?? "");
   const [referenceDirty, setReferenceDirty] = useState(false);
@@ -274,7 +276,7 @@ export function PullRequestThreadDialog({
             onClick={() => onOpenChange(false)}
             disabled={preparePullRequestThreadAction.isPending}
           >
-            Cancel
+            {t("shell.misc.cancel")}
           </Button>
           <Button
             type="button"
@@ -289,7 +291,7 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "local" ? "Preparing local..." : "Local"}
+            {preparingMode === "local" ? t("shell.misc.preparingLocal") : t("shell.misc.local")}
           </Button>
           <Button
             type="button"
@@ -304,7 +306,9 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "worktree" ? "Preparing worktree..." : "Worktree"}
+            {preparingMode === "worktree"
+              ? t("shell.misc.preparingWorktree")
+              : t("shell.misc.worktree")}
           </Button>
         </DialogFooter>
       </DialogPopup>

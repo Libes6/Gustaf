@@ -16,6 +16,7 @@ import {
 } from "./PullRequestMarkdownTextarea";
 import { pullRequestReviewKey } from "./pullRequestReviewStore";
 import { useInlineActionConfirm } from "./useInlineActionConfirm";
+import { useT } from "~/useUiLanguage";
 
 export function PullRequestCommentForm({
   environmentId,
@@ -42,6 +43,7 @@ export function PullRequestCommentForm({
   onCommented: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState<"comment" | "close" | "reopen" | null>(null);
   const locked = submitting !== null || actionPending;
@@ -96,7 +98,7 @@ export function PullRequestCommentForm({
     });
     if (result._tag === "Failure") {
       setSubmitting(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: t("misc.pullRequestCommentForm.notPosted") });
       return;
     }
     setBody("");
@@ -119,7 +121,7 @@ export function PullRequestCommentForm({
         readOnly={speech.freezesEditor}
         value={body}
         rows={3}
-        placeholder="Leave a comment"
+        placeholder={t("misc.pullRequestCommentForm.placeholder")}
         aria-label={`Comment on this ${sourceControlClients.get(detail.provider).changeRequest.singular}`}
         onValueChange={setBody}
         onKeyDown={(event) => {
@@ -162,16 +164,16 @@ export function PullRequestCommentForm({
                 </span>
                 <span className="col-start-1 row-start-1">
                   {submitting === "close"
-                    ? "Closing..."
+                    ? t("misc.pullRequestCommentForm.closing")
                     : inlineConfirm.isArmed("close")
-                      ? "Confirm close?"
-                      : "Close with comment"}
+                      ? t("misc.pullRequestCommentForm.confirmClose")
+                      : t("misc.pullRequestCommentForm.closeWithComment")}
                 </span>
               </span>
             ) : submitting === "reopen" ? (
-              "Reopening..."
+              t("misc.pullRequestCommentForm.reopening")
             ) : (
-              "Reopen with comment"
+              t("misc.pullRequestCommentForm.reopenWithComment")
             )}
           </Button>
         )}
@@ -182,7 +184,9 @@ export function PullRequestCommentForm({
           onClick={() => submitAfterDictation("comment")}
         >
           <SendIcon className="size-3.5" />
-          {submitting === "comment" ? "Posting..." : "Comment"}
+          {submitting === "comment"
+            ? t("misc.pullRequestCommentForm.posting")
+            : t("misc.pullRequestCommentForm.comment")}
         </Button>
       </div>
     </div>

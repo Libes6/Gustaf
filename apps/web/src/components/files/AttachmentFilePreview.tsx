@@ -36,6 +36,7 @@ import {
   FileSurfaceLoading,
   FileSurfaceNotice,
 } from "./fileSurfaceChrome";
+import { useT } from "../../useUiLanguage";
 
 const LargeTextViewer = lazy(() => import("./LargeTextViewer"));
 
@@ -99,6 +100,7 @@ export function AttachmentFilePreview(props: {
   onRemove?: () => void;
   onClose?: () => void;
 }) {
+  const t = useT();
   const kind = filePreviewKind(props);
   const officeKind = officePreviewKind(props);
   const delimiter = filePreviewDelimiter(props);
@@ -347,7 +349,11 @@ export function AttachmentFilePreview(props: {
       }
     />
   ) : kind === "audio" ? (
-    <AudioPreview src={url} name={props.name} onError={() => setError("Unable to load audio.")} />
+    <AudioPreview
+      src={url}
+      name={props.name}
+      onError={() => setError(t("misc.attachmentFilePreview.unableLoadAudio"))}
+    />
   ) : kind === "video" ? (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-black">
       <video
@@ -356,7 +362,7 @@ export function AttachmentFilePreview(props: {
         src={url}
         aria-label={props.name}
         className="max-h-full max-w-full"
-        onError={() => setError("Unable to load video.")}
+        onError={() => setError(t("misc.attachmentFilePreview.unableLoadVideo"))}
       />
     </div>
   ) : kind === "image" ? (
@@ -365,11 +371,11 @@ export function AttachmentFilePreview(props: {
       src={url}
       name={props.name}
       mimeType={props.mimeType}
-      onError={() => setError("Unable to load image.")}
+      onError={() => setError(t("misc.attachmentFilePreview.unableLoadImage"))}
     />
   ) : (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
-      <p className="text-sm font-medium">No preview for this file</p>
+      <p className="text-sm font-medium">{t("misc.attachmentFilePreview.noPreview")}</p>
       <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
         Save it to open in an app that supports {props.name.split(".").at(-1) || "this format"}{" "}
         files.
@@ -382,7 +388,7 @@ export function AttachmentFilePreview(props: {
       <div className={cn(FILE_SURFACE_SUBHEADER_CLASS)} data-surface-subheader>
         <div className="flex min-w-0 flex-1 items-center text-xs">
           <span className="shrink-0 px-0.5 text-muted-foreground">
-            {props.origin ?? "Attachment"}
+            {props.origin ?? t("misc.attachmentFilePreview.attachment")}
           </span>
           <ChevronRightIcon className="mx-1 size-3.5 shrink-0 text-muted-foreground/60" />
           <span aria-current="page" className="min-w-0 truncate px-0.5 font-medium text-foreground">
@@ -408,7 +414,11 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {showsRawText ? (
           <FileSurfaceAction
-            label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+            label={
+              wordWrap
+                ? t("misc.attachmentFilePreview.disableWrap")
+                : t("misc.attachmentFilePreview.enableWrap")
+            }
             pressed={wordWrap}
             onPress={() => setWordWrapOverride(!wordWrap)}
           >
@@ -417,7 +427,13 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {content || streamsText ? (
           <FileSurfaceAction
-            label={isCopied ? "Copied" : content?.truncated ? "Copy preview" : "Copy contents"}
+            label={
+              isCopied
+                ? t("misc.attachmentFilePreview.copied")
+                : content?.truncated
+                  ? t("misc.attachmentFilePreview.copyPreview")
+                  : t("misc.attachmentFilePreview.copyContents")
+            }
             onPress={() => {
               if (content) {
                 void copyToClipboard(content.text, undefined);
@@ -427,8 +443,8 @@ export function AttachmentFilePreview(props: {
               if (!copy) {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy file",
-                  description: "Wait for the file to finish loading before copying.",
+                  title: t("misc.attachmentFilePreview.couldNotCopy"),
+                  description: t("misc.attachmentFilePreview.waitBeforeCopy"),
                 });
                 return;
               }
@@ -437,8 +453,11 @@ export function AttachmentFilePreview(props: {
                 .catch((cause: unknown) =>
                   toastManager.add({
                     type: "error",
-                    title: "Could not copy file",
-                    description: cause instanceof Error ? cause.message : "Try again.",
+                    title: t("misc.attachmentFilePreview.couldNotCopy"),
+                    description:
+                      cause instanceof Error
+                        ? cause.message
+                        : t("misc.attachmentFilePreview.tryAgain"),
                   }),
                 );
             }}
@@ -448,7 +467,11 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {url ? (
           <FileSurfaceAction
-            label={saving ? "Preparing file…" : "Save file"}
+            label={
+              saving
+                ? t("misc.attachmentFilePreview.preparingFile")
+                : t("misc.attachmentFilePreview.saveFile")
+            }
             disabled={saving}
             onPress={save}
           >
@@ -456,12 +479,15 @@ export function AttachmentFilePreview(props: {
           </FileSurfaceAction>
         ) : null}
         {props.onRemove ? (
-          <FileSurfaceAction label="Remove from draft" onPress={props.onRemove}>
+          <FileSurfaceAction
+            label={t("misc.attachmentFilePreview.removeFromDraft")}
+            onPress={props.onRemove}
+          >
             <Trash2Icon className="size-3.5" />
           </FileSurfaceAction>
         ) : null}
         {props.onClose ? (
-          <FileSurfaceAction label="Close" onPress={props.onClose}>
+          <FileSurfaceAction label={t("misc.attachmentFilePreview.close")} onPress={props.onClose}>
             <XIcon className="size-3.5" />
           </FileSurfaceAction>
         ) : null}

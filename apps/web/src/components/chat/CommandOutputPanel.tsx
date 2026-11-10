@@ -8,6 +8,7 @@ import { useServerConfigs } from "../../state/entities";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useEnvironmentQuery } from "../../state/query";
 import type { TurnItemSource } from "./timelineRowContext";
+import { useT } from "~/useUiLanguage";
 
 const FOLLOW_SLACK_PX = 8;
 
@@ -29,6 +30,7 @@ export function CommandOutputPanel(props: {
   readonly itemId: TurnItemId;
   readonly source?: TurnItemSource["commandOutput"] | undefined;
 }) {
+  const t = useT();
   const input = { threadId: props.threadId, itemId: props.itemId };
   const { data, error } = useEnvironmentQuery<CommandOutputView, unknown>(
     props.source
@@ -48,15 +50,24 @@ export function CommandOutputPanel(props: {
 
   if (text.length === 0) {
     if (error) return <div className="text-destructive">Couldn&apos;t load output: {error}</div>;
-    if (data === null) return <div className="text-muted-foreground italic">Loading output…</div>;
-    return data.running ? null : <div className="text-muted-foreground italic">No output.</div>;
+    if (data === null)
+      return (
+        <div className="text-muted-foreground italic">
+          {t("chatA.commandOutputPanel.loadingOutput")}
+        </div>
+      );
+    return data.running ? null : (
+      <div className="text-muted-foreground italic">{t("chatA.commandOutputPanel.noOutput")}</div>
+    );
   }
   // Parse after all hooks to preserve the text/theme compiler cache.
   const spans = terminalOutputSpans(text, TERMINAL_PALETTES[resolvedTheme]);
   return (
     <div>
       {data?.output.truncated ? (
-        <div className="text-muted-foreground italic">Earlier output not shown</div>
+        <div className="text-muted-foreground italic">
+          {t("chatA.commandOutputPanel.earlierOutputNotShown")}
+        </div>
       ) : null}
       <div
         ref={scrollRef}

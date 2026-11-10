@@ -4,6 +4,7 @@ import {
   sessionPermissionsUnavailableMessage,
 } from "@t3tools/shared/authScopeOptions";
 import { useEnvironmentSessionState } from "~/state/session";
+import { useT } from "../../useUiLanguage";
 
 export function SessionPermissions({
   environmentId,
@@ -14,20 +15,23 @@ export function SessionPermissions({
   readonly connected: boolean;
   readonly routeContext?: boolean;
 }) {
+  const t = useT();
   const session = useEnvironmentSessionState(environmentId);
   return connected && !session.hasError && !session.isPending && session.data?.authenticated ? (
     <div className="space-y-3 py-3 text-xs">
       <p className="text-muted-foreground">
         {routeContext
-          ? "These permissions apply to your active route. Other routes may have different permissions."
-          : "These permissions apply to this client’s current connection."}
+          ? t("settingsD.sessionPermissions.routePermissions")
+          : t("settingsD.sessionPermissions.connectionPermissions")}
       </p>
       <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
         {AUTH_SCOPE_OPTIONS.map(({ scope, title }) => (
           <li key={scope} className="flex items-start justify-between gap-3">
             <span>{title}</span>
             <span className="shrink-0 text-muted-foreground">
-              {sessionGrantsScope(session.data!, scope) ? "Allowed" : "Not granted"}
+              {sessionGrantsScope(session.data!, scope)
+                ? t("settingsD.sessionPermissions.allowed")
+                : t("settingsD.sessionPermissions.notGranted")}
             </span>
           </li>
         ))}

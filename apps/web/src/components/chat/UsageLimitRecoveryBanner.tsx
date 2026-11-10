@@ -18,6 +18,7 @@ import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { Button, InlineButton } from "../ui/button";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { toastManager } from "../ui/toast";
+import { useT } from "../../useUiLanguage";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import { copyAdminRequest } from "./ThreadErrorBanner";
 
@@ -100,6 +101,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
 }
 
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
+  const t = useT();
   const [pending, setPending] = useState(false);
 
   const scheduled =
@@ -114,8 +116,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
       toastManager.add({
         type: "error",
-        title: "Could not snooze thread",
-        description: "The reset time has passed. Retry the thread manually.",
+        title: t("chatB.UsageLimitRecoveryBanner.couldNotSnoozeTitle"),
+        description: t("chatB.UsageLimitRecoveryBanner.resetPassedDescription"),
       });
       // The deadline timer can lag after a throttled tab or sleep; disable now.
       deadlineStore(Date.parse(resetAt)).refresh();
@@ -131,8 +133,14 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     } catch (cause) {
       toastManager.add({
         type: "error",
-        title: action === "resume" ? "Could not change auto-resume" : "Could not snooze thread",
-        description: cause instanceof Error ? cause.message : "An error occurred.",
+        title:
+          action === "resume"
+            ? t("chatB.UsageLimitRecoveryBanner.couldNotChangeAutoResume")
+            : t("chatB.UsageLimitRecoveryBanner.couldNotSnoozeTitle"),
+        description:
+          cause instanceof Error
+            ? cause.message
+            : t("chatB.UsageLimitRecoveryBanner.errorOccurred"),
       });
     }
     setPending(false);
@@ -141,14 +149,22 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <InlineButton touchTarget="padded" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending ? "Saving..." : scheduled ? "Cancel auto-resume" : "Resume at reset"}
+        {pending
+          ? t("chatB.UsageLimitRecoveryBanner.saving")
+          : scheduled
+            ? t("chatB.UsageLimitRecoveryBanner.cancelAutoResume")
+            : t("chatB.UsageLimitRecoveryBanner.resumeAtReset")}
       </InlineButton>
       <InlineButton
         touchTarget="padded"
         disabled={pending || (!snoozed && resetPassed)}
         onClick={() => void toggle("snooze")}
       >
-        {pending ? "Saving..." : snoozed ? "Wake now" : "Snooze until reset"}
+        {pending
+          ? t("chatB.UsageLimitRecoveryBanner.saving")
+          : snoozed
+            ? t("chatB.UsageLimitRecoveryBanner.wakeNow")
+            : t("chatB.UsageLimitRecoveryBanner.snoozeUntilReset")}
       </InlineButton>
     </span>
   );

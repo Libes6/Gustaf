@@ -346,10 +346,15 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         const selected = yield* fromExternal(candidate, "path");
         if (selected) return selected;
       }
+      // Only `agy`: `antigravity` on PATH is usually the IDE launcher, which cannot serve ACP.
+      for (const candidate of yield* commandCandidates("agy", processEnvironment)) {
+        const selected = yield* fromExternal(candidate, "path");
+        if (selected) return selected;
+      }
       return yield* installationError(
         "resolve",
         releaseAsset
-          ? "Antigravity ACP runtime is not installed. Install it in this environment's provider settings or set a custom ACP executable path. The Antigravity app, IDE, and CLI are separate installations."
+          ? "Antigravity ACP runtime is not installed. Install it in this environment's provider settings, install the agy CLI 1.5.0 or newer on PATH, or set a custom ACP executable path. The Antigravity app and IDE cannot be used."
           : `Google does not publish an Antigravity runtime for ${platform}-${arch}. Use a supported environment or a custom executable.`,
       );
     },

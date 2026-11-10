@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   workflowMemberModelSelection,
   type SubagentWorkflowGroup,
@@ -66,6 +67,7 @@ function WorkflowMemberRow({
   driver: ProviderDriverKind | undefined;
   onOpen: (threadId: string) => void;
 }) {
+  const t = useT();
   const threadId = member.childThreadId;
   const canOpen = threadId !== null;
   return (
@@ -76,7 +78,10 @@ function WorkflowMemberRow({
           render={
             <ThreadDetailsControl
               part="row"
-              aria-label={`Open ${member.title} chat`}
+              aria-label={t("chatB.ThreadLineageWorkflowRow.openMemberChat").replace(
+                "{title}",
+                member.title,
+              )}
               disabled={!canOpen}
               onClick={() => canOpen && onOpen(threadId)}
             />
@@ -142,6 +147,7 @@ export function ThreadLineageWorkflowRow({
   readonly stopping: boolean;
   readonly stopDisabled: boolean;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState<ReadonlyMap<number, boolean>>(() => new Map());
   const label = group.workflow.workflowName ?? group.workflow.title;
@@ -160,7 +166,10 @@ export function ThreadLineageWorkflowRow({
                     variant="ghost"
                     part="icon"
                     tone="destructive"
-                    aria-label={`Stop workflow ${label}`}
+                    aria-label={t("chatB.ThreadLineageWorkflowRow.stopWorkflow").replace(
+                      "{label}",
+                      label,
+                    )}
                     disabled={stopDisabled}
                     onClick={onStop}
                   />
@@ -172,7 +181,9 @@ export function ThreadLineageWorkflowRow({
                   <SquareIcon aria-hidden className="size-3 fill-current" />
                 )}
               </TooltipTrigger>
-              <TooltipPopup side="left">Stop entire workflow</TooltipPopup>
+              <TooltipPopup side="left">
+                {t("chatB.ThreadLineageWorkflowRow.stopEntireWorkflow")}
+              </TooltipPopup>
             </Tooltip>
           </div>
         ) : null}
@@ -182,7 +193,14 @@ export function ThreadLineageWorkflowRow({
           variant="ghost"
           part="secondary"
           aria-expanded={expanded}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${label}`}
+          aria-label={t("chatB.ThreadLineageWorkflowRow.actionNamed")
+            .replace(
+              "{action}",
+              expanded
+                ? t("chatB.ThreadLineageWorkflowRow.collapse")
+                : t("chatB.ThreadLineageWorkflowRow.expand"),
+            )
+            .replace("{label}", label)}
           onClick={() => setExpanded((value) => !value)}
         >
           <ChevronDownIcon
@@ -205,12 +223,22 @@ export function ThreadLineageWorkflowRow({
                   variant="panel"
                   tone={phase.state === "running" ? "emphasized" : "muted"}
                   expanded={open}
-                  aria-label={`${open ? "Collapse" : "Expand"} ${phase.title} phase, ${status}`}
+                  aria-label={t("chatB.ThreadLineageWorkflowRow.actionPhase")
+                    .replace(
+                      "{action}",
+                      open
+                        ? t("chatB.ThreadLineageWorkflowRow.collapse")
+                        : t("chatB.ThreadLineageWorkflowRow.expand"),
+                    )
+                    .replace("{title}", phase.title)
+                    .replace("{status}", status)}
                   onClick={() => setPhaseOpen((phases) => new Map(phases).set(phase.index, !open))}
                   accessory={
                     <>
                       {status === "failed" ? (
-                        <SectionHeaderStatus>Failed</SectionHeaderStatus>
+                        <SectionHeaderStatus>
+                          {t("chatB.ThreadLineageWorkflowRow.failed")}
+                        </SectionHeaderStatus>
                       ) : null}
                       <span className="shrink-0 text-2xs font-normal tabular-nums">
                         {phase.settledCount}/{phase.members.length}{" "}

@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import DOMPurify from "dompurify";
 import type { DiagramType, MathResolver } from "pele/lazy";
 import { use, useState } from "react";
@@ -226,6 +227,7 @@ export function MermaidDiagram({
   source: string;
   onExpand: (imageUrl: string) => void;
 }) {
+  const t = useT();
   const [, setAttempt] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const trimmedSource = source.trim();
@@ -247,7 +249,7 @@ export function MermaidDiagram({
       onRender: () => setRenderError(null),
       onError: (error) =>
         setRenderError(
-          error instanceof Error ? error.message : "The diagram could not be rendered.",
+          error instanceof Error ? error.message : t("chatB.MermaidDiagram.renderFailed"),
         ),
     });
     return () => mounted.destroy();
@@ -256,7 +258,7 @@ export function MermaidDiagram({
   if (load.status === "failed") {
     return (
       <DiagramError
-        message="The diagram renderer failed to load."
+        message={t("chatB.MermaidDiagram.rendererFailedToLoad")}
         source={source}
         onRetry={() => {
           if (core.status === "failed") coreLoad = null;
@@ -276,7 +278,7 @@ export function MermaidDiagram({
       {renderError ? <DiagramError message={renderError} source={source} /> : null}
       <button
         type="button"
-        aria-label="Expand diagram"
+        aria-label={t("chatB.MermaidDiagram.expandDiagram")}
         hidden={renderError !== null}
         className="block w-full cursor-zoom-in rounded-md focus-visible:outline-2 focus-visible:outline-ring"
         onClick={(event) => {
@@ -299,13 +301,14 @@ function DiagramError({
   source: string;
   onRetry?: () => void;
 }) {
+  const t = useT();
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
         <p className="m-0 text-xs text-destructive">Unable to render diagram: {message}</p>
         {onRetry ? (
           <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
-            Retry
+            {t("chatB.MermaidDiagram.retry")}
           </Button>
         ) : null}
       </div>

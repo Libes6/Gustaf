@@ -15,8 +15,8 @@ import {
   formatResetsIn,
   type LimitPace,
   paceOf,
-  paceRemainingPercent,
-  remainingPercent,
+  paceElapsedPercent,
+  usedPercentOf,
 } from "@t3tools/shared/usageLimits";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Fragment, useLayoutEffect, useState } from "react";
@@ -39,13 +39,21 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import type { MessageKey } from "../../i18n";
+import { useT } from "../../useUiLanguage";
 import { UsageLimitsPooled } from "./UsageLimitsPooled";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 
-const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
-  ahead: { label: "Ahead of pace: spending faster than the window elapses", icon: TrendingUpIcon },
-  on: { label: "On pace with the window", icon: GaugeIcon },
-  under: { label: "Under pace: headroom left for the rest of the window", icon: TrendingDownIcon },
+const PACE_KEYS: Record<LimitPace, MessageKey> = {
+  ahead: "misc.usageLimits.paceAhead",
+  on: "misc.usageLimits.paceOn",
+  under: "misc.usageLimits.paceUnder",
+};
+
+const PACE_ICONS: Record<LimitPace, typeof GaugeIcon> = {
+  ahead: TrendingUpIcon,
+  on: GaugeIcon,
+  under: TrendingDownIcon,
 };
 
 export function barColor(driver: ServerProvider["driver"]): string {
@@ -56,21 +64,19 @@ export function barColor(driver: ServerProvider["driver"]): string {
 }
 
 export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
-  const Icon = PACE[pace].icon;
+  const t = useT();
+  const Icon = PACE_ICONS[pace];
+  const label = t(PACE_KEYS[pace]);
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          <span
-            role="img"
-            aria-label={PACE[pace].label}
-            className="inline-flex text-muted-foreground"
-          />
+          <span role="img" aria-label={label} className="inline-flex text-muted-foreground" />
         }
       >
         <Icon className="size-3.5" aria-hidden />
       </TooltipTrigger>
-      <TooltipPopup side="top">{PACE[pace].label}</TooltipPopup>
+      <TooltipPopup side="top">{label}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -78,9 +84,9 @@ export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
 // The tick sits in a transparent gap cut from the bar, clamped so it stays inside at 0% and 100%.
 // The gap is a clip-path slot rather than a mask: a mask composites its layer and re-antialiases
 // the bar's rounded ends, and the polygon reaches 1px past the box so only the slot edges clip.
-function paceMarkStyles(timeLeft: number | null) {
-  if (timeLeft === null) return null;
-  const at = `clamp(3px, ${timeLeft}%, calc(100% - 3px))`;
+function paceMarkStyles(elapsed: number | null) {
+  if (elapsed === null) return null;
+  const at = `clamp(3px, ${elapsed}%, calc(100% - 3px))`;
   const [left, right] = [`calc(${at} - 3px)`, `calc(${at} + 3px)`];
   const [near, far] = ["-1px", "calc(100% + 1px)"];
   return {
@@ -100,7 +106,7 @@ function paceMarkStyles(timeLeft: number | null) {
  * Pace mark styles for the bar given the returned ref. Below 6px there is no room for the gap
  * and tick, so the bar draws neither, as the mobile bars do.
  */
-export function usePaceMark(timeLeft: number | null) {
+export function usePaceMark(elapsed: number | null) {
   const [bar, setBar] = useState<HTMLElement | null>(null);
   const [roomy, setRoomy] = useState(false);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the bar DOM width before paint and remeasures through a ResizeObserver
@@ -110,7 +116,7 @@ export function usePaceMark(timeLeft: number | null) {
     measure();
     return observeResize(bar, measure);
   }, [bar]);
-  return [setBar, roomy ? paceMarkStyles(timeLeft) : null] as const;
+  return [setBar, roomy ? paceMarkStyles(elapsed) : null] as const;
 }
 
 function WindowBar({
@@ -122,17 +128,23 @@ function WindowBar({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
+  const t = useT();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const remaining = remainingPercent(window);
-  const timeLeft = paceRemainingPercent(window, now);
-  const [barRef, paceMark] = usePaceMark(timeLeft);
+  const used = usedPercentOf(window);
+  const elapsed = paceElapsedPercent(window, now);
+  const [barRef, paceMark] = usePaceMark(elapsed);
   const resetsIn = formatResetsIn(window, now);
   const resetsAt = window.resetsAt
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
     : null;
-  const summary = `${window.label}: ${remaining}% left${
-    timeLeft === null ? "" : `, ${timeLeft}% of the window left`
-  }${resetsIn ? `, ${resetsIn}` : ""}`;
+  const summary =
+    t("misc.usageLimits.windowSummary")
+      .replace("{label}", window.label)
+      .replace("{used}", String(used)) +
+    (elapsed === null
+      ? ""
+      : t("misc.usageLimits.windowSummaryTime").replace("{elapsed}", String(elapsed))) +
+    (resetsIn ? `, ${resetsIn}` : "");
 
   return (
     <Tooltip>
@@ -150,10 +162,10 @@ function WindowBar({
         {/* Clip both layers so the gap exposes even a translucent composer surface. */}
         <div className="absolute inset-0" style={paceMark?.gap}>
           <div className="absolute inset-x-0 inset-y-1.5 rounded-full bg-muted" />
-          {remaining > 0 ? (
+          {used > 0 ? (
             <div
               className="absolute inset-y-1.5 left-0 rounded-full"
-              style={{ width: `${remaining}%`, backgroundColor: color }}
+              style={{ width: `${used}%`, backgroundColor: color }}
             />
           ) : null}
         </div>
@@ -168,15 +180,18 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {remaining}% left{timeLeft !== null ? ` · ${timeLeft}% of the window left` : ""}
+            {t("misc.usageLimits.percentUsed").replace("{used}", String(used))}
+            {elapsed !== null
+              ? t("misc.usageLimits.percentWindowElapsed").replace("{elapsed}", String(elapsed))
+              : ""}
           </span>
-          {timeLeft !== null ? (
-            <span className="text-muted-foreground">The line is where even spending would be.</span>
+          {elapsed !== null ? (
+            <span className="text-muted-foreground">{t("misc.usageLimits.evenSpendingLine")}</span>
           ) : null}
           {resetsAt ? (
             <span className="text-muted-foreground">
-              Resets {resetsAt}
-              {resetsIn ? ` · ${resetsIn}` : ""}
+              {t("misc.usageLimits.resets").replace("{when}", resetsAt)}
+              {resetsIn ? `${t("misc.usageLimits.resetsSeparator")}${resetsIn}` : ""}
             </span>
           ) : null}
         </div>
@@ -198,6 +213,7 @@ export function LimitWindows({
   readonly now: number;
   readonly compact?: boolean;
 }) {
+  const t = useT();
   const color = normalizeProviderAccentColor(accentColor) ?? barColor(driver);
   return (
     <div
@@ -215,7 +231,10 @@ export function LimitWindows({
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {remainingPercent(window)}% left
+                {t("misc.usageLimits.percentUsedShort").replace(
+                  "{used}",
+                  String(usedPercentOf(window)),
+                )}
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />
@@ -230,17 +249,18 @@ export function LimitWindows({
   );
 }
 
-const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
+const OUTCOME_KEYS: Record<ProviderConsumeResetCreditOutcome, MessageKey> = {
+  reset: "misc.usageLimits.outcomeReset",
+  nothingToReset: "misc.usageLimits.outcomeNothing",
+  noCredit: "misc.usageLimits.outcomeNoCredit",
+  alreadyRedeemed: "misc.usageLimits.outcomeAlreadyRedeemed",
 };
 
 export function useResetCredit(
   environmentId: EnvironmentId,
   input: ProviderConsumeResetCreditInput,
 ) {
+  const t = useT();
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, { reportFailure: false });
   const [confirming, setConfirming] = useState(false);
@@ -255,13 +275,13 @@ export function useResetCredit(
     const result = await consume({ environmentId, input });
     setBusy(false);
     if (result._tag === "Success") {
-      setStatus(result.value.warning ?? OUTCOME_TEXT[result.value.outcome]);
+      setStatus(result.value.warning ?? t(OUTCOME_KEYS[result.value.outcome]));
       return;
     }
     setStatus(
       "error" in result.cause && result.cause.error instanceof Error
         ? result.cause.error.message
-        : "Could not use the reset credit.",
+        : t("misc.usageLimits.couldNotUseCredit"),
     );
   };
 
@@ -281,20 +301,22 @@ export function ResetCreditDialog({
   readonly onConfirm: () => void;
   readonly disabled?: boolean;
 }) {
+  const t = useT();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Use a reset credit?</AlertDialogTitle>
+          <AlertDialogTitle>{t("misc.usageLimits.useResetCreditTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            This redeems one credit on your account and clears the current rate-limit windows. It
-            cannot be undone.
+            {t("misc.usageLimits.useResetCreditDesc")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t("misc.usageLimits.cancel")}
+          </AlertDialogClose>
           <Button disabled={disabled} onClick={onConfirm}>
-            Use credit
+            {t("misc.usageLimits.useCredit")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -306,16 +328,30 @@ export function resetCreditsSummary(
   credits: ServerProviderResetCredits,
   now: number,
   compact = false,
+  t: (key: MessageKey) => string,
 ): string {
   const expiresIn = credits.nextExpiresAt
     ? formatDuration(Date.parse(credits.nextExpiresAt) - now)
     : null;
-  if (credits.availableCount === 0) return "No reset credits banked";
-  if (compact)
-    return `${credits.availableCount} banked${expiresIn ? ` · expires in ${expiresIn}` : ""}`;
-  return `${credits.availableCount} ${credits.availableCount === 1 ? "reset credit" : "reset credits"} banked${
-    expiresIn ? ` · next expires in ${expiresIn}` : ""
-  }`;
+  if (credits.availableCount === 0) return t("misc.usageLimits.noResetCreditsBanked");
+  if (compact) {
+    return (
+      t("misc.usageLimits.creditsBankedCompact").replace(
+        "{count}",
+        String(credits.availableCount),
+      ) + (expiresIn ? t("misc.usageLimits.expiresIn").replace("{duration}", expiresIn) : "")
+    );
+  }
+  const unit =
+    credits.availableCount === 1
+      ? t("misc.usageLimits.resetCredit")
+      : t("misc.usageLimits.resetCredits");
+  return (
+    t("misc.usageLimits.creditsBankedFull")
+      .replace("{count}", String(credits.availableCount))
+      .replace("{unit}", unit) +
+    (expiresIn ? t("misc.usageLimits.nextExpiresIn").replace("{duration}", expiresIn) : "")
+  );
 }
 
 export function ResetCredits({
@@ -329,6 +365,7 @@ export function ResetCredits({
   readonly credits: ServerProviderResetCredits;
   readonly now: number;
 }) {
+  const t = useT();
   const { canManageProviders, confirming, setConfirming, busy, status, redeem } = useResetCredit(
     environmentId,
     input,
@@ -336,7 +373,7 @@ export function ResetCredits({
   if (credits.availableCount === 0 && status === null) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span className="tabular-nums">{resetCreditsSummary(credits, now)}</span>
+      <span className="tabular-nums">{resetCreditsSummary(credits, now, false, t)}</span>
       {credits.availableCount > 0 ? (
         <Button
           size="xs"
@@ -346,7 +383,7 @@ export function ResetCredits({
             if (readEnvironmentScope(environmentId, AuthProvidersManageScope)) setConfirming(true);
           }}
         >
-          {busy ? "Using…" : "Use reset"}
+          {busy ? t("misc.usageLimits.using") : t("misc.usageLimits.useReset")}
         </Button>
       ) : null}
       {status ? <span className="text-foreground">{status}</span> : null}

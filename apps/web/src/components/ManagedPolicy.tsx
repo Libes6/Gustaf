@@ -8,6 +8,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
  * A control an administrator's policy turns off: shown inert, with the policy's reason on hover
  * and focus. Without a reason it renders the control untouched.
  */
+import { useT } from "../useUiLanguage";
 export function ManagedControl({
   reason,
   children,
@@ -50,6 +51,7 @@ export function ManagedNotice({ children }: { children: ReactNode }) {
 
 /** "This environment is managed by <organization>", linking the support page when there is one. */
 export function ManagedByOrganization({ policy }: { policy: ManagedPolicySummary }) {
+  const t = useT();
   return (
     <ManagedNotice>
       This environment is managed by {policy.organization}.
@@ -62,7 +64,7 @@ export function ManagedByOrganization({ policy }: { policy: ManagedPolicySummary
             rel="noreferrer"
             className="text-foreground underline underline-offset-2"
           >
-            Get help
+            {t("shell.smallUi.getHelp")}
           </a>
         </>
       ) : null}
