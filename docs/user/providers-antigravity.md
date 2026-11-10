@@ -63,8 +63,8 @@ directory, at the same version. Make both executable on macOS or Linux; Windows
 uses `.exe` files.
 
 Set **Binary path** to the ACP executable on the environment and update it yourself.
-Leave the field blank to use the managed runtime, or a compatible executable on
-`PATH` if no managed runtime is installed.
+Leave the field blank to use the managed runtime. If none is installed, T3 Code uses a
+compatible ACP executable on `PATH`, or else the `agy` CLI (1.5.0 or newer) on `PATH`.
 
 ## Models and threads
 

@@ -672,6 +672,21 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
           operation: "resolve",
         });
 
+        // With no managed runtime and no binary path, the CLI on PATH is picked up by itself.
+        expect(yield* installation.resolve(undefined, { PATH: cliDirectory })).toMatchObject({
+          executablePath: alias,
+          harnessPath: null,
+          source: "path",
+        });
+        const launcherDirectory = path.join(baseDir, "ide-launcher");
+        yield* fs.makeDirectory(launcherDirectory);
+        yield* fs.writeFileString(path.join(launcherDirectory, "antigravity"), "ide", {
+          mode: 0o755,
+        });
+        expect(
+          yield* installation.resolve(undefined, { PATH: launcherDirectory }).pipe(Effect.flip),
+        ).toMatchObject({ operation: "resolve" });
+
         // Version-manager shims dispatch by their invoked name, so the shim path is what runs.
         const shims = path.join(baseDir, "shims");
         const mise = path.join(baseDir, "mise");
