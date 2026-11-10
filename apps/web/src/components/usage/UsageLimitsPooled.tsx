@@ -29,6 +29,7 @@ import {
 } from "react";
 
 import { ensureLocalApi } from "../../localApi";
+import { useT } from "../../useUiLanguage";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
@@ -62,11 +63,15 @@ function accountHue(email: string): number {
 }
 
 function AccountChip({ email }: { readonly email: string }) {
+  const t = useT();
   const hue = accountHue(email);
   return (
     <span
       role="img"
-      aria-label={`Account ${accountInitials(email)}`}
+      aria-label={t("misc.usageLimitsPooled.accountChip").replace(
+        "{initials}",
+        accountInitials(email),
+      )}
       className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-3xs leading-none font-semibold"
       style={{ backgroundColor: `oklch(0.85 0.08 ${hue})`, color: `oklch(0.35 0.1 ${hue})` }}
     >
@@ -148,6 +153,7 @@ function SegmentPopover({
   readonly redeem: ReturnType<typeof useResetCredit> | null;
   readonly onRedeem: () => void;
 }) {
+  const t = useT();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
@@ -170,36 +176,53 @@ function SegmentPopover({
         {account.email ? (
           <RedactedSensitiveText
             value={account.email}
-            ariaLabel="Toggle account email visibility"
-            revealTooltip="Click to reveal email"
-            hideTooltip="Click to hide email"
+            ariaLabel={t("misc.usageLimitsPooled.toggleEmailVisibility")}
+            revealTooltip={t("misc.usageLimitsPooled.revealEmail")}
+            hideTooltip={t("misc.usageLimitsPooled.hideEmail")}
             className="w-fit"
           />
         ) : null}
       </div>
       <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
-        {account.plan ? <Row label="Plan">{account.plan}</Row> : null}
+        {account.plan ? <Row label={t("misc.usageLimitsPooled.plan")}>{account.plan}</Row> : null}
         {where ? (
-          <Row label={account.environments.length > 0 ? "Signed in" : "Via"}>{where}</Row>
+          <Row
+            label={
+              account.environments.length > 0
+                ? t("misc.usageLimitsPooled.signedIn")
+                : t("misc.usageLimitsPooled.via")
+            }
+          >
+            {where}
+          </Row>
         ) : null}
       </div>
       <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
-        <Row label="Left">{remaining}%</Row>
+        <Row label={t("misc.usageLimitsPooled.left")}>{remaining}%</Row>
         {window.resetsAt ? (
-          <Row label="Resets">
+          <Row label={t("misc.usageLimitsPooled.resets")}>
             {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
             {resetsIn ? ` · ${resetsIn.replace("resets in ", "in ")}` : ""}
           </Row>
         ) : null}
-        {timeLeft !== null ? <Row label="Even pace">{timeLeft}% left by now</Row> : null}
+        {timeLeft !== null ? (
+          <Row label={t("misc.usageLimitsPooled.evenPace")}>
+            {t("misc.usageLimitsPooled.evenPaceValue").replace("{timeLeft}", String(timeLeft))}
+          </Row>
+        ) : null}
         {reset && reset.restoresPercent > 0 ? (
-          <Row label="Restores">+{reset.restoresPercent}% of pool</Row>
+          <Row label={t("misc.usageLimitsPooled.restores")}>
+            {t("misc.usageLimitsPooled.restoresValue").replace(
+              "{percent}",
+              String(reset.restoresPercent),
+            )}
+          </Row>
         ) : null}
       </div>
       {credits && redeem ? (
         <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
-            <span className="tabular-nums">{resetCreditsSummary(credits, now, true)}</span>
+            <span className="tabular-nums">{resetCreditsSummary(credits, now, true, t)}</span>
             <Button
               size="xs"
               variant="outline"
@@ -207,7 +230,7 @@ function SegmentPopover({
               className="ms-auto"
               onClick={onRedeem}
             >
-              {redeem.busy ? "Using…" : "Use reset"}
+              {redeem.busy ? t("misc.usageLimits.using") : t("misc.usageLimits.useReset")}
             </Button>
           </span>
         </div>
@@ -303,6 +326,7 @@ function RedeemableSegment({
 }: Omit<Parameters<typeof SegmentTriggers>[0], "redeem"> & {
   readonly redeemAt: NonNullable<LimitAccount["redeem"]>;
 }) {
+  const t = useT();
   const redeem = useResetCredit(redeemAt.environmentId, redeemAt.input);
   return (
     <>
@@ -317,7 +341,7 @@ function RedeemableSegment({
       {redeem.busy || redeem.status ? (
         <span role="status" className="col-span-full text-xs text-muted-foreground">
           <AccountName account={props.account} className="font-medium text-foreground" />{" "}
-          {redeem.busy ? "Using reset credit…" : redeem.status}
+          {redeem.busy ? t("misc.usageLimitsPooled.usingResetCredit") : redeem.status}
         </span>
       ) : null}
     </>
@@ -446,6 +470,7 @@ function LegendRow({
   readonly now: number;
   readonly index: number;
 }) {
+  const t = useT();
   const popover = use(SegmentPopoverContext) ?? undefined;
   const { account, window } = payload;
   const remaining = remainingPercent(window);
@@ -465,7 +490,7 @@ function LegendRow({
           className="absolute inset-0 rounded-sm opacity-35"
           style={{ backgroundColor: color }}
         />
-        <span className="sr-only">Segment </span>
+        <span className="sr-only">{t("misc.usageLimitsPooled.segment")}</span>
         <span className="relative">{index}</span>
       </span>
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
@@ -483,7 +508,14 @@ function LegendRow({
               {credits}
             </span>
             <span className="sr-only">
-              {credits} reset {credits === 1 ? "credit" : "credits"} banked
+              {t("misc.usageLimitsPooled.resetCreditBanked")
+                .replace("{count}", String(credits))
+                .replace(
+                  "{unit}",
+                  credits === 1
+                    ? t("misc.usageLimitsPooled.credit")
+                    : t("misc.usageLimitsPooled.credits"),
+                )}
             </span>
           </>
         ) : null}
@@ -541,6 +573,7 @@ function PoolWindowCard({
   readonly label?: string | undefined;
   readonly description?: string | undefined;
 }) {
+  const t = useT();
   const nextRefill = pool.resets.find((reset) => reset.restoresPercent > 0);
   return (
     <div className="grid items-center gap-x-6 gap-y-3 rounded-lg border border-border/60 p-4 md:grid-cols-[11rem_minmax(0,1fr)]">
@@ -551,7 +584,7 @@ function PoolWindowCard({
             {pool.remainingPercent}%
           </span>
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <span>left</span>
+            <span>{t("misc.usageLimitsPooled.leftLabel")}</span>
             {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
           </span>
         </span>
@@ -609,6 +642,7 @@ export function UsageLimitsPooled({
   readonly presentations: Parameters<typeof collectLimitAccounts>[0];
   readonly now: number;
 }) {
+  const t = useT();
   const [segmentPopover] = useState(() => PopoverCreateHandle<SegmentPayload>());
   const segmentPopoverActions = useRef<PopoverPrimitive.Root.Actions | null>(null);
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
@@ -617,9 +651,7 @@ export function UsageLimitsPooled({
   return (
     <div className="flex flex-col gap-8">
       {pools.length === 0 && notices.length === 0 && externalLinks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No provider on the selected environments reports subscription limits.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("misc.usageLimitsPooled.noLimits")}</p>
       ) : null}
       <SegmentPopoverContext value={segmentPopover}>
         {pools.map((pool) => (
@@ -657,7 +689,7 @@ export function UsageLimitsPooled({
               </p>
               {link.url === CHATGPT_USAGE_URL ? (
                 <p className="text-xs text-muted-foreground">
-                  View usage in ChatGPT with your connected account.
+                  {t("misc.usageLimitsPooled.viewUsageInChatGpt")}
                 </p>
               ) : link.message ? (
                 <p className="max-w-xl text-xs text-muted-foreground">{link.message}</p>
@@ -669,7 +701,7 @@ export function UsageLimitsPooled({
             size="xs"
             onClick={() => void ensureLocalApi().shell.openExternal(link.url)}
           >
-            Manage usage
+            {t("misc.usageLimitsPooled.manageUsage")}
             <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
           </Button>
         </section>

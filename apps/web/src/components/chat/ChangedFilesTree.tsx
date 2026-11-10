@@ -6,6 +6,7 @@ import { buildTurnDiffTree, type TurnDiffTreeNode } from "../../lib/turnDiffTree
 import { ChevronRightIcon, FileDiffIcon } from "lucide-react";
 import { ChevronsDownUp, ChevronsUpDown, Folder, FolderClosed } from "lucide";
 import { cn } from "~/lib/utils";
+import { useT } from "~/useUiLanguage";
 import { DiffStatLabel, hasNonZeroStat } from "./DiffStatLabel";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 import { Button } from "../ui/button";
@@ -36,6 +37,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
   onOpenTurnDiff: (runId: RunId, filePath?: string) => void;
   onFileContextMenu?: ChangedFileContextMenuHandler | undefined;
 }) {
+  const t = useT();
   const {
     runId,
     files,
@@ -82,7 +84,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                     size="icon-xs"
                     variant="ghost-muted"
                     aria-label={
-                      allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"
+                      allDirectoriesExpanded
+                        ? t("chatA.changedFilesTree.collapseAllFolders")
+                        : t("chatA.changedFilesTree.expandAllFolders")
                     }
                     data-scroll-anchor-ignore
                     onClick={() => {
@@ -98,7 +102,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                 />
               </TooltipTrigger>
               <TooltipPopup side="top">
-                {allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+                {allDirectoriesExpanded
+                  ? t("chatA.changedFilesTree.collapseAllFolders")
+                  : t("chatA.changedFilesTree.expandAllFolders")}
               </TooltipPopup>
             </Tooltip>
           )}
@@ -109,15 +115,17 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                   type="button"
                   size="xs"
                   variant="ghost-muted"
-                  aria-label="Open diff"
+                  aria-label={t("chatA.changedFilesTree.openDiff")}
                   onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
                 />
               }
             >
               <FileDiffIcon className="size-3" />
-              <span className="hidden @[24rem]/changed-files:inline">Open diff</span>
+              <span className="hidden @[24rem]/changed-files:inline">
+                {t("chatA.changedFilesTree.openDiff")}
+              </span>
             </TooltipTrigger>
-            <TooltipPopup side="top">Open the full diff</TooltipPopup>
+            <TooltipPopup side="top">{t("chatA.changedFilesTree.openFullDiff")}</TooltipPopup>
           </Tooltip>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   matchComposerEnvironmentItems,
   matchComposerThreadItems,
@@ -93,6 +94,7 @@ export function useComposerMenuItems({
   readonly workspaceSkillsScanning: boolean;
   readonly questionAttachmentTarget: DraftId | null;
 }) {
+  const t = useT();
   // Thread mentions rank by recency as of when the composer mounted.
   const [now] = useState(() => Date.now());
   const composerTriggerKind = composerTrigger?.kind ?? null;
@@ -222,7 +224,7 @@ export function useComposerMenuItems({
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: t("chatB.useComposerMenuItems.switchResponseModel"),
         },
         ...(sideChatAvailable
           ? ([
@@ -231,14 +233,15 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "side",
                 label: "/side",
-                description: sideChatDisabledReason ?? "Ask a side question in a new side chat",
+                description:
+                  sideChatDisabledReason ?? t("chatB.useComposerMenuItems.sideQuestionHint"),
               },
               {
                 id: "slash:btw",
                 type: "slash-command",
                 command: "btw",
                 label: "/btw",
-                description: sideChatDisabledReason ?? "Same as /side",
+                description: sideChatDisabledReason ?? t("chatB.useComposerMenuItems.sameAsSide"),
               },
             ] as const)
           : []),
@@ -249,7 +252,7 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "clear",
                 label: "/clear",
-                description: "Start a fresh session; earlier messages stay visible",
+                description: t("chatB.useComposerMenuItems.freshSessionHint"),
               },
             ] as const)
           : []),
@@ -267,7 +270,10 @@ export function useComposerMenuItems({
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
+        description:
+          command.description ??
+          command.input?.hint ??
+          t("chatB.useComposerMenuItems.runProviderCommand"),
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -303,7 +309,9 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
+          (skill.scope
+            ? t("chatB.useComposerMenuItems.skillScope").replace("{scope}", skill.scope)
+            : t("chatB.useComposerMenuItems.runProviderSkill")),
       }));
     }
     if (
@@ -382,25 +390,28 @@ export function useComposerMenuItems({
         exactPullRequestLookup.isPending));
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
-      return "No skills found. Try / to browse provider commands.";
+      return t("chatB.useComposerMenuItems.noSkillsFound");
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return t("chatB.useComposerMenuItems.noPullRequestsAvailable");
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return t("chatB.useComposerMenuItems.pullRequestsUnreadable");
       }
       return composerTrigger?.query
-        ? `No pull request matches ${composerTrigger.query}.`
-        : "No pull requests found in this repository.";
+        ? t("chatB.useComposerMenuItems.noPullRequestMatch").replace(
+            "{query}",
+            composerTrigger.query,
+          )
+        : t("chatB.useComposerMenuItems.noPullRequestsInRepo");
     }
     return composerTriggerKind === "path"
-      ? "No matching files or folders."
-      : "No matching command.";
+      ? t("chatB.useComposerMenuItems.noMatchingFiles")
+      : t("chatB.useComposerMenuItems.noMatchingCommand");
   })();
 
   return { items, isLoading, emptyState };

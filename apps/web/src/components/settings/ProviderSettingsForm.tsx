@@ -24,6 +24,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import type { ProviderClientDefinition } from "@t3tools/provider-core/client";
+import { useT } from "../../useUiLanguage";
 
 export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
   readonly driverKind?: ProviderClientDefinition["driverKind"];
@@ -210,6 +211,7 @@ function ProviderCommandArguments({
 }: Pick<ProviderSettingsFormProps, "value" | "onChange"> & {
   readonly managedReason: string | undefined;
 }) {
+  const t = useT();
   const args = configuredCommandArgs(value);
   const [storedDraft, setDraft] = useState(() => seedRowsDraft(args, toCommandArgumentRows));
   const draft = reconcileRowsDraft(storedDraft, args, commandArgumentsEqual, toCommandArgumentRows);
@@ -226,8 +228,8 @@ function ProviderCommandArguments({
 
   return (
     <SettingsRow
-      title="Arguments"
-      description="One literal argument per row, in launch order."
+      title={t("settingsC.providerSettingsForm.arguments")}
+      description={t("settingsC.providerSettingsForm.argumentsDesc")}
       managed={managedReason}
       control={
         <Button
@@ -237,7 +239,7 @@ function ProviderCommandArguments({
           onClick={() => updateArguments([...rows, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
-          Add argument
+          {t("settingsC.providerSettingsForm.addArgument")}
         </Button>
       }
     >
@@ -261,7 +263,10 @@ function ProviderCommandArguments({
                       ),
                     )
                   }
-                  aria-label={`Argument ${index + 1}`}
+                  aria-label={t("settingsC.providerSettingsForm.argumentAria").replace(
+                    "{index}",
+                    String(index + 1),
+                  )}
                   spellCheck={false}
                 />
                 <Button
@@ -271,7 +276,10 @@ function ProviderCommandArguments({
                   onClick={() =>
                     updateArguments(rows.filter((current) => current.id !== argument.id))
                   }
-                  aria-label={`Remove argument ${index + 1}`}
+                  aria-label={t("settingsC.providerSettingsForm.removeArgumentAria").replace(
+                    "{index}",
+                    String(index + 1),
+                  )}
                 >
                   <XIcon />
                 </Button>
@@ -355,6 +363,7 @@ function SecretSettingsControl({
   readonly environmentId: EnvironmentId;
   readonly onChange: ProviderSettingsFormProps["onChange"];
 }) {
+  const t = useT();
   const sources = useSecretSources(environmentId);
   const saved =
     value !== null && typeof value === "object"
@@ -384,7 +393,10 @@ function SecretSettingsControl({
           size="icon-sm"
           variant="ghost-destructive"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-          aria-label={`Clear ${field.label}`}
+          aria-label={t("settingsC.providerSettingsForm.clearField").replace(
+            "{label}",
+            field.label,
+          )}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -463,6 +475,7 @@ function ProviderSettingsFieldRow({
   managedReason,
   environmentId,
 }: ProviderSettingsFieldRowProps) {
+  const t = useT();
   const inputId = `${idPrefix}-${field.key}`;
   const descriptionClassName =
     variant === "dialog"
@@ -534,7 +547,10 @@ function ProviderSettingsFieldRow({
               size="icon-sm"
               variant="ghost-destructive"
               onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-              aria-label={`Clear ${field.label}`}
+              aria-label={t("settingsC.providerSettingsForm.clearField").replace(
+                "{label}",
+                field.label,
+              )}
             >
               <XIcon className="size-3.5" />
             </Button>

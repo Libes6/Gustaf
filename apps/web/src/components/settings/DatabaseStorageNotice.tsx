@@ -27,6 +27,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
+import { useT } from "../../useUiLanguage";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 
 const DismissedEnvironmentIds = Schema.Array(Schema.String);
@@ -54,6 +55,7 @@ export function DatabaseStorageNotice({
     DismissedEnvironmentIds,
   );
   const { copyToClipboard } = useCopyToClipboard({ target: "command" });
+  const t = useT();
   const visible = recommendations
     .filter((recommendation) => !dismissed.includes(recommendation.environmentId))
     .map((recommendation) => ({
@@ -68,13 +70,13 @@ export function DatabaseStorageNotice({
     }));
   if (visible.length === 0) return null;
   return (
-    <SettingsSection id="storage-database" title="Database">
+    <SettingsSection id="storage-database" title={t("settingsB.DatabaseStorageNotice.database")}>
       <SettingsRow
-        title="Reclaim freed database space"
-        description={`These databases still hold space freed by history cleanup.${
+        title={t("settingsB.DatabaseStorageNotice.reclaimTitle")}
+        description={`${t("settingsB.DatabaseStorageNotice.reclaimDescription")}${
           visible.every((recommendation) => recommendation.reclaimable)
             ? ""
-            : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
+            : ` ${t("settingsB.DatabaseStorageNotice.runCommandHint")}`
         }`}
       />
       {visible.map(({ environmentId, status, label, reclaimable }) => {
@@ -84,7 +86,7 @@ export function DatabaseStorageNotice({
             size="xs"
             onClick={() => setDismissed((current) => [...current, environmentId])}
           >
-            Dismiss
+            {t("settingsB.DatabaseStorageNotice.dismiss")}
           </Button>
         );
         return reclaimable ? (
@@ -98,7 +100,9 @@ export function DatabaseStorageNotice({
         ) : (
           <SettingsRow
             key={environmentId}
-            title={`${formatGiB(status.reclaimableBytes)} on ${label}`}
+            title={t("settingsB.DatabaseStorageNotice.amountOn")
+              .replace("{amount}", formatGiB(status.reclaimableBytes))
+              .replace("{label}", label)}
             description={<code className="select-text break-all">{status.compactCommand}</code>}
             control={
               <div className="flex flex-wrap items-center gap-1.5">
@@ -107,7 +111,7 @@ export function DatabaseStorageNotice({
                   size="xs"
                   onClick={() => copyToClipboard(status.compactCommand, undefined)}
                 >
-                  Copy command
+                  {t("settingsB.DatabaseStorageNotice.copyCommand")}
                 </Button>
                 {dismiss}
               </div>
@@ -131,6 +135,7 @@ function ReclaimRow({
   readonly dismiss: ReactNode;
 }) {
   const reclaim = useAtomCommand(serverEnvironment.reclaimDatabaseSpace);
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
   const [requested, setRequested] = useState(false);
   // A failed repair reports back after the restart, which ends the wait.
@@ -144,8 +149,13 @@ function ReclaimRow({
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: `Reclaiming ${amount} on ${label}`,
-        description: `Gustaf there restarts and is back in about ${minutes} min.`,
+        title: t("settingsB.DatabaseStorageNotice.reclaimingTitle")
+          .replace("{amount}", amount)
+          .replace("{label}", label),
+        description: t("settingsB.DatabaseStorageNotice.backInMinutes").replace(
+          "{minutes}",
+          String(minutes),
+        ),
       });
       return;
     }
@@ -154,17 +164,23 @@ function ReclaimRow({
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: `Could not reclaim space on ${label}`,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: t("settingsB.DatabaseStorageNotice.reclaimFailedTitle").replace("{label}", label),
+      description:
+        error instanceof Error ? error.message : t("settingsB.DatabaseStorageNotice.errorOccurred"),
     });
   };
   return (
     <SettingsRow
-      title={`${amount} on ${label}`}
+      title={t("settingsB.DatabaseStorageNotice.amountOn")
+        .replace("{amount}", amount)
+        .replace("{label}", label)}
       description={
         status.reclaimFailure === undefined
-          ? `Restarts Gustaf there. It is offline for about ${minutes} min.`
-          : `The last attempt failed: ${status.reclaimFailure}`
+          ? t("settingsB.DatabaseStorageNotice.restartsThere").replace("{minutes}", String(minutes))
+          : t("settingsB.DatabaseStorageNotice.lastAttemptFailed").replace(
+              "{reason}",
+              status.reclaimFailure,
+            )
       }
       control={
         <div className="flex flex-wrap items-center gap-1.5">
@@ -174,23 +190,32 @@ function ReclaimRow({
             disabled={restarting}
             onClick={() => setConfirming(true)}
           >
-            {restarting ? "Restarting…" : "Reclaim"}
+            {restarting
+              ? t("settingsB.DatabaseStorageNotice.restarting")
+              : t("settingsB.DatabaseStorageNotice.reclaim")}
           </Button>
           {dismiss}
           <AlertDialog open={confirming} onOpenChange={setConfirming}>
             <AlertDialogPopup>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Reclaim {amount} on {label}?
+                  {t("settingsB.DatabaseStorageNotice.confirmTitle")
+                    .replace("{amount}", amount)
+                    .replace("{label}", label)}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Gustaf on {label} stops, rebuilds its database, and starts again. It is offline
-                  for about {minutes} min. Running agents stop when it restarts.
+                  {t("settingsB.DatabaseStorageNotice.confirmBody")
+                    .replace("{label}", label)
+                    .replace("{minutes}", String(minutes))}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-                <Button onClick={() => void start()}>Restart and reclaim</Button>
+                <AlertDialogClose render={<Button variant="outline" />}>
+                  {t("settingsB.DatabaseStorageNotice.cancel")}
+                </AlertDialogClose>
+                <Button onClick={() => void start()}>
+                  {t("settingsB.DatabaseStorageNotice.restartAndReclaim")}
+                </Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
           </AlertDialog>

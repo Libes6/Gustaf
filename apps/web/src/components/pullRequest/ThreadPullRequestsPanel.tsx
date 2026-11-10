@@ -56,6 +56,7 @@ import {
 import { PullRequestGlyph } from "./pullRequestIcons";
 import { pullRequestQuickActions } from "./pullRequestList.logic";
 import { PullRequestSpeedActions, PullRequestSpeedModeContext } from "./PullRequestSpeedActions";
+import { useT } from "~/useUiLanguage";
 
 const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
   manual: "Linked by you",
@@ -100,6 +101,7 @@ function LinkRowImpl({
   onUnlink: (link: ThreadPullRequestLink) => void;
   onSetWatching: ((link: ThreadPullRequestLink, watching: boolean) => void) | null;
 }) {
+  const t = useT();
   const openPrLink = useOpenPrLink(threadRef);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -142,7 +144,7 @@ function LinkRowImpl({
       {depth > 0 ? <span aria-hidden className="-ml-2 h-6 w-px shrink-0 bg-border/70" /> : null}
       {snapshot === null ? (
         <PullRequestGlyph.pullRequest
-          aria-label="Waiting for host state"
+          aria-label={t("misc.threadPullRequestsPanel.waitingHost")}
           className="size-4 shrink-0 text-muted-foreground"
         />
       ) : (
@@ -194,7 +196,11 @@ function LinkRowImpl({
                 {watching ? (
                   <Tooltip>
                     <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
-                      <EyeIcon role="img" aria-label="Watching" className="size-3.5" />
+                      <EyeIcon
+                        role="img"
+                        aria-label={t("misc.threadPullRequestsPanel.watching")}
+                        className="size-3.5"
+                      />
                     </TooltipTrigger>
                     <TooltipPopup>
                       Watching: the agent wakes when checks finish, someone comments, or the branch
@@ -333,12 +339,16 @@ function LinkRowImpl({
             {onSetWatching !== null && open ? (
               <MenuItem onClick={() => onSetWatching(link, !watching)}>
                 {watching ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
-                {watching ? "Stop watching" : "Watch for changes"}
+                {watching
+                  ? t("misc.threadPullRequestsPanel.stopWatching")
+                  : t("misc.threadPullRequestsPanel.watchChanges")}
               </MenuItem>
             ) : null}
             <MenuItem onClick={() => onUnlink(link)}>
               <PullRequestGlyph.unlink className="size-3.5" />
-              {link.source === "stack" ? "Dismiss from thread" : "Unlink from thread"}
+              {link.source === "stack"
+                ? t("misc.threadPullRequestsPanel.dismissFromThread")
+                : t("misc.threadPullRequestsPanel.unlinkFromThread")}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -362,12 +372,13 @@ const lineKey = (line: PullRequestListLine) =>
   `${line.link.host}/${line.link.repository}#${line.link.number}`;
 
 export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
+  const t = useT();
   const configs = useServerConfigs();
   if (configs.get(threadRef.environmentId) === undefined) {
     return (
       <PullRequestsUnavailableState
-        title="Linked pull requests unavailable"
-        error="This environment does not support multiple linked pull requests."
+        title={t("misc.threadPullRequestsPanel.unavailable")}
+        error={t("misc.threadPullRequestsPanel.notSupported")}
       />
     );
   }
@@ -375,6 +386,7 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
 }
 
 function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
+  const t = useT();
   const thread = useThreadShell(threadRef);
   const projects = useProjects();
   const environmentProjects = projects
@@ -429,7 +441,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No linked pull requests</p>
+        <p className="text-sm font-medium">{t("misc.threadPullRequestsPanel.noLinked")}</p>
         <p className="max-w-60 text-xs text-muted-foreground">
           Pull requests the agent opens from this thread land here. Link one yourself from a URL or
           a number.

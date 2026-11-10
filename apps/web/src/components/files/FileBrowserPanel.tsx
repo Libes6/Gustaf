@@ -34,6 +34,7 @@ import { buildFileTreePathUpdates } from "./fileTreePathReconciliation";
 import { loadFileAncestors } from "./loadFileAncestors";
 import { useDirectoryEntries } from "./useDirectoryEntries";
 import { useProjectPathSearch } from "~/state/queries";
+import { useT } from "~/useUiLanguage";
 
 interface FileBrowserPanelProps {
   environmentId: EnvironmentId;
@@ -54,6 +55,7 @@ function treePath(entry: ProjectEntry): string {
 }
 
 function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }) {
+  const t = useT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -62,14 +64,18 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="Refresh workspace files"
+            aria-label={t("misc.fileBrowserPanel.refreshWorkspaceFiles")}
             onClick={props.onRefresh}
           />
         }
       >
         <RefreshIcon refreshing={props.isPending} />
       </TooltipTrigger>
-      <TooltipPopup>{props.isPending ? "Refreshing…" : "Refresh files"}</TooltipPopup>
+      <TooltipPopup>
+        {props.isPending
+          ? t("misc.fileBrowserPanel.refreshing")
+          : t("misc.fileBrowserPanel.refreshFiles")}
+      </TooltipPopup>
     </Tooltip>
   );
 }
@@ -81,6 +87,7 @@ function FileSearchField(props: {
   onValueChange: (value: string) => void;
   value: string;
 }) {
+  const t = useT();
   return (
     <InputGroup variant="ghost" className="h-7 min-w-0 flex-1">
       <InputGroupInput
@@ -89,7 +96,7 @@ function FileSearchField(props: {
         size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
-        placeholder="Search files"
+        placeholder={t("misc.fileBrowserPanel.searchFiles")}
         data-workspace-focus-default
         spellCheck={false}
         onChange={(event) => props.onValueChange(event.target.value)}
@@ -144,6 +151,7 @@ export default function FileBrowserPanel({
   workspaceMutationId,
   hostFolder = false,
 }: FileBrowserPanelProps) {
+  const t = useT();
   const panelPath = (relativePath: string) =>
     hostFolder ? joinHostPath(cwd, relativePath) : relativePath;
   const { resolvedTheme } = useTheme();
@@ -198,8 +206,8 @@ export default function FileBrowserPanel({
         const clicked = await api.contextMenu.show(
           [
             ...fileMenuItems,
-            { id: "copy-mention", label: "Copy mention" },
-            { id: "add-to-chat", label: "Add to chat" },
+            { id: "copy-mention", label: t("misc.fileBrowserPanel.copyMention") },
+            { id: "add-to-chat", label: t("misc.fileBrowserPanel.addToChat") },
           ],
           position,
         );
@@ -216,14 +224,15 @@ export default function FileBrowserPanel({
             await writeTextToClipboard(mention);
             toastManager.add({
               type: "success",
-              title: "Mention copied",
+              title: t("misc.fileBrowserPanel.mentionCopied"),
               description: relativePath,
             });
           } catch (error) {
             toastManager.add({
               type: "error",
-              title: "Failed to copy mention",
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: t("misc.fileBrowserPanel.copyMentionFailed"),
+              description:
+                error instanceof Error ? error.message : t("misc.fileBrowserPanel.errorOccurred"),
             });
           }
           return;
@@ -233,8 +242,8 @@ export default function FileBrowserPanel({
           if (!composer) {
             toastManager.add({
               type: "error",
-              title: "Unable to add to chat",
-              description: "Open a chat for this project and try again.",
+              title: t("misc.fileBrowserPanel.unableAddToChat"),
+              description: t("misc.fileBrowserPanel.openChatForProject"),
             });
             return;
           }
@@ -242,8 +251,8 @@ export default function FileBrowserPanel({
           if (!inserted) {
             toastManager.add({
               type: "error",
-              title: "Unable to add to chat",
-              description: "The chat isn't ready to accept input right now.",
+              title: t("misc.fileBrowserPanel.unableAddToChat"),
+              description: t("misc.fileBrowserPanel.chatNotReady"),
             });
           }
         }
@@ -290,7 +299,7 @@ export default function FileBrowserPanel({
       row.kind === "directory" &&
       row.isExpanded &&
       loadingDirectoriesRef.current.has(item.path.replace(/\/$/, ""))
-        ? { icon: "t3-tree-icon-loading", title: "Loading…" }
+        ? { icon: "t3-tree-icon-loading", title: t("misc.fileBrowserPanel.loading") }
         : null,
     search: false,
     onSearchChange: (value) => setQuery(value ?? ""),
@@ -506,8 +515,8 @@ export default function FileBrowserPanel({
                   variant="ghost"
                   aria-label={
                     expandAll || allDirectoriesExpanded
-                      ? "Collapse all folders"
-                      : "Expand all folders"
+                      ? t("misc.fileBrowserPanel.collapseAllFolders")
+                      : t("misc.fileBrowserPanel.expandAllFolders")
                   }
                   onClick={toggleAllDirectories}
                 />
@@ -519,7 +528,9 @@ export default function FileBrowserPanel({
               />
             </TooltipTrigger>
             <TooltipPopup>
-              {expandAll || allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+              {expandAll || allDirectoriesExpanded
+                ? t("misc.fileBrowserPanel.collapseAllFolders")
+                : t("misc.fileBrowserPanel.expandAllFolders")}
             </TooltipPopup>
           </Tooltip>
         ) : null}

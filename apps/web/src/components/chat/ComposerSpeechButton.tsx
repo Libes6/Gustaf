@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { VoiceInputErrorPill } from "./VoiceInputErrorPill";
 import { VoiceInputPill, VoiceWaveform } from "./VoiceInputPill";
 import { cn } from "~/lib/utils";
+import { useT } from "~/useUiLanguage";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -146,8 +147,12 @@ function ComposerSpeechCancelButton(props: {
   shortcutLabel?: string | null;
   onCancel(): void;
 }) {
+  const t = useT();
   if (props.state.phase === "idle") return null;
-  const label = props.state.phase === "error" ? "Dismiss voice input error" : "Cancel voice input";
+  const label =
+    props.state.phase === "error"
+      ? t("chatA.composerSpeechButton.dismissVoiceInputError")
+      : t("chatA.composerSpeechButton.cancelVoiceInput");
 
   return (
     <Tooltip>
@@ -182,8 +187,9 @@ export function ComposerSpeechButton(props: {
   onStart(): void;
   onCancel(): void;
 }) {
+  const t = useT();
   const presentation = resolveSpeechPresentation(props.state, props.progress);
-  const label = "Start voice input";
+  const label = t("chatA.composerSpeechButton.startVoiceInput");
 
   if (presentation.showsConfirm || props.state.phase === "error") return null;
 
@@ -229,6 +235,7 @@ export function ComposerSpeechRecordingPill(props: {
   onCancel(): void;
   onSkipPostProcessing(): void;
 }) {
+  const t = useT();
   const presentation = resolveSpeechPresentation(props.state, props.progress);
   if (props.state.phase === "error") {
     return (
@@ -245,8 +252,8 @@ export function ComposerSpeechRecordingPill(props: {
   if (!presentation.showsConfirm) return null;
 
   const label = presentation.confirmEnabled
-    ? "Finish voice input"
-    : (presentation.status ?? "Voice input is busy");
+    ? t("chatA.composerSpeechButton.finishVoiceInput")
+    : (presentation.status ?? t("chatA.composerSpeechButton.voiceInputBusy"));
 
   return (
     <VoiceInputPill>

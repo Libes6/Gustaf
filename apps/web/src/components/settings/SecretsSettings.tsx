@@ -27,6 +27,7 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { searchableSetting } from "./settingsSearch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { useT } from "../../useUiLanguage";
 
 const SECRET_PROVIDER_KINDS: Readonly<
   Record<string, { readonly name: string; readonly icon: Icon }>
@@ -35,6 +36,7 @@ const SECRET_PROVIDER_KINDS: Readonly<
 };
 
 export function SecretsSettingsPanel() {
+  const t = useT();
   const { scope, environment } = useSettingsScope();
   const connected = environment?.connection.phase === "connected";
   return (
@@ -44,7 +46,7 @@ export function SecretsSettingsPanel() {
       environment.serverConfig.secretProviderSettings !== true ? (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            Update Gustaf on {environment.label} to manage its secret providers.
+            {t("settingsC.secretsSettings.updateGustaf").replace("{label}", environment.label)}
           </p>
         </SettingsSection>
       ) : connected ? (
@@ -56,7 +58,7 @@ export function SecretsSettingsPanel() {
       ) : (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            Connect an environment to manage the secret providers its provider variables read from.
+            {t("settingsC.secretsSettings.connectEnvironment")}
           </p>
         </SettingsSection>
       )}
@@ -71,6 +73,7 @@ function EnvironmentSecretProviders({
   readonly environment: EnvironmentPresentation;
   readonly projectScoped: boolean;
 }) {
+  const t = useT();
   const environmentId = environment.environmentId;
   const sessionState = useEnvironmentSessionState(environmentId);
   // The server requires the same grant for secret providers as for provider settings.
@@ -103,20 +106,20 @@ function EnvironmentSecretProviders({
           !readOnly ? (
             <Button size="xs" variant="outline" onClick={() => setDialog({ mode: "add" })}>
               <PlusIcon className="size-3" aria-hidden />
-              Add provider
+              {t("settingsC.secretsSettings.addProvider")}
             </Button>
           ) : null
         }
       >
         {projectScoped ? (
           <p className="px-4 pt-3 text-xs text-muted-foreground">
-            Environment-wide setting. Select an environment to change it.
+            {t("settingsC.secretsSettings.environmentWide")}
           </p>
         ) : null}
         {entries.length === 0 ? (
           <SettingsRow
-            title="No secret providers configured."
-            description="Add a 1Password account, then pick it as the source of a provider variable."
+            title={t("settingsC.secretsSettings.noProvidersTitle")}
+            description={t("settingsC.secretsSettings.noProvidersDesc")}
           />
         ) : (
           entries.map(([id, config]) => {
@@ -142,14 +145,17 @@ function EnvironmentSecretProviders({
                       <span className="shrink-0">{kind.name} ·</span>
                       <RedactedSensitiveText
                         value={classified.account}
-                        ariaLabel="Toggle account visibility"
-                        revealTooltip="Click to reveal account"
-                        hideTooltip="Click to hide account"
+                        ariaLabel={t("settingsC.secretsSettings.toggleAccountVisibility")}
+                        revealTooltip={t("settingsC.secretsSettings.revealAccount")}
+                        hideTooltip={t("settingsC.secretsSettings.hideAccount")}
                         className="max-w-full truncate"
                       />
                     </span>
                   ) : (
-                    `Unsupported provider (${config.kind})`
+                    t("settingsC.secretsSettings.unsupportedProvider").replace(
+                      "{kind}",
+                      config.kind,
+                    )
                   )
                 }
                 control={
@@ -161,7 +167,7 @@ function EnvironmentSecretProviders({
                           variant="ghost"
                           onClick={() => setDialog({ mode: "edit", id })}
                         >
-                          Edit
+                          {t("settingsC.secretsSettings.edit")}
                         </Button>
                       ) : null}
                       <RemoveSecretProviderButton
@@ -202,20 +208,25 @@ function RemoveSecretProviderButton({
   readonly label: string;
   readonly onConfirm: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
-        Remove
+        {t("settingsC.secretsSettings.remove")}
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {label}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settingsC.secretsSettings.removeTitle").replace("{label}", label)}
+            </AlertDialogTitle>
             <SecretProviderUses environmentId={environmentId} id={id} label={label} />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {t("settingsC.secretsSettings.cancel")}
+            </AlertDialogClose>
             <Button
               variant="destructive"
               onClick={() => {
@@ -223,7 +234,7 @@ function RemoveSecretProviderButton({
                 onConfirm();
               }}
             >
-              Remove provider
+              {t("settingsC.secretsSettings.removeProvider")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -241,18 +252,19 @@ function SecretProviderUses({
   readonly id: SecretProviderId;
   readonly label: string;
 }) {
+  const t = useT();
   const uses = secretProviderUses(useEnvironmentSettings(environmentId), id);
   if (uses.length === 0) {
     return (
       <AlertDialogDescription>
-        Nothing reads from {label}. The secrets themselves are untouched.
+        {t("settingsC.secretsSettings.nothingReads").replace("{label}", label)}
       </AlertDialogDescription>
     );
   }
   return (
     <>
       <AlertDialogDescription>
-        These read from {label} and will be unset. The secrets themselves are untouched.
+        {t("settingsC.secretsSettings.theseRead").replace("{label}", label)}
       </AlertDialogDescription>
       <ul className="max-h-48 list-disc space-y-0.5 overflow-y-auto ps-5 text-sm wrap-anywhere">
         {uses.map((use) => (

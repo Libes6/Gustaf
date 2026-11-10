@@ -25,6 +25,7 @@ import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
 import { WizardPopup } from "../ui/wizard";
 import { registerThreadOverlay } from "./threadOverlayRetention";
+import { useT } from "~/useUiLanguage";
 
 /**
  * Open state for overlays the chat view hosts. It lives in atoms rather than
@@ -143,6 +144,7 @@ export function BranchRestoreConfirmHost(props: {
   readonly canWriteSourceControl: boolean;
   readonly onConfirm: () => void;
 }) {
+  const t = useT();
   const open = useThreadOverlay(branchRestoreConfirmAtom, props.threadKey) !== null;
   return (
     <AlertDialog
@@ -157,12 +159,13 @@ export function BranchRestoreConfirmHost(props: {
             Switch to <code className="font-medium">{props.threadBranch}</code>?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            You have uncommitted changes. They'll carry over to the other branch, or block the
-            switch if they conflict.
+            {t("chatA.chatOverlayHosts.uncommittedChanges")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t("chatA.chatOverlayHosts.cancel")}
+          </AlertDialogClose>
           <Button
             variant="default"
             disabled={!props.canWriteSourceControl}
@@ -171,7 +174,7 @@ export function BranchRestoreConfirmHost(props: {
               props.onConfirm();
             }}
           >
-            Switch branch
+            {t("chatA.chatOverlayHosts.switchBranch")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -194,6 +197,7 @@ export function RevertConfirmHost(props: {
   readonly threadKey: string;
   readonly onConfirm: (turnCount: number, messageId: MessageId, restoreFiles: boolean) => void;
 }) {
+  const t = useT();
   const pending = useThreadOverlay(revertConfirmAtom, props.threadKey);
   const confirm = (restoreFiles: boolean) => {
     if (pending === null) return;
@@ -209,18 +213,21 @@ export function RevertConfirmHost(props: {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Edit from here?</AlertDialogTitle>
+          <AlertDialogTitle>{t("chatA.chatOverlayHosts.editFromHere")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Rewind chat to before this message. Your prompt and attachments return to the composer.
-            “Revert files too” also undoes your own edits.
+            {t("chatA.chatOverlayHosts.rewindDescription")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t("chatA.chatOverlayHosts.cancel")}
+          </AlertDialogClose>
           <Button variant="destructive-outline" onClick={() => confirm(true)}>
-            Revert files too
+            {t("chatA.chatOverlayHosts.revertFilesToo")}
           </Button>
-          <Button onClick={() => confirm(false)}>Revert and keep changes</Button>
+          <Button onClick={() => confirm(false)}>
+            {t("chatA.chatOverlayHosts.revertAndKeep")}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

@@ -45,10 +45,15 @@ import {
 import { useLocalizedSettingLookup, useT } from "../../useUiLanguage";
 
 function useFontDefaultFamilies() {
+  const t = useT();
   const settings = useScopedSettings();
   const [defaults] = useState(() => ({
-    sans: resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK) ?? "System default",
-    code: resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK) ?? "System monospace",
+    sans:
+      resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK) ??
+      t("settingsD.typographySettings.systemDefault"),
+    code:
+      resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK) ??
+      t("settingsD.typographySettings.systemMonospace"),
   }));
   return {
     sans: defaults.sans,
@@ -58,6 +63,7 @@ function useFontDefaultFamilies() {
 }
 
 function InterfaceFontRow({ preview }: { preview?: ReactNode }) {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const defaults = useFontDefaultFamilies();
@@ -76,7 +82,7 @@ function InterfaceFontRow({ preview }: { preview?: ReactNode }) {
         })
       }
       size={{
-        label: "Interface font size",
+        label: t("settingsD.typographySettings.interfaceFontSize"),
         min: MIN_INTERFACE_FONT_SIZE,
         max: MAX_INTERFACE_FONT_SIZE,
         value: settings.fontSizeInterface,
@@ -89,6 +95,7 @@ function InterfaceFontRow({ preview }: { preview?: ReactNode }) {
 }
 
 function PromptFontRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const defaults = useFontDefaultFamilies();
@@ -107,7 +114,7 @@ function PromptFontRow() {
         })
       }
       size={{
-        label: "Prompt font size",
+        label: t("settingsD.typographySettings.promptFontSize"),
         min: MIN_PROMPT_FONT_SIZE,
         max: MAX_PROMPT_FONT_SIZE,
         value: settings.fontSizePrompt,
@@ -128,6 +135,7 @@ function CodeFontRow({
   description?: string;
   preview?: ReactNode;
 }) {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const defaults = useFontDefaultFamilies();
@@ -150,7 +158,7 @@ function CodeFontRow({
       }
       requireMonospace
       size={{
-        label: "Code font size",
+        label: t("settingsD.typographySettings.codeFontSize"),
         min: MIN_CODE_FONT_SIZE,
         max: MAX_CODE_FONT_SIZE,
         value: settings.fontSizeCode,
@@ -163,6 +171,7 @@ function CodeFontRow({
 }
 
 function TerminalFontRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const defaults = useFontDefaultFamilies();
@@ -182,7 +191,7 @@ function TerminalFontRow() {
       }
       requireMonospace
       size={{
-        label: "Terminal font size",
+        label: t("settingsD.typographySettings.terminalFontSize"),
         min: MIN_TERMINAL_FONT_SIZE,
         max: MAX_TERMINAL_FONT_SIZE,
         value: settings.fontSizeTerminal,
@@ -215,7 +224,7 @@ function FontSmoothingRow() {
       resetAction={
         settings.fontSmoothing !== DEFAULT_UNIFIED_SETTINGS.fontSmoothing ? (
           <SettingResetButton
-            label="font smoothing"
+            label={t("settingsD.typographySettings.resetFontSmoothing")}
             onClick={() =>
               updateSettings({ fontSmoothing: DEFAULT_UNIFIED_SETTINGS.fontSmoothing })
             }
@@ -234,6 +243,7 @@ function FontSmoothingRow() {
 }
 
 function WordWrapRow() {
+  const t = useT();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const row = useLocalizedSettingLookup();
@@ -243,7 +253,7 @@ function WordWrapRow() {
       resetAction={
         settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? (
           <SettingResetButton
-            label="word wrapping"
+            label={t("settingsD.typographySettings.resetWordWrap")}
             onClick={() => updateSettings({ wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap })}
           />
         ) : null
@@ -252,7 +262,7 @@ function WordWrapRow() {
         <Switch
           checked={settings.wordWrap}
           onCheckedChange={(checked) => updateSettings({ wordWrap: Boolean(checked) })}
-          aria-label="Wrap code, diffs, and file previews by default"
+          aria-label={t("settingsD.typographySettings.wrapCodeAria")}
         />
       }
     />
@@ -277,6 +287,7 @@ function SeparateFontsRow({
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
 }) {
+  const t = useT();
   const row = useLocalizedSettingLookup();
   return (
     <SettingsRow
@@ -285,7 +296,7 @@ function SeparateFontsRow({
         <Switch
           checked={checked}
           onCheckedChange={(next) => onCheckedChange(Boolean(next))}
-          aria-label="Separate fonts"
+          aria-label={t("settingsD.typographySettings.separateFontsAria")}
         />
       }
     />

@@ -25,6 +25,7 @@ import {
   pullRequestChecksStatePresentation,
   summarizePullRequestChecks,
 } from "./pullRequestPresentation";
+import { useT } from "../../useUiLanguage";
 
 // Fetch only on open to avoid per-row requests.
 function LazyChecksBody({
@@ -36,6 +37,7 @@ function LazyChecksBody({
   reference: PullRequestRef;
   threadRef: ScopedThreadRef | null;
 }) {
+  const t = useT();
   const detailQuery = useEnvironmentQuery(
     pullRequestEnvironment.detail({ environmentId, input: reference }),
   );
@@ -45,7 +47,9 @@ function LazyChecksBody({
   if (detailQuery.data === null) {
     return (
       <p className="text-muted-foreground text-xs">
-        {detailQuery.isPending ? "Loading checks…" : "No checks reported"}
+        {detailQuery.isPending
+          ? t("misc.pullRequestChecksPopover.loadingChecks")
+          : t("misc.pullRequestChecksPopover.noChecks")}
       </p>
     );
   }
@@ -59,6 +63,7 @@ function ChecksBody({
   checks: ReadonlyArray<PullRequestCheck>;
   threadRef: ScopedThreadRef | null;
 }) {
+  const t = useT();
   const openLink = useOpenLink(threadRef);
   const [showAll, setShowAll] = useState(false);
   const { attention, running, completed } = groupPullRequestChecks(checks);
@@ -66,7 +71,9 @@ function ChecksBody({
   const visibleChecks = [...attention, ...running, ...(showAll || !canCollapse ? completed : [])];
   const hasDetails = visibleChecks.some((check) => check.url !== null);
   if (checks.length === 0) {
-    return <p className="text-muted-foreground text-xs">No checks reported</p>;
+    return (
+      <p className="text-muted-foreground text-xs">{t("misc.pullRequestChecksPopover.noChecks")}</p>
+    );
   }
   return (
     <>
@@ -101,7 +108,10 @@ function ChecksBody({
                       if (!check.url) return;
                       void openLink(check.url).catch((error: unknown) => {
                         console.error(error);
-                        toastManager.add({ type: "error", title: "Unable to open check details" });
+                        toastManager.add({
+                          type: "error",
+                          title: t("misc.pullRequestChecksPopover.unableDetails"),
+                        });
                       });
                     }}
                   >
@@ -120,7 +130,9 @@ function ChecksBody({
           aria-expanded={showAll}
           onClick={() => setShowAll(!showAll)}
         >
-          {showAll ? "Show less" : "Show all"}
+          {showAll
+            ? t("misc.pullRequestChecksPopover.showLess")
+            : t("misc.pullRequestChecksPopover.showAll")}
         </Button>
       ) : null}
     </>

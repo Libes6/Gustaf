@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import {
   isTerminalSubagentStatus,
@@ -40,6 +41,7 @@ export function WorkflowOpeningBlock(props: {
   readonly environmentId: EnvironmentId;
   readonly onOpenThread: (threadId: string) => void;
 }) {
+  const t = useT();
   const { opening } = props;
   const providers = useAtomValue(providersIgnoringCheckedAtAtom(props.environmentId));
   const headline = workflowOpeningHeadline(opening);
@@ -58,7 +60,10 @@ export function WorkflowOpeningBlock(props: {
     );
   return (
     <section
-      aria-label={`Workflow started: ${headline.title}`}
+      aria-label={t("chatB.WorkflowOpeningBlock.workflowStarted").replace(
+        "{title}",
+        headline.title,
+      )}
       className="flex min-w-0 flex-col gap-3 px-1 py-0.5"
       data-workflow-opening
     >
@@ -110,6 +115,7 @@ function WorkflowMemberRow(props: {
   readonly driver: ProviderDriverKind | undefined;
   readonly onOpenThread: (threadId: string) => void;
 }) {
+  const t = useT();
   const { member } = props;
   const threadId = member.childThreadId;
   const failed = member.status === "failed";
@@ -134,7 +140,10 @@ function WorkflowMemberRow(props: {
             ) : (
               <button
                 type="button"
-                aria-label={`Open ${member.title}`}
+                aria-label={t("chatB.WorkflowOpeningBlock.openNamed").replace(
+                  "{title}",
+                  member.title,
+                )}
                 aria-description={member.status}
                 onClick={() => props.onOpenThread(threadId)}
                 className={cn(
@@ -202,6 +211,7 @@ function WorkflowMemberRow(props: {
 }
 
 function WorkflowScript(props: { readonly script: string }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const revealRef = findRevealRef(() => setExpanded(true));
   const canFold = shouldCollapseUserMessage(props.script);
@@ -231,7 +241,9 @@ function WorkflowScript(props: { readonly script: string }) {
             data-scroll-anchor-ignore
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? "Show less" : "Show full script"}
+            {expanded
+              ? t("chatB.WorkflowOpeningBlock.showLess")
+              : t("chatB.WorkflowOpeningBlock.showFullScript")}
           </Button>
         </div>
       ) : null}

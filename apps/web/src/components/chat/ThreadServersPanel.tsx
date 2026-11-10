@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
@@ -45,6 +46,7 @@ export function ThreadServersPanel(props: ThreadServersPanelProps) {
 }
 
 function ThreadServersList(props: ThreadServersPanelProps) {
+  const t = useT();
   const servers = useThreadDiscoveredPorts(props);
   const canOpen = useEnvironmentScope(props.environmentId, AuthPreviewOperateScope);
   const canStop = useAtomValue(
@@ -61,7 +63,9 @@ function ThreadServersList(props: ThreadServersPanelProps) {
   const [visibleCount, setVisibleCount] = useState(SERVER_PAGE_COUNT);
 
   if (servers.length === 0) return null;
-  const externalClickLabel = isMacPlatform(navigator.platform) ? "⌘-click" : "Ctrl-click";
+  const externalClickLabel = isMacPlatform(navigator.platform)
+    ? t("chatB.ThreadServersPanel.clickModifierMac")
+    : t("chatB.ThreadServersPanel.clickModifierCtrl");
   const threadRef = scopeThreadRef(props.environmentId, props.threadId);
   const hiddenCount = Math.max(0, servers.length - visibleCount);
 
@@ -83,12 +87,17 @@ function ThreadServersList(props: ThreadServersPanelProps) {
       const url = resolveDiscoveredServerUrl(props.environmentId, server.url);
       await readLocalApi()
         ?.shell.openExternal(url)
-        .catch((error: unknown) => reportFailure("Unable to open in browser", error));
+        .catch((error: unknown) =>
+          reportFailure(t("chatB.ThreadServersPanel.unableOpenBrowser"), error),
+        );
       return;
     }
     const result = await openDiscoveredPort({ threadRef, port: server, openPreview });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Unable to open preview", squashAtomCommandFailure(result));
+      reportFailure(
+        t("chatB.ThreadServersPanel.unableOpenPreview"),
+        squashAtomCommandFailure(result),
+      );
     }
   };
 
@@ -101,12 +110,18 @@ function ThreadServersList(props: ThreadServersPanelProps) {
     });
     setStoppingKey(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Could not stop server", squashAtomCommandFailure(result));
+      reportFailure(
+        t("chatB.ThreadServersPanel.couldNotStopServer"),
+        squashAtomCommandFailure(result),
+      );
     }
   };
 
   return (
-    <ThreadDetailsSection headingId="thread-details-servers-heading" title="Servers">
+    <ThreadDetailsSection
+      headingId="thread-details-servers-heading"
+      title={t("chatB.ThreadServersPanel.servers")}
+    >
       <ul className="m-0 list-none p-0">
         {servers.slice(0, visibleCount).map((server, index) => {
           const key = serverKey(server);
@@ -139,7 +154,12 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                       localhost:{server.port}
                     </span>
                     <span className="truncate text-2xs font-normal leading-4 text-muted-foreground">
-                      {[server.terminal === null ? "Agent" : "Terminal", server.processName]
+                      {[
+                        server.terminal === null
+                          ? t("chatB.ThreadServersPanel.agent")
+                          : t("chatB.ThreadServersPanel.terminal"),
+                        server.processName,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
@@ -159,7 +179,10 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                           variant="ghost"
                           part="icon"
                           tone="destructive"
-                          aria-label={`Stop localhost:${server.port}`}
+                          aria-label={t("chatB.ThreadServersPanel.stopLocalhost").replace(
+                            "{port}",
+                            String(server.port),
+                          )}
                           disabled={stoppingKey !== null}
                           onClick={() => void stop(server)}
                         />
@@ -171,7 +194,9 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                         <SquareIcon aria-hidden className="size-3 fill-current" />
                       )}
                     </TooltipTrigger>
-                    <TooltipPopup side="left">Stop server</TooltipPopup>
+                    <TooltipPopup side="left">
+                      {t("chatB.ThreadServersPanel.stopServer")}
+                    </TooltipPopup>
                   </Tooltip>
                 </div>
               ) : null}

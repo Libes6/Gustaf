@@ -11,8 +11,10 @@ import { useEnvironmentScope } from "../../state/session";
 import { childThreadApprovalsAtom, threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
+import { useT } from "~/useUiLanguage";
 
 function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
+  const t = useT();
   const canRespond = useEnvironmentScope(entry.thread.environmentId, AuthOrchestrationOperateScope);
   const respond = useAtomCommand(threadEnvironment.respondToApproval, { reportFailure: false });
   const [responding, setResponding] = useState(false);
@@ -20,7 +22,7 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
   const { approval } = entry;
   return (
     <section
-      aria-label={`Approval from ${entry.title}`}
+      aria-label={t("chatA.childThreadApprovals.approvalFrom").replace("{title}", entry.title)}
       className="rounded-lg border border-border bg-background p-3 text-xs"
     >
       <p className="mb-2 font-medium">Approval needed from {entry.title}</p>
@@ -58,7 +60,9 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
             if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
               const failure = squashAtomCommandFailure(result);
               setError(
-                failure instanceof Error ? failure.message : "Failed to submit approval decision.",
+                failure instanceof Error
+                  ? failure.message
+                  : t("chatA.childThreadApprovals.submitFailed"),
               );
             }
             setResponding(false);

@@ -30,6 +30,7 @@ import { useEnvironmentScope, usePreparedConnection } from "../../state/session"
 import { mintPairingCodeOn } from "../../state/peerPairingCode";
 import { peerLinkEnvironment, useLinkableMachines } from "../../state/peerLinks";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useT } from "../../useUiLanguage";
 import { accessConfig } from "../auth/ConnectAgentSurface";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { LinkAccessPicker } from "../settings/LinkAccessPicker";
@@ -85,6 +86,7 @@ function PendingLinkRequest(props: {
 }) {
   const { item } = props;
   const [open, setOpen] = useState(false);
+  const t = useT();
   const [declining, setDeclining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const answer = useAtomCommand(peerLinkEnvironment.answerRequest, {
@@ -118,8 +120,8 @@ function PendingLinkRequest(props: {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-medium text-foreground">
           {picksMachine(item)
-            ? "Link a machine to this environment"
-            : `Link ${target} to this environment`}
+            ? t("chatA.linkRequestCard.linkMachineHere")
+            : t("chatA.linkRequestCard.linkTargetHere").replace("{target}", target)}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
         {item.label !== undefined && item.url !== undefined ? (
@@ -140,15 +142,17 @@ function PendingLinkRequest(props: {
             disabled={declining}
             onClick={() => void decline()}
           >
-            Decline
+            {t("chatA.linkRequestCard.decline")}
           </Button>
           <Button type="button" size="xs" disabled={declining} onClick={() => setOpen(true)}>
-            {picksMachine(item) ? "Choose machine…" : "Review link…"}
+            {picksMachine(item)
+              ? t("chatA.linkRequestCard.chooseMachine")
+              : t("chatA.linkRequestCard.reviewLink")}
           </Button>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Only a session that manages access here can answer this.
+          {t("chatA.linkRequestCard.onlySessionCanAnswer")}
         </p>
       )}
       <LinkRequestDialog
@@ -206,6 +210,7 @@ function LinkRequestDialog(props: {
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const { item } = props;
+  const t = useT();
   const formId = useId();
   const pickMachine = picksMachine(item);
   const listed = useLinkableMachines(props.environmentId, props.open);
@@ -330,12 +335,16 @@ function LinkRequestDialog(props: {
     >
       <WizardPopup>
         <WizardHeader
-          title={pickMachine ? "Link a machine" : `Link ${targetName}`}
-          description="Agents here can then launch, message and wait on threads there. Revoke it in that machine's Connections."
+          title={
+            pickMachine
+              ? t("chatA.linkRequestCard.linkAMachine")
+              : t("chatA.linkRequestCard.linkName").replace("{name}", targetName)
+          }
+          description={t("chatA.linkRequestCard.agentsHereDescription")}
         >
           {steps.length > 1 && !useExisting ? (
             <WizardSteps
-              steps={["Machine", "Access"]}
+              steps={[t("chatA.linkRequestCard.machine"), t("chatA.linkRequestCard.stepAccess")]}
               currentStep={steps.indexOf(current)}
               summaries={[target.kind === "none" ? null : targetName, null]}
               showSummaries
@@ -373,7 +382,9 @@ function LinkRequestDialog(props: {
                 ) : null}
                 {asksAddress ? (
                   <label className="block space-y-1.5">
-                    <span className="block text-xs font-medium text-foreground">Address</span>
+                    <span className="block text-xs font-medium text-foreground">
+                      {t("chatA.linkRequestCard.address")}
+                    </span>
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
@@ -401,12 +412,12 @@ function LinkRequestDialog(props: {
                     {canMint ? null : (
                       <label className="block space-y-1.5">
                         <span className="block text-xs font-medium text-foreground">
-                          Pairing code
+                          {t("chatA.linkRequestCard.pairingCode")}
                         </span>
                         <Input
                           value={pairingCode}
                           onChange={(event) => setPairingCode(event.target.value)}
-                          placeholder="Paste the code"
+                          placeholder={t("chatA.linkRequestCard.pasteCode")}
                           disabled={busy}
                           autoComplete="one-time-code"
                           nativeInput
@@ -459,7 +470,13 @@ function LinkRequestDialog(props: {
             type="submit"
             disabled={busy || (finishesHere ? !ready : !machineReady)}
           >
-            {busy ? "Linking…" : useExisting ? "Use this link" : finishesHere ? "Link" : "Continue"}
+            {busy
+              ? t("chatA.linkRequestCard.linking")
+              : useExisting
+                ? t("chatA.linkRequestCard.useThisLink")
+                : finishesHere
+                  ? t("chatA.linkRequestCard.link")
+                  : t("chatA.linkRequestCard.continue")}
           </Button>
         </WizardFooter>
       </WizardPopup>
@@ -474,11 +491,12 @@ function MachinePicker(props: {
   readonly disabled: boolean;
   readonly onChange: (value: string) => void;
 }) {
+  const t = useT();
   const labelId = useId();
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-xs font-medium">
-        Machine
+        {t("chatA.linkRequestCard.machine")}
       </span>
       <RadioGroup
         aria-labelledby={labelId}
@@ -502,7 +520,9 @@ function MachinePicker(props: {
         ))}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm">
           <Radio value={ANOTHER_ADDRESS} />
-          <span className="min-w-0 flex-1 font-medium">Another address…</span>
+          <span className="min-w-0 flex-1 font-medium">
+            {t("chatA.linkRequestCard.anotherAddress")}
+          </span>
         </label>
       </RadioGroup>
     </div>

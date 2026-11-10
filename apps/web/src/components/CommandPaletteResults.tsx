@@ -25,6 +25,7 @@ import { getVirtualizedScrollFadeClassName } from "./ui/scroll-area";
 import { ProjectPinButton } from "./ProjectPinButton";
 import { SearchMatchHintLine, ThreadSearchMatchExcerpt } from "./ThreadSearchMatch";
 
+import { useT } from "../useUiLanguage";
 interface CommandPaletteResultsProps {
   emptyStateMessage?: string;
   groups: ReadonlyArray<CommandPaletteGroup>;
@@ -35,12 +36,13 @@ interface CommandPaletteResultsProps {
 }
 
 function CommandPaletteEmptyState(props: { emptyStateMessage?: string; isActionsOnly: boolean }) {
+  const t = useT();
   return (
     <div className="py-10 text-center text-sm text-muted-foreground">
       {props.emptyStateMessage ??
         (props.isActionsOnly
-          ? "No matching actions."
-          : "No matching commands, projects, or threads.")}
+          ? t("shell.misc.noMatchingActions")
+          : t("shell.misc.noMatchingCommands"))}
     </div>
   );
 }

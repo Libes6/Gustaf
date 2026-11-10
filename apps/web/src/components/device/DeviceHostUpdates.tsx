@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { deviceEnvironment } from "~/state/device";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { useT } from "../../useUiLanguage";
 
 export function DeviceHostUpdates({
   state,
@@ -11,6 +12,7 @@ export function DeviceHostUpdates({
   state: DeviceServiceState;
   environmentId: EnvironmentId;
 }) {
+  const t = useT();
   const retry = useAtomCommand(deviceEnvironment.list);
   const [pending, setPending] = useState<string | null>(null);
   if (state.hostStatus === "disabled") return null;
@@ -31,10 +33,10 @@ export function DeviceHostUpdates({
               <p className="whitespace-pre-wrap break-words text-muted-foreground">
                 {status.detail ??
                   (failed
-                    ? "Device support could not start."
+                    ? t("misc.deviceHostUpdates.supportNotStart")
                     : status.status === "installing"
-                      ? "Installing device tools…"
-                      : "Starting device tools…")}
+                      ? t("misc.deviceHostUpdates.installingTools")
+                      : t("misc.deviceHostUpdates.startingTools"))}
               </p>
               {failed ? (
                 <p className="mt-1 text-muted-foreground">
@@ -55,7 +57,9 @@ export function DeviceHostUpdates({
                   );
                 }}
               >
-                {pending === host.id ? "Retrying…" : "Retry"}
+                {pending === host.id
+                  ? t("misc.deviceHostUpdates.retrying")
+                  : t("misc.deviceHostUpdates.retry")}
               </Button>
             ) : null}
           </div>

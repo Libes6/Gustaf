@@ -34,7 +34,14 @@ export function useLocalizedSettingLookup() {
   return (id: SettingsSearchItemId) => {
     const base = searchableSetting(id);
     const copy = settingCopy(language, id);
-    return copy ? { id: base.id, title: copy.title, description: copy.description } : base;
+    if (copy) {
+      return { id: base.id, title: copy.title, description: copy.description };
+    }
+    return {
+      id: base.id,
+      title: base.title,
+      description: "description" in base ? String(base.description ?? "") : "",
+    };
   };
 }
 

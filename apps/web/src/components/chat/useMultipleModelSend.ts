@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   type EnvironmentId,
   type ModelSelection,
@@ -62,6 +63,7 @@ interface MultipleModelSendInput {
  * user has moved on, through a "Restore prompt" toast.
  */
 export function useMultipleModelSend(input: MultipleModelSendInput) {
+  const t = useT();
   const {
     environmentId,
     routeThreadKey,
@@ -217,7 +219,14 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: `Started ${startedCount} ${startedCount === 1 ? "thread" : "threads"} in background`,
+            title: t("chatB.useMultipleModelSend.startedInBackground")
+              .replace("{count}", String(startedCount))
+              .replace(
+                "{noun}",
+                startedCount === 1
+                  ? t("chatB.useMultipleModelSend.thread")
+                  : t("chatB.useMultipleModelSend.threads"),
+              ),
           }),
         );
       }
@@ -251,12 +260,11 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         const recoveryToastId = toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "A background prompt could not be sent",
-            description:
-              "Your newer draft is unchanged. Restore the failed prompt when this composer is empty.",
+            title: t("chatB.useMultipleModelSend.backgroundPromptNotSent"),
+            description: t("chatB.useMultipleModelSend.newerDraftUnchanged"),
             timeout: 0,
             actionProps: {
-              children: "Restore prompt",
+              children: t("chatB.useMultipleModelSend.restorePrompt"),
               onClick: () => {
                 if (
                   !draftId ||
@@ -267,8 +275,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   )
                 ) {
                   toastManager.update(recoveryToastId, {
-                    description:
-                      "Return to the original draft and send or clear its current prompt before restoring.",
+                    description: t("chatB.useMultipleModelSend.returnToOriginalDraft"),
                   });
                   return;
                 }

@@ -11,6 +11,7 @@ import { RedactedSensitiveText } from "../settings/RedactedSensitiveText";
 import { LimitWindows, ResetCredits } from "../usage/UsageLimits";
 import { ComposerBanner } from "./ComposerBanner";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
+import { useT } from "~/useUiLanguage";
 
 function accountLabel(account: UsageLimitsReport["accounts"][number]): string {
   if (!account.instanceId) return account.label;
@@ -24,6 +25,7 @@ function accountLabel(account: UsageLimitsReport["accounts"][number]): string {
 }
 
 function AccountSummary({ account }: { readonly account: UsageLimitsReport["accounts"][number] }) {
+  const t = useT();
   const label = accountLabel(account);
   return (
     <>
@@ -31,9 +33,9 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
         <RedactedSensitiveText
           key={label}
           value={label}
-          ariaLabel="Toggle account label visibility"
-          revealTooltip="Click to reveal account"
-          hideTooltip="Click to hide account"
+          ariaLabel={t("chatA.composerUsageLimits.toggleAccountLabel")}
+          revealTooltip={t("chatA.composerUsageLimits.revealAccount")}
+          hideTooltip={t("chatA.composerUsageLimits.hideAccount")}
           className="max-w-full truncate align-bottom font-sans text-xs leading-normal"
         />
       ) : (

@@ -1,4 +1,6 @@
 import { AndroidIcon, AppleIcon } from "../Icons";
+import { useT } from "../../useUiLanguage";
+import type { MessageKey } from "../../i18n";
 import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
 import { QRCodeSvg } from "../ui/qr-code";
@@ -7,13 +9,13 @@ import { searchableSetting } from "./settingsSearch";
 
 const stores = [
   {
-    label: "iPhone and iPad",
+    labelKey: "settingsB.MobileAppSettingsRow.iphoneAndIpad" as MessageKey,
     store: "App Store",
     url: "https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824",
     Icon: AppleIcon,
   },
   {
-    label: "Android",
+    labelKey: "settingsB.MobileAppSettingsRow.android" as MessageKey,
     store: "Google Play",
     url: "https://play.google.com/store/apps/details?id=com.t3tools.t3code",
     Icon: AndroidIcon,
@@ -21,22 +23,25 @@ const stores = [
 ];
 
 export function MobileAppSettingsRow() {
+  const t = useT();
   return (
     <SettingsRow
       {...searchableSetting("mobile-app")}
-      description="Connect to your server from your phone or tablet."
+      description={t("settingsB.MobileAppSettingsRow.description")}
       control={
         <div className="flex items-center gap-2">
-          {stores.map(({ label, store, url, Icon }) => (
+          {stores.map(({ labelKey, store, url, Icon }) => (
             <Popover key={store}>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 <Icon />
-                {label}
+                {t(labelKey)}
               </PopoverTrigger>
               <PopoverPopup align="end">
                 <div className="flex flex-col items-center gap-3">
                   <PopoverTitle>{store}</PopoverTitle>
-                  <p className="text-xs text-muted-foreground">Scan with your phone camera.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("settingsB.MobileAppSettingsRow.scan")}
+                  </p>
                   <div className="rounded-lg bg-white p-1.5">
                     <QRCodeSvg
                       value={url}
@@ -51,7 +56,7 @@ export function MobileAppSettingsRow() {
                     variant="outline"
                     render={<a href={url} target="_blank" rel="noreferrer noopener" />}
                   >
-                    Open {store}
+                    {t("settingsB.MobileAppSettingsRow.open").replace("{store}", store)}
                   </Button>
                 </div>
               </PopoverPopup>

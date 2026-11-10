@@ -32,6 +32,7 @@ import { toastManager } from "../ui/toast";
 import { Switch } from "../ui/switch";
 import type { ProjectSettingsCategory } from "./ProjectSettingsPanel";
 import { searchableSetting } from "./settingsSearch";
+import { useT } from "../../useUiLanguage";
 import { useSettingsScope } from "./SettingsScopeContext";
 import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
@@ -53,6 +54,7 @@ function isWorktreeSubmodules(value: string | null): value is WorktreeSubmodules
 }
 
 export function ProjectDefaultsSettings({ category }: { category: ProjectSettingsCategory }) {
+  const t = useT();
   const { scope, target, targets, connectedEnvironments } = useSettingsScope();
   const settings = useScopedSettings();
   const clientSettings = useClientSettings();
@@ -123,7 +125,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const setModel = (value: ModelSelection | null) => {
     const reason = value ? modelDisabledReason(value.instanceId, value.model) : null;
     if (reason) {
-      toastManager.add({ type: "error", title: "Default model not saved", description: reason });
+      toastManager.add({
+        type: "error",
+        title: t("settingsC.projectDefaultsSettings.modelNotSaved"),
+        description: reason,
+      });
       return;
     }
     updateSettings({ defaultModelSelection: value });
@@ -135,17 +141,19 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultModelSelection"]}
       mixed={mixedModel}
       id="default-model"
-      title="Model"
+      title={t("settingsC.projectDefaultsSettings.model")}
       description={
         isProjectScope
-          ? "Model for new threads in this project."
+          ? t("settingsC.projectDefaultsSettings.modelDescProject")
           : !unavailable && modelSource !== "project" && automaticModel
-            ? "Default model for new threads, selected automatically. Projects can override it."
-            : "Default model for new threads. Projects can override it."
+            ? t("settingsC.projectDefaultsSettings.modelDescAuto")
+            : t("settingsC.projectDefaultsSettings.modelDesc")
       }
       status={
         mixedModel
-          ? `${automaticModel ? "Automatic defaults differ." : "Defaults differ."} Select one environment or choose a shared model to edit effort.`
+          ? automaticModel
+            ? t("settingsC.projectDefaultsSettings.modelMixedAuto")
+            : t("settingsC.projectDefaultsSettings.modelMixed")
           : effortDisabledReason
       }
       resetAction={
@@ -165,7 +173,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               modelOptionsByInstance={modelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
               {...(mixedModel
-                ? { triggerLabel: automaticModel ? "Automatic (mixed)" : "Mixed" }
+                ? {
+                    triggerLabel: automaticModel
+                      ? t("settingsC.projectDefaultsSettings.automaticMixed")
+                      : t("settingsC.projectDefaultsSettings.mixed"),
+                  }
                 : {})}
               getModelDisabledReason={modelDisabledReason}
               onOpenProviderSetup={(instanceId) => {
@@ -195,7 +207,9 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">
-            {mixedModel ? "Mixed" : "No providers available"}
+            {mixedModel
+              ? t("settingsC.projectDefaultsSettings.mixed")
+              : t("settingsC.projectDefaultsSettings.noProviders")}
           </span>
         )
       }
@@ -207,11 +221,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultThreadEnvMode"]}
       mixed={mixedWorkspace}
       id={searchableSetting("new-threads").id}
-      title="Workspace"
+      title={t("settingsC.projectDefaultsSettings.workspace")}
       description={
         isProjectScope
-          ? "Where new threads in this project start."
-          : "Where new threads start. Projects and their t3.json can override it."
+          ? t("settingsC.projectDefaultsSettings.workspaceDescProject")
+          : t("settingsC.projectDefaultsSettings.workspaceDesc")
       }
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
@@ -229,14 +243,17 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               updateSettings({ defaultThreadEnvMode: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label="Default workspace">
+          <SelectTrigger
+            size="sm"
+            aria-label={t("settingsC.projectDefaultsSettings.defaultWorkspaceAria")}
+          >
             <SelectValue>
               {(value: string | null) =>
                 value === "local" || value === "worktree"
                   ? resolveEnvModeLabel(value)
                   : unavailable
-                    ? "Unavailable"
-                    : "Mixed"
+                    ? t("settingsC.projectDefaultsSettings.unavailable")
+                    : t("settingsC.projectDefaultsSettings.mixed")
               }
             </SelectValue>
           </SelectTrigger>
@@ -255,7 +272,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       {...searchableSetting("fallback-model")}
-      description="Used for new threads when the default model's provider is out of usage."
+      description={t("settingsC.projectDefaultsSettings.fallbackDesc")}
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
@@ -275,11 +292,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               instanceEntries={entries}
               modelOptionsByInstance={fallbackModelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              triggerAriaLabel="Fallback model"
+              triggerAriaLabel={t("settingsC.projectDefaultsSettings.fallbackModelAria")}
               {...(mixedFallback
-                ? { triggerLabel: "Mixed" }
+                ? { triggerLabel: t("settingsC.projectDefaultsSettings.mixed") }
                 : settings.fallbackModelSelection === null
-                  ? { triggerLabel: "None" }
+                  ? { triggerLabel: t("settingsC.projectDefaultsSettings.none") }
                   : {})}
               getModelDisabledReason={modelDisabledReason}
               onInstanceModelChange={(instanceId, model) => {
@@ -287,7 +304,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                 if (reason) {
                   toastManager.add({
                     type: "error",
-                    title: "Fallback model not saved",
+                    title: t("settingsC.projectDefaultsSettings.fallbackNotSaved"),
                     description: reason,
                   });
                   return;
@@ -316,7 +333,9 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             ) : null}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">No providers available</span>
+          <span className="text-sm text-muted-foreground">
+            {t("settingsC.projectDefaultsSettings.noProviders")}
+          </span>
         )
       }
     />
@@ -325,7 +344,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   return (
     <SettingsSection
       id={category === "source-control" ? "source-control-defaults" : "project-defaults"}
-      title={category === "source-control" ? "Repositories" : "New threads"}
+      title={
+        category === "source-control"
+          ? t("settingsC.projectDefaultsSettings.repositories")
+          : t("settingsC.projectDefaultsSettings.newThreads")
+      }
     >
       {category === "project" ? (
         <>
@@ -344,8 +367,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("default-permissions")}
             description={
               isProjectScope
-                ? "Permissions for new threads in this project."
-                : "Default permissions for new threads. Projects can override them."
+                ? t("settingsC.projectDefaultsSettings.permissionsDescProject")
+                : t("settingsC.projectDefaultsSettings.permissionsDesc")
             }
             resetAction={
               settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
@@ -366,13 +389,16 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   if (value) updateSettings({ defaultRuntimeMode: value });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Default permissions">
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t("settingsC.projectDefaultsSettings.defaultPermissionsAria")}
+                >
                   {!mixedPermissions && (
                     <PermissionIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   )}
                   <SelectValue>
                     {mixedPermissions
-                      ? "Mixed"
+                      ? t("settingsC.projectDefaultsSettings.mixed")
                       : runtimeModeConfig[settings.defaultRuntimeMode].label}
                   </SelectValue>
                 </SelectTrigger>
@@ -418,24 +444,24 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["defaultAutoPull"]}
             mixed={mixedAutoPull}
             id="automatic-pull"
-            title="Automatically pull"
+            title={t("settingsC.projectDefaultsSettings.autoPull")}
             description={
               isProjectScope
-                ? "Keeps this project's default branch current when the checkout has no local changes or commits."
-                : "Keeps the default branch current when the checkout has no local changes or commits. Projects can override it."
+                ? t("settingsC.projectDefaultsSettings.autoPullDescProject")
+                : t("settingsC.projectDefaultsSettings.autoPullDesc")
             }
             resetAction={
               settings.defaultAutoPull ? (
                 <SettingResetButton
                   label="default automatic pull"
-                  tooltip="Reset automatic pull to off"
+                  tooltip={t("settingsC.projectDefaultsSettings.autoPullReset")}
                   onClick={() => updateSettings({ defaultAutoPull: false })}
                 />
               ) : null
             }
             control={
               <Switch
-                aria-label="Default automatic pull"
+                aria-label={t("settingsC.projectDefaultsSettings.autoPullAria")}
                 mixed={mixedAutoPull}
                 checked={mixedAutoPull ? false : settings.defaultAutoPull}
                 onCheckedChange={(enabled) => updateSettings({ defaultAutoPull: enabled })}
@@ -447,19 +473,19 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["removeAgentCreditsOnMerge"]}
             mixed={mixedAgentCredits}
             {...searchableSetting("remove-agent-credits-on-merge")}
-            description="Remove recognized agent credit lines from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
+            description={t("settingsC.projectDefaultsSettings.credentialsDesc")}
             resetAction={
               settings.removeAgentCreditsOnMerge ? (
                 <SettingResetButton
                   label="agent credit removal"
-                  tooltip="Keep agent credits"
+                  tooltip={t("settingsC.projectDefaultsSettings.keepCredits")}
                   onClick={() => updateSettings({ removeAgentCreditsOnMerge: false })}
                 />
               ) : null
             }
             control={
               <Switch
-                aria-label="Remove agent credits when merging"
+                aria-label={t("settingsC.projectDefaultsSettings.removeCreditsAria")}
                 mixed={mixedAgentCredits}
                 checked={mixedAgentCredits ? false : settings.removeAgentCreditsOnMerge}
                 onCheckedChange={(enabled) =>
@@ -475,14 +501,14 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("pull-request-merge-method")}
             description={
               isProjectScope
-                ? "Pull requests in this project start with this method."
-                : "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device."
+                ? t("settingsC.projectDefaultsSettings.mergeDescProject")
+                : t("settingsC.projectDefaultsSettings.mergeDesc")
             }
             resetAction={
               settings.pullRequestMergeMethod !== null ? (
                 <SettingResetButton
                   label="default merge method"
-                  tooltip="Reset to last selected"
+                  tooltip={t("settingsC.projectDefaultsSettings.resetToLastSelected")}
                   onClick={() => updateSettings({ pullRequestMergeMethod: null })}
                 />
               ) : null
@@ -496,19 +522,24 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                     updateSettings({ pullRequestMergeMethod: value });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Default pull request merge method">
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t("settingsC.projectDefaultsSettings.mergeMethodAria")}
+                >
                   <SelectValue>
                     {(value: string | null) =>
                       value === "merge" || value === "squash" || value === "rebase"
                         ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
                         : value === "last"
-                          ? "Last selected"
-                          : "Mixed"
+                          ? t("settingsC.projectDefaultsSettings.lastSelected")
+                          : t("settingsC.projectDefaultsSettings.mixed")
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="last">Last selected</SelectItem>
+                  <SelectItem value="last">
+                    {t("settingsC.projectDefaultsSettings.lastSelected")}
+                  </SelectItem>
                   <SelectItem value="merge">{PULL_REQUEST_MERGE_METHOD_LABELS.merge}</SelectItem>
                   <SelectItem value="squash">{PULL_REQUEST_MERGE_METHOD_LABELS.squash}</SelectItem>
                   <SelectItem value="rebase">{PULL_REQUEST_MERGE_METHOD_LABELS.rebase}</SelectItem>
@@ -523,6 +554,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
 }
 
 export function WorktreeSubmodulesRow() {
+  const t = useT();
   const { scope, target, connectedEnvironments } = useSettingsScope();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -541,8 +573,8 @@ export function WorktreeSubmodulesRow() {
       {...searchableSetting("worktree-submodules")}
       description={
         isProjectScope
-          ? "How new worktrees in this project populate git submodules."
-          : "How new worktrees populate git submodules. Projects and their t3.json can override it."
+          ? t("settingsC.projectDefaultsSettings.submodulesDescProject")
+          : t("settingsC.projectDefaultsSettings.submodulesDesc")
       }
       resetAction={
         !isProjectScope && settings.worktreeSubmodules !== null ? (
@@ -559,14 +591,17 @@ export function WorktreeSubmodulesRow() {
             if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label="Worktree submodules">
+          <SelectTrigger
+            size="sm"
+            aria-label={t("settingsC.projectDefaultsSettings.submodulesAria")}
+          >
             <SelectValue>
               {(value: string | null) =>
                 isWorktreeSubmodules(value)
                   ? WORKTREE_SUBMODULES_LABELS[value]
                   : unavailable
-                    ? "Unavailable"
-                    : "Mixed"
+                    ? t("settingsC.projectDefaultsSettings.unavailable")
+                    : t("settingsC.projectDefaultsSettings.mixed")
               }
             </SelectValue>
           </SelectTrigger>

@@ -8,6 +8,7 @@ import { MiddleTruncate } from "../ui/middle-truncate";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { useT } from "../../useUiLanguage";
 
 interface BaseFreshness {
   readonly behindBy: number | null;
@@ -31,6 +32,7 @@ function PullRequestBaseFreshnessWarning({
   readonly className?: string;
   readonly children?: ReactNode;
 }) {
+  const t = useT();
   const behind =
     freshness.behindBy === null
       ? ""
@@ -60,7 +62,9 @@ function PullRequestBaseFreshnessWarning({
       </PopoverTrigger>
       <PopoverPopup align="start" side="bottom" className="max-w-80" padding="compact">
         <p className="text-xs text-foreground">{summary}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Changes can be cleanly merged.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t("misc.pullRequestBaseBranch.cleanMerge")}
+        </p>
         {freshness.methods.length > 0 ? (
           <span className="mt-2 flex flex-wrap items-center gap-1.5">
             {freshness.methods.map((method) => (
@@ -72,7 +76,9 @@ function PullRequestBaseFreshnessWarning({
                 onClick={() => onUpdate(method)}
               >
                 <PullRequestGlyph.merged aria-hidden className="size-3" />
-                {method === "rebase" ? "Update with rebase" : "Update branch"}
+                {method === "rebase"
+                  ? t("misc.pullRequestBaseBranch.updateRebase")
+                  : t("misc.pullRequestBaseBranch.updateBranch")}
               </Button>
             ))}
           </span>
@@ -98,10 +104,14 @@ export function PullRequestBaseBranch({
   readonly onUpdate: (method: PullRequestUpdateMethod) => void;
   readonly iconClassName?: string;
 }) {
+  const t = useT();
   const label = (
     <>
       {stacked ? (
-        <PullRequestGlyph.stack aria-label="Stacked pull request" className="size-3 shrink-0" />
+        <PullRequestGlyph.stack
+          aria-label={t("misc.pullRequestBaseBranch.stackedPr")}
+          className="size-3 shrink-0"
+        />
       ) : null}
       <code className="flex min-w-0">
         <MiddleTruncate value={baseBranch} showTitle={false} />
@@ -131,7 +141,11 @@ export function PullRequestBaseBranch({
           </span>
         }
       />
-      <TooltipPopup side="top">{stacked ? `Stacked on ${baseBranch}` : baseBranch}</TooltipPopup>
+      <TooltipPopup side="top">
+        {stacked
+          ? t("misc.pullRequestBaseBranch.stackedOn").replace("{base}", baseBranch)
+          : baseBranch}
+      </TooltipPopup>
     </Tooltip>
   );
 }

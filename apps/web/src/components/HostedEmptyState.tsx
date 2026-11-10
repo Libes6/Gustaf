@@ -18,7 +18,9 @@ import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 /** Home screen for the hosted app before any computer is added. */
+import { useT } from "../useUiLanguage";
 export function HostedEmptyState() {
+  const t = useT();
   const cloudEnabled = hasCloudPublicConfig();
   const localEnvironmentOff = isLocalEnvironmentDisabled();
 
@@ -36,14 +38,16 @@ export function HostedEmptyState() {
         <Empty className="flex-1">
           <EmptyHeader>
             <EmptyTitle>
-              {localEnvironmentOff ? "This computer is off" : "No computer connected"}
+              {localEnvironmentOff
+                ? t("shell.smallUi.computerOff")
+                : t("shell.smallUi.noComputerConnected")}
             </EmptyTitle>
             <EmptyDescription>
               {localEnvironmentOff
-                ? "Turn it back on, or connect a different computer."
+                ? t("shell.smallUi.turnBackOn")
                 : cloudEnabled
-                  ? "Your agents run on your computer."
-                  : "Your agents run on your computer. Start Gustaf there first."}
+                  ? t("shell.smallUi.agentsOnComputer")
+                  : t("shell.smallUi.agentsOnComputerStartFirst")}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -64,6 +68,7 @@ export function HostedEmptyState() {
 }
 
 function T3ConnectSteps() {
+  const t = useT();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   // Adding the first computer unmounts this screen. Wait for all health checks
@@ -79,11 +84,11 @@ function T3ConnectSteps() {
         {isSignedIn ? (
           <p className="flex items-center gap-1.5 text-muted-foreground">
             <CheckIcon className="size-4" />
-            Signed in
+            {t("shell.smallUi.signedIn")}
           </p>
         ) : (
           <Button size="sm" disabled={!isLoaded} onClick={openAuthPrompt}>
-            Sign in
+            {t("shell.smallUi.signIn")}
           </Button>
         )}
       </SetupStep>
@@ -106,7 +111,11 @@ function T3ConnectSteps() {
                     return next;
                   }),
               }}
-              empty={<p className="text-xs text-muted-foreground">Waiting for your computer…</p>}
+              empty={
+                <p className="text-xs text-muted-foreground">
+                  {t("shell.hostedEmpty.waitingForComputer")}
+                </p>
+              }
             />
           </div>
         ) : null}
@@ -116,6 +125,7 @@ function T3ConnectSteps() {
 }
 
 function PairingSteps() {
+  const t = useT();
   return (
     <>
       <SetupStep number={1}>
@@ -123,7 +133,7 @@ function PairingSteps() {
       </SetupStep>
       <SetupStep number={2}>
         <Button render={<Link to="/settings/connections" />} size="sm">
-          Add pairing link
+          {t("shell.smallUi.addPairingLink")}
         </Button>
       </SetupStep>
     </>
@@ -146,9 +156,10 @@ function SetupStep({
 }
 
 function RunOnComputer({ command }: { readonly command: string }) {
+  const t = useT();
   return (
     <>
-      <p>Run on your computer:</p>
+      <p>{t("shell.smallUi.runOnComputer")}</p>
       <InstallT3Commands command={command} className="mt-2" />
       <a
         className="mt-2 inline-block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -156,7 +167,7 @@ function RunOnComputer({ command }: { readonly command: string }) {
         target="_blank"
         rel="noreferrer noopener"
       >
-        Or download the desktop app
+        {t("shell.smallUi.downloadDesktopApp")}
       </a>
     </>
   );

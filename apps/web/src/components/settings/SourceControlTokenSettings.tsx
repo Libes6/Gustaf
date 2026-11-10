@@ -19,6 +19,7 @@ import { Button, InlineButton } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { SecretSourceInput, useSecretSources } from "./SecretSourceInput";
+import { useT } from "../../useUiLanguage";
 
 const hasToken = (token: SettingsSecretValue | undefined) =>
   typeof token === "string" ? token.length > 0 : token !== undefined;
@@ -34,6 +35,7 @@ export function SourceControlTokenSettings({
   readonly credentials: SourceControlHostCredentials;
   readonly onSaved: () => void;
 }) {
+  const t = useT();
   const { tokens } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
   );
@@ -104,14 +106,16 @@ export function SourceControlTokenSettings({
                 />
               }
             >
-              Create a token
+              {t("settingsD.sourceControlTokenSettings.createToken")}
               <ExternalLinkIcon aria-hidden className="size-3" />
             </InlineButton>
           ) : null}
         </p>
         <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
           <div className="grid gap-1.5">
-            <Label htmlFor={`${definition.kind}-token-host-${environmentId}`}>Host</Label>
+            <Label htmlFor={`${definition.kind}-token-host-${environmentId}`}>
+              {t("settingsD.sourceControlTokenSettings.host")}
+            </Label>
             <Input
               id={`${definition.kind}-token-host-${environmentId}`}
               autoComplete="off"
@@ -122,7 +126,9 @@ export function SourceControlTokenSettings({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor={`${definition.kind}-token-${environmentId}`}>Token</Label>
+            <Label htmlFor={`${definition.kind}-token-${environmentId}`}>
+              {t("settingsD.sourceControlTokenSettings.token")}
+            </Label>
             <SecretSourceInput
               id={`${definition.kind}-token-${environmentId}`}
               size="sm"
@@ -138,8 +144,13 @@ export function SourceControlTokenSettings({
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {savedHosts.length === 0
-              ? `No token saved; the server uses ${credentials.tokenEnvVar} or the ${credentials.cliName} login.`
-              : `Saved for ${savedHosts.join(", ")}.`}
+              ? t("settingsD.sourceControlTokenSettings.noTokenSaved")
+                  .replace("{envVar}", credentials.tokenEnvVar)
+                  .replace("{cli}", credentials.cliName)
+              : t("settingsD.sourceControlTokenSettings.savedFor").replace(
+                  "{hosts}",
+                  savedHosts.join(", "),
+                )}
           </p>
           <div className="flex shrink-0 gap-2">
             {isSaved ? (
@@ -149,7 +160,7 @@ export function SourceControlTokenSettings({
                 disabled={saving}
                 onClick={() => void save(normalizedHost, "")}
               >
-                Remove
+                {t("settingsD.sourceControlTokenSettings.remove")}
               </Button>
             ) : null}
             <Button
@@ -157,7 +168,7 @@ export function SourceControlTokenSettings({
               size="xs"
               disabled={!normalizedHost || submission === "" || saving}
             >
-              Save
+              {t("settingsD.sourceControlTokenSettings.save")}
             </Button>
           </div>
         </div>

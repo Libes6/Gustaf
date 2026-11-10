@@ -15,6 +15,7 @@ import {
   type SourceControlHostCredentials,
 } from "@t3tools/client-runtime/source-control-clients";
 import { redactedPlaceholder } from "./RedactedSensitiveText";
+import { useT } from "../../useUiLanguage";
 
 /** Sentinel select value for "follow the CLI's active login"; logins never contain spaces. */
 const ACTIVE_ACCOUNT = "active cli account";
@@ -24,6 +25,7 @@ function RedactedLogin(props: {
   readonly revealed: boolean;
   readonly label?: string;
 }) {
+  const t = useT();
   return props.revealed ? (
     <span className="min-w-0 truncate font-mono text-2xs">{props.account}</span>
   ) : (
@@ -31,7 +33,9 @@ function RedactedLogin(props: {
       <span className="select-none blur-xs" aria-hidden>
         {redactedPlaceholder(props.account)}
       </span>
-      <span className="sr-only">{props.label ?? "Hidden account"}</span>
+      <span className="sr-only">
+        {props.label ?? t("settingsD.sourceControlAccountSettings.hiddenAccount")}
+      </span>
     </span>
   );
 }
@@ -49,6 +53,7 @@ export function SourceControlAccountSettings({
   readonly auth: SourceControlProviderAuth;
   readonly onSaved: () => void;
 }) {
+  const t = useT();
   const { hosts } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
   );
@@ -101,7 +106,17 @@ export function SourceControlAccountSettings({
           size="icon-xs"
           variant="ghost-muted"
           onClick={() => setRevealed((current) => !current)}
-          aria-label={revealed ? `Hide ${label} accounts` : `Reveal ${label} accounts`}
+          aria-label={
+            revealed
+              ? t("settingsD.sourceControlAccountSettings.hideAccountsAria").replace(
+                  "{label}",
+                  label,
+                )
+              : t("settingsD.sourceControlAccountSettings.revealAccountsAria").replace(
+                  "{label}",
+                  label,
+                )
+          }
           aria-pressed={revealed}
         >
           {revealed ? <EyeOffIcon /> : <EyeIcon />}
@@ -120,7 +135,7 @@ export function SourceControlAccountSettings({
                 <span className="text-xs font-medium text-foreground">{group.host}</span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
                   <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                    <span>Signed in as</span>
+                    <span>{t("settingsD.sourceControlAccountSettings.signedInAs")}</span>
                     <RedactedLogin revealed={revealed} account={group.selectable[0]} />
                   </p>
                 ) : null}
@@ -128,13 +143,17 @@ export function SourceControlAccountSettings({
               <Switch
                 checked={enabled}
                 disabled={saving}
-                aria-label={`Use ${label} on ${group.host}`}
+                aria-label={t("settingsD.sourceControlAccountSettings.useOnHostAria")
+                  .replace("{label}", label)
+                  .replace("{host}", group.host)}
                 onCheckedChange={(checked) => void save(group.host, { enabled: checked })}
               />
             </div>
             {group.selectable.length > 1 ? (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Account</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("settingsD.sourceControlAccountSettings.account")}
+                </span>
                 <div className="w-64 max-w-full">
                   <Select
                     value={pinned}
@@ -146,12 +165,20 @@ export function SourceControlAccountSettings({
                       });
                     }}
                   >
-                    <SelectTrigger size="sm" aria-label={`${label} account for ${group.host}`}>
+                    <SelectTrigger
+                      size="sm"
+                      aria-label={t("settingsD.sourceControlAccountSettings.accountForHostAria")
+                        .replace("{label}", label)
+                        .replace("{host}", group.host)}
+                    >
                       <SelectValue>
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              Active {cliName} account
+                              {t("settingsD.sourceControlAccountSettings.activeAccount").replace(
+                                "{cli}",
+                                cliName,
+                              )}
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -172,7 +199,10 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          Active {cliName} account
+                          {t("settingsD.sourceControlAccountSettings.activeAccount").replace(
+                            "{cli}",
+                            cliName,
+                          )}
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)
@@ -185,7 +215,9 @@ export function SourceControlAccountSettings({
                           <RedactedLogin
                             revealed={revealed}
                             account={account}
-                            label={`Account ${index + 1}`}
+                            label={t(
+                              "settingsD.sourceControlAccountSettings.accountNumber",
+                            ).replace("{index}", String(index + 1))}
                           />
                         </SelectItem>
                       ))}
@@ -197,7 +229,7 @@ export function SourceControlAccountSettings({
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-warning">
-                  The chosen login is no longer signed in, so the active {cliName} login is used.
+                  {t("settingsD.sourceControlAccountSettings.staleLogin").replace("{cli}", cliName)}
                 </p>
                 <Button
                   size="xs"
@@ -205,7 +237,7 @@ export function SourceControlAccountSettings({
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
                 >
-                  Use active login
+                  {t("settingsD.sourceControlAccountSettings.useActiveLogin")}
                 </Button>
               </div>
             ) : null}
@@ -216,14 +248,23 @@ export function SourceControlAccountSettings({
               >
                 <RedactedLogin revealed={revealed} account={entry.account} />
                 <span>
-                  can't be used: {entry.error ?? `${cliName} reports this login as invalid.`}
+                  {t("settingsD.sourceControlAccountSettings.cantBeUsed").replace(
+                    "{error}",
+                    entry.error ??
+                      t("settingsD.sourceControlAccountSettings.invalidLogin").replace(
+                        "{cli}",
+                        cliName,
+                      ),
+                  )}
                 </span>
               </p>
             ))}
             {group.environmentVariable ? (
               <p className="text-xs text-warning">
-                {group.environmentVariable} is set on the server, so it overrides the account chosen
-                here until it is unset.
+                {t("settingsD.sourceControlAccountSettings.envOverrides").replace(
+                  "{var}",
+                  group.environmentVariable,
+                )}
               </p>
             ) : null}
           </div>

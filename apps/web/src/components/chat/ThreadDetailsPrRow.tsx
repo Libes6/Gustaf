@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { resolvePullRequestDetailChecks } from "@t3tools/client-runtime/pull-request-checks";
 import {
   capitalizeTerm,
@@ -107,6 +108,13 @@ export function ThreadDetailsPrRow({
   onStopWatching?: (() => void) | undefined;
 }) {
   const serverConfigs = useServerConfigs();
+  const t = useT();
+  const termText = (term: string) =>
+    term === "pull request"
+      ? t("chatB.ThreadDetailsPrRow.termPullRequest")
+      : term === "merge request"
+        ? t("chatB.ThreadDetailsPrRow.termMergeRequest")
+        : term;
   const supportsPullRequests = serverConfigs.get(environmentId) !== undefined;
   const repository = sourceControlClients.repositorySelector(project?.repositoryIdentity);
   const reference: PullRequestRef | null =
@@ -294,7 +302,10 @@ export function ThreadDetailsPrRow({
               <div className="flex min-w-0 items-start gap-2 text-destructive">
                 <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
                 <div className="min-w-0 flex-1 wrap-break-word">
-                  Merge conflicts with {detail.baseBranch}
+                  {t("chatB.ThreadDetailsPrRow.mergeConflictsWith").replace(
+                    "{branch}",
+                    detail.baseBranch,
+                  )}
                 </div>
               </div>
             ) : null}
@@ -321,42 +332,47 @@ export function ThreadDetailsPrRow({
   const trailingAction =
     rowAction === "resolve"
       ? {
-          label: "Resolve",
-          pendingLabel: "Preparing...",
+          label: t("chatB.ThreadDetailsPrRow.resolve"),
+          pendingLabel: t("chatB.ThreadDetailsPrRow.preparing"),
           pending: handoff === "conflicts",
           destructive: true,
           suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-          tooltip: "Check the branch out and resolve the conflicts in a new thread",
+          tooltip: t("chatB.ThreadDetailsPrRow.resolveTip"),
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
         ? {
-            label: "Ready",
-            pendingLabel: "Marking...",
+            label: t("chatB.ThreadDetailsPrRow.ready"),
+            pendingLabel: t("chatB.ThreadDetailsPrRow.marking"),
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: `Mark this ${terminology.singular} as ready for review`,
+            tooltip: t("chatB.ThreadDetailsPrRow.readyTip").replace(
+              "{term}",
+              termText(terminology.singular),
+            ),
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
           ? {
-              label: "Fix",
-              pendingLabel: "Preparing...",
+              label: t("chatB.ThreadDetailsPrRow.fix"),
+              pendingLabel: t("chatB.ThreadDetailsPrRow.preparing"),
               pending: handoff === "findings",
               destructive: true,
               suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-              tooltip: "Fix the failing checks in a new thread",
+              tooltip: t("chatB.ThreadDetailsPrRow.fixTip"),
               onClick: startFixChecks,
             }
           : rowAction === "merge"
             ? {
-                label: "Merge",
-                pendingLabel: "Merging...",
+                label: t("chatB.ThreadDetailsPrRow.merge"),
+                pendingLabel: t("chatB.ThreadDetailsPrRow.merging"),
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `Merge this ${terminology.singular} (${selectedMergeMethod})`,
+                tooltip: t("chatB.ThreadDetailsPrRow.mergeTip")
+                  .replace("{term}", termText(terminology.singular))
+                  .replace("{method}", selectedMergeMethod),
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -374,7 +390,10 @@ export function ThreadDetailsPrRow({
               size="sm"
               part={part}
               className="group/watch"
-              aria-label={`Stop watching #${number}`}
+              aria-label={t("chatB.ThreadDetailsPrRow.stopWatchingNumber").replace(
+                "{number}",
+                String(number),
+              )}
               onClick={onStopWatching}
             />
           }
@@ -391,10 +410,7 @@ export function ThreadDetailsPrRow({
             )}
           />
         </TooltipTrigger>
-        <TooltipPopup side="top">
-          Watching: the agent wakes when checks finish, someone comments, or the branch conflicts.
-          Click to stop.
-        </TooltipPopup>
+        <TooltipPopup side="top">{t("chatB.ThreadDetailsPrRow.watchingTooltip")}</TooltipPopup>
       </Tooltip>
     ) : null;
 
@@ -487,14 +503,19 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>Merge {terminology.singular}?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t("chatB.ThreadDetailsPrRow.mergeTitle").replace(
+                  "{term}",
+                  termText(terminology.singular),
+                )}
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 This merges #{number} using {selectedMergeMethod}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-                Cancel
+                {t("chatB.ThreadDetailsPrRow.cancel")}
               </AlertDialogClose>
               <Button
                 size="sm"
@@ -504,7 +525,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                Merge
+                {t("chatB.ThreadDetailsPrRow.merge")}
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

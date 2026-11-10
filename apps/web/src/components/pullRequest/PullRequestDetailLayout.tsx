@@ -5,6 +5,7 @@ import { cn } from "~/lib/utils";
 
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { PullRequestMetaLine } from "./pullRequestPresentation";
+import { useT } from "../../useUiLanguage";
 
 export function PullRequestDetailHeaderBody({
   title,
@@ -77,10 +78,11 @@ export function PullRequestDetailTabBar<Tab extends string>({
   inert?: boolean;
   children?: ReactNode;
 }) {
+  const t = useT();
   return (
     <nav
       className="col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2"
-      aria-label="Pull request tabs"
+      aria-label={t("misc.pullRequestDetailLayout.tabsLabel")}
       inert={inert}
     >
       <ToggleGroup

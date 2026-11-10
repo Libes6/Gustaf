@@ -13,6 +13,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
  * backdrop returns to the page that opened it. Keyboard guards that skip dialogs exempt
  * `[data-app-modal]`, because these pages own their shortcuts.
  */
+import { useT } from "../useUiLanguage";
 export function AppRouteModal({ label, children }: { label: string; children: ReactNode }) {
   const closeAppModal = useCloseAppModal();
   const [open, setOpen] = useState(true);
@@ -85,19 +86,20 @@ export function AppRouteModal({ label, children }: { label: string; children: Re
 }
 
 export function AppRouteModalClose() {
+  const t = useT();
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <DialogPrimitive.Close
-            aria-label="Close"
+            aria-label={t("shell.smallUi.close")}
             render={<Button size="icon-sm" variant="ghost" />}
           />
         }
       >
         <XIcon />
       </TooltipTrigger>
-      <TooltipPopup side="bottom">Close (Esc)</TooltipPopup>
+      <TooltipPopup side="bottom">{t("shell.smallUi.closeEsc")}</TooltipPopup>
     </Tooltip>
   );
 }

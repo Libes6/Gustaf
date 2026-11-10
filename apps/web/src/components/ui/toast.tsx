@@ -26,6 +26,7 @@ import {
 } from "./toast.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 import { useThreadRouteTarget } from "~/hooks/useThreadRouteTarget";
+import { useT } from "~/useUiLanguage";
 
 export type ThreadToastData = {
   threadRef?: ScopedThreadRef | null;
@@ -134,9 +135,35 @@ function handleToastDismissClick(
   manager.close(toastId);
 }
 
+function ToastDismissButton({
+  manager,
+  toastId,
+  onClose,
+}: {
+  manager: typeof toastManager | typeof anchoredToastManager;
+  toastId: ToastId;
+  onClose: (() => void) | undefined;
+}) {
+  const t = useT();
+  return (
+    <div className={toastCornerDismissClass}>
+      <button
+        aria-label={t("shell.toasts.dismissNotification")}
+        className={toastCornerOrbClass}
+        data-slot="toast-close"
+        onClick={() => handleToastDismissClick(manager, toastId, onClose)}
+        type="button"
+      >
+        <XIcon className="size-3" strokeWidth={2.25} />
+      </button>
+    </div>
+  );
+}
+
 function CopyErrorButton({ text }: { text: string }) {
+  const t = useT();
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-message" });
-  const label = isCopied ? "Copied error" : "Copy error";
+  const label = isCopied ? t("shell.toasts.copiedError") : t("shell.toasts.copyError");
 
   return (
     <Tooltip>
@@ -171,9 +198,10 @@ function ToastExpandableSection({
   children: ReactNode;
   labels: { expand?: string; collapse?: string };
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? t("shell.toasts.showDetails");
+  const collapseLabel = labels.collapse ?? t("shell.toasts.hideDetails");
 
   return (
     <div className="min-w-0">
@@ -204,6 +232,7 @@ function ToastDescriptionAndExpandable({
   toastDescription: unknown;
   toastType: unknown;
 }) {
+  const t = useT();
   const expandableContent = toastData?.expandableContent;
   const labels = toastData?.expandableLabels ?? {};
   const descriptionTrigger = toastData?.expandableDescriptionTrigger ?? false;
@@ -226,8 +255,8 @@ function ToastDescriptionAndExpandable({
     );
   }
 
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? t("shell.toasts.showDetails");
+  const collapseLabel = labels.collapse ?? t("shell.toasts.hideDetails");
 
   const toggle = () => setOpen((v) => !v);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -658,19 +687,11 @@ function Toasts({ position }: { position: ToastPosition }) {
                 dismissAfterVisibleMs={toast.data?.dismissAfterVisibleMs}
                 toastId={toast.id}
               />
-              <div className={toastCornerDismissClass}>
-                <button
-                  aria-label="Dismiss notification"
-                  className={toastCornerOrbClass}
-                  data-slot="toast-close"
-                  onClick={() =>
-                    handleToastDismissClick(toastManager, toast.id, toast.data?.onClose)
-                  }
-                  type="button"
-                >
-                  <XIcon className="size-3" strokeWidth={2.25} />
-                </button>
-              </div>
+              <ToastDismissButton
+                manager={toastManager}
+                onClose={toast.data?.onClose}
+                toastId={toast.id}
+              />
               <Toast.Content
                 className={cn(
                   // overflow-x:clip preserves visible vertical overflow; hidden would force overflow-y:auto
@@ -749,23 +770,11 @@ function AnchoredToasts() {
                     </Toast.Content>
                   ) : (
                     <>
-                      <div className={toastCornerDismissClass}>
-                        <button
-                          aria-label="Dismiss notification"
-                          className={toastCornerOrbClass}
-                          data-slot="toast-close"
-                          onClick={() =>
-                            handleToastDismissClick(
-                              anchoredToastManager,
-                              toast.id,
-                              toast.data?.onClose,
-                            )
-                          }
-                          type="button"
-                        >
-                          <XIcon className="size-3" strokeWidth={2.25} />
-                        </button>
-                      </div>
+                      <ToastDismissButton
+                        manager={anchoredToastManager}
+                        onClose={toast.data?.onClose}
+                        toastId={toast.id}
+                      />
                       <Toast.Content
                         className={cn(
                           "pointer-events-auto min-h-0 overflow-y-visible pl-3.5 text-sm [overflow-x:clip]",

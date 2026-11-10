@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { type EnvironmentId } from "@t3tools/contracts";
 import { type EnvironmentConnectionPresentation } from "@t3tools/client-runtime/connection";
@@ -56,6 +57,7 @@ interface SystemComposerBannersInput {
  * a server update, and auto-balanced machines that need one.
  */
 export function useSystemComposerBanners(input: SystemComposerBannersInput) {
+  const t = useT();
   const {
     activeEnvironment,
     activeEnvironmentUnavailable,
@@ -94,8 +96,11 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not reconnect environment",
-          description: error instanceof Error ? error.message : "Failed to reconnect.",
+          title: t("chatB.useSystemComposerBanners.couldNotReconnect"),
+          description:
+            error instanceof Error
+              ? error.message
+              : t("chatB.useSystemComposerBanners.failedToReconnect"),
         }),
       );
     }
@@ -122,8 +127,11 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not disconnect server",
-            description: error instanceof Error ? error.message : "Failed to disconnect.",
+            title: t("chatB.useSystemComposerBanners.couldNotDisconnect"),
+            description:
+              error instanceof Error
+                ? error.message
+                : t("chatB.useSystemComposerBanners.failedToDisconnect"),
           }),
         );
       }
@@ -163,14 +171,14 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
           size="xs"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="Hide this server's threads. Switch it on again in Environments."
+          title={t("chatB.useSystemComposerBanners.hideServerThreads")}
           onClick={() =>
             void handleDisconnectActiveEnvironmentStable(
               activeEnvironmentUnavailableState.environmentId,
             )
           }
         >
-          Disconnect server
+          {t("chatB.useSystemComposerBanners.disconnectServer")}
         </Button>
       ) : undefined;
     const environmentReconnecting =
@@ -205,7 +213,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
                   )
                 }
               >
-                Reconnect
+                {t("chatB.useSystemComposerBanners.reconnect")}
               </Button>
             ) : null}
             {disconnectAction}
@@ -227,7 +235,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         variant: updateFailed ? "error" : "default",
         group: "environment",
         icon: <ComposerServerUpdateIcon status={serverUpdateState.status} />,
-        title: `${updateFailed ? "Could not update" : "Updating"} ${versionMismatchServerLabel}`,
+        title: `${updateFailed ? t("chatB.useSystemComposerBanners.couldNotUpdate") : t("chatB.useSystemComposerBanners.updating")} ${versionMismatchServerLabel}`,
         description:
           serverUpdateState.status === "failed"
             ? serverUpdateState.message
@@ -244,13 +252,13 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
             installation={versionMismatchInstallation}
             desktopAppUpdate={versionMismatchDesktopAppUpdate}
             targetVersion={versionMismatch.clientVersion}
-            label="Retry"
+            label={t("chatB.useSystemComposerBanners.retry")}
             variant="ghost"
           />
         ),
         ...(updateFailed
           ? {
-              dismissLabel: "Dismiss update notice",
+              dismissLabel: t("chatB.useSystemComposerBanners.dismissUpdateNotice"),
               onDismiss: () => {
                 dismissServerUpdateFailure(serverUpdateState);
                 setDismissedServerUpdateState(serverUpdateState);

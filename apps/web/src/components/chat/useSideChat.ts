@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { ModelSelection, RuntimeMode, ScopedThreadRef } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
@@ -31,6 +32,7 @@ export function useSideChat(input: {
   };
   readonly onError: (message: string) => void;
 }) {
+  const t = useT();
   const pendingRef = useRef(false);
   const forkSideChat = useAtomCommand(threadEnvironment.forkSideChat, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
@@ -56,7 +58,7 @@ export function useSideChat(input: {
       input: { sourceThreadId: threadRef.threadId, targetThreadId, title: "Side chat" },
     });
     if (fork._tag === "Failure") {
-      reportFailure(fork, "Could not start a side chat.");
+      reportFailure(fork, t("chatB.useSideChat.couldNotStart"));
       return false;
     }
     // Drops the empty side chat a failed start leaves behind; one that got its message stays.
@@ -83,7 +85,7 @@ export function useSideChat(input: {
         input: { threadId: targetThreadId, runtimeMode, createdAt: new Date().toISOString() },
       });
       if (mode._tag === "Failure") {
-        reportFailure(mode, "Could not set the side chat's permission mode.");
+        reportFailure(mode, t("chatB.useSideChat.couldNotSetPermission"));
         discard();
         return false;
       }
@@ -104,7 +106,7 @@ export function useSideChat(input: {
         },
       });
       if (turn._tag === "Failure") {
-        reportFailure(turn, "Could not send the side chat message.");
+        reportFailure(turn, t("chatB.useSideChat.couldNotSendMessage"));
         discard();
         return false;
       }

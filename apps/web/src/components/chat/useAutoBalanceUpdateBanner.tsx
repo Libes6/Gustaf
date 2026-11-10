@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import { useState } from "react";
@@ -28,6 +29,7 @@ import { ComposerServerUpdateIcon } from "./ComposerServerUpdateStatus";
 export function useAutoBalanceUpdateBanner(
   environments: readonly EnvironmentPresentation[],
 ): ComposerBannerStackItem | null {
+  const t = useT();
   const updateStates = useAtomValue(
     environmentUpdateStatesAtom(
       environmentIdsKey(environments.map(({ environmentId }) => environmentId)),
@@ -80,7 +82,11 @@ export function useAutoBalanceUpdateBanner(
   );
   const count = running || failed || machines.length;
   const status = running ? "running" : failed ? "failed" : "idle";
-  const prefix = running ? "Updating" : failed ? "Could not update" : "Update available for";
+  const prefix = running
+    ? t("chatB.useAutoBalanceUpdateBanner.updating")
+    : failed
+      ? t("chatB.useAutoBalanceUpdateBanner.couldNotUpdate")
+      : t("chatB.useAutoBalanceUpdateBanner.updateAvailableFor");
   const title = `${prefix} ${count} ${count === 1 ? "machine" : "machines"}`;
   return {
     id: `auto-balance-server-updates-${dismissedNotices.size}`,
@@ -111,8 +117,11 @@ export function useAutoBalanceUpdateBanner(
                 ) : (
                   <div className="text-muted-foreground">
                     {machine.connected
-                      ? `Ready to update to ${machine.targetVersion}`
-                      : "Reconnect this machine to update"}
+                      ? t("chatB.useAutoBalanceUpdateBanner.readyToUpdateTo").replace(
+                          "{version}",
+                          machine.targetVersion,
+                        )
+                      : t("chatB.useAutoBalanceUpdateBanner.reconnectToUpdate")}
                   </div>
                 )}
               </div>
@@ -130,14 +139,14 @@ export function useAutoBalanceUpdateBanner(
           variant="ghost"
           label={
             failed > 0
-              ? "Retry"
+              ? t("chatB.useAutoBalanceUpdateBanner.retry")
               : targets.length === machines.length
-                ? "Update all"
+                ? t("chatB.useAutoBalanceUpdateBanner.updateAll")
                 : `Update ${targets.length} ${targets.length === 1 ? "machine" : "machines"}`
           }
         />
       ) : undefined,
-    dismissLabel: "Dismiss update notice",
+    dismissLabel: t("chatB.useAutoBalanceUpdateBanner.dismissUpdateNotice"),
     ...(running
       ? {}
       : {

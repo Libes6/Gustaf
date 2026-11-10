@@ -10,6 +10,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { toastManager } from "../../ui/toast";
 import { readableFailure } from "../pullRequestDetail.logic";
 import { guideRunKey, useGuideRunStore } from "./guideRunStore";
+import { useT } from "../../../useUiLanguage";
 
 export function useReviewGuideWriter({
   environmentId,
@@ -20,6 +21,7 @@ export function useReviewGuideWriter({
   reference: PullRequestRef;
   title: string | null;
 }) {
+  const t = useT();
   const query = useEnvironmentQuery(
     pullRequestEnvironment.reviewGuide({ environmentId, input: reference }),
   );
@@ -51,10 +53,10 @@ export function useReviewGuideWriter({
       useGuideRunStore.getState().settle(guideRunKey(environmentId, reference));
       toastManager.add({
         type: "error",
-        title: "Could not start a review guide",
+        title: t("misc.useReviewGuideWriter.couldNotStart"),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "Check the review guide model in Settings → Source control.",
+          t("misc.useReviewGuideWriter.checkModel"),
         ),
       });
     }

@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import type { EnvironmentThreadShell, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
@@ -58,6 +59,7 @@ interface TimelineRewindInput {
  * the composer) and forking a new thread from a run.
  */
 export function useTimelineRewind(input: TimelineRewindInput) {
+  const t = useT();
   const {
     environmentId,
     routeThreadRef,
@@ -107,16 +109,16 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!message || message.role !== "user") return;
 
     if (!supportsConversationRollback) {
-      setThreadError(
-        activeThread.id,
-        "This provider does not support reverting conversation history. Start a new thread instead.",
-      );
+      setThreadError(activeThread.id, t("chatB.useTimelineRewind.providerNoRevert"));
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        t("chatB.useTimelineRewind.reconnectBeforeRevert").replace(
+          "{name}",
+          activeEnvironmentUnavailableLabel,
+        ),
       );
       return;
     }
@@ -192,7 +194,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to fork this response.",
+          error instanceof Error ? error.message : t("chatB.useTimelineRewind.failedForkResponse"),
         );
       }
       return;

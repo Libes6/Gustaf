@@ -1,3 +1,4 @@
+import { useT } from "../../useUiLanguage";
 import {
   ConnectionBlockedError,
   ConnectionTransientError,
@@ -92,6 +93,7 @@ export function useComposerContextImport(input: {
   readonly pendingThreadImportsRef: RefObject<Map<string, number>>;
   readonly addComposerFilesToDraft: (files: ComposerFileAttachment[]) => string[];
 }) {
+  const t = useT();
   const {
     environmentId,
     linkedEnvironments,
@@ -161,7 +163,10 @@ export function useComposerContextImport(input: {
     const fail = (reason: string) => {
       toastManager.add({
         type: "error",
-        title: `Couldn't bring ${record.name} into this message`,
+        title: t("chatB.useComposerContextImport.couldNotBringIntoMessage").replace(
+          "{name}",
+          record.name,
+        ),
         description: `${reason} Remove the chip or attach the file again.`,
       });
     };
@@ -169,7 +174,7 @@ export function useComposerContextImport(input: {
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("The environment it came from is not connected.");
+        fail(t("chatB.useComposerContextImport.envNotConnected"));
         return;
       }
       const result = await createAssetUrl({
@@ -184,14 +189,14 @@ export function useComposerContextImport(input: {
         const cause = result._tag === "Failure" ? Cause.squash(result.cause) : null;
         fail(
           isUnreachable(cause)
-            ? "The environment it came from is not reachable right now."
-            : "The original attachment is no longer available.",
+            ? t("chatB.useComposerContextImport.envNotReachable")
+            : t("chatB.useComposerContextImport.originalUnavailable"),
         );
         return;
       }
       const blob = await downloadAttachmentBlob(url);
       if (!blob) {
-        fail("Downloading it from the source failed.");
+        fail(t("chatB.useComposerContextImport.downloadFailed"));
         return;
       }
       // Question attachments have no inline reference; annotations can own their screenshots.
@@ -229,7 +234,7 @@ export function useComposerContextImport(input: {
       (pendingThreadImportsRef.current.get(importTargetKey) ?? 0) > 0 &&
       countReservedAttachments() >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      fail("The attachment limit has been reached.");
+      fail(t("chatB.useComposerContextImport.attachmentLimit"));
       return;
     }
     if (record.kind === "image") {
@@ -253,8 +258,7 @@ export function useComposerContextImport(input: {
             ) ?? false,
         },
       );
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail(t("chatB.useComposerContextImport.draftRejected"));
     } else {
       const accepted = addComposerFilesToDraft([
         {
@@ -266,8 +270,7 @@ export function useComposerContextImport(input: {
           file,
         },
       ]);
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail(t("chatB.useComposerContextImport.draftRejected"));
     }
   };
   const importAttachmentRecord = async (
