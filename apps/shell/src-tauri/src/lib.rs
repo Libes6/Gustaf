@@ -1,6 +1,6 @@
 mod updater;
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::process::{Child, Command, Stdio};
 use std::sync::{mpsc, Mutex};
 use std::thread;
@@ -60,8 +60,41 @@ fn pairing_url_from_line(line: &str) -> Option<&str> {
     url.starts_with("http://").then_some(url)
 }
 
+fn login_shell_path() -> Option<String> {
+    // A Dock launch does not inherit the shell PATH, so codex, claude, and cursor disappear.
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
+    let mut child = Command::new(shell)
+        .args(["-lic", "printf %s \"$PATH\""])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let (send, receive) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let mut path = String::new();
+        let _ = stdout.read_to_string(&mut path);
+        let _ = send.send(path);
+    });
+    let path = match receive.recv_timeout(Duration::from_secs(4)) {
+        Ok(path) => path,
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        }
+    };
+    let _ = child.wait();
+    let path = path.trim();
+    (!path.is_empty()).then(|| path.to_owned())
+}
+
 fn start_server(app: &tauri::App) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
     let mut command = server_command(app)?;
+    if let Some(path) = login_shell_path() {
+        command.env("PATH", path);
+    }
     command.stdin(Stdio::null()).stdout(Stdio::piped());
     #[cfg(unix)]
     command.process_group(0);
@@ -91,6 +124,28 @@ fn start_server(app: &tauri::App) -> Result<(Server, tauri::Url), Box<dyn std::e
         return Err("Gustaf server did not report a local pairing URL".into());
     }
     Ok((server, url))
+}
+
+fn is_external_browser_url(url: &tauri::Url) -> bool {
+    url.scheme() == "http" || url.scheme() == "https"
+}
+
+fn open_external_url(url: &tauri::Url) {
+    if !is_external_browser_url(url) {
+        return;
+    }
+    let mut command = if cfg!(target_os = "macos") {
+        Command::new("open")
+    } else if cfg!(target_os = "windows") {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "", url.as_str()]);
+        let _ = command.spawn();
+        return;
+    } else {
+        Command::new("xdg-open")
+    };
+    command.arg(url.as_str());
+    let _ = command.spawn();
 }
 
 fn set_dock_icon() {
@@ -125,6 +180,11 @@ pub fn run() {
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
+                // WKWebView drops window.open. ChatGPT sign-in uses it.
+                .on_new_window(|url, _features| {
+                    open_external_url(&url);
+                    tauri::webview::NewWindowResponse::Deny
+                })
                 .build()?;
             app.manage(Mutex::new(Some(server)));
             Ok(())
@@ -142,7 +202,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::pairing_url_from_line;
+    use super::{is_external_browser_url, pairing_url_from_line};
 
     #[test]
     fn reads_the_pairing_url_from_the_server_log() {
@@ -152,5 +212,15 @@ mod tests {
             Some("http://localhost:7445/pair#token=abc")
         );
         assert_eq!(pairing_url_from_line("serverPort=1 webPort=2"), None);
+    }
+
+    #[test]
+    fn only_http_links_leave_the_app() {
+        assert!(is_external_browser_url(
+            &"https://auth.openai.com/authorize".parse().unwrap()
+        ));
+        assert!(!is_external_browser_url(
+            &"javascript:alert(1)".parse().unwrap()
+        ));
     }
 }

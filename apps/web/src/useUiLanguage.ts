@@ -1,7 +1,13 @@
 import { useEffect } from "react";
 
 import { useClientSettings } from "./hooks/useSettings";
-import { settingCopy, translate, translateSettingsNav, type MessageKey } from "./i18n";
+import {
+  settingCopy,
+  translate,
+  translateSettingsGroup,
+  translateSettingsNav,
+  type MessageKey,
+} from "./i18n";
 import { searchableSetting, type SettingsSearchItemId } from "./components/settings/settingsSearch";
 
 function useUiLanguage() {
@@ -16,6 +22,11 @@ export function useT() {
 export function useSettingsNavLabel() {
   const language = useUiLanguage();
   return (path: string, fallback: string) => translateSettingsNav(language, path, fallback);
+}
+
+export function useSettingsGroupLabel() {
+  const language = useUiLanguage();
+  return (heading: string) => translateSettingsGroup(language, heading);
 }
 
 export function useLocalizedSettingLookup() {
