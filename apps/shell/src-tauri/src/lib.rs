@@ -169,6 +169,13 @@ fn set_dock_icon() {
     }
 }
 
+/// The server holds files inside the app bundle, so it has to end before an update replaces them.
+pub(crate) fn stop_server(app: &tauri::AppHandle) {
+    if let Some(server) = app.try_state::<Mutex<Option<Server>>>() {
+        let _ = server.lock().map(|mut server| server.take());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -196,9 +203,7 @@ pub fn run() {
         .expect("error while running Gustaf")
         .run(|app, event| {
             if matches!(event, RunEvent::Exit) {
-                if let Some(server) = app.try_state::<Mutex<Option<Server>>>() {
-                    let _ = server.lock().map(|mut server| server.take());
-                }
+                stop_server(app);
             }
         });
 }
