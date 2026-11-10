@@ -3,7 +3,6 @@ const semver = /^\d+\.\d+\.\d+$/;
 
 const labels = {
   "darwin-aarch64": "macOS-arm64",
-  "darwin-x86_64": "macOS-x64",
   "windows-x86_64": "Windows-x64",
   "linux-x86_64": "Linux-x64",
 };
