@@ -86,3 +86,8 @@
 .dev-role { flex: none; padding: 0 5px; border-radius: 4px; background: var(--bg-chip); color: var(--text-2); font: 10px/16px var(--mono); }
 .dev-row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dev-row-tap { padding: 1px 8px; }
+/* Device controls stay next to the screen; the inspector is a secondary drawer. */
+.dev-stage > .dev-keys { align-self: center; padding: 5px; border: 1px solid var(--border-strong); border-radius: 18px; background: var(--bg-panel); }
+.dev-stage > .dev-keys .dev-btn { border: 0; border-radius: 14px; background: transparent; }
+.panel .dev-screen { height: min(72vh, 760px); border: 0; background: transparent; }
+.panel .dev-toolbar { padding-bottom: 8px; border-bottom: 1px solid var(--border); }

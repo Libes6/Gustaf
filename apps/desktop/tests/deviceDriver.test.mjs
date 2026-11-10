@@ -43,6 +43,7 @@ function fakeRunner(routes) {
     if (cmd && cmd[1] === 'close') opened.delete(cmd[2]);
     for (const [re, reply] of routes)
       if (re.test(script)) return typeof reply === 'function' ? reply(script, opts) : reply;
+    if (cmd && cmd[1] === 'appstate') return json({ success: true, data: { state: 'runningForeground' } });
     return { code: 127, stdout: '', stderr: `no route for: ${script.slice(0, 200)}` };
   };
   return { run, calls, helperCalls: (cmd) => calls.filter((c) => h(cmd).test(c.script)) };
@@ -886,4 +887,23 @@ test('Android (synthetic): no focused app to bind to is a clear error', async ()
 test('parseSnapshot keeps working on the Android shape (pixel rects, text-field)', () => {
   const m = parseSnapshot(droid.snapshot.data);
   assert.equal(m.nodes.find((n) => n.role === 'text-field').id, 'com.android.settings:id/search_src_text');
+});
+
+test('snapshot: refuses a background iOS app tree instead of drawing it over SpringBoard', async () => {
+  let foreground = true;
+  const runner = fakeRunner([
+    HELPER_PRESENT,
+    [h('open'), json({ success: true, data: { appBundleId: 'com.apple.springboard' } })],
+    [h('snapshot'), json(settingsSnapshot())],
+    [
+      h('appstate'),
+      () => json({ success: true, data: { state: foreground ? 'runningForeground' : 'runningBackground' } }),
+    ],
+  ]);
+  const d = createDriver({ run: runner.run, appDataDir: '/data' });
+  await d.snapshot(UDID);
+  foreground = false;
+  const captures = runner.helperCalls('snapshot').length;
+  await assert.rejects(d.snapshot(UDID), (error) => error.code === 'background-app');
+  assert.equal(runner.helperCalls('snapshot').length, captures);
 });

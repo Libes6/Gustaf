@@ -118,7 +118,7 @@ export function DeviceScreen(p: Props) {
     if (p.mode !== "inspect" || !p.map || !p.frame) return;
     const at = boxToDevice(device, sizeNow(), local(e));
     const node = at ? hitTest(p.map, at) : null;
-    setHover((h) => (h?.index === node?.index ? h : node));
+    setHover(node);
   };
   const onMouseDown = (e: React.MouseEvent) => {
     p.onActivity();
@@ -154,9 +154,11 @@ export function DeviceScreen(p: Props) {
   };
 
   const outline = (n: UiNode) => deviceToView(device, shown, n.rect);
-  const active = p.highlight ?? (p.mode === "inspect" ? hover : null);
+  // Local hover belongs to a particular snapshot, never to a reused node index.
+  const currentHover = hover && p.map?.nodes[hover.index] === hover ? hover : null;
+  const active = p.map ? (p.highlight ?? (p.mode === "inspect" ? currentHover : null)) : null;
   const marks: { node: UiNode; kind: "pinned" | "hover" }[] = [];
-  if (p.pinned) marks.push({ node: p.pinned, kind: "pinned" });
+  if (p.map && p.pinned) marks.push({ node: p.pinned, kind: "pinned" });
   if (active && active.index !== p.pinned?.index) marks.push({ node: active, kind: "hover" });
 
   const src = p.frame ? `data:${p.frame.mime};base64,${p.frame.data}` : null;

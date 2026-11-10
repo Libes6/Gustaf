@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ChangesPanel } from "../../src/components/ChangesPanel";
 import { renderApp } from "./render";
@@ -40,10 +40,13 @@ function backend(
     review_diff: ({ id, path }: { id: string; path: string }) => over.diffs?.[`${id}:${path}`] ?? "",
   });
 }
-const open = (messages: any[] = []) =>
-  renderApp(
+const open = (messages: any[] = []) => {
+  const result = renderApp(
     <ChangesPanel name="Alpha" root="/work/alpha" busy={false} messages={messages} tick={0} onChanged={() => {}} />,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+  return result;
+};
 const branchRow = () => document.querySelector(".panel-branch") as HTMLElement;
 const head = () => document.querySelector(".panel-head") as HTMLElement;
 
@@ -71,7 +74,7 @@ describe("pending-changes chip", () => {
     backend({ numstat: "5\t1\tsrc/a.ts\0" + "12\t0\tsrc/new.ts\0", stat: " 1 file changed, 1 insertion(+)" });
     open([checkpointMessage]);
     expect(await screen.findByRole("button", { name: "Changed files · 2" })).toBeInTheDocument();
-    expect(screen.queryByText(/Pending changes/)).toBeNull();
+    expect(within(head()).queryByText(/Pending changes/)).toBeNull();
     await waitFor(() => expect(branchRow()).toHaveTextContent("+17−1"));
   });
 
@@ -85,7 +88,7 @@ describe("pending-changes chip", () => {
     });
     open();
     expect(await screen.findByText("Uncommitted · 2")).toBeInTheDocument();
-    expect(screen.queryByText(/Pending changes/)).toBeNull();
+    expect(within(head()).queryByText(/Pending changes/)).toBeNull();
     expect(head().querySelector("button.btn-soft")).toBeNull();
     await waitFor(() => expect(branchRow()).toHaveTextContent("+7−2"));
   });
@@ -110,7 +113,7 @@ describe("pending-changes chip", () => {
     open();
     await waitFor(() => expect(branchRow()).toHaveTextContent("gustaf/ui-fixes"));
     expect(within(head()).queryByText(/·/)).toBeNull();
-    expect(screen.queryByText(/Pending changes/)).toBeNull();
+    expect(within(head()).queryByText(/Pending changes/)).toBeNull();
     expect(branchRow().querySelector(".plus")).toBeNull();
   });
 });

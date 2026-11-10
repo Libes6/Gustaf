@@ -43,6 +43,7 @@ async function openLive(f = setup(), props: Partial<React.ComponentProps<typeof 
   await userEvent.click(await screen.findByRole("button", { name: "Open iPhone 17 Pro" }));
   const box = await screen.findByRole("group", { name: "Device screen" });
   await waitFor(() => expect(box.querySelector("img")).not.toBeNull());
+  await userEvent.click(screen.getByRole("button", { name: "Show map" }));
   await waitFor(() => expect(f.calls.some((c) => c.method === "snapshot")).toBe(true));
   await screen.findByText("Settings");
   return { ...r, f, box };
@@ -425,5 +426,19 @@ describe("frame loop", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Simulator is not booted");
     f.driver.frame = frame;
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull(), { timeout: 3000 });
+  });
+});
+
+describe("inspection freshness", () => {
+  it("removes a pinned outline and details as soon as the live screen changes", async () => {
+    const { f, box } = await openLive();
+    await userEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.mouseMove(box, view(200, 355));
+    fireEvent.click(box, view(200, 355));
+    expect(screen.getByTestId("dev-outline-pinned")).toBeInTheDocument();
+    const frame = f.driver.frame;
+    f.driver.frame = async (id) => ({ ...(await frame(id)), data: "changed-screen" });
+    await waitFor(() => expect(screen.queryByTestId("dev-outline-pinned")).toBeNull());
+    expect(screen.queryByTestId("dev-outline-hover")).toBeNull();
   });
 });

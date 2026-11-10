@@ -423,6 +423,18 @@ export function createDriver(o: DriverOptions): DeviceDriver & {
   // ---------- snapshot ----------
 
   async function snapshotNow(id: string): Promise<UiMap> {
+    // A helper session is bound to an app, while simctl screenshots always show the
+    // device display. Never publish that app's tree when it is in the background.
+    if (isIosId(id) && st(id).bound) {
+      const state = await helper(id, ["appstate"]);
+      if (state.state !== "runningForeground") {
+        st(id).map = undefined;
+        throw new DeviceError(
+          "The inspected app is no longer in the foreground. Open the current app in the device panel to inspect it.",
+          "background-app",
+        );
+      }
+    }
     let data = await helper(id, ["snapshot", "-i"], 45_000);
     // Right after an app launched or a transition the helper may only see a few nodes and says so: look again.
     for (let i = 0; i < 2 && settling(data); i++) {

@@ -100,7 +100,8 @@ describe("ChangesPanel AI review", () => {
         { file: "other.ts", title: "ignored", detail: "unknown file" },
       ]);
     const { app } = open();
-    await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await screen.findByRole("button", { name: /Pending changes · 2/ });
     await reviewAll();
     expect(await screen.findByRole("status")).toHaveTextContent("findings 1, files 1");
     expect(model.requests).toHaveLength(1);
@@ -119,7 +120,8 @@ describe("ChangesPanel AI review", () => {
   it("shows an error for a malformed reply and applies nothing", async () => {
     model.reply = async () => ({ parts: [{ type: "text", text: "I could not do JSON, sorry" }], usage: undefined });
     open();
-    await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await screen.findByRole("button", { name: /Pending changes · 2/ });
     await reviewAll();
     expect(await screen.findByRole("alert")).toHaveTextContent("expected format");
     expect(callsOf("review_decide")).toEqual([]);
@@ -130,7 +132,8 @@ describe("ChangesPanel AI review", () => {
     model.reply = async () =>
       reply([{ file: "src/a.ts", line: 20, severity: "warn", title: "Fragile call", detail: "d" }]);
     open();
-    await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await screen.findByRole("button", { name: /Pending changes · 2/ });
     await reviewAll();
     await userEvent.click(await screen.findByRole("button", { name: /Show finding: src\/a\.ts:20/ }));
     const dialog = await screen.findByRole("dialog");
@@ -146,7 +149,8 @@ describe("ChangesPanel AI review", () => {
     model.reply = async () => reply([{ file: "src/a.ts", line: 1, severity: "bug", title: "Null deref", detail: "d" }]);
     const onReplyToAgent = vi.fn();
     const { rerenderApp } = open({ onReplyToAgent });
-    await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await screen.findByRole("button", { name: /Pending changes · 2/ });
     await userEvent.click(await screen.findByRole("button", { name: /^src\/a\.ts/ }));
     const dialog = await screen.findByRole("dialog");
     const first = within(dialog).getByRole("region", { name: "@@ -1,2 +1,2 @@" });

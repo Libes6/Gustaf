@@ -83,7 +83,8 @@ export interface DeviceDriver {
   release(id: string): Promise<void>;
 }
 
-export type DeviceErrorCode = "toolchain" | "helper-missing" | "no-device" | "stale-ref" | "timeout" | "failed";
+export type DeviceErrorCode =
+  "toolchain" | "helper-missing" | "no-device" | "background-app" | "stale-ref" | "timeout" | "failed";
 
 /** Thrown by drivers; `code` lets callers show a specific message. */
 export class DeviceError extends Error {

@@ -82,7 +82,11 @@ async function setup(
 }
 /** The agent run ends: busy goes true -> false. */
 const finishRun = (view: Awaited<ReturnType<typeof setup>>) => view.rerenderApp(panel(false));
-const chip = () => screen.findByRole("button", { name: /Pending changes · 3/ });
+const chip = async () => {
+  const tool = screen.getByRole("button", { name: "Changes" });
+  if (tool.getAttribute("aria-pressed") !== "true") await userEvent.click(tool);
+  return screen.findByRole("button", { name: /Pending changes · 3/ });
+};
 const pause = (ms = 50) => new Promise((r) => setTimeout(r, ms));
 
 beforeEach(() => {
@@ -208,7 +212,8 @@ describe("automatic review: what is sent and what goes wrong", () => {
       review_diff: "+x",
     });
     finishRun(view);
-    await userEvent.click(await screen.findByRole("button", { name: /Pending changes · 2/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await screen.findByRole("button", { name: /Pending changes · 2/ });
     expect(await screen.findByText(/Automatic review skipped: nothing to review/)).toBeInTheDocument();
     expect(model.requests).toHaveLength(0);
   });

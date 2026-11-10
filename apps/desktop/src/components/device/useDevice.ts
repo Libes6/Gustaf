@@ -13,11 +13,16 @@ import {
 import type { UiMap } from "../../device/uiMap";
 import { createPoller, frameDelay, FRAME_INTERVALS, type Poller } from "./poller";
 
-export type DeviceErrorState = { message: string; code?: DeviceError["code"]; source: "frame" | "action" | "other" };
+export type DeviceErrorState = {
+  message: string;
+  code?: DeviceError["code"];
+  source: "frame" | "action" | "map" | "other";
+};
 
 export type UseDeviceOptions = {
   /** The panel is on screen (its tab is selected). */
   visible: boolean;
+  inspect?: boolean;
   intervals?: typeof FRAME_INTERVALS;
 };
 
@@ -36,6 +41,21 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   const [frame, setFrame] = useState<Frame | null>(null);
   const [map, setMap] = useState<UiMap | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
+  const mapFrame = useRef<string | null>(null);
+  const mapRequest = useRef(false);
+  const mapEpoch = useRef(0);
+  const frameRequest = useRef<{ id: string; promise: Promise<Frame> } | null>(null);
+  const captureFrame = useCallback(
+    (id: string) => {
+      if (frameRequest.current?.id === id) return frameRequest.current.promise;
+      const promise = driver!.frame(id).finally(() => {
+        if (frameRequest.current?.promise === promise) frameRequest.current = null;
+      });
+      frameRequest.current = { id, promise };
+      return promise;
+    },
+    [driver],
+  );
   const [error, setError] = useState<DeviceErrorState | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
   const [powering, setPowering] = useState<Record<string, "boot" | "shutdown">>({});
@@ -106,6 +126,7 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
     setSelectedId(null);
     setFrame(null);
     setMap(null);
+    mapFrame.current = null;
     void refresh();
   }, [refresh]);
 
@@ -115,10 +136,12 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   selectedRef.current = selectedId;
 
   const select = useCallback((id: string | null) => {
+    mapEpoch.current++;
     selectedRef.current = id;
     setSelectedId(id);
     setFrame(null);
     setMap(null);
+    mapFrame.current = null;
     setError(null);
     live.current.failing = false;
   }, []);
@@ -126,37 +149,64 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
   // ---- the interface map ----
   const refreshMap = useCallback(async () => {
     const id = selectedRef.current;
-    if (!driver || !id) return;
+    if (!driver || !id || mapRequest.current) return;
+    const epoch = mapEpoch.current;
+    mapRequest.current = true;
     setMapLoading(true);
     try {
+      const before = await captureFrame(id);
       const next = await driver.snapshot(id);
-      if (mounted.current && selectedRef.current === id) setMap(next);
+      const after = await captureFrame(id);
+      if (mounted.current && selectedRef.current === id && mapEpoch.current === epoch) {
+        setFrame(after);
+        // A transition during the accessibility capture invalidates its coordinates.
+        mapFrame.current = before.data === after.data ? after.data : null;
+        setMap(mapFrame.current ? next : null);
+        setError((e) => (e?.source === "map" ? null : e));
+      }
     } catch (e) {
-      if (mounted.current && selectedRef.current === id) setError(toError(e, "other"));
+      if (mounted.current && selectedRef.current === id && mapEpoch.current === epoch) {
+        mapFrame.current = null;
+        setMap(null);
+        setError(toError(e, "map"));
+      }
     } finally {
+      mapRequest.current = false;
       if (mounted.current) setMapLoading(false);
     }
-  }, [driver]);
+  }, [driver, captureFrame]);
   useEffect(() => {
-    if (booted && helperReady && selectedId) void refreshMap();
-  }, [booted, helperReady, selectedId, refreshMap]);
+    if (booted && helperReady && selectedId && opts.visible && opts.inspect !== false) void refreshMap();
+  }, [booted, helperReady, selectedId, refreshMap, opts.visible, opts.inspect]);
+
+  useEffect(() => {
+    if (!booted || !helperReady || !opts.visible || opts.inspect === false || !windowVisible) return;
+    const timer = window.setInterval(() => {
+      if (pending.current === 0) void refreshMap();
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [booted, helperReady, opts.visible, opts.inspect, windowVisible, refreshMap]);
 
   // ---- the frame loop ----
   const grabFrame = useCallback(async () => {
     const id = selectedRef.current;
     if (!driver || !id) return;
     try {
-      const f = await driver.frame(id);
+      const f = await captureFrame(id);
       if (!mounted.current || selectedRef.current !== id) return;
       live.current.failing = false;
       setFrame(f);
+      if (mapFrame.current !== null && mapFrame.current !== f.data) {
+        mapFrame.current = null;
+        setMap(null);
+      }
       setError((e) => (e?.source === "frame" ? null : e));
     } catch (e) {
       if (!mounted.current || selectedRef.current !== id) return;
       live.current.failing = true;
       setError(toError(e, "frame"));
     }
-  }, [driver]);
+  }, [driver, captureFrame]);
   useEffect(() => {
     if (!driver || !selectedId || !booted) return;
     const p = createPoller({
@@ -186,6 +236,9 @@ export function useDevice(driver: DeviceDriver | null, opts: UseDeviceOptions) {
     (label: string, fn: (d: DeviceDriver, id: string) => Promise<ActionResult | void>) => {
       const id = selectedRef.current;
       if (!driver || !id) return Promise.resolve(null);
+      mapEpoch.current++;
+      mapFrame.current = null;
+      setMap(null);
       pending.current++;
       setQueue((q) => [...q, label]);
       const job = chain.current.then(async (): Promise<ActionResult | null> => {

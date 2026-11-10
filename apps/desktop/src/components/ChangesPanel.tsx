@@ -1,4 +1,17 @@
-import { Check, ChevronDown, ChevronUp, GitBranch, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
+import {
+  Check,
+  Terminal,
+  Globe,
+  Smartphone,
+  FileDiff,
+  Maximize2,
+  Minimize2,
+  GitBranch,
+  RotateCcw,
+  Sparkles,
+  Undo2,
+  X,
+} from "lucide-react";
 import { createPortal } from "react-dom";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getAgentActivity, subscribeAgentActivity } from "../device/agentActivity";
@@ -58,6 +71,8 @@ function DiffView({ text }: { text: string }) {
 }
 
 export function ChangesPanel({
+  toolbarHost,
+  visible = true,
   reviewOn,
   name,
   root,
@@ -69,6 +84,8 @@ export function ChangesPanel({
   onReplyToAgent,
   chatId,
 }: {
+  toolbarHost?: HTMLElement | null;
+  visible?: boolean;
   /** The chat this panel belongs to: a created PR can be watched in it. */ chatId?: number | null;
   /** False: this chat edits the project directly (no review copy), so the copy hint is not shown while nothing is pending. */ reviewOn?: boolean;
   name: string;
@@ -91,6 +108,9 @@ export function ChangesPanel({
   const [comments, setComments] = useState<FeedbackComment[]>([]);
   const [focusHunk, setFocusHunk] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [width, setWidth] = useState(38);
+  const [dragging, setDragging] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [, setViewedTick] = useState(0);
   const bumpViewed = () => setViewedTick((n) => n + 1);
   const [terminalOpened, setTerminalOpened] = useState(false);
@@ -145,7 +165,7 @@ export function ChangesPanel({
   }, [root]);
 
   const diffDialogRef = useRef<HTMLElement>(null);
-  useDialogFocus(diffDialogRef, undefined, !!diff);
+  useDialogFocus(diffDialogRef, undefined, false);
   useEffect(() => {
     if (!diff) return;
     const close = (e: KeyboardEvent) => {
@@ -404,114 +424,202 @@ export function ChangesPanel({
     return { commands, outputs };
   }, [messages]);
 
-  return (
-    <aside className={`panel${open ? " open" : ""}`} aria-label={t("changes")}>
-      <div className="panel-head">
-        <span className="grow">{name}</span>
-        {summary.source === "review" && (
-          <button
-            className="btn-soft"
-            onClick={() => {
-              setOpen(true);
-              setTab("changes");
-            }}
-          >
-            {t("reviewPending")} · {summary.files}
-            {badge}
-          </button>
-        )}
-        {summary.source === "checkpoint" && (
-          <button
-            className="btn-soft"
-            onClick={() => {
-              setOpen(true);
-              setTab("changes");
-            }}
-          >
-            {t("changesChipChat", { count: summary.files })}
-            {badge}
-          </button>
-        )}
-        {summary.source === "tree" && (
-          <span className="hint" title={summary.added === null ? t("changesLinesUnknown") : undefined}>
-            {t("changesChipTree", { count: summary.files })}
-          </span>
-        )}
+  const toolbar = (
+    <div className="workspace-tools" aria-label={t("workspaceTools")}>
+      {(
+        [
+          ["terminal", Terminal, t("terminal")],
+          ["changes", FileDiff, t("changes")],
+          ["preview", Globe, t.locale === "ru" ? "Предпросмотр" : "Preview"],
+          ["device", Smartphone, t("deviceTab")],
+        ] as const
+      ).map(([key, Icon, label]) => (
         <button
-          className="icon-btn"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-label={open ? t("collapse") : t("changes")}
-          title={open ? t("collapse") : t("changes")}
+          key={key}
+          className={`icon-btn${open && tab === key ? " active" : ""}`}
+          title={label}
+          aria-label={label}
+          aria-pressed={open && tab === key}
+          onClick={() => {
+            setOpen(!open || tab !== key);
+            setTab(key);
+            setDiff(null);
+            if (key === "terminal") setTerminalOpened(true);
+            if (key === "preview") setPreviewOpened(true);
+            if (key === "device") setDeviceOpened(true);
+          }}
         >
-          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          <Icon size={16} />
         </button>
-      </div>
-      <div className="panel-branch">
-        <GitBranch size={13} />
-        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {info?.branch ?? t("noGit")}
-        </span>
-        {summary.added !== null && summary.removed !== null && summary.files > 0 && (
-          <>
-            <span className="plus">+{t.num(summary.added)}</span>
-            <span className="minus">−{t.num(summary.removed)}</span>
-          </>
-        )}
-      </div>
-      {offer.length > 0 && (
-        <div className="commit-offer">
-          <span className="grow">{t("gitOffer", { count: offer.length })}</span>
-          <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>
-            {t("gitCommitAction")}
+      ))}
+    </div>
+  );
+  return (
+    <>
+      {toolbarHost ? createPortal(toolbar, toolbarHost) : toolbar}
+      <aside
+        hidden={!open}
+        data-tool={tab}
+        className={`panel${open ? " open" : ""}`}
+        style={{ flexBasis: `${expanded ? 70 : width}%` }}
+        aria-label={t("changes")}
+      >
+        <div
+          className="workspace-resizer"
+          role="separator"
+          tabIndex={0}
+          aria-label={t("workspacePanelResize")}
+          aria-orientation="vertical"
+          aria-valuemin={25}
+          aria-valuemax={70}
+          aria-valuenow={expanded ? 70 : width}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragging(true);
+          }}
+          onPointerMove={(e) => {
+            if (!dragging) return;
+            const b = e.currentTarget.parentElement!.parentElement!.getBoundingClientRect();
+            setExpanded(false);
+            setWidth(Math.max(25, Math.min(70, ((b.right - e.clientX) / b.width) * 100)));
+          }}
+          onPointerUp={() => setDragging(false)}
+          onLostPointerCapture={() => setDragging(false)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+              e.preventDefault();
+              setExpanded(false);
+              setWidth((v) => Math.max(25, Math.min(70, v + (e.key === "ArrowLeft" ? 2 : -2))));
+            }
+          }}
+        />
+        <div className="panel-head">
+          <span className="grow">
+            {tab === "terminal"
+              ? t("terminal")
+              : tab === "device"
+                ? t("deviceTab")
+                : tab === "preview"
+                  ? t.locale === "ru"
+                    ? "Предпросмотр"
+                    : "Preview"
+                  : name}
+          </span>
+          {summary.source === "review" && (
+            <button
+              className="btn-soft"
+              onClick={() => {
+                setOpen(true);
+                setTab("changes");
+              }}
+            >
+              {t("reviewPending")} · {summary.files}
+              {badge}
+            </button>
+          )}
+          {summary.source === "checkpoint" && (
+            <button
+              className="btn-soft"
+              onClick={() => {
+                setOpen(true);
+                setTab("changes");
+              }}
+            >
+              {t("changesChipChat", { count: summary.files })}
+              {badge}
+            </button>
+          )}
+          {summary.source === "tree" && (
+            <span className="hint" title={summary.added === null ? t("changesLinesUnknown") : undefined}>
+              {t("changesChipTree", { count: summary.files })}
+            </span>
+          )}
+          <button
+            className="icon-btn"
+            aria-label={t(expanded ? "workspacePanelRestore" : "workspacePanelExpand")}
+            title={t(expanded ? "workspacePanelRestore" : "workspacePanelExpand")}
+            aria-pressed={expanded}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
           <button
             className="icon-btn"
-            title={t("gitOfferDismiss")}
-            aria-label={t("gitOfferDismiss")}
             onClick={() => {
-              acceptedFiles.forget(
-                root,
-                offer.map((f) => f.path),
-              );
-              refresh().catch((e) => setErr(String(e)));
+              toolbarHost?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+              setOpen(false);
             }}
+            aria-expanded={open}
+            aria-label={t("workspacePanelClose")}
+            title={t("workspacePanelClose")}
           >
-            <X size={13} />
+            <X size={15} />
           </button>
         </div>
-      )}
-      {notice && (
-        <div className="commit-notice" role="status">
-          <Check size={13} />
-          <span className="grow">{notice}</span>
+        <div className="panel-branch">
+          <GitBranch size={13} />
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {info?.branch ?? t("noGit")}
+          </span>
+          {summary.added !== null && summary.removed !== null && summary.files > 0 && (
+            <>
+              <span className="plus">+{t.num(summary.added)}</span>
+              <span className="minus">−{t.num(summary.removed)}</span>
+            </>
+          )}
         </div>
-      )}
-      {commitOpen && (
-        <GitCommitDialog
-          root={root}
-          chatId={chatId}
-          accepted={acceptedFiles.list(root)}
-          onClose={() => setCommitOpen(false)}
-          gate={
-            auto.enabled
-              ? {
-                  ensure: () => trigger.ensureReviewed().then(() => undefined),
-                  high: highFor,
-                  dismiss: aiReview.dismiss,
-                }
-              : undefined
-          }
-          onCommitted={(r) => {
-            acceptedFiles.forget(root, r.files);
-            setNotice(t("gitCommitted", { sha: r.short, branch: r.branch ?? "HEAD" }));
-            refresh().catch((e) => setErr(String(e)));
-            onChanged();
-          }}
-        />
-      )}
-      {diff &&
-        createPortal(
+        {offer.length > 0 && (
+          <div className="commit-offer">
+            <span className="grow">{t("gitOffer", { count: offer.length })}</span>
+            <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>
+              {t("gitCommitAction")}
+            </button>
+            <button
+              className="icon-btn"
+              title={t("gitOfferDismiss")}
+              aria-label={t("gitOfferDismiss")}
+              onClick={() => {
+                acceptedFiles.forget(
+                  root,
+                  offer.map((f) => f.path),
+                );
+                refresh().catch((e) => setErr(String(e)));
+              }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div className="commit-notice" role="status">
+            <Check size={13} />
+            <span className="grow">{notice}</span>
+          </div>
+        )}
+        {commitOpen && (
+          <GitCommitDialog
+            root={root}
+            chatId={chatId}
+            accepted={acceptedFiles.list(root)}
+            onClose={() => setCommitOpen(false)}
+            gate={
+              auto.enabled
+                ? {
+                    ensure: () => trigger.ensureReviewed().then(() => undefined),
+                    high: highFor,
+                    dismiss: aiReview.dismiss,
+                  }
+                : undefined
+            }
+            onCommitted={(r) => {
+              acceptedFiles.forget(root, r.files);
+              setNotice(t("gitCommitted", { sha: r.short, branch: r.branch ?? "HEAD" }));
+              refresh().catch((e) => setErr(String(e)));
+              onChanged();
+            }}
+          />
+        )}
+        {diff && (
           <div
             className="review-overlay"
             onMouseDown={(e) => {
@@ -522,7 +630,7 @@ export function ChangesPanel({
               ref={diffDialogRef}
               className="review-dialog"
               role="dialog"
-              aria-modal="true"
+              aria-modal="false"
               aria-label={diff.path}
             >
               <header>
@@ -617,306 +725,276 @@ export function ChangesPanel({
                 </div>
               )}
             </section>
-          </div>,
-          document.body,
-        )}
-      {gate &&
-        createPortal(
-          <div
-            className="review-overlay"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setGate(null);
-            }}
-          >
-            <section
-              ref={gateRef}
-              className="review-dialog"
-              role="alertdialog"
-              aria-modal="true"
-              aria-label={t("gateTitle", { count: gateNow.length })}
-            >
-              <ReviewGate
-                findings={gateNow.map((f) => ({ id: f.id, file: f.file, line: f.line, title: f.title }))}
-                confirmLabel={gateNow.length ? gate.label : t("gateContinue")}
-                onDismiss={aiReview.dismiss}
-                onBack={() => setGate(null)}
-                onConfirm={() => {
-                  const g = gate;
-                  setGate(null);
-                  void g.proceed();
-                }}
-              />
-            </section>
-          </div>,
-          document.body,
-        )}
-      {open && (
-        <>
-          <div className="panel-tabs">
-            <button
-              className={tab === "changes" ? "active" : ""}
-              aria-pressed={tab === "changes"}
-              onClick={() => setTab("changes")}
-            >
-              {t("changes")} {files.length ? `(${files.length})` : ""}
-              {badge}
-            </button>
-            <button
-              className={tab === "terminal" ? "active" : ""}
-              aria-pressed={tab === "terminal"}
-              onClick={() => {
-                setTab("terminal");
-                setTerminalOpened(true);
-              }}
-            >
-              {t("terminal")}
-            </button>
-            <button
-              className={tab === "preview" ? "active" : ""}
-              aria-pressed={tab === "preview"}
-              onClick={() => {
-                setTab("preview");
-                setPreviewOpened(true);
-              }}
-            >
-              {t.locale === "ru" ? "Предпросмотр" : "Preview"}
-            </button>
-            <button
-              className={tab === "device" ? "active" : ""}
-              aria-pressed={tab === "device"}
-              onClick={() => {
-                setTab("device");
-                setDeviceOpened(true);
-              }}
-            >
-              {t("deviceTab")}
-            </button>
           </div>
-          <div className="panel-body">
-            {deviceOpened && (
-              <div hidden={tab !== "device"}>
-                <Suspense fallback={<div className="term">{t("deviceTab")}…</div>}>
-                  <DevicePanel
-                    visible={tab === "device"}
-                    agentActive={agentDevices.length > 0}
-                    agentLabel={agentDevices[0]?.name}
-                    onStopAgent={() => window.dispatchEvent(new Event("gustaf-stop"))}
-                  />
-                </Suspense>
-              </div>
-            )}
-            {previewOpened && (
-              <div hidden={tab !== "preview"}>
-                <Suspense fallback={<div className="term">Preview…</div>}>
-                  <ProjectPreview root={reviews[0]?.[0].workspace ?? root} onSendConsole={onReplyToAgent} />
-                </Suspense>
-              </div>
-            )}
-            {tab === "changes" && (
-              <>
-                {workspace && workspacePrefix !== null && (
-                  <WorkspaceChanges
-                    projectRoot={workspace.projectRoot}
-                    taskId={workspace.taskId}
-                    branch={workspace.branch}
-                    root={root}
-                    prefix={workspacePrefix}
-                    tick={tick}
-                    onShowDiff={(path, text) => {
-                      setErr("");
-                      setPicked(new Set());
-                      setDiff({ path, text });
-                    }}
-                    onError={setErr}
-                  />
-                )}
-                {(reviewOn !== false || pending > 0) && (
-                  <div className="review-intro">
-                    <strong>{t("reviewPending")}</strong>
-                    <p>{t("reviewHint")}</p>
-                    {pending > 0 && (
+        )}
+        {gate &&
+          createPortal(
+            <div
+              className="review-overlay"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setGate(null);
+              }}
+            >
+              <section
+                ref={gateRef}
+                className="review-dialog"
+                role="alertdialog"
+                aria-modal="true"
+                aria-label={t("gateTitle", { count: gateNow.length })}
+              >
+                <ReviewGate
+                  findings={gateNow.map((f) => ({ id: f.id, file: f.file, line: f.line, title: f.title }))}
+                  confirmLabel={gateNow.length ? gate.label : t("gateContinue")}
+                  onDismiss={aiReview.dismiss}
+                  onBack={() => setGate(null)}
+                  onConfirm={() => {
+                    const g = gate;
+                    setGate(null);
+                    void g.proceed();
+                  }}
+                />
+              </section>
+            </div>,
+            document.body,
+          )}
+        {(open || terminalOpened || previewOpened || deviceOpened) && (
+          <>
+            <div className="panel-body">
+              {deviceOpened && (
+                <div className="panel-tool-view" hidden={tab !== "device"}>
+                  <Suspense fallback={<div className="term">{t("deviceTab")}…</div>}>
+                    <DevicePanel
+                      visible={visible && open && tab === "device"}
+                      agentActive={agentDevices.length > 0}
+                      agentLabel={agentDevices[0]?.name}
+                      onStopAgent={() => window.dispatchEvent(new Event("gustaf-stop"))}
+                    />
+                  </Suspense>
+                </div>
+              )}
+              {previewOpened && (
+                <div className="panel-tool-view" hidden={tab !== "preview"}>
+                  <Suspense fallback={<div className="term">Preview…</div>}>
+                    <ProjectPreview root={reviews[0]?.[0].workspace ?? root} onSendConsole={onReplyToAgent} />
+                  </Suspense>
+                </div>
+              )}
+              {tab === "changes" && (
+                <>
+                  {workspace && workspacePrefix !== null && (
+                    <WorkspaceChanges
+                      projectRoot={workspace.projectRoot}
+                      taskId={workspace.taskId}
+                      branch={workspace.branch}
+                      root={root}
+                      prefix={workspacePrefix}
+                      tick={tick}
+                      onShowDiff={(path, text) => {
+                        setErr("");
+                        setPicked(new Set());
+                        setDiff({ path, text });
+                      }}
+                      onError={setErr}
+                    />
+                  )}
+                  {(reviewOn !== false || pending > 0) && (
+                    <div className="review-intro">
+                      <strong>{t("reviewPending")}</strong>
+                      <p>{t("reviewHint")}</p>
+                      {pending > 0 && (
+                        <button
+                          className="btn-soft"
+                          disabled={!canReview}
+                          onClick={() => reviewFiles()}
+                          title={t("aiReviewHint")}
+                        >
+                          <Sparkles size={13} /> {t("aiReviewAll")}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {reviewOn === false && pending === 0 && (files.length > 0 || !!workspace) && (
+                    <div className="review-intro">
                       <button
                         className="btn-soft"
                         disabled={!canReview}
-                        onClick={() => reviewFiles()}
+                        onClick={() => void reviewEverything()}
                         title={t("aiReviewHint")}
                       >
                         <Sparkles size={13} /> {t("aiReviewAll")}
                       </button>
-                    )}
-                  </div>
-                )}
-                {reviewOn === false && pending === 0 && (files.length > 0 || !!workspace) && (
-                  <div className="review-intro">
-                    <button
-                      className="btn-soft"
-                      disabled={!canReview}
-                      onClick={() => void reviewEverything()}
-                      title={t("aiReviewHint")}
-                    >
-                      <Sparkles size={13} /> {t("aiReviewAll")}
-                    </button>
-                  </div>
-                )}
-                <FindingsList
-                  findings={aiReview.findings}
-                  summary={aiReview.summary}
-                  statusText={statusText}
-                  running={aiReview.running}
-                  error={statusError}
-                  rules={aiReview.rules}
-                  onJump={jumpTo}
-                  onDismiss={aiReview.dismiss}
-                  onCancel={aiReview.cancel}
-                />
-                <FeedbackQueue
-                  comments={comments}
-                  busy={busy}
-                  canSend={!!onReplyToAgent}
-                  onRemove={(id) => setComments((old) => old.filter((c) => c.id !== id))}
-                  onSend={sendFeedback}
-                />
-                {busy && (
-                  <div className="hint" style={{ padding: 12 }}>
-                    {t("reviewWorking")}
-                  </div>
-                )}
-                {!pending && reviewOn !== false && (
-                  <div className="hint" style={{ padding: 12 }}>
-                    {t("reviewEmpty")}
-                  </div>
-                )}
-                {reviewOn === false && !pending && (
-                  <div className="hint" style={{ padding: 12 }}>
-                    {t("reviewCopyDirectNote")}
-                  </div>
-                )}
-                <ReviewSetupForm root={root} config={setupCfg} onSaved={setSetupCfg} />
-                {reviews.map(([r, list]) => (
-                  <div key={r.id} className="review-group">
-                    {reviews.length > 1 && (
-                      <button className="btn-soft review-ai" disabled={!canReview} onClick={() => reviewFiles(r.id)}>
-                        <Sparkles size={13} /> {t("aiReviewGroup", { count: list.length })}
-                      </button>
-                    )}
-                    {setupCfg.testCommand && (
-                      <ReviewTestRun reviewId={r.id} command={setupCfg.testCommand} tick={tick} busy={busy || acting} />
-                    )}
-                    {list.map((f) => (
-                      <div
-                        key={f.path}
-                        className={`file-row review-row${isViewed(root, f.path, `review:${r.id}`) ? " viewed" : ""}`}
-                      >
-                        <ViewedBox root={root} path={f.path} signature={`review:${r.id}`} onChange={bumpViewed} />
-                        <button className="path review-path" onClick={() => showDiff(f.path, r.id)}>
-                          {f.path}
-                          <span className="hint">{t(f.binary ? "reviewBinary" : "reviewChanged")}</span>
-                        </button>
-                        <button
-                          className="icon-btn"
-                          disabled={busy || acting}
-                          title={t("reviewAccept")}
-                          aria-label={`${t("reviewAccept")}: ${f.path}`}
-                          onClick={guarded([f.path], t("gateAcceptAnyway"), act(accept(r.id, f.path)))}
-                        >
-                          <Check size={15} />
-                        </button>
-                        <button
-                          className="icon-btn"
-                          disabled={busy || acting}
-                          title={t("reviewReject")}
-                          aria-label={`${t("reviewReject")}: ${f.path}`}
-                          onClick={act(() => review.decide(r.id, f.path, false))}
-                        >
-                          <X size={15} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {files.length > 0 && (
-                  <div className="review-intro">
-                    <strong>{t("changes")}</strong>
-                  </div>
-                )}
-                {!files.length && (
-                  <div className="hint" style={{ padding: 12 }}>
-                    {t("noChanges")}
-                  </div>
-                )}
-                {files.map((f) => (
-                  <div
-                    key={f.path}
-                    className={`file-row${isViewed(root, f.path, `${f.added}/${f.removed}`) ? " viewed" : ""}`}
-                  >
-                    <ViewedBox root={root} path={f.path} signature={`${f.added}/${f.removed}`} onChange={bumpViewed} />
-                    <button className="path" onClick={() => showDiff(f.path)}>
-                      {f.path}
-                    </button>
-                    <span className="plus">+{f.added}</span>
-                    <span className="minus">−{f.removed}</span>
-                    <button
-                      className="icon-btn"
-                      disabled={busy || acting}
-                      title={t("revertFile")}
-                      aria-label={`${t("revertFile")}: ${f.path}`}
-                      onClick={(e) => (e.stopPropagation(), act(() => restoreFile(root, base!, f.path))())}
-                    >
-                      <Undo2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-            {terminalOpened && (
-              <div hidden={tab !== "terminal"} style={{ minHeight: 260 }}>
-                <Suspense fallback={<div className="term">{t("terminal")}…</div>}>
-                  <TerminalPanel
-                    commandScope={root}
-                    root={reviews[0]?.[0].workspace ?? root}
-                    onSendSelection={onReplyToAgent}
+                    </div>
+                  )}
+                  <FindingsList
+                    findings={aiReview.findings}
+                    summary={aiReview.summary}
+                    statusText={statusText}
+                    running={aiReview.running}
+                    error={statusError}
+                    rules={aiReview.rules}
+                    onJump={jumpTo}
+                    onDismiss={aiReview.dismiss}
+                    onCancel={aiReview.cancel}
                   />
-                </Suspense>
-                <details className="term">
-                  <summary>
-                    {t("terminal")} · {t.locale === "ru" ? "История команд агента" : "Agent command history"}
-                  </summary>
-                  {!commands.length && t("noCommands")}
-                  {commands.map((c) => (
-                    <div key={c.id} style={{ marginBottom: 10 }}>
-                      <div className="cmd">$ {c.args.command}</div>
-                      {outputs.get(c.id)}
+                  <FeedbackQueue
+                    comments={comments}
+                    busy={busy}
+                    canSend={!!onReplyToAgent}
+                    onRemove={(id) => setComments((old) => old.filter((c) => c.id !== id))}
+                    onSend={sendFeedback}
+                  />
+                  {busy && (
+                    <div className="hint" style={{ padding: 12 }}>
+                      {t("reviewWorking")}
+                    </div>
+                  )}
+                  {!pending && reviewOn !== false && (
+                    <div className="hint" style={{ padding: 12 }}>
+                      {t("reviewEmpty")}
+                    </div>
+                  )}
+                  {reviewOn === false && !pending && (
+                    <div className="hint" style={{ padding: 12 }}>
+                      {t("reviewCopyDirectNote")}
+                    </div>
+                  )}
+                  <ReviewSetupForm root={root} config={setupCfg} onSaved={setSetupCfg} />
+                  {reviews.map(([r, list]) => (
+                    <div key={r.id} className="review-group">
+                      {reviews.length > 1 && (
+                        <button className="btn-soft review-ai" disabled={!canReview} onClick={() => reviewFiles(r.id)}>
+                          <Sparkles size={13} /> {t("aiReviewGroup", { count: list.length })}
+                        </button>
+                      )}
+                      {setupCfg.testCommand && (
+                        <ReviewTestRun
+                          reviewId={r.id}
+                          command={setupCfg.testCommand}
+                          tick={tick}
+                          busy={busy || acting}
+                        />
+                      )}
+                      {list.map((f) => (
+                        <div
+                          key={f.path}
+                          className={`file-row review-row${isViewed(root, f.path, `review:${r.id}`) ? " viewed" : ""}`}
+                        >
+                          <ViewedBox root={root} path={f.path} signature={`review:${r.id}`} onChange={bumpViewed} />
+                          <button className="path review-path" onClick={() => showDiff(f.path, r.id)}>
+                            {f.path}
+                            <span className="hint">{t(f.binary ? "reviewBinary" : "reviewChanged")}</span>
+                          </button>
+                          <button
+                            className="icon-btn"
+                            disabled={busy || acting}
+                            title={t("reviewAccept")}
+                            aria-label={`${t("reviewAccept")}: ${f.path}`}
+                            onClick={guarded([f.path], t("gateAcceptAnyway"), act(accept(r.id, f.path)))}
+                          >
+                            <Check size={15} />
+                          </button>
+                          <button
+                            className="icon-btn"
+                            disabled={busy || acting}
+                            title={t("reviewReject")}
+                            aria-label={`${t("reviewReject")}: ${f.path}`}
+                            onClick={act(() => review.decide(r.id, f.path, false))}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ))}
-                </details>
+                  {files.length > 0 && (
+                    <div className="review-intro">
+                      <strong>{t("changes")}</strong>
+                    </div>
+                  )}
+                  {!files.length && (
+                    <div className="hint" style={{ padding: 12 }}>
+                      {t("noChanges")}
+                    </div>
+                  )}
+                  {files.map((f) => (
+                    <div
+                      key={f.path}
+                      className={`file-row${isViewed(root, f.path, `${f.added}/${f.removed}`) ? " viewed" : ""}`}
+                    >
+                      <ViewedBox
+                        root={root}
+                        path={f.path}
+                        signature={`${f.added}/${f.removed}`}
+                        onChange={bumpViewed}
+                      />
+                      <button className="path" onClick={() => showDiff(f.path)}>
+                        {f.path}
+                      </button>
+                      <span className="plus">+{f.added}</span>
+                      <span className="minus">−{f.removed}</span>
+                      <button
+                        className="icon-btn"
+                        disabled={busy || acting}
+                        title={t("revertFile")}
+                        aria-label={`${t("revertFile")}: ${f.path}`}
+                        onClick={(e) => (e.stopPropagation(), act(() => restoreFile(root, base!, f.path))())}
+                      >
+                        <Undo2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+              {terminalOpened && (
+                <div className="panel-tool-view" hidden={tab !== "terminal"} style={{ minHeight: 260 }}>
+                  <Suspense fallback={<div className="term">{t("terminal")}…</div>}>
+                    <TerminalPanel
+                      commandScope={root}
+                      root={reviews[0]?.[0].workspace ?? root}
+                      onSendSelection={onReplyToAgent}
+                    />
+                  </Suspense>
+                  <details className="term">
+                    <summary>
+                      {t("terminal")} · {t.locale === "ru" ? "История команд агента" : "Agent command history"}
+                    </summary>
+                    {!commands.length && t("noCommands")}
+                    {commands.map((c) => (
+                      <div key={c.id} style={{ marginBottom: 10 }}>
+                        <div className="cmd">$ {c.args.command}</div>
+                        {outputs.get(c.id)}
+                      </div>
+                    ))}
+                  </details>
+                </div>
+              )}
+            </div>
+            {err && (
+              <div className="error-box" style={{ margin: 8 }}>
+                {err}
               </div>
             )}
-          </div>
-          {err && (
-            <div className="error-box" style={{ margin: 8 }}>
-              {err}
+            <div className="panel-foot">
+              {files.length > 0 && (
+                <button
+                  className="btn-soft"
+                  disabled={busy || acting}
+                  onClick={act(() => restoreAll(root, base!))}
+                  title={t("revertAll")}
+                >
+                  <RotateCcw size={13} />
+                </button>
+              )}
+              {repo?.repo && (
+                <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>
+                  {t("gitCommitAction")}
+                </button>
+              )}
             </div>
-          )}
-          <div className="panel-foot">
-            {files.length > 0 && (
-              <button
-                className="btn-soft"
-                disabled={busy || acting}
-                onClick={act(() => restoreAll(root, base!))}
-                title={t("revertAll")}
-              >
-                <RotateCcw size={13} />
-              </button>
-            )}
-            {repo?.repo && (
-              <button className="btn-soft" disabled={busy || acting} onClick={() => setCommitOpen(true)}>
-                {t("gitCommitAction")}
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </aside>
+          </>
+        )}
+      </aside>
+    </>
   );
 }
 

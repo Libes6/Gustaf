@@ -51,18 +51,20 @@ function DeviceWorkspace({
   intervals,
 }: DevicePanelProps & { driver: DeviceDriver }) {
   const t = useT();
-  const dev = useDevice(driver, { visible, intervals });
   const [mode, setMode] = useState<ScreenMode>("interact");
-  const [mapOpen, setMapOpen] = useState(true);
-  const [pin, setPin] = useState<{ device: string; node: UiNode } | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const dev = useDevice(driver, { visible, intervals, inspect: mapOpen || mode === "inspect" });
+  const [pin, setPin] = useState<{ device: string; app?: string; node: UiNode } | null>(null);
   const [hover, setHover] = useState<UiNode | null>(null);
   const [hint, setHint] = useState("");
   const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { map, selectedId } = dev;
+  if (!map && pin) setPin(null);
+  if (!map && hover) setHover(null);
 
   // A pinned element survives a map refresh when it can be recognised in the new map; it never leaks to another device.
   const pinned = useMemo(() => {
-    if (!pin || !map || pin.device !== selectedId) return null;
+    if (!pin || !map || pin.device !== selectedId || pin.app !== map.app?.bundleId) return null;
     return map.nodes[pin.node.index] === pin.node ? pin.node : rematchNode(map, pin.node);
   }, [pin, map, selectedId]);
   const highlight = hover && map?.nodes[hover.index] === hover ? hover : null;
@@ -92,7 +94,8 @@ function DeviceWorkspace({
     if (locked) return blocked();
     void dev.run(label, (d, id) => d.press(id, key));
   };
-  const selectNode = (node: UiNode | null) => setPin(node && selectedId ? { device: selectedId, node } : null);
+  const selectNode = (node: UiNode | null) =>
+    setPin(node && selectedId ? { device: selectedId, app: map?.app?.bundleId, node } : null);
 
   return (
     <section className="dev-panel" aria-label={t("deviceTab")}>
@@ -117,7 +120,7 @@ function DeviceWorkspace({
       {dev.error && (
         <div className="dev-error" role="alert">
           <span>
-            {dev.error.message}
+            {dev.error.code === "background-app" ? t("deviceErrBackgroundApp") : dev.error.message}
             {dev.error.code === "helper-missing" && ` ${t("deviceErrHelperMissing")}`}
             {dev.error.code === "stale-ref" && ` ${t("deviceErrStale")}`}
           </span>
@@ -148,23 +151,6 @@ function DeviceWorkspace({
               </button>
               <button aria-pressed={mode === "inspect"} onClick={() => setMode("inspect")}>
                 {t("deviceModeInspect")}
-              </button>
-            </div>
-            <div className="dev-keys" role="group" aria-label={t("deviceButtons")}>
-              <button className="dev-btn" disabled={locked} onClick={() => press("home", t("deviceKeyHome"))}>
-                {t("deviceKeyHome")}
-              </button>
-              {dev.selected.platform === "android" && (
-                <button className="dev-btn" disabled={locked} onClick={() => press("back", t("deviceKeyBack"))}>
-                  {t("deviceKeyBack")}
-                </button>
-              )}
-              <button
-                className="dev-btn"
-                disabled={locked}
-                onClick={() => press("app-switcher", t("deviceKeySwitcher"))}
-              >
-                {t("deviceKeySwitcher")}
               </button>
             </div>
             <button
@@ -203,6 +189,24 @@ function DeviceWorkspace({
                 onActivity={dev.noteActivity}
                 onBlocked={blocked}
               />
+              <div className="dev-keys" role="group" aria-label={t("deviceButtons")}>
+                <button className="dev-btn" disabled={locked} onClick={() => press("home", t("deviceKeyHome"))}>
+                  {t("deviceKeyHome")}
+                </button>
+                {dev.selected.platform === "android" && (
+                  <button className="dev-btn" disabled={locked} onClick={() => press("back", t("deviceKeyBack"))}>
+                    {t("deviceKeyBack")}
+                  </button>
+                )}
+                <button
+                  className="dev-btn"
+                  disabled={locked}
+                  onClick={() => press("app-switcher", t("deviceKeySwitcher"))}
+                >
+                  {t("deviceKeySwitcher")}
+                </button>
+              </div>
+
               <p className="dev-dim dev-hint">
                 {mode === "interact" ? t("deviceHintInteract") : t("deviceHintInspect")}
               </p>

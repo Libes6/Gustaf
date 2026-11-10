@@ -49,6 +49,7 @@ import { useAutoMemorySuggest } from "../lib/useAutoMemorySuggest";
 import { MemorySuggestDialog } from "./MemoryDialogs";
 
 export function ChatView({ session, visible }: { session: ChatSession; visible: boolean }) {
+  const [toolsHost, setToolsHost] = useState<HTMLDivElement | null>(null);
   const t = useT();
   const app = useApp();
   const [messages, setMessages] = useState<StoredMsg[]>([]);
@@ -403,8 +404,184 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
       <main className="main">
         {stopGuard.node}
         {root && <AgentsToggle tasks={tasks} buttonRef={toggleRef} />}
+        <div className="chat-content">
+          <div className="chat-tools-host" ref={setToolsHost} />
+
+          {messages.length === 0 && stream === null && !error ? (
+            <div className="empty">
+              <h1>{project ? t("emptyProject", { name: project.name }) : t("emptyTitle")}</h1>
+              {blocked && resolved.state === "missing" && (
+                <div className="error-box" role="alert">
+                  {blocked}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {session.chatId && <BranchBar chatId={session.chatId} />}
+              {branchPoint && (
+                <BranchPicker
+                  busy={running}
+                  onCancel={() => setBranchPoint(null)}
+                  onCreate={async (selection) => {
+                    await latest.current.run.branchFrom(
+                      branchPoint,
+                      latest.current.title,
+                      latest.current.branchLabel,
+                      selection,
+                    );
+                    setBranchPoint(null);
+                  }}
+                />
+              )}
+              <div
+                className="feed"
+                ref={feedRef}
+                role="log"
+                aria-live="off"
+                aria-label={t("conversation")}
+                tabIndex={0}
+                onScroll={(e) => {
+                  setAtBottom(
+                    e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40,
+                  );
+                  rememberScroll(e.currentTarget);
+                }}
+              >
+                <div className="feed-inner">
+                  {turns.map((turn, i) => (
+                    <TurnView
+                      key={turn.user?.id ?? `t${i}`}
+                      turn={turn}
+                      liveResults={toolResults}
+                      live={running && i === turns.length - 1}
+                      onRewind={turn.user ? run.rewind : undefined}
+                      focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null}
+                      busy={running}
+                      isLastTurn={i === turns.length - 1}
+                      handlers={turnHandlers}
+                      approving={!!approval}
+                    />
+                  ))}
+                  {blocked && (
+                    <div className="error-box" role="alert">
+                      {blocked}
+                    </div>
+                  )}
+                  <LiveStatus
+                    activities={activities}
+                    stream={stream}
+                    approval={approval}
+                    retryNotice={run.retryNotice}
+                    stats={run.live.current}
+                    visible={visible}
+                    onRunCommand={turnHandlers.onRunCommand}
+                    projectRoot={root ?? undefined}
+                    pendingCall={pendingCall}
+                  />
+                  {run.secretRequest && <SecretCard request={run.secretRequest} />}
+                  {error && (
+                    <div className="error-box" role="alert">
+                      {error}
+                      <div>
+                        <button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>
+                          {t("retryRequest")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          {!atBottom && (
+            <button
+              className="to-bottom"
+              title={t("scrollToBottom")}
+              aria-label={t("scrollToBottom")}
+              onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}
+            >
+              <ArrowDown size={15} />
+            </button>
+          )}
+
+          {sessionNotice && (
+            <div className="hint fan-notice" role="status">
+              {sessionNotice}
+              <button className="btn-ghost" onClick={() => setSessionNotice("")}>
+                {t("cancel")}
+              </button>
+            </div>
+          )}
+          {fanNotice && (
+            <div className="hint fan-notice" role="status">
+              {fanNotice}
+              <button className="btn-ghost" onClick={() => setFanNotice("")}>
+                {t("cancel")}
+              </button>
+            </div>
+          )}
+          <GoalBar chatId={session.chatId} running={running} />
+          <PrWatchBar chatId={session.chatId} />
+          {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
+          <Composer
+            scopeKey={session.key}
+            text={text}
+            setText={setText}
+            images={images}
+            setImages={setImages}
+            taRef={taRef}
+            visible={visible}
+            root={root}
+            projectName={project?.name}
+            files={files}
+            knowledge={{ ...knowledge, onManage: () => app.openSettings("knowledge") }}
+            workspace={{
+              available: !workspace && !!project && isGit && messages.length === 0 && !running,
+              on: newWorkspace,
+              onToggle: () => setNewWorkspace((v) => !v),
+              linkedBranch: resolved.state === "workspace" ? resolved.info.branch : (workspace?.branch ?? undefined),
+            }}
+            provider={provider}
+            selectedModel={selectedModel}
+            modelName={modelName}
+            supports={supports}
+            running={running}
+            mode={mode}
+            onModeChange={setMode}
+            onSend={(opposite) => run.send(false, undefined, opposite === true)}
+            followUp={run.followUp}
+            onFanOut={startFanOut}
+            onStop={run.requestStop}
+            contextTokens={contextTokens}
+            lastInput={lastInput}
+            canCompact={!(running || !loaded || messages.length < 4 || !provider)}
+            canRestore={messages.some((m) => m.meta?.compacted)}
+            onCompact={run.compact}
+            onRestore={run.restoreContext}
+          />
+          {project && root && (
+            <BranchSwitcher
+              root={root}
+              running={running}
+              worktree={!!workspace}
+              visible={visible}
+              onChanged={run.bumpTick}
+            />
+          )}
+          {autoMemory.found && chat && autoMemory.found.chatId === chat.id && (
+            <MemorySuggestDialog
+              chat={chat}
+              project={project ?? null}
+              initial={autoMemory.found.suggestions}
+              onClose={autoMemory.dismiss}
+            />
+          )}
+        </div>
         {root && project && (
           <ChangesPanel
+            toolbarHost={toolsHost}
+            visible={visible}
             reviewOn={workspace ? undefined : reviewOn}
             name={project.name}
             root={root}
@@ -419,177 +596,6 @@ export function ChatView({ session, visible }: { session: ChatSession; visible: 
             onChanged={run.bumpTick}
             onReplyToAgent={continueAgent}
             chatId={session.chatId}
-          />
-        )}
-
-        {messages.length === 0 && stream === null && !error ? (
-          <div className="empty">
-            <h1>{project ? t("emptyProject", { name: project.name }) : t("emptyTitle")}</h1>
-            {blocked && resolved.state === "missing" && (
-              <div className="error-box" role="alert">
-                {blocked}
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            {session.chatId && <BranchBar chatId={session.chatId} />}
-            {branchPoint && (
-              <BranchPicker
-                busy={running}
-                onCancel={() => setBranchPoint(null)}
-                onCreate={async (selection) => {
-                  await latest.current.run.branchFrom(
-                    branchPoint,
-                    latest.current.title,
-                    latest.current.branchLabel,
-                    selection,
-                  );
-                  setBranchPoint(null);
-                }}
-              />
-            )}
-            <div
-              className="feed"
-              ref={feedRef}
-              role="log"
-              aria-live="off"
-              aria-label={t("conversation")}
-              tabIndex={0}
-              onScroll={(e) => {
-                setAtBottom(
-                  e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40,
-                );
-                rememberScroll(e.currentTarget);
-              }}
-            >
-              <div className="feed-inner">
-                {turns.map((turn, i) => (
-                  <TurnView
-                    key={turn.user?.id ?? `t${i}`}
-                    turn={turn}
-                    liveResults={toolResults}
-                    live={running && i === turns.length - 1}
-                    onRewind={turn.user ? run.rewind : undefined}
-                    focusId={flashId != null && turnHasMessage(turn, flashId) ? flashId : null}
-                    busy={running}
-                    isLastTurn={i === turns.length - 1}
-                    handlers={turnHandlers}
-                    approving={!!approval}
-                  />
-                ))}
-                {blocked && (
-                  <div className="error-box" role="alert">
-                    {blocked}
-                  </div>
-                )}
-                <LiveStatus
-                  activities={activities}
-                  stream={stream}
-                  approval={approval}
-                  retryNotice={run.retryNotice}
-                  stats={run.live.current}
-                  visible={visible}
-                  onRunCommand={turnHandlers.onRunCommand}
-                  projectRoot={root ?? undefined}
-                  pendingCall={pendingCall}
-                />
-                {run.secretRequest && <SecretCard request={run.secretRequest} />}
-                {error && (
-                  <div className="error-box" role="alert">
-                    {error}
-                    <div>
-                      <button className="btn-soft" disabled={running} onClick={() => run.retryRequest()}>
-                        {t("retryRequest")}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-        {!atBottom && (
-          <button
-            className="to-bottom"
-            title={t("scrollToBottom")}
-            aria-label={t("scrollToBottom")}
-            onClick={() => feedRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}
-          >
-            <ArrowDown size={15} />
-          </button>
-        )}
-
-        {sessionNotice && (
-          <div className="hint fan-notice" role="status">
-            {sessionNotice}
-            <button className="btn-ghost" onClick={() => setSessionNotice("")}>
-              {t("cancel")}
-            </button>
-          </div>
-        )}
-        {fanNotice && (
-          <div className="hint fan-notice" role="status">
-            {fanNotice}
-            <button className="btn-ghost" onClick={() => setFanNotice("")}>
-              {t("cancel")}
-            </button>
-          </div>
-        )}
-        <GoalBar chatId={session.chatId} running={running} />
-        <PrWatchBar chatId={session.chatId} />
-        {run.queue && <QueuePanel key={session.key} queue={run.queue} onChange={run.changeQueue} />}
-        <Composer
-          scopeKey={session.key}
-          text={text}
-          setText={setText}
-          images={images}
-          setImages={setImages}
-          taRef={taRef}
-          visible={visible}
-          root={root}
-          projectName={project?.name}
-          files={files}
-          knowledge={{ ...knowledge, onManage: () => app.openSettings("knowledge") }}
-          workspace={{
-            available: !workspace && !!project && isGit && messages.length === 0 && !running,
-            on: newWorkspace,
-            onToggle: () => setNewWorkspace((v) => !v),
-            linkedBranch: resolved.state === "workspace" ? resolved.info.branch : (workspace?.branch ?? undefined),
-          }}
-          provider={provider}
-          selectedModel={selectedModel}
-          modelName={modelName}
-          supports={supports}
-          running={running}
-          mode={mode}
-          onModeChange={setMode}
-          onSend={(opposite) => run.send(false, undefined, opposite === true)}
-          followUp={run.followUp}
-          onFanOut={startFanOut}
-          onStop={run.requestStop}
-          contextTokens={contextTokens}
-          lastInput={lastInput}
-          canCompact={!(running || !loaded || messages.length < 4 || !provider)}
-          canRestore={messages.some((m) => m.meta?.compacted)}
-          onCompact={run.compact}
-          onRestore={run.restoreContext}
-        />
-        {project && root && (
-          <BranchSwitcher
-            root={root}
-            running={running}
-            worktree={!!workspace}
-            visible={visible}
-            onChanged={run.bumpTick}
-          />
-        )}
-        {autoMemory.found && chat && autoMemory.found.chatId === chat.id && (
-          <MemorySuggestDialog
-            chat={chat}
-            project={project ?? null}
-            initial={autoMemory.found.suggestions}
-            onClose={autoMemory.dismiss}
           />
         )}
       </main>
