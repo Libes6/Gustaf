@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -16,12 +17,12 @@ export function PullRequestActivityFilters({
   const kinds = [
     { id: "all", title: "All activity" },
     { id: "comments", title: "Comments" },
-    { id: "commits", title: "Commits" },
+    { id: "commits", title: t("Commits") },
   ] as const;
   return (
     <View className="mb-4 flex-row items-center justify-between gap-3">
       <Menu
-        title="Activity"
+        title={t("Activity")}
         actions={kinds.map((kind) => ({ ...kind, state: value.kind === kind.id ? "on" : "off" }))}
         onPressAction={({ nativeEvent }) => {
           const kind = kinds.find((item) => item.id === nativeEvent.event);

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { Button } from "../../components/ui/Button";
 import type {
@@ -71,11 +72,11 @@ function ArchivedThreadsHeader(props: {
           items: [
             {
               id: "environment",
-              title: "Environment",
+              title: t("Environment"),
               items: [
                 {
                   id: "environment:all",
-                  title: "All environments",
+                  title: t("All environments"),
                   selected: props.selectedEnvironmentId === null,
                   onPress: () => props.onEnvironmentChange(null),
                 },
@@ -93,13 +94,13 @@ function ArchivedThreadsHeader(props: {
               items: [
                 {
                   id: "sort:newest",
-                  title: "Newest first",
+                  title: t("Newest first"),
                   selected: props.sortOrder === "newest",
                   onPress: () => props.onSortOrderChange("newest"),
                 },
                 {
                   id: "sort:oldest",
-                  title: "Oldest first",
+                  title: t("Oldest first"),
                   selected: props.sortOrder === "oldest",
                   onPress: () => props.onSortOrderChange("oldest"),
                 },
@@ -257,7 +258,7 @@ function ArchivedThreadRow(props: {
       primaryAction={{
         accessibilityLabel: `Unarchive ${props.thread.title}`,
         icon: "arrow.uturn.backward",
-        label: "Unarchive",
+        label: t("Unarchive"),
         onPress: props.onUnarchive,
       }}
       simultaneousWith={props.simultaneousSwipeGesture}
@@ -276,7 +277,7 @@ function ArchiveError(props: { readonly message: string; readonly onRetry: () =>
       </Text>
       <Text className="mt-1 text-sm text-foreground-muted">{props.message}</Text>
       <View className="mt-3">
-        <Button label="Try again" tone="secondary" onPress={props.onRetry} />
+        <Button label={t("Try again")} tone="secondary" onPress={props.onRetry} />
       </View>
     </View>
   );

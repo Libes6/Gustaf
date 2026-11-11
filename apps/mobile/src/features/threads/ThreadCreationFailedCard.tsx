@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import { View } from "react-native";
 
@@ -19,7 +20,7 @@ export function ThreadCreationFailedCard(props: {
         Your prompt was kept in the project draft.
       </Text>
       <View className="flex-row">
-        <Button label="Edit task" tone="primary" onPress={props.onEditTask} />
+        <Button label={t("Edit task")} tone="primary" onPress={props.onEditTask} />
       </View>
     </View>
   );

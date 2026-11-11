@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { TextInput, View } from "react-native";
 
 import { AppText as Text } from "../../../components/ui/AppText";
@@ -28,10 +29,10 @@ export function ScheduledTaskPromptField(props: {
 
   return (
     <View className="gap-2 border-t border-border-subtle px-4 py-3">
-      <Text className="text-sm text-foreground-muted">Prompt</Text>
+      <Text className="text-sm text-foreground-muted">{t("Prompt")}</Text>
       <View className="flex-row items-end">
         <TextInput
-          accessibilityLabel="Prompt"
+          accessibilityLabel={t("Prompt")}
           value={props.value}
           onChangeText={props.onChange}
           selection={props.selection}

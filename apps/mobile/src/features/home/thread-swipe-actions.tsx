@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { Menu } from "../../components/ui/Menu";
 import type { MenuAction } from "@react-native-menu/menu";
@@ -91,7 +92,7 @@ function resolveSecondaryAction(input: {
       accessibilityLabel: `Delete ${input.threadTitle}`,
       tone: "danger",
       icon: "trash",
-      label: "Delete",
+      label: t("Delete"),
       onPress: () => {
         input.close();
         input.onDelete();

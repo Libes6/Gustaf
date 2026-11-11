@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { useOpenPullRequest } from "../../native/useOpenPullRequest";
 import type { AppBarMenu } from "../../components/ui/AppBar.types";
@@ -251,7 +252,7 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
 export function threadTerminalMenu(props: ThreadGitControlsProps): AppBarMenu | null {
   if (!props.canOpenTerminal) return null;
   return {
-    title: "Terminal",
+    title: t("Terminal"),
     icon: "terminal",
     separateBackground: false,
     items: [
@@ -329,7 +330,7 @@ export function useThreadGitMenuDefinition(props: ThreadGitMenuProps): AppBarMen
       },
       {
         id: "git-review",
-        title: "Review changes",
+        title: t("Review changes"),
         icon: "text.bubble",
         disabled: !model.isRepo || props.hasThread === false,
         subtitle:
@@ -351,7 +352,7 @@ export function useThreadGitMenuDefinition(props: ThreadGitMenuProps): AppBarMen
         : []),
       {
         id: "git-more",
-        title: "More",
+        title: t("More"),
         icon: "ellipsis",
         disabled: props.hasThread === false,
         subtitle:

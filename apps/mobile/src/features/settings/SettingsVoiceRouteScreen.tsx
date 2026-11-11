@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -95,7 +96,7 @@ const KINDS: Record<
     icon: "headphones",
   },
   builtIn: {
-    label: "Built-in",
+    label: t("Built-in"),
     row: "Built-in microphone",
     rowDescription: "The microphone on this device",
     icon: "iphone",
@@ -222,7 +223,7 @@ export function SettingsVoiceRouteScreen() {
   const dragTo = drag === null ? -1 : dragFrom + dropSteps(dragFrom, drag.translation);
 
   return (
-    <SettingsScreen title="Voice">
+    <SettingsScreen title={t("Voice")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -232,7 +233,7 @@ export function SettingsVoiceRouteScreen() {
       >
         <SettingsSection title="Transcribe on">
           <ListChoiceRow
-            label="This device"
+            label={t("This device")}
             description="Audio stays on this device and is transcribed here."
             selected={!grant}
             onPress={() => saveDestination(null)}
@@ -302,7 +303,7 @@ export function SettingsVoiceRouteScreen() {
             <Text className="px-2 text-sm text-foreground-muted">
               {permission === "ask"
                 ? "Allow microphone access to record and to see your microphones."
-                : "Turn on microphone access for T3 Code in Settings to use voice input."}
+                : "Turn on microphone access for Gustaf in Settings to use voice input."}
             </Text>
           </>
         ) : null}
@@ -387,7 +388,7 @@ function MicrophoneRow(props: {
       <View
         accessible
         accessibilityLabel={`${title}, ${kind.label}, ${props.position} of ${props.count}`}
-        accessibilityActions={onForget ? [{ name: "forget", label: "Forget" }] : undefined}
+        accessibilityActions={onForget ? [{ name: "forget", label: t("Forget") }] : undefined}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === "forget") onForget?.();
         }}
@@ -431,7 +432,7 @@ function MicrophoneRow(props: {
             accessibilityLabel: `Forget ${title}`,
             destructive: true,
             icon: "trash",
-            label: "Forget",
+            label: t("Forget"),
             onPress: onForget,
           }}
           secondaryAction={null}

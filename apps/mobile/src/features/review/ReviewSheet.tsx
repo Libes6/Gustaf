@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
@@ -119,7 +120,7 @@ function ReviewHeader(
                     ? [
                         {
                           id: "turns",
-                          title: "Turn",
+                          title: t("Turn"),
                           items: props.sectionMenu.turns.map((section) => ({
                             id: `section:${section.id}`,
                             title: section.title,
@@ -744,7 +745,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
                   )}
                 >
                   <AppActivityIndicator size="small" />
-                  <Text className="text-xs text-foreground-muted">Loading diff…</Text>
+                  <Text className="text-xs text-foreground-muted">{t("Loading diff…")}</Text>
                 </View>
               ) : parsedDiff.kind === "empty" ? (
                 <View

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import { useAudioPlayerStatus } from "expo-audio";
 import { useEffect, useState } from "react";
@@ -87,7 +88,7 @@ export function AudioFilePreview(props: { uri: string; onRetry: () => void }) {
             This audio could not be played. Try again or save it to open in another app.
           </Text>
           <View className="items-center">
-            <Button label="Try again" tone="secondary" onPress={props.onRetry} />
+            <Button label={t("Try again")} tone="secondary" onPress={props.onRetry} />
           </View>
         </View>
       ) : null}

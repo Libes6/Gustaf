@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   navigationCustomizationAvailable,
   overflowNavigationTabs,
@@ -79,7 +80,7 @@ export function SettingsListScreen(props: {
     <SettingsSidebarContext value={props.sidebar ? { selected: props.selected } : null}>
       <View className="flex-1 bg-screen">
         <SettingsScreen
-          title="Settings"
+          title={t("Settings")}
           workspaceRoot={props.sidebar}
           menus={[environmentMenu]}
           search={
@@ -88,7 +89,7 @@ export function SettingsListScreen(props: {
                   value: workspace.state.tabs.settings.query,
                   onChangeText: (query) =>
                     workspace.dispatch({ type: "query", tab: "settings", query }),
-                  placeholder: "Search settings",
+                  placeholder: t("Search settings"),
                 }
               : undefined
           }
@@ -133,7 +134,7 @@ function ConfiguredSettingsRouteScreen() {
         {
           id: "SettingsNotifications",
           icon: "bell.badge",
-          label: "Notifications",
+          label: t("Notifications"),
           target: "SettingsNotifications",
         },
       ]}
@@ -150,7 +151,7 @@ function environmentsRow(count: number): SettingsListRow {
   return {
     id: "SettingsEnvironments",
     icon: "desktopcomputer",
-    label: "Environments",
+    label: t("Environments"),
     value: `${count}`,
     valuePosition: "trailing",
     target: "SettingsEnvironments",
@@ -170,7 +171,11 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
   const overflowRows = useOverflowRows();
   const indexSections = useSettingsIndexSections();
   const sections = filterSettingsSections(
-    [{ rows: overflowRows }, { title: "Connections", rows: props.connections }, ...indexSections],
+    [
+      { rows: overflowRows },
+      { title: t("Connections"), rows: props.connections },
+      ...indexSections,
+    ],
     query,
   );
 
@@ -202,7 +207,7 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
         ) : (
           <EmptyState
             variant="plain"
-            title="No results"
+            title={t("No results")}
             detail={`No settings match “${query.trim()}”.`}
           />
         )}
@@ -233,7 +238,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
     icon: SettingsListRow["icon"],
     label: string,
     extra?: Pick<SettingsListRow, "disabled" | "value">,
-  ): SettingsListRow => ({ id: target, icon, label, target, ...extra });
+  ): SettingsListRow => ({ id: target, icon, label: t(label), target, ...extra });
   const serverPage = (target: SettingsPageTarget, icon: SettingsListRow["icon"], label: string) =>
     page(target, icon, label, { disabled: noServerTargets });
   // The same pages and groups as Settings on web, minus what mobile has no setting for.
@@ -251,7 +256,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
       ],
     },
     {
-      title: "Agents",
+      title: t("Agents"),
       rows: [
         serverPage("SettingsProviderAccounts", "person.crop.circle", "Providers"),
         serverPage("SettingsThreads", "text.bubble", "Threads"),
@@ -259,7 +264,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
       ],
     },
     {
-      title: "Code",
+      title: t("Code"),
       rows: [
         page(
           "SettingsProjectOverview",

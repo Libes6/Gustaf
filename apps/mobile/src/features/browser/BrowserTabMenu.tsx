@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
@@ -18,9 +19,9 @@ import { previewEnvironment } from "../../state/preview";
 import { useAtomCommand } from "../../state/use-atom-command";
 
 const APPEARANCES = [
-  { id: "system", title: "System" },
-  { id: "light", title: "Light" },
-  { id: "dark", title: "Dark" },
+  { id: "system", title: t("System") },
+  { id: "light", title: t("Light") },
+  { id: "dark", title: t("Dark") },
 ] as const;
 
 const VIEWPORTS = [
@@ -75,11 +76,11 @@ export function BrowserTabMenu({
     attributes: { destructive: true, disabled: !canClose },
   };
   const actions: MenuAction[] = [
-    ...(onPaste ? [{ id: "paste", title: "Paste", image: "doc.on.clipboard" }] : []),
-    { id: "hard-reload", title: "Hard reload", image: "arrow.clockwise.circle" },
+    ...(onPaste ? [{ id: "paste", title: t("Paste"), image: "doc.on.clipboard" }] : []),
+    { id: "hard-reload", title: t("Hard reload"), image: "arrow.clockwise.circle" },
     {
       id: "appearance",
-      title: "Appearance",
+      title: t("Appearance"),
       image: "circle.lefthalf.filled",
       subactions: APPEARANCES.map((option) => ({
         id: `appearance:${option.id}`,
@@ -92,8 +93,8 @@ export function BrowserTabMenu({
       title: `Zoom (${Math.round(zoomFactor * 100)}%)`,
       image: "plus.magnifyingglass",
       subactions: [
-        { id: "zoom:in", title: "Zoom in", image: "plus.magnifyingglass" },
-        { id: "zoom:out", title: "Zoom out", image: "minus.magnifyingglass" },
+        { id: "zoom:in", title: t("Zoom in"), image: "plus.magnifyingglass" },
+        { id: "zoom:out", title: t("Zoom out"), image: "minus.magnifyingglass" },
         { id: "zoom:reset", title: "Actual size", image: "1.magnifyingglass" },
       ],
     },
@@ -112,8 +113,8 @@ export function BrowserTabMenu({
       title: "Site data",
       image: "trash",
       subactions: [
-        { id: "clear:cookies", title: "Clear cookies", attributes: { destructive: true } },
-        { id: "clear:cache", title: "Clear cache", attributes: { destructive: true } },
+        { id: "clear:cookies", title: t("Clear cookies"), attributes: { destructive: true } },
+        { id: "clear:cache", title: t("Clear cache"), attributes: { destructive: true } },
       ],
     },
     closeAction,

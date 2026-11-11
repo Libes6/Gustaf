@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
 import { parsePullRequestQuery } from "@t3tools/client-runtime/pull-request-query";
 import {
@@ -467,7 +468,7 @@ export function pullRequestListReviewStatus(
 ) {
   if (entry.reviewDecision === "changes-requested")
     return {
-      label: "Changes",
+      label: t("Changes"),
       accessibleLabel: "Changes requested",
       icon: "person.fill.xmark",
       tint: "accent-danger-foreground",
@@ -488,7 +489,7 @@ export function pullRequestListReviewStatus(
     } as const;
   if (entry.reviewDecision === "review-required")
     return {
-      label: "Review",
+      label: t("Review"),
       accessibleLabel: "Review required",
       icon: "person.badge.clock",
       tint: "accent-icon-muted",

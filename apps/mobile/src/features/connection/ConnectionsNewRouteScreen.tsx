@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ListRow } from "../../components/ui/ListRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -176,7 +177,7 @@ function PairingForm({
 
   return (
     <SettingsScreen
-      title="Add environment"
+      title={t("Add environment")}
       actions={[
         {
           accessibilityLabel: connecting ? "Connecting" : "Add environment",
@@ -221,7 +222,7 @@ function PairingForm({
               )}
             >
               <PairingInputRow
-                label="Address"
+                label={t("Address")}
                 keyboardType="url"
                 placeholder="192.168.1.100:3773"
                 value={hostInput}
@@ -229,8 +230,8 @@ function PairingForm({
               />
               <View className="ml-4 border-t border-border-subtle" />
               <PairingInputRow
-                label="Code"
-                placeholder="Pairing code"
+                label={t("Code")}
+                placeholder={t("Pairing code")}
                 returnKeyType="go"
                 value={codeInput}
                 onChangeText={handleCodeChange}

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import * as Hash from "effect/Hash";
 import { File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
@@ -222,7 +223,7 @@ function MermaidBlock(props: MermaidCodeBlockProps & { readonly diagram: Diagram
           ) : null}
           <HeaderButton
             icon="doc.on.doc"
-            label="Copy code"
+            label={t("Copy code")}
             color={secondaryColor}
             onPress={() => copyTextWithHaptic(code)}
           />

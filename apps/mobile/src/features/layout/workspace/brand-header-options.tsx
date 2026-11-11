@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Platform } from "react-native";
 
@@ -14,7 +15,7 @@ export function getCompactBrandHeaderOptions(
   return {
     headerTitle: renderCompactBrandTitle,
     headerTitleStyle: fallbackTitleStyle,
-    title: "Threads",
+    title: t("Threads"),
     unstable_headerLeftItems: undefined,
   };
 }

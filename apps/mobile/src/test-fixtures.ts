@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import {
   presentThreadShell,
   type EnvironmentThreadShell,
@@ -22,7 +23,7 @@ export function makeRawThreadShell(
   return {
     id,
     projectId: ProjectId.make("project-test"),
-    title: "Thread",
+    title: t("Thread"),
     providerInstanceId,
     modelSelection: { instanceId: providerInstanceId, model: "gpt-5.4" },
     runtimeMode: "full-access",

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/ui/AppText";
@@ -72,7 +73,7 @@ export function ModelRowContent(
             </Text>
             {props.option.isDefault ? (
               <View className="rounded-md bg-subtle-strong px-1.5 py-0.5">
-                <Text className="text-3xs font-t3-bold text-foreground-muted">Default</Text>
+                <Text className="text-3xs font-t3-bold text-foreground-muted">{t("Default")}</Text>
               </View>
             ) : null}
             {props.option.isLegacy ? (
@@ -84,7 +85,7 @@ export function ModelRowContent(
               <Text className="text-xs text-foreground-muted">Hidden</Text>
             ) : null}
             {props.option.isUnavailable ? (
-              <Text className="text-xs text-foreground">Unavailable</Text>
+              <Text className="text-xs text-foreground">{t("Unavailable")}</Text>
             ) : null}
           </View>
           {props.option.subtitle ? (

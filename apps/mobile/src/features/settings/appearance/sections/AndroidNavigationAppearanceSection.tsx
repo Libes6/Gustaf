@@ -1,3 +1,4 @@
+import { t } from "../../../../i18n";
 import { View } from "react-native";
 
 import { ListChoiceRow as SettingsChoiceRow } from "../../../../components/ui/ListChoiceRow";
@@ -7,7 +8,7 @@ import { useAppearancePreferences } from "../AppearancePreferencesProvider";
 export function AndroidNavigationAppearanceSection() {
   const { isReady, androidNavigationStyle, setAndroidNavigationStyle } = useAppearancePreferences();
   return (
-    <SettingsSection title="Navigation">
+    <SettingsSection title={t("Navigation")}>
       <View accessibilityRole="radiogroup">
         <SettingsChoiceRow
           label="One UI"

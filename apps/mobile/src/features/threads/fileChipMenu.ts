@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { formatFilePathForClipboard } from "@t3tools/client-runtime/media-actions";
 import { fileBasename } from "@t3tools/shared/path";
 import type { ThreadId } from "@t3tools/contracts";
@@ -71,8 +72,10 @@ export function fileChipMenu(target: FileChipTarget): MarkdownFileContextMenu {
   return {
     title: target.fullPath ?? target.relativePath ?? "",
     actions: [
-      ...(target.fullPath ? [{ id: "copy-full-path", title: "Copy full path" }] : []),
-      ...(target.relativePath ? [{ id: "copy-relative-path", title: "Copy relative path" }] : []),
+      ...(target.fullPath ? [{ id: "copy-full-path", title: t("Copy full path") }] : []),
+      ...(target.relativePath
+        ? [{ id: "copy-relative-path", title: t("Copy relative path") }]
+        : []),
       { id: "open-file", title: "Open in file viewer" },
       ...(fileChipMetadata(target)
         ? [

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   managedRuntimeModeDenial,
   type ManagedPolicySummary,
@@ -11,23 +12,23 @@ export const RUNTIME_MODE_CHOICES: ReadonlyArray<{
 }> = [
   {
     mode: "approval-required",
-    label: "Supervised",
-    description: "Ask before commands and file changes.",
+    label: t("Supervised"),
+    description: t("Ask before commands and file changes."),
   },
   {
     mode: "auto-accept-edits",
-    label: "Auto-accept edits",
-    description: "Auto-approve edits, ask before other actions.",
+    label: t("Auto-accept edits"),
+    description: t("Auto-approve edits, ask before other actions."),
   },
   {
     mode: "auto",
-    label: "Auto",
-    description: "Supported providers approve routine actions; others still ask.",
+    label: t("Auto"),
+    description: t("Supported providers approve routine actions; others still ask."),
   },
   {
     mode: "full-access",
-    label: "Full access",
-    description: "Allow commands and edits without prompts.",
+    label: t("Full access"),
+    description: t("Allow commands and edits without prompts."),
   },
 ];
 

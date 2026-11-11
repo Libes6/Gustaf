@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import * as Dialog from "../../components/ui/Dialog";
@@ -150,7 +151,7 @@ export function PreviewStreamWebView(
           </AppText>
           {error && (
             <View className="items-center">
-              <Button label="Retry" tone="secondary" onPress={refresh} />
+              <Button label={t("Retry")} tone="secondary" onPress={refresh} />
             </View>
           )}
         </>
@@ -434,7 +435,7 @@ function PreviewStreamDocumentView({
             The page asks for {fileChooser.multiple ? "files" : "a file"}.
           </AppText>
           <View className="flex-row justify-end gap-3">
-            <Button label="Cancel" tone="text" onPress={() => answerFileChooser(false)} />
+            <Button label={t("Cancel")} tone="text" onPress={() => answerFileChooser(false)} />
             <Button
               label={`Choose ${fileChooser.multiple ? "files" : "file"}`}
               tone="secondary"
@@ -460,7 +461,7 @@ function PreviewStreamDocumentView({
               ) : null}
               <View className="flex-row justify-end gap-3">
                 <Button
-                  label="Dismiss"
+                  label={t("Dismiss")}
                   tone="text"
                   onPress={() => command({ type: "dialog", accept: false })}
                 />
@@ -508,7 +509,7 @@ function PreviewStreamDocumentView({
               <AppText selectable className="flex-1 font-mono text-sm text-secondary-foreground">
                 {hostSetup.command}
               </AppText>
-              <AppText className="text-xs text-foreground-muted">Copy</AppText>
+              <AppText className="text-xs text-foreground-muted">{t("Copy")}</AppText>
             </Pressable>
           ) : null}
           {status === "error" && !gone && !compact ? (

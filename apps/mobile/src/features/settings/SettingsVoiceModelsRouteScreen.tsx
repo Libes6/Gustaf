@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { StaticScreenProps } from "@react-navigation/native";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -46,7 +47,7 @@ export function SettingsVoiceModelsRouteScreen({
     );
   return (
     <PullRequestSearchSheet
-      title="Transcription models"
+      title={t("Transcription models")}
       placeholder="Search models or languages"
       closeAccessibilityLabel="Close transcription models"
       clearAccessibilityLabel="Clear model search"

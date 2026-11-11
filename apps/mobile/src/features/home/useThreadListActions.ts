@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { ThreadMoveDestination } from "../threads/threadOrder";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
@@ -553,7 +554,7 @@ export function useThreadListActions(): {
     };
 
     Dialog.prompt({
-      title: "Rename thread",
+      title: t("Rename thread"),
       initialValue: thread.title,
       confirmText: "Rename",
       onConfirm: commit,

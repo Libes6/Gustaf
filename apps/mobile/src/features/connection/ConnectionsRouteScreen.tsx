@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 
 import { useNavigation } from "@react-navigation/native";
@@ -30,12 +31,12 @@ export function ConnectionsRouteScreen() {
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
       <AppBar
-        title="Environments"
+        title={t("Environments")}
         onClose={() => navigation.goBack()}
         closeAccessibilityLabel="Close environments"
         actions={[
           {
-            accessibilityLabel: "Add environment",
+            accessibilityLabel: t("Add environment"),
             icon: "plus",
             onPress: () => navigation.navigate("ConnectionsNew"),
           },

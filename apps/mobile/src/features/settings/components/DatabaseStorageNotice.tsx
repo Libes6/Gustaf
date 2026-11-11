@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 
@@ -45,7 +46,7 @@ export function DatabaseStorageNotice({
       ))}
       <SettingsActionRow
         icon="xmark"
-        label="Dismiss"
+        label={t("Dismiss")}
         onPress={() =>
           updatePreferences({
             transform: (current) => ({

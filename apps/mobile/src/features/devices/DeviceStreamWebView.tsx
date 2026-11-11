@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import deviceStreamScript from "@t3tools/mobile-device-stream";
 import {
@@ -203,7 +204,7 @@ function DeviceStreamDocumentView({
           </AppText>
           {status === "error" ? (
             <View className="items-center">
-              <Button label="Reconnect" tone="secondary" onPress={onRetry} />
+              <Button label={t("Reconnect")} tone="secondary" onPress={onRetry} />
             </View>
           ) : null}
         </View>

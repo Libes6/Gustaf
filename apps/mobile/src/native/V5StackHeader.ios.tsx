@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type {
   NativeStackHeaderItem,
   NativeStackHeaderItemMenu,
@@ -232,7 +233,7 @@ export function V5StackHeader(props: {
     const compose: HeaderItem = {
       type: "item",
       id: "workspace-compose",
-      title: "New task",
+      title: t("New task"),
       icon: { type: "sfSymbol", name: "square.and.pencil" },
       onPress: props.onCompose,
     };

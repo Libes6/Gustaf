@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { uuidv4 } from "../../lib/uuid";
 import * as Dialog from "../../components/ui/Dialog";
 import { useNavigation } from "@react-navigation/native";
@@ -46,7 +47,7 @@ export function DraftThreadHeader(props: {
   return (
     <ThreadHeader
       draft
-      title="New thread"
+      title={t("New thread")}
       subtitle=""
       hasThreadCwd={props.cwd !== null}
       fileInspectorSupported={false}

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { usePaneRole } from "../../components/ui/Pane";
 import { Button } from "../../components/ui/Button";
 import {
@@ -347,7 +348,7 @@ export function PullRequestsScreen(
             <View className="items-center gap-2 px-8 py-4">
               <Text className="text-xs text-foreground-muted">{result.loadMoreError}</Text>
               <Button
-                label="Try again"
+                label={t("Try again")}
                 accessibilityLabel="Retry loading more pull requests"
                 onPress={() => void result.loadMore(true)}
               />
@@ -356,8 +357,8 @@ export function PullRequestsScreen(
             // A filtered page can be too short to scroll, which leaves nothing to reach the end of.
             <View className="items-center py-4">
               <Button
-                label="Load more"
-                accessibilityLabel="Load more pull requests"
+                label={t("Load more")}
+                accessibilityLabel={t("Load more pull requests")}
                 onPress={() => void result.loadMore()}
               />
             </View>

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type AtomCommandResult,
@@ -111,7 +112,7 @@ export function ThreadGuestShareBar(props: {
             ? "Guest link active"
             : `${share.guestName} is a guest`}
       </Text>
-      <Button label="Stop sharing" tone="text" disabled={disabled} onPress={stopSharing} />
+      <Button label={t("Stop sharing")} tone="text" disabled={disabled} onPress={stopSharing} />
     </View>
   );
 }
@@ -170,14 +171,14 @@ export function ThreadGuestPendingMessage(props: {
       {canOperate ? (
         <View className="mt-1.5 flex-row gap-2">
           <Button
-            label="Dismiss"
+            label={t("Dismiss")}
             tone="secondary"
             accessibilityLabel={`Dismiss message from ${guestName}`}
             disabled={busy}
             onPress={() => void resolve("dismiss")}
           />
           <Button
-            label="Send"
+            label={t("Send")}
             tone="primary"
             accessibilityLabel={`Send message from ${guestName}`}
             disabled={busy}

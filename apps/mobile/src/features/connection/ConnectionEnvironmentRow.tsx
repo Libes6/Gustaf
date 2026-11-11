@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { ConnectionTraceId } from "./ConnectionTraceId";
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -215,7 +216,7 @@ export function ConnectionEnvironmentRow(props: {
           ) : (
             <>
               <ConnectionFormField
-                label="Label"
+                label={t("Label")}
                 autoCapitalize="words"
                 autoCorrect={false}
                 placeholder="My MacBook"
@@ -240,7 +241,7 @@ export function ConnectionEnvironmentRow(props: {
               {props.environment.isRelayManaged ? null : (
                 <View className="flex-1">
                   <Button
-                    label="Save"
+                    label={t("Save")}
                     tone="primary"
                     fullWidth
                     onPress={() => {
@@ -277,7 +278,7 @@ export function ConnectionEnvironmentRow(props: {
                     type="monochrome"
                   />
                   <Text className="text-xs font-t3-bold tracking-[0.8px] uppercase text-primary-foreground">
-                    Save
+                    {t("Save")}
                   </Text>
                 </Pressable>
               )}

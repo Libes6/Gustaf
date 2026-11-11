@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect } from "react";
 import { BackHandler, Keyboard } from "react-native";
@@ -54,17 +55,17 @@ export function PullRequestToolbar(props: {
   }, [searching, closeSearch, navigation, isTabActive]);
   return (
     <AppBar
-      title="T3 Code"
+      title="Gustaf"
       titleContent={
         <WorkspaceBrandTitle
-          accessibilityLabel="T3 Code, Pull requests"
+          accessibilityLabel="Gustaf, Pull requests"
           onOpenEnvironments={() => openSettings(navigation, "SettingsEnvironments")}
         />
       }
       search={{
         value: tab.query,
         onChangeText: (query) => dispatch({ type: "query", tab: "pullRequests", query }),
-        placeholder: "Search pull requests",
+        placeholder: t("Search pull requests"),
         active: searching,
         onOpen: openSearch,
         onClose: closeSearch,

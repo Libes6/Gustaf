@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { BranchNamingMode, type ServerSettingsPatch } from "@t3tools/contracts";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { View } from "react-native";
@@ -7,13 +8,16 @@ import { ListChoiceRow as SettingsChoiceRow } from "../../../components/ui/ListC
 import { SettingsSection } from "./SettingsSection";
 
 const MODES = {
-  static: { label: "Static prefix", description: "Add your prefix to the generated branch name." },
+  static: {
+    label: t("Static prefix"),
+    description: "Add your prefix to the generated branch name.",
+  },
   semantic: {
-    label: "Semantic prefix",
+    label: t("Semantic prefix"),
     description: "Let the model choose feat/, fix/, refactor/, or another prefix.",
   },
   custom: {
-    label: "Custom instructions",
+    label: t("Custom instructions"),
     description: "Generate the complete name with no added prefix or suffix.",
   },
 } satisfies Record<BranchNamingMode, { label: string; description: string }>;
@@ -55,9 +59,11 @@ export function BranchNamingSettings(props: {
   useEffect(() => () => saveDrafts(), []);
   return (
     <SettingsSection
-      title="Worktree branch naming"
+      title={t("Worktree branch naming")}
       trailing={
-        props.mode === null ? <Text className="text-xs text-foreground-muted">Mixed</Text> : null
+        props.mode === null ? (
+          <Text className="text-xs text-foreground-muted">{t("Mixed")}</Text>
+        ) : null
       }
     >
       {BranchNamingMode.literals.map((mode, index) => (
@@ -78,7 +84,7 @@ export function BranchNamingSettings(props: {
           </Text>
           <AppTextInput
             key={props.prefix}
-            accessibilityLabel="Branch prefix"
+            accessibilityLabel={t("Branch prefix")}
             onChangeText={(text) => edit("branchNamePrefix", text)}
             defaultValue={props.prefix ?? ""}
             placeholder={props.prefix === null ? "Mixed" : "No prefix"}
@@ -97,7 +103,7 @@ export function BranchNamingSettings(props: {
           </Text>
           <AppTextInput
             key={props.instructions}
-            accessibilityLabel="Branch naming instructions"
+            accessibilityLabel={t("Branch naming instructions")}
             onChangeText={(text) => edit("branchNameInstructions", text)}
             defaultValue={props.instructions ?? ""}
             placeholder={

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { Chip } from "../../components/ui/Chip";
 import { pullRequestTabOffset } from "./pullRequestTabScroll";
@@ -197,7 +198,8 @@ function PullRequestIdentity(props: {
           {pr.author?.login ?? "Unknown author"}
         </Text>
         <Text className="shrink text-right text-2xs text-foreground-muted" numberOfLines={1}>
-          Updated <RelativeTime timestamp={pr.updatedAt} /> ago
+          {t("Updated")}
+          <RelativeTime timestamp={pr.updatedAt} /> ago
         </Text>
       </View>
       <View className="flex-row items-start gap-1.5">
@@ -474,7 +476,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                   ? [
                       {
                         id: "submit-review",
-                        title: "Submit review",
+                        title: t("Submit review"),
                         icon: "text.bubble",
                         onPress: () =>
                           navigation.navigate("PullRequestReview", { ...params, mode: "review" }),
@@ -496,14 +498,14 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                   ? [
                       {
                         id: "edit-title",
-                        title: "Edit title",
+                        title: t("Edit title"),
                         icon: "pencil",
                         onPress: () =>
                           navigation.navigate("PullRequestEdit", { ...params, field: "title" }),
                       },
                       {
                         id: "edit-description",
-                        title: "Edit description",
+                        title: t("Edit description"),
                         icon: "doc.text",
                         disabled: description.pending,
                         subtitle: description.pending ? "Saving…" : undefined,
@@ -516,7 +518,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                   ? [
                       {
                         id: "maintainer-edits",
-                        title: "Allow edits from maintainers",
+                        title: t("Allow edits from maintainers"),
                         icon: "pencil",
                         selected: maintainerEdits.value,
                         disabled: maintainerEdits.saving,
@@ -535,7 +537,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                       },
                       {
                         id: "copy-link",
-                        title: "Copy link",
+                        title: t("Copy link"),
                         icon: "link",
                         onPress: () => copyPullRequestLink(identity),
                       },
@@ -780,7 +782,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                                 ...(guidesEnabled
                                   ? [{ value: "guide" as const, label: "Guide" }]
                                   : []),
-                                { value: "activity", label: "Activity" },
+                                { value: "activity", label: t("Activity") },
                               ]}
                               selected={section}
                               onSelect={selectSection}
@@ -1020,14 +1022,14 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
         onBack={() => navigation.goBack()}
         menus={[
           {
-            title: "Diff options",
+            title: t("Diff options"),
             icon: "ellipsis",
             items: [
               ...(permissions.verdicts.length
                 ? [
                     {
                       id: "submit-review",
-                      title: "Submit review",
+                      title: t("Submit review"),
                       icon: "text.bubble",
                       onPress: () =>
                         navigation.navigate("PullRequestReview", {
@@ -1053,14 +1055,14 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
                 : []),
               {
                 id: "word-wrap",
-                title: "Word wrap",
+                title: t("Word wrap"),
                 icon: "text.alignleft",
                 selected: appearance.codeWordBreak,
                 onPress: () => setCodeWordBreak(!appearance.codeWordBreak),
               },
               {
                 id: "hide-tests",
-                title: "Hide test files",
+                title: t("Hide test files"),
                 icon: "line.3.horizontal.decrease",
                 selected: filter.hideTestFiles,
                 onPress: toggleTestFiles,
@@ -1212,7 +1214,9 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
               <EmptyState
                 title="Only test files changed"
                 detail="Test files are hidden from this review."
-                action={<Button label="Show test files" tone="contrast" onPress={filter.showAll} />}
+                action={
+                  <Button label={t("Show test files")} tone="contrast" onPress={filter.showAll} />
+                }
                 variant="plain"
               />
             </View>

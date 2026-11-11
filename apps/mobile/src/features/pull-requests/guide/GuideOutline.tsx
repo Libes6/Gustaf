@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { Button } from "../../../components/ui/Button";
 import type { PullRequestReviewGuide } from "@t3tools/contracts";
 import { stopFilePaths } from "@t3tools/client-runtime/review-guide-tour";
@@ -34,12 +35,12 @@ export function GuideOutline({
           actions={[
             {
               id: "word-wrap",
-              title: "Word wrap",
+              title: t("Word wrap"),
               image: "text.alignleft",
               state: appearance.codeWordBreak ? "on" : "off",
             },
             ...(onRewrite
-              ? [{ id: "rewrite", title: "Rewrite guide", image: "arrow.clockwise" }]
+              ? [{ id: "rewrite", title: t("Rewrite guide"), image: "arrow.clockwise" }]
               : []),
           ]}
           onPressAction={({ nativeEvent }) =>

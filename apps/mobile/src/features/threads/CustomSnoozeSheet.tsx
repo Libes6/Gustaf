@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { SheetHeader } from "../../components/ui/SheetHeader";
 import {
   DatePicker,
@@ -36,13 +37,13 @@ import { useAppearancePreferences } from "../settings/appearance/AppearancePrefe
 
 const durationAmounts = Array.from({ length: 99 }, (_, index) => index + 1);
 const modes = [
-  { value: "date", label: "Date and time" },
-  { value: "duration", label: "Duration" },
+  { value: "date", label: t("Date and time") },
+  { value: "duration", label: t("Duration") },
 ] as const;
 const units = [
-  { value: "minutes", label: "Minutes" },
-  { value: "hours", label: "Hours" },
-  { value: "days", label: "Days" },
+  { value: "minutes", label: t("Minutes") },
+  { value: "hours", label: t("Hours") },
+  { value: "days", label: t("Days") },
 ] as const;
 
 export function CustomSnoozeSheet(props: {
@@ -224,10 +225,10 @@ function SnoozePopoverNavigation(props: {
         <View style={{ width: props.width, height: props.height }}>
           <StandaloneStack>
             <SheetHeader
-              title="Custom snooze"
+              title={t("Custom snooze")}
               onCancel={props.onClose}
               accessibilityLabel="Cancel custom snooze"
-              confirm={{ label: "Snooze", onPress: props.onSubmit }}
+              confirm={{ label: t("Snooze"), onPress: props.onSubmit }}
             />
             <ScrollView
               contentInsetAdjustmentBehavior="automatic"

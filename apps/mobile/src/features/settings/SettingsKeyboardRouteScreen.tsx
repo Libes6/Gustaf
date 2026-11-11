@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -20,7 +21,7 @@ const ENTER_BEHAVIOR_OPTIONS: ReadonlyArray<{
 }> = [
   {
     behavior: "send",
-    label: "Send message",
+    label: t("Send message"),
     description: "Return sends the message. Shift-Return inserts a new line.",
   },
   {

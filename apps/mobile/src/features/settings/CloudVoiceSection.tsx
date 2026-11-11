@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { cloudSpeechDisclosure } from "@t3tools/shared/speech";
 import { setCloudSpeechKey } from "@t3tools/client-runtime/voice-input";
@@ -95,7 +96,7 @@ function ModelPicker({
     <>
       <TextInput
         accessibilityLabel="Search OpenRouter models"
-        placeholder="Search transcription models"
+        placeholder={t("Search transcription models")}
         autoCapitalize="none"
         autoCorrect={false}
         editable={!disabled}
@@ -129,7 +130,9 @@ function ModelPicker({
         />
       ))}
       {matches.length === 0 ? (
-        <Text className="mx-4 text-sm text-foreground-muted">No transcription model matches.</Text>
+        <Text className="mx-4 text-sm text-foreground-muted">
+          {t("No transcription model matches.")}
+        </Text>
       ) : matches.length > shown.length ? (
         <ListActionRow
           label={`Show all ${matches.length} models`}

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useId, useState } from "react";
 import { Image, Pressable, View } from "react-native";
 
@@ -60,7 +61,7 @@ function ResolvedWorkspaceFileImagePreview(props: {
           pointerEvents="none"
           className="absolute inset-0 items-center justify-center bg-card px-6"
         >
-          <EmptyState title="Image unavailable" detail={loadError} />
+          <EmptyState title={t("Image unavailable")} detail={loadError} />
         </View>
       ) : null}
       <FilePreviewModal source={preview} onRequestClose={() => setPreview(null)} />

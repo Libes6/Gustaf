@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import type {
   ProviderApprovalDecision,
@@ -27,7 +28,7 @@ export interface PendingApprovalCardProps {
 const DEFAULT_APPROVAL_OPTIONS: ReadonlyArray<ProviderApprovalOption> = [
   { decision: "accept", label: "Allow once" },
   { decision: "acceptForSession", label: "Allow session" },
-  { decision: "decline", label: "Decline" },
+  { decision: "decline", label: t("Decline") },
 ];
 
 export function PendingApprovalCard(props: PendingApprovalCardProps) {

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Platform, Pressable, ScrollView, View } from "react-native";
 
@@ -30,7 +31,7 @@ export function ThreadSideChatsRow(props: {
         size={12}
         tintColorClassName="accent-foreground-muted"
       />
-      <Text className="text-xs text-foreground-muted">Side chats</Text>
+      <Text className="text-xs text-foreground-muted">{t("Side chats")}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
         <View className="flex-row gap-1 pr-4">
           {sideChats.map((sideChat) => {

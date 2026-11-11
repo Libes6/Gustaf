@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import type { PullRequestReviewGuideResult } from "@t3tools/contracts";
 
 export function reviewGuideState(data: PullRequestReviewGuideResult | null) {
@@ -51,7 +52,7 @@ export function guideNoticeState(state: {
   if (!state.data) {
     return {
       kind: "loading" as const,
-      title: "Review guide",
+      title: t("Review guide"),
       description: "Checking for a saved guide…",
       action: "Loading guide…",
     };
@@ -66,7 +67,7 @@ export function guideNoticeState(state: {
   }
   return {
     kind: guide ? ("ready" as const) : ("empty" as const),
-    title: "Review guide",
+    title: t("Review guide"),
     description:
       "Get a tour of the change, with code excerpts and notes on what needs a closer look.",
     action: "Write guide",

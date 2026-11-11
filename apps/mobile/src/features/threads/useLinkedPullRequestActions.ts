@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   pullRequestLinkProject,
   resolveLinkPullRequestInput,
@@ -118,7 +119,7 @@ export function useLinkedPullRequestActions(input: {
     const open = link.snapshot === null || link.snapshot.state === "open";
     const watching = link.watch !== undefined;
     return [
-      { id: "copy", title: "Copy link", image: "link" },
+      { id: "copy", title: t("Copy link"), image: "link" },
       { id: "browser", title: "Open in browser", image: "safari" },
       ...((watching ? canWatch : canStartWatch) && open
         ? [

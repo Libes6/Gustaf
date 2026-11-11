@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
@@ -191,7 +192,7 @@ export function usePullRequestListActions(
         title: "Share…",
         image: "square.and.arrow.up",
       },
-      { id: "copy", title: "Copy link", image: "link" },
+      { id: "copy", title: t("Copy link"), image: "link" },
       {
         id: "provider",
         title: openOnProviderLabel(entry.provider),

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { useSearchToolbarInset } from "../../components/ui/useBarInset";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -54,7 +55,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
     value: query,
     onChangeText: setQuery,
     placeholder: "Search packages",
-    accessibilityLabel: "Search open-source licenses",
+    accessibilityLabel: t("Search open-source licenses"),
     clearAccessibilityLabel: "Clear package search",
   };
   const searchInset = useSearchToolbarInset(search);
@@ -102,7 +103,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
         ListEmptyComponent={
           <View className="items-center px-6 py-12">
             <Text className="text-center text-base text-foreground-muted">
-              No licenses match that search.
+              {t("No licenses match that search.")}
             </Text>
           </View>
         }
@@ -158,7 +159,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
               onPress={() => void Linking.openURL(sourceUrl)}
               className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
             >
-              <Text className="font-t3-medium text-primary-text">Project source</Text>
+              <Text className="font-t3-medium text-primary-text">{t("Project source")}</Text>
               <SymbolView
                 name="arrow.up.right"
                 size={16}

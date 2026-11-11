@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type {
   PullRequestActivity,
   PullRequestCheck,
@@ -11,7 +12,7 @@ import { PullRequestGlyph } from "./pullRequestGlyphs";
 
 const STATES = {
   open: {
-    label: "Open",
+    label: t("Open"),
     icon: PullRequestGlyph.pullRequest,
     tint: "accent-adaptive-emerald-600-400",
     text: "text-adaptive-emerald-600-400",
@@ -25,14 +26,14 @@ const STATES = {
     background: "bg-adaptive-violet-500-a12-a16",
   },
   closed: {
-    label: "Closed",
+    label: t("Closed"),
     icon: PullRequestGlyph.closed,
     tint: "accent-danger-foreground",
     text: "text-danger-foreground",
     background: "bg-danger",
   },
   draft: {
-    label: "Draft",
+    label: t("Draft"),
     icon: PullRequestGlyph.draft,
     tint: "accent-icon-muted",
     text: "text-foreground-muted",
@@ -67,7 +68,7 @@ export function checkStatus(check: PullRequestCheck) {
       } as const;
     case "failure":
       return {
-        label: "Failed",
+        label: t("Failed"),
         icon: "exclamationmark.circle",
         tint: "accent-danger-foreground",
       } as const;
@@ -82,7 +83,7 @@ export function checkStatus(check: PullRequestCheck) {
     case "cancelled":
       return { label: "Cancelled", icon: "minus", tint: "accent-icon-muted" } as const;
     case "skipped":
-      return { label: "Skipped", icon: "slash.circle", tint: "accent-icon-muted" } as const;
+      return { label: t("Skipped"), icon: "slash.circle", tint: "accent-icon-muted" } as const;
     case "neutral":
       return { label: "Neutral", icon: "minus", tint: "accent-icon-muted" } as const;
   }

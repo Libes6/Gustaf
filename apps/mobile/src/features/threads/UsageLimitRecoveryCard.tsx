@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -114,7 +115,7 @@ export function UsageLimitRecoveryCard({
         },
       }
     : {
-        label: "Manage usage",
+        label: t("Manage usage"),
         role: "link" as const,
         run: () => {
           setError(null);

@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { View } from "react-native";
 
 import { Button } from "../../../components/ui/Button";
@@ -12,7 +13,7 @@ export function SettingsProjectOverridesSection(props: {
   readonly onClear: () => void;
 }) {
   return (
-    <SettingsSection title="Project">
+    <SettingsSection title={t("Project")}>
       <View className="min-h-16 flex-row items-center gap-3 px-4 py-3">
         <Text className="min-w-0 flex-1 text-base text-foreground" numberOfLines={2}>
           {props.projectLabel}

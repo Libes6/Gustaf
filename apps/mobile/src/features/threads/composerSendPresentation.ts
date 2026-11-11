@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   alternateComposerDispatchAction,
   type ActiveTurnComposerAction,
@@ -33,7 +34,7 @@ export function resolveComposerSendPresentation(input: {
 }): ComposerSendPresentation {
   if (input.editingQueuedMessage) {
     return {
-      label: "Update queued message",
+      label: t("Update queued message"),
       icon: "checkmark",
       action: null,
       alternate: null,

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   sourceControlClients,
   type ChangeRequestTerminology,
@@ -71,7 +72,7 @@ export function pullRequestAgentActions(pr: PullRequestDetail, canWatch: boolean
   return [
     {
       task: "ask",
-      title: "Ask a question",
+      title: t("Ask a question"),
       icon: "bubble.left.and.text.bubble.right",
       disabled: false,
     },
@@ -84,7 +85,7 @@ export function pullRequestAgentActions(pr: PullRequestDetail, canWatch: boolean
     },
     {
       task: "conflicts",
-      title: "Resolve conflicts",
+      title: t("Resolve conflicts"),
       icon: "arrow.triangle.branch",
       disabled: pr.state !== "open" || pr.mergeability !== "conflicting",
     },

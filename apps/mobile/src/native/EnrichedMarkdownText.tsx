@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { decodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
 import {
   collectComposerContextReferences,
@@ -254,7 +255,7 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
               title: url,
               actions: [
                 { id: "enriched-open-link", title: "Open link" },
-                { id: "enriched-copy-link", title: "Copy link" },
+                { id: "enriched-copy-link", title: t("Copy link") },
                 { id: "enriched-share-link", title: "Share link" },
               ],
             };
@@ -333,7 +334,7 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
               title: url,
               actions: [
                 { id: "enriched-open-link", title: "Open link" },
-                { id: "enriched-copy-link", title: "Copy link" },
+                { id: "enriched-copy-link", title: t("Copy link") },
               ],
             };
             setActiveMenu({ url, menu });

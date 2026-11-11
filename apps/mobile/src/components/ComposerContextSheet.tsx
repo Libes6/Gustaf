@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { Button } from "./ui/Button";
 import * as Dialog from "./ui/Dialog";
 import { useOpenPullRequest } from "../native/useOpenPullRequest";
@@ -68,7 +69,7 @@ function ContextSource(props: { source: ElementContextSource | null }) {
     : null;
   return (
     <ContextField
-      label="Source"
+      label={t("Source")}
       value={[source.functionName, location].filter(Boolean).join("\n")}
       code
     />
@@ -263,9 +264,9 @@ export function ComposerContextSheet(props: {
             ) : null}
             {record.kind === "preview-annotation" ? (
               <>
-                <ContextField label="Page" value={record.pageTitle ?? record.pageUrl} />
+                <ContextField label={t("Page")} value={record.pageTitle ?? record.pageUrl} />
                 <ContextField label="URL" value={record.pageUrl} />
-                <ContextField label="Comment" value={record.comment} />
+                <ContextField label={t("Comment")} value={record.comment} />
                 <ContextField label="Selection" value={record.targetSummary} />
                 <ContextField label="Requested changes" value={record.styleChanges.join("\n")} />
                 {record.elements?.map(
@@ -289,7 +290,7 @@ export function ComposerContextSheet(props: {
             ) : null}
             {record.kind === "element" ? (
               <>
-                <ContextField label="Page" value={record.pageUrl} />
+                <ContextField label={t("Page")} value={record.pageUrl} />
                 <ContextField label="Element" value={record.componentName ?? record.tagName} />
                 <ContextField label="Selector" value={record.selector} code />
                 <ContextSource source={record.source} />
@@ -299,19 +300,19 @@ export function ComposerContextSheet(props: {
             ) : null}
             {record.kind === "image" ? (
               <ContextField
-                label="File"
+                label={t("File")}
                 value={`${record.mimeType} · ${formatAttachmentSize(record.sizeBytes)}`}
               />
             ) : null}
             {record.kind === "mention" ? (
-              <ContextField label="Path" value={record.path} code />
+              <ContextField label={t("Path")} value={record.path} code />
             ) : null}
             {record.kind === "thread" ? (
               <View className="gap-3">
-                <ContextField label="Thread" value={record.title} />
+                <ContextField label={t("Thread")} value={record.title} />
                 {props.onOpenThread ? (
                   <Button
-                    label="Open thread"
+                    label={t("Open thread")}
                     tone="secondary"
                     onPress={() =>
                       props.onOpenThread?.({
@@ -325,13 +326,13 @@ export function ComposerContextSheet(props: {
               </View>
             ) : null}
             {record.kind === "environment" ? (
-              <ContextField label="Machine" value={record.label} />
+              <ContextField label={t("Machine")} value={record.label} />
             ) : null}
             {record.kind === "skill" ? (
               <View className="gap-3">
                 <ContextField label="Skill" value={record.name} />
                 <ContextField
-                  label="Description"
+                  label={t("Description")}
                   value={props.skillDescription ?? "No description is available for this skill."}
                 />
                 {props.onOpenSkill ? (
@@ -372,7 +373,10 @@ export function ComposerContextSheet(props: {
             }}
             className="rounded-xl bg-subtle p-4"
           >
-            <Text className="text-foreground">Open {changeRequestTerm}</Text>
+            <Text className="text-foreground">
+              {t("Open")}
+              {changeRequestTerm}
+            </Text>
           </Pressable>
         ) : null}
         {props.onOpenAttachment ? (
@@ -392,7 +396,12 @@ export function ComposerContextSheet(props: {
           />
         ) : null}
         {props.onRemove ? (
-          <Button label="Remove from draft" tone="secondary" onPress={props.onRemove} fullWidth />
+          <Button
+            label={t("Remove from draft")}
+            tone="secondary"
+            onPress={props.onRemove}
+            fullWidth
+          />
         ) : null}
       </ScrollView>
     </Sheet>

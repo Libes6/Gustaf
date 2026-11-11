@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AppBar, type AppBarSearch } from "../../components/ui/AppBar";
 import { AsyncResult } from "effect/reactivity";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
@@ -229,7 +230,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                 />
                 {queryError ? (
                   <Button
-                    label="Retry"
+                    label={t("Retry")}
                     onPress={result.error ? result.refresh : searchResult.refresh}
                   />
                 ) : null}

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -62,7 +63,7 @@ export function PdfPreview(props: { readonly uri: string }) {
       <View className="flex-1 gap-4 bg-card">
         <FilePreviewNotice title="Could not load PDF">{error}</FilePreviewNotice>
         <View className="items-center">
-          <ControlPill label="Try again" variant="pill" onPress={refresh} />
+          <ControlPill label={t("Try again")} variant="pill" onPress={refresh} />
         </View>
       </View>
     );

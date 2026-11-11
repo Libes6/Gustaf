@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -17,12 +18,12 @@ const FOLLOW_UP_OPTIONS: ReadonlyArray<{
 }> = [
   {
     behavior: "queue",
-    label: "Queue",
+    label: t("Queue"),
     description: "Your message waits and runs after the current turn finishes.",
   },
   {
     behavior: "steer",
-    label: "Steer",
+    label: t("Steer"),
     description: "Your message reaches the agent right away, changing what it is working on.",
   },
 ];
@@ -64,5 +65,5 @@ export function SettingsFollowUpRouteScreen() {
     </ScrollView>
   );
 
-  return <SettingsScreen title="Chat">{content}</SettingsScreen>;
+  return <SettingsScreen title={t("Chat")}>{content}</SettingsScreen>;
 }

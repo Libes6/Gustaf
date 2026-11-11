@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { View } from "react-native";
 
@@ -98,7 +99,7 @@ export function AttachmentDocumentBody(props: {
   return (
     <View className="flex-1 items-center justify-center bg-sheet px-6">
       <EmptyState
-        title="No preview for this file"
+        title={t("No preview for this file")}
         detail={
           props.nativeError ??
           "No app on this device can show this format. Save or share it to open it elsewhere."

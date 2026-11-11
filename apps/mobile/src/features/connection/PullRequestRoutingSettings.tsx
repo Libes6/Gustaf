@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { ListChoiceRow } from "../../components/ui/ListChoiceRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
@@ -21,15 +22,19 @@ const options: ReadonlyArray<{
   label: string;
   description: string;
 }> = [
-  { value: "off", label: "Off", description: "Keep source control requests on this environment." },
+  {
+    value: "off",
+    label: t("Off"),
+    description: "Keep source control requests on this environment.",
+  },
   {
     value: "read",
-    label: "Read PRs",
+    label: t("Read PRs"),
     description: "Share PR data with other enabled environments.",
   },
   {
     value: "read-write",
-    label: "Read and act",
+    label: t("Read and act"),
     description:
       "Actions may use broader source control permissions than the original environment.",
   },

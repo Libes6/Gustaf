@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { VoiceInputPhase, VoiceInputState } from "@t3tools/client-runtime/voice-input";
 import { memo, useState, type ReactNode } from "react";
 import { Linking, Pressable, Text as SystemText, View, type LayoutChangeEvent } from "react-native";
@@ -330,7 +331,7 @@ export function ComposerDictationError(props: {
         {props.error}
       </Text>
       <Pressable
-        accessibilityLabel="Dismiss voice input error"
+        accessibilityLabel={t("Dismiss voice input error")}
         accessibilityRole="button"
         className="size-7 items-center justify-center active:opacity-70"
         hitSlop={8}

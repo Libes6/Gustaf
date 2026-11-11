@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { pipe } from "effect/Function";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
@@ -235,7 +236,7 @@ function PendingSecretRequestForm(props: {
           </Text>
         </View>
         <Button
-          label="Decline"
+          label={t("Decline")}
           tone="text"
           disabled={submitting}
           onPress={() => void send({ type: "decline" })}

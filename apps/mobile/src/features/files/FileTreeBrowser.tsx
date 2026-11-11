@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { Button } from "../../components/ui/Button";
 import { LegendList } from "@legendapp/list/react-native";
@@ -259,7 +260,7 @@ export function FileTreeBrowser(props: {
               </Text>
               <View className="mt-3">
                 <Button
-                  label="Try again"
+                  label={t("Try again")}
                   tone="secondary"
                   onPress={props.onRefresh}
                   disabled={props.isPending}

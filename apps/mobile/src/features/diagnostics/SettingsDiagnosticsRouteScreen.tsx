@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import * as Application from "expo-application";
@@ -93,7 +94,7 @@ export function SettingsDiagnosticsRouteScreen() {
   };
 
   return (
-    <SettingsScreen title="Diagnostics">
+    <SettingsScreen title={t("Diagnostics")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentInset={{ bottom: Math.max(insets.bottom, 18) }}
@@ -129,7 +130,7 @@ export function SettingsDiagnosticsRouteScreen() {
         </SettingsSection>
 
         <View className="gap-3">
-          <SettingsSection title="Actions">
+          <SettingsSection title={t("Actions")}>
             <SettingsActionRow
               icon={copied ? "checkmark" : "doc.on.doc"}
               label={copied ? "Copied" : "Copy crash report"}
@@ -189,7 +190,7 @@ function CrashReportsSetting() {
       </SettingsSection>
       <Text className="px-2 text-sm leading-normal text-foreground-muted">
         When the app crashes or hits an error, it sends the error message, the stack trace, the app
-        version, and the device model and OS version to the T3 Code team. Each launch also sends
+        version, and the device model and OS version to the Gustaf team. Each launch also sends
         startup timings. Reports carry a random ID for this install.
       </Text>
     </View>

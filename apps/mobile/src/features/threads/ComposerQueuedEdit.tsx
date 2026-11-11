@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import type { ChatAttachment, EnvironmentId } from "@t3tools/contracts";
 import { Image } from "expo-image";
@@ -19,9 +20,9 @@ export function ComposerQueuedEditBanner(props: {
         Editing queued message
       </Text>
       <Button
-        label="Cancel"
+        label={t("Cancel")}
         tone="text"
-        accessibilityLabel="Cancel editing queued message"
+        accessibilityLabel={t("Cancel editing queued message")}
         disabled={props.saving}
         onPress={props.onCancel}
       />

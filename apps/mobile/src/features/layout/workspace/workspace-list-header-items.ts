@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import type {
   NativeStackHeaderItem,
   NativeStackHeaderItemMenu,
@@ -58,8 +59,8 @@ export function createWorkspaceListHeaderItems(input: {
           withNativeGlassHeaderItem({
             type: "button",
             axisBehavior: "horizontalOnly",
-            label: "Settings",
-            accessibilityLabel: "Open settings",
+            label: t("Settings"),
+            accessibilityLabel: t("Open settings"),
             icon: sfSymbolIcon("gearshape"),
             onPress: input.onOpenSettings,
           }),

@@ -10,14 +10,22 @@ import {
 } from "./appLinking";
 
 describe("shouldHandleAppLink", () => {
-  it.each(["t3code://", "t3code:///", "t3code-dev://", "t3code-preview://"])(
-    "ignores scheme-only URL %s",
-    (url) => {
-      expect(shouldHandleAppLink(url, true)).toBe(false);
-    },
-  );
+  it.each([
+    "gustaf://",
+    "gustaf:///",
+    "gustaf-dev://",
+    "gustaf-preview://",
+    "t3code://",
+    "t3code:///",
+    "t3code-dev://",
+    "t3code-preview://",
+  ])("ignores scheme-only URL %s", (url) => {
+    expect(shouldHandleAppLink(url, true)).toBe(false);
+  });
 
   it.each([
+    "gustaf://threads/env-1/thread-1",
+    "gustaf-dev://pair?pairingUrl=x",
     "t3code://threads/env-1/thread-1",
     "t3code://pair?pairingUrl=x",
     "t3code-dev://settings/usage?tab=limits",
@@ -36,6 +44,8 @@ describe("shouldHandleAppLink", () => {
 
 describe("cloud-only deep links", () => {
   it.each([
+    "gustaf://connect-onboarding",
+    "gustaf-dev://settings/auth",
     "t3code://connect-onboarding",
     "t3code-dev://connect-onboarding/?source=x",
     "t3code://settings/waitlist",

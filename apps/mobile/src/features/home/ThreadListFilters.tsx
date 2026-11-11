@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Pressable, ScrollView } from "react-native";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
@@ -37,7 +38,7 @@ export function ThreadListFilters(props: {
         actions={[
           {
             id: "all",
-            title: "All environments",
+            title: t("All environments"),
             state: props.selectedEnvironmentId === null ? "on" : "off",
           },
           ...props.environments.map((environment) => ({
@@ -61,12 +62,12 @@ export function ThreadListFilters(props: {
       />
       <ListFilterMenu
         label={selectedProject?.label ?? "All projects"}
-        accessibilityLabel="Filter threads by project"
+        accessibilityLabel={t("Filter threads by project")}
         active={selectedProject !== undefined}
         actions={[
           {
             id: "all",
-            title: "All projects",
+            title: t("All projects"),
             state: props.selectedProjectKey === null ? "on" : "off",
           },
           ...props.projects.map((project) => ({

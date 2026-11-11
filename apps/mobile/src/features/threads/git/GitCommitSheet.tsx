@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { ScreenContent } from "../../../components/ui/ScreenContent";
 import { SheetHeader } from "../../../components/ui/SheetHeader";
 import { Button } from "../../../components/ui/Button";
@@ -69,7 +70,7 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
   const android = Platform.OS === "android";
   const header = (
     <SheetHeader
-      title="Commit changes"
+      title={t("Commit changes")}
       subtitle={gitStatus.data?.refName ?? "(detached HEAD)"}
       onCancel={() => navigation.goBack()}
       accessibilityLabel="Cancel commit"
@@ -120,8 +121,10 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
               <View className="flex-1 gap-1">
                 <Text className="text-base font-t3-bold text-foreground">Changed files</Text>
                 <Text className="text-xs text-foreground-muted">
-                  {selectedFiles.length} of {allFiles.length} selected · +
-                  {formatDiffCount(selectedInsertions)} −{formatDiffCount(selectedDeletions)}
+                  {selectedFiles.length}
+                  {t("of")}
+                  {allFiles.length} selected · +{formatDiffCount(selectedInsertions)} −
+                  {formatDiffCount(selectedDeletions)}
                 </Text>
               </View>
               {allFiles.length > 0 ? (
@@ -209,7 +212,7 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
           </View>
           <View className="gap-2">
             <Button
-              label="Commit changes"
+              label={t("Commit changes")}
               icon="checkmark"
               tone="primary"
               fullWidth

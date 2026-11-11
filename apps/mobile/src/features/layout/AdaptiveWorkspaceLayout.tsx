@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   WorkspaceColumnsRendererContext,
   WorkspacePresentationHostContext,
@@ -1084,7 +1085,7 @@ function AdaptiveWorkspaceLayoutContent(
                   <RenderFailureView
                     {...fallback}
                     title="The sidebar couldn't be displayed"
-                    exit={{ label: "Open settings", onPress: handleOpenSettings }}
+                    exit={{ label: t("Open settings"), onPress: handleOpenSettings }}
                   />
                 )}
               >

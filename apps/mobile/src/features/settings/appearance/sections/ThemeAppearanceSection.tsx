@@ -1,3 +1,4 @@
+import { t } from "../../../../i18n";
 import { memo, useId } from "react";
 import { Pressable, View } from "react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
@@ -23,9 +24,9 @@ const APPEARANCE_MODES: ReadonlyArray<{
   readonly id: MobileThemeMode;
   readonly label: string;
 }> = [
-  { id: "system", label: "System" },
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
+  { id: "system", label: t("System") },
+  { id: "light", label: t("Light") },
+  { id: "dark", label: t("Dark") },
 ];
 
 const previewPercentage = (value: number) => `${value * 100}%`;

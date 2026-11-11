@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   normalizeProviderAccentColor,
@@ -75,7 +76,8 @@ export function SubagentRow(props: {
             </Text>
             {presentation.runsOn !== null ? (
               <Text numberOfLines={1} className="shrink text-xs text-foreground-muted">
-                on {presentation.runsOn}
+                {t("on")}
+                {presentation.runsOn}
               </Text>
             ) : null}
           </View>

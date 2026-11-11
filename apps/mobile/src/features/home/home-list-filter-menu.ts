@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 
 import type { AppBarMenuItem } from "../../components/ui/AppBar.types";
@@ -23,11 +24,11 @@ export function buildHomeListFilterMenuItems(props: {
   const items: AppBarMenuItem[] = [
     {
       id: "environment",
-      title: "Environment",
+      title: t("Environment"),
       items: [
         {
           id: "environment:all",
-          title: "All environments",
+          title: t("All environments"),
           subtitle: "Show threads from every environment",
           selected: props.selectedEnvironmentId === null,
           onPress: () => props.onEnvironmentChange(null),
@@ -45,11 +46,11 @@ export function buildHomeListFilterMenuItems(props: {
   if (props.projects.length > 0) {
     items.push({
       id: "project",
-      title: "Project",
+      title: t("Project"),
       items: [
         {
           id: "project:all",
-          title: "All projects",
+          title: t("All projects"),
           subtitle: "Show threads from every project",
           selected: props.selectedProjectKey === null,
           onPress: () => props.onProjectChange(null),

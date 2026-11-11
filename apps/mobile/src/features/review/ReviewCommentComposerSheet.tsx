@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TextInputWrapper } from "expo-paste-input";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
@@ -209,7 +210,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
               </View>
 
               <View className="min-h-0 flex-1 gap-2">
-                <Text className="text-sm font-t3-bold text-foreground">Comment</Text>
+                <Text className="text-sm font-t3-bold text-foreground">{t("Comment")}</Text>
                 <View className="min-h-[132px] flex-1 overflow-hidden rounded-[20px] border border-border bg-card">
                   <View className="min-h-0 flex-1 px-4 pt-3.5">
                     <TextInputWrapper onPaste={handleNativePaste} style={{ flex: 1, minHeight: 0 }}>
@@ -255,9 +256,9 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
             />
             <View className="flex-1" />
             <ControlPill
-              accessibilityLabel="Comment"
+              accessibilityLabel={t("Comment")}
               icon="arrow.up"
-              label="Comment"
+              label={t("Comment")}
               variant="primary"
               disabled={!canSubmit}
               onPress={handleSubmit}
@@ -281,9 +282,9 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
             />
             <View className="flex-1" />
             <ControlPill
-              accessibilityLabel="Comment"
+              accessibilityLabel={t("Comment")}
               icon="arrow.up"
-              label="Comment"
+              label={t("Comment")}
               variant="primary"
               disabled={!canSubmit}
               onPress={handleSubmit}

@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { sanitizeFeatureBranchName } from "@t3tools/shared/git";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useState } from "react";
@@ -115,7 +116,7 @@ export function GitBranchesSheet(_props: GitBranchesSheetProps) {
               New worktree
             </Text>
             {Platform.OS === "android" ? (
-              <Text className="text-foreground-secondary text-sm">Base branch</Text>
+              <Text className="text-foreground-secondary text-sm">{t("Base branch")}</Text>
             ) : null}
             <TextInput
               value={worktreeBaseBranch}

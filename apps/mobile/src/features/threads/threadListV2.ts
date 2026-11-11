@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   canSnooze,
   effectiveSnoozed,
@@ -153,7 +154,7 @@ export function layoutThreadListV2RowMenuActions(input: {
     ...input.pin,
     {
       id: "more",
-      title: "More",
+      title: t("More"),
       image: "ellipsis.circle",
       subactions: [
         ...(input.reorder.length > 1

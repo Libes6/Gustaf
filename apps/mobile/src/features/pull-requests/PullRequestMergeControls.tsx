@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -105,9 +106,9 @@ export function PullRequestMergeControls(props: {
       : pr.state === "merged"
         ? { label: "Merged", icon: PullRequestGlyph.merged, final: true }
         : pr.state === "closed"
-          ? { label: "Closed", icon: PullRequestGlyph.closed, final: true }
+          ? { label: t("Closed"), icon: PullRequestGlyph.closed, final: true }
           : pr.isDraft
-            ? { label: "Draft", icon: PullRequestGlyph.draft }
+            ? { label: t("Draft"), icon: PullRequestGlyph.draft }
             : pr.mergeability === "conflicting"
               ? { label: "Resolve conflicts to merge", icon: PullRequestGlyph.conflicting }
               : pr.autoMergeEnabled

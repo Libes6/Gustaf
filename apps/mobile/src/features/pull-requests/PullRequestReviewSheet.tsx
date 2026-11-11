@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AsyncResult } from "effect/reactivity";
 import { useAtomRefresh } from "@effect/atom-react";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
@@ -55,8 +56,8 @@ function useActionSubmission(params: PullRequestParams) {
 }
 
 const VERDICTS = [
-  { value: "comment", title: "Comment" },
-  { value: "approve", title: "Approve" },
+  { value: "comment", title: t("Comment") },
+  { value: "approve", title: t("Approve") },
   {
     value: "request-changes",
     title: "Request changes",

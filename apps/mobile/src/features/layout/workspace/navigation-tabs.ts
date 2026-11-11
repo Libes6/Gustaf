@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { Platform } from "react-native";
@@ -14,8 +15,10 @@ import { PullRequestGlyph } from "../../pull-requests/pullRequestGlyphs";
 import { resolveWorkspaceTabOrder } from "./workspace-tabs-state";
 
 export const WORKSPACE_TAB_LABELS = {
-  ...NAVIGATION_TAB_LABELS,
-  ...(Platform.OS === "ios" ? { threads: "Chats", pullRequests: "PRs" } : {}),
+  threads: t(NAVIGATION_TAB_LABELS.threads),
+  pullRequests: t(NAVIGATION_TAB_LABELS.pullRequests),
+  usage: t(NAVIGATION_TAB_LABELS.usage),
+  ...(Platform.OS === "ios" ? { threads: t("Chats"), pullRequests: "PRs" } : {}),
 };
 
 export const NAVIGATION_TAB_ICONS = {

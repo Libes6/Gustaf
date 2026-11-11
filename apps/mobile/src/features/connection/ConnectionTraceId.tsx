@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AppText as Text } from "../../components/ui/AppText";
 import { cn } from "../../lib/cn";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
@@ -21,7 +22,7 @@ export function ConnectionTraceId({
         }
         accessibilityLabel={`Copy trace ID ${traceId}`}
         accessibilityRole="button"
-        accessibilityActions={[{ name: "activate", label: "Copy trace ID" }]}
+        accessibilityActions={[{ name: "activate", label: t("Copy trace ID") }]}
         onAccessibilityAction={(event) => {
           event.stopPropagation();
           if (event.nativeEvent.actionName === "activate") copy();

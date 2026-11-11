@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { SheetCloseButton } from "../../components/ui/SheetHeader";
 import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
@@ -211,7 +212,7 @@ export function DevicePreviewScreen({
       ? [
           {
             id: "back",
-            title: "Back",
+            title: t("Back"),
             icon: "arrow.left",
             disabled: !inputConnected,
             onPress: () => streamRef.current?.back(),
@@ -229,7 +230,7 @@ export function DevicePreviewScreen({
       ? [
           {
             id: "rotate",
-            title: "Rotate device",
+            title: t("Rotate device"),
             icon: "arrow.clockwise" as const,
             disabled: !inputConnected,
             onPress: () => streamRef.current?.rotate(),
@@ -250,7 +251,7 @@ export function DevicePreviewScreen({
       ? [
           {
             id: "devices",
-            title: "Devices",
+            title: t("Devices"),
             inline: true,
             items: previews.map((device) => ({
               id: device.key,
@@ -298,7 +299,7 @@ export function DevicePreviewScreen({
                 {state.error}
               </AppText>
               <View className="items-center">
-                <Button label="Retry" tone="secondary" onPress={state.refresh} />
+                <Button label={t("Retry")} tone="secondary" onPress={state.refresh} />
               </View>
             </>
           ) : focused && foreground ? (
@@ -312,7 +313,7 @@ export function DevicePreviewScreen({
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
         >
           <ControlPill
-            accessibilityLabel="Home"
+            accessibilityLabel={t("Home")}
             icon="house"
             disabled={!inputConnected}
             onPress={pressHome}
@@ -340,7 +341,7 @@ export function DevicePreviewScreen({
                 {preview?.name ?? "Devices"}
               </AppText>
               <ControlPill
-                accessibilityLabel="Home"
+                accessibilityLabel={t("Home")}
                 icon="house"
                 disabled={!inputConnected}
                 onPress={pressHome}
@@ -430,7 +431,7 @@ function OpenDevicePreview({
             {error}
           </AppText>
           <View className="items-center">
-            <Button label="Retry" tone="secondary" onPress={refresh} />
+            <Button label={t("Retry")} tone="secondary" onPress={refresh} />
           </View>
         </>
       ) : (

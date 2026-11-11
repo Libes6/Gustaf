@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 
 import type { AppBarMenu } from "../../../components/ui/AppBar.types";
@@ -54,7 +55,7 @@ export function useSettingsEnvironmentMenu(): AppBarMenu {
         items: [
           {
             id: "project:all",
-            title: "All projects",
+            title: t("All projects"),
             selected: selectedProjectKey === null,
             onPress: () => selectProject(null),
           },

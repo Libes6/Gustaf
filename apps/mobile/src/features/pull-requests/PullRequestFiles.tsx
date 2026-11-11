@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
@@ -162,7 +163,7 @@ function FileFilterMenu({ filter }: { readonly filter: ChangedFiles["filter"] })
       actions={[
         {
           id: "hide-tests",
-          title: "Hide test files",
+          title: t("Hide test files"),
           image: "line.3.horizontal.decrease",
           state: filter.hideTestFiles ? "on" : "off",
         },
@@ -187,7 +188,7 @@ function NoVisibleFiles({ files }: { readonly files: ChangedFiles }) {
       <EmptyState
         title={diff.nextCursor ? "No non-test files loaded yet" : "Only test files changed"}
         detail="Test files are hidden from this review."
-        action={<Button label="Show test files" tone="contrast" onPress={filter.showAll} />}
+        action={<Button label={t("Show test files")} tone="contrast" onPress={filter.showAll} />}
         variant="plain"
       />
     ) : null;
@@ -422,7 +423,7 @@ export function PullRequestFilesSheet({ route }: StaticScreenProps<PullRequestDi
             items: [
               {
                 id: "hide-tests",
-                title: "Hide test files",
+                title: t("Hide test files"),
                 icon: "line.3.horizontal.decrease",
                 selected: filter.hideTestFiles,
                 onPress: filter.toggle,

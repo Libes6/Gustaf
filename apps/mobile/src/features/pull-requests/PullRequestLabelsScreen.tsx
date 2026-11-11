@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { StaticScreenProps } from "@react-navigation/native";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -71,8 +72,8 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
   };
   return (
     <PullRequestSearchSheet
-      title="Labels"
-      placeholder="Search labels"
+      title={t("Labels")}
+      placeholder={t("Search labels")}
       closeAccessibilityLabel="Close labels"
       clearAccessibilityLabel="Clear label search"
       query={query}
@@ -138,7 +139,7 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
                   }
                   variant="plain"
                 />
-                {result.error ? <Button label="Retry" onPress={result.refresh} /> : null}
+                {result.error ? <Button label={t("Retry")} onPress={result.refresh} /> : null}
               </View>
             )
           }

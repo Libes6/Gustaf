@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Toolbar } from "./Toolbar";
 import { AppActivityIndicator } from "./AppActivityIndicator";
 import type { HeaderBarButtonMailSearchToolbarItem } from "react-native-screens";
@@ -165,7 +166,7 @@ export function AppBar(props: AppBarProps) {
         <Toolbar placement="left">
           {rootBack ? (
             <ScreenHeaderButton
-              accessibilityLabel="Back"
+              accessibilityLabel={t("Back")}
               icon="chevron.left"
               onPress={rootBack}
               separateBackground
@@ -183,8 +184,8 @@ export function AppBar(props: AppBarProps) {
           ) : null}
           {compose ? (
             <ScreenHeaderButton
-              accessibilityLabel="New task"
-              label="New task"
+              accessibilityLabel={t("New task")}
+              label={t("New task")}
               icon="square.and.pencil"
               onPress={compose}
               separateBackground

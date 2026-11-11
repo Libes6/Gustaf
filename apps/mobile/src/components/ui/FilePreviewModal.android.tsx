@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "./Button";
 import * as Dialog from "./Dialog";
 import { createContext, useContext, useEffect, useEffectEvent } from "react";
@@ -114,7 +115,7 @@ function DocumentPreview(props: {
             {name ?? "Document"}
           </Text>
           <View className="items-end">
-            <Button label="Cancel" tone="text" onPress={props.onRequestClose} />
+            <Button label={t("Cancel")} tone="text" onPress={props.onRequestClose} />
           </View>
         </View>
       </View>

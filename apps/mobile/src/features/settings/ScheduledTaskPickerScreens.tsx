@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useNavigation } from "@react-navigation/native";
 import { isListedThreadLineage } from "@t3tools/contracts";
 import * as Haptics from "expo-haptics";
@@ -142,7 +143,7 @@ export function ScheduledTaskBranchPickerRouteScreen() {
 
   return (
     <BranchPickerScreen
-      title="Base branch"
+      title={t("Base branch")}
       project={project}
       branches={visibleBranches}
       selectedBranchName={editor.draft.baseRef}
@@ -195,7 +196,7 @@ export function ScheduledTaskThreadPickerRouteScreen() {
     value: query,
     onChangeText: setQuery,
     placeholder: THREAD_SEARCH_PLACEHOLDER,
-    accessibilityLabel: "Search threads",
+    accessibilityLabel: t("Search threads"),
     clearAccessibilityLabel: "Clear thread search",
     mode: "inline" as const,
     compactToolbar: true,
@@ -236,7 +237,7 @@ export function ScheduledTaskThreadPickerRouteScreen() {
   const selectedKey = threadId ?? (editor.draft.threadMode === "new_thread" ? "new-thread" : null);
 
   return (
-    <SettingsScreen title="Destination" search={search}>
+    <SettingsScreen title={t("Destination")} search={search}>
       <FlatList
         data={rows}
         keyExtractor={(row) => row.key}

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ComponentProps } from "react";
 import { FloatingActionButton } from "./ui/FloatingActionButton.android";
 import { ScrollComposeButton } from "./ScrollComposeButton.android";
@@ -11,7 +12,7 @@ export function NewThreadButton(props: ComponentProps<typeof SharedNewThreadButt
     <FloatingActionButton
       {...props}
       icon="square.and.pencil"
-      label="New thread"
+      label={t("New thread")}
       tone="primary"
       variant={props.extended ? "extended" : "large"}
     />
