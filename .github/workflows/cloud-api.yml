@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/api/**"
+      - "scripts/cloud/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".pnpmfile.cjs"
@@ -14,6 +15,7 @@ on:
     branches: [dev, gustaf/cloud-api-foundation]
     paths:
       - "apps/api/**"
+      - "scripts/cloud/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".pnpmfile.cjs"
@@ -133,32 +135,22 @@ jobs:
             --header "Authorization: Bearer $COOLIFY_TOKEN" --output /dev/null
           echo "Coolify accepted deployment request for \`$IMAGE:$TAG\`. Verify completion in Coolify deployment logs and /health/ready." >> "$GITHUB_STEP_SUMMARY"
 
-  inspect-coolify:
+  bootstrap-coolify:
     if: github.ref == 'refs/heads/gustaf/cloud-api-foundation' && github.event_name == 'push'
+    needs: image
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 5
     environment: cloud-staging
     steps:
-      - name: Inspect available Coolify resources
+      - uses: actions/checkout@v6
+      - name: Configure first API deployment
         env:
           COOLIFY_URL: ${{ vars.COOLIFY_URL }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          TAG: ${{ needs.image.outputs.tag }}
+        run: python3 scripts/cloud/coolify-bootstrap.py
+      - name: Verify public HTTPS readiness
         run: |
-          python3 - <<'PYCODE'
-          import os, json, urllib.request, urllib.error
-          base = os.environ["COOLIFY_URL"].rstrip("/") + "/api/v1/"
-          for endpoint in ["version", "projects", "servers", "databases", "applications"]:
-              request = urllib.request.Request(base + endpoint, headers={"Authorization": "Bearer " + os.environ["COOLIFY_TOKEN"]})
-              try:
-                  with urllib.request.urlopen(request, timeout=20) as response:
-                      raw = response.read().decode()
-              except urllib.error.HTTPError as error:
-                  message = error.read().decode().replace(os.environ["COOLIFY_TOKEN"], "[redacted]")
-                  print(endpoint, "HTTP", error.code, message[:500])
-                  raise SystemExit(1)
-              data = raw if endpoint == "version" else json.loads(raw)
-              if isinstance(data, list):
-                  print(endpoint, json.dumps([{key: row.get(key) for key in ["uuid", "name", "status", "environment_id", "destination_id"]} for row in data]))
-              else:
-                  print(endpoint, data if endpoint == "version" else list(data.keys()))
-          PYCODE
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 3 --max-time 6 https://api.libes6.ru/health/ready
