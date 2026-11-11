@@ -31,6 +31,7 @@ function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
   window.top = window;
   NodeVM.runInNewContext(script, {
     window,
+    document: { addEventListener: (name, listener) => events.set(name, listener) },
     navigator: { language: "ru", languages: ["ru"] },
     EventTarget,
     Event,
