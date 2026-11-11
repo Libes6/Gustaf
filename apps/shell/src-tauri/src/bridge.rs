@@ -8,11 +8,36 @@
 use std::path::{Path, PathBuf};
 
 /// Runs in the main frame before the page's own code.
-pub(crate) const INIT_SCRIPT: &str = r#"(() => {
+const INIT_SCRIPT: &str = r#"(() => {
   if (window.top !== window || window.gustafShell) return;
   const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
 
+  // The shell pushes each update state here (`publish` in updater.rs).
+  const updateListeners = new Set();
+  window.__gustafUpdateState = (state) => {
+    for (const listener of updateListeners) listener(state);
+  };
+
   window.gustafShell = Object.freeze({
+    /** The installed app's version; the page's own version is the web client's. */
+    version: __GUSTAF_VERSION__,
+    /** The update calls of Electron's desktopBridge, for the sidebar button and Settings. */
+    updater: Object.freeze({
+      getUpdateState: () => invoke("update_state"),
+      onUpdateState: (listener) => {
+        updateListeners.add(listener);
+        return () => updateListeners.delete(listener);
+      },
+      checkForUpdate: () => invoke("update_check"),
+      downloadUpdate: () => invoke("update_download"),
+      installUpdate: (expectedVersion) =>
+        invoke("update_install", { expectedVersion: expectedVersion ?? null }),
+      // The shell opens every new window in the system browser.
+      openExternal: async (url) => {
+        window.open(url, "_blank");
+        return true;
+      },
+    }),
     /** Native folder dialog; null when the user cancels. */
     pickFolder: async (options) => {
       const picked = await invoke("plugin:dialog|open", {
@@ -63,6 +88,11 @@ pub(crate) const INIT_SCRIPT: &str = r#"(() => {
   });
 })();
 "#;
+
+pub(crate) fn init_script(version: &str) -> String {
+    let version = serde_json::to_string(version).unwrap_or_else(|_| "null".to_owned());
+    INIT_SCRIPT.replace("__GUSTAF_VERSION__", &version)
+}
 
 /// Schemes that belong to another app: editors opened on a remote path, and mail.
 const HANDOFF_SCHEMES: [&str; 7] = [
@@ -152,7 +182,14 @@ pub(crate) fn dropped_paths(app: tauri::AppHandle) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{free_destination, is_handoff_url};
+    use super::{free_destination, init_script, is_handoff_url};
+
+    #[test]
+    fn the_page_is_told_the_app_version_as_a_string() {
+        let script = init_script("0.8.3\"; alert(1); \"");
+        assert!(script.contains(r#"version: "0.8.3\"; alert(1); \"","#));
+        assert!(!script.contains("__GUSTAF_VERSION__"));
+    }
 
     #[test]
     fn editor_and_mail_links_go_to_their_app() {

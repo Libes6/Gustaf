@@ -7,10 +7,50 @@
         "description": "Enables the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": ["dropped_paths"], "deny": [] }
       },
+      "allow-update-check": {
+        "identifier": "allow-update-check",
+        "description": "Enables the update_check command without any pre-configured scope.",
+        "commands": { "allow": ["update_check"], "deny": [] }
+      },
+      "allow-update-download": {
+        "identifier": "allow-update-download",
+        "description": "Enables the update_download command without any pre-configured scope.",
+        "commands": { "allow": ["update_download"], "deny": [] }
+      },
+      "allow-update-install": {
+        "identifier": "allow-update-install",
+        "description": "Enables the update_install command without any pre-configured scope.",
+        "commands": { "allow": ["update_install"], "deny": [] }
+      },
+      "allow-update-state": {
+        "identifier": "allow-update-state",
+        "description": "Enables the update_state command without any pre-configured scope.",
+        "commands": { "allow": ["update_state"], "deny": [] }
+      },
       "deny-dropped-paths": {
         "identifier": "deny-dropped-paths",
         "description": "Denies the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["dropped_paths"] }
+      },
+      "deny-update-check": {
+        "identifier": "deny-update-check",
+        "description": "Denies the update_check command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["update_check"] }
+      },
+      "deny-update-download": {
+        "identifier": "deny-update-download",
+        "description": "Denies the update_download command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["update_download"] }
+      },
+      "deny-update-install": {
+        "identifier": "deny-update-install",
+        "description": "Denies the update_install command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["update_install"] }
+      },
+      "deny-update-state": {
+        "identifier": "deny-update-state",
+        "description": "Denies the update_state command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["update_state"] }
       }
     },
     "permission_sets": {},

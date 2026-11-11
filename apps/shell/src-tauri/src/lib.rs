@@ -236,7 +236,13 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![bridge::dropped_paths])
+        .invoke_handler(tauri::generate_handler![
+            bridge::dropped_paths,
+            updater::update_state,
+            updater::update_check,
+            updater::update_download,
+            updater::update_install,
+        ])
         .setup(|app| {
             updater::initialize(app)?;
             set_dock_icon();
@@ -248,7 +254,7 @@ pub fn run() {
                 // Tauri's own drop handler swallows Finder drags before the page sees them.
                 // The composer handles drops itself, so the web view has to receive them.
                 .disable_drag_drop_handler()
-                .initialization_script(bridge::INIT_SCRIPT)
+                .initialization_script(bridge::init_script(&app.package_info().version.to_string()))
                 // Editor and mail links have no page to load; their own app opens them.
                 .on_navigation(|url| {
                     if bridge::is_handoff_url(url) {
