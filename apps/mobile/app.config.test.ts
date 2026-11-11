@@ -1,8 +1,4 @@
-import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { afterEach, expect, it, vi } from "vite-plus/test";
-
-import appleAppSiteAssociation from "../web/public/.well-known/apple-app-site-association.json";
-import assetLinks from "../web/public/.well-known/assetlinks.json";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
@@ -26,22 +22,29 @@ it.each(["prod", ""])("rejects APP_VARIANT=%j before selecting production IDs", 
 });
 
 it.each([
-  [undefined, "com.t3tools.t3code"],
-  ["development", "com.t3tools.t3code.dev"],
-  ["preview", "com.t3tools.t3code.preview"],
-  ["production", "com.t3tools.t3code"],
-])("keeps the iOS and Android identifiers for APP_VARIANT=%j", async (value, identifier) => {
-  const config = await loadConfig(value);
-  expect(config.ios?.bundleIdentifier).toBe(identifier);
-  expect(config.android?.package).toBe(identifier);
-  // Copied thread links open this app only while app.t3.codes lists it.
-  const host = new URL(DEFAULT_HOSTED_APP_URL).host;
-  expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
-  expect(appleAppSiteAssociation.applinks.details[0]?.appIDs).toContain(
-    `${config.ios?.appleTeamId}.${identifier}`,
-  );
-  expect(config.android?.intentFilters?.[0]?.data).toEqual([
-    { scheme: "https", host, pathPrefix: "/threads/" },
-  ]);
-  expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
+  [undefined, "io.github.libes6.gustaf", "gustaf"],
+  ["development", "io.github.libes6.gustaf.dev", "gustaf-dev"],
+  ["preview", "io.github.libes6.gustaf.preview", "gustaf-preview"],
+  ["production", "io.github.libes6.gustaf", "gustaf"],
+])(
+  "keeps the iOS and Android identifiers for APP_VARIANT=%j",
+  async (value, identifier, scheme) => {
+    const config = await loadConfig(value);
+    expect(config.ios?.bundleIdentifier).toBe(identifier);
+    expect(config.android?.package).toBe(identifier);
+    expect(config.scheme).toBe(scheme);
+  },
+);
+
+// Gustaf has no hosted web app, Expo update service or EAS project: a build must not
+// claim T3's domains or point at their services.
+it("carries nothing that belongs to T3's services", async () => {
+  const config = await loadConfig(undefined);
+  expect(config.ios?.associatedDomains).toBeUndefined();
+  expect(config.android?.intentFilters).toBeUndefined();
+  expect(config.updates?.enabled).toBe(false);
+  expect(config.updates?.url).toBeUndefined();
+  expect(config.owner).toBeUndefined();
+  expect(config.extra?.eas?.projectId).toBeUndefined();
+  expect(JSON.stringify(config)).not.toMatch(/t3\.codes|pingdotgg|com\.t3tools/);
 });
