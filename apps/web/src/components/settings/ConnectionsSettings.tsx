@@ -1,7 +1,7 @@
 import { SessionPermissions } from "./SessionPermissions";
 import { ChevronRightIcon, EllipsisIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
@@ -258,6 +258,31 @@ function ConnectionsSettingsContent({
 }) {
   const t = useT();
   const desktopBridge = window.desktopBridge;
+  const [preventSleep, setPreventSleep] = useState(false);
+  const [powerError, setPowerError] = useState<string | null>(null);
+  const [savingPower, setSavingPower] = useState(true);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the persisted native power preference when this bridge mounts
+  useEffect(() => {
+    let cancelled = false;
+    desktopBridge?.getPreventSleep?.().then(
+      (enabled) => {
+        if (!cancelled) {
+          setPreventSleep(enabled);
+          setSavingPower(false);
+        }
+      },
+      (error: unknown) => {
+        if (!cancelled) {
+          setPowerError(String(error));
+          setSavingPower(false);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopBridge]);
+
   const { environments } = useEnvironments();
   const primaryEnvironment = usePrimaryEnvironment();
   const peerLinkHosts = usePeerLinkHosts();
@@ -1284,6 +1309,35 @@ function ConnectionsSettingsContent({
             {canManageLocalBackend && desktopBridge ? (
               <>
                 {renderNetworkAccessRow()}
+                {desktopBridge.setPreventSleep ? (
+                  <SettingsRow
+                    title={t("settingsA.connectionsSettings.preventSleep")}
+                    description={t("settingsA.connectionsSettings.preventSleepDescription")}
+                    status={
+                      powerError ? <span className="text-destructive">{powerError}</span> : null
+                    }
+                    control={
+                      <Switch
+                        checked={preventSleep}
+                        disabled={savingPower}
+                        aria-label={t("settingsA.connectionsSettings.preventSleep")}
+                        onCheckedChange={async (enabled) => {
+                          setSavingPower(true);
+                          setPowerError(null);
+                          try {
+                            await desktopBridge.setPreventSleep?.(enabled);
+                            setPreventSleep(enabled);
+                          } catch (error) {
+                            setPowerError(String(error));
+                          } finally {
+                            setSavingPower(false);
+                          }
+                        }}
+                      />
+                    }
+                  />
+                ) : null}
+
                 {renderEndpointRows()}
                 {renderTailscaleRow()}
                 {renderWslRow()}

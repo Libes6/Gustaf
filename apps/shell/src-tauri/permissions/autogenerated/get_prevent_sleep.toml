@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-prevent-sleep"
+description = "Enables the get_prevent_sleep command without any pre-configured scope."
+commands.allow = ["get_prevent_sleep"]
+
+[[permission]]
+identifier = "deny-get-prevent-sleep"
+description = "Denies the get_prevent_sleep command without any pre-configured scope."
+commands.deny = ["get_prevent_sleep"]

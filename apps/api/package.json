@@ -1,0 +1,32 @@
+{
+  "name": "@gustaf/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "test": "node --test tests/*.test.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file-if-exists=.env dist/database/migrate.js",
+    "start:watch": "node --env-file-if-exists=.env --watch dist/main.js",
+    "test:integration": "node --test tests/*.integration.mjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.9",
+    "@nestjs/core": "^11.2.9",
+    "@nestjs/platform-express": "^11.2.9",
+    "drizzle-orm": "0.45.4",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "0.31.8",
+    "typescript": "6.0.3"
+  }
+}
