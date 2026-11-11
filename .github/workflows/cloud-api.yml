@@ -147,6 +147,7 @@ jobs:
         env:
           COOLIFY_URL: ${{ vars.COOLIFY_URL }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          BOOTSTRAP_DATABASE_URL: ${{ secrets.BOOTSTRAP_DATABASE_URL }}
           IMAGE: ${{ needs.image.outputs.image }}
           TAG: ${{ needs.image.outputs.tag }}
         run: python3 scripts/cloud/coolify-bootstrap.py

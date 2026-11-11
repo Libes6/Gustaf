@@ -39,9 +39,9 @@ if not database.get('status', '').startswith('running'):
     raise SystemExit('PostgreSQL is not running')
 destination = database['destination']
 server = destination['server']
-database_url = database.get('internal_db_url')
+database_url = os.environ.get('BOOTSTRAP_DATABASE_URL') or database.get('internal_db_url')
 if not database_url or '***' in database_url:
-    raise SystemExit('Internal database URL unavailable: the Coolify token needs read:sensitive permission')
+    raise SystemExit('Internal database URL unavailable: set the temporary BOOTSTRAP_DATABASE_URL secret')
 print('::add-mask::' + database_url)
 password = database.get('postgres_password')
 if password:
