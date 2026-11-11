@@ -8,6 +8,7 @@ RUN pnpm --filter @gustaf/api build && pnpm --filter @gustaf/api test
 RUN pnpm --filter @gustaf/api deploy --legacy --prod --ignore-scripts --config.allowUnusedPatches=true /runtime
 
 FROM node:26.12.1-bookworm-slim AS runtime
+RUN apt-get update && apt-get install --yes --no-install-recommends curl ca-certificates && apt-get clean
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3100
 WORKDIR /app
 COPY --from=build --chown=node:node /runtime/ ./

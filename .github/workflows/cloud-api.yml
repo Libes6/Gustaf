@@ -68,6 +68,7 @@ jobs:
       - name: Verify production image with PostgreSQL
         run: |
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml up -d --wait --wait-timeout 90
+          docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api curl --fail --silent http://127.0.0.1:3100/health/ready
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api node dist/database/migrate.js
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api node dist/database/migrate.js
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml stop postgres
