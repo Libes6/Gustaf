@@ -302,7 +302,8 @@ function ThemeImportBody({
 
   const openFilePicker = () => {
     const bridge = window.desktopBridge;
-    if (bridge) {
+    // The Gustaf shell has a bridge but no native theme picker.
+    if (bridge && typeof bridge.pickThemeFiles === "function") {
       void bridge.pickThemeFiles().then((picked) => {
         if (!picked || picked.length === 0) return;
         readThemeFiles(

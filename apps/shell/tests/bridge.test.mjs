@@ -200,3 +200,11 @@ NodeTest.test("every listener of the desktop bridge can be subscribed to", () =>
   NodeAssert.equal(typeof bridge.webLinks.setReady(true)?.catch, "function");
   NodeAssert.equal(typeof bridge.appActivation.setReady(true)?.catch, "function");
 });
+
+// Settings shows these controls only when the call exists, and falls back to the
+// page's own file input for themes. A stub that does nothing breaks both.
+NodeTest.test("calls the shell cannot honour are absent, not stubbed", () => {
+  const { bridge } = load(() => null);
+  NodeAssert.equal(bridge.pickThemeFiles, undefined);
+  NodeAssert.equal(bridge.setLocalEnvironmentEnabled, undefined);
+});

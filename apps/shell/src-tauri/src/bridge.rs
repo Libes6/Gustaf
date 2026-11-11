@@ -126,9 +126,9 @@ const INIT_SCRIPT: &str = r#"(() => {
     getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
     // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.
     getLocalEnvironmentBootstraps: () => __GUSTAF_BOOTSTRAPS__.map((entry) => ({ ...entry })),
+    // No setLocalEnvironmentEnabled: the shell cannot run without its server, and the
+    // Settings row hides itself when the call is absent.
     getLocalEnvironmentEnabled: () => true,
-    setLocalEnvironmentEnabled: (enabled) =>
-      invoke("set_local_environment_enabled", { enabled }),
     getLocalEnvironmentBearerToken: () => invoke("local_environment_bearer_token"),
     getClientSettings,
     setClientSettings: (settings) => invoke("write_client_settings", { settings }),
@@ -163,7 +163,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     showContextMenu: async () => null,
     cancelProviderAuthCallback: async () => {},
     readMedia: async () => null,
-    pickThemeFiles: async () => null,
+    // No pickThemeFiles: the theme dialog then uses the page's own file input.
     onMenuAction: () => () => {},
     pasteAsText: async () => false,
     setTheme: (theme) => invoke("set_window_theme", { theme }),
