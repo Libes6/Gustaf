@@ -1,6 +1,6 @@
 [package]
 name = "gustaf"
-version = "0.8.3"
+version = "0.9.0"
 description = "Gustaf desktop shell"
 authors = ["Max"]
 edition = "2021"
