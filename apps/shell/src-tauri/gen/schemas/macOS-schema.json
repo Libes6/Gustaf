@@ -189,12 +189,6 @@
           "markdownDescription": "Enables the dropped_paths command without any pre-configured scope."
         },
         {
-          "description": "Enables the get_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-get-prevent-sleep",
-          "markdownDescription": "Enables the get_prevent_sleep command without any pre-configured scope."
-        },
-        {
           "description": "Enables the local_environment_bearer_token command without any pre-configured scope.",
           "type": "string",
           "const": "allow-local-environment-bearer-token",
@@ -241,12 +235,6 @@
           "type": "string",
           "const": "allow-set-local-environment-enabled",
           "markdownDescription": "Enables the set_local_environment_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the set_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-set-prevent-sleep",
-          "markdownDescription": "Enables the set_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Enables the set_server_exposure_mode command without any pre-configured scope.",
@@ -339,12 +327,6 @@
           "markdownDescription": "Denies the dropped_paths command without any pre-configured scope."
         },
         {
-          "description": "Denies the get_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-get-prevent-sleep",
-          "markdownDescription": "Denies the get_prevent_sleep command without any pre-configured scope."
-        },
-        {
           "description": "Denies the local_environment_bearer_token command without any pre-configured scope.",
           "type": "string",
           "const": "deny-local-environment-bearer-token",
@@ -391,12 +373,6 @@
           "type": "string",
           "const": "deny-set-local-environment-enabled",
           "markdownDescription": "Denies the set_local_environment_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the set_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-set-prevent-sleep",
-          "markdownDescription": "Denies the set_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Denies the set_server_exposure_mode command without any pre-configured scope.",
