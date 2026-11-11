@@ -27,6 +27,6 @@
     "@types/node": "catalog:",
     "@types/pg": "^8.15.5",
     "drizzle-kit": "0.31.8",
-    "typescript": "^5.9.3"
+    "typescript": "6.0.3"
   }
 }
