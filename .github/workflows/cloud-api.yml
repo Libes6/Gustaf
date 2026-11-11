@@ -131,8 +131,10 @@ jobs:
             --header "Authorization: Bearer $COOLIFY_TOKEN" \
             --header 'Content-Type: application/json' --data "$BODY" --output /dev/null
           curl --silent --show-error --fail --connect-timeout 10 --max-time 60 \
-            "$API/deploy?uuid=$COOLIFY_APP_UUID&force=false" \
-            --header "Authorization: Bearer $COOLIFY_TOKEN" --output /dev/null
+            --request POST "$API/deploy" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$(jq -nc --arg uuid "$COOLIFY_APP_UUID" '{uuid:$uuid,force:false}')" --output /dev/null
           echo "Coolify accepted deployment request for \`$IMAGE:$TAG\`. Verify completion in Coolify deployment logs and /health/ready." >> "$GITHUB_STEP_SUMMARY"
 
   bootstrap-coolify:

@@ -75,7 +75,7 @@ api('applications/' + uuid + '/envs/bulk', 'PATCH', {'data': [
     {'key': 'HOST', 'value': '0.0.0.0', 'is_literal': True},
     {'key': 'PORT', 'value': '3100', 'is_literal': True},
 ]})
-api('deploy?uuid=' + uuid + '&force=false')
+api('deploy', 'POST', {'uuid': uuid, 'force': False})
 print('API_UUID=' + uuid)
 print('IMAGE=' + image + ':' + tag)
 print('Deployment request accepted; verify completion and HTTPS readiness.')
