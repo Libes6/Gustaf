@@ -2,9 +2,12 @@ name: Gustaf Tauri
 
 # A pull request builds one platform. The full set runs only for a release tag
 # or a manual run, so a release no longer pays for it on dev and main as well.
+# A push to dev only compiles the Rust crates and saves the cache: a cache saved
+# by a pull request or a tag is invisible to other runs, one saved on dev is not.
 on:
   pull_request:
   push:
+    branches: [dev]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -16,8 +19,39 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  warm-cache:
+    name: Warm Rust cache (${{ matrix.platform }})
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, platform: darwin-aarch64 }
+          - { runner: windows-2025, platform: windows-x86_64 }
+          - { runner: ubuntu-24.04, platform: linux-x86_64 }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      # Same shared-key and workspaces as the bundle job, or the two would not share a cache.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/shell/src-tauri
+            native/resource-monitor
+          shared-key: gustaf-${{ matrix.platform }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: apps/shell/scripts/install-linux-deps.sh
+      # The same profile and features the bundle job compiles with.
+      - run: cargo test --locked --release --no-run --manifest-path apps/shell/src-tauri/Cargo.toml
+      - run: cargo build --locked --release --bins --features tauri/custom-protocol --manifest-path apps/shell/src-tauri/Cargo.toml
+      - run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml
+
   bundle:
     name: Bundle (${{ matrix.platform }})
+    if: github.ref != 'refs/heads/dev' || github.event_name != 'push'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -32,22 +66,22 @@ jobs:
           node-version-file: package.json
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
+      # Restores what warm-cache saved on dev. Only dev saves: a cache saved here is scoped
+      # to this pull request or tag, costs half a minute and fills the repository quota.
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/shell/src-tauri
-          key: ${{ matrix.platform }}
+          workspaces: |
+            apps/shell/src-tauri
+            native/resource-monitor
+          shared-key: gustaf-${{ matrix.platform }}
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
-            libdbus-1-dev libxcb1-dev libxrandr-dev libgbm-dev libegl-dev libwayland-dev \
-            libpipewire-0.3-dev libspa-0.2-dev patchelf libatomic1 xvfb rpm \
-            gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+        run: apps/shell/scripts/install-linux-deps.sh
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/provider-ollama/src/http.test.ts
-      - run: cargo test --locked --manifest-path apps/shell/src-tauri/Cargo.toml
+      # --release: shares every compiled dependency with the bundle below instead of building them twice.
+      - run: cargo test --locked --release --manifest-path apps/shell/src-tauri/Cargo.toml
       - name: Build T3 and bundle Gustaf
         shell: bash
         env:

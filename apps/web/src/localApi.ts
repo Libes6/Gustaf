@@ -10,8 +10,8 @@ export function createLocalApi(): LocalApi {
   return {
     dialogs: {
       pickFolder: async (options) => {
-        if (!window.desktopBridge) return null;
-        return window.desktopBridge.pickFolder(options);
+        if (window.desktopBridge) return window.desktopBridge.pickFolder(options);
+        return (await window.gustafShell?.pickFolder(options)) ?? null;
       },
       confirm: async (message, options?: ConfirmDialogOptions) => {
         return requestConfirmDialog(message, options) ?? false;

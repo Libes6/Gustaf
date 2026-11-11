@@ -1,3 +1,4 @@
+mod bridge;
 mod updater;
 
 use std::io::{BufRead, BufReader, Read};
@@ -131,7 +132,7 @@ fn is_external_browser_url(url: &tauri::Url) -> bool {
 }
 
 fn open_external_url(url: &tauri::Url) {
-    if !is_external_browser_url(url) {
+    if !is_external_browser_url(url) && !bridge::is_handoff_url(url) {
         return;
     }
     let mut command = if cfg!(target_os = "macos") {
@@ -176,9 +177,66 @@ pub(crate) fn stop_server(app: &tauri::AppHandle) {
     }
 }
 
+/// The default menu binds Cmd+W to "Close Window", which ends the app and every running agent.
+/// The web app uses that shortcut to close a panel, so this menu leaves it out.
+#[cfg(target_os = "macos")]
+fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, PredefinedMenuItem as Item, Submenu};
+
+    let name = app.package_info().name.clone();
+    Menu::with_items(
+        app,
+        &[
+            &Submenu::with_items(
+                app,
+                name,
+                true,
+                &[
+                    &Item::about(app, None, None)?,
+                    &Item::separator(app)?,
+                    &Item::services(app, None)?,
+                    &Item::separator(app)?,
+                    &Item::hide(app, None)?,
+                    &Item::hide_others(app, None)?,
+                    &Item::show_all(app, None)?,
+                    &Item::separator(app)?,
+                    &Item::quit(app, None)?,
+                ],
+            )?,
+            &Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &Item::undo(app, None)?,
+                    &Item::redo(app, None)?,
+                    &Item::separator(app)?,
+                    &Item::cut(app, None)?,
+                    &Item::copy(app, None)?,
+                    &Item::paste(app, None)?,
+                    &Item::select_all(app, None)?,
+                ],
+            )?,
+            &Submenu::with_items(app, "View", true, &[&Item::fullscreen(app, None)?])?,
+            &Submenu::with_items(
+                app,
+                "Window",
+                true,
+                &[&Item::minimize(app, None)?, &Item::maximize(app, None)?],
+            )?,
+        ],
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(app_menu);
+    builder
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![bridge::dropped_paths])
         .setup(|app| {
             updater::initialize(app)?;
             set_dock_icon();
@@ -190,6 +248,22 @@ pub fn run() {
                 // Tauri's own drop handler swallows Finder drags before the page sees them.
                 // The composer handles drops itself, so the web view has to receive them.
                 .disable_drag_drop_handler()
+                .initialization_script(bridge::INIT_SCRIPT)
+                // Editor and mail links have no page to load; their own app opens them.
+                .on_navigation(|url| {
+                    if bridge::is_handoff_url(url) {
+                        open_external_url(url);
+                        return false;
+                    }
+                    true
+                })
+                // Without a handler the web view cancels every download.
+                .on_download(|_webview, event| {
+                    if let tauri::webview::DownloadEvent::Requested { destination, .. } = event {
+                        *destination = bridge::free_destination(destination);
+                    }
+                    true
+                })
                 // WKWebView drops window.open. ChatGPT sign-in uses it.
                 .on_new_window(|url, _features| {
                     open_external_url(&url);

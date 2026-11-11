@@ -1,7 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Gustaf window",
+  "description": "Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "remote": {
+    "urls": ["http://127.0.0.1:*", "http://localhost:*"]
+  },
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "notification:allow-notify",
+    "allow-dropped-paths"
+  ]
 }

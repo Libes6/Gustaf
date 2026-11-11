@@ -30,7 +30,8 @@ const node = (args) => run(process.execPath, args);
 try {
   node(["node_modules/vite-plus/bin/vp", "run", "--filter", "t3", "build"]);
   node(["apps/server/scripts/cli.ts", "build-exe"]);
-  const monitorTarget = NodePath.join(stage, "monitor-target");
+  // A fixed target directory, so CI can cache it; a temporary one recompiles the monitor every run.
+  const monitorTarget = NodePath.join(root, "native/resource-monitor/target");
   const monitorDir = NodePath.join(stage, "resource-monitor", platformKey);
   const monitor = `t3-resource-monitor${suffix}`;
   run("cargo", [

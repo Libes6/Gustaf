@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Gustaf uses the microphone for dictation, and lets commands run by terminals and coding agents use it.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Gustaf lets commands run by terminals and coding agents use the camera.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Commands run by terminals and coding agents in Gustaf may control other apps.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Gustaf connects to devices on your local network for remote environments and commands run by terminals and coding agents.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>Commands you run in Gustaf may need access to your calendars.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>Commands you run in Gustaf may need to read and write your calendar events.</string>
+  <key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+  <string>Commands you run in Gustaf may need to add events to your calendars.</string>
+</dict>
+</plist>

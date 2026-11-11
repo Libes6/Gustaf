@@ -40,6 +40,24 @@ function isSavedLoopbackConnection({
   }
 }
 
+/**
+ * The Gustaf shell cannot read a path off a `File`, so it reports what the drag carried.
+ * A folder is matched by name; two dragged folders with one name stay unresolved.
+ */
+export function matchDroppedFolderPath(
+  folder: Pick<File, "name">,
+  droppedPaths: readonly string[],
+): string | null {
+  const matches = droppedPaths.filter(
+    (path) =>
+      path
+        .replace(/[\\/]+$/, "")
+        .split(/[\\/]/)
+        .at(-1) === folder.name,
+  );
+  return matches.length === 1 ? (matches[0] ?? null) : null;
+}
+
 export function resolveDroppedFolderPath(
   folder: File,
   getPathForFile: ((file: File) => string) | undefined,
