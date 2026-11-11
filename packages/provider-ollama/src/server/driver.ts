@@ -38,6 +38,10 @@ const PRESENTATION = {
   supportedRuntimeModes: ["full-access"],
 } as const;
 
+// Models come and go with `ollama pull` and `ollama rm`, and the probe is a call to a local
+// server, so it runs far more often than the 5-minute default of CLI providers.
+const OLLAMA_REFRESH_INTERVAL = "30 seconds";
+
 const maintenance = makeManualOnlyProviderMaintenanceCapabilities({
   provider: OLLAMA_DRIVER_KIND,
   packageName: null,
@@ -186,8 +190,11 @@ export const OllamaDriver: ProviderDriver<OllamaSettings, OllamaDriverEnv> = {
       getSettings: snapshotSettings.getSettings,
       streamSettings: snapshotSettings.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
+      refreshInterval: OLLAMA_REFRESH_INTERVAL,
       initialSnapshot: (settings) =>
-        snapshotFor({ http, settings: settings.provider, checking: true }).pipe(Effect.map(identity)),
+        snapshotFor({ http, settings: settings.provider, checking: true }).pipe(
+          Effect.map(identity),
+        ),
       checkProvider: snapshotSettings.getSettings.pipe(
         Effect.flatMap((settings) =>
           snapshotFor({ http, settings: settings.provider, checking: false }),
