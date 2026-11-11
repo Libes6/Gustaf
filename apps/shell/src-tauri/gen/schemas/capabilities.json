@@ -1,1 +1,36 @@
-{"default":{"identifier":"default","description":"Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.","remote":{"urls":["http://127.0.0.1:*","http://localhost:*"]},"local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","notification:allow-notify","allow-dropped-paths","allow-read-connection-catalog","allow-write-connection-catalog","allow-reveal-window","allow-window-fullscreen-state","allow-set-window-theme","allow-read-client-settings","allow-write-client-settings","allow-local-environment-bootstraps","allow-local-environment-bearer-token","allow-local-environment-enabled","allow-set-local-environment-enabled","allow-server-exposure-state","allow-set-server-exposure-mode","allow-set-tailscale-serve-enabled","allow-advertised-endpoints","allow-client-platform","allow-app-branding","allow-update-state","allow-update-check","allow-update-download","allow-update-install"]}}
+{
+  "default": {
+    "identifier": "default",
+    "description": "Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.",
+    "remote": { "urls": ["http://127.0.0.1:*", "http://localhost:*"] },
+    "local": true,
+    "windows": ["main"],
+    "permissions": [
+      "core:default",
+      "dialog:allow-open",
+      "notification:allow-notify",
+      "allow-dropped-paths",
+      "allow-read-connection-catalog",
+      "allow-write-connection-catalog",
+      "allow-reveal-window",
+      "allow-window-fullscreen-state",
+      "allow-set-window-theme",
+      "allow-read-client-settings",
+      "allow-write-client-settings",
+      "allow-local-environment-bootstraps",
+      "allow-local-environment-bearer-token",
+      "allow-local-environment-enabled",
+      "allow-set-local-environment-enabled",
+      "allow-server-exposure-state",
+      "allow-set-server-exposure-mode",
+      "allow-set-tailscale-serve-enabled",
+      "allow-advertised-endpoints",
+      "allow-client-platform",
+      "allow-app-branding",
+      "allow-update-state",
+      "allow-update-check",
+      "allow-update-download",
+      "allow-update-install"
+    ]
+  }
+}

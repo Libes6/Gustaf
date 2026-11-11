@@ -12,6 +12,9 @@ use tauri::Manager;
 /// Runs in the main frame before the page's own code.
 const INIT_SCRIPT: &str = r#"(() => {
   if (window.top !== window || window.gustafShell) return;
+  // The script runs on every page the window loads. Only the local server's page may
+  // get the bridge: it carries the token that signs this window in.
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) return;
   const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
 
   // The shell pushes each update state here (`publish` in updater.rs).
@@ -116,6 +119,9 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
+    // SSH environments are not ported; the page subscribes while it starts.
+    onSshPasswordPrompt: () => () => {},
+    resolveSshPasswordPrompt: async () => {},
     getSystemLocale: () => navigator.language || "en-US",
     getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
     // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.
@@ -153,7 +159,11 @@ const INIT_SCRIPT: &str = r#"(() => {
       }),
     getAdvertisedEndpoints: () => invoke("advertised_endpoints"),
     pickFolder,
+    // Context menus: the page draws its own (see localApi.ts); there is no native one yet.
     showContextMenu: async () => null,
+    cancelProviderAuthCallback: async () => {},
+    readMedia: async () => null,
+    pickThemeFiles: async () => null,
     onMenuAction: () => () => {},
     pasteAsText: async () => false,
     setTheme: (theme) => invoke("set_window_theme", { theme }),
@@ -207,11 +217,10 @@ const INIT_SCRIPT: &str = r#"(() => {
     getRelayTelemetryEnabled: () => false,
     cliCommand: {
       getState: async () => ({
-        installed: false,
-        path: null,
+        supported: false,
+        installedPath: null,
         onPath: false,
-        canInstall: false,
-        canAddToPath: false,
+        launcherPath: null,
       }),
       install: async () => {
         throw new Error("CLI install is not available in this Gustaf build yet.");
@@ -224,11 +233,11 @@ const INIT_SCRIPT: &str = r#"(() => {
       },
     },
     webLinks: {
-      setReady: () => {},
+      setReady: async () => {},
       onOpen: () => () => {},
     },
     appActivation: {
-      setReady: () => {},
+      setReady: async () => {},
       complete: async () => {},
       onRequest: () => () => {},
     },

@@ -186,10 +186,10 @@ fn open_external_url(url: &tauri::Url) {
     let mut command = if cfg!(target_os = "macos") {
         Command::new("open")
     } else if cfg!(target_os = "windows") {
-        let mut command = Command::new("cmd");
-        command.args(["/C", "start", "", url.as_str()]);
-        let _ = command.spawn();
-        return;
+        // Not `cmd /C start`: cmd reads `&` in a URL as the start of another command.
+        let mut command = Command::new("rundll32");
+        command.arg("url.dll,FileProtocolHandler");
+        command
     } else {
         Command::new("xdg-open")
     };
