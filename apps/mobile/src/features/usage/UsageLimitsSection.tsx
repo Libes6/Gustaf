@@ -10,14 +10,8 @@ import {
   type ServerProviderResetCredits,
   type ServerProviderUsageWindow,
 } from "@t3tools/contracts";
-import {
-  formatDuration,
-  formatResetsIn,
-  limitsNotice,
-  paceOf,
-  paceRemainingPercent,
-  remainingPercent,
-} from "@t3tools/shared/usageLimits";
+import { formatDuration, formatResetsIn, limitsNotice, paceOf } from "@t3tools/shared/usageLimits";
+import { paceRemainingPercent, remainingPercent } from "./remaining";
 import { type ReactNode, useContext, useRef, useState } from "react";
 import { Atom } from "effect/reactivity";
 import { Linking, Pressable, View } from "react-native";
