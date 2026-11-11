@@ -1,6 +1,7 @@
 import { useRef } from "react";
 
 import { APP_VERSION } from "../../branding";
+import { installedAppVersion } from "../../localUpdater";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { showAnchoredCopySuccessToast } from "../ui/anchoredCopyToast";
 import { InlineButton } from "../ui/button";
@@ -10,6 +11,7 @@ import { useT } from "../../useUiLanguage";
 
 export function AboutVersionTitle() {
   const t = useT();
+  const version = installedAppVersion(APP_VERSION);
   const copyButtonRef = useRef<HTMLButtonElement>(null);
   const { copyToClipboard } = useCopyToClipboard<void>({
     target: "version",
@@ -35,13 +37,10 @@ export function AboutVersionTitle() {
               <InlineButton
                 ref={copyButtonRef}
                 tone="muted"
-                aria-label={t("settingsA.aboutVersion.copyVersion").replace(
-                  "{version}",
-                  APP_VERSION,
-                )}
-                onClick={() => copyToClipboard(APP_VERSION, undefined)}
+                aria-label={t("settingsA.aboutVersion.copyVersion").replace("{version}", version)}
+                onClick={() => copyToClipboard(version, undefined)}
               >
-                {APP_VERSION}
+                {version}
               </InlineButton>
             }
           />

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-connection-catalog"
+description = "Enables the read_connection_catalog command without any pre-configured scope."
+commands.allow = ["read_connection_catalog"]
+
+[[permission]]
+identifier = "deny-read-connection-catalog"
+description = "Denies the read_connection_catalog command without any pre-configured scope."
+commands.deny = ["read_connection_catalog"]

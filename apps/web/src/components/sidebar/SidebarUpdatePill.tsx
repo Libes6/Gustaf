@@ -1,8 +1,4 @@
-import {
-  type DesktopBridge,
-  type DesktopUpdateState,
-  managedUpdatesDenial,
-} from "@t3tools/contracts";
+import { type DesktopUpdateState, managedUpdatesDenial } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -12,6 +8,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useT } from "../../useUiLanguage";
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
+import { hasShellUpdater, type LocalUpdater, localUpdater } from "../../localUpdater";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -142,7 +139,7 @@ const toastUpdateError: ReportLocalUpdateError = (title, description) => {
 };
 
 export async function downloadLocalUpdate(
-  bridge: DesktopBridge,
+  bridge: LocalUpdater,
   {
     notifyDownloaded,
     reportError = toastUpdateError,
@@ -168,7 +165,7 @@ export async function downloadLocalUpdate(
 }
 
 export async function installLocalUpdate(
-  bridge: DesktopBridge,
+  bridge: LocalUpdater,
   reportError: ReportLocalUpdateError = toastUpdateError,
   expectedVersion?: string,
 ): Promise<boolean> {
@@ -281,7 +278,7 @@ function SidebarUpdateControl() {
   }
 
   const handleAction = async () => {
-    const bridge = window.desktopBridge;
+    const bridge = localUpdater();
     if (isInteractionDisabled) return;
 
     if (runsEverything) {
@@ -362,7 +359,7 @@ function SidebarUpdateControl() {
   };
 
   const runEverything = async () => {
-    const bridge = window.desktopBridge;
+    const bridge = localUpdater();
     setIsConfirmingEverything(false);
     setIsActionPending(true);
     const result = await settlePromise(() =>
@@ -403,7 +400,7 @@ function SidebarUpdateControl() {
     );
   };
 
-  if (!isElectron && !runsEverything && !isRunningEverything) return null;
+  if (!isElectron && !hasShellUpdater && !runsEverything && !isRunningEverything) return null;
 
   const statusIcon = (
     <DesktopUpdateStatusIcon
@@ -439,7 +436,7 @@ function SidebarUpdateControl() {
           run={run}
           local={local}
           icon={statusIcon}
-          {...(run.localVersion === null && action === "install" && window.desktopBridge
+          {...(run.localVersion === null && action === "install" && localUpdater()
             ? {
                 onRestart: async () => {
                   saveUpdateEverythingResult({
@@ -449,7 +446,7 @@ function SidebarUpdateControl() {
                     failures: [],
                     restarting: [],
                   });
-                  if (!(await installLocalUpdate(window.desktopBridge!))) {
+                  if (!(await installLocalUpdate(localUpdater()!))) {
                     clearSavedUpdateEverythingResult();
                   }
                 },
@@ -577,11 +574,7 @@ function SidebarUpdateControl() {
             side="top"
             tooltipStyle
           >
-            <SidebarUpdateReleaseNotes
-              shell={window.desktopBridge}
-              state={state}
-              tooltip={tooltip}
-            />
+            <SidebarUpdateReleaseNotes shell={localUpdater()} state={state} tooltip={tooltip} />
           </PopoverPopup>
         ) : null}
       </Popover>

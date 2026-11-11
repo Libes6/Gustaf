@@ -1,6 +1,6 @@
 [package]
 name = "gustaf"
-version = "0.8.3"
+version = "0.9.0"
 description = "Gustaf desktop shell"
 authors = ["Max"]
 edition = "2021"
@@ -13,15 +13,22 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+chacha20poly1305 = { version = "0.10.1", features = ["std"] }
+keyring = { version = "3.6.3", features = [
+  "apple-native",
+  "windows-native",
+  "sync-secret-service",
+  "crypto-rust",
+] }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sys-locale = "0.3"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
+ureq = { version = "2", features = ["json"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"

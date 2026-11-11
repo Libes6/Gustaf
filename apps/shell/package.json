@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "cargo run --manifest-path src-tauri/Cargo.toml",
     "build:runtime": "node scripts/build-runtime.mjs",
-    "build": "tauri build --config src-tauri/tauri.release.conf.json"
+    "build": "tauri build --config src-tauri/tauri.release.conf.json",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

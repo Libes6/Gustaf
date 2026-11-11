@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-write-client-settings"
+description = "Enables the write_client_settings command without any pre-configured scope."
+commands.allow = ["write_client_settings"]
+
+[[permission]]
+identifier = "deny-write-client-settings"
+description = "Denies the write_client_settings command without any pre-configured scope."
+commands.deny = ["write_client_settings"]

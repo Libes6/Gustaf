@@ -7,6 +7,8 @@ import * as Stream from "effect/Stream";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { Atom } from "effect/reactivity";
 
+import { localUpdater } from "../localUpdater";
+
 type DesktopUpdateBridge = Pick<DesktopBridge, "getUpdateState" | "onUpdateState">;
 
 const INITIAL_STATE_READ_ATTEMPT_COUNT = 3;
@@ -24,7 +26,7 @@ export class DesktopUpdateStateReadError extends Schema.TaggedError<DesktopUpdat
 }
 
 function getDesktopUpdateBridge(): DesktopUpdateBridge | undefined {
-  return typeof window === "undefined" ? undefined : window.desktopBridge;
+  return localUpdater();
 }
 
 export function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridge | undefined) {

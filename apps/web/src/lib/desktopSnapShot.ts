@@ -14,5 +14,9 @@ export function subscribeSnapShotComposerFocus(listener: () => void): () => void
 }
 
 export function getDesktopSnapShotBridge(): DesktopBridge | undefined {
-  return typeof window === "undefined" ? undefined : window.desktopBridge;
+  if (typeof window === "undefined") return undefined;
+  const bridge = window.desktopBridge;
+  // Gustaf's Tauri shell installs desktopBridge without SnapShots; do not treat that as support.
+  if (!bridge || typeof bridge.getSnapShotState !== "function") return undefined;
+  return bridge;
 }

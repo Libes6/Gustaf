@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-client-settings"
+description = "Enables the read_client_settings command without any pre-configured scope."
+commands.allow = ["read_client_settings"]
+
+[[permission]]
+identifier = "deny-read-client-settings"
+description = "Denies the read_client_settings command without any pre-configured scope."
+commands.deny = ["read_client_settings"]

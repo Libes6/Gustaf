@@ -2614,8 +2614,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       return;
     }
     // The shell knows what a drag carried, not what a paste did.
-    const shell =
-      source === "drop" && window.desktopBridge === undefined ? window.gustafShell : undefined;
+    const shell = source === "drop" ? window.gustafShell : undefined;
     if (shell === undefined) {
       insertDroppedFolders(folders, []);
       return;
