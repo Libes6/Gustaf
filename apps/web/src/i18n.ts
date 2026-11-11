@@ -556,8 +556,14 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
 
 export function translateProviderMessage(language: UiLanguage, message: string): string {
   const knownMessages = {
-    "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.": "chatB.provider.conversationGone",
-    "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.": "chatB.provider.startFailed",
+    "Turn failed to start": "chatB.provider.startFailedTitle",
+    "Claude steer cancelled.": "chatB.provider.steerCancelled",
+    "Claude steer accepted.": "chatB.provider.steerAccepted",
+    "Claude steer is waiting for acceptance.": "chatB.provider.steerPending",
+    "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.":
+      "chatB.provider.conversationGone",
+    "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.":
+      "chatB.provider.startFailed",
     "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.":
       "chatB.provider.claudeUnanswered",
     "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.":

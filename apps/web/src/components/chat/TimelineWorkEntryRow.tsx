@@ -227,7 +227,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? `${t("chatB.TimelineWorkEntryRow.usageLimitReached")}${resetTime ? ` ${t("chatB.TimelineWorkEntryRow.retryAfter").replace("{time}", resetTime)}` : ""}`
       : notInSubscription
         ? t("chatB.TimelineWorkEntryRow.modelNotInSubscription")
-        : workEntry.label;
+        : translateProviderMessage(language, workEntry.label);
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&

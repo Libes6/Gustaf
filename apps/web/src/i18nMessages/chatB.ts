@@ -3,8 +3,14 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "chatB." and both languages list the same keys.
 export const chatBMessages = {
   en: {
-    "chatB.provider.conversationGone": "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.",
-    "chatB.provider.startFailed": "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
+    "chatB.provider.startFailedTitle": "Turn failed to start",
+    "chatB.provider.steerCancelled": "Claude steer cancelled.",
+    "chatB.provider.steerAccepted": "Claude steer accepted.",
+    "chatB.provider.steerPending": "Claude steer is waiting for acceptance.",
+    "chatB.provider.conversationGone":
+      "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.",
+    "chatB.provider.startFailed":
+      "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
     "chatB.provider.claudeUnanswered":
       "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.",
     "chatB.provider.claudeBootTimeout":
@@ -760,8 +766,14 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.appAccessRequest": "App access request",
   },
   ru: {
-    "chatB.provider.conversationGone": "Claude Code не нашёл сохранённую беседу. Отправьте сообщение ещё раз, чтобы продолжить в новой сессии Claude с историей этого чата.",
-    "chatB.provider.startFailed": "Не удалось запустить ход. Отправьте сообщение ещё раз; если ошибка повторяется, проверьте логи сервера.",
+    "chatB.provider.startFailedTitle": "Не удалось запустить ход",
+    "chatB.provider.steerCancelled": "Уточнение для Claude отменено.",
+    "chatB.provider.steerAccepted": "Claude принял уточнение.",
+    "chatB.provider.steerPending": "Claude ожидает принятия уточнения.",
+    "chatB.provider.conversationGone":
+      "Claude Code не нашёл сохранённую беседу. Отправьте сообщение ещё раз, чтобы продолжить в новой сессии Claude с историей этого чата.",
+    "chatB.provider.startFailed":
+      "Не удалось запустить ход. Отправьте сообщение ещё раз; если ошибка повторяется, проверьте логи сервера.",
     "chatB.provider.claudeUnanswered":
       "Claude не прислал ответ за 10 минут. API или промежуточный шлюз не отвечает.",
     "chatB.provider.claudeBootTimeout":
