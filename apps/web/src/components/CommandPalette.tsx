@@ -2499,7 +2499,9 @@ function OpenCommandPaletteDialog(props: {
     (browseEnvironmentId === primaryEnvironmentId ||
       (browseEnvironmentIsDesktopLocal && browseDesktopInstanceId !== null)) &&
     typeof window !== "undefined" &&
-    window.desktopBridge !== undefined;
+    (window.desktopBridge !== undefined ||
+      // The shell's dialog shows this machine's folders, which is where its own server runs.
+      (window.gustafShell !== undefined && browseEnvironmentId === primaryEnvironmentId));
   const fileManagerInitialPath = (() => {
     if (!canOpenProjectFromFileManager) {
       return undefined;

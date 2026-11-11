@@ -20,7 +20,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "macOS": { "signingIdentity": "-" },
+    "macOS": { "signingIdentity": "-", "entitlements": "Entitlements.plist" },
     "linux": { "appimage": { "bundleMediaFramework": true } },
     "icon": [
       "icons/32x32.png",

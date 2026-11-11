@@ -50,7 +50,7 @@ import * as Schema from "effect/Schema";
 import { isPasteAsTextShortcut } from "@t3tools/client-runtime/text-paste";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
-import { folderDropTarget, resolveDroppedFolderPath } from "./folderDrop";
+import { folderDropTarget, matchDroppedFolderPath, resolveDroppedFolderPath } from "./folderDrop";
 import { splitTransferredFiles } from "./workspaceFileDrop";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
@@ -2570,23 +2570,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const insertComposerTextAtEndStable = useStableCallback(insertComposerTextAtEnd);
 
-  const addComposerFolders = (folders: File[]) => {
-    const target = folderDropTarget({
-      localEnvironmentDisabled: isLocalEnvironmentDisabled(),
-      environmentId,
-      primaryEnvironmentId,
-      connection: readPreparedConnection(environmentId),
-      isDesktopRenderer: window.desktopBridge !== undefined,
-    });
-    if (target === "remote") {
-      toastManager.add({
-        type: "error",
-        title: t("chatA.chatComposer.foldersOnlyLocal"),
-      });
-      return;
-    }
+  const insertDroppedFolders = (folders: File[], shellPaths: readonly string[]) => {
     for (const folder of folders) {
-      const path = resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile);
+      const path =
+        resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile) ??
+        matchDroppedFolderPath(folder, shellPaths);
       if (path === null) {
         toastManager.add({
           type: "error",
@@ -2609,7 +2597,38 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     }
     focusComposer();
   };
+
+  const addComposerFolders = (folders: File[], source: "drop" | "paste") => {
+    const target = folderDropTarget({
+      localEnvironmentDisabled: isLocalEnvironmentDisabled(),
+      environmentId,
+      primaryEnvironmentId,
+      connection: readPreparedConnection(environmentId),
+      isDesktopRenderer: window.desktopBridge !== undefined,
+    });
+    if (target === "remote") {
+      toastManager.add({
+        type: "error",
+        title: t("chatA.chatComposer.foldersOnlyLocal"),
+      });
+      return;
+    }
+    // The shell knows what a drag carried, not what a paste did.
+    const shell =
+      source === "drop" && window.desktopBridge === undefined ? window.gustafShell : undefined;
+    if (shell === undefined) {
+      insertDroppedFolders(folders, []);
+      return;
+    }
+    void shell.droppedPaths().then(
+      (paths) => insertDroppedFolders(folders, paths),
+      () => insertDroppedFolders(folders, []),
+    );
+  };
   const addComposerFoldersStable = useStableCallback(addComposerFolders);
+  const addDroppedFoldersStable = useStableCallback((folders: File[]) =>
+    addComposerFolders(folders, "drop"),
+  );
 
   const onComposerPaste = (event: React.ClipboardEvent<HTMLElement>) => {
     const { files, folders } = splitTransferredFiles(event.clipboardData);
@@ -2623,7 +2642,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ) {
       event.preventDefault();
       event.stopPropagation();
-      if (folders.length > 0) addComposerFoldersStable(folders);
+      if (folders.length > 0) addComposerFoldersStable(folders, "paste");
       if (files.length > 0) {
         void addComposerAttachments(files, { skipImageInlineChip: bypassAutoAttachment });
       }
@@ -2890,7 +2909,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           if (!inserted) focusComposer();
         });
       },
-      addDroppedFolders: addComposerFoldersStable,
+      addDroppedFolders: addDroppedFoldersStable,
       hasPendingAttachments: () =>
         countPreparingComposerImages(attachmentTargetKey) > 0 ||
         pendingDraftWork.has(attachmentTargetKey),
@@ -3083,7 +3102,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     [
       activeThread,
       addComposerAttachments,
-      addComposerFoldersStable,
+      addDroppedFoldersStable,
       foldPastedText,
       composerDraftTarget,
       composerModelOptions,

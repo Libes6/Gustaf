@@ -6,7 +6,7 @@ import {
 import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { folderDropTarget } from "./folderDrop";
+import { folderDropTarget, matchDroppedFolderPath } from "./folderDrop";
 
 const environmentId = EnvironmentId.make("saved-local");
 const base = { environmentId, label: "server" };
@@ -78,5 +78,25 @@ describe("folderDropTarget", () => {
     ["an unprepared connection", { ...thinClient, connection: null }, "remote"],
   ] as const)("targets %s", (_name, input, expected) => {
     expect(folderDropTarget(input)).toBe(expected);
+  });
+});
+
+describe("matchDroppedFolderPath", () => {
+  const folder = { name: "kate-core" };
+
+  it("finds the dragged folder by its name", () => {
+    expect(
+      matchDroppedFolderPath(folder, ["/Users/me/pet/notes.md", "/Users/me/pet/kate-core"]),
+    ).toBe("/Users/me/pet/kate-core");
+    expect(matchDroppedFolderPath(folder, ["/Users/me/pet/kate-core/"])).toBe(
+      "/Users/me/pet/kate-core/",
+    );
+    expect(matchDroppedFolderPath(folder, ["C:\\work\\kate-core"])).toBe("C:\\work\\kate-core");
+  });
+
+  it("stays unresolved without exactly one match", () => {
+    expect(matchDroppedFolderPath(folder, [])).toBeNull();
+    expect(matchDroppedFolderPath(folder, ["/Users/me/pet/kate-core-old"])).toBeNull();
+    expect(matchDroppedFolderPath(folder, ["/a/kate-core", "/b/kate-core"])).toBeNull();
   });
 });
