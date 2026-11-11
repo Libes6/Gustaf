@@ -1,3 +1,5 @@
+import { translateProviderMessage } from "../../i18n";
+import { useUiLanguage } from "../../uiLanguageStore";
 import { useT } from "../../useUiLanguage";
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogDetails, WorkLogRow } from "./WorkLog";
@@ -203,6 +205,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     }
     setExpanded(next);
   };
+  const language = useUiLanguage();
   const failureItem = workEntry.projectedItem?.item;
   const pendingApproval =
     failureItem?.type === "approval_request"
@@ -260,7 +263,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           <p className="ms-7 whitespace-pre-wrap break-words py-1 text-sm leading-relaxed text-foreground/80">
             {notInSubscription
               ? t("chatB.TimelineWorkEntryRow.modelNotInSubscriptionDetail")
-              : failureItem.failure.message}
+              : translateProviderMessage(language, failureItem.failure.message)}
           </p>
         ) : null}
         {retryRunId !== null && onRetryWorkspacePreparation ? (
