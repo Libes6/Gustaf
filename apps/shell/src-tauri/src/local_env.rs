@@ -2,13 +2,18 @@
 //!
 //! The server still prints a one-shot pairing URL on startup. The shell exchanges
 //! that credential for a bearer token and opens the app root without `/pair`, so
-//! the page never flashes the pairing form. Electron does the same idea via
-//! `getLocalEnvironmentBootstraps` + `getLocalEnvironmentBearerToken`.
+//! the page never flashes the pairing form.
 
 use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::Value;
+use tauri::Manager;
+
+use crate::network;
+use crate::shell_settings::{
+    self, ExposureMode, ShellSettings, DEFAULT_TAILSCALE_SERVE_PORT,
+};
 
 const OAUTH_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
 const OAUTH_BOOTSTRAP_TOKEN_TYPE: &str = "urn:t3:params:oauth:token-type:environment-bootstrap";
@@ -193,6 +198,60 @@ fn urlencoding_encode(value: &str) -> String {
     out
 }
 
+fn exposure_state_value(
+    settings: &ShellSettings,
+    http_base_url: &str,
+) -> Value {
+    let advertised_host = if settings.exposure_mode == ExposureMode::NetworkAccessible {
+        network::lan_ipv4_addresses().into_iter().next()
+    } else {
+        None
+    };
+    let endpoint_url = advertised_host
+        .as_ref()
+        .map(|host| {
+            let port = http_base_url
+                .rsplit_once(':')
+                .and_then(|(_, port)| port.trim_end_matches('/').parse::<u16>().ok())
+                .unwrap_or(3773);
+            format!("http://{host}:{port}")
+        });
+    serde_json::json!({
+        "mode": settings.exposure_mode.as_bridge_str(),
+        "endpointUrl": endpoint_url,
+        "advertisedHost": advertised_host,
+        "tailscaleServeEnabled": settings.tailscale_serve_enabled,
+        "tailscaleServePort": settings.tailscale_serve_port,
+    })
+}
+
+fn schedule_relaunch(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(250));
+        crate::stop_server(&app);
+        app.restart();
+    });
+}
+
+fn read_settings(app: &tauri::AppHandle) -> ShellSettings {
+    if let Some(managed) = app.try_state::<Mutex<ShellSettings>>() {
+        if let Ok(guard) = managed.lock() {
+            return guard.clone();
+        }
+    }
+    shell_settings::load(app)
+}
+
+fn write_settings(app: &tauri::AppHandle, settings: &ShellSettings) -> Result<(), String> {
+    shell_settings::save(app, settings)?;
+    if let Some(managed) = app.try_state::<Mutex<ShellSettings>>() {
+        if let Ok(mut guard) = managed.lock() {
+            *guard = settings.clone();
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub(crate) fn local_environment_bootstraps(
     state: tauri::State<'_, LocalEnvironmentState>,
@@ -219,38 +278,65 @@ pub(crate) fn set_local_environment_enabled(_enabled: bool) -> Result<(), String
 
 #[tauri::command]
 pub(crate) fn server_exposure_state(
+    app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
+    let settings = read_settings(&app);
     let endpoint = state.http_base_url()?;
-    Ok(serde_json::json!({
-        "mode": "local-only",
-        "endpointUrl": endpoint,
-        "advertisedHost": null,
-        "tailscaleServeEnabled": false,
-        "tailscaleServePort": 443,
-    }))
+    Ok(exposure_state_value(&settings, &endpoint))
 }
 
 #[tauri::command]
 pub(crate) fn set_server_exposure_mode(
-    _mode: String,
+    mode: String,
+    app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
-    server_exposure_state(state)
+    let parsed =
+        ExposureMode::parse(&mode).ok_or_else(|| format!("unknown exposure mode: {mode}"))?;
+    let mut settings = read_settings(&app);
+    settings.exposure_mode = parsed;
+    write_settings(&app, &settings)?;
+    let endpoint = state.http_base_url()?;
+    let value = exposure_state_value(&settings, &endpoint);
+    schedule_relaunch(app);
+    Ok(value)
 }
 
 #[tauri::command]
 pub(crate) fn set_tailscale_serve_enabled(
-    _enabled: bool,
-    _port: Option<u16>,
+    enabled: bool,
+    port: Option<u16>,
+    app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
-    server_exposure_state(state)
+    let mut settings = read_settings(&app);
+    settings.tailscale_serve_enabled = enabled;
+    if let Some(port) = port {
+        settings.tailscale_serve_port = port;
+    } else if settings.tailscale_serve_port == 0 {
+        settings.tailscale_serve_port = DEFAULT_TAILSCALE_SERVE_PORT;
+    }
+    write_settings(&app, &settings)?;
+    let endpoint = state.http_base_url()?;
+    let value = exposure_state_value(&settings, &endpoint);
+    schedule_relaunch(app);
+    Ok(value)
 }
 
 #[tauri::command]
-pub(crate) fn advertised_endpoints() -> Value {
-    serde_json::json!([])
+pub(crate) fn advertised_endpoints(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, LocalEnvironmentState>,
+) -> Result<Value, String> {
+    let settings = read_settings(&app);
+    let http_base = state.http_base_url()?;
+    Ok(network::advertised_endpoints_json(
+        &http_base,
+        settings.exposure_mode.as_bridge_str(),
+        settings.tailscale_serve_enabled,
+        settings.tailscale_serve_port,
+    ))
 }
 
 #[tauri::command]

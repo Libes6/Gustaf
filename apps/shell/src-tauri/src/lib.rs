@@ -1,5 +1,7 @@
 mod bridge;
 mod local_env;
+mod network;
+mod shell_settings;
 mod updater;
 
 use std::io::{BufRead, BufReader, Read};
@@ -11,6 +13,7 @@ use std::time::Duration;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 use local_env::{build_local_environment, LocalEnvironmentState};
+use shell_settings::{ExposureMode, ShellSettings};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -32,29 +35,67 @@ impl Drop for Server {
     }
 }
 
+#[cfg(not(debug_assertions))]
+fn apply_exposure_args(command: &mut Command, settings: &ShellSettings) {
+    match settings.exposure_mode {
+        ExposureMode::LocalOnly => {
+            command.args(["--host", "127.0.0.1"]);
+        }
+        ExposureMode::NetworkAccessible => {
+            // Bind every interface so a phone on the same Wi-Fi can pair.
+            command.args(["--host", "0.0.0.0", "--lan"]);
+        }
+    }
+    if settings.tailscale_serve_enabled {
+        command.arg("--tailscale-serve");
+        command.arg("--tailscale-serve-port");
+        command.arg(settings.tailscale_serve_port.to_string());
+    }
+}
+
 #[cfg(debug_assertions)]
-fn server_command(_app: &tauri::App) -> tauri::Result<Command> {
+fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<Command> {
     let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let mut command = Command::new("node");
     command
         .args(["scripts/dev-runner.ts", "dev", "--no-seed"])
         .current_dir(repo);
+    // Dev runner forwards unknown flags poorly; expose via env the server already reads.
+    match settings.exposure_mode {
+        ExposureMode::LocalOnly => {
+            command.env("T3CODE_HOST", "127.0.0.1");
+            command.env_remove("T3CODE_LAN");
+        }
+        ExposureMode::NetworkAccessible => {
+            command.env("T3CODE_HOST", "0.0.0.0");
+            command.env("T3CODE_LAN", "1");
+        }
+    }
+    if settings.tailscale_serve_enabled {
+        command.env("T3CODE_TAILSCALE_SERVE", "1");
+        command.env(
+            "T3CODE_TAILSCALE_SERVE_PORT",
+            settings.tailscale_serve_port.to_string(),
+        );
+    }
+    let _ = app;
     Ok(command)
 }
 
 #[cfg(not(debug_assertions))]
-fn server_command(app: &tauri::App) -> tauri::Result<Command> {
+fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<Command> {
     let runtime = app.path().resource_dir()?.join("runtime");
     let executable = if cfg!(windows) { "t3.exe" } else { "t3" };
     let data_dir = app.path().app_local_data_dir()?;
     let mut command = Command::new(runtime.join(executable));
     command
         .current_dir(runtime)
-        .args(["--mode", "web", "--host", "127.0.0.1", "--no-browser"])
+        .args(["--mode", "web", "--no-browser"])
         .arg("--no-auto-bootstrap-project-from-cwd")
         .arg("--base-dir")
         .arg(data_dir)
         .env_remove("VITE_DEV_SERVER_URL");
+    apply_exposure_args(&mut command, settings);
     Ok(command)
 }
 
@@ -94,8 +135,11 @@ fn login_shell_path() -> Option<String> {
     (!path.is_empty()).then(|| path.to_owned())
 }
 
-fn start_server(app: &tauri::App) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
-    let mut command = server_command(app)?;
+fn start_server(
+    app: &tauri::App,
+    settings: &ShellSettings,
+) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
+    let mut command = server_command(app, settings)?;
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
@@ -259,7 +303,9 @@ pub fn run() {
         .setup(|app| {
             updater::initialize(app)?;
             set_dock_icon();
-            let (server, pairing_url) = start_server(app)?;
+            let settings = shell_settings::load(app.handle());
+            app.manage(Mutex::new(settings.clone()));
+            let (server, pairing_url) = start_server(app, &settings)?;
             let local = build_local_environment(&pairing_url).map_err(|error| {
                 Box::<dyn std::error::Error>::from(format!(
                     "failed to hand off the local environment: {error}"
