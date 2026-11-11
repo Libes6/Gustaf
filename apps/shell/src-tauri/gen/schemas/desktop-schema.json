@@ -165,10 +165,58 @@
           "markdownDescription": "Enables the dropped_paths command without any pre-configured scope."
         },
         {
+          "description": "Enables the update_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-check",
+          "markdownDescription": "Enables the update_check command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the update_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-download",
+          "markdownDescription": "Enables the update_download command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the update_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-install",
+          "markdownDescription": "Enables the update_install command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the update_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-state",
+          "markdownDescription": "Enables the update_state command without any pre-configured scope."
+        },
+        {
           "description": "Denies the dropped_paths command without any pre-configured scope.",
           "type": "string",
           "const": "deny-dropped-paths",
           "markdownDescription": "Denies the dropped_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-check",
+          "markdownDescription": "Denies the update_check command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-download",
+          "markdownDescription": "Denies the update_download command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-install",
+          "markdownDescription": "Denies the update_install command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-state",
+          "markdownDescription": "Denies the update_state command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

@@ -42,6 +42,7 @@ import {
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { isElectron } from "../../env";
+import { hasShellUpdater, localUpdater } from "../../localUpdater";
 import { buildHostedChannelSelectionUrl, type HostedAppChannel } from "../../hostedPairing";
 import {
   readAppearanceModePreference,
@@ -169,7 +170,7 @@ function AboutVersionSection() {
     ).length;
 
   const handleButtonClick = async () => {
-    const bridge = window.desktopBridge;
+    const bridge = localUpdater();
     if (!bridge) return;
 
     const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
@@ -2157,7 +2158,7 @@ export function AboutSettingsPanel() {
             }
           />
         ) : null}
-        {isElectron || HOSTED_APP_CHANNEL ? (
+        {isElectron || hasShellUpdater || HOSTED_APP_CHANNEL ? (
           <AboutVersionSection />
         ) : (
           <>

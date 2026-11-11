@@ -34,6 +34,9 @@ declare global {
       readonly pickFolder: (options?: { initialPath?: string | null }) => Promise<string | null>;
       /** Absolute paths of what the last drag carried; empty where the system does not tell. */
       readonly droppedPaths: () => Promise<readonly string[]>;
+      /** The installed app's version. */
+      readonly version: string;
+      readonly updater: import("./localUpdater").LocalUpdater;
     };
     /** Dev builds only, from DevReplayHost. Agents call these from the browser console. */
     t3dev?: {

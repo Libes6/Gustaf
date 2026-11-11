@@ -10,6 +10,10 @@
     "core:default",
     "dialog:allow-open",
     "notification:allow-notify",
-    "allow-dropped-paths"
+    "allow-dropped-paths",
+    "allow-update-state",
+    "allow-update-check",
+    "allow-update-download",
+    "allow-update-install"
   ]
 }
