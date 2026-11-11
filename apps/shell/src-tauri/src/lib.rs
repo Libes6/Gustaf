@@ -1,4 +1,5 @@
 mod bridge;
+mod local_env;
 mod updater;
 
 use std::io::{BufRead, BufReader, Read};
@@ -8,6 +9,8 @@ use std::thread;
 use std::time::Duration;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+
+use local_env::{build_local_environment, LocalEnvironmentState};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -238,6 +241,16 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
+            local_env::local_environment_bootstraps,
+            local_env::local_environment_bearer_token,
+            local_env::local_environment_enabled,
+            local_env::set_local_environment_enabled,
+            local_env::server_exposure_state,
+            local_env::set_server_exposure_mode,
+            local_env::set_tailscale_serve_enabled,
+            local_env::advertised_endpoints,
+            local_env::client_platform,
+            local_env::app_branding,
             updater::update_state,
             updater::update_check,
             updater::update_download,
@@ -247,14 +260,33 @@ pub fn run() {
             updater::initialize(app)?;
             set_dock_icon();
             let (server, pairing_url) = start_server(app)?;
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(pairing_url))
+            let local = build_local_environment(&pairing_url).map_err(|error| {
+                Box::<dyn std::error::Error>::from(format!(
+                    "failed to hand off the local environment: {error}"
+                ))
+            })?;
+            let bootstraps = serde_json::json!([{
+                "id": "primary",
+                "label": "This computer",
+                "httpBaseUrl": local.http_base_url,
+                "wsBaseUrl": local.ws_base_url,
+                "bootstrapToken": local.bootstrap_token,
+            }]);
+            let app_url = local.app_url.clone();
+            let platform = local_env::client_platform();
+            app.manage(LocalEnvironmentState::new(local));
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url))
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
                 // Tauri's own drop handler swallows Finder drags before the page sees them.
                 // The composer handles drops itself, so the web view has to receive them.
                 .disable_drag_drop_handler()
-                .initialization_script(bridge::init_script(&app.package_info().version.to_string()))
+                .initialization_script(bridge::init_script(
+                    &app.package_info().version.to_string(),
+                    &bootstraps,
+                    platform,
+                ))
                 // Editor and mail links have no page to load; their own app opens them.
                 .on_navigation(|url| {
                     if bridge::is_handoff_url(url) {

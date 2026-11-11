@@ -1,9 +1,10 @@
 //! What the web app cannot do from inside a system web view.
 //!
-//! The window shows the server's web app, which was written for Electron and for
-//! browsers. A system web view is neither: it has no `Notification`, hides the
-//! path of a dropped folder, drops downloads, and cannot follow editor links.
-//! The script below gives the page the missing pieces under `window.gustafShell`.
+//! The window shows the server's web app, which was written for a desktop bridge
+//! and for browsers. A system web view is neither: it has no `Notification`, hides
+//! the path of a dropped folder, drops downloads, and cannot follow editor links.
+//! The script below installs `window.desktopBridge` (so the page treats Gustaf as
+//! the desktop app) and keeps `window.gustafShell` for shell-only helpers.
 
 use std::path::{Path, PathBuf};
 
@@ -18,43 +19,182 @@ const INIT_SCRIPT: &str = r#"(() => {
     for (const listener of updateListeners) listener(state);
   };
 
-  window.gustafShell = Object.freeze({
-    /** The installed app's version; the page's own version is the web client's. */
-    version: __GUSTAF_VERSION__,
-    /** The update calls of Electron's desktopBridge, for the sidebar button and Settings. */
-    updater: Object.freeze({
-      getUpdateState: () => invoke("update_state"),
-      onUpdateState: (listener) => {
-        updateListeners.add(listener);
-        return () => updateListeners.delete(listener);
-      },
-      checkForUpdate: () => invoke("update_check"),
-      downloadUpdate: () => invoke("update_download"),
-      installUpdate: (expectedVersion) =>
-        invoke("update_install", { expectedVersion: expectedVersion ?? null }),
-      // The shell opens every new window in the system browser.
-      openExternal: async (url) => {
-        window.open(url, "_blank");
-        return true;
-      },
-    }),
-    /** Native folder dialog; null when the user cancels. */
-    pickFolder: async (options) => {
-      const picked = await invoke("plugin:dialog|open", {
-        options: {
-          directory: true,
-          multiple: false,
-          ...(options?.initialPath ? { defaultPath: options.initialPath } : {}),
-        },
-      });
-      return typeof picked === "string" && picked.length > 0 ? picked : null;
+  const updater = Object.freeze({
+    getUpdateState: () => invoke("update_state"),
+    onUpdateState: (listener) => {
+      updateListeners.add(listener);
+      return () => updateListeners.delete(listener);
     },
-    /** Absolute paths of what the last drag carried; empty where the system does not tell. */
-    droppedPaths: async () => {
-      const paths = await invoke("dropped_paths");
-      return Array.isArray(paths) ? paths.filter((path) => typeof path === "string") : [];
+    checkForUpdate: () => invoke("update_check"),
+    downloadUpdate: () => invoke("update_download"),
+    installUpdate: (expectedVersion) =>
+      invoke("update_install", { expectedVersion: expectedVersion ?? null }),
+    openExternal: async (url) => {
+      window.open(url, "_blank");
+      return true;
     },
   });
+
+  const pickFolder = async (options) => {
+    const picked = await invoke("plugin:dialog|open", {
+      options: {
+        directory: true,
+        multiple: false,
+        ...(options?.initialPath ? { defaultPath: options.initialPath } : {}),
+      },
+    });
+    return typeof picked === "string" && picked.length > 0 ? picked : null;
+  };
+
+  const droppedPaths = async () => {
+    const paths = await invoke("dropped_paths");
+    return Array.isArray(paths) ? paths.filter((path) => typeof path === "string") : [];
+  };
+
+  // Persistence the page already has browser fallbacks for; keep values in localStorage
+  // until the shell grows a dedicated store.
+  const readJson = (key, fallback) => {
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const writeJson = (key, value) => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  };
+
+  window.gustafShell = Object.freeze({
+    version: __GUSTAF_VERSION__,
+    updater,
+    pickFolder,
+    droppedPaths,
+  });
+
+  // Same surface the web client expects from Electron's preload. Methods we have
+  // not ported yet stay absent; callers use optional chaining. `preview` is omitted
+  // on purpose (in-app browser is a separate project).
+  window.desktopBridge = {
+    getPathForFile: () => null,
+    revealWindow: async () => {
+      window.focus();
+    },
+    setNotificationBadge: async () => {},
+    onNotificationBadgeClear: () => () => {},
+    onTrackpadScrollBegin: () => () => {},
+    onTrackpadScrollEnd: () => () => {},
+    getWindowFullscreenState: () => ({ htmlFullscreen: false, windowFullscreen: false }),
+    onWindowFullscreenStateChange: () => () => {},
+    getWindowZoomFactor: () => 1,
+    onQuitShortcut: () => () => {},
+    getSystemLocale: () => navigator.language || "en-US",
+    getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
+    // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.
+    getLocalEnvironmentBootstraps: () => __GUSTAF_BOOTSTRAPS__.map((entry) => ({ ...entry })),
+    getLocalEnvironmentEnabled: () => true,
+    setLocalEnvironmentEnabled: (enabled) =>
+      invoke("set_local_environment_enabled", { enabled }),
+    getLocalEnvironmentBearerToken: () => invoke("local_environment_bearer_token"),
+    getClientSettings: async () => readJson("gustaf.clientSettings", {}),
+    setClientSettings: async (settings) => {
+      writeJson("gustaf.clientSettings", settings ?? {});
+    },
+    getConnectionCatalog: async () => window.localStorage.getItem("gustaf.connectionCatalog"),
+    setConnectionCatalog: async (catalog) => {
+      if (typeof catalog !== "string") return false;
+      window.localStorage.setItem("gustaf.connectionCatalog", catalog);
+      return true;
+    },
+    getServerExposureState: () => invoke("server_exposure_state"),
+    setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
+    setTailscaleServeEnabled: (enabled, options) =>
+      invoke("set_tailscale_serve_enabled", {
+        enabled,
+        port: options?.port ?? null,
+      }),
+    getAdvertisedEndpoints: () => invoke("advertised_endpoints"),
+    pickFolder,
+    showContextMenu: async () => null,
+    onMenuAction: () => () => {},
+    pasteAsText: async () => false,
+    setTheme: async () => {},
+    openExternal: updater.openExternal,
+    openSystemSettings: async () => false,
+    checkSystemPermission: async () => false,
+    getWslState: async () => ({
+      enabled: false,
+      distro: null,
+      available: false,
+      wslOnly: false,
+      distros: [],
+      preflightError: null,
+    }),
+    setWslBackendEnabled: async () => ({
+      enabled: false,
+      distro: null,
+      available: false,
+      wslOnly: false,
+      distros: [],
+      preflightError: null,
+    }),
+    setWslDistro: async () => ({
+      enabled: false,
+      distro: null,
+      available: false,
+      wslOnly: false,
+      distros: [],
+      preflightError: null,
+    }),
+    setWslOnly: async () => ({
+      enabled: false,
+      distro: null,
+      available: false,
+      wslOnly: false,
+      distros: [],
+      preflightError: null,
+    }),
+    getUpdateState: updater.getUpdateState,
+    setUpdateChannel: async () => updater.getUpdateState(),
+    checkForUpdate: updater.checkForUpdate,
+    downloadUpdate: updater.downloadUpdate,
+    installUpdate: updater.installUpdate,
+    onUpdateState: updater.onUpdateState,
+    getClientPlatform: () => __GUSTAF_PLATFORM__,
+    getAppBranding: () => ({
+      baseName: "Gustaf",
+      stageLabel: "Beta",
+      displayName: "Gustaf",
+    }),
+    getRelayTelemetryEnabled: () => false,
+    cliCommand: {
+      getState: async () => ({
+        installed: false,
+        path: null,
+        onPath: false,
+        canInstall: false,
+        canAddToPath: false,
+      }),
+      install: async () => {
+        throw new Error("CLI install is not available in this Gustaf build yet.");
+      },
+      uninstall: async () => {
+        throw new Error("CLI uninstall is not available in this Gustaf build yet.");
+      },
+      addToPath: async () => {
+        throw new Error("Adding the CLI to PATH is not available in this Gustaf build yet.");
+      },
+    },
+    webLinks: {
+      setReady: () => {},
+      onOpen: () => () => {},
+    },
+    appActivation: {
+      setReady: () => {},
+      complete: async () => {},
+      onRequest: () => () => {},
+    },
+  };
 
   // A system web view has no Notification. The system shows these itself, and a click
   // on one brings the app forward, so there is no click event to deliver.
@@ -89,9 +229,18 @@ const INIT_SCRIPT: &str = r#"(() => {
 })();
 "#;
 
-pub(crate) fn init_script(version: &str) -> String {
+pub(crate) fn init_script(
+    version: &str,
+    bootstraps_json: &serde_json::Value,
+    platform: &str,
+) -> String {
     let version = serde_json::to_string(version).unwrap_or_else(|_| "null".to_owned());
-    INIT_SCRIPT.replace("__GUSTAF_VERSION__", &version)
+    let bootstraps = serde_json::to_string(bootstraps_json).unwrap_or_else(|_| "[]".to_owned());
+    let platform = serde_json::to_string(platform).unwrap_or_else(|_| "\"darwin\"".to_owned());
+    INIT_SCRIPT
+        .replace("__GUSTAF_VERSION__", &version)
+        .replace("__GUSTAF_BOOTSTRAPS__", &bootstraps)
+        .replace("__GUSTAF_PLATFORM__", &platform)
 }
 
 /// Schemes that belong to another app: editors opened on a remote path, and mail.
@@ -186,9 +335,29 @@ mod tests {
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {
-        let script = init_script("0.8.3\"; alert(1); \"");
+        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin");
         assert!(script.contains(r#"version: "0.8.3\"; alert(1); \"","#));
         assert!(!script.contains("__GUSTAF_VERSION__"));
+    }
+
+    #[test]
+    fn installs_desktop_bridge_without_preview() {
+        let script = init_script(
+            "0.8.4",
+            &serde_json::json!([{
+                "id": "primary",
+                "label": "This computer",
+                "httpBaseUrl": "http://127.0.0.1:3773",
+                "wsBaseUrl": "ws://127.0.0.1:3773",
+                "bootstrapToken": "tok",
+            }]),
+            "darwin",
+        );
+        assert!(script.contains("window.desktopBridge = {"));
+        assert!(!script.contains("preview:"));
+        assert!(script.contains("getLocalEnvironmentBootstraps"));
+        assert!(script.contains("http://127.0.0.1:3773"));
+        assert!(!script.contains("__GUSTAF_BOOTSTRAPS__"));
     }
 
     #[test]

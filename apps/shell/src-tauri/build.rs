@@ -3,6 +3,16 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "dropped_paths",
+            "local_environment_bootstraps",
+            "local_environment_bearer_token",
+            "local_environment_enabled",
+            "set_local_environment_enabled",
+            "server_exposure_state",
+            "set_server_exposure_mode",
+            "set_tailscale_serve_enabled",
+            "advertised_endpoints",
+            "client_platform",
+            "app_branding",
             "update_state",
             "update_check",
             "update_download",

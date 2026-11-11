@@ -1660,10 +1660,12 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
 
 export function BrowserSettingsPanel() {
   const t = useT();
-  const desktopOnly = !isElectron;
-  const desktopOnlyMessage = desktopOnly
-    ? t("settingsB.IntegrationsSettings.desktopOnly")
-    : undefined;
+  // Native in-app browser needs desktopBridge.preview. The Tauri shell omits it on purpose.
+  const hasNativeBrowser = previewBridge !== null;
+  const desktopOnly = !hasNativeBrowser;
+  // Only the plain web client gets the "desktop app" notice; Gustaf hides native-only rows.
+  const desktopOnlyMessage =
+    desktopOnly && !isElectron ? t("settingsB.IntegrationsSettings.desktopOnly") : undefined;
 
   return (
     <SettingsPageContainer>
@@ -1674,36 +1676,42 @@ export function BrowserSettingsPanel() {
         <AgentBrowserAccessSetting />
       </SettingsSection>
       <SettingsSection id="browser" title={t("settingsB.IntegrationsSettings.sectionBrowsing")}>
-        <SettingsUnavailableGroup message={desktopOnlyMessage}>
-          <BrowserProfilesSetting disabled={desktopOnly} />
-          <BrowserLinkTargetSetting disabled={desktopOnly} />
-          <BrowserAutoShowFloatingPreviewSetting disabled={desktopOnly} />
-        </SettingsUnavailableGroup>
+        {hasNativeBrowser || desktopOnlyMessage ? (
+          <SettingsUnavailableGroup message={desktopOnlyMessage}>
+            <BrowserProfilesSetting disabled={desktopOnly} />
+            <BrowserLinkTargetSetting disabled={desktopOnly} />
+            <BrowserAutoShowFloatingPreviewSetting disabled={desktopOnly} />
+          </SettingsUnavailableGroup>
+        ) : null}
         {/* Not desktop-only: web clients search from server-run browser tabs too. */}
         <BrowserSearchEngineSetting />
-        <AdvancedSettings
-          targetIds={[
-            searchableSetting("browser-default-viewport").id,
-            searchableSetting("browser-default-zoom").id,
-            searchableSetting("browser-default-appearance").id,
-          ]}
+        {hasNativeBrowser || desktopOnlyMessage ? (
+          <AdvancedSettings
+            targetIds={[
+              searchableSetting("browser-default-viewport").id,
+              searchableSetting("browser-default-zoom").id,
+              searchableSetting("browser-default-appearance").id,
+            ]}
+          >
+            <SettingsUnavailableGroup message={desktopOnlyMessage}>
+              <BrowserViewportSetting disabled={desktopOnly} />
+              <BrowserZoomSetting disabled={desktopOnly} />
+              <BrowserAppearanceSetting disabled={desktopOnly} />
+            </SettingsUnavailableGroup>
+          </AdvancedSettings>
+        ) : null}
+      </SettingsSection>
+      {hasNativeBrowser || desktopOnlyMessage ? (
+        <SettingsSection
+          id="browser-recordings"
+          title={t("settingsB.IntegrationsSettings.sectionRecordings")}
         >
           <SettingsUnavailableGroup message={desktopOnlyMessage}>
-            <BrowserViewportSetting disabled={desktopOnly} />
-            <BrowserZoomSetting disabled={desktopOnly} />
-            <BrowserAppearanceSetting disabled={desktopOnly} />
+            <BrowserRecordingFrameRateSetting disabled={desktopOnly} />
+            <BrowserRecordingInputSettings disabled={desktopOnly} />
           </SettingsUnavailableGroup>
-        </AdvancedSettings>
-      </SettingsSection>
-      <SettingsSection
-        id="browser-recordings"
-        title={t("settingsB.IntegrationsSettings.sectionRecordings")}
-      >
-        <SettingsUnavailableGroup message={desktopOnlyMessage}>
-          <BrowserRecordingFrameRateSetting disabled={desktopOnly} />
-          <BrowserRecordingInputSettings disabled={desktopOnly} />
-        </SettingsUnavailableGroup>
-      </SettingsSection>
+        </SettingsSection>
+      ) : null}
     </SettingsPageContainer>
   );
 }
