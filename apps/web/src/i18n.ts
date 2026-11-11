@@ -556,9 +556,11 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
 
 export function translateProviderMessage(language: UiLanguage, message: string): string {
   const mcpStartup = /^MCP server (.+) failed to start\.?$/.exec(message);
-  if (mcpStartup) return translate(language, "chatB.provider.mcpStartupFailed").replace("{name}", mcpStartup[1]!);
+  if (mcpStartup)
+    return translate(language, "chatB.provider.mcpStartupFailed").replace("{name}", mcpStartup[1]!);
   const knownMessages = {
-    "This provider does not support /compact. Start a new thread to continue with a fresh context.": "chatB.provider.compactUnsupported",
+    "This provider does not support /compact. Start a new thread to continue with a fresh context.":
+      "chatB.provider.compactUnsupported",
     "Turn failed to start": "chatB.provider.startFailedTitle",
     "Claude steer cancelled.": "chatB.provider.steerCancelled",
     "Claude steer accepted.": "chatB.provider.steerAccepted",
