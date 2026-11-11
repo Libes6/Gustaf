@@ -108,10 +108,10 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
     getServerExposureState: () => invoke("server_exposure_state"),
     setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
-    setTailscaleServeEnabled: (enabled, options) =>
+    setTailscaleServeEnabled: (input) =>
       invoke("set_tailscale_serve_enabled", {
-        enabled,
-        port: options?.port ?? null,
+        enabled: Boolean(input?.enabled),
+        port: input?.port ?? null,
       }),
     getAdvertisedEndpoints: () => invoke("advertised_endpoints"),
     pickFolder,
