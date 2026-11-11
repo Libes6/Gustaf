@@ -12,7 +12,7 @@ on:
       - "patches/**"
       - ".github/workflows/cloud-api.yml"
   push:
-    branches: [dev, gustaf/cloud-api-foundation]
+    branches: [dev]
     paths:
       - "apps/api/**"
       - "scripts/cloud/**"
@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy the checked image to Coolify staging (dev branch only)
+        description: Deploy the checked image to Coolify production (dev branch only)
         type: boolean
         default: false
 
@@ -106,9 +106,9 @@ jobs:
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: cloud-staging
+    environment: cloud-production
     concurrency:
-      group: cloud-api-staging-deploy
+      group: cloud-api-production-deploy
       cancel-in-progress: false
     steps:
       - name: Select image and request Coolify deployment
@@ -120,9 +120,9 @@ jobs:
           TAG: ${{ needs.image.outputs.tag }}
         run: |
           set -euo pipefail
-          : "${COOLIFY_URL:?Set cloud-staging variable COOLIFY_URL}"
-          : "${COOLIFY_APP_UUID:?Set cloud-staging variable COOLIFY_APP_UUID}"
-          : "${COOLIFY_TOKEN:?Set cloud-staging secret COOLIFY_TOKEN}"
+          : "${COOLIFY_URL:?Set cloud-production variable COOLIFY_URL}"
+          : "${COOLIFY_APP_UUID:?Set cloud-production variable COOLIFY_APP_UUID}"
+          : "${COOLIFY_TOKEN:?Set cloud-production secret COOLIFY_TOKEN}"
           [[ "$COOLIFY_URL" == https://* ]] || { echo "COOLIFY_URL must use HTTPS"; exit 1; }
           [[ "$COOLIFY_APP_UUID" =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
           API="${COOLIFY_URL%/}/api/v1"
@@ -137,24 +137,3 @@ jobs:
             --header 'Content-Type: application/json' \
             --data "$(jq -nc --arg uuid "$COOLIFY_APP_UUID" '{uuid:$uuid,force:false}')" --output /dev/null
           echo "Coolify accepted deployment request for \`$IMAGE:$TAG\`. Verify completion in Coolify deployment logs and /health/ready." >> "$GITHUB_STEP_SUMMARY"
-
-  bootstrap-coolify:
-    if: github.ref == 'refs/heads/gustaf/cloud-api-foundation' && github.event_name == 'push'
-    needs: image
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    environment: cloud-staging
-    steps:
-      - uses: actions/checkout@v6
-      - name: Configure first API deployment
-        env:
-          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          BOOTSTRAP_DATABASE_URL: ${{ secrets.BOOTSTRAP_DATABASE_URL }}
-          IMAGE: ${{ needs.image.outputs.image }}
-          TAG: ${{ needs.image.outputs.tag }}
-        run: python3 scripts/cloud/coolify-bootstrap.py
-      - name: Verify public HTTPS readiness
-        run: |
-          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
-            --connect-timeout 3 --max-time 6 https://api.libes6.ru/health/ready

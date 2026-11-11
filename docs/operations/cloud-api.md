@@ -49,7 +49,8 @@ docker compose -p gustaf-cloud-dev -f apps/api/compose.yaml down
 Из корня: `docker build -f apps/api/Dockerfile -t gustaf-api:local .`.
 Docker использует общий frozen lockfile и отдельный список разрешённых файлов
 контекста; .env и остальные приложения не копируются. Runtime работает от
-пользователя node, слушает `0.0.0.0:3100`, имеет readiness healthcheck.
+пользователя node, слушает `0.0.0.0:3100`, имеет readiness healthcheck. Runtime включает curl для health check, который
+Coolify добавляет поверх Dockerfile.
 
 Проверка образа с одноразовой базой:
 
@@ -59,14 +60,14 @@ docker compose -p gustaf-cloud-image-test -f apps/api/compose.image-test.yaml ex
 docker compose -p gustaf-cloud-image-test -f apps/api/compose.image-test.yaml down --volumes
 ```
 
-Workflow `Gustaf Cloud API` проверяет образ в PR. При push в `dev`, `gustaf/cloud-api-foundation` и ручном запуске
+Workflow `Gustaf Cloud API` проверяет образ в PR. При push в `dev` и ручном запуске
 публикует проверенный образ `ghcr.io/libes6/gustaf/cloud-api:sha-<полный SHA>`.
 GitHub runner выпускает linux/amd64; подтвердите эту архитектуру у VPS.
 Десктоп и мобильные release workflows не изменены. Этот workflow не следует
 назначать обязательным repo-wide check: он фильтруется по путям и пропускает
 несвязанные PR. Общий CI gate следует настраивать отдельно.
 
-## Первый staging в Coolify
+## Размещение в Coolify
 
 1. У DNS-провайдера домена `libes6.ru` добавить A-записи `coolify`, `api`, `admin`
    на публичный IP VPS. На момент настройки по скриншоту это `83.141.74.125`.
@@ -91,17 +92,20 @@ GitHub runner выпускает linux/amd64; подтвердите эту ар
 миграций из нового образа до его запуска. Текущий workflow не запускает миграции
 на VPS. До добавления auth-таблиц это не мешает работе каркаса.
 
-Для деплоя из Actions создать GitHub Environment `cloud-staging`:
+Для деплоя из Actions создать GitHub Environment `cloud-production`:
 
 - Variable `COOLIFY_URL`: `https://coolify.libes6.ru` без `/api/v1`.
 - Variable `COOLIFY_APP_UUID`: UUID только приложения API.
 - Secret `COOLIFY_TOKEN`: Coolify API token с правами изменения приложения и Deploy.
 
 В Coolify включить API access. Actions сначала PATCH-ит repository/tag приложения,
-затем вызывает GET `/api/v1/deploy?uuid=...`. Настроить environment approvals при
+затем вызывает POST `/api/v1/deploy`. Настроить environment approvals при
 необходимости. Push в `dev` после проверок автоматически запускает деплой. При ручном запуске
-с ветки `dev` нужен флаг deploy. Из рабочей ветки публикуется только образ для
-первичной настройки; первый деплой запускается отдельно через Coolify API.
+с ветки `dev` нужен флаг deploy. Из других веток ручной запуск только публикует образ, без деплоя.
+
+Workflow подключается к существующему приложению `gustaf-cloud-api` в окружении
+Coolify `Gustaf / production`. Пароль базы хранится в runtime env Coolify и для
+обычного обновления из GitHub не требуется.
 
 Успех job deploy означает, что Coolify принял запрос, а не что контейнер уже
 готов: завершение проверяется в Coolify и через readiness. При ошибке запроса
@@ -109,4 +113,3 @@ GitHub runner выпускает linux/amd64; подтвердите эту ар
 Для отката выбрать предыдущий SHA tag в Coolify и выполнить Deploy.
 
 Админки пока нет: DNS admin резервирует адрес, но приложение ещё не развёрнуто.
-Деплой на VPS и запуск workflow из этой рабочей ветки пока не выполнялись.
