@@ -145,12 +145,18 @@ jobs:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
         run: |
           python3 - <<'PYCODE'
-          import os, json, urllib.request
+          import os, json, urllib.request, urllib.error
           base = os.environ["COOLIFY_URL"].rstrip("/") + "/api/v1/"
           for endpoint in ["version", "projects", "servers", "databases", "applications"]:
               request = urllib.request.Request(base + endpoint, headers={"Authorization": "Bearer " + os.environ["COOLIFY_TOKEN"]})
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  data = json.load(response)
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      raw = response.read().decode()
+              except urllib.error.HTTPError as error:
+                  message = error.read().decode().replace(os.environ["COOLIFY_TOKEN"], "[redacted]")
+                  print(endpoint, "HTTP", error.code, message[:500])
+                  raise SystemExit(1)
+              data = raw if endpoint == "version" else json.loads(raw)
               if isinstance(data, list):
                   print(endpoint, json.dumps([{key: row.get(key) for key in ["uuid", "name", "status", "environment_id", "destination_id"]} for row in data]))
               else:
