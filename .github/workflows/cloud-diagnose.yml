@@ -14,7 +14,7 @@ jobs:
       - name: Read deployment state
         env:
           COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_DIAGNOSTIC_TOKEN }}
           APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
         run: |
           python3 - <<'PY'
@@ -34,7 +34,7 @@ jobs:
               detail = get('deployments/' + d['deployment_uuid'])
               logs = detail.get('logs', [])
               if isinstance(logs, str): logs = json.loads(logs)
-              for entry in logs[-30:]:
+              for entry in logs[-80:]:
                   line = entry.get('output', '')
                   if re.search(r'password|postgresql:|DATABASE_URL|token|Authorization|docker run|docker compose| -e ', line, re.I): continue
                   print(line[:400])
