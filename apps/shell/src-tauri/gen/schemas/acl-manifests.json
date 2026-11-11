@@ -17,10 +17,20 @@
         "description": "Enables the client_platform command without any pre-configured scope.",
         "commands": { "allow": ["client_platform"], "deny": [] }
       },
+      "allow-drag-window": {
+        "identifier": "allow-drag-window",
+        "description": "Enables the drag_window command without any pre-configured scope.",
+        "commands": { "allow": ["drag_window"], "deny": [] }
+      },
       "allow-dropped-paths": {
         "identifier": "allow-dropped-paths",
         "description": "Enables the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": ["dropped_paths"], "deny": [] }
+      },
+      "allow-get-prevent-sleep": {
+        "identifier": "allow-get-prevent-sleep",
+        "description": "Enables the get_prevent_sleep command without any pre-configured scope.",
+        "commands": { "allow": ["get_prevent_sleep"], "deny": [] }
       },
       "allow-local-environment-bearer-token": {
         "identifier": "allow-local-environment-bearer-token",
@@ -61,6 +71,11 @@
         "identifier": "allow-set-local-environment-enabled",
         "description": "Enables the set_local_environment_enabled command without any pre-configured scope.",
         "commands": { "allow": ["set_local_environment_enabled"], "deny": [] }
+      },
+      "allow-set-prevent-sleep": {
+        "identifier": "allow-set-prevent-sleep",
+        "description": "Enables the set_prevent_sleep command without any pre-configured scope.",
+        "commands": { "allow": ["set_prevent_sleep"], "deny": [] }
       },
       "allow-set-server-exposure-mode": {
         "identifier": "allow-set-server-exposure-mode",
@@ -127,10 +142,20 @@
         "description": "Denies the client_platform command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["client_platform"] }
       },
+      "deny-drag-window": {
+        "identifier": "deny-drag-window",
+        "description": "Denies the drag_window command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["drag_window"] }
+      },
       "deny-dropped-paths": {
         "identifier": "deny-dropped-paths",
         "description": "Denies the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["dropped_paths"] }
+      },
+      "deny-get-prevent-sleep": {
+        "identifier": "deny-get-prevent-sleep",
+        "description": "Denies the get_prevent_sleep command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["get_prevent_sleep"] }
       },
       "deny-local-environment-bearer-token": {
         "identifier": "deny-local-environment-bearer-token",
@@ -171,6 +196,11 @@
         "identifier": "deny-set-local-environment-enabled",
         "description": "Denies the set_local_environment_enabled command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["set_local_environment_enabled"] }
+      },
+      "deny-set-prevent-sleep": {
+        "identifier": "deny-set-prevent-sleep",
+        "description": "Denies the set_prevent_sleep command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["set_prevent_sleep"] }
       },
       "deny-set-server-exposure-mode": {
         "identifier": "deny-set-server-exposure-mode",

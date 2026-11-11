@@ -2,6 +2,8 @@ mod bridge;
 mod connection_storage;
 mod local_env;
 mod network;
+#[cfg(target_os = "macos")]
+mod power;
 mod shell_settings;
 mod updater;
 
@@ -281,11 +283,18 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(app_menu);
+    #[cfg(target_os = "macos")]
+    let builder = builder.manage(power::PowerState::default());
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
+            bridge::drag_window,
+            #[cfg(target_os = "macos")]
+            power::get_prevent_sleep,
+            #[cfg(target_os = "macos")]
+            power::set_prevent_sleep,
             connection_storage::read_connection_catalog,
             connection_storage::write_connection_catalog,
             bridge::reveal_window,
@@ -315,6 +324,8 @@ pub fn run() {
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
+            #[cfg(target_os = "macos")]
+            power::apply(&app.state::<power::PowerState>(), &settings)?;
             let (server, pairing_url) = start_server(app, &settings)?;
             let local = build_local_environment(&pairing_url).map_err(|error| {
                 Box::<dyn std::error::Error>::from(format!(
@@ -331,7 +342,13 @@ pub fn run() {
             let app_url = local.app_url.clone();
             let platform = local_env::client_platform();
             app.manage(LocalEnvironmentState::new(local));
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url))
+            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
+            #[cfg(target_os = "macos")]
+            let window = window
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true)
+                .traffic_light_position(tauri::LogicalPosition::new(16.0, 20.0));
+            window
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)

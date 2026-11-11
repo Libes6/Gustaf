@@ -17,6 +17,15 @@ const INIT_SCRIPT: &str = r#"(() => {
   if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) return;
   const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
 
+  // WKWebView does not implement Electron's -webkit-app-region CSS.
+  document.addEventListener("mousedown", (event) => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    if (!event.target.closest(".drag-region")) return;
+    if (event.target.closest("button, a, input, textarea, select, [role=button], [contenteditable=true]")) return;
+    event.preventDefault();
+    invoke("drag_window", { doubleClick: event.detail === 2 }).catch(console.error);
+  });
+
   // The shell pushes each update state here (`publish` in updater.rs).
   const updateListeners = new Set();
   window.__gustafUpdateState = (state) => {
@@ -150,6 +159,10 @@ const INIT_SCRIPT: &str = r#"(() => {
       window.localStorage.removeItem("gustaf.connectionCatalog");
       return true;
     }),
+    ...(__GUSTAF_PLATFORM__ === "darwin" ? {
+      getPreventSleep: () => invoke("get_prevent_sleep"),
+      setPreventSleep: (enabled) => invoke("set_prevent_sleep", { enabled }),
+    } : {}),
     getServerExposureState: () => invoke("server_exposure_state"),
     setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
     setTailscaleServeEnabled: (input) =>
@@ -365,6 +378,19 @@ pub(crate) fn write_client_settings(
     let raw = serde_json::to_vec_pretty(&settings).map_err(|error| error.to_string())?;
     std::fs::write(&temporary, raw).map_err(|error| error.to_string())?;
     std::fs::rename(temporary, path).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) fn drag_window(window: tauri::WebviewWindow, double_click: bool) -> Result<(), String> {
+    if double_click {
+        if window.is_maximized().map_err(|error| error.to_string())? {
+            window.unmaximize().map_err(|error| error.to_string())
+        } else {
+            window.maximize().map_err(|error| error.to_string())
+        }
+    } else {
+        window.start_dragging().map_err(|error| error.to_string())
+    }
 }
 
 /// Schemes that belong to another app: editors opened on a remote path, and mail.
