@@ -1,0 +1,59 @@
+name: Gustaf Android preview
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev]
+    paths:
+      - apps/mobile/**
+      - packages/client-runtime/**
+      - packages/contracts/**
+      - packages/shared/**
+      - pnpm-lock.yaml
+      - .github/workflows/mobile-android-preview.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      APP_VARIANT: development
+      EXPO_NO_DOTENV: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v5
+      - run: pnpm install --frozen-lockfile
+      - name: Check mobile types and tests
+        working-directory: apps/mobile
+        run: |
+          pnpm run typecheck
+          pnpm test
+      - name: Generate Android project
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install
+      - name: Build standalone test APK (debug signing key)
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Gustaf-Android-preview-arm64
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          retention-days: 7

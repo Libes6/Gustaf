@@ -40,6 +40,8 @@ impl ExposureMode {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ShellSettings {
     pub exposure_mode: ExposureMode,
+    #[serde(default)]
+    pub prevent_sleep: bool,
     pub tailscale_serve_enabled: bool,
     pub tailscale_serve_port: u16,
 }
@@ -48,6 +50,7 @@ impl Default for ShellSettings {
     fn default() -> Self {
         Self {
             exposure_mode: ExposureMode::LocalOnly,
+            prevent_sleep: false,
             tailscale_serve_enabled: false,
             tailscale_serve_port: DEFAULT_TAILSCALE_SERVE_PORT,
         }
