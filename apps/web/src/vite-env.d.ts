@@ -27,8 +27,8 @@ declare global {
   interface Window {
     desktopBridge?: DesktopBridge;
     /**
-     * Set by the Gustaf shell (apps/shell), whose system web view runs this app as a web
-     * client: there is no desktopBridge, and these are the pieces a web view cannot do alone.
+     * Set by the Gustaf Tauri shell. The shell also installs `desktopBridge` for local
+     * environment hand-off; these helpers stay for updater/version/dropped-path call sites.
      */
     gustafShell?: {
       readonly pickFolder: (options?: { initialPath?: string | null }) => Promise<string | null>;

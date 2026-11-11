@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-local-environment-bootstraps"
+description = "Enables the local_environment_bootstraps command without any pre-configured scope."
+commands.allow = ["local_environment_bootstraps"]
+
+[[permission]]
+identifier = "deny-local-environment-bootstraps"
+description = "Denies the local_environment_bootstraps command without any pre-configured scope."
+commands.deny = ["local_environment_bootstraps"]

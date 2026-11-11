@@ -1,4 +1,8 @@
 mod bridge;
+mod connection_storage;
+mod local_env;
+mod network;
+mod shell_settings;
 mod updater;
 
 use std::io::{BufRead, BufReader, Read};
@@ -8,6 +12,9 @@ use std::thread;
 use std::time::Duration;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+
+use local_env::{build_local_environment, LocalEnvironmentState};
+use shell_settings::{ExposureMode, ShellSettings};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -29,29 +36,67 @@ impl Drop for Server {
     }
 }
 
+#[cfg(not(debug_assertions))]
+fn apply_exposure_args(command: &mut Command, settings: &ShellSettings) {
+    match settings.exposure_mode {
+        ExposureMode::LocalOnly => {
+            command.args(["--host", "127.0.0.1"]);
+        }
+        ExposureMode::NetworkAccessible => {
+            // Bind every interface so a phone on the same Wi-Fi can pair.
+            command.args(["--host", "0.0.0.0", "--lan"]);
+        }
+    }
+    if settings.tailscale_serve_enabled {
+        command.arg("--tailscale-serve");
+        command.arg("--tailscale-serve-port");
+        command.arg(settings.tailscale_serve_port.to_string());
+    }
+}
+
 #[cfg(debug_assertions)]
-fn server_command(_app: &tauri::App) -> tauri::Result<Command> {
+fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<Command> {
     let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let mut command = Command::new("node");
     command
         .args(["scripts/dev-runner.ts", "dev", "--no-seed"])
         .current_dir(repo);
+    // Dev runner forwards unknown flags poorly; expose via env the server already reads.
+    match settings.exposure_mode {
+        ExposureMode::LocalOnly => {
+            command.env("T3CODE_HOST", "127.0.0.1");
+            command.env_remove("T3CODE_LAN");
+        }
+        ExposureMode::NetworkAccessible => {
+            command.env("T3CODE_HOST", "0.0.0.0");
+            command.env("T3CODE_LAN", "1");
+        }
+    }
+    if settings.tailscale_serve_enabled {
+        command.env("T3CODE_TAILSCALE_SERVE", "1");
+        command.env(
+            "T3CODE_TAILSCALE_SERVE_PORT",
+            settings.tailscale_serve_port.to_string(),
+        );
+    }
+    let _ = app;
     Ok(command)
 }
 
 #[cfg(not(debug_assertions))]
-fn server_command(app: &tauri::App) -> tauri::Result<Command> {
+fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<Command> {
     let runtime = app.path().resource_dir()?.join("runtime");
     let executable = if cfg!(windows) { "t3.exe" } else { "t3" };
     let data_dir = app.path().app_local_data_dir()?;
     let mut command = Command::new(runtime.join(executable));
     command
         .current_dir(runtime)
-        .args(["--mode", "web", "--host", "127.0.0.1", "--no-browser"])
+        .args(["--mode", "web", "--no-browser"])
         .arg("--no-auto-bootstrap-project-from-cwd")
         .arg("--base-dir")
         .arg(data_dir)
         .env_remove("VITE_DEV_SERVER_URL");
+    apply_exposure_args(&mut command, settings);
     Ok(command)
 }
 
@@ -91,8 +136,11 @@ fn login_shell_path() -> Option<String> {
     (!path.is_empty()).then(|| path.to_owned())
 }
 
-fn start_server(app: &tauri::App) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
-    let mut command = server_command(app)?;
+fn start_server(
+    app: &tauri::App,
+    settings: &ShellSettings,
+) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
+    let mut command = server_command(app, settings)?;
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
@@ -138,10 +186,10 @@ fn open_external_url(url: &tauri::Url) {
     let mut command = if cfg!(target_os = "macos") {
         Command::new("open")
     } else if cfg!(target_os = "windows") {
-        let mut command = Command::new("cmd");
-        command.args(["/C", "start", "", url.as_str()]);
-        let _ = command.spawn();
-        return;
+        // Not `cmd /C start`: cmd reads `&` in a URL as the start of another command.
+        let mut command = Command::new("rundll32");
+        command.arg("url.dll,FileProtocolHandler");
+        command
     } else {
         Command::new("xdg-open")
     };
@@ -238,6 +286,23 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
+            connection_storage::read_connection_catalog,
+            connection_storage::write_connection_catalog,
+            bridge::reveal_window,
+            bridge::window_fullscreen_state,
+            bridge::set_window_theme,
+            bridge::read_client_settings,
+            bridge::write_client_settings,
+            local_env::local_environment_bootstraps,
+            local_env::local_environment_bearer_token,
+            local_env::local_environment_enabled,
+            local_env::set_local_environment_enabled,
+            local_env::server_exposure_state,
+            local_env::set_server_exposure_mode,
+            local_env::set_tailscale_serve_enabled,
+            local_env::advertised_endpoints,
+            local_env::client_platform,
+            local_env::app_branding,
             updater::update_state,
             updater::update_check,
             updater::update_download,
@@ -245,16 +310,39 @@ pub fn run() {
         ])
         .setup(|app| {
             updater::initialize(app)?;
+            app.manage(bridge::ClientSettingsFile(Mutex::new(())));
+            app.manage(connection_storage::CatalogStore::default());
             set_dock_icon();
-            let (server, pairing_url) = start_server(app)?;
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(pairing_url))
+            let settings = shell_settings::load(app.handle());
+            app.manage(Mutex::new(settings.clone()));
+            let (server, pairing_url) = start_server(app, &settings)?;
+            let local = build_local_environment(&pairing_url).map_err(|error| {
+                Box::<dyn std::error::Error>::from(format!(
+                    "failed to hand off the local environment: {error}"
+                ))
+            })?;
+            let bootstraps = serde_json::json!([{
+                "id": "primary",
+                "label": "This computer",
+                "httpBaseUrl": local.http_base_url,
+                "wsBaseUrl": local.ws_base_url,
+                "bootstrapToken": local.bootstrap_token,
+            }]);
+            let app_url = local.app_url.clone();
+            let platform = local_env::client_platform();
+            app.manage(LocalEnvironmentState::new(local));
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url))
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
                 // Tauri's own drop handler swallows Finder drags before the page sees them.
                 // The composer handles drops itself, so the web view has to receive them.
                 .disable_drag_drop_handler()
-                .initialization_script(bridge::init_script(&app.package_info().version.to_string()))
+                .initialization_script(bridge::init_script(
+                    &app.package_info().version.to_string(),
+                    &bootstraps,
+                    platform,
+                ))
                 // Editor and mail links have no page to load; their own app opens them.
                 .on_navigation(|url| {
                     if bridge::is_handoff_url(url) {

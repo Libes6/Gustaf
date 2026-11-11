@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-advertised-endpoints"
+description = "Enables the advertised_endpoints command without any pre-configured scope."
+commands.allow = ["advertised_endpoints"]
+
+[[permission]]
+identifier = "deny-advertised-endpoints"
+description = "Denies the advertised_endpoints command without any pre-configured scope."
+commands.deny = ["advertised_endpoints"]

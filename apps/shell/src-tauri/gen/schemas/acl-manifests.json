@@ -2,10 +2,80 @@
   "__app-acl__": {
     "default_permission": null,
     "permissions": {
+      "allow-advertised-endpoints": {
+        "identifier": "allow-advertised-endpoints",
+        "description": "Enables the advertised_endpoints command without any pre-configured scope.",
+        "commands": { "allow": ["advertised_endpoints"], "deny": [] }
+      },
+      "allow-app-branding": {
+        "identifier": "allow-app-branding",
+        "description": "Enables the app_branding command without any pre-configured scope.",
+        "commands": { "allow": ["app_branding"], "deny": [] }
+      },
+      "allow-client-platform": {
+        "identifier": "allow-client-platform",
+        "description": "Enables the client_platform command without any pre-configured scope.",
+        "commands": { "allow": ["client_platform"], "deny": [] }
+      },
       "allow-dropped-paths": {
         "identifier": "allow-dropped-paths",
         "description": "Enables the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": ["dropped_paths"], "deny": [] }
+      },
+      "allow-local-environment-bearer-token": {
+        "identifier": "allow-local-environment-bearer-token",
+        "description": "Enables the local_environment_bearer_token command without any pre-configured scope.",
+        "commands": { "allow": ["local_environment_bearer_token"], "deny": [] }
+      },
+      "allow-local-environment-bootstraps": {
+        "identifier": "allow-local-environment-bootstraps",
+        "description": "Enables the local_environment_bootstraps command without any pre-configured scope.",
+        "commands": { "allow": ["local_environment_bootstraps"], "deny": [] }
+      },
+      "allow-local-environment-enabled": {
+        "identifier": "allow-local-environment-enabled",
+        "description": "Enables the local_environment_enabled command without any pre-configured scope.",
+        "commands": { "allow": ["local_environment_enabled"], "deny": [] }
+      },
+      "allow-read-client-settings": {
+        "identifier": "allow-read-client-settings",
+        "description": "Enables the read_client_settings command without any pre-configured scope.",
+        "commands": { "allow": ["read_client_settings"], "deny": [] }
+      },
+      "allow-read-connection-catalog": {
+        "identifier": "allow-read-connection-catalog",
+        "description": "Enables the read_connection_catalog command without any pre-configured scope.",
+        "commands": { "allow": ["read_connection_catalog"], "deny": [] }
+      },
+      "allow-reveal-window": {
+        "identifier": "allow-reveal-window",
+        "description": "Enables the reveal_window command without any pre-configured scope.",
+        "commands": { "allow": ["reveal_window"], "deny": [] }
+      },
+      "allow-server-exposure-state": {
+        "identifier": "allow-server-exposure-state",
+        "description": "Enables the server_exposure_state command without any pre-configured scope.",
+        "commands": { "allow": ["server_exposure_state"], "deny": [] }
+      },
+      "allow-set-local-environment-enabled": {
+        "identifier": "allow-set-local-environment-enabled",
+        "description": "Enables the set_local_environment_enabled command without any pre-configured scope.",
+        "commands": { "allow": ["set_local_environment_enabled"], "deny": [] }
+      },
+      "allow-set-server-exposure-mode": {
+        "identifier": "allow-set-server-exposure-mode",
+        "description": "Enables the set_server_exposure_mode command without any pre-configured scope.",
+        "commands": { "allow": ["set_server_exposure_mode"], "deny": [] }
+      },
+      "allow-set-tailscale-serve-enabled": {
+        "identifier": "allow-set-tailscale-serve-enabled",
+        "description": "Enables the set_tailscale_serve_enabled command without any pre-configured scope.",
+        "commands": { "allow": ["set_tailscale_serve_enabled"], "deny": [] }
+      },
+      "allow-set-window-theme": {
+        "identifier": "allow-set-window-theme",
+        "description": "Enables the set_window_theme command without any pre-configured scope.",
+        "commands": { "allow": ["set_window_theme"], "deny": [] }
       },
       "allow-update-check": {
         "identifier": "allow-update-check",
@@ -27,10 +97,95 @@
         "description": "Enables the update_state command without any pre-configured scope.",
         "commands": { "allow": ["update_state"], "deny": [] }
       },
+      "allow-window-fullscreen-state": {
+        "identifier": "allow-window-fullscreen-state",
+        "description": "Enables the window_fullscreen_state command without any pre-configured scope.",
+        "commands": { "allow": ["window_fullscreen_state"], "deny": [] }
+      },
+      "allow-write-client-settings": {
+        "identifier": "allow-write-client-settings",
+        "description": "Enables the write_client_settings command without any pre-configured scope.",
+        "commands": { "allow": ["write_client_settings"], "deny": [] }
+      },
+      "allow-write-connection-catalog": {
+        "identifier": "allow-write-connection-catalog",
+        "description": "Enables the write_connection_catalog command without any pre-configured scope.",
+        "commands": { "allow": ["write_connection_catalog"], "deny": [] }
+      },
+      "deny-advertised-endpoints": {
+        "identifier": "deny-advertised-endpoints",
+        "description": "Denies the advertised_endpoints command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["advertised_endpoints"] }
+      },
+      "deny-app-branding": {
+        "identifier": "deny-app-branding",
+        "description": "Denies the app_branding command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["app_branding"] }
+      },
+      "deny-client-platform": {
+        "identifier": "deny-client-platform",
+        "description": "Denies the client_platform command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["client_platform"] }
+      },
       "deny-dropped-paths": {
         "identifier": "deny-dropped-paths",
         "description": "Denies the dropped_paths command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["dropped_paths"] }
+      },
+      "deny-local-environment-bearer-token": {
+        "identifier": "deny-local-environment-bearer-token",
+        "description": "Denies the local_environment_bearer_token command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["local_environment_bearer_token"] }
+      },
+      "deny-local-environment-bootstraps": {
+        "identifier": "deny-local-environment-bootstraps",
+        "description": "Denies the local_environment_bootstraps command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["local_environment_bootstraps"] }
+      },
+      "deny-local-environment-enabled": {
+        "identifier": "deny-local-environment-enabled",
+        "description": "Denies the local_environment_enabled command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["local_environment_enabled"] }
+      },
+      "deny-read-client-settings": {
+        "identifier": "deny-read-client-settings",
+        "description": "Denies the read_client_settings command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["read_client_settings"] }
+      },
+      "deny-read-connection-catalog": {
+        "identifier": "deny-read-connection-catalog",
+        "description": "Denies the read_connection_catalog command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["read_connection_catalog"] }
+      },
+      "deny-reveal-window": {
+        "identifier": "deny-reveal-window",
+        "description": "Denies the reveal_window command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["reveal_window"] }
+      },
+      "deny-server-exposure-state": {
+        "identifier": "deny-server-exposure-state",
+        "description": "Denies the server_exposure_state command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["server_exposure_state"] }
+      },
+      "deny-set-local-environment-enabled": {
+        "identifier": "deny-set-local-environment-enabled",
+        "description": "Denies the set_local_environment_enabled command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["set_local_environment_enabled"] }
+      },
+      "deny-set-server-exposure-mode": {
+        "identifier": "deny-set-server-exposure-mode",
+        "description": "Denies the set_server_exposure_mode command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["set_server_exposure_mode"] }
+      },
+      "deny-set-tailscale-serve-enabled": {
+        "identifier": "deny-set-tailscale-serve-enabled",
+        "description": "Denies the set_tailscale_serve_enabled command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["set_tailscale_serve_enabled"] }
+      },
+      "deny-set-window-theme": {
+        "identifier": "deny-set-window-theme",
+        "description": "Denies the set_window_theme command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["set_window_theme"] }
       },
       "deny-update-check": {
         "identifier": "deny-update-check",
@@ -51,6 +206,21 @@
         "identifier": "deny-update-state",
         "description": "Denies the update_state command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["update_state"] }
+      },
+      "deny-window-fullscreen-state": {
+        "identifier": "deny-window-fullscreen-state",
+        "description": "Denies the window_fullscreen_state command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["window_fullscreen_state"] }
+      },
+      "deny-write-client-settings": {
+        "identifier": "deny-write-client-settings",
+        "description": "Denies the write_client_settings command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["write_client_settings"] }
+      },
+      "deny-write-connection-catalog": {
+        "identifier": "deny-write-connection-catalog",
+        "description": "Denies the write_connection_catalog command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["write_connection_catalog"] }
       }
     },
     "permission_sets": {},

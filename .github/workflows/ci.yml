@@ -80,6 +80,7 @@ jobs:
         run: apps/shell/scripts/install-linux-deps.sh
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/provider-ollama/src/http.test.ts
+      - run: node --test apps/shell/tests/*.test.mjs
       # --release: shares every compiled dependency with the bundle below instead of building them twice.
       - run: cargo test --locked --release --manifest-path apps/shell/src-tauri/Cargo.toml
       - name: Build T3 and bundle Gustaf
