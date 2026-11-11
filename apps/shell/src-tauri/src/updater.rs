@@ -132,7 +132,6 @@ pub fn initialize(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         app.handle()
             .plugin(tauri_plugin_updater::Builder::new().build())?;
         app.handle().plugin(tauri_plugin_process::init())?;
-        app.handle().plugin(tauri_plugin_dialog::init())?;
         if self_updating_install() {
             let handle = app.handle().clone();
             thread::spawn(move || watch(handle));

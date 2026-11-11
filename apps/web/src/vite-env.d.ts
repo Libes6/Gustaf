@@ -26,6 +26,15 @@ interface ImportMeta {
 declare global {
   interface Window {
     desktopBridge?: DesktopBridge;
+    /**
+     * Set by the Gustaf shell (apps/shell), whose system web view runs this app as a web
+     * client: there is no desktopBridge, and these are the pieces a web view cannot do alone.
+     */
+    gustafShell?: {
+      readonly pickFolder: (options?: { initialPath?: string | null }) => Promise<string | null>;
+      /** Absolute paths of what the last drag carried; empty where the system does not tell. */
+      readonly droppedPaths: () => Promise<readonly string[]>;
+    };
     /** Dev builds only, from DevReplayHost. Agents call these from the browser console. */
     t3dev?: {
       readonly replayScenarios: () => ReadonlyArray<string>;
