@@ -11,9 +11,7 @@ use serde_json::Value;
 use tauri::Manager;
 
 use crate::network;
-use crate::shell_settings::{
-    self, ExposureMode, ShellSettings, DEFAULT_TAILSCALE_SERVE_PORT,
-};
+use crate::shell_settings::{self, ExposureMode, ShellSettings, DEFAULT_TAILSCALE_SERVE_PORT};
 
 const OAUTH_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
 const OAUTH_BOOTSTRAP_TOKEN_TYPE: &str = "urn:t3:params:oauth:token-type:environment-bootstrap";
@@ -198,24 +196,19 @@ fn urlencoding_encode(value: &str) -> String {
     out
 }
 
-fn exposure_state_value(
-    settings: &ShellSettings,
-    http_base_url: &str,
-) -> Value {
+fn exposure_state_value(settings: &ShellSettings, http_base_url: &str) -> Value {
     let advertised_host = if settings.exposure_mode == ExposureMode::NetworkAccessible {
         network::lan_ipv4_addresses().into_iter().next()
     } else {
         None
     };
-    let endpoint_url = advertised_host
-        .as_ref()
-        .map(|host| {
-            let port = http_base_url
-                .rsplit_once(':')
-                .and_then(|(_, port)| port.trim_end_matches('/').parse::<u16>().ok())
-                .unwrap_or(3773);
-            format!("http://{host}:{port}")
-        });
+    let endpoint_url = advertised_host.as_ref().map(|host| {
+        let port = http_base_url
+            .rsplit_once(':')
+            .and_then(|(_, port)| port.trim_end_matches('/').parse::<u16>().ok())
+            .unwrap_or(3773);
+        format!("http://{host}:{port}")
+    });
     serde_json::json!({
         "mode": settings.exposure_mode.as_bridge_str(),
         "endpointUrl": endpoint_url,

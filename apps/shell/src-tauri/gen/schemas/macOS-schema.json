@@ -219,6 +219,24 @@
           "markdownDescription": "Enables the local_environment_enabled command without any pre-configured scope."
         },
         {
+          "description": "Enables the read_client_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-read-client-settings",
+          "markdownDescription": "Enables the read_client_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the read_connection_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-read-connection-catalog",
+          "markdownDescription": "Enables the read_connection_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reveal_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-reveal-window",
+          "markdownDescription": "Enables the reveal_window command without any pre-configured scope."
+        },
+        {
           "description": "Enables the server_exposure_state command without any pre-configured scope.",
           "type": "string",
           "const": "allow-server-exposure-state",
@@ -243,6 +261,12 @@
           "markdownDescription": "Enables the set_tailscale_serve_enabled command without any pre-configured scope."
         },
         {
+          "description": "Enables the set_window_theme command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-window-theme",
+          "markdownDescription": "Enables the set_window_theme command without any pre-configured scope."
+        },
+        {
           "description": "Enables the update_check command without any pre-configured scope.",
           "type": "string",
           "const": "allow-update-check",
@@ -265,6 +289,24 @@
           "type": "string",
           "const": "allow-update-state",
           "markdownDescription": "Enables the update_state command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the window_fullscreen_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-window-fullscreen-state",
+          "markdownDescription": "Enables the window_fullscreen_state command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the write_client_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-write-client-settings",
+          "markdownDescription": "Enables the write_client_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the write_connection_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-write-connection-catalog",
+          "markdownDescription": "Enables the write_connection_catalog command without any pre-configured scope."
         },
         {
           "description": "Denies the advertised_endpoints command without any pre-configured scope.",
@@ -309,6 +351,24 @@
           "markdownDescription": "Denies the local_environment_enabled command without any pre-configured scope."
         },
         {
+          "description": "Denies the read_client_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-read-client-settings",
+          "markdownDescription": "Denies the read_client_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the read_connection_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-read-connection-catalog",
+          "markdownDescription": "Denies the read_connection_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reveal_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-reveal-window",
+          "markdownDescription": "Denies the reveal_window command without any pre-configured scope."
+        },
+        {
           "description": "Denies the server_exposure_state command without any pre-configured scope.",
           "type": "string",
           "const": "deny-server-exposure-state",
@@ -333,6 +393,12 @@
           "markdownDescription": "Denies the set_tailscale_serve_enabled command without any pre-configured scope."
         },
         {
+          "description": "Denies the set_window_theme command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-window-theme",
+          "markdownDescription": "Denies the set_window_theme command without any pre-configured scope."
+        },
+        {
           "description": "Denies the update_check command without any pre-configured scope.",
           "type": "string",
           "const": "deny-update-check",
@@ -355,6 +421,24 @@
           "type": "string",
           "const": "deny-update-state",
           "markdownDescription": "Denies the update_state command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the window_fullscreen_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-window-fullscreen-state",
+          "markdownDescription": "Denies the window_fullscreen_state command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the write_client_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-write-client-settings",
+          "markdownDescription": "Denies the write_client_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the write_connection_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-write-connection-catalog",
+          "markdownDescription": "Denies the write_connection_catalog command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

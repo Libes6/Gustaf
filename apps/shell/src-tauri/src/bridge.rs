@@ -7,6 +7,7 @@
 //! the desktop app) and keeps `window.gustafShell` for shell-only helpers.
 
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 /// Runs in the main frame before the page's own code.
 const INIT_SCRIPT: &str = r#"(() => {
@@ -51,18 +52,44 @@ const INIT_SCRIPT: &str = r#"(() => {
     return Array.isArray(paths) ? paths.filter((path) => typeof path === "string") : [];
   };
 
-  // Persistence the page already has browser fallbacks for; keep values in localStorage
-  // until the shell grows a dedicated store.
-  const readJson = (key, fallback) => {
+  const fullscreenListeners = new Set();
+  let fullscreen = false;
+  window.__gustafFullscreenState = (value) => {
+    if (fullscreen === value) return;
+    fullscreen = value;
+    for (const listener of fullscreenListeners) listener(value);
+  };
+  let fullscreenRequest = 0;
+  const refreshFullscreen = async () => {
+    const request = ++fullscreenRequest;
     try {
-      const raw = window.localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
+      const value = await invoke("window_fullscreen_state");
+      if (request === fullscreenRequest) window.__gustafFullscreenState(value);
+    } catch (error) {
+      console.error(error);
     }
   };
-  const writeJson = (key, value) => {
-    window.localStorage.setItem(key, JSON.stringify(value));
+  window.addEventListener("resize", refreshFullscreen);
+  refreshFullscreen();
+
+  // Migrate the previous, port-specific browser settings only after saving succeeds.
+  const getClientSettings = async () => {
+    const saved = await invoke("read_client_settings");
+    if (saved !== null) return saved;
+    const raw = window.localStorage.getItem("gustaf.clientSettings");
+    if (!raw) return null;
+    const settings = JSON.parse(raw);
+    await invoke("write_client_settings", { settings });
+    window.localStorage.removeItem("gustaf.clientSettings");
+    return settings;
+  };
+
+  // A migration must finish before a newer catalog can be saved.
+  let catalogQueue = Promise.resolve();
+  const withCatalog = (operation) => {
+    const result = catalogQueue.then(operation);
+    catalogQueue = result.catch(() => {});
+    return result;
   };
 
   window.gustafShell = Object.freeze({
@@ -77,15 +104,16 @@ const INIT_SCRIPT: &str = r#"(() => {
   // on purpose (in-app browser is a separate project).
   window.desktopBridge = {
     getPathForFile: () => null,
-    revealWindow: async () => {
-      window.focus();
-    },
+    revealWindow: () => invoke("reveal_window"),
     setNotificationBadge: async () => {},
     onNotificationBadgeClear: () => () => {},
     onTrackpadScrollBegin: () => () => {},
     onTrackpadScrollEnd: () => () => {},
-    getWindowFullscreenState: () => ({ htmlFullscreen: false, windowFullscreen: false }),
-    onWindowFullscreenStateChange: () => () => {},
+    getWindowFullscreenState: () => fullscreen,
+    onWindowFullscreenStateChange: (listener) => {
+      fullscreenListeners.add(listener);
+      return () => fullscreenListeners.delete(listener);
+    },
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
     getSystemLocale: () => navigator.language || "en-US",
@@ -96,16 +124,26 @@ const INIT_SCRIPT: &str = r#"(() => {
     setLocalEnvironmentEnabled: (enabled) =>
       invoke("set_local_environment_enabled", { enabled }),
     getLocalEnvironmentBearerToken: () => invoke("local_environment_bearer_token"),
-    getClientSettings: async () => readJson("gustaf.clientSettings", {}),
-    setClientSettings: async (settings) => {
-      writeJson("gustaf.clientSettings", settings ?? {});
-    },
-    getConnectionCatalog: async () => window.localStorage.getItem("gustaf.connectionCatalog"),
-    setConnectionCatalog: async (catalog) => {
+    getClientSettings,
+    setClientSettings: (settings) => invoke("write_client_settings", { settings }),
+    getConnectionCatalog: () => withCatalog(async () => {
+      const saved = await invoke("read_connection_catalog");
+      if (saved !== null) {
+        window.localStorage.removeItem("gustaf.connectionCatalog");
+        return saved;
+      }
+      const legacy = window.localStorage.getItem("gustaf.connectionCatalog");
+      if (legacy === null) return null;
+      await invoke("write_connection_catalog", { catalog: legacy });
+      window.localStorage.removeItem("gustaf.connectionCatalog");
+      return legacy;
+    }),
+    setConnectionCatalog: (catalog) => withCatalog(async () => {
       if (typeof catalog !== "string") return false;
-      window.localStorage.setItem("gustaf.connectionCatalog", catalog);
+      await invoke("write_connection_catalog", { catalog });
+      window.localStorage.removeItem("gustaf.connectionCatalog");
       return true;
-    },
+    }),
     getServerExposureState: () => invoke("server_exposure_state"),
     setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
     setTailscaleServeEnabled: (input) =>
@@ -118,7 +156,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     showContextMenu: async () => null,
     onMenuAction: () => () => {},
     pasteAsText: async () => false,
-    setTheme: async () => {},
+    setTheme: (theme) => invoke("set_window_theme", { theme }),
     openExternal: updater.openExternal,
     openSystemSettings: async () => false,
     checkSystemPermission: async () => false,
@@ -241,6 +279,83 @@ pub(crate) fn init_script(
         .replace("__GUSTAF_VERSION__", &version)
         .replace("__GUSTAF_BOOTSTRAPS__", &bootstraps)
         .replace("__GUSTAF_PLATFORM__", &platform)
+}
+
+#[tauri::command]
+pub(crate) fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|error| error.to_string())?;
+    window.unminimize().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) fn window_fullscreen_state(window: tauri::WebviewWindow) -> Result<bool, String> {
+    window.is_fullscreen().map_err(|error| error.to_string())
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum WindowTheme {
+    Light,
+    Dark,
+    System,
+}
+
+#[tauri::command]
+pub(crate) fn set_window_theme(
+    window: tauri::WebviewWindow,
+    theme: WindowTheme,
+) -> Result<(), String> {
+    let theme = match theme {
+        WindowTheme::Light => Some(tauri::Theme::Light),
+        WindowTheme::Dark => Some(tauri::Theme::Dark),
+        WindowTheme::System => None,
+    };
+    window.set_theme(theme).map_err(|error| error.to_string())
+}
+
+// Serialize writes so a rapid series of settings changes cannot share a temp file.
+pub(crate) struct ClientSettingsFile(pub std::sync::Mutex<()>);
+
+fn client_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_local_data_dir()
+        .map(|dir| dir.join("client-settings.json"))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) fn read_client_settings(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ClientSettingsFile>,
+) -> Result<Option<serde_json::Value>, String> {
+    let _guard = state.0.lock().map_err(|error| error.to_string())?;
+    match std::fs::read(client_settings_path(&app)?) {
+        Ok(raw) => serde_json::from_slice(&raw)
+            .map(Some)
+            .map_err(|error| error.to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+#[tauri::command]
+pub(crate) fn write_client_settings(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ClientSettingsFile>,
+    settings: serde_json::Value,
+) -> Result<(), String> {
+    if !settings.is_object() {
+        return Err("Client settings must be an object".to_owned());
+    }
+    let _guard = state.0.lock().map_err(|error| error.to_string())?;
+    let path = client_settings_path(&app)?;
+    let parent = path.parent().ok_or("Missing settings directory")?;
+    std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let temporary = path.with_extension("json.tmp");
+    let raw = serde_json::to_vec_pretty(&settings).map_err(|error| error.to_string())?;
+    std::fs::write(&temporary, raw).map_err(|error| error.to_string())?;
+    std::fs::rename(temporary, path).map_err(|error| error.to_string())
 }
 
 /// Schemes that belong to another app: editors opened on a remote path, and mail.

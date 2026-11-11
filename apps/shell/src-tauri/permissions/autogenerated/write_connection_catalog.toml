@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-write-connection-catalog"
+description = "Enables the write_connection_catalog command without any pre-configured scope."
+commands.allow = ["write_connection_catalog"]
+
+[[permission]]
+identifier = "deny-write-connection-catalog"
+description = "Denies the write_connection_catalog command without any pre-configured scope."
+commands.deny = ["write_connection_catalog"]

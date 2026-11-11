@@ -3,6 +3,13 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "dropped_paths",
+            "read_connection_catalog",
+            "write_connection_catalog",
+            "reveal_window",
+            "window_fullscreen_state",
+            "set_window_theme",
+            "read_client_settings",
+            "write_client_settings",
             "local_environment_bootstraps",
             "local_environment_bearer_token",
             "local_environment_enabled",

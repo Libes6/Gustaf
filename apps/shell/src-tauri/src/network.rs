@@ -79,7 +79,10 @@ fn tailscale_status_ipv4() -> Vec<String> {
     let Some(status) = run_tailscale_status_json() else {
         return Vec::new();
     };
-    let Some(ips) = status.pointer("/Self/TailscaleIPs").and_then(Value::as_array) else {
+    let Some(ips) = status
+        .pointer("/Self/TailscaleIPs")
+        .and_then(Value::as_array)
+    else {
         return Vec::new();
     };
     ips.iter()
@@ -199,8 +202,21 @@ fn is_tailscale_cgnat(address: Ipv4Addr) -> bool {
 fn is_host_only_interface(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     [
-        "bridge", "utun", "ipsec", "ppp", "tun", "tap", "wg", "docker", "br-", "veth", "virbr",
-        "vmnet", "vboxnet", "vethernet", "hyper-v",
+        "bridge",
+        "utun",
+        "ipsec",
+        "ppp",
+        "tun",
+        "tap",
+        "wg",
+        "docker",
+        "br-",
+        "veth",
+        "virbr",
+        "vmnet",
+        "vboxnet",
+        "vethernet",
+        "hyper-v",
     ]
     .iter()
     .any(|prefix| lower.starts_with(prefix) || lower.contains(prefix))
@@ -350,7 +366,7 @@ pub(crate) fn tailscale_available() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{advertised_endpoints_json, is_tailscale_cgnat, ensure_trailing_slash};
+    use super::{advertised_endpoints_json, ensure_trailing_slash, is_tailscale_cgnat};
     use std::net::Ipv4Addr;
 
     #[test]
@@ -361,7 +377,8 @@ mod tests {
 
     #[test]
     fn local_only_endpoints_include_loopback() {
-        let endpoints = advertised_endpoints_json("http://127.0.0.1:3773/", "local-only", false, 443);
+        let endpoints =
+            advertised_endpoints_json("http://127.0.0.1:3773/", "local-only", false, 443);
         let list = endpoints.as_array().unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0]["reachability"], "loopback");

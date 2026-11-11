@@ -1,4 +1,5 @@
 mod bridge;
+mod connection_storage;
 mod local_env;
 mod network;
 mod shell_settings;
@@ -285,6 +286,13 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
+            connection_storage::read_connection_catalog,
+            connection_storage::write_connection_catalog,
+            bridge::reveal_window,
+            bridge::window_fullscreen_state,
+            bridge::set_window_theme,
+            bridge::read_client_settings,
+            bridge::write_client_settings,
             local_env::local_environment_bootstraps,
             local_env::local_environment_bearer_token,
             local_env::local_environment_enabled,
@@ -302,6 +310,8 @@ pub fn run() {
         ])
         .setup(|app| {
             updater::initialize(app)?;
+            app.manage(bridge::ClientSettingsFile(Mutex::new(())));
+            app.manage(connection_storage::CatalogStore::default());
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
