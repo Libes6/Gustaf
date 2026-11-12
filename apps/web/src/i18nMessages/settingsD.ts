@@ -858,6 +858,31 @@ export const settingsDMessages = {
     "settingsD.account.signInFailed": "Could not sign in",
     "settingsD.account.actionFailed": "Account action failed",
     "settingsD.account.devicesFailed": "Could not load devices",
+    "settingsD.relay.title": "Remote access",
+    "settingsD.relay.anyNetwork": "Reach this computer from any network",
+    "settingsD.relay.description":
+      "Your phone connects through the Gustaf relay with end-to-end encryption. The relay sees only that two of your devices are talking, not what they say.",
+    "settingsD.relay.disabledDescription":
+      "Register this computer in Account above to turn this on.",
+    "settingsD.relay.disabled": "Off",
+    "settingsD.relay.connecting": "Connecting",
+    "settingsD.relay.online": "Online",
+    "settingsD.relay.offline": "Offline",
+    "settingsD.relay.unauthorized": "Not authorized",
+    "settingsD.relay.connectPhone": "Connect a phone",
+    "settingsD.relay.scanTitle": "Scan with the Gustaf app",
+    "settingsD.relay.scanDescription":
+      "Open Gustaf on the phone, add a connection and scan this code. It works once, for five minutes.",
+    "settingsD.relay.allowTitle": "Allow “{name}”?",
+    "settingsD.relay.safetyCode": "Safety code {code}",
+    "settingsD.relay.allow": "Allow device",
+    "settingsD.relay.reject": "Reject",
+    "settingsD.relay.allowedAt": "Allowed on {date}",
+    "settingsD.relay.detailsTitle": "Details",
+    "settingsD.relay.detailsDescription":
+      "Each allowed phone shows the same safety code. Matching codes mean nobody sits between the two devices.",
+    "settingsD.relay.showCodes": "Show safety codes",
+    "settingsD.relay.hideCodes": "Hide safety codes",
   },
   ru: {
     "settingsD.scheduledTasksSettings.workspaceModeWorktree": "Создать новый worktree",
@@ -1738,5 +1763,30 @@ export const settingsDMessages = {
     "settingsD.account.signInFailed": "Не удалось войти",
     "settingsD.account.actionFailed": "Не удалось выполнить действие с аккаунтом",
     "settingsD.account.devicesFailed": "Не удалось загрузить устройства",
+    "settingsD.relay.title": "Удалённый доступ",
+    "settingsD.relay.anyNetwork": "Доступ к компьютеру из любой сети",
+    "settingsD.relay.description":
+      "Телефон подключается через релей Gustaf со сквозным шифрованием. Релей видит только, что два ваших устройства общаются, но не что они передают.",
+    "settingsD.relay.disabledDescription":
+      "Зарегистрируйте этот компьютер в разделе «Аккаунт» выше, чтобы включить доступ.",
+    "settingsD.relay.disabled": "Выключено",
+    "settingsD.relay.connecting": "Подключение",
+    "settingsD.relay.online": "В сети",
+    "settingsD.relay.offline": "Нет связи",
+    "settingsD.relay.unauthorized": "Нет доступа",
+    "settingsD.relay.connectPhone": "Подключить телефон",
+    "settingsD.relay.scanTitle": "Отсканируйте в приложении Gustaf",
+    "settingsD.relay.scanDescription":
+      "Откройте Gustaf на телефоне, добавьте подключение и отсканируйте код. Он одноразовый и действует пять минут.",
+    "settingsD.relay.allowTitle": "Разрешить «{name}»?",
+    "settingsD.relay.safetyCode": "Код безопасности {code}",
+    "settingsD.relay.allow": "Разрешить устройство",
+    "settingsD.relay.reject": "Отклонить",
+    "settingsD.relay.allowedAt": "Разрешено {date}",
+    "settingsD.relay.detailsTitle": "Подробности",
+    "settingsD.relay.detailsDescription":
+      "Каждый разрешённый телефон показывает тот же код безопасности. Совпадение кодов означает, что между устройствами никого нет.",
+    "settingsD.relay.showCodes": "Показать коды безопасности",
+    "settingsD.relay.hideCodes": "Скрыть коды безопасности",
   },
 } as const satisfies Record<UiLanguage, Record<string, string>>;
