@@ -2,39 +2,23 @@ mod bridge;
 mod connection_storage;
 mod local_env;
 mod network;
+mod server_process;
 mod shell_settings;
 mod updater;
 
+use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
-use std::process::{Child, Command, Stdio};
-use std::sync::{mpsc, Mutex};
+use std::process::{Command, Stdio};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use local_env::{build_local_environment, LocalEnvironmentState};
+use server_process::Server;
 use shell_settings::{ExposureMode, ShellSettings};
-
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-
-struct Server(Child);
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        if !matches!(self.0.try_wait(), Ok(None)) {
-            return;
-        }
-        #[cfg(unix)]
-        if let Ok(pid) = i32::try_from(self.0.id()) {
-            unsafe { libc::kill(-pid, libc::SIGTERM) };
-        }
-        #[cfg(not(unix))]
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
 
 #[cfg(not(debug_assertions))]
 fn apply_exposure_args(command: &mut Command, settings: &ShellSettings) {
@@ -136,23 +120,27 @@ fn login_shell_path() -> Option<String> {
     (!path.is_empty()).then(|| path.to_owned())
 }
 
+/// Lines of server output kept to tell the user why it did not start.
+const LOG_TAIL_LINES: usize = 20;
+
 fn start_server(
     app: &tauri::App,
     settings: &ShellSettings,
-) -> Result<(Server, tauri::Url), Box<dyn std::error::Error>> {
-    let mut command = server_command(app, settings)?;
+) -> Result<(Server, tauri::Url), String> {
+    let mut command = server_command(app, settings).map_err(|error| error.to_string())?;
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
     command.stdin(Stdio::null()).stdout(Stdio::piped());
-    #[cfg(unix)]
-    command.process_group(0);
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
 
-    let mut server = Server(command.spawn()?);
-    let stdout = server.0.stdout.take().expect("piped server stdout");
+    let mut server = Server::spawn(&mut command)
+        .map_err(|error| format!("The server program could not be started: {error}"))?;
+    let stdout = server.take_stdout().expect("piped server stdout");
+    let log_tail = Arc::new(Mutex::new(VecDeque::<String>::new()));
     let (send_url, receive_url) = mpsc::sync_channel(1);
+    let reader_tail = Arc::clone(&log_tail);
     thread::spawn(move || {
         let mut send_url = Some(send_url);
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -162,17 +150,66 @@ fn start_server(
                 }
             } else {
                 eprintln!("{line}");
+                if let Ok(mut tail) = reader_tail.lock() {
+                    if tail.len() == LOG_TAIL_LINES {
+                        tail.pop_front();
+                    }
+                    tail.push_back(line);
+                }
             }
         }
     });
 
-    let url: tauri::Url = receive_url
-        .recv_timeout(Duration::from_secs(120))?
-        .parse()?;
+    let describe = |problem: String| {
+        let tail = log_tail
+            .lock()
+            .map(|tail| tail.iter().cloned().collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default();
+        if tail.is_empty() {
+            problem
+        } else {
+            format!("{problem}\n\nLast server output:\n{tail}")
+        }
+    };
+    let url = match receive_url.recv_timeout(Duration::from_secs(120)) {
+        Ok(url) => url,
+        // The reader ends when the server's output closes, which is when the server exits.
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            let status = server
+                .try_wait()
+                .ok()
+                .flatten()
+                .map(|status| format!(" ({status})"))
+                .unwrap_or_default();
+            return Err(describe(format!(
+                "The server stopped before it was ready{status}."
+            )));
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            return Err(describe(
+                "The server did not become ready within two minutes.".to_owned(),
+            ));
+        }
+    };
+    let url: tauri::Url = url
+        .parse()
+        .map_err(|error| format!("The server reported an invalid address: {error}"))?;
     if !matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")) {
-        return Err("Gustaf server did not report a local pairing URL".into());
+        return Err("The server did not report a local address.".to_owned());
     }
     Ok((server, url))
+}
+
+/// Without a window there is nothing else to show the reason in; leaving silently looked like a crash.
+fn report_start_failure(app: &tauri::AppHandle, reason: &str) {
+    eprintln!("Gustaf could not start: {reason}");
+    let handle = app.clone();
+    app.dialog()
+        .message(format!("Gustaf could not start.\n\n{reason}"))
+        .title("Gustaf")
+        .kind(MessageDialogKind::Error)
+        .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
+        .show(move |_| handle.exit(1));
 }
 
 fn is_external_browser_url(url: &tauri::Url) -> bool {
@@ -282,6 +319,14 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     let builder = builder.menu(app_menu);
     builder
+        // Must be the first plugin. A second launch would start a second server on the same data.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
@@ -316,12 +361,23 @@ pub fn run() {
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
-            let (server, pairing_url) = start_server(app, &settings)?;
-            let local = build_local_environment(&pairing_url).map_err(|error| {
-                Box::<dyn std::error::Error>::from(format!(
-                    "failed to hand off the local environment: {error}"
-                ))
-            })?;
+            let (server, pairing_url) = match start_server(app, &settings) {
+                Ok(started) => started,
+                Err(reason) => {
+                    report_start_failure(app.handle(), &reason);
+                    return Ok(());
+                }
+            };
+            let local = match build_local_environment(&pairing_url) {
+                Ok(local) => local,
+                Err(error) => {
+                    report_start_failure(
+                        app.handle(),
+                        &format!("The server started, but signing in to it failed: {error}"),
+                    );
+                    return Ok(());
+                }
+            };
             let bootstraps = serde_json::json!([{
                 "id": "primary",
                 "label": "This computer",
