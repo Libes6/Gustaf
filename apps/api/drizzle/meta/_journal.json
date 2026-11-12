@@ -15,6 +15,13 @@
       "when": 1794488200568,
       "tag": "0001_app_sign_in",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794503291433,
+      "tag": "0002_admin",
+      "breakpoints": true
     }
   ]
 }

@@ -101,6 +101,9 @@ GitHub runner выпускает linux/amd64; подтвердите эту ар
    Для аккаунтов: секреты `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`, переменные
    `PUBLIC_BASE_URL=https://api.libes6.ru`, `GITHUB_CLIENT_ID`, `AUTH_TRUSTED_ORIGINS`.
    Задать их (или `AUTH_ENABLED=0`) до деплоя версии с auth, иначе контейнер не стартует.
+   Для админки: `ADMIN_ORIGIN=https://admin.libes6.ru` и `ADMIN_GITHUB_LOGINS` (GitHub-логины
+   администраторов через запятую). Пока они не заданы, CORS выключен и админов нет
+   (см. [admin-api.md](../internals/admin-api.md)).
    Не создавать host port mapping 3100: наружу приложение отдаёт proxy.
 7. Healthcheck: GET `/health/ready`, порт 3100, ожидаемый код 200.
 8. Выполнить Deploy, проверить выбранный SHA в логах деплоя и

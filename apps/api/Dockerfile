@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install --yes --no-install-recommends curl ca-cert
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3100
 WORKDIR /app
 COPY --from=build --chown=node:node /runtime/ ./
+# Shown in GET /v1/admin/overview; declared last so changing them keeps the layer cache.
+ARG GUSTAF_VERSION=dev
+ARG GUSTAF_COMMIT=unknown
+ENV GUSTAF_VERSION=$GUSTAF_VERSION GUSTAF_COMMIT=$GUSTAF_COMMIT
 USER node
 EXPOSE 3100
 HEALTHCHECK --interval=10s --timeout=4s --start-period=60s --retries=3 \

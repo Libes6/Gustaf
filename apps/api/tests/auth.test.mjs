@@ -41,8 +41,11 @@ NodeTest.test("auth config is required unless AUTH_ENABLED=0", () => {
     "http://localhost:3100",
   );
   NodeAssert.deepEqual(
-    readConfig({ ...auth, AUTH_TRUSTED_ORIGINS: " https://admin.example.test, gustaf:// ,," }).auth
-      .trustedOrigins,
+    readConfig({
+      ...auth,
+      NODE_ENV: "production",
+      AUTH_TRUSTED_ORIGINS: " https://admin.example.test, gustaf:// ,,",
+    }).auth.trustedOrigins,
     ["https://admin.example.test", "gustaf://"],
   );
   NodeAssert.throws(
