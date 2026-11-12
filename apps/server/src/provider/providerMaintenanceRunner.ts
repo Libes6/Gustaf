@@ -7,7 +7,7 @@ import {
   type ServerProviderUpdatedPayload,
   type ServerProviderUpdateState,
 } from "@t3tools/contracts";
-import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import { clearCommandResolutionCache, resolveSpawnCommand } from "@t3tools/shared/shell";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -51,6 +51,9 @@ const UPDATE_PROGRESS_INTERVAL = Duration.seconds(1);
 const UPDATE_PROGRESS_MAX_LENGTH = 200;
 // An installer may write for minutes without a line ending; only its tail matters.
 const UPDATE_PARTIAL_LINE_MAX_LENGTH = 4_096;
+// A freshly installed binary can fail its first start while the installer finishes linking it.
+const POST_UPDATE_VERIFY_ATTEMPTS = 3;
+const POST_UPDATE_VERIFY_RETRY_DELAY = Duration.millis(1_500);
 
 export interface ProviderMaintenanceCommandResult {
   readonly stdout: string;
@@ -282,6 +285,73 @@ function isOutdatedProvider(provider: ServerProvider | undefined): boolean {
 
 function isStillInstalled(provider: ServerProvider): boolean {
   return provider.installed;
+}
+
+interface PostUpdateVerification {
+  readonly status: "succeeded" | "unchanged";
+  readonly message: string;
+  /** A missing, unstartable or erroring binary can be an install that has not settled yet. */
+  readonly retryable: boolean;
+}
+
+function unverifiedReason(
+  verifiedProvider: ServerProvider,
+  targetVersion: string | undefined,
+): { readonly reason: string; readonly retryable: boolean } | null {
+  if (!isStillInstalled(verifiedProvider)) {
+    return {
+      reason: verifiedProvider.message ?? "the provider executable was not found",
+      retryable: true,
+    };
+  }
+  // Cursor about probes can fail transiently; missing versions alone do not imply failure.
+  if (
+    verifiedProvider.status === "error" &&
+    (verifiedProvider.auth.status !== "unauthenticated" || !verifiedProvider.version)
+  ) {
+    return { reason: verifiedProvider.message ?? "the provider check failed", retryable: true };
+  }
+  const installedVersion =
+    verifiedProvider.installedVersion !== undefined
+      ? verifiedProvider.installedVersion
+      : verifiedProvider.version;
+  if (targetVersion !== undefined && installedVersion?.replace(/^v/, "") !== targetVersion) {
+    return {
+      reason: `found version ${installedVersion ?? "unknown"}, expected ${targetVersion}`,
+      retryable: false,
+    };
+  }
+  return null;
+}
+
+function verifyUpdatedProviders(
+  verifiedProviders: ReadonlyArray<ServerProvider>,
+  targetVersion: string | undefined,
+): PostUpdateVerification {
+  const unverified =
+    verifiedProviders.length === 0
+      ? { reason: "the provider did not report its status after the update", retryable: true }
+      : verifiedProviders
+          .map((verifiedProvider) => unverifiedReason(verifiedProvider, targetVersion))
+          .find((reason) => reason !== null);
+  if (unverified) {
+    return {
+      status: "unchanged",
+      message: `Update command completed, but Gustaf could not verify the provider version: ${unverified.reason.trim().replace(/\.$/, "")}.`,
+      retryable: unverified.retryable,
+    };
+  }
+  if (
+    targetVersion === undefined &&
+    verifiedProviders.some((verifiedProvider) => isOutdatedProvider(verifiedProvider))
+  ) {
+    return {
+      status: "unchanged",
+      message: "Update command completed, but Gustaf still detects an outdated provider version.",
+      retryable: false,
+    };
+  }
+  return { status: "succeeded", message: "Provider updated.", retryable: false };
 }
 
 function makeUpdateState(input: {
@@ -556,51 +626,50 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
             }
 
             yield* setRunningMessage("Verifying the installed version");
-            const verified = yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
-              instanceId,
-              provider,
-              { fresh: true },
-            );
-            yield* invalidateLatestProviderVersion(verified).pipe(
-              Effect.provideService(ProviderLatestVersions.ProviderLatestVersions, latestVersions),
-            );
-            const { verifiedProviders } = yield* verifyFromRefresh(
-              providerRegistry.refreshAfterUpdate(provider, instanceId),
-              provider,
-              verified,
-              instanceId,
-              "post-update",
-            );
-            // Cursor about probes can fail transiently; missing versions alone do not imply failure.
-            const couldNotVerify =
-              verifiedProviders.length === 0 ||
-              verifiedProviders.some((verifiedProvider) => {
-                const installedVersion =
-                  verifiedProvider.installedVersion !== undefined
-                    ? verifiedProvider.installedVersion
-                    : verifiedProvider.version;
-                return (
-                  !isStillInstalled(verifiedProvider) ||
-                  (verifiedProvider.status === "error" &&
-                    (verifiedProvider.auth.status !== "unauthenticated" ||
-                      !verifiedProvider.version)) ||
-                  (targetVersion !== undefined &&
-                    installedVersion?.replace(/^v/, "") !== targetVersion)
+            const verifyInstalledVersion = Effect.fn(
+              "ProviderMaintenanceRunner.verifyInstalledVersion",
+            )(function* () {
+              // The installer may have moved the binary; a memoized PATH lookup would probe the old one.
+              yield* clearCommandResolutionCache;
+              const verified =
+                yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
+                  instanceId,
+                  provider,
+                  { fresh: true },
                 );
-              });
-            const stillOutdated =
-              targetVersion === undefined &&
-              verifiedProviders.some((verifiedProvider) => isOutdatedProvider(verifiedProvider));
+              yield* invalidateLatestProviderVersion(verified).pipe(
+                Effect.provideService(
+                  ProviderLatestVersions.ProviderLatestVersions,
+                  latestVersions,
+                ),
+              );
+              const { verifiedProviders } = yield* verifyFromRefresh(
+                providerRegistry.refreshAfterUpdate(provider, instanceId),
+                provider,
+                verified,
+                instanceId,
+                "post-update",
+              );
+              return verifyUpdatedProviders(verifiedProviders, targetVersion);
+            });
+            let verification = yield* verifyInstalledVersion();
+            for (
+              let attempt = 1;
+              attempt < POST_UPDATE_VERIFY_ATTEMPTS && verification.retryable;
+              attempt++
+            ) {
+              yield* setRunningMessage(
+                `Verifying the installed version (attempt ${attempt + 1} of ${POST_UPDATE_VERIFY_ATTEMPTS})`,
+              );
+              yield* Effect.sleep(POST_UPDATE_VERIFY_RETRY_DELAY);
+              verification = yield* verifyInstalledVersion();
+            }
             return yield* finish(
               makeUpdateState({
-                status: couldNotVerify || stillOutdated ? "unchanged" : "succeeded",
+                status: verification.status,
                 startedAt,
                 finishedAt,
-                message: couldNotVerify
-                  ? "Update command completed, but Gustaf could not verify the provider version."
-                  : stillOutdated
-                    ? "Update command completed, but Gustaf still detects an outdated provider version."
-                    : "Provider updated.",
+                message: verification.message,
                 output: commandOutput(result),
               }),
             );

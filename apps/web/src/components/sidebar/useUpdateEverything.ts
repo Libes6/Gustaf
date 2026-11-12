@@ -153,7 +153,8 @@ export function useUpdateEverything(
             const runs = await providers.updateAll({ quiet: true });
             const outcomes = runs.map((run) => {
               const runOutcome = getProviderUpdateRunOutcome(run);
-              if (runOutcome.status !== "updated") {
+              // An unverified update stays visible through the provider's "still needs an update" pill.
+              if (runOutcome.status === "failed" || runOutcome.status === "interrupted") {
                 providerFailures.set(
                   run.environmentId,
                   runOutcome.status === "failed" ? runOutcome.line : "Provider update interrupted",
