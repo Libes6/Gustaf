@@ -1,11 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.",
+  "description": "Commands and plugins the Gustaf page may use. It is granted to the page of the server the shell started, at its exact origin, by ipc_scope.rs at startup; this file names no origin.",
   "windows": ["main"],
-  "remote": {
-    "urls": ["http://127.0.0.1:*", "http://localhost:*"]
-  },
   "permissions": [
     "core:default",
     "dialog:allow-open",
