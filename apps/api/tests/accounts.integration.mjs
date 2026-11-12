@@ -334,3 +334,185 @@ NodeTest.test(
     });
   },
 );
+
+function cookieJar() {
+  const cookies = new Map();
+  return {
+    store(response) {
+      for (const header of response.headers.getSetCookie()) {
+        const [pair] = header.split(";");
+        const separator = pair.indexOf("=");
+        const name = pair.slice(0, separator);
+        if (/max-age=0/i.test(header)) cookies.delete(name);
+        else cookies.set(name, pair.slice(separator + 1));
+      }
+    },
+    has: (name) => [...cookies.keys()].some((key) => key.endsWith(name)),
+    header: () => [...cookies].map(([name, value]) => `${name}=${value}`).join("; "),
+  };
+}
+
+function pkcePair() {
+  const verifier = NodeCrypto.randomBytes(32).toString("base64url");
+  return {
+    verifier,
+    challenge: NodeCrypto.createHash("sha256").update(verifier).digest("base64url"),
+  };
+}
+
+function appStartPath({ redirectUri, challenge, state }) {
+  const query = new URLSearchParams({
+    redirect_uri: redirectUri,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state,
+  });
+  return `/v1/auth/app/start?${query}`;
+}
+
+// Drives the system-browser half of the app handoff and returns the app redirect it ends on.
+async function appBrowserSignIn(base, profile, { redirectUri, challenge, state }, githubError) {
+  const jar = cookieJar();
+  const start = await fetch(`${base}${appStartPath({ redirectUri, challenge, state })}`, {
+    redirect: "manual",
+  });
+  NodeAssert.equal(start.status, 302);
+  const authorize = new URL(start.headers.get("location"));
+  NodeAssert.equal(
+    authorize.origin + authorize.pathname,
+    "https://github.com/login/oauth/authorize",
+  );
+  jar.store(start);
+  const callbackQuery = githubError
+    ? `error=${githubError}&state=${authorize.searchParams.get("state")}`
+    : `code=${profile.login}&state=${authorize.searchParams.get("state")}`;
+  const callback = await fetch(`${base}/v1/auth/callback/github?${callbackQuery}`, {
+    headers: { cookie: jar.header() },
+    redirect: "manual",
+  });
+  NodeAssert.equal(callback.status, 302);
+  NodeAssert.equal(
+    new URL(callback.headers.get("location"), base).href.split("?")[0],
+    `${base}/v1/auth/app/done`,
+  );
+  jar.store(callback);
+  const done = await fetch(new URL(callback.headers.get("location"), base), {
+    headers: { cookie: jar.header() },
+    redirect: "manual",
+  });
+  NodeAssert.equal(done.status, 302);
+  jar.store(done);
+  NodeAssert.equal(jar.has("session_token"), false, "the browser keeps no session cookie");
+  NodeAssert.equal(jar.has("app_sign_in"), false);
+  return new URL(done.headers.get("location"));
+}
+
+NodeTest.test(
+  "the app handoff trades a one-time code and PKCE verifier for a bearer token",
+  async () => {
+    await withApi(async ({ base, api, pool }) => {
+      const profile = githubUser("grace");
+      const pkce = pkcePair();
+      const redirectUri = "gustaf://auth";
+      const landed = await appBrowserSignIn(base, profile, {
+        redirectUri,
+        challenge: pkce.challenge,
+        state: "state-1",
+      });
+      NodeAssert.equal(`${landed.protocol}//${landed.host}`, redirectUri);
+      NodeAssert.equal(landed.searchParams.get("state"), "state-1");
+      const code = landed.searchParams.get("code");
+      NodeAssert.match(code, /^[A-Za-z0-9_-]{43}$/);
+      const stored = await pool.query("select code_hash from app_auth_code where user_id = $1", [
+        (await pool.query('select id from "user" where email = $1', [profile.email])).rows[0].id,
+      ]);
+      NodeAssert.deepEqual(
+        stored.rows.map((row) => row.code_hash),
+        [NodeCrypto.createHash("sha256").update(code).digest("hex")],
+      );
+
+      const exchange = (body) => api("/v1/auth/app/token", { method: "POST", body });
+      const valid = { code, code_verifier: pkce.verifier, redirect_uri: redirectUri };
+      NodeAssert.deepEqual(await exchange({ ...valid, code_verifier: pkcePair().verifier }), {
+        status: 400,
+        body: { error: "invalid_grant" },
+      });
+      NodeAssert.equal(
+        (await exchange({ ...valid, redirect_uri: "gustaf-dev://auth" })).status,
+        400,
+      );
+      NodeAssert.deepEqual(await exchange({ code }), {
+        status: 400,
+        body: { error: "invalid_request" },
+      });
+
+      const granted = await exchange(valid);
+      NodeAssert.equal(granted.status, 200);
+      NodeAssert.deepEqual(Object.keys(granted.body).sort(), ["expiresAt", "token", "user"]);
+      NodeAssert.ok(new Date(granted.body.expiresAt).getTime() > Date.now());
+      NodeAssert.equal(granted.body.user.email, profile.email);
+      NodeAssert.deepEqual(Object.keys(granted.body.user).sort(), ["email", "id", "image", "name"]);
+      const me = await api("/v1/me", { auth: { bearer: granted.body.token } });
+      NodeAssert.equal(me.status, 200);
+      NodeAssert.equal(me.body.user.id, granted.body.user.id);
+
+      NodeAssert.deepEqual(await exchange(valid), {
+        status: 400,
+        body: { error: "invalid_grant" },
+      });
+      NodeAssert.equal((await api("/v1/me", { auth: { bearer: granted.body.token } })).status, 401);
+
+      const loopback = "http://127.0.0.1:49152/callback";
+      const second = pkcePair();
+      const again = await appBrowserSignIn(base, profile, {
+        redirectUri: loopback,
+        challenge: second.challenge,
+        state: "state-2",
+      });
+      NodeAssert.equal(again.href.split("?")[0], loopback);
+      const relogin = await exchange({
+        code: again.searchParams.get("code"),
+        code_verifier: second.verifier,
+        redirect_uri: loopback,
+      });
+      NodeAssert.equal(relogin.status, 200);
+      NodeAssert.equal(relogin.body.user.id, granted.body.user.id);
+    });
+  },
+);
+
+NodeTest.test(
+  "the app handoff rejects foreign redirects and reports GitHub errors to the app",
+  async () => {
+    await withApi(async ({ base }) => {
+      const { challenge } = pkcePair();
+      for (const redirectUri of [
+        "https://evil.test/callback",
+        "gustaf://auth/../evil",
+        "http://127.0.0.1:80/callback",
+      ]) {
+        const start = await fetch(
+          `${base}${appStartPath({ redirectUri, challenge, state: "s" })}`,
+          {
+            redirect: "manual",
+          },
+        );
+        NodeAssert.equal(start.status, 400);
+        NodeAssert.deepEqual(await start.json(), { error: "invalid_redirect_uri" });
+        NodeAssert.deepEqual(start.headers.getSetCookie(), []);
+      }
+
+      const denied = await appBrowserSignIn(
+        base,
+        githubUser("heidi"),
+        { redirectUri: "gustaf-preview://auth", challenge, state: "s-3" },
+        "access_denied",
+      );
+      NodeAssert.equal(denied.href, "gustaf-preview://auth?error=access_denied&state=s-3");
+
+      const stray = await fetch(`${base}/v1/auth/app/done`, { redirect: "manual" });
+      NodeAssert.equal(stray.status, 400);
+      NodeAssert.match(stray.headers.get("content-type"), /^text\/plain/);
+    });
+  },
+);
