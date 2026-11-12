@@ -21,6 +21,7 @@ use tauri::Manager;
 
 use crate::cloud_api::{self, ApiError, CloudDevice, CloudUser};
 use crate::connection_storage::{lock_catalog, read_catalog, write_catalog};
+use crate::local_env::LocalEnvironmentState;
 
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const CALLBACK_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -482,7 +483,7 @@ pub(crate) async fn account_register_device(app: tauri::AppHandle) -> Result<Acc
         let token = session_token(&app)?;
         let (device, device_token) =
             forget_rejected_session(&app, cloud_api::register_computer(&token, &computer_name()))?;
-        change_account(&app, |account| {
+        let state = change_account(&app, |account| {
             if let Some(session) = &account.session {
                 account.device = Some(StoredDevice {
                     id: device.id,
@@ -491,9 +492,52 @@ pub(crate) async fn account_register_device(app: tauri::AppHandle) -> Result<Acc
                 });
             }
             account.state()
-        })
+        })?;
+        sync_relay_credential(&app);
+        Ok(state)
     })
     .await
+}
+
+/// The local server keeps this computer's relay connection with the device credential, which the
+/// page never sees. Called at startup and whenever the stored device changes.
+pub(crate) fn sync_relay_credential(app: &tauri::AppHandle) {
+    let Ok(device) = read_account(app, |account| {
+        account
+            .device
+            .as_ref()
+            .map(|device| (device.id.clone(), device.token.clone()))
+    }) else {
+        return;
+    };
+    let Some(local) = app.try_state::<LocalEnvironmentState>() else {
+        return;
+    };
+    let (Ok(base), Ok(bearer)) = (local.http_base_url(), local.bearer_token()) else {
+        return;
+    };
+    let url = format!("{}/api/relay-host/credential", base.trim_end_matches('/'));
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(10))
+        .build();
+    let authorization = format!("Bearer {bearer}");
+    let result = match device {
+        Some((device_id, token)) => agent
+            .put(&url)
+            .set("Authorization", &authorization)
+            .send_json(serde_json::json!({
+                "relayUrl": cloud_api::API_BASE,
+                "deviceId": device_id,
+                "token": token,
+            })),
+        None => agent
+            .delete(&url)
+            .set("Authorization", &authorization)
+            .call(),
+    };
+    if let Err(error) = result {
+        eprintln!("[gustaf] relay credential handoff failed: {error}");
+    }
 }
 
 #[tauri::command]
@@ -507,16 +551,20 @@ pub(crate) async fn account_revoke_device(
     off_main_thread(move || {
         let token = session_token(&app)?;
         forget_rejected_session(&app, cloud_api::revoke_device(&token, &device_id))?;
-        change_account(&app, |account| {
-            if account
+        let (state, was_this_computer) = change_account(&app, |account| {
+            let this_computer = account
                 .device
                 .as_ref()
-                .is_some_and(|device| device.id == device_id)
-            {
+                .is_some_and(|device| device.id == device_id);
+            if this_computer {
                 account.device = None;
             }
-            account.state()
-        })
+            (account.state(), this_computer)
+        })?;
+        if was_this_computer {
+            sync_relay_credential(&app);
+        }
+        Ok(state)
     })
     .await
 }
