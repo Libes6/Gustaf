@@ -1,0 +1,2962 @@
+{
+  "totals": {
+    "web": {
+      "files": 261,
+      "strings": 940
+    },
+    "mobile": {
+      "files": 235,
+      "strings": 1414
+    }
+  },
+  "files": {
+    "apps/web/src/browser/BrowserDeviceToolbar.tsx": [
+      "Browser device preset",
+      "Browser device toolbar",
+      "Close device toolbar",
+      "Dimensions",
+      "Lock aspect ratio",
+      "Lock viewport aspect ratio",
+      "Responsive",
+      "Rotate viewport",
+      "Standard",
+      "Unlock aspect ratio",
+      "Unlock viewport aspect ratio",
+      "Viewport dimensions",
+      "Viewport height",
+      "Viewport width"
+    ],
+    "apps/web/src/browser/BrowserViewportResizeHandles.tsx": [
+      "Resize browser viewport from bottom edge",
+      "Resize browser viewport from bottom-left corner",
+      "Resize browser viewport from bottom-right corner",
+      "Resize browser viewport from left edge",
+      "Resize browser viewport from right edge"
+    ],
+    "apps/web/src/browser/ServerBrowserSurface.tsx": [
+      "Accept",
+      "Browser connection was refused.",
+      "Browser dialog",
+      "Browser page",
+      "Cancel",
+      "Choose",
+      "Choose files for the page",
+      "Could not send the files to the page",
+      "Dialog response",
+      "Dismiss",
+      "PDF document",
+      "Press Shift+Escape to leave the browser page.",
+      "Reconnect",
+      "Release control",
+      "Take control",
+      "Take control to respond.",
+      "The page asks for",
+      "The page copied text",
+      "Try again",
+      "a file",
+      "file",
+      "files",
+      "files"
+    ],
+    "apps/web/src/browser/browserViewportActions.ts": ["Unable to resize browser viewport"],
+    "apps/web/src/cloud/useCloudLinkController.ts": ["Could not update T3 Connect"],
+    "apps/web/src/components/AddProjectToMachineDialog.tsx": [
+      "HTTPS",
+      "SSH",
+      "git clone",
+      "no files",
+      "of"
+    ],
+    "apps/web/src/components/AppSidebarLayout.tsx": ["Toggle main sidebar"],
+    "apps/web/src/components/BranchToolbarBranchSelector.tsx": ["Checkout", "Create new ref \""],
+    "apps/web/src/components/ChatMarkdown.tsx": [
+      "Media unavailable",
+      "Thread",
+      "Toggle task",
+      "Unable to open link in browser",
+      "Use template"
+    ],
+    "apps/web/src/components/ChatView.tsx": [
+      "The composer is busy; try again once it is ready.",
+      "The composer is not ready",
+      "The environment is not connected.",
+      "Try citing the selection after the connection or pending input is resolved.",
+      "Unable to add to chat"
+    ],
+    "apps/web/src/components/CommandPalette.tsx": ["Enter", "New thread in"],
+    "apps/web/src/components/CommandPaletteContent.tsx": ["Backspace", "Enter", "Esc"],
+    "apps/web/src/components/CommandPaletteThreadItems.tsx": ["Remote"],
+    "apps/web/src/components/ComposerContextPermissions.tsx": ["Permissions"],
+    "apps/web/src/components/CustomSnoozeDialog.tsx": ["Time", "Unit"],
+    "apps/web/src/components/DevReplayHost.tsx": [
+      "Needs a project and the Replay (dev) provider, which dev servers start."
+    ],
+    "apps/web/src/components/DiffPanel.tsx": [
+      "The provider recorded file content without a diff.",
+      "This preview exceeds the size limit. Changes shown are incomplete.",
+      "This tool call changed",
+      "Totals include all changes.",
+      "files. The recorded patch omits",
+      "of them.",
+      "vs"
+    ],
+    "apps/web/src/components/DiffWorkerPoolProvider.tsx": ["Loading code..."],
+    "apps/web/src/components/GitActionsControl.tsx": [
+      "Check out feature branch & continue",
+      "HTTPS",
+      "Provider",
+      "SSH",
+      "Setup Required"
+    ],
+    "apps/web/src/components/HostedEmptyState.tsx": ["Open Environments"],
+    "apps/web/src/components/InstallT3Commands.tsx": [
+      ". If",
+      "Skip the install if you already have",
+      "is not found after installing, add the folder the installer names to your PATH."
+    ],
+    "apps/web/src/components/ManagedPolicy.tsx": ["This environment is managed by"],
+    "apps/web/src/components/ProjectScriptsControl.tsx": ["Run"],
+    "apps/web/src/components/PullRequestThreadDialog.tsx": [
+      ", then create the draft thread in the main repo or in a dedicated worktree.",
+      "Checkout",
+      "Resolve a",
+      "Resolving",
+      "to"
+    ],
+    "apps/web/src/components/ServerUpdateAction.tsx": [
+      "Could not copy update command",
+      "Update the desktop app on that machine to update this server."
+    ],
+    "apps/web/src/components/Sidebar.snooze.ts": [
+      "Could not snooze thread",
+      "That snooze time has passed. Choose another time."
+    ],
+    "apps/web/src/components/SlowRpcRequestToastCoordinator.tsx": ["Started"],
+    "apps/web/src/components/SourceControlAppAccessNotice.tsx": [
+      ", so requests here use your own GitHub login and its lower rate limit.",
+      "Install on",
+      "isn't installed on"
+    ],
+    "apps/web/src/components/ThreadSearchMatch.tsx": ["Agent:", "You:"],
+    "apps/web/src/components/ThreadStatusIndicators.tsx": ["chain", "stack"],
+    "apps/web/src/components/auth/ConnectAgentSurface.tsx": [
+      ". Only approve a sign-in you just started there.",
+      "Create one in Settings → Sharing & access, or run",
+      "The name is chosen by the agent. Approval gives access to whoever runs",
+      "The name is chosen by the agent. Approval returns to",
+      "This agent wants to use the threads in every project on",
+      "on the computer that opened this page. Only approve a sign-in you just started.",
+      "on this machine."
+    ],
+    "apps/web/src/components/chat/AssistantCitationChip.tsx": ["Go to source"],
+    "apps/web/src/components/chat/AssistantCitationCommentEditor.tsx": [
+      "Cancel",
+      "Comments can contain up to",
+      "characters."
+    ],
+    "apps/web/src/components/chat/AssistantCitationSource.tsx": [
+      "Click the citation to try again.",
+      "Could not open the cited response",
+      "Showing the source response. The saved quote is unchanged.",
+      "The quoted text has changed"
+    ],
+    "apps/web/src/components/chat/BackgroundWorkDetails.tsx": ["Open thread"],
+    "apps/web/src/components/chat/ChangedFilesTree.tsx": [
+      "changed file",
+      "in the full diff",
+      "more file"
+    ],
+    "apps/web/src/components/chat/ChatComposer.tsx": ["Esc", "Switch to", "⇥ Tab"],
+    "apps/web/src/components/chat/ChatGptSharingControl.tsx": ["Using ChatGPT plan"],
+    "apps/web/src/components/chat/ChatHeader.tsx": [
+      "From",
+      "Started by an agent on",
+      "through a linked environment."
+    ],
+    "apps/web/src/components/chat/ChatOverlayHosts.tsx": ["Switch to"],
+    "apps/web/src/components/chat/ChildThreadApprovals.tsx": [
+      "Approval needed from",
+      "Provider process is gone. Interrupt or restart the child thread to respond."
+    ],
+    "apps/web/src/components/chat/CommandOutputPanel.tsx": ["Couldn't load output:"],
+    "apps/web/src/components/chat/ComposerAttachmentStrip.tsx": [
+      "Draft attachment could not be saved locally and may be lost on navigation."
+    ],
+    "apps/web/src/components/chat/ComposerFeedback.tsx": ["Copy ID", "Could not copy thread ID"],
+    "apps/web/src/components/chat/ComposerModelEffort.tsx": ["Fast", "Off", "On", "Standard"],
+    "apps/web/src/components/chat/ComposerSpeechButton.tsx": ["Skip"],
+    "apps/web/src/components/chat/ComposerStashMenu.tsx": [
+      "Nothing stashed yet.",
+      "dropped",
+      "image",
+      "image",
+      "saving"
+    ],
+    "apps/web/src/components/chat/ComposerUsageLimits.tsx": ["Manage usage", "Use"],
+    "apps/web/src/components/chat/DraftHeroHeadline.tsx": ["to start"],
+    "apps/web/src/components/chat/DraftHeroProjectHeading.tsx": [
+      "What should we build",
+      "What should we build in",
+      "in"
+    ],
+    "apps/web/src/components/chat/ExpandedImageDialog.tsx": ["Expanded", "preview"],
+    "apps/web/src/components/chat/HtmlRenderFrame.tsx": ["Unable to load"],
+    "apps/web/src/components/chat/LinkRequestCard.tsx": [
+      ". The agent can use that link as it is; change its access in Settings → Connections.",
+      ": Settings → Connections → Create link, then paste its code here.",
+      "Back",
+      "Cancel",
+      "Create a link on",
+      "This app has no address for",
+      "This environment is already linked to",
+      "that another machine can reach. Enter its https or Tailscale address."
+    ],
+    "apps/web/src/components/chat/MarkdownCodeBlock.tsx": ["Code block actions"],
+    "apps/web/src/components/chat/McpAppFrame.tsx": [
+      "The",
+      "The",
+      "Unable to load the",
+      "app",
+      "app left its page and was stopped",
+      "app was closed"
+    ],
+    "apps/web/src/components/chat/MermaidDiagram.tsx": ["Unable to render diagram:"],
+    "apps/web/src/components/chat/MessagesTimeline.tsx": ["Loading work history", "tokens"],
+    "apps/web/src/components/chat/OpenInPicker.tsx": [
+      "Choose editor",
+      "No SSH route to",
+      "No installed editors found",
+      "Open file in preferred editor",
+      "Opens over SSH. Needs your key on"
+    ],
+    "apps/web/src/components/chat/ProposedPlanCard.tsx": ["Enter a path relative to"],
+    "apps/web/src/components/chat/ProviderSubagentBar.tsx": ["Open parent"],
+    "apps/web/src/components/chat/QueuedRunsControl.tsx": ["queued"],
+    "apps/web/src/components/chat/SecretRequestCard.tsx": ["Decline", "Open", "Save securely"],
+    "apps/web/src/components/chat/SideChatPane.tsx": ["This side chat was deleted."],
+    "apps/web/src/components/chat/SkillInlineText.tsx": [
+      "No description is available for this skill.",
+      "View instructions"
+    ],
+    "apps/web/src/components/chat/SnapShotAttachmentDetails.tsx": [
+      "Structured accessibility elements were included, but they have no readable names or values.",
+      "The app or capture backend did not provide verified accessibility data."
+    ],
+    "apps/web/src/components/chat/ThreadActivityBanners.tsx": [
+      ". Sending will continue on",
+      "Branch changed from",
+      "Restore branch",
+      "This thread last ran on"
+    ],
+    "apps/web/src/components/chat/ThreadAutomationsPanel.tsx": [
+      "Could not load automations:",
+      "· next"
+    ],
+    "apps/web/src/components/chat/ThreadDetailsPrRow.tsx": [
+      "This merges #",
+      "file",
+      "files",
+      "using"
+    ],
+    "apps/web/src/components/chat/ThreadDetailsPrRows.tsx": ["Show less"],
+    "apps/web/src/components/chat/ThreadDetailsUsage.tsx": ["% used", "Resets in", "of", "tokens"],
+    "apps/web/src/components/chat/ThreadErrorBanner.tsx": [
+      "ChatGPT usage limit reached",
+      "Copy request for admin",
+      "Could not copy the request",
+      "Request copied",
+      "Send it to your workspace admin.",
+      "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
+    ],
+    "apps/web/src/components/chat/ThreadLineageWorkflowRow.tsx": [
+      "No agents yet",
+      "agent",
+      "agents"
+    ],
+    "apps/web/src/components/chat/ThreadRelationshipsControl.tsx": ["Show", "failed", "more"],
+    "apps/web/src/components/chat/ThreadServersPanel.tsx": [
+      "Open in the browser panel.",
+      "Show less",
+      "for your browser.",
+      "localhost:"
+    ],
+    "apps/web/src/components/chat/TimelineAssistantRows.tsx": ["Gustaf"],
+    "apps/web/src/components/chat/TimelineOverlays.tsx": ["Drop files to attach", "Scroll to end"],
+    "apps/web/src/components/chat/TimelineUserMessageRow.tsx": ["Sending…"],
+    "apps/web/src/components/chat/TimelineWorkGroupRows.tsx": [
+      "Background setup",
+      "Compacting for",
+      "Working for"
+    ],
+    "apps/web/src/components/chat/TriageDraftHero.tsx": [
+      "The agent reads Gustaf's logs and source here, and asks before it applies a fix or posts anything."
+    ],
+    "apps/web/src/components/chat/UsageLimitRecoveryBanner.tsx": ["Copy request for admin"],
+    "apps/web/src/components/chat/V2ItemInspector.tsx": ["exit"],
+    "apps/web/src/components/chat/VoiceInputSetup.tsx": [
+      ". Microphone audio is sent there for transcription, as chosen in Voice settings.",
+      "Download the",
+      "MB model to",
+      "your transcription environment"
+    ],
+    "apps/web/src/components/chat/WorkflowOpeningBlock.tsx": ["Workflow started"],
+    "apps/web/src/components/chat/ZoomableImage.tsx": [
+      "% zoom",
+      "Click to zoom in or return to fit. Scroll to zoom, drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit."
+    ],
+    "apps/web/src/components/chat/chatViewSend.ts": [
+      "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?"
+    ],
+    "apps/web/src/components/chat/useAutoBalanceUpdateBanner.tsx": ["Manual update required"],
+    "apps/web/src/components/chat/useComposerStash.ts": ["Stashed images did not attach"],
+    "apps/web/src/components/clerk/ClerkUserProfilePage.tsx": ["Refresh"],
+    "apps/web/src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx": [
+      "Cancel",
+      "It stays on your T3 Connect account and keeps its host space. Deregister it in",
+      "Remove",
+      "Remove from this device",
+      "T3 Connect settings",
+      "This doesn't change your T3 Connect account. To deregister it there, use",
+      "This forgets its pairing, credentials, and cached threads here.",
+      "from this device?",
+      "to free it."
+    ],
+    "apps/web/src/components/clerk/T3ChatUserProfilePage.tsx": [
+      ", then select Refresh.",
+      "Confirm on",
+      "Link T3 Chat",
+      "Opening…",
+      "Pro · up to",
+      "T3 Chat",
+      "Unlink",
+      "Unlinking…",
+      "Upgrade on T3 Chat",
+      "for more tunnels",
+      "to Premier for",
+      "tunnels."
+    ],
+    "apps/web/src/components/clerk/T3ConnectSidebarSignIn.tsx": ["Sign in to T3 Connect"],
+    "apps/web/src/components/cloud/CloudEnvironmentConnectList.tsx": [
+      "Add",
+      "Add",
+      "Add route",
+      "Adding…",
+      "Client not supported",
+      "Connecting…",
+      "Could not connect environment",
+      "Could not load T3 Connect environments",
+      "Try again"
+    ],
+    "apps/web/src/components/cloud/ConnectCliAuthSurface.tsx": [
+      "Connecting your terminal",
+      "Redirecting to authorize T3 Connect for your CLI…",
+      "Sign in",
+      "Sign in to continue authorizing T3 Connect for your CLI."
+    ],
+    "apps/web/src/components/composerContextPresentation.tsx": [
+      "Annotated preview crop",
+      "Preview annotation",
+      "Review comment",
+      "Screenshot unavailable",
+      "This context is no longer available. Remove it or attach it again."
+    ],
+    "apps/web/src/components/desktop/DesktopWebLinkCoordinator.tsx": [
+      "Backend added",
+      "Could not add backend",
+      "Could not open the link",
+      "The environment is saved and will reconnect on app startup."
+    ],
+    "apps/web/src/components/desktop/SnapShotCoordinator.tsx": [
+      "Add a project, then capture the window again.",
+      "Snapshot failed",
+      "Snapshot failed",
+      "Snapshot failed",
+      "Snapshot taken, but no project is available"
+    ],
+    "apps/web/src/components/desktop/SshPasswordPromptDialog.tsx": [
+      ". Gustaf passes your response to the local SSH process and keeps it in memory to reuse for this host. Gustaf does not write it to disk.",
+      "Cancel",
+      "Continue",
+      "Dismiss",
+      "Enter the password or verification code required by",
+      "Expired",
+      "SSH keys may replace a password, but your server can still require a verification code.",
+      "SSH verification required"
+    ],
+    "apps/web/src/components/device/DeviceAndroidFoldControls.tsx": ["Android fold controls"],
+    "apps/web/src/components/device/DeviceControlsRail.tsx": [
+      "Close device panel",
+      "Float device over chat",
+      "Landscape",
+      "Portrait"
+    ],
+    "apps/web/src/components/device/DeviceDuoViewport.tsx": [
+      "Interactive 3D iPhone Duo. Drag the screen to interact. Drag outside it or swipe with two fingers to turn. Pinch over the device to open or close its hinge."
+    ],
+    "apps/web/src/components/device/DeviceHostAvailability.tsx": [
+      "Android",
+      "available",
+      "unavailable"
+    ],
+    "apps/web/src/components/device/DeviceHostUpdates.tsx": [
+      "Check the host connection and network access, then retry. Your device settings are saved."
+    ],
+    "apps/web/src/components/device/DeviceLoadingView.tsx": [
+      "Step 1 of 2: open device",
+      "Step 2 of 2: connect video"
+    ],
+    "apps/web/src/components/device/DevicePanel.tsx": [
+      "Details",
+      "No Android virtual devices found. Create one in Android Studio's Device Manager, then refresh.",
+      "Refresh devices",
+      "Retry",
+      "Starting",
+      "… This can take a minute."
+    ],
+    "apps/web/src/components/device/DevicePhoneViewport.tsx": [
+      "Interactive 3D device. Drag the screen to interact. Drag outside it or swipe with two fingers to turn."
+    ],
+    "apps/web/src/components/device/DeviceSetup.tsx": [
+      "Agent tools are ready.",
+      "Back",
+      "Continue",
+      "Leave this off to keep manual device controls without giving agents access.",
+      "You can use either platform. Fixing a missing platform does not block the other one."
+    ],
+    "apps/web/src/components/device/DeviceStreamView.tsx": [
+      ", reconnecting…",
+      "Connecting video…",
+      "Flat",
+      "Input disconnected",
+      "Reconnect",
+      "Show 3D phone",
+      "Waiting for device video…"
+    ],
+    "apps/web/src/components/device/DeviceToolVersions.tsx": [
+      "Tools update automatically on this host when needed."
+    ],
+    "apps/web/src/components/device/DeviceToolsPanel.tsx": [
+      "Liquid Glass",
+      "Liquid Glass",
+      "VoiceOver"
+    ],
+    "apps/web/src/components/diffs/DiffCommentAnnotation.tsx": ["Cancel", "⌘/Ctrl Enter to send"],
+    "apps/web/src/components/files/AttachmentFilePreview.tsx": [
+      ". Save the file to read it in full.",
+      "Could not save file",
+      "Preview limited to the first 1 MB",
+      "Save it to open in an app that supports",
+      "files.",
+      "this format"
+    ],
+    "apps/web/src/components/files/AudioPreview.tsx": [
+      "Audio unavailable. Open the file or retry playback.",
+      "Unavailable"
+    ],
+    "apps/web/src/components/files/BinaryViewer.tsx": [
+      "0 rows",
+      "Modified",
+      "Name",
+      "Read-only. Up to 50 columns and 1,024 characters per cell. Blob contents are omitted.",
+      "Size",
+      "columns",
+      "entries",
+      "rows ·"
+    ],
+    "apps/web/src/components/files/FileBreadcrumbs.tsx": [
+      "Back to",
+      "Loading folder…",
+      "Refresh failed. Retry"
+    ],
+    "apps/web/src/components/files/FileBrowserPanel.tsx": [
+      "Click to retry.",
+      "Loading files…",
+      "More matches available. Refine your search.",
+      "No matching files."
+    ],
+    "apps/web/src/components/files/FilePreviewPanel.tsx": [
+      ". Check the link's path or locate the file in Files.",
+      "Attempted path",
+      "Checking file access...",
+      "Preview limited to the first 1 MB of a",
+      "Read-only connection. Unsaved edits are kept until write access returns.",
+      "Unable to load file preview.",
+      "Unable to load workspace image.",
+      "Workspace folder:",
+      "byte file."
+    ],
+    "apps/web/src/components/files/FontViewer.tsx": ["Save it to open in another app."],
+    "apps/web/src/components/files/LargeTextViewer.tsx": [
+      "Showing the first 1,024 columns. Source and Save retain every column.",
+      "This file is empty.",
+      "lines",
+      "rows",
+      "· Indexing…"
+    ],
+    "apps/web/src/components/files/MermaidViewer.tsx": [
+      "This diagram contains resource URLs, markup, node metadata, or custom configuration. Show Mermaid source to inspect it safely."
+    ],
+    "apps/web/src/components/files/NotebookPreview.tsx": ["Show more cells (", "cells ·"],
+    "apps/web/src/components/files/OfficeViewer.tsx": [
+      "Cell values only. Charts, images, and formatting are not shown.",
+      "Limited to 500 rows and 50 columns.",
+      "Preview limited to 250,000 rows, 1,024 columns, and bounded cell text.",
+      "Save it or open it in another app.",
+      "Sheet",
+      "Text and images. Layout and embedded objects may differ from the original.",
+      "columns",
+      "of",
+      "rows ·"
+    ],
+    "apps/web/src/components/files/OpenXmlOfficeViewer.tsx": [
+      "No preview for this file",
+      "Preview limited. Save it or open it in another app to read the full document.",
+      "Save it or open it in another app.",
+      "· Fit to width"
+    ],
+    "apps/web/src/components/files/PdfViewer.tsx": ["PDF"],
+    "apps/web/src/components/files/fileSurfaceChrome.tsx": ["Try again"],
+    "apps/web/src/components/files/office/Spreadsheet.tsx": ["Sheets"],
+    "apps/web/src/components/files/office/WordDocument.tsx": ["Page"],
+    "apps/web/src/components/media/MediaVideoPlayer.tsx": [
+      "Loading video",
+      "Play video",
+      "Retry video",
+      "Retrying…",
+      "Video preview",
+      "Video preview unavailable",
+      "Video unavailable"
+    ],
+    "apps/web/src/components/media/OpenMediaLink.tsx": [
+      "Download video",
+      "Open in browser",
+      "Open original"
+    ],
+    "apps/web/src/components/onboarding/WelcomeWizard.tsx": [
+      ", see our",
+      ". On a tailnet, run",
+      ". Open a new terminal to use",
+      ". You can set",
+      "Add to PATH",
+      "Added to",
+      "Choose one or more computers. We’ll set up agents and projects on each.",
+      "Close",
+      "Connect another ChatGPT account",
+      "Connect your computers",
+      "Continue",
+      "Continue",
+      "Could not check projects.",
+      "Do not import projects",
+      "Do not import projects",
+      "Gustaf",
+      "Gustaf",
+      "Gustaf collects anonymous usage data to help us improve it.",
+      "Keep Gustaf running. Select the computers you want to set up above.",
+      "Looking for projects from Claude Code and Codex…",
+      "Looking for projects…",
+      "Need a pairing link?",
+      "No existing Claude Code or Codex projects found.",
+      "Not connected, so setup skips",
+      "Pairing link",
+      "Ready",
+      "Retry",
+      "Retry",
+      "Run",
+      "Run this on each computer you want to connect.",
+      "Select all",
+      "Select none",
+      "Some history was not imported",
+      "Start Gustaf or run",
+      "T3 Connect",
+      "This connection cannot control terminals.",
+      "To read more about how your data is used",
+      "Use",
+      "and how to opt out",
+      "folder",
+      "folders",
+      "from any terminal. Adds one line to",
+      "in this terminal.",
+      "instead.",
+      "it",
+      "of",
+      "privacy policy",
+      "selected",
+      "them",
+      "there before",
+      "up later from Settings."
+    ],
+    "apps/web/src/components/permissions/PermissionChecklist.tsx": ["Allow", "Allowed"],
+    "apps/web/src/components/preview/PreviewEmptyState.tsx": [
+      "Select a live local server to open it in this browser tab.",
+      "Type a URL above, or run a dev script. Local servers this thread starts will show up here automatically."
+    ],
+    "apps/web/src/components/preview/PreviewUnreachable.tsx": [
+      "Download",
+      "Open in browser",
+      "Reload",
+      "This file can t be shown here",
+      "This site can t be reached",
+      "from",
+      "was downloaded instead."
+    ],
+    "apps/web/src/components/preview/PreviewView.tsx": [
+      "This tab is open in the Gustaf desktop app."
+    ],
+    "apps/web/src/components/preview/ThreadPreviewMiniPlayer.tsx": ["Reconnecting preview…"],
+    "apps/web/src/components/projectScriptEditor.tsx": [
+      "Actions are project-scoped commands you can run from the top bar or keybindings.",
+      "Delete",
+      "Delete action \"",
+      "Open this URL in the in-app preview when this action runs.",
+      "Press a shortcut. Use",
+      "bun test",
+      "to clear. Shortcuts are environment-wide. Projects using the same action share its shortcut."
+    ],
+    "apps/web/src/components/promptLinks/HostedPromptLinkLanding.tsx": [
+      ". Read the prompt before you send it.",
+      "Gustaf removed",
+      "This prompt had hidden characters, it may be malicious",
+      "hidden character"
+    ],
+    "apps/web/src/components/promptLinks/NewThreadLinkView.tsx": [
+      "Clone",
+      "Open it again",
+      "Use without project"
+    ],
+    "apps/web/src/components/promptLinks/ThreadLinkPrompt.tsx": [
+      "Could not open the linked prompt"
+    ],
+    "apps/web/src/components/promptLinks/copyPromptLink.ts": [
+      "Could not copy the prompt link",
+      "Prompt link copied"
+    ],
+    "apps/web/src/components/promptLinks/linkedPrompt.ts": [
+      "Linked prompt ready",
+      "Prompt added from a link",
+      "This prompt had hidden characters, it may be malicious",
+      "This thread already has a draft. Replace it with the linked prompt?"
+    ],
+    "apps/web/src/components/pullRequest/LinkPullRequestDialog.tsx": [
+      "Attach a pull request to this thread by its URL, or by its number for this thread's repository.",
+      "Cancel"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestActionsMenu.tsx": [
+      "A walk through the diff and what to read closely.",
+      "Confirm close?",
+      "Confirm close?",
+      "Copy",
+      "Copy link",
+      "Disable auto-merge",
+      "Maintainers can push to this branch. If your fork has workflows, this can also give access to its secrets.",
+      "Refresh",
+      "Reopen",
+      "Saving…",
+      "number"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestActivityUnavailableState.tsx": [
+      "Could not load",
+      "Retry",
+      "activity"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestChecksPopover.tsx": [
+      "Check details are out of date. Refresh the pull request to update them.",
+      "Details",
+      "checks",
+      "failed"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestCodeTab.tsx": [
+      "1 conversation",
+      "A comment is anchored to the whole change, so switch to All commits to write one.",
+      "Changed",
+      "Hide whitespace changes",
+      "Line",
+      "Retry",
+      "Show more (",
+      "Split",
+      "Stacked",
+      "The boxes below are whatever was last read, and empty if nothing has been read yet.",
+      "The host withheld part of this diff: a binary file, or a change too large to inline.",
+      "This change has more files than the host will report ticks for in one read, so the count is short and some boxes below start empty.",
+      "This commit has no file changes.",
+      "This file has been pushed to since you marked it viewed.",
+      "This host keeps no shared record of which files you have read, so these ticks are kept by this environment. They follow you between the apps connected to it, but the host's own web UI will not show them.",
+      "Wrap lines",
+      "file",
+      "file",
+      "files",
+      "files",
+      "hidden",
+      "test",
+      "viewed"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestCommentForm.tsx": ["Close with comment"],
+    "apps/web/src/components/pullRequest/PullRequestComposer.tsx": ["Review"],
+    "apps/web/src/components/pullRequest/PullRequestCopyableCode.tsx": ["Copied"],
+    "apps/web/src/components/pullRequest/PullRequestDetailActions.tsx": [
+      ": the host will merge this on its own once its requirements are met",
+      ": the host will merge this on its own once its requirements are met",
+      "Approve workflows to run",
+      "Check out this",
+      "Confirm approve?",
+      "Its own folder and thread. Nothing you have open moves.",
+      "Switches the branch you are working in."
+    ],
+    "apps/web/src/components/pullRequest/PullRequestDetailLayout.tsx": ["receives changes from"],
+    "apps/web/src/components/pullRequest/PullRequestDetailPanel.tsx": [
+      "Checks",
+      "Could not copy checkout command",
+      "Retry stack lookup",
+      "approval",
+      "approvals",
+      "updated"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestDiffUnavailableState.tsx": [
+      "Open on",
+      "Technical details",
+      "Try again"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestGhosts.tsx": ["Labels", "Reviewers", "updated"],
+    "apps/web/src/components/pullRequest/PullRequestGuideTab.tsx": ["Technical details"],
+    "apps/web/src/components/pullRequest/PullRequestLinkPreview.tsx": ["opened"],
+    "apps/web/src/components/pullRequest/PullRequestListFilters.tsx": [
+      "Any",
+      "Anyone",
+      "merges loaded",
+      "· Unavailable"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestMarkdown.tsx": ["Open attachment on"],
+    "apps/web/src/components/pullRequest/PullRequestMarkdownEditor.tsx": ["Cancel"],
+    "apps/web/src/components/pullRequest/PullRequestMoreReplies.tsx": ["View on host"],
+    "apps/web/src/components/pullRequest/PullRequestReviewAnnotation.tsx": [
+      "Add to chat",
+      "Cancel",
+      "Reply",
+      "Reply",
+      "comment",
+      "comments"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestRow.tsx": [
+      "matched in the description",
+      "matched in the description"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestSpeedActions.tsx": [
+      "Close immediately, or drag across rows to close several"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestStackHeader.tsx": ["Stack #"],
+    "apps/web/src/components/pullRequest/PullRequestStackMenu.tsx": [
+      ", layer",
+      "Cancel",
+      "Every layer being merged must be open and ready for review.",
+      "Merge stack",
+      "Merge stack (",
+      "Rebase stack",
+      "View stack #",
+      "of"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestStackPopover.tsx": [
+      ", layer",
+      "View stack #",
+      "of"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestSummaryTab.tsx": [
+      "Bot comments",
+      "Filter",
+      "Refresh",
+      "Resolved or dismissed",
+      "Show",
+      "Show only",
+      "The only comment is hidden by the filter.",
+      "This conversation is only partially loaded.",
+      "comment",
+      "is",
+      "loaded; open it on the host to read the rest.",
+      "older conversation",
+      "recent conversations",
+      "replies",
+      "reply",
+      "s are",
+      "· Open comment on host"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestThreadLinks.tsx": [
+      ". Search in the command palette.",
+      "Link",
+      "No active threads found.",
+      "to a thread"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestTimelineTab.tsx": [
+      ", before the latest commits",
+      "Resolved",
+      "author",
+      "authors",
+      "comment",
+      "comments",
+      "ghost",
+      "ghost",
+      "replies",
+      "reply"
+    ],
+    "apps/web/src/components/pullRequest/PullRequestTitleEditor.tsx": ["Cancel"],
+    "apps/web/src/components/pullRequest/PullRequestsPage.tsx": [
+      "Load more pull requests",
+      "Retry",
+      "Showing the last pull requests loaded."
+    ],
+    "apps/web/src/components/pullRequest/PullRequestsUnavailableState.tsx": ["Retry"],
+    "apps/web/src/components/pullRequest/ThreadPullRequestsPanel.tsx": [
+      "Copy link",
+      "Link",
+      "Link pull request",
+      "Open",
+      "Pull requests the agent opens from this thread land here. Link one yourself from a URL or a number.",
+      "Watching: the agent wakes when checks finish, someone comments, or the branch conflicts",
+      "linked",
+      "open ·",
+      "· synced"
+    ],
+    "apps/web/src/components/pullRequest/filesViewedStore.ts": ["Could not update viewed files"],
+    "apps/web/src/components/pullRequest/guide/GuideExcerpt.tsx": [
+      "Loading",
+      "Open in Code",
+      "are not in the loaded diff.",
+      "diff lines",
+      "lines",
+      "of",
+      "removed code,",
+      "showing"
+    ],
+    "apps/web/src/components/pullRequest/guide/GuideNotes.tsx": ["1 note", "Notes on this stop"],
+    "apps/web/src/components/pullRequest/guide/GuideRail.tsx": ["Look closely", "of", "read"],
+    "apps/web/src/components/pullRequest/guide/GuideStop.tsx": [
+      "Ask about this stop",
+      "Finish review",
+      "Next:",
+      "Stop",
+      "Stop",
+      "of",
+      "of"
+    ],
+    "apps/web/src/components/pullRequest/guide/GuideTour.tsx": [
+      "The diff could not be loaded, so excerpts are missing:"
+    ],
+    "apps/web/src/components/pullRequest/pullRequestPresentation.tsx": ["· Open profile"],
+    "apps/web/src/components/pullRequest/usePullRequestActions.ts": [
+      "Asked in a thread",
+      "Checked out, but the thread stayed where it was",
+      "Checkout ready",
+      "Could not open a thread for the checkout",
+      "The task is in the composer. Read it over, then send."
+    ],
+    "apps/web/src/components/pullRequest/useThreadLinkedPullRequest.ts": [
+      "Unable to update the thread pull request"
+    ],
+    "apps/web/src/components/search/ProjectContentSearchDialog.tsx": [
+      "Aa",
+      "Open a project to search its files.",
+      "Searching…",
+      "ab"
+    ],
+    "apps/web/src/components/settings/AddEnvironmentDialog.tsx": ["PAIRCODE"],
+    "apps/web/src/components/settings/AppearanceSettingsPanel.tsx": ["English", "English", "ms"],
+    "apps/web/src/components/settings/ArchivedThreadsPanel.tsx": ["Archived", "· Created"],
+    "apps/web/src/components/settings/ChatGptWelcomeCoordinator.tsx": ["on"],
+    "apps/web/src/components/settings/CodexSetupSection.tsx": ["Codex", "Codex", "Codex"],
+    "apps/web/src/components/settings/ConnectionsSettings.tsx": ["Could not change WSL backend"],
+    "apps/web/src/components/settings/DeviceHostEditor.tsx": ["Mac mini"],
+    "apps/web/src/components/settings/IntegrationsSettings.tsx": [
+      "Add profile",
+      "New agent sessions can open and drive these devices. agent-device:",
+      "Open simulators and emulators in the Device panel. Hub:",
+      "fps",
+      "fps"
+    ],
+    "apps/web/src/components/settings/KeybindingsSettings.tsx": [
+      "Add keybinding",
+      "Alt",
+      "Condition",
+      "Ctrl",
+      "Fix the expression above to continue editing visually.",
+      "Group",
+      "Group",
+      "Gustaf does not recognize this condition yet. It can still be saved, but it may not match unless the runtime provides it.",
+      "No keybindings match your search.",
+      "Not",
+      "Press shortcut",
+      "Remove",
+      "Reset to default",
+      "Unassigned"
+    ],
+    "apps/web/src/components/settings/LabsSettingsPanel.tsx": [
+      ". An alpha that may change or break. Gustaf never installs Simlock.",
+      ". Turning it off stops every guest link.",
+      ". While off, nothing new starts over a link; running tasks finish.",
+      "Connections",
+      "Devices",
+      "Let agents here work on your other machines, and theirs here. Turn it on for each machine, then link them in",
+      "Let the Device panel lease simulators and emulators from your own",
+      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Needs T3 Connect: sign in and link this machine in",
+      "Sharing & access",
+      "Simlock",
+      "pool, added in"
+    ],
+    "apps/web/src/components/settings/LinkMachineSelect.tsx": ["T3 Connect"],
+    "apps/web/src/components/settings/ProcessSignalActions.tsx": ["INT", "KILL"],
+    "apps/web/src/components/settings/ProjectActionsList.tsx": [
+      "on settle",
+      "preview · desktop only",
+      "setup"
+    ],
+    "apps/web/src/components/settings/ProjectDefaultsSettings.tsx": [
+      "agent credit removal",
+      "default automatic pull",
+      "default merge method",
+      "default model",
+      "default permissions",
+      "default workspace",
+      "fallback model",
+      "worktree submodules"
+    ],
+    "apps/web/src/components/settings/ProjectSettingsPanel.tsx": ["project icon", "project name"],
+    "apps/web/src/components/settings/ProviderAccentColorPicker.tsx": ["Accent color"],
+    "apps/web/src/components/settings/ProviderAuthenticationSection.tsx": [
+      "Enter code",
+      "Loading sign-in terminal…",
+      "Signed in as",
+      "in your browser."
+    ],
+    "apps/web/src/components/settings/ProviderInstanceCard.tsx": [
+      ", which is not available in this build. Its configuration is preserved.",
+      "This instance uses"
+    ],
+    "apps/web/src/components/settings/ProviderModelsSection.tsx": ["model"],
+    "apps/web/src/components/settings/ProviderSettingsPanel.tsx": [
+      "Checked",
+      "Checked",
+      "provider health check interval",
+      "provider health check interval",
+      "seconds"
+    ],
+    "apps/web/src/components/settings/ResourceTelemetryDiagnostics.tsx": [
+      "CPU",
+      "CPU",
+      "Identity:",
+      "PID",
+      "PID",
+      "PID + start time",
+      "Updated",
+      "process",
+      "processes"
+    ],
+    "apps/web/src/components/settings/SavedEnvironmentRows.tsx": ["Routes", "T3 Connect"],
+    "apps/web/src/components/settings/ScheduledTasksSettings.tsx": [
+      "Next run",
+      "base64",
+      "empty placeholder",
+      "hex",
+      "opened, reopened"
+    ],
+    "apps/web/src/components/settings/SecretSourceInput.tsx": [
+      "Enter a valid secret reference.",
+      "Value"
+    ],
+    "apps/web/src/components/settings/SettingInheritance.tsx": [
+      "Environment",
+      "Reset",
+      "all",
+      "it"
+    ],
+    "apps/web/src/components/settings/SettingsFontPreviews.tsx": [
+      "Prompt font preview",
+      "Terminal font preview"
+    ],
+    "apps/web/src/components/settings/SettingsPanels.tsx": [
+      "1 machine still runs",
+      "Connect an environment to choose its text generation model.",
+      "Get help",
+      "Latest",
+      "Leave empty to use \"~/\" when the Add Project browser opens.",
+      "Nightly",
+      "Nightly",
+      "No text generation providers available.",
+      "Review",
+      "Stable",
+      "View diagnostics",
+      "View licenses",
+      "View policy",
+      "add project base directory",
+      "archive confirmation",
+      "auto-settle on merge",
+      "clone into host folders",
+      "compact idle threads",
+      "continue threads after restarts",
+      "default diff file state",
+      "delete confirmation",
+      "diff colors",
+      "diff layout",
+      "diff whitespace changes",
+      "follow-up behavior",
+      "proactive panels",
+      "project grouping",
+      "project order",
+      "provider update checks",
+      "quit shortcut behavior",
+      "response streaming",
+      "rich text composer",
+      "send shortcut",
+      "skills in slash menu",
+      "text generation model",
+      "time format",
+      "tool calls in chat",
+      "unpin confirmation",
+      "working section"
+    ],
+    "apps/web/src/components/settings/SimlockDeviceHostEditor.tsx": [
+      ", or leave it blank to add it later. A blank token uses the machine's",
+      "Leases, drives, and streams devices. Create one",
+      "is this gateway.",
+      "per environment",
+      "when its",
+      "with"
+    ],
+    "apps/web/src/components/settings/SnapShotSettings.tsx": ["SnapShots", "Whoosh", "Whoosh"],
+    "apps/web/src/components/settings/SnoozePresetsSettings.tsx": ["snooze options"],
+    "apps/web/src/components/settings/SourceControlAccountSettings.tsx": [
+      "Choose which",
+      "Sign in with",
+      "host uses, or turn a host off.",
+      "login each",
+      "on the server host, then rescan to choose accounts here."
+    ],
+    "apps/web/src/components/settings/SourceControlAppSignInSettings.tsx": [
+      "Waiting for approval · code expires at"
+    ],
+    "apps/web/src/components/settings/SourceControlHostSettings.tsx": ["Remove"],
+    "apps/web/src/components/settings/SourceControlSettings.tsx": [
+      "is not authenticated on this server. Sign in or configure credentials using the",
+      "tool on the server host to enable change request features."
+    ],
+    "apps/web/src/components/settings/SourceControlTokenSettings.tsx": [
+      ". Give it",
+      "A token saved here is used before",
+      "and the",
+      "login, so",
+      "works without the"
+    ],
+    "apps/web/src/components/settings/SourceControlWritingSettings.tsx": [
+      "change request templates",
+      "review guide instructions",
+      "source control writing style"
+    ],
+    "apps/web/src/components/settings/SpeechModelComparison.tsx": ["% error)", "Speed:"],
+    "apps/web/src/components/settings/StorageSettings.tsx": ["more results.", "worktree location"],
+    "apps/web/src/components/settings/TextGeneratorsSettings.tsx": [
+      ". Switch any of these to it, or keep what they use now.",
+      "is connected and lists",
+      "model",
+      "models"
+    ],
+    "apps/web/src/components/settings/ThemeColorPicker.tsx": ["HEX", "RGB"],
+    "apps/web/src/components/settings/ThemeSearchSection.tsx": ["downloads"],
+    "apps/web/src/components/settings/ThreadDetailsItemsRow.tsx": ["thread details"],
+    "apps/web/src/components/settings/TypographySettings.tsx": ["px", "px"],
+    "apps/web/src/components/settings/UsageProviderSettings.tsx": ["CLI Proxy"],
+    "apps/web/src/components/settings/VoiceSettingsPanel.tsx": [
+      "CPU",
+      "CPU",
+      "entries",
+      "entries",
+      "entry",
+      "entry"
+    ],
+    "apps/web/src/components/settings/settingsLayout.tsx": [
+      "Background policy details",
+      "Reset to inherited value"
+    ],
+    "apps/web/src/components/sidebar/SidebarChrome.tsx": ["Gustaf"],
+    "apps/web/src/components/sidebar/SidebarProjectFolderHeader.tsx": ["New thread in"],
+    "apps/web/src/components/sidebar/SidebarThreadRow.tsx": [
+      "Custom…",
+      "Handed off from",
+      "Regenerating title",
+      "Regenerating title",
+      "Settle",
+      "Woke",
+      "You're currently checked out on another branch."
+    ],
+    "apps/web/src/components/sidebar/SidebarUpdateReleaseNotes.tsx": ["Update ready to download"],
+    "apps/web/src/components/sidebar/UpdateEverythingDialog.tsx": ["Gustaf", "Gustaf"],
+    "apps/web/src/components/sidebar/updateEverythingRun.tsx": ["Update did not apply"],
+    "apps/web/src/components/ui/anchoredCopyToast.ts": ["Copied!", "Failed to copy"],
+    "apps/web/src/components/ui/color-picker.tsx": [
+      "Use arrow keys to adjust the focused value. Hold Shift for larger steps. Use Home and End for the minimum and maximum. Press Tab to move between saturation and brightness."
+    ],
+    "apps/web/src/components/ui/dialog.tsx": ["Close"],
+    "apps/web/src/components/ui/sheet.tsx": ["Close"],
+    "apps/web/src/components/ui/sidebar.tsx": ["Displays the mobile sidebar."],
+    "apps/web/src/components/ui/spinner.tsx": ["Loading"],
+    "apps/web/src/components/ui/standalone-page.tsx": ["Gustaf", "Gustaf"],
+    "apps/web/src/components/ui/wizard.tsx": ["Setup progress"],
+    "apps/web/src/components/usage/UsageModelDialog.tsx": ["Premium", "tokens have no known price"],
+    "apps/web/src/components/usage/UsagePage.tsx": [
+      "API estimate excludes",
+      "All environments",
+      "All providers",
+      "Counted once across environments sharing a transcript directory:",
+      "Model prices",
+      "No activity in this window.",
+      "No activity in this window.",
+      "Totals are partial while selected environments scan.",
+      "sessions",
+      "unpriced records.",
+      "· API estimate"
+    ],
+    "apps/web/src/components/usage/UsageProviderChart.tsx": ["Total"],
+    "apps/web/src/hooks/useNewProject.ts": [
+      "Could not create the project",
+      "Failed to open project",
+      "Failed to open project"
+    ],
+    "apps/web/src/hooks/useRemoveClonedProject.ts": ["Failed to remove project"],
+    "apps/web/src/hooks/useSettings.ts": [
+      "Could not load saved model preferences. Try again.",
+      "Could not load saved model preferences. Try again.",
+      "Favorites not saved",
+      "Model preferences not saved",
+      "Setting not saved",
+      "Setting not saved",
+      "Setting not saved"
+    ],
+    "apps/web/src/hooks/useStartTriage.ts": ["Could not start triage", "Starting triage…"],
+    "apps/web/src/hooks/useThreadActionMenu.ts": [
+      "Branch copied",
+      "Path copied",
+      "Path unavailable",
+      "Project created",
+      "This thread does not have a workspace path to copy.",
+      "Thread ID copied"
+    ],
+    "apps/web/src/hooks/useThreadActions.ts": ["Thread deleted, but navigation failed"],
+    "apps/web/src/lib/openPullRequestLink.ts": [
+      "This commit is not in the thread's workspace",
+      "Unable to open pull request link"
+    ],
+    "apps/web/src/providerAuthDelivery.ts": [
+      "ChatGPT sign-in couldn't finish",
+      "ChatGPT sign-in couldn't finish",
+      "Reconnect to the environment and try again.",
+      "Return to the provider and try again."
+    ],
+    "apps/web/src/routes/__root.tsx": [
+      ". Go home to choose a project or start a thread.",
+      "Copied",
+      "Copy error",
+      "Error report",
+      "Go home",
+      "Page not found",
+      "Reload app",
+      "Something went wrong.",
+      "This link doesn't point to a page in",
+      "Try again"
+    ],
+    "apps/web/src/routes/_chat.index.tsx": [
+      "Couldn’t start a new thread",
+      "The project is still available. Try opening the draft again.",
+      "Try again"
+    ],
+    "apps/web/src/routes/_chat.new.tsx": ["Could not open the link"],
+    "apps/web/src/routes/_chat.settings.providers.tsx": [
+      "Connect an environment to set up its providers."
+    ],
+    "apps/web/src/routes/_chat.settings.tsx": [
+      "Reconnect",
+      "Restore device defaults",
+      "Settings",
+      "to change its settings."
+    ],
+    "apps/web/src/shortcuts/chatRouteCommands.ts": [
+      "Open Gustaf in the desktop app to use the in-app preview.",
+      "Preview is desktop-only"
+    ],
+    "apps/web/src/speech/useEnvironmentSpeechInput.ts": [
+      "Could not start voice input",
+      "The original transcript was added.",
+      "Transcript cleanup failed",
+      "Voice input is not available"
+    ],
+    "apps/web/src/speech/useTextFieldSpeech.tsx": ["Esc"],
+    "apps/mobile/src/Stack.tsx": ["Return home", "Route not found"],
+    "apps/mobile/src/components/BrandMark.tsx": ["Gustaf"],
+    "apps/mobile/src/components/CompactBrandTitle.tsx": ["Gustaf", "Gustaf, Threads"],
+    "apps/mobile/src/components/ComposerAttachmentStrip.tsx": ["Retry"],
+    "apps/mobile/src/components/ComposerContextAttachment.tsx": [
+      "Attachment unavailable. Reconnect and try again.",
+      "Could not open attachment",
+      "Open or share attachment",
+      "Opening attachment…"
+    ],
+    "apps/mobile/src/components/ComposerContextSheet.tsx": [
+      "Context unavailable. The reference was copied without its payload. Copy it again from the original message or remove it.",
+      "Element",
+      "Element",
+      "HTML",
+      "HTML",
+      "Lines",
+      "Open attachment",
+      "Requested changes",
+      "Selection",
+      "Selector",
+      "Selector",
+      "Skill",
+      "Styles",
+      "Styles",
+      "This context type is not supported by this version of the app. Its payload will be preserved when sent.",
+      "Try again when connected.",
+      "URL",
+      "View instructions"
+    ],
+    "apps/mobile/src/components/ComposerEditor.tsx": [
+      "Copying context…",
+      "Could not paste context",
+      "Could not paste context",
+      "Remove some attachments or context items from the draft, then paste again.",
+      "Skill",
+      "Some context is unavailable"
+    ],
+    "apps/mobile/src/components/GustafMark.tsx": ["Gustaf"],
+    "apps/mobile/src/components/MediaActionsMenu.tsx": ["Media actions"],
+    "apps/mobile/src/components/MediaVideoPlayer.tsx": [
+      "Loading video",
+      "Loading video",
+      "Retry video",
+      "Touch and hold for media actions"
+    ],
+    "apps/mobile/src/components/PdfPreview.android.tsx": ["Could not load PDF", "Loading PDF..."],
+    "apps/mobile/src/components/PdfPreview.tsx": ["Could not load PDF", "Loading PDF..."],
+    "apps/mobile/src/components/VideoAttachmentTile.tsx": ["Touch and hold for media actions"],
+    "apps/mobile/src/components/ui/AndroidScreenHeader.android.tsx": [
+      "More actions",
+      "Navigate up"
+    ],
+    "apps/mobile/src/components/ui/AppBar.android.tsx": [
+      "Clear search",
+      "Close",
+      "Close",
+      "Close inspector",
+      "Close search",
+      "Navigate up"
+    ],
+    "apps/mobile/src/components/ui/AppBar.tsx": ["Close", "Close inspector"],
+    "apps/mobile/src/components/ui/FilePreviewModal.android.tsx": [
+      "A compatible viewer must be installed. Check your connection and try again.",
+      "Close image",
+      "Could not open document",
+      "Document",
+      "Image",
+      "Opening document…",
+      "PDF"
+    ],
+    "apps/mobile/src/components/ui/FilePreviewModal.tsx": [
+      "Could not open preview",
+      "The file could not be loaded. Please try again."
+    ],
+    "apps/mobile/src/components/ui/FilePreviewSession.tsx": [
+      "Could not open preview",
+      "Could not open preview",
+      "Could not share file",
+      "Please try again."
+    ],
+    "apps/mobile/src/components/ui/ListToggleRow.tsx": ["Mixed · Set on"],
+    "apps/mobile/src/components/ui/Notice.tsx": ["Dismiss message"],
+    "apps/mobile/src/components/ui/Toast.tsx": ["Dismiss message"],
+    "apps/mobile/src/components/ui/VideoPreviewModal.android.tsx": [
+      "Close video",
+      "Loading video...",
+      "Opening share sheet...",
+      "Save or share video",
+      "Save or share video"
+    ],
+    "apps/mobile/src/components/ui/VideoPreviewModal.tsx": ["Could not open video"],
+    "apps/mobile/src/components/ui/WorkspaceAppBar.android.tsx": ["Close search"],
+    "apps/mobile/src/features/archive/ArchivedThreadsScreen.tsx": [
+      "Archived threads",
+      "Could not load every archive",
+      "Loading archive...",
+      "No archived threads",
+      "No matching threads",
+      "Threads you archive will appear here.",
+      "Try another search or environment."
+    ],
+    "apps/mobile/src/features/browser/BrowserPreviewRouteScreen.tsx": [
+      "Browser",
+      "Close browser",
+      "Could not open this address",
+      "Enter a URL",
+      "Enter an http or https URL.",
+      "Picture in picture is unavailable",
+      "Reload page"
+    ],
+    "apps/mobile/src/features/browser/BrowserTabMenu.tsx": [
+      "Browser tab options",
+      "Browser tab options",
+      "Could not change the viewport",
+      "Could not change this browser tab",
+      "Could not close this browser tab"
+    ],
+    "apps/mobile/src/features/browser/PreviewStreamWebView.tsx": [
+      "Accept",
+      "Connecting to browser...",
+      "Connecting to browser...",
+      "Could not read the clipboard",
+      "Could not save the download",
+      "Could not send the files to the page",
+      "Dialog response",
+      "Reconnect",
+      "Release control",
+      "Take control",
+      "Take control to respond.",
+      "The page asks for",
+      "Try again",
+      "a file",
+      "files"
+    ],
+    "apps/mobile/src/features/browser/ThreadBrowserFloat.tsx": [
+      "Opens the browser tab full screen"
+    ],
+    "apps/mobile/src/features/browser/browser-preview-button.tsx": [
+      "One tab open",
+      "View browser",
+      "Watch and control browser tabs open in this thread"
+    ],
+    "apps/mobile/src/features/cloud/ConnectOnboardingRouteScreen.tsx": [
+      "Don't show this again",
+      "Set up T3 Connect",
+      "Sign in to your T3 account to set up T3 Connect."
+    ],
+    "apps/mobile/src/features/cloud/T3ConnectProfilePage.tsx": [
+      "Connections on this device are managed in Settings.",
+      "Could not deregister server",
+      "Link a server from its local Settings to reach it through T3 Connect.",
+      "Loading environments",
+      "No servers registered",
+      "Registered servers"
+    ],
+    "apps/mobile/src/features/connection/CloudEnvironmentRows.tsx": [
+      "Loading linked cloud environments.",
+      "Long press to remove from this device",
+      "Long press to remove from this device",
+      "No additional linked cloud environments.",
+      "T3 Connect"
+    ],
+    "apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx": [
+      "Could not update environment",
+      "Managed by T3 Connect. Tunnel details update automatically.",
+      "My MacBook",
+      "Reconnect environment",
+      "Reconnect environment",
+      "Remove environment",
+      "Remove environment",
+      "URL"
+    ],
+    "apps/mobile/src/features/connection/ConnectionTraceId.tsx": [
+      "Copies the trace ID",
+      "Long press to copy the trace ID",
+      "Trace ID:"
+    ],
+    "apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx": [
+      "Camera access needed",
+      "Camera access was denied for this app. Open Settings to enable it.",
+      "For machines on your local network or tailnet. The machine keeps its own provider credentials.",
+      "Invalid QR code",
+      "Or enter it",
+      "Or use the managed relay",
+      "Reach your machines from anywhere, no network setup.",
+      "Scan QR code",
+      "Scan the code from t3 pair or desktop Connections settings",
+      "Sign in to T3 Connect",
+      "Tap to scan"
+    ],
+    "apps/mobile/src/features/connection/ConnectionsRouteScreen.tsx": ["Close environments"],
+    "apps/mobile/src/features/connection/LocalEnvironmentList.tsx": [
+      "No environments connected yet.",
+      "Tap",
+      "to add one."
+    ],
+    "apps/mobile/src/features/connection/PullRequestRoutingSettings.tsx": [
+      "Choose environments you trust to share PR data and use each other's source control access. Enable both environments. This applies only to this client.",
+      "Could not save pull request routing permission",
+      "Pull request routing",
+      "T3 Connect",
+      "Try again before leaving this screen."
+    ],
+    "apps/mobile/src/features/connection/permissionUpdateNotice.ts": [
+      "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need."
+    ],
+    "apps/mobile/src/features/development/ComponentCatalogScreen.tsx": [
+      "Alert",
+      "Buttons",
+      "Changes are ready to review.",
+      "Choose an action.",
+      "Clear examples search",
+      "Dialog",
+      "Discard changes?",
+      "Example alert",
+      "Example count",
+      "Example menu",
+      "Example name",
+      "Example sheet",
+      "Example slider",
+      "Example upload",
+      "Feedback and presentation",
+      "Forms",
+      "Lists and selection",
+      "Menu",
+      "More information",
+      "Open example sheet",
+      "Overview",
+      "Primary",
+      "Rename example",
+      "Search examples",
+      "Search examples",
+      "Secondary",
+      "Selected filter",
+      "Selected option",
+      "Show notice",
+      "Theme preview",
+      "This action could not finish. Try again.",
+      "This example only changes local catalog state.",
+      "This second alert stays open.",
+      "UI components",
+      "Updates from your active threads"
+    ],
+    "apps/mobile/src/features/development/NativeAppBarExample.android.tsx": [
+      "Example back",
+      "Example search",
+      "Native app bar"
+    ],
+    "apps/mobile/src/features/devices/DevicePreviewRouteScreen.tsx": [
+      "Close device preview",
+      "Close device preview",
+      "Connecting to device...",
+      "Could not shut down device",
+      "Device options",
+      "Device options",
+      "Device tool versions",
+      "Devices",
+      "Devices",
+      "Hide device controls",
+      "Show device controls"
+    ],
+    "apps/mobile/src/features/devices/DeviceStreamWebView.tsx": ["Connecting to device..."],
+    "apps/mobile/src/features/devices/device-preview-button.tsx": [
+      "One device open",
+      "View device",
+      "Watch and control devices open in this thread"
+    ],
+    "apps/mobile/src/features/diagnostics/SettingsDiagnosticsRouteScreen.tsx": [
+      "Copied",
+      "Copy crash report",
+      "Crash log unavailable",
+      "Crash reports",
+      "No startup crashes",
+      "Nothing has taken the app down during launch in the last 7 days.",
+      "Paste the report into a GitHub issue. It contains the app version, the JavaScript error message, and the component stack. Error messages can quote values from the app, so read it over before sharing.",
+      "Reading crash log…",
+      "Send crash reports",
+      "Startup crash records are only kept in store and TestFlight builds.",
+      "Startup crashes",
+      "When the app crashes or hits an error, it sends the error message, the stack trace, the app version, and the device model and OS version to the Gustaf team. Each launch also sends startup timings. Reports carry a random ID for this install."
+    ],
+    "apps/mobile/src/features/files/AttachmentDocumentBody.tsx": [
+      "File unavailable",
+      "Loading file...",
+      "No app on this device can show this format. Save or share it to open it elsewhere.",
+      "Opening in file viewer...",
+      "Partial file",
+      "Preview limited to the first 1 MB. Save or share the file to read it in full.",
+      "Try again",
+      "Try again"
+    ],
+    "apps/mobile/src/features/files/AttachmentFileScreen.tsx": ["Could not open document"],
+    "apps/mobile/src/features/files/AudioFilePreview.tsx": [
+      "Back 15 seconds",
+      "Forward 15 seconds",
+      "Loading…",
+      "Pause",
+      "Play",
+      "This audio could not be played. Try again or save it to open in another app."
+    ],
+    "apps/mobile/src/features/files/DelimitedFilePreview.tsx": [
+      "Table limited to the first 100 rows and 30 columns. Source shows the rest."
+    ],
+    "apps/mobile/src/features/files/FileTreeBrowser.tsx": [
+      "Files unavailable",
+      "More search results available. Refine your search to see them.",
+      "No files found",
+      "The workspace is empty.",
+      "Try a different search."
+    ],
+    "apps/mobile/src/features/files/ThreadFilesRouteScreen.tsx": [
+      "Checking file access...",
+      "Checking file access...",
+      "File unavailable",
+      "File unavailable",
+      "Loading file...",
+      "Loading file...",
+      "Opening file...",
+      "Opening file...",
+      "Opening files...",
+      "Partial file",
+      "Preview limited to the first 1 MB of a truncated file.",
+      "This connection cannot read host files.",
+      "This connection cannot read host files.",
+      "This file path is invalid."
+    ],
+    "apps/mobile/src/features/files/WorkspaceFileImagePreview.tsx": [
+      "Preparing image preview...",
+      "Touch and hold for media actions"
+    ],
+    "apps/mobile/src/features/files/WorkspaceFilePreviewError.tsx": [
+      "Environment",
+      "Preview unavailable",
+      "This file may be missing, unsupported, or unavailable on this environment.",
+      "Try again"
+    ],
+    "apps/mobile/src/features/files/WorkspaceFileWebPreview.tsx": [
+      "Back to document",
+      "Preparing preview...",
+      "Preview failed"
+    ],
+    "apps/mobile/src/features/files/ZipArchiveView.tsx": [
+      "Added to chat",
+      "Clear filter",
+      "Clear filter",
+      "Filter files in ZIP",
+      "It has no files.",
+      "No preview for this file",
+      "Open in file viewer",
+      "Open it in the file viewer, save it, or add it to chat.",
+      "Opening ZIP...",
+      "Save ZIP",
+      "The filter checks file names and folder paths.",
+      "This ZIP is empty",
+      "ZIP download progress"
+    ],
+    "apps/mobile/src/features/home/HomeRouteScreen.tsx": ["Gustaf, Threads"],
+    "apps/mobile/src/features/home/HomeScreen.tsx": [
+      "Add environment",
+      "Choose another environment or create a new task.",
+      "Choose another project or create a new task.",
+      "Create a task to start a new coding session."
+    ],
+    "apps/mobile/src/features/home/ThreadListFilters.tsx": [
+      "All environments",
+      "All projects",
+      "Filter threads by environment",
+      "Reset thread filters"
+    ],
+    "apps/mobile/src/features/home/WorkspaceConnectionTitle.tsx": ["Opens environment settings"],
+    "apps/mobile/src/features/home/usePendingTaskListActions.ts": [
+      "Could not delete pending task",
+      "Delete pending task?",
+      "Discard draft?"
+    ],
+    "apps/mobile/src/features/home/useThreadListActions.ts": [
+      "Could not move thread",
+      "Could not move thread",
+      "Could not pin thread",
+      "Could not pin thread",
+      "Could not pin thread",
+      "Could not regenerate title",
+      "Could not regenerate title",
+      "Could not rename thread",
+      "Could not rename thread",
+      "Could not restore snooze",
+      "Could not snooze thread",
+      "Could not snooze thread",
+      "Could not snooze thread",
+      "Could not undo thread action",
+      "Could not unpin thread",
+      "Could not unpin thread",
+      "Could not update auto-settle",
+      "Could not update auto-settle",
+      "Could not wake thread",
+      "Could not wake thread",
+      "This connection cannot change threads.",
+      "This environment's server does not support pinning yet. Update the server to use Pin.",
+      "This environment's server does not support pinning yet. Update the server to use Pin.",
+      "This environment's server does not support reordering these threads. Update the server to arrange them.",
+      "This environment's server does not support settling yet. Update the server to use Settle.",
+      "This environment's server does not support snoozing yet. Update the server to use Snooze.",
+      "This environment's server does not support snoozing yet. Update the server to wake this thread.",
+      "This environment's server does not support title regeneration yet. Update the server to regenerate thread titles.",
+      "This environment's server does not support turning auto-settle off per thread yet. Update the server to use it.",
+      "This thread is working. Interrupt it first, then try again.",
+      "Thread title cannot be empty."
+    ],
+    "apps/mobile/src/features/keyboard/CommandPalette.tsx": [
+      "Close command palette",
+      "In messages",
+      "No results",
+      "Search commands, projects, and threads",
+      "Search commands, projects, and threads…",
+      "Searching…"
+    ],
+    "apps/mobile/src/features/layout/AdaptiveWorkspaceLayout.tsx": [
+      "Hide sidebar",
+      "The sidebar couldn't be displayed"
+    ],
+    "apps/mobile/src/features/layout/WorkspaceEmptyDetail.tsx": [
+      "Add an environment to load projects and start coding sessions.",
+      "Choose a page from the sidebar.",
+      "Choose a pull request from the sidebar to review it.",
+      "Choose a thread from the sidebar or start a new task.",
+      "Choose a thread from the sidebar or start a new thread.",
+      "Select a pull request",
+      "Select a setting",
+      "Select a thread"
+    ],
+    "apps/mobile/src/features/layout/createWorkspaceStackNavigator.ios.tsx": ["Resize inspector"],
+    "apps/mobile/src/features/layout/inspector-host.android.tsx": [
+      "The inspector couldn't be displayed"
+    ],
+    "apps/mobile/src/features/layout/inspector-host.tsx": ["The inspector couldn't be displayed"],
+    "apps/mobile/src/features/layout/workspace-inspector-pane.tsx": ["Resize detail pane"],
+    "apps/mobile/src/features/layout/workspace/PullRequestToolbar.android.tsx": [
+      "Gustaf",
+      "Gustaf, Pull requests"
+    ],
+    "apps/mobile/src/features/layout/workspace/WorkspaceListHeader.android.tsx": ["Gustaf"],
+    "apps/mobile/src/features/layout/workspace/WorkspaceNativeTabs.ios.tsx": ["Settings"],
+    "apps/mobile/src/features/layout/workspace/WorkspaceNoTabs.tsx": [
+      "All sections are hidden",
+      "Edit navigation tabs",
+      "Show a section to add it back to navigation."
+    ],
+    "apps/mobile/src/features/layout/workspace/WorkspaceSectionToolbar.tsx": ["New chat"],
+    "apps/mobile/src/features/layout/workspace/WorkspaceToolbar.tsx": [
+      "Close search",
+      "New chat",
+      "New chat"
+    ],
+    "apps/mobile/src/features/projects/AddProjectScreen.tsx": [
+      "Browse a folder on disk",
+      "Browse folders",
+      "Clone destination",
+      "Clone project",
+      "Continue",
+      "Create project",
+      "Created without a first commit",
+      "Git URL",
+      "Lookup repository",
+      "Project added",
+      "Project already exists",
+      "Project not added",
+      "Start or reconnect an environment before adding a project.",
+      "The project was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+      "This connection cannot add projects.",
+      "This connection cannot add projects.",
+      "This connection cannot browse host folders.",
+      "This connection cannot clone projects.",
+      "This folder does not exist yet. Cloning creates it."
+    ],
+    "apps/mobile/src/features/prompt-links/newTaskPromptLink.ts": [
+      "Connect an environment first.",
+      "Could not clone",
+      "Could not open link",
+      "Could not open link",
+      "Could not start without a project",
+      "Could not start without a project",
+      "Drafts could not be loaded, so the prompt was not added.",
+      "No connected environment offers threads without a project."
+    ],
+    "apps/mobile/src/features/prompt-links/prompt-link-actions.ts": [
+      "Could not copy",
+      "Could not open link",
+      "Drafts could not be loaded, so the prompt was not added.",
+      "Linked prompt ready. Replace draft?",
+      "Prompt from a link",
+      "Try again."
+    ],
+    "apps/mobile/src/features/prompt-links/threadPromptLink.ts": ["Could not open link"],
+    "apps/mobile/src/features/pull-requests/PullRequestActivityFilters.tsx": [
+      "Newest",
+      "Newest first",
+      "Oldest",
+      "Oldest first",
+      "Show in activity",
+      "hidden"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestControls.tsx": [
+      "AI helpers",
+      "AI helpers",
+      "Changed files",
+      "Changed files"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestDescription.tsx": [
+      "Attachments",
+      "Collapse description",
+      "Expand description",
+      "No description provided.",
+      "Show less",
+      "Show more"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestDiscussionScreen.tsx": [
+      "Discussion",
+      "Discussion reply",
+      "Load more replies",
+      "Loading…",
+      "Posting…",
+      "Reply",
+      "Reply…",
+      "Resolved",
+      "This discussion is no longer available.",
+      "Unknown author",
+      "Unresolved",
+      "View file diff",
+      "· Outdated"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestEditScreen.tsx": [
+      "Comment",
+      "Save",
+      "Saving…",
+      "Title",
+      "Write in Markdown…"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestFiles.tsx": [
+      "Changed files",
+      "Changed files",
+      "Changed files",
+      "Filter review files",
+      "Load more files",
+      "Loading changed files",
+      "Loading changed files",
+      "No non-test files loaded yet",
+      "No text changes available.",
+      "Only test files changed",
+      "Renamed from",
+      "Retry loading files",
+      "Review files",
+      "Test files are hidden from this review.",
+      "file",
+      "files"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestFilterSearchScreen.tsx": [
+      "Clear author search",
+      "Clear label search",
+      "Close author filter",
+      "Close label filter",
+      "Couldn't search the host",
+      "Filter by author",
+      "Filter by label",
+      "No matching authors",
+      "No matching labels",
+      "Search people by name or handle on the repositories' hosts.",
+      "Search the labels of the repositories this list covers.",
+      "The host didn't answer. Try again in a moment."
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestInlineCommentScreen.tsx": [
+      "Delete draft",
+      "Delete this draft?",
+      "Edit review comment",
+      "Inline review comment",
+      "Review comment",
+      "Save draft",
+      "Saved comments are private until you submit your review.",
+      "Saving…",
+      "The branch changed. Return to the current diff and select the line again.",
+      "Write feedback on this line…",
+      "Your other review comments will be kept."
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestLabelsScreen.tsx": [
+      "Clear label search",
+      "Close labels",
+      "Couldn't load labels",
+      "No matching labels",
+      "This repository has more labels than are listed here. Apply the rest on the provider.",
+      "This repository has no labels"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestListFilters.tsx": [
+      "By you",
+      "Choose pull request environment",
+      "Filter by author",
+      "Filter by label",
+      "Filters",
+      "Labels",
+      "More filters"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestListRow.tsx": [
+      "Double tap to open. Touch and hold for quick actions."
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestMergeControls.tsx": [
+      "Couldn't complete the merge action",
+      "Merge options",
+      "Reconnect to merge",
+      "Retry stack lookup",
+      "Working…"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestOverviewLoading.tsx": [
+      "Branch",
+      "Checks",
+      "Checks completed",
+      "Checks failing",
+      "Checks running",
+      "Loading pull request details",
+      "Reviews"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestReactions.tsx": [
+      "Couldn't save the reaction",
+      "Try again in a moment."
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestReviewSheet.tsx": [
+      ". Your drafts are kept here.",
+      "Add comment",
+      "Approve",
+      "Branch changed · Tap to choose a new line",
+      "Comment",
+      "Comment",
+      "Post comment",
+      "Request changes",
+      "Review summary",
+      "Submit review",
+      "Submit review",
+      "Submitting…",
+      "Summarize your review…",
+      "Summary",
+      "Summary required to request changes…",
+      "Tap to edit",
+      "The branch changed since you wrote a comment. Choose its current line before submitting.",
+      "Write a comment…",
+      "You can no longer submit line comments on this",
+      "comment",
+      "comments",
+      "pending line"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestReviewersScreen.tsx": [
+      "Close request review",
+      "Couldn't load reviewers",
+      "No matching reviewers",
+      "No reviewers available",
+      "Remove review request",
+      "Request review",
+      "Request review",
+      "Requested",
+      "Requesting reviews requires write access and an open",
+      "Reviewer ID",
+      "Reviewer login or ID",
+      "Search people and teams with access to this repository.",
+      "Tap someone to request a review. Tap a requested reviewer to remove the request.",
+      "This provider accepts a reviewer ID but cannot list candidates.",
+      "· Team"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestRouteScreen.tsx": [
+      "Add labels",
+      "Diff unavailable",
+      "Edit",
+      "Edit labels",
+      "Loading changes",
+      "Loading more files…",
+      "No activity matches these filters.",
+      "Only test files changed",
+      "Reload changes",
+      "Retry loading remaining files",
+      "Select a current line, then choose “Move draft to this line” from its menu.",
+      "Test files are hidden from this review.",
+      "The branch changed. Reload before adding line comments.",
+      "Unknown author",
+      "ago",
+      "file",
+      "files"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestStackCard.tsx": [
+      ". Open a layer to review it or merge the stack through that layer.",
+      "Base:",
+      "Stack",
+      "Stack"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestStatusRows.tsx": [
+      "Approve workflows",
+      "Approve workflows",
+      "Branch",
+      "Fix failing checks",
+      "Open checks on provider",
+      "Request review",
+      "Unknown reviewer",
+      "View reviewers on provider"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestTimeline.tsx": [
+      "More activity is available on the provider.",
+      "Resolved",
+      "Show less",
+      "Show more",
+      "Unknown author",
+      "Unknown author",
+      "Unresolved",
+      "approved",
+      "commented",
+      "requested changes",
+      "started a discussion",
+      "· Outdated"
+    ],
+    "apps/mobile/src/features/pull-requests/PullRequestsScreen.tsx": [
+      "Connect an environment",
+      "Couldn't load pull requests",
+      "Environment offline",
+      "Loading more pull requests",
+      "No matching pull requests",
+      "No results",
+      "Retry loading more pull requests"
+    ],
+    "apps/mobile/src/features/pull-requests/SourceControlAppAccessNotice.tsx": [
+      ", so requests here use your own GitHub login and its lower rate limit.",
+      "Install on",
+      "isn't installed on"
+    ],
+    "apps/mobile/src/features/pull-requests/guide/GuideNotice.tsx": [
+      "Reconnect or ask someone with write access to retry.",
+      "Review guide",
+      "Started",
+      "Writing a guide requires a connection and write access."
+    ],
+    "apps/mobile/src/features/pull-requests/guide/GuideOutline.tsx": [
+      "Context",
+      "Guide options",
+      "Guide options",
+      "Start tour",
+      "file",
+      "files",
+      "stops",
+      "through"
+    ],
+    "apps/mobile/src/features/pull-requests/guide/PullRequestGuideScreen.tsx": [
+      "End of guide",
+      "Excerpts are hidden until the guide is rewritten for the current head.",
+      "Finish review",
+      "Finish review",
+      "Finish tour",
+      "Finish tour",
+      "Loading stop…",
+      "Next stop",
+      "Notes on this stop",
+      "Review guides are disabled for this server.",
+      "Review guides are disabled for this server.",
+      "This guide was rewritten. Go back to start the new tour."
+    ],
+    "apps/mobile/src/features/pull-requests/usePullRequestDescription.ts": [
+      "Could not save the description"
+    ],
+    "apps/mobile/src/features/pull-requests/usePullRequestMaintainerEdits.ts": [
+      "Could not save maintainer access"
+    ],
+    "apps/mobile/src/features/pull-requests/usePullRequestThreads.ts": ["Couldn't open a thread"],
+    "apps/mobile/src/features/review/ReviewCommentComposerSheet.tsx": [
+      "Add Comment",
+      "Add image",
+      "Add image",
+      "Leave a comment...",
+      "No selection",
+      "Select a diff line or range first."
+    ],
+    "apps/mobile/src/features/review/ReviewSheet.tsx": [
+      "Changed files",
+      "Environment",
+      "Native diff view unavailable. Showing the raw patch.",
+      "No changes",
+      "No review diffs",
+      "Partial diff",
+      "Review unavailable",
+      "This diff is empty.",
+      "This thread has no ready turn diffs and the worktree diff is empty."
+    ],
+    "apps/mobile/src/features/settings/ClaudeAccounts.tsx": [
+      "Add",
+      "Add Claude account",
+      "Save",
+      "Use a Claude config folder that is already signed in on this server."
+    ],
+    "apps/mobile/src/features/settings/CloudVoiceSection.tsx": [
+      ". Dictation stays off until you choose another model.",
+      "API key saved on this environment",
+      "API key saved · choose a model to use it",
+      "Add an API key to use this provider",
+      "Ask an administrator to add an OpenRouter key",
+      "Ask an environment administrator to add an API key",
+      "Back to providers",
+      "Check device storage and choose the provider again.",
+      "Check the environment connection and your settings permissions.",
+      "Checking API keys…",
+      "Cloud providers",
+      "Cloud providers",
+      "Could not enable cloud dictation",
+      "Could not load keys · Retry",
+      "Could not load models · Retry",
+      "Could not update the API key",
+      "Environment not connected",
+      "Everyone using it for dictation will lose access.",
+      "Loading transcription models…",
+      "OpenRouter no longer lists",
+      "Optional · use your own API key",
+      "Remove key from environment",
+      "Save",
+      "Save and enable",
+      "Save and enable",
+      "Save key",
+      "Search OpenRouter models",
+      "Tap to manage key",
+      "Update the environment to use this provider",
+      "Uses the API key saved on this environment. The model choice applies only to this device.",
+      "Value"
+    ],
+    "apps/mobile/src/features/settings/EnvironmentRoutesSection.tsx": [
+      "Allowed",
+      "Applies to the route marked In use. Other routes may have different permissions and have not been checked.",
+      "Done",
+      "Edit",
+      "Not granted",
+      "Your permissions"
+    ],
+    "apps/mobile/src/features/settings/OutdatedServerUpdateSection.tsx": [
+      "Downloading update…",
+      "Gustaf",
+      "Installing update…",
+      "No newer version is available yet.",
+      "Restarting and reconnecting…",
+      "Retry update",
+      "This app needs a newer version of Gustaf on this machine.",
+      "Update required"
+    ],
+    "apps/mobile/src/features/settings/ScheduledTaskPickerScreens.tsx": [
+      "No matching threads",
+      "Open a scheduled task form first.",
+      "Scheduled task"
+    ],
+    "apps/mobile/src/features/settings/SettingsAboutRouteScreen.tsx": [
+      "Client Storage",
+      "Open source licenses",
+      "Update failed"
+    ],
+    "apps/mobile/src/features/settings/SettingsClientStorageRouteScreen.tsx": [
+      "Clear all client caches?",
+      "Clear caches",
+      "Clearing caches never removes environment connections, credentials, account data, or appearance preferences.",
+      "Client Storage",
+      "Client storage is temporarily unavailable. Try again after restarting the app.",
+      "Environment caches",
+      "Inspecting cached data…",
+      "No cached data",
+      "Offline cache records will appear here after environments are used.",
+      "Restart the app and try again.",
+      "Storage unavailable",
+      "This removes offline data for every environment. Connections, credentials, account data, and app preferences stay intact.",
+      "This removes offline threads, server metadata, and cached branches for this environment. The saved connection and credentials stay intact."
+    ],
+    "apps/mobile/src/features/settings/SettingsEnvironmentDetailRouteScreen.tsx": [
+      "Connect this environment to manage it.",
+      "Downloading update…",
+      "Environment",
+      "Gustaf",
+      "Managed by",
+      "Not installed",
+      "Refresh providers",
+      "Restarting and reconnecting…",
+      "This connection does not have permission to manage the environment.",
+      "This environment is no longer saved on this device.",
+      "Update and restart Gustaf on this machine.",
+      "Update the desktop app on this machine.",
+      "Update this provider on the environment's machine.",
+      "You are up to date."
+    ],
+    "apps/mobile/src/features/settings/SettingsFollowUpRouteScreen.tsx": [
+      "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.",
+      "While the agent is running"
+    ],
+    "apps/mobile/src/features/settings/SettingsKeyboardRouteScreen.tsx": [
+      "Applies to the composer when a hardware keyboard is connected.",
+      "Keyboard",
+      "Return key"
+    ],
+    "apps/mobile/src/features/settings/SettingsNavigationRouteScreen.tsx": [
+      "Hidden",
+      "In Settings",
+      "Navigation tabs",
+      "Phones show the first four enabled sections; Android tablet rails show all enabled sections. Remaining sections appear at the top of Settings. Hidden sections appear only here. Settings always stays last. Saved on this device.",
+      "Reset tabs",
+      "Tab customization becomes available when there are six sections, including Settings.",
+      "Tab order"
+    ],
+    "apps/mobile/src/features/settings/SettingsNotificationsRouteScreen.tsx": [
+      "Agent Live Updates",
+      "Agent activity",
+      "Agent notifications are enabled for this device.",
+      "Agent notifications are unavailable on this platform.",
+      "Couldn't finish enabling activity updates",
+      "Couldn't finish enabling notifications",
+      "Couldn't open Settings",
+      "Device Notifications",
+      "Disable notifications",
+      "Enable notifications in system Settings to show ongoing agent activity.",
+      "Live Activity Updates",
+      "Live Activity updates require T3 Connect so relay can deliver updates to this device.",
+      "Live Update Settings",
+      "Notification access was granted, but this device could not be registered with T3 Connect. Notifications will start once registration succeeds.",
+      "Notification permission needed",
+      "Notifications disabled",
+      "Notifications disabled",
+      "Notifications enabled",
+      "Notifications require T3 Connect in this app build.",
+      "Notifications unavailable",
+      "Notifications unavailable",
+      "Notifications were denied for this app. Open Settings to enable them.",
+      "Notifications were not enabled.",
+      "Ongoing Agent Activity",
+      "Ongoing activity unavailable",
+      "Open Android Settings, select Gustaf, then enable Live Updates in Notifications.",
+      "Open system Settings to disable notifications for Gustaf.",
+      "Sign in to T3 Connect",
+      "This device could not be registered with T3 Connect, so activity updates won't appear yet. They'll start once registration succeeds.",
+      "Turn off Live Activity preference"
+    ],
+    "apps/mobile/src/features/settings/SettingsOpenSourceLicensesRouteScreen.tsx": [
+      "License notice",
+      "License notice",
+      "License notices are unavailable in this build.",
+      "Open source licenses",
+      "Open source licenses",
+      "Opens the project website",
+      "This license notice is unavailable."
+    ],
+    "apps/mobile/src/features/settings/SettingsProjectOverviewRouteScreen.tsx": [
+      "1 checkout",
+      "Archive project",
+      "Choose a project with the filter above to manage its name, checkouts and removal.",
+      "Connect every machine with this project to change this.",
+      "Deletes the project entry and its threads. Files on disk are not touched.",
+      "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched.",
+      "Environment",
+      "Failed to remove project",
+      "Failed to update project",
+      "Hidden from project pickers. Threads and files are kept.",
+      "Hides the project from project pickers. Threads and files are kept.",
+      "Organize",
+      "Pinned projects come first in project pickers.",
+      "Remove checkout",
+      "Remove project",
+      "Remove this project everywhere",
+      "Save project name",
+      "This connection can no longer change it.",
+      "This project has no checkout on the selected connected environments. Change the filter above.",
+      "Unarchive project"
+    ],
+    "apps/mobile/src/features/settings/SettingsProviderAccountsRouteScreen.tsx": [
+      "Configure a provider with in-app sign-in in web or desktop Settings.",
+      "Connect",
+      "Enter code",
+      "Hides the account email",
+      "Reveals the account email",
+      "Select a connected environment.",
+      "Send response",
+      "Sign in",
+      "Sign in with",
+      "Sign out?",
+      "on the sign-in page."
+    ],
+    "apps/mobile/src/features/settings/SettingsScheduledTasksRouteScreen.tsx": [
+      "Add a name, prompt, project, model, valid schedule, and checkout path if needed.",
+      "Check for issues",
+      "Choose a project in this environment.",
+      "Coalesce key template",
+      "Coalesce window (seconds, 10–3600)",
+      "Coalescing runs the latest payload when the window from the first delivery closes. Empty keys run normally.",
+      "Connect an environment to create a scheduled task.",
+      "Connect an environment to view and create scheduled tasks.",
+      "Copies the URL to the clipboard",
+      "Copy webhook URL",
+      "Could not rotate URL",
+      "Create task",
+      "Date",
+      "Delete task?",
+      "Discard changes?",
+      "Each dedupe key must contain a valid request placeholder. The coalesce window must be whole seconds from 10 to 3600, or blank.",
+      "Edit scheduled task",
+      "Filter",
+      "Incomplete task",
+      "Intervals must be at least 1 minute. Update this interval before saving.",
+      "Invalid age limit",
+      "Invalid filter",
+      "Invalid webhook settings",
+      "Last run failed:",
+      "Loading tasks…",
+      "Minutes between runs",
+      "New scheduled task",
+      "No environments match the current filters. Change the filters to create a task.",
+      "No environments match these filters. Change the filter above.",
+      "No scheduled tasks yet.",
+      "No tasks in this project.",
+      "Once is not available here",
+      "Project unavailable",
+      "Repeat",
+      "Rotate URL",
+      "Rotate URL?",
+      "Rotating…",
+      "Run in",
+      "Runs go to",
+      "Runs only when every filter matches. Other requests are logged as filtered. Separate “is one of” values with commas; a value can't contain a comma.",
+      "Save changes",
+      "Save the task to get its webhook URL.",
+      "Saving task",
+      "Saving…",
+      "Signature check configured on desktop/web.",
+      "Skip requests older than (minutes)",
+      "Task",
+      "Task enabled",
+      "The current URL stops working immediately.",
+      "The prompt can use {{body.a.b}}, {{headers.name}}, {{query.name}}, {{body}} and {{request}}. The filled-in prompt is all the agent sees.",
+      "This environment is disconnected. Reconnect before saving.",
+      "This environment runs an older Gustaf. Update it to schedule a one-time task, or pick another schedule.",
+      "This task no longer exists.",
+      "This task previously ran more than once per minute. Saving requires an interval of at least 1 minute.",
+      "Time",
+      "Time uses the environment's time zone, which may differ from your phone's.",
+      "Value",
+      "Values, comma-separated",
+      "Wait for the task to finish saving before leaving.",
+      "Webhook URL",
+      "Webhook path",
+      "Your unsaved changes will be lost.",
+      "opened, reopened",
+      "· Paused"
+    ],
+    "apps/mobile/src/features/settings/SettingsServerControlsRouteScreen.tsx": [
+      "Check provider updates",
+      "Clones",
+      "Clones go to github.com/owner/repo under the Add project folder, like ghq.",
+      "Continue after restart",
+      "New worktrees",
+      "Preview browser",
+      "Select a project with a checkout on a connected environment.",
+      "Selected environments use different values",
+      "Selected project checkouts use different values",
+      "Some settings are managed by",
+      "Unavailable project",
+      "Use the filter above to select a connected environment.",
+      "and cannot be changed here."
+    ],
+    "apps/mobile/src/features/settings/SettingsVoiceModelsRouteScreen.tsx": [
+      "Clear model search",
+      "Close transcription models",
+      "No models match",
+      "No transcription models",
+      "Search models or languages",
+      "This connection can’t change settings on",
+      "Try another name or language."
+    ],
+    "apps/mobile/src/features/settings/SettingsVoiceRouteScreen.tsx": [
+      "Allow microphone access",
+      "Allow microphone access to record and to see your microphones.",
+      "Android may still use a different microphone if the preferred one can’t be routed.",
+      "Audio stays on this device and is transcribed here.",
+      "Could not save transcription choice",
+      "Dictation on an environment is off for this session. Save again before closing the app, or your previous choice may return when it restarts.",
+      "Microphone access",
+      "No longer paired",
+      "No transcription model installed",
+      "Not connected",
+      "Open Settings",
+      "Preferred order",
+      "Previously selected environment",
+      "Transcribe on",
+      "Transcription unavailable",
+      "Turn on microphone access for Gustaf in Settings to use voice input.",
+      "Voice input uses the first connected microphone in this list. A wired or Bluetooth microphone is added by name the first time you dictate with it connected; until then it falls under Other. Swipe left on a named microphone to forget it."
+    ],
+    "apps/mobile/src/features/settings/SettingsWorkspaceLayout.android.tsx": ["Select a setting"],
+    "apps/mobile/src/features/settings/ThreadSettingsSections.tsx": [
+      "Across environments",
+      "Apply auto-settle defaults",
+      "Auto-settle defaults differ",
+      "Fold working and monitoring threads into a Working section. They return to the top of the list when they need you. While this is on, active threads are ordered by time and cannot be moved.",
+      "Inactive days",
+      "Labs",
+      "Let agents on a machine work on your other machines, and theirs on it. Turn it on for each machine. While off, nothing new starts over a link; running tasks finish.",
+      "Start new threads in the last project you used on this device.",
+      "Use last project"
+    ],
+    "apps/mobile/src/features/settings/VoiceModelSection.tsx": [
+      "% error)",
+      "Choose a transcription model to dictate on this environment.",
+      "No model selected",
+      "Verifying download…"
+    ],
+    "apps/mobile/src/features/settings/appearance/components/AppearancePreviews.tsx": [
+      "Local:",
+      "Messages, labels, and headings scale with this size.",
+      "READY",
+      "The quick brown fox jumps over the lazy dog.",
+      "VITE v7.1.1",
+      "main",
+      "ready in",
+      "t3code",
+      "vpr dev",
+      "watching for changes",
+      "△ 2 warnings",
+      "✓ 85 passed",
+      "✗ 0 failed"
+    ],
+    "apps/mobile/src/features/settings/appearance/sections/AndroidNavigationAppearanceSection.tsx": [
+      "Floating navigation with a separate compose button.",
+      "Material",
+      "One UI",
+      "Standard Android navigation bar and side rail."
+    ],
+    "apps/mobile/src/features/settings/appearance/sections/CodeAppearanceSection.tsx": [
+      "Code & Diffs",
+      "Custom font size",
+      "Word break"
+    ],
+    "apps/mobile/src/features/settings/appearance/sections/TerminalAppearanceSection.tsx": [
+      "Custom font size"
+    ],
+    "apps/mobile/src/features/settings/appearance/sections/ThemeAppearanceSection.tsx": [
+      "Color scheme",
+      "Sets both light and dark appearances",
+      "Themes"
+    ],
+    "apps/mobile/src/features/settings/components/AutoSettleDaysField.tsx": [
+      "Days before auto-settle"
+    ],
+    "apps/mobile/src/features/settings/components/BranchNamingSettings.tsx": [
+      "Append instructions to the naming prompt.",
+      "Mixed",
+      "Mixed. Enter instructions for all selected targets.",
+      "No prefix",
+      "Use julius/ followed by the issue ID and a short description.",
+      "Use t3 or t3/ for t3/add-search. Leave empty for no prefix."
+    ],
+    "apps/mobile/src/features/settings/components/DatabaseStorageNotice.tsx": [
+      "Reclaim database space"
+    ],
+    "apps/mobile/src/features/settings/components/ScheduledTaskPromptField.tsx": [
+      "What should the agent do each time?"
+    ],
+    "apps/mobile/src/features/settings/components/SettingsLegalDocumentRouteScreen.tsx": [
+      "Close legal document",
+      "Couldn't load the",
+      "Open in Browser",
+      "Try Again"
+    ],
+    "apps/mobile/src/features/settings/components/SettingsProjectOverridesSection.tsx": [
+      "Use defaults",
+      "Use environment defaults for this project"
+    ],
+    "apps/mobile/src/features/settings/components/SourceControlSignInSection.tsx": [
+      "Could not start the sign-in",
+      "Sign-in did not finish",
+      "Signed in. GitHub requests use the app's higher rate limit, in repositories where the app is installed."
+    ],
+    "apps/mobile/src/features/settings/useSettingsWriter.ts": ["Could not save settings"],
+    "apps/mobile/src/features/sharing/IncomingShareProvider.tsx": [
+      "Could not cancel import",
+      "Could not import shared content",
+      "Could not import shared content",
+      "Some shared content was skipped"
+    ],
+    "apps/mobile/src/features/terminal/NativeTerminalSurface.tsx": [
+      "Ctrl-C",
+      "type and press return"
+    ],
+    "apps/mobile/src/features/terminal/TerminalContextSheet.tsx": [
+      "Attach selected output",
+      "Remove some context from the draft and try again.",
+      "Select fewer lines to fit the context limit.",
+      "Tap the first and last line to select a range.",
+      "Terminal output",
+      "Too many context items"
+    ],
+    "apps/mobile/src/features/terminal/ThreadTerminalRouteScreen.tsx": [
+      "Attach output",
+      "Attach visible output",
+      "Checking terminal access",
+      "Could not check terminal access",
+      "Could not load terminals",
+      "Could not load terminals",
+      "Dismiss keyboard",
+      "Environment",
+      "Existing terminals will appear here when another client opens one.",
+      "Loading terminals",
+      "Loading terminals",
+      "No terminal output",
+      "No terminal sessions",
+      "Opening terminal…",
+      "Opening terminal…",
+      "Reading existing terminal sessions.",
+      "Reading existing terminal sessions.",
+      "Show keyboard",
+      "Show keyboard",
+      "Terminal access unavailable",
+      "Terminal unavailable",
+      "Terminal unavailable",
+      "There is no visible output to attach.",
+      "This connection does not have permission to view terminals.",
+      "This terminal route needs an active thread and workspace.",
+      "This thread does not have a workspace root yet, so there is nowhere to open a shell.",
+      "Thread unavailable",
+      "Waiting for this connection's permissions."
+    ],
+    "apps/mobile/src/features/threads/ChatGptSharingStatus.tsx": [
+      "ChatGPT sharing is on",
+      "ChatGPT token sharing is active",
+      "Using ChatGPT plan"
+    ],
+    "apps/mobile/src/features/threads/ChildThreadApprovals.tsx": ["Approval from"],
+    "apps/mobile/src/features/threads/ComposerAttachmentButton.tsx": [
+      "Add attachment",
+      "Add attachment"
+    ],
+    "apps/mobile/src/features/threads/ComposerCommandPopover.tsx": ["skill:"],
+    "apps/mobile/src/features/threads/ComposerErrorNotice.tsx": ["Dismiss error"],
+    "apps/mobile/src/features/threads/ComposerFeedback.tsx": ["Copy ID", "Dismiss feedback notice"],
+    "apps/mobile/src/features/threads/ComposerQueuedEdit.tsx": ["Editing queued message"],
+    "apps/mobile/src/features/threads/ComposerUsageLimits.tsx": ["Dismiss usage limits"],
+    "apps/mobile/src/features/threads/CopyTextButton.tsx": [
+      "Copied",
+      "Could not copy",
+      "Could not copy",
+      "Try again.",
+      "Try again."
+    ],
+    "apps/mobile/src/features/threads/CustomSnoozeSheet.tsx": [
+      "Cancel custom snooze",
+      "Duration amount",
+      "Duration unit",
+      "Snooze mode",
+      "Snooze until"
+    ],
+    "apps/mobile/src/features/threads/DraftThreadHeader.tsx": [
+      "Available after the first message",
+      "Could not pull",
+      "Git action failed",
+      "This action needs a saved thread."
+    ],
+    "apps/mobile/src/features/threads/FreshSessionNotice.tsx": [
+      "Keep the current session",
+      "Your next message starts a fresh session. The agent won't see earlier messages in this thread."
+    ],
+    "apps/mobile/src/features/threads/GitActionProgressOverlay.tsx": ["Source control"],
+    "apps/mobile/src/features/threads/LinkRequestCard.tsx": [
+      ". The agent can use that link as it is; change its access in Settings → Connections.",
+      ": Settings → Connections → Create link, then paste its code here.",
+      "Agents here can then launch, message and wait on threads there. It appears in that machine's Connections, where it can be revoked.",
+      "An agent here never gets more there than its own mode here either. Threads it starts there cannot change that environment's own threads, projects or settings.",
+      "Choose machine…",
+      "Create a link on",
+      "Link",
+      "Link a machine",
+      "Link a machine this app does not know, by its https or Tailscale address.",
+      "Link a machine to this environment",
+      "Linking…",
+      "Review link…",
+      "This app has no address for",
+      "This environment is already linked to",
+      "Use this link",
+      "that another machine can reach. Enter its https or Tailscale address."
+    ],
+    "apps/mobile/src/features/threads/LinkedPullRequestList.tsx": [
+      "Touch and hold for actions.",
+      "Waiting for host state"
+    ],
+    "apps/mobile/src/features/threads/McpAppFullscreenScreen.tsx": [
+      "App",
+      "Exit full screen",
+      "This app cannot be shown."
+    ],
+    "apps/mobile/src/features/threads/McpAppWebView.tsx": [
+      "Allow",
+      "Open",
+      "Save",
+      "Send",
+      "The",
+      "The",
+      "The",
+      "Unable to load the",
+      "app",
+      "app is open full screen",
+      "app left its page and was stopped",
+      "app was closed"
+    ],
+    "apps/mobile/src/features/threads/NativeChildWorkSheet.tsx": ["Subagent"],
+    "apps/mobile/src/features/threads/NewTaskContextPickerScreens.tsx": [
+      "Base branch",
+      "Branch",
+      "Could not switch branch",
+      "Loading branches…",
+      "Next reconnect at",
+      "No branches available",
+      "No matching branches",
+      "Reconnect now"
+    ],
+    "apps/mobile/src/features/threads/NewTaskDraftRouteScreen.tsx": [
+      "Could not switch branch",
+      "Switching branch..."
+    ],
+    "apps/mobile/src/features/threads/NewTaskDraftScreen.tsx": [
+      "Attached thread unavailable",
+      "Could not queue task",
+      "Failed to remove project",
+      "Loading branches…",
+      "Opens the project picker",
+      "Opens the project picker",
+      "The shared content is no longer in the inbox. You can continue editing this task draft.",
+      "Too many attachments",
+      "Too much context",
+      "What should we build",
+      "Your draft is saved on this device. Connect to an environment to choose its first model.",
+      "in"
+    ],
+    "apps/mobile/src/features/threads/NewTaskRouteScreen.tsx": [
+      "Add environment",
+      "Add new project",
+      "Add new project",
+      "Could not change project",
+      "Could not start without a project",
+      "No matching projects",
+      "Start a task without a project",
+      "Start a task without a project",
+      "Try a different project name or workspace path."
+    ],
+    "apps/mobile/src/features/threads/PendingApprovalCard.tsx": [
+      "Approval needed",
+      "The provider process for this request is no longer available. Interrupt or restart the run to continue.",
+      "This connection cannot respond to approvals."
+    ],
+    "apps/mobile/src/features/threads/PendingUserInputCard.tsx": [
+      "Collapse user input",
+      "Dismiss without answering",
+      "Fill in the pending answers",
+      "The provider process for this request is no longer available. Interrupt or restart the run to continue.",
+      "This connection cannot submit answers.",
+      "User input needed",
+      "User input needed",
+      "question"
+    ],
+    "apps/mobile/src/features/threads/ProposedPlanCard.tsx": [
+      "Copy plan",
+      "Could not save plan",
+      "Enter a path relative to the thread's workspace. A file already at that path is replaced.",
+      "Enter a workspace path",
+      "Plan saved to workspace",
+      "Proposed plan",
+      "Save to workspace"
+    ],
+    "apps/mobile/src/features/threads/ProviderSubagentBar.tsx": [
+      "Open parent",
+      "Work",
+      "· Runs on its own"
+    ],
+    "apps/mobile/src/features/threads/QuestionAttachments.tsx": [
+      "Could not attach file",
+      "Could not attach file",
+      "Could not paste image",
+      "Could not paste image",
+      "Or type a custom answer",
+      "Too many attachments."
+    ],
+    "apps/mobile/src/features/threads/SecretRequestCard.tsx": ["Save securely", "Value"],
+    "apps/mobile/src/features/threads/ThreadAgentsSheet.tsx": [
+      "No agents in this turn.",
+      "Opens this agent's thread",
+      "Provider-managed agent. Its work appears in the transcript."
+    ],
+    "apps/mobile/src/features/threads/ThreadArrangementSheet.tsx": [
+      "Arrange threads",
+      "Close arrange threads",
+      "Could not load older threads. Retry",
+      "Drag to reorder, pin, or settle. Changes save when you drop.",
+      "Loading",
+      "Move up and Move down reorder within this section. Other actions move between sections."
+    ],
+    "apps/mobile/src/features/threads/ThreadBackgroundWorkSheet.tsx": [
+      "Nothing running in the background."
+    ],
+    "apps/mobile/src/features/threads/ThreadComposer.tsx": [
+      "Choose how to send this message",
+      "Model unavailable. Open model settings.",
+      "Pasted text is too large for this message",
+      "Remove some text or an attachment, then paste again.",
+      "Stop agent",
+      "Stop agent",
+      "This connection cannot control this task. You can still edit your draft.",
+      "This provider does not currently report limits.",
+      "Usage limits unavailable"
+    ],
+    "apps/mobile/src/features/threads/ThreadCreationFailedCard.tsx": [
+      "Could not start task",
+      "Your prompt was kept in the project draft."
+    ],
+    "apps/mobile/src/features/threads/ThreadDetailScreen.tsx": [
+      "Approval feedback",
+      "Ask anything",
+      "Could not edit message",
+      "Could not force stop the agent",
+      "Could not update thread",
+      "Force stop the agent?",
+      "It has not answered Stop. Force stop ends the turn and kills the agent's processes, unless other working threads share them.",
+      "Pi",
+      "Send a message to decline and redirect the agent",
+      "Send approval feedback without attachments or added context.",
+      "Send feedback to decline this request",
+      "The conversation couldn't be displayed",
+      "Turn stopped; the agent is still shutting down",
+      "Turn stopped; the agent process kept running"
+    ],
+    "apps/mobile/src/features/threads/ThreadFeed.tsx": [
+      "Ask the agent to inspect the repo, run a command, or continue the active thread.",
+      "Compacting context",
+      "Context compaction",
+      "Copy message",
+      "Copy message",
+      "Could not copy context",
+      "Could not open attachment",
+      "Edit pending message",
+      "Fork created",
+      "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
+      "Load earlier activity",
+      "Load earlier activity",
+      "Loading earlier activity…",
+      "No conversation yet",
+      "Pending",
+      "Try copying this context again.",
+      "Use template"
+    ],
+    "apps/mobile/src/features/threads/ThreadGitControls.tsx": [
+      "Choose a feature branch",
+      "Switch branches before publishing changes from this draft."
+    ],
+    "apps/mobile/src/features/threads/ThreadGuestShareBar.tsx": [
+      "Guest link active",
+      "Guest link expired",
+      "Stop sharing?",
+      "The guest loses access and the link stops working."
+    ],
+    "apps/mobile/src/features/threads/ThreadHeader.tsx": ["Hide inspector", "Show inspector"],
+    "apps/mobile/src/features/threads/ThreadInlineFilePreview.tsx": [
+      "Audio",
+      "Loading…",
+      "Pause audio",
+      "Play audio",
+      "Retry audio",
+      "Unavailable · tap play to retry"
+    ],
+    "apps/mobile/src/features/threads/ThreadMarkdownImage.tsx": [
+      "Image unavailable",
+      "Markdown image",
+      "Markdown image",
+      "Touch and hold for media actions",
+      "Touch and hold for media actions"
+    ],
+    "apps/mobile/src/features/threads/ThreadNavigationSidebar.tsx": [
+      "Gustaf, Threads",
+      "Loading threads…",
+      "No environments connected",
+      "No matching threads",
+      "No threads yet",
+      "Searching thread messages…"
+    ],
+    "apps/mobile/src/features/threads/ThreadPullRequestsSheet.tsx": [
+      "No linked",
+      "linked",
+      "open ·"
+    ],
+    "apps/mobile/src/features/threads/ThreadQueueControl.tsx": [
+      "Editing",
+      "No messages waiting in this queue.",
+      "Opens this message in the composer for editing",
+      "Queue paused",
+      "Resume queue"
+    ],
+    "apps/mobile/src/features/threads/ThreadRouteScreen.tsx": [
+      "Could not restore draft",
+      "Could not resume thread",
+      "Manage environments",
+      "Opening thread…",
+      "Reconnect environment",
+      "This thread is not available in the current mobile snapshot.",
+      "Thread",
+      "Thread unavailable"
+    ],
+    "apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx": ["Hidden", "Legacy"],
+    "apps/mobile/src/features/threads/ThreadSettingsSheet.tsx": [
+      "Cancel thread settings",
+      "Catalog",
+      "Could not refresh models",
+      "Manage hidden models",
+      "Model unavailable",
+      "No available models",
+      "No favorite models",
+      "No matching models",
+      "Reasoning controlled by prompt",
+      "Set up this provider on web or desktop, or select another model.",
+      "Thread settings",
+      "Your prompt contains \"ultrathink\" in the text. Remove it to change this option."
+    ],
+    "apps/mobile/src/features/threads/ThreadWorkflowGroup.tsx": [
+      "Collapses the workflow",
+      "Its thread is not available yet",
+      "No agents yet",
+      "Opens the current phase",
+      "Opens this agent's thread"
+    ],
+    "apps/mobile/src/features/threads/UsageLimitRecoveryCard.tsx": [
+      "Cancel auto-resume",
+      "ChatGPT usage limit reached",
+      "Request copied. Send it to your workspace admin.",
+      "Resume at reset",
+      "Snooze until reset",
+      "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available.",
+      "Wake now",
+      "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
+    ],
+    "apps/mobile/src/features/threads/floating-working-control.tsx": [
+      "Compacting",
+      "Opens queued messages to send now, edit, or remove",
+      "Opens this turn's subagents",
+      "Scroll to end",
+      "Scroll to end",
+      "Scroll to end",
+      "Shows the full Pi status",
+      "queued"
+    ],
+    "apps/mobile/src/features/threads/git/GitBranchesSheet.tsx": [
+      "Branches & worktrees",
+      "Create & checkout",
+      "Create worktree",
+      "Existing branches",
+      "Loading branches...",
+      "New branch",
+      "New branch",
+      "New branch name",
+      "New worktree",
+      "No local branches found.",
+      "Worktree base branch",
+      "Worktree branch name"
+    ],
+    "apps/mobile/src/features/threads/git/GitCommitSheet.tsx": [
+      "(detached HEAD)",
+      "Cancel commit",
+      "Changed files",
+      "Commit message",
+      "Commit message",
+      "Commit on a new branch",
+      "Describe your changes…",
+      "Deselect all",
+      "Leave empty to generate a message automatically.",
+      "No changed files to commit.",
+      "Select all",
+      "You’re on the default branch. You can create a new branch when committing.",
+      "selected · +"
+    ],
+    "apps/mobile/src/features/threads/git/GitConfirmSheet.tsx": [
+      "Choose how to continue.",
+      "Continue",
+      "Feature branch & continue",
+      "Run action on default branch?"
+    ],
+    "apps/mobile/src/features/threads/git/GitOverviewSheet.tsx": [
+      "Branches & worktrees",
+      "Inspect changes, uncommitted edits, and turn diffs",
+      "Pull latest",
+      "Switch branch, create branch, or move to a worktree",
+      "This connection cannot change source control.",
+      "View branches and worktrees",
+      "Worktree"
+    ],
+    "apps/mobile/src/features/threads/new-task-flow-provider.tsx": ["Could not switch machine"],
+    "apps/mobile/src/features/threads/thread-handoff-row.tsx": ["Show provider account"],
+    "apps/mobile/src/features/threads/thread-inspector-preview.tsx": ["Close thread"],
+    "apps/mobile/src/features/threads/thread-list-v2-items.tsx": [
+      "Could not snooze thread",
+      "Sends on reconnect",
+      "That snooze time has passed. Choose another time.",
+      "Try copying this thread again.",
+      "Unsent",
+      "Woke"
+    ],
+    "apps/mobile/src/features/threads/thread-search-match.tsx": ["Agent:", "You:"],
+    "apps/mobile/src/features/threads/thread-subagent-group.tsx": [
+      "Opens this agent's thread",
+      "Provider-managed agent"
+    ],
+    "apps/mobile/src/features/threads/thread-work-log.tsx": [
+      "Long press to copy.",
+      "Long press to copy.",
+      "Opens this agent's thread. Long press to copy.",
+      "Retry workspace preparation",
+      "exit"
+    ],
+    "apps/mobile/src/features/threads/thread-workflow-opening.tsx": [
+      "Opens this agent's thread",
+      "Show full script",
+      "Show less",
+      "Workflow started"
+    ],
+    "apps/mobile/src/features/threads/turnThreadIntoProject.ts": [
+      "This connection cannot change threads."
+    ],
+    "apps/mobile/src/features/threads/use-composer-command-menu.ts": [
+      "Remove some context from the draft and try again.",
+      "Remove some context from the draft and try again.",
+      "Remove some context from the draft and try again.",
+      "Too many context items",
+      "Too many context items",
+      "Too many context items"
+    ],
+    "apps/mobile/src/features/threads/useFileChipShare.ts": ["Could not share file"],
+    "apps/mobile/src/features/threads/useStartSideChat.ts": [
+      "Side chat not started",
+      "Side chat not started",
+      "Side chat not started",
+      "The side chat is no longer available.",
+      "The side chat was created, but it did not reach this device."
+    ],
+    "apps/mobile/src/features/threads/worktree-setup-card.tsx": [
+      "Background setup",
+      "Cancel setup",
+      "Cancel worktree setup",
+      "Details",
+      "Setup script output",
+      "Worktree setup details"
+    ],
+    "apps/mobile/src/features/triage/useStartTriage.ts": [
+      "Could not copy",
+      "Could not start triage"
+    ],
+    "apps/mobile/src/features/updates/app-updates.ts": [
+      "A new version has been downloaded and installs automatically the next time you leave the app. Install it now instead?",
+      "Update ready"
+    ],
+    "apps/mobile/src/features/usage/ChatGptUsageSummary.tsx": [
+      ". Open ChatGPT with the account you connected."
+    ],
+    "apps/mobile/src/features/usage/UsageLimitsPooled.tsx": [
+      "% left",
+      "% left by now",
+      "% of the pool",
+      "Even pace:",
+      "Hide account email",
+      "No provider on the selected environments reports subscription limits.",
+      "Reset credits",
+      "Reveal account email",
+      "Select an environment to see limits.",
+      "Show account details",
+      "Show account details",
+      "Signed in",
+      "Source",
+      "This account is no longer reporting limits on the selected environments.",
+      "could not refresh limits. Showing the last known values.",
+      "left"
+    ],
+    "apps/mobile/src/features/usage/UsageLimitsSection.tsx": [
+      "% left",
+      "Hide account label",
+      "Reveal account label",
+      "This connection cannot manage provider accounts.",
+      "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+      "Use a reset credit?",
+      "Use reset",
+      "Using…"
+    ],
+    "apps/mobile/src/features/usage/UsageRouteScreen.tsx": [
+      "* if billed at full API rate",
+      "By model",
+      "By speed",
+      "By type",
+      "Connect an environment to see usage.",
+      "Counted once across environments sharing a transcript directory:",
+      "No activity in this window.",
+      "Processed tokens",
+      "Raw token cost",
+      "Scanning provider transcripts…",
+      "Select an environment to see usage.",
+      "Unpriced",
+      "of records, excluded from cost",
+      "vs full input rates"
+    ],
+    "apps/mobile/src/features/voice-input/ComposerDictationControl.tsx": [
+      "Cancel dictation",
+      "Finish dictation",
+      "Open microphone settings",
+      "Start dictation"
+    ],
+    "apps/mobile/src/features/voice-input/GlobalVoiceInputControl.tsx": [
+      "Cancel dictation",
+      "Dismiss voice input error",
+      "Finish dictation",
+      "Hides dictation controls",
+      "Open microphone settings",
+      "Retry dictation",
+      "Shows dictation controls"
+    ],
+    "apps/mobile/src/lib/attachmentDocument.ts": ["Could not share file"],
+    "apps/mobile/src/native/MermaidCodeBlock.tsx": [
+      "Mermaid",
+      "Mermaid diagram",
+      "Opens the diagram full screen",
+      "Show code",
+      "Show diagram",
+      "Unable to render diagram:"
+    ],
+    "apps/mobile/src/native/T3ComposerEditor.ios.tsx": ["Send Message", "Send Message"],
+    "apps/mobile/src/native/V5StackHeader.ios.tsx": ["Search"],
+    "apps/mobile/src/state/threadOutboxDelivery.ts": [
+      "Some queued messages could not be loaded",
+      "Unreadable records and attachment files are still saved. Other messages can still be sent."
+    ],
+    "apps/mobile/src/state/use-composer-attachment-actions.ts": [
+      "Could not attach file",
+      "Could not attach pasted text",
+      "Could not paste images",
+      "This server does not support file attachments."
+    ],
+    "apps/mobile/src/state/use-remote-environment-registry.ts": [
+      "Client not supported",
+      "Remove from this device?",
+      "Remove from this device?"
+    ],
+    "apps/mobile/src/state/use-selected-thread-requests.ts": [
+      "Attachments are not ready",
+      "Wait for uploads to finish, or retry failed uploads."
+    ],
+    "apps/mobile/src/state/use-thread-composer-state.ts": [
+      "A queued message cannot be left empty.",
+      "Add a message",
+      "Ask a side question",
+      "Could not save the queued message",
+      "Could not save the queued message",
+      "It may have already started. Your edit is still in the composer.",
+      "Remove some context from the draft and try again.",
+      "Remove the attachments and context, then send it again.",
+      "Send a message before you submit feedback.",
+      "Side chat not started",
+      "Side chats take text only",
+      "Start a Codex thread first",
+      "Too many attachments",
+      "Too many attachments",
+      "Too many context items",
+      "Too much context",
+      "Type the question after /side, then send it."
+    ],
+    "apps/mobile/src/widgets/AgentActivity.tsx": ["Approval", "Failed", "Input"],
+    "apps/mobile/src/widgets/SubscriptionUsage.android.tsx": [
+      "Open T3 to refresh",
+      "Tap to connect in T3"
+    ],
+    "apps/mobile/src/widgets/SubscriptionUsage.tsx": [
+      "% left",
+      "No subscription limits available.",
+      "Open T3",
+      "Tap to connect in T3",
+      "more in T3"
+    ]
+  },
+  "missingRu": {
+    "web": [],
+    "mobile": []
+  }
+}

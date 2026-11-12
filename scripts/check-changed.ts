@@ -182,8 +182,8 @@ export const comparisonBase = Effect.fn("checkChanged.comparisonBase")(function*
 // CI's lint and knip also read Astro components' frontmatter.
 const CODE = /\.(?:[cm]?[jt]sx?|astro)$/;
 const TEST = /\.test\.[cm]?[jt]sx?$/;
-// CI runs the .github/scripts tests with `node --test`; vitest passes a failing node:test file.
-const NODE_TEST = /^\.github[/\\]scripts[/\\]/;
+// CI runs these with `node --test`; vitest passes a failing node:test file.
+const NODE_TEST = /^\.github[/\\]scripts[/\\]|^scripts[/\\]i18n-audit\.test\.mjs$/;
 export const splitTests = (tests: Iterable<string>) => {
   const all = [...tests];
   return {
@@ -473,6 +473,9 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   const typecheckWorkers = Math.min(concurrency, affected.length);
   const command = (name: string, args: ReadonlyArray<string>) => ({ name, run: vp(args) });
   const compilerFiles = compilerApps.reduce((count, app) => count + app.names.length, 0);
+  const runI18nAudit = files.some((file) =>
+    /^(apps\/(web|mobile)\/src\/|scripts\/i18n-audit\.)/.test(file),
+  );
 
   const steps: Array<Step<never>> = [
     ...(runPatchCheck ? [{ name: "unused patches", run: checkPatches }] : []),
@@ -529,6 +532,9 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
             ...nodeTests,
           ]),
         ]
+      : []),
+    ...(runI18nAudit
+      ? [command("i18n audit", ["exec", "node", "scripts/i18n-audit.mjs", "--check"])]
       : []),
     ...(compilerApps.length > 0
       ? [
