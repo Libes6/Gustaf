@@ -1,5 +1,6 @@
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron, isSecretsFeatureEnabled } from "~/env";
+import { hasShellAccount } from "~/shellAccount";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
 import { STATIC_KEYBINDING_COMMANDS, type KeybindingCommand } from "@t3tools/contracts";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -56,6 +57,8 @@ export interface SettingsSearchItem {
   readonly searchTerms?: ReadonlyArray<string>;
   readonly scope?: SettingsSearchScope;
   readonly desktopOnly?: boolean;
+  /** The Gustaf shell's cloud account. */
+  readonly shellAccountOnly?: boolean;
   readonly macOnly?: boolean;
   readonly windowsOnly?: boolean;
   readonly releaseChannelOnly?: boolean;
@@ -846,6 +849,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
   },
   {
+    id: "account",
+    title: "Account",
+    to: "/settings/about",
+    searchTerms: ["sign in sign out log in GitHub cloud devices register this computer revoke"],
+    shellAccountOnly: true,
+  },
+  {
     id: "app-version",
     title: "Version",
     to: "/settings/about",
@@ -1493,6 +1503,7 @@ export function settingsForThisPlatform(
   return items.filter(
     (item) =>
       (isElectron || item.desktopOnly !== true) &&
+      (!item.shellAccountOnly || hasShellAccount) &&
       (!item.releaseChannelOnly || isElectron || HOSTED_APP_CHANNEL !== null) &&
       (!item.secretsFeatureOnly || isSecretsFeatureEnabled) &&
       (!item.macOnly || isMacPlatform(platform)) &&
