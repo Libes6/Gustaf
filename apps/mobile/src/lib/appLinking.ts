@@ -13,6 +13,8 @@ export function shouldHandleAppLink(url: string, cloudConfigured: boolean): bool
     !route.includes("expo-development-client") &&
     !route.includes("://expo-sharing") &&
     !/^(?:gustaf|t3code)(-dev|-preview)?:\/*$/.test(url) &&
+    // The account sign-in redirect belongs to the open browser session, not navigation.
+    !/^gustaf(-dev|-preview)?:\/\/auth\/?$/.test(route) &&
     (cloudConfigured || !CLOUD_ONLY_LINK_PATH.test(route))
   );
 }

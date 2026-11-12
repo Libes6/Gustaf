@@ -334,6 +334,13 @@ export function CommandPalette(props: {
         run: () => openSettings(navigation, "SettingsScheduledTasks"),
       },
       {
+        key: "account",
+        kind: "action",
+        title: t("Account"),
+        searchTerms: ["sign in", "sign out", "github", "devices"],
+        run: () => openSettings(navigation, "SettingsAccount"),
+      },
+      {
         key: "usage",
         kind: "action",
         title: t("Usage"),
