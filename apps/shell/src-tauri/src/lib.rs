@@ -1,4 +1,6 @@
+mod account;
 mod bridge;
+mod cloud_api;
 mod connection_storage;
 mod ipc_scope;
 mod local_env;
@@ -217,7 +219,7 @@ fn is_external_browser_url(url: &tauri::Url) -> bool {
     url.scheme() == "http" || url.scheme() == "https"
 }
 
-fn open_external_url(url: &tauri::Url) {
+pub(crate) fn open_external_url(url: &tauri::Url) {
     if !is_external_browser_url(url) && !bridge::is_handoff_url(url) {
         return;
     }
@@ -354,11 +356,19 @@ pub fn run() {
             updater::update_check,
             updater::update_download,
             updater::update_install,
+            account::account_state,
+            account::account_sign_in,
+            account::account_cancel_sign_in,
+            account::account_sign_out,
+            account::account_devices,
+            account::account_register_device,
+            account::account_revoke_device,
         ])
         .setup(|app| {
             updater::initialize(app)?;
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
+            app.manage(account::AccountStore::default());
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));

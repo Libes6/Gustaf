@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-register-device"
+description = "Enables the account_register_device command without any pre-configured scope."
+commands.allow = ["account_register_device"]
+
+[[permission]]
+identifier = "deny-account-register-device"
+description = "Denies the account_register_device command without any pre-configured scope."
+commands.deny = ["account_register_device"]

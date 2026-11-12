@@ -29,6 +29,13 @@
     "allow-update-state",
     "allow-update-check",
     "allow-update-download",
-    "allow-update-install"
+    "allow-update-install",
+    "allow-account-state",
+    "allow-account-sign-in",
+    "allow-account-cancel-sign-in",
+    "allow-account-sign-out",
+    "allow-account-devices",
+    "allow-account-register-device",
+    "allow-account-revoke-device"
   ]
 }

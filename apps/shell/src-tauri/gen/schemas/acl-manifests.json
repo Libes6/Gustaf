@@ -2,6 +2,41 @@
   "__app-acl__": {
     "default_permission": null,
     "permissions": {
+      "allow-account-cancel-sign-in": {
+        "identifier": "allow-account-cancel-sign-in",
+        "description": "Enables the account_cancel_sign_in command without any pre-configured scope.",
+        "commands": { "allow": ["account_cancel_sign_in"], "deny": [] }
+      },
+      "allow-account-devices": {
+        "identifier": "allow-account-devices",
+        "description": "Enables the account_devices command without any pre-configured scope.",
+        "commands": { "allow": ["account_devices"], "deny": [] }
+      },
+      "allow-account-register-device": {
+        "identifier": "allow-account-register-device",
+        "description": "Enables the account_register_device command without any pre-configured scope.",
+        "commands": { "allow": ["account_register_device"], "deny": [] }
+      },
+      "allow-account-revoke-device": {
+        "identifier": "allow-account-revoke-device",
+        "description": "Enables the account_revoke_device command without any pre-configured scope.",
+        "commands": { "allow": ["account_revoke_device"], "deny": [] }
+      },
+      "allow-account-sign-in": {
+        "identifier": "allow-account-sign-in",
+        "description": "Enables the account_sign_in command without any pre-configured scope.",
+        "commands": { "allow": ["account_sign_in"], "deny": [] }
+      },
+      "allow-account-sign-out": {
+        "identifier": "allow-account-sign-out",
+        "description": "Enables the account_sign_out command without any pre-configured scope.",
+        "commands": { "allow": ["account_sign_out"], "deny": [] }
+      },
+      "allow-account-state": {
+        "identifier": "allow-account-state",
+        "description": "Enables the account_state command without any pre-configured scope.",
+        "commands": { "allow": ["account_state"], "deny": [] }
+      },
       "allow-advertised-endpoints": {
         "identifier": "allow-advertised-endpoints",
         "description": "Enables the advertised_endpoints command without any pre-configured scope.",
@@ -116,6 +151,41 @@
         "identifier": "allow-write-connection-catalog",
         "description": "Enables the write_connection_catalog command without any pre-configured scope.",
         "commands": { "allow": ["write_connection_catalog"], "deny": [] }
+      },
+      "deny-account-cancel-sign-in": {
+        "identifier": "deny-account-cancel-sign-in",
+        "description": "Denies the account_cancel_sign_in command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_cancel_sign_in"] }
+      },
+      "deny-account-devices": {
+        "identifier": "deny-account-devices",
+        "description": "Denies the account_devices command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_devices"] }
+      },
+      "deny-account-register-device": {
+        "identifier": "deny-account-register-device",
+        "description": "Denies the account_register_device command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_register_device"] }
+      },
+      "deny-account-revoke-device": {
+        "identifier": "deny-account-revoke-device",
+        "description": "Denies the account_revoke_device command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_revoke_device"] }
+      },
+      "deny-account-sign-in": {
+        "identifier": "deny-account-sign-in",
+        "description": "Denies the account_sign_in command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_sign_in"] }
+      },
+      "deny-account-sign-out": {
+        "identifier": "deny-account-sign-out",
+        "description": "Denies the account_sign_out command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_sign_out"] }
+      },
+      "deny-account-state": {
+        "identifier": "deny-account-state",
+        "description": "Denies the account_state command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_state"] }
       },
       "deny-advertised-endpoints": {
         "identifier": "deny-advertised-endpoints",
