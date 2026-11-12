@@ -754,6 +754,15 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "keep-awake",
+    title: "Keep computer awake",
+    to: "/settings/maintenance",
+    scope: "environment-defaults",
+    searchTerms: [
+      "caffeinate sleep prevent stay awake power laptop lid inhibit always agents working phone remote",
+    ],
+  },
+  {
     id: "background-activity",
     title: "Background activity",
     to: "/settings/maintenance",

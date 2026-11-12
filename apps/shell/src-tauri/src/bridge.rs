@@ -159,10 +159,6 @@ const INIT_SCRIPT: &str = r#"(() => {
       window.localStorage.removeItem("gustaf.connectionCatalog");
       return true;
     }),
-    ...(__GUSTAF_PLATFORM__ === "darwin" ? {
-      getPreventSleep: () => invoke("get_prevent_sleep"),
-      setPreventSleep: (enabled) => invoke("set_prevent_sleep", { enabled }),
-    } : {}),
     getServerExposureState: () => invoke("server_exposure_state"),
     setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
     setTailscaleServeEnabled: (input) =>
