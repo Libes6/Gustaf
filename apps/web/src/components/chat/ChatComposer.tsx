@@ -394,6 +394,7 @@ export interface ChatComposerProps {
     customAnswer: string;
     activeQuestion: {
       id: string;
+      options: ReadonlyArray<unknown>;
       initialAnswer?: string | undefined;
       multiSelect?: boolean | undefined;
       allowCustomAnswer?: boolean | undefined;
@@ -3558,7 +3559,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
                             ? t("chatA.chatComposer.chooseOptionAbove")
-                            : t("chatA.chatComposer.typeOwnAnswer")
+                            : activePendingProgress.activeQuestion?.options.length === 0
+                              ? t("chatA.chatComposer.typeAnswer")
+                              : t("chatA.chatComposer.typeOwnAnswer")
                           : projectSelectionRequired
                             ? t("chatA.chatComposer.chooseProjectAbove")
                             : showProviderUnavailable
