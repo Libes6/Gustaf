@@ -68,6 +68,8 @@ jobs:
       - name: Verify production image with PostgreSQL
         run: |
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml up -d --wait --wait-timeout 90
+          # The container healthcheck only covers liveness; prove the start command migrated the database.
+          test "$(docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T postgres psql -U gustaf -d gustaf_cloud -tAc "select to_regclass('drizzle.__drizzle_migrations') is not null")" = t
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api curl --fail --silent http://127.0.0.1:3100/health/ready
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api node dist/database/migrate.js
           docker compose -p cloud-api-ci -f apps/api/compose.image-test.yaml exec -T api node dist/database/migrate.js
