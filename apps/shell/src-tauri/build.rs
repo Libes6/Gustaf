@@ -4,8 +4,6 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "dropped_paths",
             "drag_window",
-            "get_prevent_sleep",
-            "set_prevent_sleep",
             "read_connection_catalog",
             "write_connection_catalog",
             "reveal_window",
@@ -27,6 +25,13 @@ fn main() {
             "update_check",
             "update_download",
             "update_install",
+            "account_state",
+            "account_sign_in",
+            "account_cancel_sign_in",
+            "account_sign_out",
+            "account_devices",
+            "account_register_device",
+            "account_revoke_device",
         ]),
     ))
     .expect("failed to run tauri-build");

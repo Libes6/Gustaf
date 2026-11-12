@@ -159,6 +159,48 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the account_cancel_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-cancel-sign-in",
+          "markdownDescription": "Enables the account_cancel_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_devices command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-devices",
+          "markdownDescription": "Enables the account_devices command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_register_device command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-register-device",
+          "markdownDescription": "Enables the account_register_device command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_revoke_device command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-revoke-device",
+          "markdownDescription": "Enables the account_revoke_device command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-sign-in",
+          "markdownDescription": "Enables the account_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_sign_out command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-sign-out",
+          "markdownDescription": "Enables the account_sign_out command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the account_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-account-state",
+          "markdownDescription": "Enables the account_state command without any pre-configured scope."
+        },
+        {
           "description": "Enables the advertised_endpoints command without any pre-configured scope.",
           "type": "string",
           "const": "allow-advertised-endpoints",
@@ -187,12 +229,6 @@
           "type": "string",
           "const": "allow-dropped-paths",
           "markdownDescription": "Enables the dropped_paths command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the get_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-get-prevent-sleep",
-          "markdownDescription": "Enables the get_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Enables the local_environment_bearer_token command without any pre-configured scope.",
@@ -241,12 +277,6 @@
           "type": "string",
           "const": "allow-set-local-environment-enabled",
           "markdownDescription": "Enables the set_local_environment_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the set_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-set-prevent-sleep",
-          "markdownDescription": "Enables the set_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Enables the set_server_exposure_mode command without any pre-configured scope.",
@@ -309,6 +339,48 @@
           "markdownDescription": "Enables the write_connection_catalog command without any pre-configured scope."
         },
         {
+          "description": "Denies the account_cancel_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-cancel-sign-in",
+          "markdownDescription": "Denies the account_cancel_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_devices command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-devices",
+          "markdownDescription": "Denies the account_devices command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_register_device command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-register-device",
+          "markdownDescription": "Denies the account_register_device command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_revoke_device command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-revoke-device",
+          "markdownDescription": "Denies the account_revoke_device command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-sign-in",
+          "markdownDescription": "Denies the account_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_sign_out command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-sign-out",
+          "markdownDescription": "Denies the account_sign_out command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the account_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-account-state",
+          "markdownDescription": "Denies the account_state command without any pre-configured scope."
+        },
+        {
           "description": "Denies the advertised_endpoints command without any pre-configured scope.",
           "type": "string",
           "const": "deny-advertised-endpoints",
@@ -337,12 +409,6 @@
           "type": "string",
           "const": "deny-dropped-paths",
           "markdownDescription": "Denies the dropped_paths command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the get_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-get-prevent-sleep",
-          "markdownDescription": "Denies the get_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Denies the local_environment_bearer_token command without any pre-configured scope.",
@@ -391,12 +457,6 @@
           "type": "string",
           "const": "deny-set-local-environment-enabled",
           "markdownDescription": "Denies the set_local_environment_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the set_prevent_sleep command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-set-prevent-sleep",
-          "markdownDescription": "Denies the set_prevent_sleep command without any pre-configured scope."
         },
         {
           "description": "Denies the set_server_exposure_mode command without any pre-configured scope.",

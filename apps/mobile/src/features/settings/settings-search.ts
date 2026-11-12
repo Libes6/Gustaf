@@ -112,6 +112,7 @@ const SETTINGS_SEARCH_TERMS = {
     "clone cache",
   ],
   SettingsEnvironmentMaintenance: ["updates", "provider updates", "restart", "manage environments"],
+  SettingsAccount: ["account", "sign in", "sign out", "github", "devices", "register this phone"],
   SettingsAbout: [
     "version",
     "diagnostics",

@@ -1,4 +1,7 @@
-import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
+import {
+  PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+  type OrchestrationV2ProviderFailureClass,
+} from "@t3tools/contracts";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
   CHATGPT_WORKSPACE_ADMIN_REQUEST,
@@ -105,6 +108,13 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
                   }
                 </p>
               ) : null}
+            </div>
+          ) : errorCode === PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE ? (
+            <div className="space-y-1">
+              <p className="font-medium">
+                {t("chatB.TimelineWorkEntryRow.modelNotInSubscription")}
+              </p>
+              <p>{t("chatB.TimelineWorkEntryRow.modelNotInSubscriptionDetail")}</p>
             </div>
           ) : (
             <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />

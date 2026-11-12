@@ -350,6 +350,11 @@ export interface AcpAdapterV2Flavor {
     modeState: AcpSessionModeState | undefined,
     modelState: EffectAcpSchema.SessionModelState | null | undefined,
   ) => Effect.Effect<void>;
+  /** Sees each failed turn with the model it ran on, after `promptFailure` classified it. */
+  readonly onTurnFailure?: (input: {
+    readonly model: string;
+    readonly failure: OrchestrationV2ProviderFailure;
+  }) => Effect.Effect<void>;
   readonly onUrlElicitation?: (input: {
     readonly elicitationId: string;
     readonly url: string;
@@ -7643,6 +7648,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           yield* closeTextStreams(context);
           if (settledStatus !== "failed") {
             yield* emitProviderRetry(context, settledStatus);
+          } else if (failure !== undefined && flavor.onTurnFailure !== undefined) {
+            yield* flavor.onTurnFailure({ model: context.input.modelSelection.model, failure });
           }
           const now = yield* DateTime.now;
           if (

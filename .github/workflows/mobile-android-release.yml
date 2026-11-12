@@ -1,0 +1,186 @@
+name: Gustaf Android release
+
+# Releases published by ci.yml use GITHUB_TOKEN, which does not fire `release` events,
+# so ci.yml dispatches this workflow; the `release` trigger covers hand-published ones.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build, such as v1.2.3. Empty builds the latest release.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-release-${{ github.event.release.tag_name || inputs.tag || 'latest' }}
+  cancel-in-progress: false
+
+env:
+  # SHA-256 of the owner's release certificate. A different key would stop installed apps from updating.
+  EXPECTED_CERT_SHA256: "84:6C:A3:53:98:86:D0:05:86:B6:FA:C4:A9:E1:E2:2C:A0:0C:12:13:6A:CF:0F:1B:53:A3:DD:18:AB:08:25:09"
+  ANDROID_PACKAGE: io.github.libes6.gustaf
+
+jobs:
+  apk:
+    if: github.repository == 'Libes6/Gustaf'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      APP_VARIANT: production
+      EXPO_NO_DOTENV: "1"
+      EXPO_NO_GIT_STATUS: "1"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${EVENT_TAG:-$INPUT_TAG}"
+          if [ -z "$tag" ]; then
+            tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag must look like v1.2.3, got '$tag'."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v5
+      - run: pnpm install --frozen-lockfile
+      - name: Derive version
+        id: version
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            const { androidReleaseVersion } = await import(process.argv[1]);
+            const { versionName, versionCode } = androidReleaseVersion(process.argv[2]);
+            console.log(`name=${versionName}\ncode=${versionCode}`);
+          ' "$GITHUB_WORKSPACE/apps/mobile/androidVersion.ts" "$TAG" >> "$GITHUB_OUTPUT"
+      - name: Generate Android project
+        working-directory: apps/mobile
+        env:
+          GUSTAF_VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: pnpm exec expo prebuild --platform android --no-install
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/gustaf-release.p12"
+      - name: Build signed release APK
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+          GUSTAF_VERSION_NAME: ${{ steps.version.outputs.name }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        # A PKCS12 keystore has one password for the store and its key.
+        # The injected properties replace the template's debug signing for the release variant.
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease --no-daemon \
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/gustaf-release.p12" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEYSTORE_PASSWORD"
+      - name: Verify APK signature and version
+        id: apk
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          mkdir dist
+          apk="dist/Gustaf-$VERSION_NAME-Android.apk"
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
+
+          certs=$("$build_tools/apksigner" verify --print-certs "$apk")
+          digests=$(sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p' <<< "$certs")
+          expected=$(tr -d ':' <<< "$EXPECTED_CERT_SHA256" | tr '[:upper:]' '[:lower:]')
+          if [ "$digests" != "$expected" ]; then
+            echo "::error::APK is not signed with the release key only. Signer digests: ${digests:-none}"
+            exit 1
+          fi
+
+          badging=$("$build_tools/aapt2" dump badging "$apk")
+          grep -qF "package: name='$ANDROID_PACKAGE' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" <<< "$badging" || {
+            echo "::error::APK identity does not match $ANDROID_PACKAGE $VERSION_NAME ($VERSION_CODE):"
+            grep '^package:' <<< "$badging"
+            exit 1
+          }
+          abis=$(sed -n "s/^native-code: //p" <<< "$badging" | tr -d "'" | tr ' ' '\n' | sort | xargs)
+          if [ "$abis" != "arm64-v8a armeabi-v7a" ]; then
+            echo "::error::APK must contain exactly arm64-v8a and armeabi-v7a native code, got: ${abis:-none}"
+            exit 1
+          fi
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+      - name: Write checksum and update feed
+        env:
+          APK: ${{ steps.apk.outputs.path }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          name=$(basename "$APK")
+          (cd dist && sha256sum -- "$name" > "$name.sha256")
+          sha256=$(cut -d ' ' -f 1 "$APK.sha256")
+          size=$(stat -c %s "$APK")
+          pub_date=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json publishedAt --jq '.publishedAt // empty' 2>/dev/null || true)
+          jq -n \
+            --arg version "$VERSION_NAME" \
+            --argjson versionCode "$VERSION_CODE" \
+            --arg apkUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$name" \
+            --arg sha256 "$sha256" \
+            --argjson size "$size" \
+            --arg pubDate "${pub_date:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" \
+            '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, sha256: $sha256, size: $size, pubDate: $pubDate}' \
+            > dist/latest-android.json
+          cat dist/latest-android.json
+      # The release job in ci.yml may still be creating the release.
+      - name: Upload to the release
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber dist/*; then
+              exit 0
+            fi
+            echo "Upload attempt $attempt failed; retrying in 30 seconds."
+            sleep 30
+          done
+          echo "::error::Could not upload the APK to release $TAG."
+          exit 1
+      - name: Remove release keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gustaf-release.p12"

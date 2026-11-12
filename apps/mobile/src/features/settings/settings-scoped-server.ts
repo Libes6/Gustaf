@@ -132,3 +132,17 @@ export function planMobileScopedSettingsClear(
     patch: { projectSettingsOverrides } as ServerSettingsPatch,
   }));
 }
+
+/**
+ * Older servers decode `keepAwake` to its default and drop writes, so the row shows only where
+ * every selected server advertises it, and stays read-only when some do not.
+ */
+export function keepAwakeSupport(
+  targets: readonly Pick<ScopedMobileSettingsTarget, "environment">[],
+): "hidden" | "outdated" | "supported" {
+  const supported = targets.filter(
+    (target) => target.environment.serverConfig.environment.capabilities.keepAwake === true,
+  ).length;
+  if (supported === 0) return "hidden";
+  return supported === targets.length ? "supported" : "outdated";
+}

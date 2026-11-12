@@ -18,6 +18,7 @@ import {
   DEFAULT_UNIFIED_SETTINGS,
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
+  type KeepAwakeMode,
   type ResponseStreamingMode,
   SidebarProjectSortOrder,
   ToolCallVisibility,
@@ -29,6 +30,7 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
 import { AboutVersionTitle } from "./AboutVersionTitle";
+import { AccountSettingsSection } from "./AccountSettings";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
 import {
@@ -121,6 +123,18 @@ const RESPONSE_STREAMING_MODE_LABELS: Record<ResponseStreamingMode, MessageKey> 
 const RESPONSE_STREAMING_MODE_DESCRIPTIONS: Record<ResponseStreamingMode, MessageKey> = {
   turn: "settingsD.settingsPanels.streamingTurnDescription",
   paragraph: "settingsD.settingsPanels.streamingParagraphDescription",
+};
+
+const KEEP_AWAKE_LABELS: Record<KeepAwakeMode, MessageKey> = {
+  off: "settingsD.settingsPanels.keepAwakeOff",
+  "while-agents-work": "settingsD.settingsPanels.keepAwakeWhileWorking",
+  always: "settingsD.settingsPanels.keepAwakeAlways",
+};
+
+const KEEP_AWAKE_DESCRIPTIONS: Record<KeepAwakeMode, MessageKey> = {
+  off: "settingsD.settingsPanels.keepAwakeOffDescription",
+  "while-agents-work": "settingsD.settingsPanels.keepAwakeWhileWorkingDescription",
+  always: "settingsD.settingsPanels.keepAwakeAlwaysDescription",
 };
 
 const isSidebarProjectSortOrder = Schema.is(SidebarProjectSortOrder);
@@ -543,6 +557,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
       ? ["Continue threads after restarts"]
       : []),
+    ...(settings.keepAwake !== DEFAULT_UNIFIED_SETTINGS.keepAwake ? ["Keep computer awake"] : []),
     ...(isBackgroundActivityDirty ? ["Background activity"] : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
       ? ["New thread mode"]
@@ -663,6 +678,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
+      keepAwake: DEFAULT_UNIFIED_SETTINGS.keepAwake,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       backgroundActivityProfile: DEFAULT_UNIFIED_SETTINGS.backgroundActivityProfile,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
@@ -2029,6 +2045,7 @@ export function MaintenanceSettingsPanel() {
   const environmentId = environment?.environmentId ?? null;
   const isEnvironmentScope = scope.environmentIds.length === 1 && environmentId !== null;
   const hasServerTargets = connectedEnvironments.length > 0;
+  const mixedKeepAwake = useScopedSettingsMixed(["keepAwake"]);
 
   return (
     <SettingsPageContainer>
@@ -2099,6 +2116,60 @@ export function MaintenanceSettingsPanel() {
             />
           }
         />
+        <SettingsRow
+          {...searchableSetting("keep-awake")}
+          serverScoped
+          settingKeys={["keepAwake"]}
+          description={
+            mixedKeepAwake
+              ? t("settingsD.settingsPanels.differentKeepAwakeModes")
+              : t(KEEP_AWAKE_DESCRIPTIONS[settings.keepAwake])
+          }
+          resetAction={
+            hasServerTargets && settings.keepAwake !== DEFAULT_UNIFIED_SETTINGS.keepAwake ? (
+              <SettingResetButton
+                label="keep computer awake"
+                onClick={() => updateSettings({ keepAwake: DEFAULT_UNIFIED_SETTINGS.keepAwake })}
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={mixedKeepAwake ? null : settings.keepAwake}
+              disabled={!hasServerTargets}
+              onValueChange={(value) => {
+                if (value === "off" || value === "while-agents-work" || value === "always") {
+                  updateSettings({ keepAwake: value });
+                }
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-56"
+                aria-label={t("settingsD.settingsPanels.keepAwake")}
+              >
+                <SelectValue>
+                  {(value: KeepAwakeMode | null) =>
+                    value === null
+                      ? t("settingsD.settingsPanels.mixed")
+                      : t(KEEP_AWAKE_LABELS[value])
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="off">
+                  {t(KEEP_AWAKE_LABELS.off)}
+                </SelectItem>
+                <SelectItem hideIndicator value="while-agents-work">
+                  {t(KEEP_AWAKE_LABELS["while-agents-work"])}
+                </SelectItem>
+                <SelectItem hideIndicator value="always">
+                  {t(KEEP_AWAKE_LABELS.always)}
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
       </SettingsSection>
 
       <SettingsSection id="background" title={t("settingsD.settingsPanels.backgroundActivity")}>
@@ -2138,6 +2209,7 @@ export function AboutSettingsPanel() {
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
+      <AccountSettingsSection />
       <SettingsSection id="about" title={t("settingsD.settingsPanels.app")}>
         {primaryPolicy ? (
           <SettingsRow

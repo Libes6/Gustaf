@@ -126,6 +126,7 @@ import { SettingsProjectOverviewRouteScreen } from "./features/settings/Settings
 import { UsageLimitAccountScreen } from "./features/usage/UsageLimitsPooled";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
+import { AccountSettingsRouteScreen } from "./features/account/AccountSettingsRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsLabsRouteScreen } from "./features/settings/ThreadSettingsSections";
@@ -222,6 +223,11 @@ const SETTINGS_SCREENS = {
     screen: SettingsThreadsRouteScreen,
     linking: "settings/thread-preferences",
     options: settingsPage("Threads"),
+  }),
+  SettingsAccount: createNativeStackScreen({
+    screen: AccountSettingsRouteScreen,
+    linking: "settings/account",
+    options: settingsPage("Account"),
   }),
   SettingsAbout: createNativeStackScreen({
     screen: SettingsAboutRouteScreen,

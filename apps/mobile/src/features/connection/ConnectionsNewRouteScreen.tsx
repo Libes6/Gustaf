@@ -1,4 +1,5 @@
 import { t } from "../../i18n";
+import { Button } from "../../components/ui/Button";
 import { ListRow } from "../../components/ui/ListRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -24,7 +25,10 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/ui/AppText";
 import { FrostedCutout } from "../../components/ui/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
-import { useRemoteConnections } from "../../state/use-remote-environment-registry";
+import {
+  type PairingOutcome,
+  useRemoteConnections,
+} from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
@@ -63,8 +67,12 @@ function PairingForm({
   readonly routePairingUrl: string;
   readonly routeFor: EnvironmentId | undefined;
 }) {
-  const { connectionPairingUrl, onChangeConnectionPairingUrl, onConnectPress } =
-    useRemoteConnections();
+  const {
+    connectedEnvironments,
+    connectionPairingUrl,
+    onChangeConnectionPairingUrl,
+    onConnectPress,
+  } = useRemoteConnections();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [initialPairing] = useState(() => parsePairingUrl(routePairingUrl || connectionPairingUrl));
@@ -72,6 +80,13 @@ function PairingForm({
   const [codeInput, setCodeInput] = useState(initialPairing.code);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [alreadySaved, setAlreadySaved] = useState<PairingOutcome["alreadySaved"]>(undefined);
+  const alreadySavedLabel =
+    alreadySaved === undefined
+      ? undefined
+      : (connectedEnvironments.find(
+          (environment) => environment.environmentId === alreadySaved.environmentId,
+        )?.environmentLabel ?? alreadySaved.address);
   // The user's own edit or submit dismisses the dev auto-connect report.
   const [ownAttempt, setOwnAttempt] = useState(false);
   const autoConnect = autoConnectReport(
@@ -80,7 +95,12 @@ function PairingForm({
     ownAttempt,
   );
   const connecting = isSubmitting || autoConnect.connecting;
-  const pairingConnectionError = submitError ?? autoConnect.error;
+  const pairingConnectionError =
+    alreadySavedLabel !== undefined
+      ? t(
+          "{name} is already saved on this device. This address can be added to it as another route.",
+        ).replace("{name}", alreadySavedLabel)
+      : (submitError ?? autoConnect.error);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const screenFocused = useIsFocused();
   const [scannerLocked, setScannerLocked] = useState(false);
@@ -93,6 +113,7 @@ function PairingForm({
 
   const clearError = () => {
     setSubmitError(null);
+    setAlreadySaved(undefined);
     setOwnAttempt(true);
   };
 
@@ -150,15 +171,18 @@ function PairingForm({
     }
   };
 
-  const handleSubmit = async () => {
+  // The duplicate check runs before the code is redeemed, so the same code can add the route.
+  const handleSubmit = async (targetEnvironmentId = routeFor) => {
     const pairingUrl = buildPairingUrl(hostInput, codeInput);
     setOwnAttempt(true);
     setSubmitError(null);
+    setAlreadySaved(undefined);
     setIsSubmitting(true);
     onChangeConnectionPairingUrl(pairingUrl);
-    const outcome = await onConnectPress(pairingUrl, routeFor);
+    const outcome = await onConnectPress(pairingUrl, targetEnvironmentId);
     setIsSubmitting(false);
     setSubmitError(outcome.error);
+    setAlreadySaved(outcome.alreadySaved);
     void Haptics.notificationAsync(
       outcome.ok
         ? Haptics.NotificationFeedbackType.Success
@@ -250,6 +274,20 @@ function PairingForm({
               {pairingConnectionError ??
                 "For machines on your local network or tailnet. The machine keeps its own provider credentials."}
             </Text>
+            {alreadySaved !== undefined && alreadySavedLabel !== undefined ? (
+              <Button
+                label={t("Add this address as a route to {name}").replace(
+                  "{name}",
+                  alreadySavedLabel,
+                )}
+                icon="plus"
+                loading={connecting}
+                disabled={connecting}
+                onPress={() => {
+                  void handleSubmit(alreadySaved.environmentId);
+                }}
+              />
+            ) : null}
           </View>
 
           {hasCloudPublicConfig() ? <T3ConnectSection /> : null}

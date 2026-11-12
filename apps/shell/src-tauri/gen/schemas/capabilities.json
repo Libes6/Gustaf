@@ -1,8 +1,7 @@
 {
   "default": {
     "identifier": "default",
-    "description": "Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.",
-    "remote": { "urls": ["http://127.0.0.1:*", "http://localhost:*"] },
+    "description": "Commands and plugins the Gustaf page may use. It is granted to the page of the server the shell started, at its exact origin, by ipc_scope.rs at startup; this file names no origin.",
     "local": true,
     "windows": ["main"],
     "permissions": [
@@ -11,8 +10,6 @@
       "notification:allow-notify",
       "allow-dropped-paths",
       "allow-drag-window",
-      "allow-get-prevent-sleep",
-      "allow-set-prevent-sleep",
       "allow-read-connection-catalog",
       "allow-write-connection-catalog",
       "allow-reveal-window",
@@ -33,7 +30,14 @@
       "allow-update-state",
       "allow-update-check",
       "allow-update-download",
-      "allow-update-install"
+      "allow-update-install",
+      "allow-account-state",
+      "allow-account-sign-in",
+      "allow-account-cancel-sign-in",
+      "allow-account-sign-out",
+      "allow-account-devices",
+      "allow-account-register-device",
+      "allow-account-revoke-device"
     ]
   }
 }

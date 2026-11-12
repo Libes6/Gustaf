@@ -10,11 +10,12 @@ import {
   type OrchestrationV2Subagent,
   type ServerProvider,
 } from "@t3tools/contracts";
-import { deriveSubagentElapsedMs, formatDuration } from "@t3tools/shared/orchestrationTiming";
+import { deriveSubagentElapsedMs } from "@t3tools/shared/orchestrationTiming";
 import { useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 
 import { AppText as Text } from "../../components/ui/AppText";
+import { formatElapsed } from "../../i18n";
 import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
 import { Chip } from "../../components/ui/Chip";
 import { ListRowLayout } from "../../components/ui/ListRowLayout";
@@ -284,5 +285,5 @@ type ElapsedTiming = Parameters<typeof deriveSubagentElapsedMs>[0];
 function useElapsedLabel(timing: ElapsedTiming): string | null {
   const nowMs = useVisibleSecondClock(isActiveSubagentStatus(timing.status));
   const elapsedMs = deriveSubagentElapsedMs(timing, nowMs);
-  return elapsedMs === null || elapsedMs === 0 ? null : formatDuration(elapsedMs);
+  return elapsedMs === null || elapsedMs === 0 ? null : formatElapsed(elapsedMs);
 }

@@ -517,6 +517,9 @@ export const CommandResolutionCache = Context.Reference<Map<string, CommandResol
   },
 );
 
+/** Installers can move or replace a binary; drop every memoized PATH lookup so the next one rescans. */
+export const clearCommandResolutionCache = CommandResolutionCache.useSync((cache) => cache.clear());
+
 interface PathDirectoryListing {
   readonly modified: number | null | undefined;
   readonly names: ReadonlySet<string> | undefined;

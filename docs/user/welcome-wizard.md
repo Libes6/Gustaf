@@ -4,8 +4,8 @@ T3 Code shows a setup flow when you open a new installation. Existing
 workspaces skip this flow.
 
 The hosted app at app.t3.codes does not open setup. With no computer connected,
-it asks you to sign in to T3 Connect, then to install T3 Code and run
-`t3 connect` on your computer. From home, it adds compatible computers linked to your account and
+it asks you to sign in to T3 Connect, then to install T3 Code and turn on
+T3 Connect on your computer. From home, it adds compatible computers linked to your account and
 opens the app.
 
 Close setup while no import is running to go straight to the app. You can connect
@@ -22,9 +22,9 @@ browser.
 You can add more computers before continuing:
 
 - **T3 Connect** connects computers that are signed in to your account.
-  [Install the CLI](./install.md#command-line) and run `t3 connect` on each
-  computer you want to add, then start T3 Code or run `t3 serve` so the
-  computer stays available.
+  Turn on T3 Connect in the desktop app's **Settings → Sharing & access** on
+  each computer you want to add, and keep the app running so the computer stays
+  available.
 - **Add a computer** connects directly to a server on your network or tailnet.
   Start the server with `t3 serve`, then run `t3 pair --tailscale` and paste
   the pairing link. You can also run `t3 serve --host <address>` and use

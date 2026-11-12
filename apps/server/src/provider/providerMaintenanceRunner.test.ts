@@ -12,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
@@ -20,7 +21,7 @@ import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import { SpawnExecutableResolution } from "@t3tools/shared/shell";
+import { CommandResolutionCache, SpawnExecutableResolution } from "@t3tools/shared/shell";
 
 import * as ProviderRegistry from "./ProviderRegistry.ts";
 import * as ModelManifest from "./ModelManifest.ts";
@@ -358,6 +359,11 @@ describe("providerMaintenanceRunner", () => {
             ),
           );
         },
+        // Only the precheck is under test; a healthy post-update probe skips verification retries.
+        refreshAfterUpdate: () =>
+          Ref.updateAndGet(providersRef, (providers) =>
+            providers.map((provider) => ({ ...provider, status: "ready" })),
+          ),
         getProviderMaintenanceCapabilitiesForInstance: () =>
           Effect.succeed(
             makeProviderMaintenanceCapabilities({
@@ -757,6 +763,76 @@ describe("providerMaintenanceRunner", () => {
         ),
       ),
   );
+
+  it.effect.each([
+    {
+      name: "succeeds when a slow first probe recovers on retry",
+      probes: [
+        { status: "error", message: "Codex app-server provider probe failed: spawn ETXTBSY." },
+        {},
+      ],
+      status: "succeeded",
+      message: "Provider updated.",
+    },
+    {
+      name: "names the missing binary after every retry fails",
+      probes: [
+        {
+          installed: false,
+          status: "error",
+          message: "Could not start Codex CLI (`/opt/homebrew/bin/codex`).",
+        },
+      ],
+      status: "unchanged",
+      message:
+        "Update command completed, but Gustaf could not verify the provider version: Could not start Codex CLI (`/opt/homebrew/bin/codex`).",
+    },
+  ] as const)("post-update verification $name", ({ probes, status, message }) => {
+    const cache = new Map([
+      ["stale codex", { resolvedPath: "/old/bin/codex", expiresAtNanos: 2n ** 62n }],
+    ]);
+    const staleLookupsSeen: Array<boolean> = [];
+    return Effect.gen(function* () {
+      const { registry, providersRef } = yield* makeRegistry(baseNativeCliProvider);
+      const retries = yield* Queue.unbounded<void>();
+      const updater = yield* makeTestRunner({
+        ...registry,
+        setProviderMaintenanceActionState: (input) =>
+          (input.state?.message?.includes("(attempt")
+            ? Queue.offer(retries, undefined)
+            : Effect.void
+          ).pipe(Effect.andThen(registry.setProviderMaintenanceActionState(input))),
+        refreshAfterUpdate: () => {
+          // The installer may have moved the binary, so each probe must resolve PATH afresh.
+          staleLookupsSeen.push(cache.has("stale codex"));
+          cache.set("stale codex", { resolvedPath: "/old/bin/codex", expiresAtNanos: 2n ** 62n });
+          const probe = probes[Math.min(staleLookupsSeen.length, probes.length) - 1];
+          return Ref.updateAndGet(providersRef, () => [{ ...baseNativeCliProvider, ...probe }]);
+        },
+      });
+
+      const update = yield* updater.updateProvider(NATIVE_CLI_DRIVER).pipe(Effect.forkScoped);
+      const expectedProbes = status === "succeeded" ? probes.length : 3;
+      for (let retry = 1; retry < expectedProbes; retry++) {
+        yield* Queue.take(retries);
+        yield* TestClock.adjust("1500 millis");
+      }
+      const result = yield* Fiber.join(update);
+
+      assert.deepStrictEqual(staleLookupsSeen, Array(expectedProbes).fill(false));
+      assert.strictEqual(result.providers[0]?.updateState?.status, status);
+      assert.strictEqual(result.providers[0]?.updateState?.message, message);
+    }).pipe(
+      Effect.provideService(CommandResolutionCache, cache),
+      Effect.provide(
+        Layer.mergeAll(
+          layerNonWindowsPlatform,
+          layerLatestVersionHttpClient("1.0.0"),
+          layerMockSpawner(() => ({ stdout: "updated" })),
+        ),
+      ),
+    );
+  });
 
   // A native updater such as `claude update` downloads a ~300 MB binary and
   // prints nothing while it does. Killed mid-download, it leaves a truncated
@@ -1216,6 +1292,10 @@ it.effect("refuses incompatible latest versions and unapproved or unpinnable tar
       targetVersion: "2.0.0",
     });
     assert.strictEqual(unchanged.providers[0]?.updateState?.status, "unchanged");
+    assert.strictEqual(
+      unchanged.providers[0]?.updateState?.message,
+      "Update command completed, but Gustaf could not verify the provider version: found version 1.0.0, expected 2.0.0.",
+    );
     const nativeUpdater = yield* makeTestRunner(
       {
         ...registry,

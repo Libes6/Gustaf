@@ -5,6 +5,7 @@ import {
   type ConnectionDiagnosis,
   connectionDiagnosisText,
   connectionRoutes,
+  hasOnlyLanRoutes,
   hasRelayRoute,
   presentConnectionDiagnosis,
   type EnvironmentPresentation,
@@ -41,6 +42,7 @@ export function useConnectionDiagnosis(
     hostLabel: presentation.entry.target.label,
     state,
     via: relayOnly ? "relay" : "direct",
+    lanOnly: hasOnlyLanRoutes(presentation.entry),
     clientVersion: Constants.expoConfig?.version,
     serverVersion: presentation.serverConfig?.environment.serverVersion,
   });

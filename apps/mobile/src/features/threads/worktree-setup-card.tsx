@@ -1,4 +1,4 @@
-import { t } from "../../i18n";
+import { formatElapsed, t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import {
   worktreeSetupStageLabel,
@@ -6,7 +6,6 @@ import {
   type WorktreeSetupStage,
 } from "@t3tools/contracts";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import { useState } from "react";
 import { Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,7 +27,7 @@ export interface WorktreeSetupCardProps {
 
 function elapsed(start: string | null, end: string | null, now: number) {
   const duration = (end ? Date.parse(end) : now) - (start ? Date.parse(start) : NaN);
-  return Number.isFinite(duration) ? formatDuration(Math.max(0, duration)) : null;
+  return Number.isFinite(duration) ? formatElapsed(duration) : null;
 }
 
 const icons: Record<WorktreeSetupStage["status"], AppSymbolName> = {
@@ -52,7 +51,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
     snapshot.phase === "failed" || snapshot.stages.some((stage) => stage.status === "failed");
   const label =
     handedOff && working
-      ? `Working for ${elapsed(turnStartedAt, null, now) ?? "0s"}`
+      ? `${t("Working for")} ${formatElapsed(now - Date.parse(turnStartedAt ?? ""))}`
       : running
         ? handedOff
           ? "Setup continues…"
@@ -153,7 +152,10 @@ export function WorktreeWorkingHeader({ startedAt }: { startedAt: string }) {
   return (
     <View className="py-1">
       <View className="min-h-11 flex-row items-center border-b border-border px-1">
-        <HeaderLabel label={`Working for ${elapsed(startedAt, null, now) ?? "0s"}`} active />
+        <HeaderLabel
+          label={`${t("Working for")} ${formatElapsed(now - Date.parse(startedAt))}`}
+          active
+        />
       </View>
     </View>
   );

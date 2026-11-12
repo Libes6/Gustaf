@@ -104,9 +104,21 @@ const INIT_SCRIPT: &str = r#"(() => {
     return result;
   };
 
+  // The cloud account lives in the shell; the page only ever sees state, never a token.
+  const account = Object.freeze({
+    getState: () => invoke("account_state"),
+    signIn: () => invoke("account_sign_in"),
+    cancelSignIn: () => invoke("account_cancel_sign_in"),
+    signOut: () => invoke("account_sign_out"),
+    listDevices: () => invoke("account_devices"),
+    registerThisComputer: () => invoke("account_register_device"),
+    revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
+  });
+
   window.gustafShell = Object.freeze({
     version: __GUSTAF_VERSION__,
     updater,
+    account,
     pickFolder,
     droppedPaths,
   });
@@ -159,10 +171,6 @@ const INIT_SCRIPT: &str = r#"(() => {
       window.localStorage.removeItem("gustaf.connectionCatalog");
       return true;
     }),
-    ...(__GUSTAF_PLATFORM__ === "darwin" ? {
-      getPreventSleep: () => invoke("get_prevent_sleep"),
-      setPreventSleep: (enabled) => invoke("set_prevent_sleep", { enabled }),
-    } : {}),
     getServerExposureState: () => invoke("server_exposure_state"),
     setServerExposureMode: (mode) => invoke("set_server_exposure_mode", { mode }),
     setTailscaleServeEnabled: (input) =>

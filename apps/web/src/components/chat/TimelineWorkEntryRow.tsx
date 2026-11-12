@@ -9,6 +9,7 @@ import {
 } from "@t3tools/client-runtime/work-log/user-input";
 import {
   ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE,
+  PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
   type EnvironmentId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -217,9 +218,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     const resetTime = resetAt
       ? `${formatUpcomingTimestamp(resetAt, timestampFormat, undefined, timeZone)} (${timeZone})`
       : null;
+    const notInSubscription =
+      failureItem.failure.code === PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE;
     const label = warning
       ? `${t("chatB.TimelineWorkEntryRow.usageLimitReached")}${resetTime ? ` ${t("chatB.TimelineWorkEntryRow.retryAfter").replace("{time}", resetTime)}` : ""}`
-      : workEntry.label;
+      : notInSubscription
+        ? t("chatB.TimelineWorkEntryRow.modelNotInSubscription")
+        : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
@@ -253,7 +258,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       >
         {!warning ? (
           <p className="ms-7 whitespace-pre-wrap break-words py-1 text-sm leading-relaxed text-foreground/80">
-            {failureItem.failure.message}
+            {notInSubscription
+              ? t("chatB.TimelineWorkEntryRow.modelNotInSubscriptionDetail")
+              : failureItem.failure.message}
           </p>
         ) : null}
         {retryRunId !== null && onRetryWorkspacePreparation ? (

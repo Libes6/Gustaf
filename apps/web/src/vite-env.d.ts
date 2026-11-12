@@ -37,6 +37,8 @@ declare global {
       /** The installed app's version. */
       readonly version: string;
       readonly updater: import("./localUpdater").LocalUpdater;
+      /** Absent in shells older than the cloud account. */
+      readonly account?: import("./shellAccount").ShellAccount;
     };
     /** Dev builds only, from DevReplayHost. Agents call these from the browser console. */
     t3dev?: {

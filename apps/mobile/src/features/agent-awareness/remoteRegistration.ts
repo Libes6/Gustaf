@@ -44,7 +44,7 @@ import {
   getAgentLiveActivities,
   startAgentLiveActivity,
 } from "./agentLiveActivity";
-import { resolveCloudPublicConfig } from "../cloud/publicConfig";
+import { hasCloudPublicConfig, resolveCloudPublicConfig } from "../cloud/publicConfig";
 import { supportsAgentAwarenessPush } from "./capabilities";
 import { makeRelayDeviceRegistrationRequest, resolveApsEnvironment } from "./registrationPayload";
 
@@ -209,7 +209,10 @@ export function setAgentAwarenessRelayTokenProvider(
     }
     // Signed-out activities would be orphaned because the relay can no longer update or end them.
     endLocalLiveActivities("live activity cleanup after cloud sign-out failed");
-    publishWidget({ kind: "signed-out" });
+    // A build without T3 Connect has nothing to sign in to, so it must not ask for it.
+    publishWidget(
+      hasCloudPublicConfig() ? { kind: "signed-out" } : { kind: "snapshot", aggregate: null },
+    );
     setRegistrationStatus("unknown");
     void clearAgentAwarenessRegistrationRecord().catch((error: unknown) => {
       logRegistrationError("clear registration record on sign-out failed", error);

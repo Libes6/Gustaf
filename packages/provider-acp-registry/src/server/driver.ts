@@ -285,6 +285,20 @@ export function applyAcpRegistryLiveConfiguration(
   };
 }
 
+export function applyAcpRegistryModelAccessDenials(
+  provider: ServerProvider,
+  deniedModels: ReadonlySet<string>,
+): ServerProvider {
+  return {
+    ...provider,
+    models: provider.models.map(({ unavailableReason: _previous, ...model }) =>
+      deniedModels.has(model.slug)
+        ? { ...model, unavailableReason: "not_in_subscription" as const }
+        : model,
+    ),
+  };
+}
+
 function applyAcpRegistryUrlAuthAction(
   provider: ServerProvider,
   action: Option.Option<NonNullable<ServerProvider["auth"]["action"]>>,
@@ -567,8 +581,9 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             commands: runtimeCoordinator.value.getAvailableCommands(instanceId),
             configuration: runtimeCoordinator.value.getLiveConfiguration(instanceId),
             authAction: runtimeCoordinator.value.getUrlAuthAction(instanceId),
+            deniedModels: runtimeCoordinator.value.getModelAccessDenials(instanceId),
           }).pipe(
-            Effect.map(({ commands, configuration, authAction }) => {
+            Effect.map(({ commands, configuration, authAction, deniedModels }) => {
               const withCommands = applyAcpRegistryAvailableCommands(provider, commands);
               const withConfiguration = Option.match(configuration, {
                 onNone: () => withCommands,
@@ -579,7 +594,10 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
                     effectiveConfig.customModels,
                   ),
               });
-              return applyAcpRegistryUrlAuthAction(withConfiguration, authAction);
+              return applyAcpRegistryModelAccessDenials(
+                applyAcpRegistryUrlAuthAction(withConfiguration, authAction),
+                deniedModels,
+              );
             }),
           );
     });
@@ -701,20 +719,38 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
               ),
             ),
         );
+        const withModelAccessDenials = (provider: ServerProvider) =>
+          runtimeCoordinator.value
+            .getModelAccessDenials(instanceId)
+            .pipe(
+              Effect.map((deniedModels) =>
+                applyAcpRegistryModelAccessDenials(provider, deniedModels),
+              ),
+            );
         const publishLiveConfiguration = runtimeCoordinator.value.watchLiveConfiguration(
           instanceId,
           (configuration) =>
             liveSnapshotSemaphore.withPermit(
               getSnapshot.pipe(
-                Effect.flatMap((current) =>
-                  publishSnapshot(
-                    applyAcpRegistryLiveConfiguration(
-                      current,
-                      configuration,
-                      effectiveConfig.customModels,
-                    ),
+                Effect.map((current) =>
+                  applyAcpRegistryLiveConfiguration(
+                    current,
+                    configuration,
+                    effectiveConfig.customModels,
                   ),
                 ),
+                Effect.flatMap(withModelAccessDenials),
+                Effect.flatMap(publishSnapshot),
+              ),
+            ),
+        );
+        const publishModelAccessDenials = runtimeCoordinator.value.watchModelAccessDenials(
+          instanceId,
+          () =>
+            liveSnapshotSemaphore.withPermit(
+              getSnapshot.pipe(
+                Effect.flatMap(withModelAccessDenials),
+                Effect.flatMap(publishSnapshot),
               ),
             ),
         );
@@ -732,7 +768,13 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             ),
         );
         return Effect.all(
-          [publishEnrichment, publishLiveCommands, publishLiveConfiguration, publishUrlAuthAction],
+          [
+            publishEnrichment,
+            publishLiveCommands,
+            publishLiveConfiguration,
+            publishModelAccessDenials,
+            publishUrlAuthAction,
+          ],
           {
             concurrency: "unbounded",
             discard: true,
@@ -780,6 +822,10 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
           .clearLiveConfiguration(instanceId)
           .pipe(Effect.andThen(runtimeCoordinator.value.clearAvailableCommands(instanceId)))
       : Effect.void;
+    // A new sign-in may carry a different plan, so earlier rejections no longer apply.
+    const clearModelAccessDenials = Option.isSome(runtimeCoordinator)
+      ? runtimeCoordinator.value.clearModelAccessDenials(instanceId)
+      : Effect.void;
     const controller = yield* AcpRegistryAuth.makeAcpRegistryAuth({
       instanceId,
       settings: effectiveConfig,
@@ -789,6 +835,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         confirmedAuthentication
           .set(authenticated)
           .pipe(
+            Effect.andThen(clearModelAccessDenials),
             Effect.andThen(authenticated ? Effect.void : clearLiveState),
             Effect.andThen(liveSnapshotSemaphore.withPermit(invalidateEnrichmentCache)),
             Effect.andThen(snapshot.refresh),
@@ -804,6 +851,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       invalidate: (controller.invalidate ?? Effect.void).pipe(
         Effect.andThen(confirmedAuthentication.set(false)),
         Effect.andThen(clearLiveState),
+        Effect.andThen(clearModelAccessDenials),
         Effect.andThen(liveSnapshotSemaphore.withPermit(invalidateEnrichmentCache)),
         Effect.andThen(snapshot.refresh),
         Effect.asVoid,
@@ -888,6 +936,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
             Effect.provideService(SecureRandom.SecureRandom, random),
             Effect.tap(() => confirmedAuthentication.set(false)),
+            Effect.tap(() => clearModelAccessDenials),
             Effect.tap(() =>
               liveSnapshotSemaphore.withPermit(
                 invalidateEnrichmentCache.pipe(

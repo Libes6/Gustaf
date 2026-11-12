@@ -19,6 +19,20 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  # Untranslated interface copy may only go down; see the top of scripts/i18n-audit.mjs.
+  i18n-audit:
+    name: i18n audit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - run: node --test scripts/i18n-audit.test.mjs
+      - run: node scripts/i18n-audit.mjs --check
+
   warm-cache:
     name: Warm Rust cache (${{ matrix.platform }})
     if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
@@ -136,6 +150,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -157,14 +172,22 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$version"
           mapfile -t installers < <(find release-assets -type f -print | sort)
           test "${#installers[@]}" -eq 13
-          node apps/shell/scripts/release-manifest.mjs release-assets "$version"
+          previous=$(git describe --tags --abbrev=0 --match 'v*.*.*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          node apps/shell/scripts/release-notes.mjs "$version" "$previous" "$RUNNER_TEMP/release-notes.md"
+          node apps/shell/scripts/release-manifest.mjs release-assets "$version" "$RUNNER_TEMP/release-notes.md"
           mkdir publish
           cp "${installers[@]}" release-assets/latest.json publish/
           (cd publish && sha256sum -- * > SHA256SUMS.txt)
           if state=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
             test "$state" = true
+            gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "Gustaf $GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "Gustaf $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
           gh release upload "$GITHUB_REF_NAME" --clobber publish/*
           gh release edit "$GITHUB_REF_NAME" --draft=false
+      # A release published with GITHUB_TOKEN fires no `release` event, so start the APK build directly.
+      - name: Build the Android APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mobile-android-release.yml -R "$GITHUB_REPOSITORY" -f tag="$GITHUB_REF_NAME"

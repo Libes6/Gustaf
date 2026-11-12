@@ -143,19 +143,21 @@ describe("check:changed", () => {
     }),
   );
 
-  it("runs the .github/scripts node:test files with node --test, not vitest", () => {
+  it("runs the node:test files with node --test, not vitest", () => {
     assert.deepStrictEqual(
       splitTests([
         "apps/server/src/ws.test.ts",
         ".github/scripts/ci-changes.test.cjs",
         ".github\\scripts\\thread-transfer-report.test.cjs",
         "scripts/check-changed.test.ts",
+        "scripts/i18n-audit.test.mjs",
       ]),
       {
         vitestTests: ["apps/server/src/ws.test.ts", "scripts/check-changed.test.ts"],
         nodeTests: [
           ".github/scripts/ci-changes.test.cjs",
           ".github\\scripts\\thread-transfer-report.test.cjs",
+          "scripts/i18n-audit.test.mjs",
         ],
       },
     );

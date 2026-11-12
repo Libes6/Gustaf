@@ -98,8 +98,7 @@ enabled, or keep `t3 serve` running in a terminal. Minimize the desktop app rath
 than closing its last window, which stops its local server. Linking T3 Connect
 does not configure automatic startup at Windows sign-in.
 
-`t3 up` installs the service when you set up T3 Connect, but the two are managed
-separately. Signing out of T3 Connect does not stop or uninstall the service.
+Signing out of T3 Connect does not stop or uninstall the service.
 
 ## Keep the server responsive when agents use all memory
 

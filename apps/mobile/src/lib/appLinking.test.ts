@@ -34,12 +34,14 @@ describe("shouldHandleAppLink", () => {
     expect(shouldHandleAppLink(url, true)).toBe(true);
   });
 
-  it.each(["t3code://expo-development-client/?url=x", "t3code://expo-sharing/anything"])(
-    "ignores lifecycle URL %s",
-    (url) => {
-      expect(shouldHandleAppLink(url, true)).toBe(false);
-    },
-  );
+  it.each([
+    "t3code://expo-development-client/?url=x",
+    "t3code://expo-sharing/anything",
+    "gustaf://auth?code=c&state=s",
+    "gustaf-dev://auth/?error=access_denied&state=s",
+  ])("ignores lifecycle URL %s", (url) => {
+    expect(shouldHandleAppLink(url, true)).toBe(false);
+  });
 });
 
 describe("cloud-only deep links", () => {

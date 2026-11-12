@@ -23,6 +23,8 @@ import { useNativeColumnLayoutMetrics } from "../../native/native-layout-metrics
 import { deriveProjectGroupLabel } from "@t3tools/client-runtime/state/project-grouping";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { accountRowValue } from "../account/accountScreenState";
+import { useAccount } from "../account/useAccount";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { useAdaptiveWorkspaceLayout } from "../layout/adaptive-workspace-context";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
@@ -170,9 +172,17 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
   const query = workspace?.state.tabs.settings.query ?? "";
   const overflowRows = useOverflowRows();
   const indexSections = useSettingsIndexSections();
+  const accountRow: SettingsListRow = {
+    id: "SettingsAccount",
+    icon: "person.crop.circle",
+    label: t("Account"),
+    value: accountRowValue(useAccount()),
+    target: "SettingsAccount",
+  };
   const sections = filterSettingsSections(
     [
       { rows: overflowRows },
+      { rows: [accountRow] },
       { title: t("Connections"), rows: props.connections },
       ...indexSections,
     ],

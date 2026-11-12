@@ -8,49 +8,21 @@ machine. That machine must stay running and reachable while you work.
 T3 Connect makes an environment available to your other devices without setting
 up router forwarding. In the desktop app on the host, open **Settings →
 Sharing & access**, sign in, and enable **T3 Connect** for that environment.
+The `t3` command does not set up T3 Connect in Gustaf; a command-line host uses
+the [local network](#pair-over-a-lan-or-private-network) instead.
 
-For a command-line host, run:
-
-```bash
-t3 up
-```
-
-It asks how your other devices reach the machine: T3 Connect, the local network,
-or both. Choose T3 Connect and follow the sign-in instructions. On Linux and
-macOS, it then runs T3 Code as a [background service](./background-service.md).
-`t3 connect` is the same as `t3 up --connect`. Run `t3 up` again to change your
-choice, and `t3 status` to see it.
-
-The background service is not available on Windows, so there `t3 up` prints the
-`t3 serve` command to keep running in a terminal. You can also keep the desktop
-app running with its local environment enabled. Closing the desktop app's last
-window stops its local server. Saving your sign-in alone does not start a server
-or make the machine reachable.
+Keep the desktop app running with its local environment enabled. Closing the
+desktop app's last window stops its local server. Saving your sign-in alone does
+not start a server or make the machine reachable.
 
 On your other device, sign in to the same T3 Connect account and choose the
 environment. On the app.t3.codes home page with no computer added yet, signing
-in adds compatible computers linked to your account. Over SSH, the CLI prints a
-browser link and a short code. Open the link on any device, confirm the code
-matches, and approve. The CLI continues on its own, so you do not need to forward
-an OAuth callback port.
+in adds compatible computers linked to your account.
 
 T3 Connect renews access credentials when needed without disconnecting a healthy
 connection. Pull request diffs and provider settings keep working after the
 previous credential expires. A failed renewal affects that request; it does not
 disconnect an otherwise healthy conversation.
-
-### Scripts and agents
-
-`t3 up` asks nothing when you name a choice: `--connect`, `--lan`, or their
-`--no-` forms. Choices you do not name keep their settings, and `--yes` takes
-the defaults. Without a terminal:
-
-- T3 Connect sign-in prints a URL and a code. Approve it on any device.
-- A needed restart runs without asking, and stops running agent turns.
-- With nothing set up and no choice named, `t3 up` stops and names the flags.
-
-`t3 status --json` prints the settings. `t3 up --help` lists every flag with
-examples.
 
 ### More machines with T3 Chat
 
@@ -72,11 +44,21 @@ On a desktop host, open **Settings → Sharing & access**, enable **Network acce
 then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
-For a command-line host, choose the local network in `t3 up`, or run:
+For a command-line host, run `t3 up`. It asks whether to allow the local
+network and, on Linux and macOS, runs T3 Code as a
+[background service](./background-service.md). Run it again to change your
+choice, and `t3 status` to see it. To skip the question, run:
 
 ```bash
 t3 up --lan
 ```
+
+`--no-lan` turns it off, and `--yes` keeps the current setting. Without a
+terminal, a needed restart runs without asking and stops running agent turns,
+and a machine with nothing set up needs `--lan`, `--no-lan`, or `--yes`.
+`t3 status --json` prints the settings for scripts. The background service is
+not available on Windows, so there `t3 up` prints the `t3 serve` command to keep
+running in a terminal.
 
 For a server in a terminal, run `t3 serve --lan`. Either way, T3 Code then
 accepts connections from your local network and tailnet, so a pairing code is
@@ -423,10 +405,7 @@ page, or **Settings → T3 Connect** on mobile, and choose **Deregister**. This
 revokes its cloud access and frees its host space even when the environment is
 offline or has been wiped. When T3 Connect rejects a host's link, the host
 shows that it was removed from T3 Connect. To link it again, turn on
-**T3 Connect** in **Settings → Sharing & access** on a desktop host, or run
-`t3 connect link` on a command-line host and then restart T3 Code there. A
-command-line host that released its tunnel when it last stopped may link itself
-again on its next start; run `t3 connect unlink` on that host to keep it off.
+**T3 Connect** in **Settings → Sharing & access** on a desktop host.
 Removing an environment from a device's connection settings only forgets it on
 that device and doesn't change your T3 Connect account. A device keeps a saved
 environment after it's deregistered until you remove it from that device.
@@ -441,10 +420,6 @@ T3 Connect also removes the tunnel of an environment running an older version of
 T3 Code once it has been offline for seven days. That environment shows a message
 asking you to update. Start T3 Code on that computer and update it to the latest
 version; it reconnects at the same address without pairing again.
-
-On a command-line host, `t3 connect unlink` disables exposure while retaining
-your login; `t3 connect logout` also clears that login. Background-service
-[removal](./background-service.md#manage-the-service) is separate.
 
 Treat pairing URLs and authorization codes as passwords. Do not include them in
 screenshots, logs, or bug reports.
