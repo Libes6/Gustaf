@@ -15,7 +15,11 @@ import {
   isCopilotLostSessionError,
   makeCopilotSubagentRouting,
 } from "./copilotAcp.ts";
-import { defaultInstanceIdForDriver, ProviderDriverKind } from "@t3tools/contracts";
+import {
+  defaultInstanceIdForDriver,
+  PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+  ProviderDriverKind,
+} from "@t3tools/contracts";
 import { readCustomModelEntries } from "@t3tools/shared/model";
 import { AcpRegistrySettings } from "../settings.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -114,7 +118,31 @@ export function registerMistralVibeAcpExtensions(context: AcpAdapterV2ExtensionC
   );
 }
 
+// Kimi Code lists models the plan cannot use and rejects them only at session/prompt:
+// "Authentication required: Your current subscription does not have access ...".
+const MODEL_NOT_IN_SUBSCRIPTION = /\byour current subscription does not have access\b/iu;
+
+function acpRequestErrorText(error: EffectAcpErrors.AcpRequestError): string {
+  const data = error.data;
+  const detail =
+    typeof data === "string"
+      ? data
+      : typeof data === "object" && data !== null && "message" in data
+        ? String(data.message)
+        : "";
+  return `${error.errorMessage}\n${detail}`;
+}
+
 export function acpRegistryPromptFailure(agentId: string, cause: unknown) {
+  if (isAcpRequestError(cause) && MODEL_NOT_IN_SUBSCRIPTION.test(acpRequestErrorText(cause))) {
+    return makeProviderFailure({
+      cause,
+      message: cause.errorMessage,
+      code: PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+      class: "permission_error",
+      retryable: false,
+    });
+  }
   return makeProviderFailure({
     cause,
     ...(isAcpRequestError(cause)
@@ -272,6 +300,10 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
               options.instanceId,
               normalizeAcpRegistryLiveConfiguration(configOptions, modeState, modelState),
             ),
+          onTurnFailure: ({ model, failure }) =>
+            failure.code === PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE
+              ? runtimeCoordinator.recordModelAccessDenied(options.instanceId, model)
+              : Effect.void,
           onUrlElicitation: ({ elicitationId, url, message }) => {
             const normalizedUrl = normalizeAcpRegistryWebUrl(url);
             if (normalizedUrl === undefined || elicitationId.trim().length === 0) {
