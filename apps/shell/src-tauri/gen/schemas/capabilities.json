@@ -2,7 +2,6 @@
   "default": {
     "identifier": "default",
     "description": "Gustaf window. The page comes from the local server the shell starts, so loopback is the only origin granted anything.",
-    "remote": { "urls": ["http://127.0.0.1:*", "http://localhost:*"] },
     "local": true,
     "windows": ["main"],
     "permissions": [

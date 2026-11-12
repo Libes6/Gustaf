@@ -1,5 +1,6 @@
 mod bridge;
 mod connection_storage;
+mod ipc_scope;
 mod local_env;
 mod network;
 mod server_process;
@@ -386,6 +387,20 @@ pub fn run() {
                 "bootstrapToken": local.bootstrap_token,
             }]);
             let app_url = local.app_url.clone();
+            let Some(port) = app_url.port() else {
+                report_start_failure(
+                    app.handle(),
+                    "The server reported an address without a port.",
+                );
+                return Ok(());
+            };
+            if let Err(error) = app.add_capability(ipc_scope::server_capability(port)) {
+                report_start_failure(
+                    app.handle(),
+                    &format!("The window could not be given access to the shell: {error}"),
+                );
+                return Ok(());
+            }
             let platform = local_env::client_platform();
             app.manage(LocalEnvironmentState::new(local));
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
