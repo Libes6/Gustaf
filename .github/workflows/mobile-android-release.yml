@@ -124,10 +124,13 @@ jobs:
           cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
 
           certs=$("$build_tools/apksigner" verify --print-certs "$apk")
-          digests=$(sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p' <<< "$certs")
+          # Older apksigner prints "Signer #1 certificate ...", newer prints "Signer (minSdkVersion=N, ...) certificate ..." when v3 signing is present.
+          digests=$(sed -n -E 's/^Signer (#[0-9]+|\(.*\)) certificate SHA-256 digest: //p' <<< "$certs" | sort -u)
           expected=$(tr -d ':' <<< "$EXPECTED_CERT_SHA256" | tr '[:upper:]' '[:lower:]')
           if [ "$digests" != "$expected" ]; then
             echo "::error::APK is not signed with the release key only. Signer digests: ${digests:-none}"
+            echo "apksigner output (certificate lines only):"
+            grep -i 'certificate' <<< "$certs" | sed -E 's/(DN: ).*/\1<hidden>/' || true
             exit 1
           fi
 
