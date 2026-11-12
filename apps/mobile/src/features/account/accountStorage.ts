@@ -39,7 +39,7 @@ const run = <A>(
   >,
 ) => Effect.runPromise(program.pipe(Effect.provide(MobileSecureStorage.layer)));
 
-function read<A>(key: string, decode: (raw: string) => Effect.Effect<A, unknown>) {
+function read<A>(key: string, decode: (raw: string) => Effect.Effect<A, Schema.SchemaError>) {
   return run(
     Effect.gen(function* () {
       const storage = yield* MobileSecureStorage.MobileSecureStorage;
