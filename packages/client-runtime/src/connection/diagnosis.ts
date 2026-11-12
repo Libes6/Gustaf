@@ -35,6 +35,8 @@ export interface ConnectionDiagnosisInput {
   readonly state: SupervisorConnectionState;
   /** The environment's usual route, used when the failure does not name one. */
   readonly via: "relay" | "direct";
+  /** Every saved route is a private network address, e.g. 192.168.x.x. */
+  readonly lanOnly?: boolean;
   /** The relay's last health check, which can name a cause before any connect attempt. */
   readonly relayStatus?: Pick<
     RelayEnvironmentStatusResponse,
@@ -352,10 +354,21 @@ export function presentConnectionDiagnosis(
   add("Error", failure?.detail);
   add("Trace ID", failure?.traceId);
 
+  const unreachable =
+    failure?.reason === "network" ||
+    failure?.reason === "timeout" ||
+    failure?.reason === "transport";
+  const lanSteps =
+    input.lanOnly === true && !relayPath && unreachable
+      ? [
+          `${host} is saved only with local network addresses, which work only on the same network as ${host}. Add a stable route, such as a Tailscale address, in ${host}'s settings.`,
+        ]
+      : [];
+
   return {
     headline: headline(host, located, failure),
     hops,
-    steps: steps(host, located, failure),
+    steps: [...lanSteps, ...steps(host, located, failure)],
     facts,
     moreInfoUrl:
       relayPath || located.cause === "session_pending"

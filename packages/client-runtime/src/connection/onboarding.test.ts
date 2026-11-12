@@ -316,7 +316,14 @@ describe("connection onboarding", () => {
         .registerPairing({ host: "attacker.example.test", pairingCode: "pairing-token" })
         .pipe(Effect.flip);
 
-      expect(error).toMatchObject({ _tag: "ConnectionBlockedError", reason: "configuration" });
+      expect(error).toMatchObject({
+        _tag: "ConnectionBlockedError",
+        reason: "configuration",
+        alreadySaved: {
+          environmentId: PAIRED_ENVIRONMENT_ID,
+          address: "https://attacker.example.test/",
+        },
+      });
       expect(yield* SubscriptionRef.get(registry.entries)).toEqual(before);
       expect(calls.map((call) => call.url)).toEqual([
         "https://attacker.example.test/.well-known/t3/environment",

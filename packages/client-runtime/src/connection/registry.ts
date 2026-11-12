@@ -44,6 +44,7 @@ import {
 } from "./pullRequestRoutingPermissions.ts";
 import {
   RELAY_ROUTE_ID,
+  connectionRouteAddress,
   connectionRouteId,
   connectionRoutes,
   credentialConnectionId,
@@ -554,6 +555,7 @@ export const make = Effect.gen(function* () {
       return yield* new ConnectionBlockedError({
         reason: "configuration",
         detail: `That address claims to be ${saved.target.label}, which is already saved. Add it as a route from that environment's settings instead.`,
+        alreadySaved: { environmentId, address: connectionRouteAddress(route) ?? "" },
       });
     }
   });

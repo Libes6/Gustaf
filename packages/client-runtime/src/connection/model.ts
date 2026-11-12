@@ -125,6 +125,10 @@ export class ConnectionBlockedError extends Schema.TaggedError<ConnectionBlocked
     ...ConnectionFailureFields,
 
     serverUpdateRequired: Schema.optionalKey(Schema.Boolean),
+    /** The address reached an environment saved under other addresses; it can become a route of it. */
+    alreadySaved: Schema.optionalKey(
+      Schema.Struct({ environmentId: EnvironmentId, address: Schema.String }),
+    ),
   },
 ) {
   override get message(): string {

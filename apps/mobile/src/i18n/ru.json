@@ -170,6 +170,8 @@
   "No transcription model matches.": "Нет подходящих моделей транскрипции.",
   "Routes": "Маршруты",
   "Add route": "Добавить маршрут",
+  "Add this address as a route to {name}": "Добавить этот адрес как маршрут к «{name}»",
+  "{name} is already saved on this device. This address can be added to it as another route.": "«{name}» уже сохранено на этом устройстве. Этот адрес можно добавить к нему как ещё один маршрут.",
   "In use": "Используется",
   "Check for updates": "Проверить обновления",
   "Base branch": "Базовая ветка",

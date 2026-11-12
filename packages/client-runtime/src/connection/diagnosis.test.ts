@@ -154,6 +154,22 @@ describe("presentConnectionDiagnosis", () => {
     expect(results(backoff(failure))).not.toContainEqual(expect.stringMatching(/:ok$/));
   });
 
+  it("explains that local network addresses only work on the host's network", () => {
+    const failure = mapRemoteEnvironmentError(
+      new RemoteEnvironmentAuthFetchError({ message: "Failed to fetch", cause: new TypeError() }),
+    );
+    const stepsFor = (lanOnly: boolean) =>
+      presentConnectionDiagnosis({
+        hostLabel: "Mac mini",
+        state: backoff(failure),
+        via: "direct",
+        lanOnly,
+      })?.steps[0];
+    expect(stepsFor(true)).toContain("only on the same network as Mac mini");
+    expect(stepsFor(true)).toContain("Tailscale");
+    expect(stepsFor(false)).not.toContain("same network");
+  });
+
   it("keeps the relay health status out of a failure that has its own cause", () => {
     const failure = mapRemoteEnvironmentError(
       new RemoteEnvironmentAuthFetchError({ message: "Failed to fetch", cause: new TypeError() }),
