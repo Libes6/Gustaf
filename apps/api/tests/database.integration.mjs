@@ -1,9 +1,9 @@
 import * as NodeAssert from "node:assert/strict";
-import * as NodeURL from "node:url";
 import * as NodeTest from "node:test";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { createApp } from "../dist/app.js";
+import { readConfig } from "../dist/config.js";
 import { DatabaseService } from "../dist/database/database.service.js";
+import { runMigrations } from "../dist/database/migrations.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl)
@@ -12,11 +12,10 @@ if (!databaseUrl)
 NodeTest.test(
   "migration runner is repeatable and HTTP readiness uses real PostgreSQL",
   async () => {
+    await runMigrations(databaseUrl);
+    await runMigrations(databaseUrl);
     const database = new DatabaseService(databaseUrl);
     try {
-      const migrationsFolder = NodeURL.fileURLToPath(new URL("../drizzle/", import.meta.url));
-      await migrate(database.db, { migrationsFolder });
-      await migrate(database.db, { migrationsFolder });
       const result = await database.pool.query(
         "select count(*)::int as count from drizzle.__drizzle_migrations",
       );
@@ -24,7 +23,7 @@ NodeTest.test(
     } finally {
       await database.onModuleDestroy();
     }
-    const app = await createApp({ databaseUrl, port: 3100, host: "127.0.0.1" });
+    const app = await createApp(readConfig({ DATABASE_URL: databaseUrl }));
     app.useLogger(false);
     try {
       await app.listen(0, "127.0.0.1");
