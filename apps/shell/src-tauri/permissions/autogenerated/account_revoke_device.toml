@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-revoke-device"
+description = "Enables the account_revoke_device command without any pre-configured scope."
+commands.allow = ["account_revoke_device"]
+
+[[permission]]
+identifier = "deny-account-revoke-device"
+description = "Denies the account_revoke_device command without any pre-configured scope."
+commands.deny = ["account_revoke_device"]

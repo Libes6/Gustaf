@@ -25,6 +25,13 @@ fn main() {
             "update_check",
             "update_download",
             "update_install",
+            "account_state",
+            "account_sign_in",
+            "account_cancel_sign_in",
+            "account_sign_out",
+            "account_devices",
+            "account_register_device",
+            "account_revoke_device",
         ]),
     ))
     .expect("failed to run tauri-build");

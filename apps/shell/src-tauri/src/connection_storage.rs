@@ -1,5 +1,6 @@
-//! Keep the catalog encrypted on disk and only its small encryption key in the
-//! OS credential store. Catalogs can exceed Windows Credential Manager's limit.
+//! Keep the catalog (and the cloud account, see account.rs) encrypted on disk and only
+//! a small encryption key in the OS credential store. Catalogs can exceed Windows
+//! Credential Manager's limit.
 
 use std::{fs, path::Path, sync::Mutex};
 
@@ -24,85 +25,82 @@ fn encrypt(catalog: &str, key: &Key) -> Result<Vec<u8>, String> {
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let ciphertext = ChaCha20Poly1305::new(key)
         .encrypt(&nonce, catalog.as_bytes())
-        .map_err(|_| "Cannot encrypt connection catalog")?;
+        .map_err(|_| "Cannot encrypt saved data")?;
     serde_json::to_vec(&EncryptedCatalog {
         version: 1,
         nonce: nonce.into(),
         ciphertext,
     })
-    .map_err(|_| "Cannot encode connection catalog".to_owned())
+    .map_err(|_| "Cannot encode saved data".to_owned())
 }
 
 fn decrypt(raw: &[u8], key: &Key) -> Result<String, String> {
     let saved: EncryptedCatalog =
-        serde_json::from_slice(raw).map_err(|_| "Cannot decode encrypted connection catalog")?;
+        serde_json::from_slice(raw).map_err(|_| "Cannot decode encrypted saved data")?;
     if saved.version != 1 {
-        return Err("Unsupported connection catalog encryption version".to_owned());
+        return Err("Unsupported saved data encryption version".to_owned());
     }
     let plaintext = ChaCha20Poly1305::new(key)
         .decrypt(Nonce::from_slice(&saved.nonce), saved.ciphertext.as_ref())
-        .map_err(|_| "Cannot decrypt connection catalog")?;
-    String::from_utf8(plaintext).map_err(|_| "Invalid connection catalog encoding".to_owned())
+        .map_err(|_| "Cannot decrypt saved data")?;
+    String::from_utf8(plaintext).map_err(|_| "Invalid saved data encoding".to_owned())
 }
 
 fn read_key(entry: &keyring::Entry) -> Result<Option<Key>, String> {
     match entry.get_secret() {
         Ok(secret) => {
             if secret.len() != 32 {
-                return Err("Invalid connection storage key".to_owned());
+                return Err("Invalid storage key".to_owned());
             }
             Ok(Some(*Key::from_slice(&secret)))
         }
         Err(keyring::Error::NoEntry) => Ok(None),
         // Do not include credential data in errors sent to the renderer/logs.
-        Err(_) => Err("Cannot access the system keyring for connections".to_owned()),
+        Err(_) => Err("Cannot access the system keyring".to_owned()),
     }
 }
 
-fn read_catalog(path: &Path, entry: &keyring::Entry) -> Result<Option<String>, String> {
+pub(crate) fn read_catalog(path: &Path, entry: &keyring::Entry) -> Result<Option<String>, String> {
     let raw = match fs::read(path) {
         Ok(raw) => raw,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("Cannot read connection catalog: {error}")),
+        Err(error) => return Err(format!("Cannot read saved data: {error}")),
     };
-    let key =
-        read_key(entry)?.ok_or("Connection storage key is missing from the system keyring")?;
+    let key = read_key(entry)?.ok_or("The storage key is missing from the system keyring")?;
     decrypt(&raw, &key).map(Some)
 }
 
-fn write_catalog(path: &Path, entry: &keyring::Entry, catalog: &str) -> Result<(), String> {
+pub(crate) fn write_catalog(
+    path: &Path,
+    entry: &keyring::Entry,
+    catalog: &str,
+) -> Result<(), String> {
     let key = match read_key(entry)? {
         Some(key) => key,
         None => {
             // Never replace the key of an existing catalog: that would destroy it.
             if path.try_exists().map_err(|error| error.to_string())? {
-                return Err("Connection storage key is missing from the system keyring".to_owned());
+                return Err("The storage key is missing from the system keyring".to_owned());
             }
             let key = ChaCha20Poly1305::generate_key(&mut OsRng);
             entry
                 .set_secret(key.as_slice())
-                .map_err(|_| "Cannot save the connection storage key in the system keyring")?;
+                .map_err(|_| "Cannot save the storage key in the system keyring")?;
             key
         }
     };
     let raw = encrypt(catalog, &key)?;
-    fs::create_dir_all(
-        path.parent()
-            .ok_or("Missing connection storage directory")?,
-    )
-    .map_err(|error| error.to_string())?;
+    fs::create_dir_all(path.parent().ok_or("Missing storage directory")?)
+        .map_err(|error| error.to_string())?;
     let temporary = path.with_extension("json.tmp");
     fs::write(&temporary, raw).map_err(|error| error.to_string())?;
     fs::rename(temporary, path).map_err(|error| error.to_string())
 }
 
 // A second Gustaf process must not race key creation or replace the same temp file.
-fn lock_catalog(path: &Path) -> Result<fs::File, String> {
-    fs::create_dir_all(
-        path.parent()
-            .ok_or("Missing connection storage directory")?,
-    )
-    .map_err(|error| error.to_string())?;
+pub(crate) fn lock_catalog(path: &Path) -> Result<fs::File, String> {
+    fs::create_dir_all(path.parent().ok_or("Missing storage directory")?)
+        .map_err(|error| error.to_string())?;
     let file = fs::OpenOptions::new()
         .read(true)
         .write(true)
