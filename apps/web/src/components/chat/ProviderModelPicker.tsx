@@ -6,7 +6,17 @@ import {
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
-import { createContext, memo, type ReactNode, useRef, useState } from "react";
+import { RegistryContext } from "@effect/atom-react";
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { Badge } from "../ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -15,10 +25,19 @@ import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPick
 import { ChatGptSharingControl } from "./ChatGptSharingControl";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./providerIconUtils";
-import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
+import {
+  isProviderInstancePickerVisible,
+  shouldShowInstanceBadge,
+  type ProviderInstanceEntry,
+} from "../../providerInstances";
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { takeOpenTarget, useComposerMenuProps } from "./composerEventScope";
 import { shortcutLabelForCommand } from "../../keybindings";
+import { serverEnvironment } from "../../state/server";
+import { useAtomCommand } from "../../state/use-atom-command";
+import { takeModelPickerRefreshTargets } from "./modelPickerRefresh";
+
+const modelPickerRefreshedAt = new Map<string, number>();
 
 /** Holds the page still behind the open picker; its lifetime is the popup element's. */
 function lockBackgroundScroll(popup: HTMLElement | null) {
@@ -118,6 +137,29 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   const composerFloatingLayerProps = useComposerMenuProps();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
+  const registry = useContext(RegistryContext);
+  const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
+    reportFailure: false,
+  });
+  const refreshListedInstances = useEffectEvent(() => {
+    const environmentId = props.environmentId;
+    if (environmentId === null) return;
+    if (!registry.get(serverEnvironment.refreshProviders.permissionAtom(environmentId))) return;
+    const instanceIds = takeModelPickerRefreshTargets(modelPickerRefreshedAt, {
+      environmentId,
+      instanceIds: props.instanceEntries
+        .filter(isProviderInstancePickerVisible)
+        .map((entry) => entry.instanceId),
+      now: Date.now(),
+    });
+    for (const instanceId of instanceIds) {
+      void refreshProviders({ environmentId, input: { instanceId } });
+    }
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- re-probes listed providers (e.g. newly pulled Ollama models) on every open; a parent, a keybinding or the palette can open the picker, so no single handler sees them all
+  useEffect(() => {
+    if (isMenuOpen) refreshListedInstances();
+  }, [isMenuOpen]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
