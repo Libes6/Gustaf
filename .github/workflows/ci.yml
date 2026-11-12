@@ -136,6 +136,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -168,3 +169,8 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" --clobber publish/*
           gh release edit "$GITHUB_REF_NAME" --draft=false
+      # A release published with GITHUB_TOKEN fires no `release` event, so start the APK build directly.
+      - name: Build the Android APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mobile-android-release.yml -R "$GITHUB_REPOSITORY" -f tag="$GITHUB_REF_NAME"
