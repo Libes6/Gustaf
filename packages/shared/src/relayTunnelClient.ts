@@ -84,8 +84,8 @@ export class RelayTunnelClient {
   readonly #closeListeners = new Set<(error: RelayTunnelClientError) => void>();
   #nextStream = 1;
   #closed: RelayTunnelClientError | null = null;
-  /** Set once, when the computer's user approved this device during pairing. */
-  readonly bearerToken: string | undefined;
+  /** Set once, when the computer's user approved this device: a one-time code for the pairing link. */
+  readonly pairingToken: string | undefined;
   readonly remoteStaticKey: Uint8Array;
   readonly localStaticKey: Uint8Array;
 
@@ -93,14 +93,14 @@ export class RelayTunnelClient {
     socket: WebSocket;
     send: NoiseCipherState;
     receive: NoiseCipherState;
-    bearerToken: string | undefined;
+    pairingToken: string | undefined;
     remoteStaticKey: Uint8Array;
     localStaticKey: Uint8Array;
   }) {
     this.#socket = input.socket;
     this.#send = input.send;
     this.#receive = input.receive;
-    this.bearerToken = input.bearerToken;
+    this.pairingToken = input.pairingToken;
     this.remoteStaticKey = input.remoteStaticKey;
     this.localStaticKey = input.localStaticKey;
   }
@@ -225,7 +225,7 @@ export class RelayTunnelClient {
             socket,
             send: session.send,
             receive: session.receive,
-            bearerToken: status.bearerToken,
+            pairingToken: status.pairingToken,
             remoteStaticKey: session.remoteStaticKey,
             localStaticKey: options.clientKeyPair.publicKey,
           });
@@ -404,7 +404,37 @@ interface TunnelSocketWiring {
 type SocketEvent = { readonly type: string } & Record<string, unknown>;
 type SocketListener = (event: SocketEvent) => void;
 
-class RelayTunnelWebSocket {
+/** The `addEventListener` and `on…` half of a browser WebSocket, without relying on EventTarget (Hermes). */
+class SocketEvents {
+  onopen: SocketListener | null = null;
+  onmessage: SocketListener | null = null;
+  onclose: SocketListener | null = null;
+  onerror: SocketListener | null = null;
+  readonly #listeners = new Map<string, Set<SocketListener>>();
+
+  addEventListener(type: string, listener: SocketListener) {
+    let set = this.#listeners.get(type);
+    if (!set) this.#listeners.set(type, (set = new Set()));
+    set.add(listener);
+  }
+
+  removeEventListener(type: string, listener: SocketListener) {
+    this.#listeners.get(type)?.delete(listener);
+  }
+
+  protected emit(event: SocketEvent) {
+    for (const listener of this.#listeners.get(event.type) ?? []) listener(event);
+    const handler = {
+      open: this.onopen,
+      message: this.onmessage,
+      close: this.onclose,
+      error: this.onerror,
+    }[event.type];
+    handler?.(event);
+  }
+}
+
+class RelayTunnelWebSocket extends SocketEvents {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
   static readonly CLOSING = 2;
@@ -418,29 +448,15 @@ class RelayTunnelWebSocket {
   extensions = "";
   bufferedAmount = 0;
   binaryType: "blob" | "arraybuffer" = "blob";
-  onopen: SocketListener | null = null;
-  onmessage: SocketListener | null = null;
-  onclose: SocketListener | null = null;
-  onerror: SocketListener | null = null;
-  readonly #listeners = new Map<string, Set<SocketListener>>();
   readonly #wiring: TunnelSocketWiring;
   readonly #fragments: Array<Uint8Array> = [];
 
   readonly url: string;
 
   constructor(url: string, wiring: TunnelSocketWiring) {
+    super();
     this.url = url;
     this.#wiring = wiring;
-  }
-
-  addEventListener(type: string, listener: SocketListener) {
-    let set = this.#listeners.get(type);
-    if (!set) this.#listeners.set(type, (set = new Set()));
-    set.add(listener);
-  }
-
-  removeEventListener(type: string, listener: SocketListener) {
-    this.#listeners.get(type)?.delete(listener);
   }
 
   send(data: string | ArrayBufferLike | ArrayBufferView) {
@@ -478,7 +494,7 @@ class RelayTunnelWebSocket {
         if (head?.status !== 101) return this.handleFailure();
         this.protocol = head.headers.find(([name]) => name === "sec-websocket-protocol")?.[1] ?? "";
         this.readyState = 1;
-        this.#emit({ type: "open" });
+        this.emit({ type: "open" });
         return;
       }
       case TunnelMessageType.data:
@@ -492,7 +508,7 @@ class RelayTunnelWebSocket {
             : this.binaryType === "arraybuffer"
               ? whole.buffer
               : new Blob([whole]);
-        this.#emit({ type: "message", data });
+        this.emit({ type: "message", data });
         return;
       }
       case TunnelMessageType.end: {
@@ -507,7 +523,7 @@ class RelayTunnelWebSocket {
 
   handleFailure() {
     if (this.readyState === 3) return;
-    this.#emit({ type: "error" });
+    this.emit({ type: "error" });
     this.#finish(1006, "", false);
   }
 
@@ -515,18 +531,7 @@ class RelayTunnelWebSocket {
     if (this.readyState === 3) return;
     this.readyState = 3;
     this.#wiring.onDone();
-    this.#emit({ type: "close", code, reason, wasClean });
-  }
-
-  #emit(event: SocketEvent) {
-    for (const listener of this.#listeners.get(event.type) ?? []) listener(event);
-    const handler = {
-      open: this.onopen,
-      message: this.onmessage,
-      close: this.onclose,
-      error: this.onerror,
-    }[event.type];
-    handler?.(event);
+    this.emit({ type: "close", code, reason, wasClean });
   }
 }
 
@@ -538,4 +543,154 @@ function concat(parts: ReadonlyArray<Uint8Array>) {
     offset += part.length;
   }
   return out;
+}
+
+/** Clients reach a computer over the relay at this made-up origin; the pool intercepts it. */
+const RELAY_VIRTUAL_HOST_SUFFIX = ".relay.gustaf.invalid";
+
+export function relayVirtualBaseUrl(hostDeviceId: string): string {
+  return `https://${hostDeviceId.toLowerCase()}${RELAY_VIRTUAL_HOST_SUFFIX}`;
+}
+
+export function relayHostFromUrl(url: string | URL): string | null {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  if (!hostname.endsWith(RELAY_VIRTUAL_HOST_SUFFIX)) return null;
+  const host = hostname.slice(0, -RELAY_VIRTUAL_HOST_SUFFIX.length);
+  return /^[a-z0-9-]{1,128}$/.test(host) ? host : null;
+}
+
+/**
+ * One tunnel per computer, opened on first use and again after it drops. `fetch` and
+ * `createWebSocket` route virtual relay URLs through it; the platform supplies the keys.
+ */
+export class RelayTunnelPool {
+  readonly #resolve: (hostDeviceId: string) => Promise<RelayTunnelClientOptions>;
+  readonly #clients = new Map<string, Promise<RelayTunnelClient>>();
+
+  constructor(resolve: (hostDeviceId: string) => Promise<RelayTunnelClientOptions>) {
+    this.#resolve = resolve;
+  }
+
+  client(hostDeviceId: string): Promise<RelayTunnelClient> {
+    const existing = this.#clients.get(hostDeviceId);
+    if (existing) return existing;
+    const connecting = this.#resolve(hostDeviceId)
+      .then((options) => RelayTunnelClient.connect(options))
+      .then((client) => {
+        client.onClose(() => {
+          if (this.#clients.get(hostDeviceId) === connecting) this.#clients.delete(hostDeviceId);
+        });
+        return client;
+      });
+    connecting.catch(() => {
+      if (this.#clients.get(hostDeviceId) === connecting) this.#clients.delete(hostDeviceId);
+    });
+    this.#clients.set(hostDeviceId, connecting);
+    return connecting;
+  }
+
+  /** Drops a computer's tunnel, e.g. after its route is removed. */
+  forget(hostDeviceId: string) {
+    const existing = this.#clients.get(hostDeviceId);
+    this.#clients.delete(hostDeviceId);
+    void existing?.then((client) => client.close()).catch(() => undefined);
+  }
+
+  /** Wraps a platform `fetch` so virtual relay URLs go through the tunnel. */
+  wrapFetch(base: typeof fetch): typeof fetch {
+    return (async (input: Request | string | URL, init?: RequestInit) => {
+      const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;
+      const host = relayHostFromUrl(url);
+      if (host === null) return base(input, init);
+      return (await this.client(host)).fetch(input, init);
+    }) as typeof fetch;
+  }
+
+  /** A WebSocket for a virtual relay URL; it connects once the tunnel is up. */
+  createWebSocket(url: string, protocols?: string | ReadonlyArray<string>): WebSocket {
+    const host = relayHostFromUrl(url);
+    if (host === null) throw new TypeError("Not a relay URL.");
+    return new LazyRelayWebSocket(url, this.client(host), protocols) as unknown as WebSocket;
+  }
+}
+
+class LazyRelayWebSocket extends SocketEvents {
+  readonly CONNECTING = 0;
+  readonly OPEN = 1;
+  readonly CLOSING = 2;
+  readonly CLOSED = 3;
+  readyState = 0;
+  protocol = "";
+  extensions = "";
+  bufferedAmount = 0;
+  #binaryType: "blob" | "arraybuffer" = "blob";
+  #inner: WebSocket | null = null;
+  readonly url: string;
+
+  constructor(
+    url: string,
+    client: Promise<RelayTunnelClient>,
+    protocols?: string | ReadonlyArray<string>,
+  ) {
+    super();
+    this.url = url;
+    client.then(
+      (tunnel) => {
+        if (this.readyState !== 0) return;
+        const inner = tunnel.createWebSocket(url, protocols);
+        inner.binaryType = this.#binaryType;
+        this.#inner = inner;
+        inner.addEventListener("open", () => {
+          this.readyState = 1;
+          this.protocol = inner.protocol;
+          this.emit({ type: "open" });
+        });
+        inner.addEventListener("message", (event) =>
+          this.emit({ type: "message", data: event.data }),
+        );
+        inner.addEventListener("error", () => this.emit({ type: "error" }));
+        inner.addEventListener("close", (event) => {
+          this.readyState = 3;
+          this.emit({
+            type: "close",
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
+        });
+      },
+      () => {
+        if (this.readyState === 3) return;
+        this.readyState = 3;
+        this.emit({ type: "error" });
+        this.emit({ type: "close", code: 1006, reason: "", wasClean: false });
+      },
+    );
+  }
+
+  get binaryType() {
+    return this.#binaryType;
+  }
+
+  set binaryType(value: "blob" | "arraybuffer") {
+    this.#binaryType = value;
+    if (this.#inner) this.#inner.binaryType = value;
+  }
+
+  send(data: string | ArrayBufferLike | ArrayBufferView) {
+    if (!this.#inner || this.readyState !== 1) throw new Error("WebSocket is not open.");
+    this.#inner.send(data as string);
+  }
+
+  close(code = 1000, reason = "") {
+    if (this.readyState >= 2) return;
+    if (this.#inner) return this.#inner.close(code, reason);
+    this.readyState = 3;
+    this.emit({ type: "close", code, reason, wasClean: true });
+  }
 }

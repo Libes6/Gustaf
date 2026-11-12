@@ -27,7 +27,7 @@ import {
 
 /** What the host decides about a client whose handshake finished. */
 export type RelayAdmission =
-  | { readonly kind: "ready"; readonly bearerToken?: string }
+  | { readonly kind: "ready"; readonly pairingToken?: string }
   | { readonly kind: "reject"; readonly reason: string }
   /** Ask the user; the promise settles with their answer. */
   | { readonly kind: "pending"; readonly decision: Promise<RelayAdmission> };
@@ -276,7 +276,7 @@ export class RelayHostEngine {
           channel,
           encodeTunnelJson(TunnelMessageType.status, 0, {
             state: "ready",
-            ...(admission.bearerToken ? { bearerToken: admission.bearerToken } : {}),
+            ...(admission.pairingToken ? { pairingToken: admission.pairingToken } : {}),
           }),
         );
     }

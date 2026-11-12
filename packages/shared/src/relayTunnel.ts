@@ -144,8 +144,11 @@ export interface TunnelHead {
 
 export type TunnelStatus =
   | { readonly state: "pending" }
-  /** `bearerToken` is sent once, right after the host's user approves a new device. */
-  | { readonly state: "ready"; readonly bearerToken?: string };
+  /**
+   * `pairingToken` is sent once, right after the host's user approves a new device: a one-time
+   * environment pairing code the client redeems through the tunnel like any other pairing link.
+   */
+  | { readonly state: "ready"; readonly pairingToken?: string };
 
 export interface TunnelMessage {
   readonly type: TunnelMessageType;

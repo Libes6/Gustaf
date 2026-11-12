@@ -4,7 +4,12 @@ import * as NodeEvents from "node:events";
 import * as NodeHttp from "node:http";
 import type * as NodeNet from "node:net";
 
-import { RelayTunnelClient, RelayTunnelClientError } from "@t3tools/shared/relayTunnelClient";
+import {
+  RelayTunnelClient,
+  RelayTunnelClientError,
+  RelayTunnelPool,
+  relayVirtualBaseUrl,
+} from "@t3tools/shared/relayTunnelClient";
 import { generateNoiseKeyPair } from "@t3tools/shared/relayNoise";
 import { toBase64Url } from "@t3tools/shared/relayTunnel";
 import { describe, expect, it } from "@effect/vitest";
@@ -199,9 +204,9 @@ describe("relay tunnel", () => {
     expect(admitted).toMatchObject([
       { clientDeviceId: "pixel", hello: { name: "Pixel", pairingSecret: "s".repeat(32) } },
     ]);
-    approve.resolve({ kind: "ready", bearerToken: "bearer-1" });
+    approve.resolve({ kind: "ready", pairingToken: "PAIRCODE1" });
     const client = await connecting;
-    expect(client.bearerToken).toBe("bearer-1");
+    expect(client.pairingToken).toBe("PAIRCODE1");
 
     const response = await client.fetch("https://relay.invalid/api/echo?x=1", {
       method: "POST",
@@ -262,5 +267,38 @@ describe("relay tunnel", () => {
     const rejected = await connect(relay.url, host.hostKey).catch((error: unknown) => error);
     expect(rejected).toBeInstanceOf(RelayTunnelClientError);
     expect(rejected).toMatchObject({ reason: "rejected" });
+  });
+
+  it("routes virtual relay URLs through one lazily opened tunnel per computer", async () => {
+    await using relay = await startRelay();
+    await using local = await startLocalServer();
+    using host = startHost(relay.url, local.url, async () => ({ kind: "ready" }));
+    await host.online;
+    const clientKeyPair = generateNoiseKeyPair(random);
+    let opened = 0;
+    const pool = new RelayTunnelPool(async (hostDeviceId) => {
+      opened += 1;
+      return {
+        relayUrl: relay.url,
+        deviceToken: PHONE_TOKEN,
+        hostDeviceId,
+        hostKey: host.hostKey,
+        clientKeyPair,
+        name: "Pixel",
+        randomBytes: random,
+      };
+    });
+    const base = relayVirtualBaseUrl("laptop");
+    const poolFetch = pool.wrapFetch(() => Promise.reject(new Error("not a relay URL")));
+    const first = await poolFetch(`${base}/api/echo`, { method: "POST", body: "a" });
+    expect(await first.json()).toMatchObject({ url: "/api/echo", body: "a" });
+
+    const socket = pool.createWebSocket(`${base.replace("https", "wss")}/ws`);
+    const reply = Promise.withResolvers<unknown>();
+    socket.addEventListener("open", () => socket.send("hi"));
+    socket.addEventListener("message", (event) => reply.resolve(event.data));
+    expect(await reply.promise).toBe("echo:hi:/ws");
+    expect(opened).toBe(1);
+    await expect(poolFetch("https://example.invalid/")).rejects.toThrow("not a relay URL");
   });
 });

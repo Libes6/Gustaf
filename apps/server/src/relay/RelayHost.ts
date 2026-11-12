@@ -9,7 +9,6 @@ import type {
   RelayHostPendingDevice,
   RelayHostStatus,
 } from "@t3tools/contracts";
-import { AuthSessionId, AuthStandardClientScopes } from "@t3tools/contracts";
 import { bytesEqual, noiseKeyPairFromSecret, relaySafetyCode } from "@t3tools/shared/relayNoise";
 import { formatRelayPairingLink, fromBase64Url, toBase64Url } from "@t3tools/shared/relayTunnel";
 import * as Clock from "effect/Clock";
@@ -72,9 +71,8 @@ const CREDENTIAL_SECRET = "relay-host-credential";
 const DEVICES_SECRET = "relay-host-devices";
 const OFFER_TTL = Duration.minutes(5);
 const APPROVAL_TTL_MS = 5 * 60_000;
-const SESSION_TTL = Duration.days(90);
-// A known device gets a fresh bearer when its current one has less than this left.
-const SESSION_RENEW_BEFORE_MS = 30 * 24 * 60 * 60_000;
+// The approved phone redeems it through the tunnel within seconds.
+const PAIRING_TOKEN_TTL = Duration.minutes(5);
 
 const StoredCredential = Schema.Struct({
   relayUrl: Schema.String,
@@ -86,8 +84,6 @@ const StoredDevice = Schema.Struct({
   key: Schema.String,
   name: Schema.String,
   approvedAt: Schema.String,
-  sessionId: AuthSessionId,
-  sessionExpiresAt: Schema.String,
 });
 type StoredDevice = typeof StoredDevice.Type;
 const StoredDevices = Schema.Array(StoredDevice);
@@ -190,15 +186,12 @@ const make = Effect.gen(function* () {
       };
     });
 
-  const issueBearer = (name: string) =>
-    auth.issueSession({
-      ttl: SESSION_TTL,
-      scopes: AuthStandardClientScopes,
-      label: `${name} (relay)`,
-    });
+  // The phone pairs through the tunnel like over any other route and gets an ordinary session.
+  const issuePairingToken = (name: string) =>
+    auth.createPairingLink({ ttl: PAIRING_TOKEN_TTL, label: `${name} (relay)` });
 
-  const ready = (bearerToken?: string): RelayAdmission =>
-    bearerToken === undefined ? { kind: "ready" } : { kind: "ready", bearerToken };
+  const ready = (pairingToken?: string): RelayAdmission =>
+    pairingToken === undefined ? { kind: "ready" } : { kind: "ready", pairingToken };
   const reject = (reason: string): RelayAdmission => ({ kind: "reject", reason });
 
   const waitForUser = (key: string, name: string): RelayAdmission => {
@@ -222,50 +215,26 @@ const make = Effect.gen(function* () {
   };
 
   /** Runs inside the engine's callback: decides about a client whose handshake completed. */
-  const admit = Effect.fn("RelayHost.admit")(
-    function* (client: {
-      readonly clientKey: string;
-      readonly hello: { readonly name: string; readonly pairingSecret?: string };
-    }) {
-      const now = yield* Clock.currentTimeMillis;
-      const known = devices.find((device) => device.key === client.clientKey);
-      if (known) {
-        if (Date.parse(known.sessionExpiresAt) - now > SESSION_RENEW_BEFORE_MS) return ready();
-        const issued = yield* issueBearer(known.name);
-        yield* auth.revokeSession(known.sessionId).pipe(Effect.ignore);
-        yield* saveDevices(
-          devices.map((device) =>
-            device.key === known.key
-              ? {
-                  ...device,
-                  sessionId: issued.sessionId,
-                  sessionExpiresAt: DateTime.formatIso(issued.expiresAt),
-                }
-              : device,
-          ),
-        );
-        return ready(issued.token);
-      }
-      const secret = client.hello.pairingSecret;
-      const current = offer;
-      if (
-        !secret ||
-        !current ||
-        Date.parse(current.view.expiresAt) <= now ||
-        !bytesEqual(new TextEncoder().encode(secret), new TextEncoder().encode(current.secret))
-      ) {
-        return reject("unknown_device");
-      }
-      // One scan, one device: a second phone needs a fresh code.
-      offer = null;
-      return waitForUser(client.clientKey, client.hello.name);
-    },
-    Effect.catch((error) =>
-      Effect.logWarning("relay admission failed", { error: String(error) }).pipe(
-        Effect.as(reject("host_error")),
-      ),
-    ),
-  );
+  const admit = Effect.fn("RelayHost.admit")(function* (client: {
+    readonly clientKey: string;
+    readonly hello: { readonly name: string; readonly pairingSecret?: string };
+  }) {
+    const now = yield* Clock.currentTimeMillis;
+    if (devices.some((device) => device.key === client.clientKey)) return ready();
+    const secret = client.hello.pairingSecret;
+    const current = offer;
+    if (
+      !secret ||
+      !current ||
+      Date.parse(current.view.expiresAt) <= now ||
+      !bytesEqual(new TextEncoder().encode(secret), new TextEncoder().encode(current.secret))
+    ) {
+      return reject("unknown_device");
+    }
+    // One scan, one device: a second phone needs a fresh code.
+    offer = null;
+    return waitForUser(client.clientKey, client.hello.name);
+  });
 
   const stopEngine = () => {
     engine?.stop();
@@ -347,18 +316,16 @@ const make = Effect.gen(function* () {
       approval.settle({ kind: "reject", reason: "rejected" });
       return yield* status();
     }
-    const issued = yield* issueBearer(approval.view.name).pipe(Effect.mapError(storageError));
+    const issued = yield* issuePairingToken(approval.view.name).pipe(Effect.mapError(storageError));
     yield* saveDevices([
       ...devices.filter((device) => device.key !== approval.key),
       {
         key: approval.key,
         name: approval.view.name,
         approvedAt: DateTime.formatIso(yield* DateTime.now),
-        sessionId: issued.sessionId,
-        sessionExpiresAt: DateTime.formatIso(issued.expiresAt),
       },
     ]);
-    approval.settle({ kind: "ready", bearerToken: issued.token });
+    approval.settle(ready(issued.credential));
     return yield* status();
   });
 
@@ -366,8 +333,8 @@ const make = Effect.gen(function* () {
     function* (input) {
       const device = devices.find((candidate) => candidate.key === input.key);
       if (!device) return yield* new RelayHostError({ reason: "not_found" });
+      // Without an approved key the phone's session is unreachable: its only route is this tunnel.
       yield* saveDevices(devices.filter((candidate) => candidate.key !== input.key));
-      yield* auth.revokeSession(device.sessionId).pipe(Effect.ignore);
       engine?.disconnectClient(device.key);
       return yield* status();
     },
