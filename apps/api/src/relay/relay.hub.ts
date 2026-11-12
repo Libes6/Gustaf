@@ -17,6 +17,8 @@ export interface RelayDevice {
 
 export interface RelayLimits {
   helloTimeoutMs: number;
+  /** Connection attempts per client IP per minute, checked before any database work. */
+  connectsPerMinutePerIp: number;
   heartbeatMs: number;
   /** A peer that lets this much pile up unsent is too slow to keep. */
   maxBufferedBytes: number;
@@ -27,6 +29,7 @@ export interface RelayLimits {
 
 export const DEFAULT_RELAY_LIMITS: RelayLimits = {
   helloTimeoutMs: 10_000,
+  connectsPerMinutePerIp: 30,
   heartbeatMs: 30_000,
   maxBufferedBytes: 8 * 1024 * 1024,
   maxChannelsPerClient: 8,
@@ -75,10 +78,14 @@ export class RelayHub {
   private readonly peers = new Set<Peer>();
   private readonly heartbeat: NodeJS.Timeout;
   private checkingRevocations = false;
+  private attempts = new Map<string, number>();
+  private attemptsWindowStart = Date.now();
 
   constructor(
     private readonly deps: RelayDependencies,
     private readonly limits: RelayLimits = DEFAULT_RELAY_LIMITS,
+    /** Express's `trust proxy` hop count: how many proxies in front of us add X-Forwarded-For. */
+    private readonly trustedProxyHops = 0,
   ) {
     this.heartbeat = setInterval(() => void this.sweep(), limits.heartbeatMs);
     this.heartbeat.unref();
@@ -88,7 +95,14 @@ export class RelayHub {
   handleUpgrade(request: NodeHttp.IncomingMessage, socket: NodeStream.Duplex, head: Buffer) {
     const path = (request.url ?? "").split("?")[0];
     if (path !== RELAY_PATH) return false;
-    this.server.handleUpgrade(request, socket, head, (ws) => this.accept(ws, request));
+    const ip = this.clientIp(request);
+    if (!this.allowAttempt(ip)) {
+      socket.end(
+        "HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
+      );
+      return true;
+    }
+    this.server.handleUpgrade(request, socket, head, (ws) => this.accept(ws, ip));
     return true;
   }
 
@@ -104,8 +118,7 @@ export class RelayHub {
     this.server.close();
   }
 
-  private accept(socket: WebSocket, request: NodeHttp.IncomingMessage) {
-    const ip = request.socket.remoteAddress;
+  private accept(socket: WebSocket, ip: string | undefined) {
     const timer = setTimeout(() => socket.close(4401, "hello timeout"), this.limits.helloTimeoutMs);
     socket.once("message", async (data, isBinary) => {
       clearTimeout(timer);
@@ -231,6 +244,33 @@ export class RelayHub {
     if (link.peer.channels.delete(link.peerChannel)) {
       this.send(link.peer, { type: "close", channel: link.peerChannel, reason });
     }
+  }
+
+  /** The client's address behind `trustedProxyHops` proxies, the way Express reads `req.ip`. */
+  private clientIp(request: NodeHttp.IncomingMessage) {
+    const remote = request.socket.remoteAddress;
+    const header = request.headers["x-forwarded-for"];
+    if (this.trustedProxyHops === 0 || typeof header !== "string") return remote;
+    const chain = [
+      ...header
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean),
+      remote,
+    ];
+    return chain[Math.max(0, chain.length - 1 - this.trustedProxyHops)] ?? remote;
+  }
+
+  private allowAttempt(ip: string | undefined) {
+    const now = Date.now();
+    if (now - this.attemptsWindowStart >= 60_000) {
+      this.attempts = new Map();
+      this.attemptsWindowStart = now;
+    }
+    const key = ip ?? "unknown";
+    const count = (this.attempts.get(key) ?? 0) + 1;
+    this.attempts.set(key, count);
+    return count <= this.limits.connectsPerMinutePerIp;
   }
 
   private async sweep() {

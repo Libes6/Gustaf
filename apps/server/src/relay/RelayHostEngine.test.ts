@@ -92,7 +92,12 @@ describe("relay tunnel", () => {
 
     const response = await client.fetch("https://relay.invalid/api/echo?x=1", {
       method: "POST",
-      headers: { authorization: "Bearer bearer-1", "content-type": "text/plain" },
+      // A client cannot pass itself off as local by sending the relay marker's other value.
+      headers: {
+        authorization: "Bearer bearer-1",
+        "content-type": "text/plain",
+        "x-gustaf-relay": "0",
+      },
       body: "hello",
     });
     expect(response.status).toBe(201);
@@ -101,6 +106,7 @@ describe("relay tunnel", () => {
       method: "POST",
       url: "/api/echo?x=1",
       authorization: "Bearer bearer-1",
+      relay: "1",
       body: "hello",
     });
 

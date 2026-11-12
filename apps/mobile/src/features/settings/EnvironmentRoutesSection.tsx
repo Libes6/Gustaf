@@ -35,6 +35,8 @@ import { connectionTone } from "../connection/connectionTone";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
 import { SettingsDragHandle } from "./components/SettingsDragHandle";
 import { SettingsSection } from "./components/SettingsSection";
+import { relayHostFromUrl } from "@t3tools/shared/relayTunnelClient";
+import { useRelaySafetyCode } from "../relay/useRelaySafetyCode";
 
 const ICON_SIZE = Platform.OS === "android" ? 24 : 22;
 const REMOVE_SIZE = 20;
@@ -241,7 +243,16 @@ function RouteRow(props: {
 }) {
   const { route, lifted, offset } = props;
   const label = connectionRouteLabel(route);
-  const address = connectionRouteAddress(route);
+  const routeAddress = connectionRouteAddress(route);
+  // A relay route's address is a made-up origin; the safety code is what the user can check.
+  const relayHost = routeAddress === null ? null : relayHostFromUrl(routeAddress);
+  const safetyCode = useRelaySafetyCode(relayHost);
+  const address =
+    relayHost === null
+      ? routeAddress
+      : safetyCode === null
+        ? null
+        : t("Safety code {code}").replace("{code}", safetyCode);
   const style = useAnimatedStyle(() => ({
     transform: [
       {

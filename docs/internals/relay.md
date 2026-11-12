@@ -26,7 +26,9 @@ Cloudflare for scale; with tens or hundreds of users, carrying the bytes ourselv
 - **Client** ([`relayTunnelClient.ts`](../../packages/shared/src/relayTunnelClient.ts)): one tunnel
   per computer with `fetch` and `WebSocket` look-alikes. On mobile the runtime's HTTP client and
   WebSocket layer route `https://<host-device-id>.relay.gustaf.invalid` through it, so the
-  connection supervisor, auth, routes and RPC need no relay-specific code.
+  connection supervisor, auth, routes and RPC need no relay-specific code. Features that call
+  `fetch` or `new WebSocket` themselves go through the same pool. That origin is a `relay` route,
+  ranked behind every direct one, so a phone at home uses the LAN.
 
 ## Crypto
 
@@ -55,7 +57,12 @@ of the first handshake.
    without a second approval. Revoking the key closes its tunnel and refuses new ones; the phone's
    session then has no route left.
 
-Safety codes come from both static keys, so they are stable and match on both screens.
+Safety codes come from both static keys, so they are stable and match on both screens: the phone
+shows it while it waits for approval and on the relay route afterwards.
+
+Pairing, approving and revoking are refused for requests that came through the tunnel (the host
+sets `x-gustaf-relay` on every replayed request and drops a client's own). A lost phone with an
+allowed key cannot let in another device; that needs this computer or a direct route.
 
 ## What the relay sees
 
@@ -72,11 +79,17 @@ Encryption does not help against a compromised device or a malicious app update.
 - Per client 8 channels, per host 64, per user 20 sockets.
 - `RELAY_MONTHLY_GB` (default 100) per user: over it, new channels are refused (`limit`), open ones
   finish.
+- 30 connection attempts per client IP per minute, refused before any database work. The IP comes
+  from `X-Forwarded-For` behind `TRUST_PROXY` hops (Traefik on Coolify).
 - Revoked devices and banned users lose their sockets within one 30 s heartbeat.
+- Sockets that die silently (sleep, network change) are found by `ping`/`pong` control messages:
+  the host pings every 25 s and reconnects after 60 s of silence; the phone pings when idle and
+  before new work on a quiet tunnel.
 - Not carried: the device hub video stream. React Native `Image` loads URLs natively, so media at a
   relay origin needs to go through `fetch` first.
 
 ## Open
 
+- A host without the desktop shell (the `t3` command) has no way to receive the device credential.
 - Independent security review (a second model and a human) and a load test with realistic sessions.
 - Scale-out beyond one API process needs shared presence.

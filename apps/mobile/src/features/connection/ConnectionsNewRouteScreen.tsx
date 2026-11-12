@@ -187,8 +187,12 @@ function PairingForm({
     setRelayStatus(t("Connecting to the computer through the Gustaf relay…"));
     let pairingUrl: string;
     try {
-      pairingUrl = await pairOverRelay(link, () =>
-        setRelayStatus(t("Allow this phone on the computer to finish pairing.")),
+      pairingUrl = await pairOverRelay(link, (safetyCode) =>
+        setRelayStatus(
+          t(
+            "Allow this phone on the computer to finish pairing. The computer shows the same safety code: {code}",
+          ).replace("{code}", safetyCode),
+        ),
       );
     } catch (error) {
       setIsSubmitting(false);

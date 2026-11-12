@@ -75,6 +75,10 @@ describe("connection routes", () => {
     expect(connectionRouteKind(direct("ts6", "http://[fd7a:115c:a1e0::1]:3773/"))).toBe("tailnet");
     expect(connectionRouteLabel(TAILNET)).toBe("Tailscale");
     expect(connectionRouteLabel(RELAY)).toBe("T3 Connect");
+    const gustafRelay = direct("gustaf-relay", "https://3f2a.relay.gustaf.invalid/");
+    expect(connectionRouteKind(gustafRelay)).toBe("relay");
+    expect(connectionRouteLabel(gustafRelay)).toBe("Gustaf relay");
+    expect(insertRoute([gustafRelay], LAN)).toEqual([LAN, gustafRelay]);
   });
 
   it("places a new route after faster kinds and ahead of T3 Connect", () => {

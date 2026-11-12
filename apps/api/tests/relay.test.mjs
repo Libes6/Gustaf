@@ -7,9 +7,10 @@ import { DEFAULT_RELAY_LIMITS, RelayHub } from "../dist/relay/relay.hub.js";
 
 const token = (name) => `gdt_${name.padEnd(43, "x")}`;
 
-async function withRelay(devices, run, limits = {}) {
+async function withRelay(devices, run, limits = {}, trustedProxyHops = 0) {
   const revoked = new Set();
   const counted = [];
+  const logs = [];
   let budgetLeft = true;
   const hub = new RelayHub(
     {
@@ -17,9 +18,10 @@ async function withRelay(devices, run, limits = {}) {
       stillUsable: async (ids) => new Set(ids.filter((id) => !revoked.has(id))),
       mayOpen: () => budgetLeft,
       countBytes: (userId, bytes) => counted.push([userId, bytes]),
-      log: () => {},
+      log: (event) => logs.push(event),
     },
     { ...DEFAULT_RELAY_LIMITS, heartbeatMs: 60_000, ...limits },
+    trustedProxyHops,
   );
   const server = NodeHttp.createServer();
   server.on("upgrade", (request, socket, head) => {
@@ -29,8 +31,8 @@ async function withRelay(devices, run, limits = {}) {
   await NodeEvents.once(server, "listening");
   const url = `ws://127.0.0.1:${server.address().port}/v1/relay`;
   const sockets = [];
-  const connect = async (name, role) => {
-    const socket = new WebSocket(url);
+  const connect = async (name, role, headers = {}) => {
+    const socket = new WebSocket(url, { headers });
     sockets.push(socket);
     const inbox = messages(socket);
     await NodeEvents.once(socket, "open");
@@ -40,6 +42,8 @@ async function withRelay(devices, run, limits = {}) {
   try {
     await run({
       connect,
+      url,
+      logs,
       hub,
       counted,
       revoke: (id) => revoked.add(id),
@@ -224,3 +228,26 @@ NodeTest.test("budget, channel caps and revocation stop traffic", async () => {
     { maxChannelsPerClient: 1 },
   );
 });
+
+NodeTest.test(
+  "limits connection attempts per client IP, read behind the trusted proxy",
+  async () => {
+    await withRelay(
+      devices,
+      async ({ connect, url, logs }) => {
+        const viaProxy = { "x-forwarded-for": "203.0.113.7" };
+        await connect("laptop", "host", viaProxy);
+        NodeAssert.equal(logs.find((event) => event.event === "relay.connect")?.ip, "203.0.113.7");
+        await connect("pixel", "client", viaProxy);
+        const refused = new WebSocket(url, { headers: viaProxy });
+        const [, response] = await NodeEvents.once(refused, "unexpected-response");
+        NodeAssert.equal(response.statusCode, 429);
+        // Another address has its own allowance.
+        const other = await connect("pixel", "client", { "x-forwarded-for": "198.51.100.2" });
+        NodeAssert.deepEqual(other.first, { type: "ready", deviceId: "pixel" });
+      },
+      { connectsPerMinutePerIp: 2 },
+      1,
+    );
+  },
+);

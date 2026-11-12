@@ -1,3 +1,4 @@
+// @effect-diagnostics extendsNativeError:off globalDate:off globalTimers:off -- Plain socket code for React Native and Node, outside any Effect runtime.
 /**
  * The phone's side of the Gustaf relay: one relay socket, one Noise channel to one computer, and
  * `fetch` / `WebSocket` look-alikes that carry HTTP requests and sockets through it.

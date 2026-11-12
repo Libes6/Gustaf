@@ -6,6 +6,11 @@
 import { NOISE_MAX_MESSAGE_LENGTH } from "./relayNoise.ts";
 
 export const RELAY_SOCKET_PATH = "/v1/relay";
+/**
+ * Set by the host on every HTTP request it replays from the tunnel (a client's own value is
+ * dropped), so the server can tell relay clients apart from ones on this machine or network.
+ */
+export const RELAY_TUNNEL_HEADER = "x-gustaf-relay";
 export const RELAY_PROTOCOL_VERSION = 1;
 
 export type RelayRole = "host" | "client";
@@ -75,7 +80,7 @@ export function isChannel(value: unknown): value is number {
 export const RELAY_FRAME_HEADER_LENGTH = 4;
 export const RELAY_MAX_FRAME_LENGTH = RELAY_FRAME_HEADER_LENGTH + NOISE_MAX_MESSAGE_LENGTH;
 
-export function encodeRelayFrame(channel: number, payload: Uint8Array): Uint8Array {
+export function encodeRelayFrame(channel: number, payload: Uint8Array): Uint8Array<ArrayBuffer> {
   const frame = new Uint8Array(RELAY_FRAME_HEADER_LENGTH + payload.length);
   new DataView(frame.buffer).setUint32(0, channel);
   frame.set(payload, RELAY_FRAME_HEADER_LENGTH);

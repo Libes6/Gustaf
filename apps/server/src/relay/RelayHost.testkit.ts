@@ -102,6 +102,7 @@ export async function startLocalServer() {
           method: request.method,
           url: request.url,
           authorization: request.headers.authorization ?? null,
+          relay: request.headers["x-gustaf-relay"] ?? null,
           body: Buffer.concat(chunks).toString(),
         }),
       );

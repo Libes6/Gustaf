@@ -74,7 +74,7 @@ export async function createApp(
           {
             provide: RelayService,
             useFactory: (db: DatabaseService, devices: DevicesService) =>
-              new RelayService(db, devices, config.auth!.relayMonthlyBytes),
+              new RelayService(db, devices, config.auth!.relayMonthlyBytes, config.trustProxy),
             inject: [DatabaseService, DevicesService],
           },
         ],

@@ -1,3 +1,4 @@
+// @effect-diagnostics extendsNativeError:off -- Plain library code shared with React Native, outside any Effect runtime.
 /**
  * Noise_XX_25519_ChaChaPoly_BLAKE2s (https://noiseprotocol.org/noise.html, revision 34) for the
  * Gustaf relay. Only the XX pattern: pairing and reconnects use the same handshake, and each side

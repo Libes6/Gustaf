@@ -1,4 +1,8 @@
-import { generateNoiseKeyPair, noiseKeyPairFromSecret } from "@t3tools/shared/relayNoise";
+import {
+  generateNoiseKeyPair,
+  noiseKeyPairFromSecret,
+  relaySafetyCode,
+} from "@t3tools/shared/relayNoise";
 import {
   type RelayPairingOffer,
   fromBase64Url,
@@ -98,7 +102,11 @@ export const isRelayPairingLink = (value: string) => parseRelayPairingLink(value
  * Scanned relay QR code → the computer's approval → an ordinary pairing link at the computer's
  * virtual relay origin, which the normal pairing flow redeems through the tunnel.
  */
-export async function pairOverRelay(link: string, onPending: () => void): Promise<string> {
+export async function pairOverRelay(
+  link: string,
+  /** Called with the code the computer shows beside "Allow …?". */
+  onPending: (safetyCode: string) => void,
+): Promise<string> {
   const offer = parseRelayPairingLink(link);
   if (!offer) throw new Error("This QR code is not a Gustaf relay code.");
   const [deviceToken, clientKeyPair] = await Promise.all([phoneCredential(), phoneKeyPair()]);
@@ -111,7 +119,8 @@ export async function pairOverRelay(link: string, onPending: () => void): Promis
     name: phoneDisplayName(),
     pairingSecret: offer.secret,
     randomBytes,
-    onPending,
+    onPending: () =>
+      onPending(relaySafetyCode(clientKeyPair.publicKey, fromBase64Url(offer.hostKey))),
   });
   const token = client.pairingToken;
   client.close();
@@ -120,4 +129,11 @@ export async function pairOverRelay(link: string, onPending: () => void): Promis
   await saveHost(offer);
   relayTunnels.forget(offer.hostDeviceId.toLowerCase());
   return `${relayVirtualBaseUrl(offer.hostDeviceId)}/pair#token=${encodeURIComponent(token)}`;
+}
+
+/** The code this phone and a relay-paired computer both show; null when it was not paired here. */
+export async function relaySafetyCodeFor(hostDeviceId: string): Promise<string | null> {
+  const [hosts, keyPair] = await Promise.all([loadHosts(), phoneKeyPair()]);
+  const host = hosts[hostDeviceId];
+  return host ? relaySafetyCode(keyPair.publicKey, fromBase64Url(host.hostKey)) : null;
 }

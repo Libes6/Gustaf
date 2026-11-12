@@ -2,7 +2,8 @@ import * as NodeFS from "node:fs";
 import { NotFoundException } from "@nestjs/common";
 import { and, count, desc, eq, gt, ilike, isNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
-import { auditLog, device, session, user } from "../database/tables.schema.js";
+import { auditLog, device, relayUsage, session, user } from "../database/tables.schema.js";
+import { usageMonth } from "../relay/relay.usage.js";
 import { assertNotSelf, decodeCursor, type Role, toPage } from "./admin-rules.js";
 
 type AuditAction =
@@ -91,7 +92,7 @@ export class AdminService {
   async overview() {
     const db = this.database.db;
     const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-    const [[users], [devices], [sessions], signups, migrations] = await Promise.all([
+    const [[users], [devices], [sessions], [relay], signups, migrations] = await Promise.all([
       db
         .select({
           total: count(),
@@ -118,6 +119,13 @@ export class AdminService {
         .select({ active: count() })
         .from(session)
         .where(gt(session.expiresAt, sql`now()`)),
+      db
+        .select({
+          bytesThisMonth: sql<number>`coalesce(sum(${relayUsage.bytes}), 0)`.mapWith(Number),
+          users: count(),
+        })
+        .from(relayUsage)
+        .where(eq(relayUsage.month, usageMonth())),
       // UTC calendar days, today included, zero-filled.
       db.execute<{ date: string; count: number }>(sql`
         select to_char(day, 'YYYY-MM-DD') as date, count(${user.id})::int as count
@@ -139,6 +147,7 @@ export class AdminService {
         byKind: { computer: devices!.computer, phone: devices!.phone },
       },
       sessions: sessions!,
+      relay: relay!,
       signupsByDay: signups.rows.map(({ date, count }) => ({ date, count })),
       build: { ...this.build, startedAt: this.startedAt },
       db: { ok: applied >= this.bundledMigrations, migrations: applied },
@@ -170,7 +179,7 @@ export class AdminService {
     const db = this.database.db;
     const [row] = await db.select(userColumns).from(user).where(eq(user.id, id));
     if (!row) throw new NotFoundException();
-    const [devices, sessions] = await Promise.all([
+    const [devices, sessions, relay] = await Promise.all([
       db
         .select(deviceColumns)
         .from(device)
@@ -188,8 +197,15 @@ export class AdminService {
         .from(session)
         .where(and(eq(session.userId, id), gt(session.expiresAt, sql`now()`)))
         .orderBy(desc(session.createdAt)),
+      // Bytes through the relay per UTC month, newest first; the relay never sees content.
+      db
+        .select({ month: relayUsage.month, bytes: relayUsage.bytes })
+        .from(relayUsage)
+        .where(eq(relayUsage.userId, id))
+        .orderBy(desc(relayUsage.month))
+        .limit(12),
     ]);
-    return { ...row, devices, sessions };
+    return { ...row, devices, sessions, relay };
   }
 
   async listDevices(

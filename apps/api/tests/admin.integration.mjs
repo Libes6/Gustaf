@@ -377,10 +377,17 @@ NodeTest.test("admin delete cascades like account deletion and is audited", asyn
 NodeTest.test("overview numbers match the database", async () => {
   await withAdmin(async ({ base, api, adminApi, pool }) => {
     const user = await signIn(base, githubUser("mia"));
-    await registerDevice(api, { bearer: user.bearer }, "Mac", "computer");
+    const mac = await registerDevice(api, { bearer: user.bearer }, "Mac", "computer");
+    const month = new Date().toISOString().slice(0, 7);
+    await pool.query(
+      `insert into relay_usage (user_id, month, bytes)
+       select user_id, $2, 5000 from device where id = $1`,
+      [mac.device.id, month],
+    );
     const overview = await adminApi("/v1/admin/overview");
     NodeAssert.equal(overview.status, 200);
-    const { rows } = await pool.query(`select
+    const { rows } = await pool.query(
+      `select
       (select count(*) from "user")::int as users,
       (select count(*) from "user" where created_at > now() - interval '7 days')::int as last7d,
       (select count(*) from "user" where banned)::int as banned,
@@ -389,7 +396,11 @@ NodeTest.test("overview numbers match the database", async () => {
       (select count(*) from device where revoked_at is null and kind = 'phone')::int as phones,
       (select count(*) from session where expires_at > now())::int as sessions,
       (select count(*) from "user" where (created_at at time zone 'utc')::date = (now() at time zone 'utc')::date)::int as today,
-      (select count(*) from drizzle.__drizzle_migrations)::int as migrations`);
+      (select count(*) from drizzle.__drizzle_migrations)::int as migrations,
+      (select coalesce(sum(bytes), 0)::bigint from relay_usage where month = $1) as relay_bytes,
+      (select count(*) from relay_usage where month = $1)::int as relay_users`,
+      [month],
+    );
     const expected = rows[0];
     const body = overview.body;
     NodeAssert.deepEqual(body.users, {
@@ -404,6 +415,14 @@ NodeTest.test("overview numbers match the database", async () => {
     });
     NodeAssert.ok(body.devices.active7d <= body.devices.total);
     NodeAssert.deepEqual(body.sessions, { active: expected.sessions });
+    NodeAssert.deepEqual(body.relay, {
+      bytesThisMonth: Number(expected.relay_bytes),
+      users: expected.relay_users,
+    });
+    const userId = (await pool.query("select user_id from device where id = $1", [mac.device.id]))
+      .rows[0].user_id;
+    const detail = await adminApi(`/v1/admin/users/${userId}`);
+    NodeAssert.deepEqual(detail.body.relay, [{ month, bytes: 5000 }]);
     NodeAssert.equal(body.signupsByDay.length, 30);
     NodeAssert.match(body.signupsByDay[0].date, /^\d{4}-\d{2}-\d{2}$/);
     NodeAssert.deepEqual(body.signupsByDay.at(-1), {

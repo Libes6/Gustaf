@@ -9,6 +9,7 @@ import {
   type RelayClientHello,
   type TunnelMessage,
   type TunnelOpen,
+  RELAY_TUNNEL_HEADER,
   TUNNEL_CHUNK,
   TUNNEL_FLAG_FIN,
   TunnelMessageType,
@@ -75,6 +76,7 @@ const DROPPED_REQUEST_HEADERS = new Set([
   "content-length",
   "proxy-authorization",
   "te",
+  RELAY_TUNNEL_HEADER,
 ]);
 // fetch already decoded the body, so the encoding and length no longer describe it.
 const DROPPED_RESPONSE_HEADERS = new Set([
@@ -373,6 +375,7 @@ export class RelayHostEngine {
     for (const [name, value] of open.headers) {
       if (!DROPPED_REQUEST_HEADERS.has(name.toLowerCase())) headers.append(name, value);
     }
+    headers.set(RELAY_TUNNEL_HEADER, "1");
     try {
       const response = await fetch(new URL(open.path, this.#options.localOrigin), {
         method: open.method,
