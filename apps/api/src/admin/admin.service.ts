@@ -5,7 +5,7 @@ import { DatabaseService } from "../database/database.service.js";
 import { auditLog, device, session, user } from "../database/tables.schema.js";
 import { assertNotSelf, decodeCursor, type Role, toPage } from "./admin-rules.js";
 
-export type AuditAction =
+type AuditAction =
   | "user.ban"
   | "user.unban"
   | "user.revoke_sessions"
@@ -20,7 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const journal = new URL("../../drizzle/meta/_journal.json", import.meta.url);
 
-export interface BuildInfo {
+interface BuildInfo {
   version: string;
   commit: string;
 }
@@ -72,9 +72,7 @@ const deviceColumns = {
   revokedAt: device.revokedAt,
 };
 
-type UserRow = { [K in keyof typeof userColumns]: unknown } & { cursorAt: string; id: string };
-
-function presentUser({ cursorAt: _cursorAt, ...row }: UserRow) {
+function withoutCursor<Row extends { cursorAt: string }>({ cursorAt: _cursorAt, ...row }: Row) {
   return row;
 }
 
@@ -165,15 +163,12 @@ export class AdminService {
       )
       .orderBy(desc(user.createdAt), desc(user.id))
       .limit(page.limit + 1);
-    return toPage(rows, page.limit, presentUser, (row) => [row.cursorAt, row.id]);
+    return toPage(rows, page.limit, withoutCursor, (row) => [row.cursorAt, row.id]);
   }
 
   async getUser(id: string) {
     const db = this.database.db;
-    const [row] = await db
-      .select({ ...userColumns, cursorAt: createdAtKey(user.createdAt) })
-      .from(user)
-      .where(eq(user.id, id));
+    const [row] = await db.select(userColumns).from(user).where(eq(user.id, id));
     if (!row) throw new NotFoundException();
     const [devices, sessions] = await Promise.all([
       db
@@ -194,7 +189,7 @@ export class AdminService {
         .where(and(eq(session.userId, id), gt(session.expiresAt, sql`now()`)))
         .orderBy(desc(session.createdAt)),
     ]);
-    return { ...presentUser(row), devices, sessions };
+    return { ...row, devices, sessions };
   }
 
   async listDevices(
@@ -217,12 +212,7 @@ export class AdminService {
       )
       .orderBy(desc(device.createdAt), desc(device.id))
       .limit(page.limit + 1);
-    return toPage(
-      rows,
-      page.limit,
-      ({ cursorAt: _cursorAt, ...item }) => item,
-      (row) => [row.cursorAt, row.id],
-    );
+    return toPage(rows, page.limit, withoutCursor, (row) => [row.cursorAt, row.id]);
   }
 
   async listAudit(page: Page) {
