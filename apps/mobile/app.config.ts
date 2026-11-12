@@ -24,7 +24,15 @@ const observeEndpointUrl = repoEnv.T3CODE_RELAY_URL?.trim()
   ? new URL("/v1/mobile/observe", repoEnv.T3CODE_RELAY_URL.trim()).toString()
   : "https://observe.invalid";
 
-const androidAdaptiveForeground = "./assets/gustaf-icon.png";
+// The foreground and monochrome layers keep the bird inside the adaptive icon's 66dp safe zone.
+const SHARED_ASSETS = {
+  appIcon: "./assets/gustaf-icon-square.png",
+  splashIcon: "./assets/gustaf-icon-square.png",
+  androidAdaptiveForeground: "./assets/gustaf-icon-foreground.png",
+  androidSplashIcon: "./assets/gustaf-splash-icon-android.png",
+  androidMonochromeIcon: "./assets/gustaf-icon-monochrome.png",
+  androidNotificationIcon: "./assets/gustaf-notification-icon.png",
+} as const;
 
 if (
   isIosPersonalTeamBuild &&
@@ -37,42 +45,21 @@ if (
 }
 
 const DEVELOPMENT_ASSETS = {
-  appIcon: "./assets/gustaf-icon.png",
-  iosIcon: "./assets/gustaf-icon.png",
-  splashIcon: "./assets/gustaf-icon.png",
-  androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#347FF8",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-dev.png",
-  androidSplashIcon: "./assets/gustaf-icon.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
-  androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#00639B",
+  ...SHARED_ASSETS,
+  androidAdaptiveBackgroundColor: "#1F4D3A",
+  androidNotificationColor: "#2E7D57",
 } as const;
 
 const PREVIEW_ASSETS = {
-  appIcon: "./assets/gustaf-icon.png",
-  iosIcon: "./assets/gustaf-icon.png",
-  splashIcon: "./assets/gustaf-icon.png",
-  androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#111533",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-nightly.png",
-  androidSplashIcon: "./assets/gustaf-icon.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
-  androidNotificationIcon: "./assets/android-notification-icon.png",
+  ...SHARED_ASSETS,
+  androidAdaptiveBackgroundColor: "#3D2A5C",
   androidNotificationColor: "#7565C7",
 } as const;
 
 const RELEASE_ASSETS = {
-  appIcon: "./assets/gustaf-icon.png",
-  iosIcon: "./assets/gustaf-icon.png",
-  splashIcon: "./assets/gustaf-icon.png",
-  androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#000000",
-  androidAdaptiveBackgroundImage: undefined,
-  androidSplashIcon: "./assets/gustaf-icon.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
-  androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#FFFFFF",
+  ...SHARED_ASSETS,
+  androidAdaptiveBackgroundColor: "#0A203A",
+  androidNotificationColor: "#3A6EA5",
 } as const;
 
 const VARIANT_CONFIG = {
@@ -245,7 +232,7 @@ const config: ExpoConfig = {
     fallbackToCacheTimeout: 0,
   },
   ios: {
-    icon: variant.assets.iosIcon,
+    icon: variant.assets.appIcon,
     supportsTablet: true,
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
@@ -287,8 +274,9 @@ const config: ExpoConfig = {
       ? { googleServicesFile: repoEnv.T3CODE_ANDROID_GOOGLE_SERVICES_FILE }
       : {}),
     adaptiveIcon: {
-      backgroundColor: "#102941",
+      backgroundColor: variant.assets.androidAdaptiveBackgroundColor,
       foregroundImage: variant.assets.androidAdaptiveForeground,
+      monochromeImage: variant.assets.androidMonochromeIcon,
     },
     // JS back dispatch needs RN's Android 16 shim and withAndroidPredictiveBackCompat on Android 13-15.
     predictiveBackGestureEnabled: true,
@@ -333,6 +321,7 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
+        icon: variant.assets.androidNotificationIcon,
         color: variant.assets.androidNotificationColor,
         mode: APP_VARIANT === "development" ? "development" : "production",
       },
@@ -347,9 +336,6 @@ const config: ExpoConfig = {
           shortcut_icon: {
             foregroundImage: variant.assets.androidAdaptiveForeground,
             backgroundColor: variant.assets.androidAdaptiveBackgroundColor,
-            ...(variant.assets.androidAdaptiveBackgroundImage
-              ? { backgroundImage: variant.assets.androidAdaptiveBackgroundImage }
-              : {}),
           },
         },
       },
