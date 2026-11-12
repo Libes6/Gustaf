@@ -3,6 +3,7 @@ import { secondTick } from "@t3tools/client-runtime/clock";
 import { type VcsActionState, type VcsActionTarget } from "@t3tools/client-runtime/state/vcs";
 import { Atom } from "effect/reactivity";
 import * as Haptics from "expo-haptics";
+import { formatElapsed, t } from "../i18n";
 import { useSyncExternalStore } from "react";
 
 import { appAtomRegistry } from "./atom-registry";
@@ -81,7 +82,7 @@ function formatElapsedSeconds(ms: number | null, nowMs: number): string | null {
   if (ms === null) return null;
   const elapsed = Math.max(0, Math.floor((nowMs - ms) / 1000));
   if (elapsed < 2) return null;
-  return `Running for ${elapsed}s`;
+  return `${t("Running for")} ${formatElapsed(elapsed * 1_000)}`;
 }
 
 export function useGitActionProgress(target: VcsActionTarget): GitActionProgress {
