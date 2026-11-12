@@ -91,6 +91,7 @@ export const strings = {
     sessions: "Sessions",
     sessionsEmpty: "No active sessions.",
     revoked: "Revoked",
+    started: "Started",
     expires: "Expires",
     ipAddress: "IP address",
     userAgent: "Client",

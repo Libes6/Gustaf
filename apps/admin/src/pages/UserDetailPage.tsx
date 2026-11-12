@@ -169,7 +169,7 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{strings.users.columns.created}</TableHead>
+                <TableHead>{strings.users.started}</TableHead>
                 <TableHead>{strings.users.expires}</TableHead>
                 <TableHead>{strings.users.ipAddress}</TableHead>
                 <TableHead className="max-md:hidden">{strings.users.userAgent}</TableHead>

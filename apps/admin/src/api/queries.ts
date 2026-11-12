@@ -31,7 +31,10 @@ export const queryKeys = {
 export function createQueryClient(): QueryClient {
   const client: QueryClient = new QueryClient({
     // An expired session on any request sends the app back to the sign-in screen.
-    queryCache: new QueryCache({ onError: (error) => onAnyError(error) }),
+    // /v1/me itself is skipped: its own 401 is the signed-out state, and refetching it would loop.
+    queryCache: new QueryCache({
+      onError: (error, query) => query.queryKey[0] !== queryKeys.me[0] && onAnyError(error),
+    }),
     mutationCache: new MutationCache({ onError: (error) => onAnyError(error) }),
     defaultOptions: {
       queries: {
