@@ -3,9 +3,16 @@ import * as NodeCrypto from "node:crypto";
 import { ConsoleLogger, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { toNodeHandler } from "better-auth/node";
+import { AccountController } from "./account.controller.js";
+import { AUTH, AUTH_BASE_PATH, type Auth, createAuth } from "./auth/auth.js";
+import { SessionGuard } from "./auth/session.guard.js";
 import type { AppConfig } from "./config.js";
 import { DatabaseService } from "./database/database.service.js";
+import { DeviceGuard, DevicesController } from "./devices/devices.controller.js";
+import { DevicesService } from "./devices/devices.service.js";
 import { HealthController } from "./health.controller.js";
+import { OwnershipService } from "./ownership.js";
 
 @Module({})
 // oxlint-disable-next-line typescript/no-extraneous-class -- Nest requires a decorated module class.
@@ -19,15 +26,33 @@ export function resolveRequestId(incoming: string | string[] | undefined) {
     : NodeCrypto.randomUUID();
 }
 
-export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustProxy">) {
+export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustProxy" | "auth">) {
   const logger = new ConsoleLogger("GustafCloud", { json: true });
+  const database = {
+    provide: DatabaseService,
+    useFactory: () => new DatabaseService(config.databaseUrl),
+  };
+  const accounts = config.auth
+    ? {
+        controllers: [AccountController, DevicesController],
+        providers: [
+          {
+            provide: AUTH,
+            useFactory: (db: DatabaseService) => createAuth(config.auth!, db),
+            inject: [DatabaseService],
+          },
+          SessionGuard,
+          DeviceGuard,
+          DevicesService,
+          OwnershipService,
+        ],
+      }
+    : { controllers: [], providers: [] };
   const app = await NestFactory.create<NestExpressApplication>(
     {
       module: AppModule,
-      controllers: [HealthController],
-      providers: [
-        { provide: DatabaseService, useFactory: () => new DatabaseService(config.databaseUrl) },
-      ],
+      controllers: [HealthController, ...accounts.controllers],
+      providers: [database, ...accounts.providers],
     },
     { logger, abortOnError: false },
   );
@@ -61,6 +86,13 @@ export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustPr
       next();
     },
   );
+  if (config.auth) {
+    // Better Auth reads the raw body itself, so it is mounted before Nest's JSON parser.
+    app
+      .getHttpAdapter()
+      .getInstance()
+      .all(`${AUTH_BASE_PATH}/*splat`, toNodeHandler(app.get<Auth>(AUTH)));
+  }
   app.enableShutdownHooks();
   return app;
 }

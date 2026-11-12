@@ -6,7 +6,7 @@ import { readConfig } from "../dist/config.js";
 const unreachableDatabase = "postgresql://hidden:secret@127.0.0.1:1/missing";
 
 async function withApp(databaseUrl, run) {
-  const app = await createApp(readConfig({ DATABASE_URL: databaseUrl }));
+  const app = await createApp(readConfig({ DATABASE_URL: databaseUrl, AUTH_ENABLED: "0" }));
   app.useLogger(false);
   try {
     await app.listen(0, "127.0.0.1");
@@ -60,7 +60,7 @@ NodeTest.test("incoming request ids are echoed only when they match the safe pat
 });
 
 NodeTest.test("config parses TRUST_PROXY and RUN_MIGRATIONS", () => {
-  const base = { DATABASE_URL: "postgresql://u:p@127.0.0.1:5432/db" };
+  const base = { DATABASE_URL: "postgresql://u:p@127.0.0.1:5432/db", AUTH_ENABLED: "0" };
   const config = readConfig(base);
   NodeAssert.equal(config.trustProxy, 1);
   NodeAssert.equal(config.runMigrations, true);
