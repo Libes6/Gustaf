@@ -336,6 +336,7 @@ export const chatBMessages = {
     "chatB.ModelListRow.newModelAria": "New model",
     "chatB.ModelListRow.newBadge": "New",
     "chatB.ModelListRow.unavailableBadge": "Unavailable",
+    "chatB.ModelListRow.notInSubscription": "Not included in your subscription",
     "chatB.ModelListRow.removeFromFavorites": "Remove from favorites",
     "chatB.ModelListRow.addToFavorites": "Add to favorites",
     "chatB.ModelPickerSidebar.disabledInSettings": "{label}: Disabled in settings.",
@@ -522,6 +523,9 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.providerProcessGone":
       "Provider process is gone. Interrupt or restart the run to respond.",
     "chatB.TimelineWorkEntryRow.usageLimitReached": "Usage limit reached.",
+    "chatB.TimelineWorkEntryRow.modelNotInSubscription": "Not included in your subscription",
+    "chatB.TimelineWorkEntryRow.modelNotInSubscriptionDetail":
+      "Your plan with this provider does not include the selected model. Pick another model and send your message again; it is still in the thread.",
     "chatB.TimelineWorkEntryRow.retryAfter": "Retry after {time}.",
     "chatB.TimelineWorkEntryRow.retry": "Retry",
     "chatB.TimelineWorkEntryRow.thinking": "Thinking",
@@ -1082,6 +1086,7 @@ export const chatBMessages = {
     "chatB.ModelListRow.newModelAria": "Новая модель",
     "chatB.ModelListRow.newBadge": "Новая",
     "chatB.ModelListRow.unavailableBadge": "Недоступна",
+    "chatB.ModelListRow.notInSubscription": "Не входит в вашу подписку",
     "chatB.ModelListRow.removeFromFavorites": "Убрать из избранного",
     "chatB.ModelListRow.addToFavorites": "Добавить в избранное",
     "chatB.ModelPickerSidebar.disabledInSettings": "{label}: отключена в настройках.",
@@ -1269,6 +1274,9 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.providerProcessGone":
       "Процесс провайдера завершился. Прервите или перезапустите запуск, чтобы ответить.",
     "chatB.TimelineWorkEntryRow.usageLimitReached": "Достигнут лимит использования.",
+    "chatB.TimelineWorkEntryRow.modelNotInSubscription": "Не входит в вашу подписку",
+    "chatB.TimelineWorkEntryRow.modelNotInSubscriptionDetail":
+      "Ваш тариф у этого провайдера не включает выбранную модель. Выберите другую модель и отправьте сообщение ещё раз: оно осталось в треде.",
     "chatB.TimelineWorkEntryRow.retryAfter": "Повтор после {time}.",
     "chatB.TimelineWorkEntryRow.retry": "Повторить",
     "chatB.TimelineWorkEntryRow.thinking": "Размышление",

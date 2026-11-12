@@ -83,6 +83,8 @@ export const ServerProviderModel = Schema.Struct({
   isCustom: Schema.Boolean,
   isDefault: Schema.optional(Schema.Boolean),
   isLegacy: Schema.optional(Schema.Boolean),
+  /** Set after the provider rejected this model for the signed-in plan; cleared on expiry or refresh. */
+  unavailableReason: Schema.optional(Schema.Literal("not_in_subscription")),
   capabilities: Schema.NullOr(ModelCapabilities),
 });
 export type ServerProviderModel = typeof ServerProviderModel.Type;

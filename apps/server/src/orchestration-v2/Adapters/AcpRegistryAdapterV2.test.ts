@@ -9,6 +9,7 @@ import {
   RunAttemptId,
   RunId,
   type ModelSelection,
+  PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
   ProviderInstanceId,
   ProviderSessionId,
   ThreadId,
@@ -447,6 +448,45 @@ describe("AcpRegistryAdapterV2", () => {
     assert.include(rejected.message, "Request rejected.");
     assert.notInclude(rejected.message, "private-key");
     assert.notInclude(rejected.message, "token=secret");
+  });
+
+  it("classifies a plan rejection of the selected model, and only that", () => {
+    const kimiRejection = new EffectAcpErrors.AcpRequestError({
+      code: -32000,
+      errorMessage:
+        "Authentication required: Your current subscription does not have access to this model.",
+    });
+    assert.deepEqual(acpRegistryPromptFailure("kimi", kimiRejection), {
+      class: "permission_error",
+      message: kimiRejection.errorMessage,
+      code: PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+      retryable: false,
+    });
+    const inData = new EffectAcpErrors.AcpRequestError({
+      code: -32000,
+      errorMessage: "Authentication required",
+      data: { message: "Your current subscription does not have access to this model." },
+    });
+    assert.equal(
+      acpRegistryPromptFailure("kimi", inData).code,
+      PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+    );
+    for (const cause of [
+      new EffectAcpErrors.AcpRequestError({
+        code: -32000,
+        errorMessage: "Authentication required",
+      }),
+      new EffectAcpErrors.AcpRequestError({
+        code: -32603,
+        errorMessage: "Your subscription has expired.",
+      }),
+      new Error("Your current subscription does not have access to this model."),
+    ]) {
+      assert.notEqual(
+        acpRegistryPromptFailure("kimi", cause).code,
+        PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
+      );
+    }
   });
 
   describe("the agent's own pickers", () => {
@@ -2743,6 +2783,116 @@ describe("AcpRegistryAdapterV2", () => {
       assert.equal(yield* runTurn(1), "failed");
       assert.equal(yield* runTurn(2), "completed");
       assert.equal(spawned, restarts ? 2 : 1);
+    }).pipe(Effect.provide(layerTest), Effect.scoped),
+  );
+
+  it.effect.each([
+    {
+      failure: "a plan rejection",
+      message:
+        "Authentication required: Your current subscription does not have access to this model.",
+      marked: ["default"],
+    },
+    { failure: "a sign-in failure", message: "Authentication required", marked: [] },
+  ] as const)("remembers the turn's model only after $failure", ({ message, marked }) =>
+    Effect.gen(function* () {
+      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const replayDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-kimi-plan-" });
+      const request = (method: string) => ({
+        type: "expect_outbound",
+        frame: { kind: "request", method, params: "<any>" },
+      });
+      const respond = (method: string, response: object) => ({
+        type: "emit_inbound",
+        frame: { kind: "response", method, ...response },
+      });
+      const transcript = yield* decodeAcpReplayTranscript(
+        {
+          provider: ACP_REGISTRY_PROVIDER,
+          protocol: "acp.ndjson-jsonrpc",
+          version: "1",
+          scenario: "kimi-plan-rejection",
+          entries: [
+            request("initialize"),
+            respond("initialize", { result: { protocolVersion: 1, agentCapabilities: {} } }),
+            request("session/new"),
+            respond("session/new", { result: { sessionId: "kimi-session" } }),
+            request("session/prompt"),
+            respond("session/prompt", { error: { code: -32000, message } }),
+          ] as never,
+        },
+        ACP_REGISTRY_PROVIDER,
+      ).pipe(Effect.orDie);
+      const instanceId = ProviderInstanceId.make("acpRegistry_kimi_code");
+      const recorded: Array<readonly [ProviderInstanceId, string]> = [];
+      const adapter = yield* makeAcpRegistryAdapterV2({
+        selfInvocation: yield* resolveSelfInvocation(),
+        instanceId,
+        settings: yield* decodeAcpRegistryAdapterSettings({ agentId: "kimi" }),
+        environment: {},
+        makeRuntime: makeAcpReplayRuntime({
+          transcript,
+          statusPath: path.join(replayDir, "status.json"),
+          scriptPath: yield* path.fromFileUrl(
+            new URL("../../../scripts/acp-replay-agent.ts", import.meta.url),
+          ),
+          childProcessSpawner,
+          fileSystem,
+        }),
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            layerInjectedRuntimeCatalog,
+            Layer.mock(AcpRegistryRuntimeCoordinator.AcpRegistryRuntimeCoordinator)({
+              withForegroundStartup: (_startupKey, effect) => effect,
+              publishLiveConfiguration: () => Effect.void,
+              recordModelAccessDenied: (deniedInstanceId, model) =>
+                Effect.sync(() => {
+                  recorded.push([deniedInstanceId, model]);
+                }),
+            }),
+          ),
+        ),
+      );
+      const threadId = ThreadId.make("thread-kimi-plan-rejection");
+      const modelSelection = { instanceId, model: "default" } as const;
+      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "approval-required",
+        interactionMode: "default",
+        cwd: replayDir,
+      });
+      const runtime = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("session-kimi-plan-rejection"),
+        modelSelection,
+        runtimePolicy,
+      });
+      const providerThread = yield* runtime.ensureThread({
+        threadId,
+        modelSelection,
+        runtimePolicy,
+      });
+      yield* runtime.startTurn(
+        makeTurnInput({
+          threadId,
+          providerThread,
+          instanceId,
+          runtimePolicy,
+          now: yield* DateTime.now,
+        }),
+      );
+      const [terminal] = yield* runtime.events.pipe(
+        Stream.filter((event) => event.type === "turn.terminal"),
+        Stream.take(1),
+        Stream.runCollect,
+      );
+      assert.equal(terminal?.status, "failed");
+      assert.deepEqual(
+        recorded,
+        marked.map((model) => [instanceId, model] as const),
+      );
     }).pipe(Effect.provide(layerTest), Effect.scoped),
   );
 });

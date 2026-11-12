@@ -3,6 +3,7 @@ import {
   type AcpRegistryUrlAuthAction,
   type ProviderInstanceId,
 } from "@t3tools/contracts";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as DateTime from "effect/DateTime";
@@ -33,6 +34,8 @@ interface UrlAuthActionUpdate {
 }
 
 const URL_AUTH_ACTION_TTL = Duration.minutes(10);
+// Long enough to stop repeat failures, short enough to notice a plan upgrade without sign-out.
+export const MODEL_ACCESS_DENIAL_TTL = Duration.hours(24);
 
 interface PendingUrlAuthAction {
   readonly action: AcpRegistryUrlAuthAction;
@@ -78,6 +81,18 @@ export class AcpRegistryRuntimeCoordinator extends Context.Service<
       instanceId: ProviderInstanceId,
       onUpdate: (configuration: AcpRegistryLiveConfiguration) => Effect.Effect<void>,
     ) => Effect.Effect<void>;
+    readonly recordModelAccessDenied: (
+      instanceId: ProviderInstanceId,
+      model: string,
+    ) => Effect.Effect<void>;
+    readonly getModelAccessDenials: (
+      instanceId: ProviderInstanceId,
+    ) => Effect.Effect<ReadonlySet<string>>;
+    readonly clearModelAccessDenials: (instanceId: ProviderInstanceId) => Effect.Effect<void>;
+    readonly watchModelAccessDenials: (
+      instanceId: ProviderInstanceId,
+      onUpdate: () => Effect.Effect<void>,
+    ) => Effect.Effect<void>;
     readonly requestUrlAuthentication: (
       instanceId: ProviderInstanceId,
       action: AcpRegistryUrlAuthAction,
@@ -105,6 +120,10 @@ const make = Effect.gen(function* () {
   const liveConfigurationUpdates = yield* PubSub.unbounded<LiveConfigurationUpdate>();
   const liveConfigurationByInstance = yield* Ref.make(
     new Map<ProviderInstanceId, AcpRegistryLiveConfiguration>(),
+  );
+  const modelAccessDenialUpdates = yield* PubSub.unbounded<ProviderInstanceId>();
+  const modelAccessDenialsByInstance = yield* Ref.make(
+    new Map<ProviderInstanceId, ReadonlyMap<string, number>>(),
   );
   const urlAuthActionUpdates = yield* PubSub.unbounded<UrlAuthActionUpdate>();
   const pendingUrlAuthActions = yield* Ref.make(
@@ -247,6 +266,53 @@ const make = Effect.gen(function* () {
         }),
       );
 
+  const recordModelAccessDenied: AcpRegistryRuntimeCoordinator["Service"]["recordModelAccessDenied"] =
+    Effect.fn("AcpRegistryRuntimeCoordinator.recordModelAccessDenied")(
+      function* (instanceId, model) {
+        const expiresAt =
+          (yield* Clock.currentTimeMillis) + Duration.toMillis(MODEL_ACCESS_DENIAL_TTL);
+        yield* Ref.update(modelAccessDenialsByInstance, (current) =>
+          new Map(current).set(instanceId, new Map(current.get(instanceId)).set(model, expiresAt)),
+        );
+        yield* PubSub.publish(modelAccessDenialUpdates, instanceId);
+      },
+    );
+
+  const getModelAccessDenials: AcpRegistryRuntimeCoordinator["Service"]["getModelAccessDenials"] =
+    Effect.fn("AcpRegistryRuntimeCoordinator.getModelAccessDenials")(function* (instanceId) {
+      const now = yield* Clock.currentTimeMillis;
+      const denials = (yield* Ref.get(modelAccessDenialsByInstance)).get(instanceId);
+      return new Set(
+        [...(denials ?? [])].flatMap(([model, expiresAt]) => (expiresAt > now ? [model] : [])),
+      );
+    });
+
+  const clearModelAccessDenials: AcpRegistryRuntimeCoordinator["Service"]["clearModelAccessDenials"] =
+    (instanceId) =>
+      Ref.modify(modelAccessDenialsByInstance, (current) => {
+        if (!current.has(instanceId)) return [false, current] as const;
+        const next = new Map(current);
+        next.delete(instanceId);
+        return [true, next] as const;
+      }).pipe(
+        Effect.flatMap((cleared) =>
+          cleared ? PubSub.publish(modelAccessDenialUpdates, instanceId) : Effect.void,
+        ),
+        Effect.asVoid,
+      );
+
+  const watchModelAccessDenials: AcpRegistryRuntimeCoordinator["Service"]["watchModelAccessDenials"] =
+    (instanceId, onUpdate) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const subscription = yield* PubSub.subscribe(modelAccessDenialUpdates);
+          yield* Stream.fromSubscription(subscription).pipe(
+            Stream.filter((update) => update === instanceId),
+            Stream.runForEach(() => onUpdate()),
+          );
+        }),
+      );
+
   const publishUrlAuthAction = (
     instanceId: ProviderInstanceId,
     action: AcpRegistryUrlAuthAction | null,
@@ -347,6 +413,10 @@ const make = Effect.gen(function* () {
     publishLiveConfiguration,
     getLiveConfiguration,
     watchLiveConfiguration,
+    recordModelAccessDenied,
+    getModelAccessDenials,
+    clearModelAccessDenials,
+    watchModelAccessDenials,
     requestUrlAuthentication,
     acceptUrlAuthentication,
     getUrlAuthAction,

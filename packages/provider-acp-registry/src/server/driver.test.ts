@@ -9,6 +9,7 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import {
   applyAcpRegistryAvailableCommands,
   applyAcpRegistryLiveConfiguration,
+  applyAcpRegistryModelAccessDenials,
   buildCheckedAcpRegistrySnapshot,
   checkAcpRegistryProviderReadiness,
   checkAcpRegistryProviderStatus,
@@ -206,6 +207,33 @@ describe("acpRegistrySnapshotReadiness", () => {
         capabilities: { optionDescriptors: [{ id: "effort", currentValue: "high" }] },
       },
     ]);
+  });
+
+  it("marks only rejected models and drops marks that no longer apply", () => {
+    const provider = buildCheckedAcpRegistrySnapshot({
+      ...identity,
+      settings: decodeSettings({ agentId: "kimi" }),
+      checkedAt: "2026-08-13T10:00:00.000Z",
+      inspection: { status: "ready", agentId: "kimi", version: "1.0.0", distribution: "npx" },
+    });
+    const live = applyAcpRegistryLiveConfiguration(
+      provider,
+      {
+        models: [
+          { id: "k3.1-pro", name: "K3.1 Pro", description: null },
+          { id: "k3.1-pro-highspeed", name: "K3.1 Pro Highspeed", description: null },
+        ],
+        currentModelId: "k3.1-pro",
+        configOptions: [],
+      },
+      [],
+    );
+    const marked = applyAcpRegistryModelAccessDenials(live, new Set(["k3.1-pro-highspeed"]));
+    expect(marked.models.map((model) => [model.slug, model.unavailableReason])).toEqual([
+      ["k3.1-pro", undefined],
+      ["k3.1-pro-highspeed", "not_in_subscription"],
+    ]);
+    expect(applyAcpRegistryModelAccessDenials(marked, new Set()).models).toEqual(live.models);
   });
 
   it("projects discovery without claiming authentication when no login methods are advertised", () => {
