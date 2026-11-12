@@ -1,4 +1,4 @@
-// @effect-diagnostics globalTimers:off globalFetch:off globalRandom:off -- A plain socket engine outside the Effect runtime; RelayHost owns its lifecycle.
+// @effect-diagnostics globalTimers:off globalFetch:off globalRandom:off globalDate:off -- A plain socket engine outside the Effect runtime; RelayHost owns its lifecycle.
 import {
   type NoiseCipherState,
   NoiseHandshake,
@@ -59,6 +59,11 @@ export type RelayHostConnectionState =
   | { readonly status: "unauthorized"; readonly error: string };
 
 const MAX_BACKOFF_MS = 5 * 60_000;
+// Retrying at once would knock the newer connection off and loop; it may be this server's successor.
+const REPLACED_RETRY_MS = 2 * 60_000;
+// A sleeping laptop's socket dies without a close event, so the host pings the relay itself.
+const KEEPALIVE_MS = 25_000;
+const SILENCE_LIMIT_MS = 60_000;
 const MAX_REQUEST_BODY = 64 * 1024 * 1024;
 // Hop-by-hop headers and ones fetch computes itself.
 const DROPPED_REQUEST_HEADERS = new Set([
@@ -91,7 +96,7 @@ interface HttpStream {
 interface WsStream {
   readonly kind: "ws";
   readonly socket: WebSocket;
-  readonly pending: Array<Uint8Array>;
+  readonly pending: Array<string | Uint8Array>;
   readonly fragments: Array<Uint8Array>;
   fragmentText: boolean;
 }
@@ -158,11 +163,45 @@ export class RelayHostEngine {
         JSON.stringify({ type: "hello", token: this.#options.deviceToken, role: "host" }),
       );
     });
+    let lastInbound = Date.now();
+    const keepalive = setInterval(() => {
+      if (this.#socket !== socket || this.#stopped) return clearInterval(keepalive);
+      if (Date.now() - lastInbound > SILENCE_LIMIT_MS) {
+        failure = "The relay stopped answering.";
+        return gone(1006);
+      }
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "ping" }));
+    }, KEEPALIVE_MS);
+    // Also called for a socket that never reports its own close.
+    const gone = (code: number) => {
+      if (this.#socket !== socket) return;
+      clearInterval(keepalive);
+      this.#socket = null;
+      this.#dropChannels();
+      if (socket.readyState !== WebSocket.CLOSED) socket.close();
+      if (this.#stopped) return;
+      if (unauthorized || code === 4401 || code === 4403) {
+        this.#options.onState({ status: "unauthorized", error: failure });
+        return;
+      }
+      const replaced = code === 4409;
+      if (replaced) failure = "Another Gustaf on this computer took over the relay.";
+      const base = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** this.#attempt);
+      const retryInMs = replaced
+        ? REPLACED_RETRY_MS
+        : Math.round(base / 2 + Math.random() * (base / 2));
+      this.#attempt += 1;
+      this.#options.onState({ status: "offline", error: failure, retryInMs });
+      this.#retryTimer = setTimeout(() => this.#connect(), retryInMs);
+    };
     socket.addEventListener("message", (event) => {
+      lastInbound = Date.now();
       if (typeof event.data === "string") {
         const message = parseRelayServerMessage(event.data);
         if (!message) return;
         switch (message.type) {
+          case "pong":
+            return;
           case "ready":
             this.#attempt = 0;
             this.#deviceId = message.deviceId;
@@ -200,23 +239,7 @@ export class RelayHostEngine {
         this.#closeChannel(channel, "protocol_error");
       });
     });
-    socket.addEventListener("close", (event) => {
-      if (this.#socket !== socket) return;
-      this.#socket = null;
-      this.#dropChannels();
-      if (this.#stopped) return;
-      if (unauthorized || event.code === 4401 || event.code === 4403) {
-        this.#options.onState({ status: "unauthorized", error: failure });
-        return;
-      }
-      // A newer connection of this computer took over; that one keeps the slot.
-      if (event.code === 4409) failure = "Another Gustaf on this computer took over the relay.";
-      const base = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** this.#attempt);
-      const retryInMs = Math.round(base / 2 + Math.random() * (base / 2));
-      this.#attempt += 1;
-      this.#options.onState({ status: "offline", error: failure, retryInMs });
-      this.#retryTimer = setTimeout(() => this.#connect(), retryInMs);
-    });
+    socket.addEventListener("close", (event) => gone(event.code));
     socket.addEventListener("error", () => {
       failure = "Could not reach the relay.";
     });
@@ -322,7 +345,7 @@ export class RelayHostEngine {
           stream.fragments.length = 0;
           const payload = stream.fragmentText ? new TextDecoder().decode(whole) : whole;
           if (stream.socket.readyState === WebSocket.OPEN) stream.socket.send(payload);
-          else if (stream.socket.readyState === WebSocket.CONNECTING) stream.pending.push(whole);
+          else if (stream.socket.readyState === WebSocket.CONNECTING) stream.pending.push(payload);
         }
         return;
       }

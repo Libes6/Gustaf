@@ -65,6 +65,11 @@ export class RelayTunnelClientError extends Error {
 
 const CHANNEL = 1;
 const CONNECT_TIMEOUT_MS = 15_000;
+// A suspended phone's socket dies without a close event. The tunnel pings the relay while idle and
+// before new work on a quiet socket, and gives up when nothing comes back.
+const KEEPALIVE_MS = 20_000;
+const QUIET_BEFORE_PROBE_MS = 10_000;
+const PROBE_TIMEOUT_MS = 5_000;
 
 // React Native's Response cannot take a stream, so a response body is collected, then resolved.
 interface PendingHttp {
@@ -84,6 +89,9 @@ export class RelayTunnelClient {
   readonly #closeListeners = new Set<(error: RelayTunnelClientError) => void>();
   #nextStream = 1;
   #closed: RelayTunnelClientError | null = null;
+  #lastInbound = Date.now();
+  #probeTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly #keepalive: ReturnType<typeof setInterval>;
   /** Set once, when the computer's user approved this device: a one-time code for the pairing link. */
   readonly pairingToken: string | undefined;
   readonly remoteStaticKey: Uint8Array;
@@ -103,6 +111,7 @@ export class RelayTunnelClient {
     this.pairingToken = input.pairingToken;
     this.remoteStaticKey = input.remoteStaticKey;
     this.localStaticKey = input.localStaticKey;
+    this.#keepalive = setInterval(() => this.#probe(), KEEPALIVE_MS);
   }
 
   static connect(options: RelayTunnelClientOptions): Promise<RelayTunnelClient> {
@@ -145,6 +154,7 @@ export class RelayTunnelClient {
       );
       socket.addEventListener("close", () => fail("closed", "The relay connection closed."));
       socket.addEventListener("message", (event) => {
+        if (client) client.#heard();
         if (typeof event.data === "string") {
           const message = parseRelayServerMessage(event.data);
           if (message?.type === "ready") {
@@ -252,20 +262,25 @@ export class RelayTunnelClient {
 
   /** A `fetch` that sends the request to the computer; only the path and query of the URL matter. */
   readonly fetch = async (input: Request | string | URL, init?: RequestInit): Promise<Response> => {
-    const request = new Request(input, init);
-    if (this.#closed) throw new TypeError(this.#closed.message);
-    const url = new URL(request.url);
-    const stream = this.#allocateStream();
+    const fromRequest = typeof input !== "string" && !(input instanceof URL) ? input : null;
+    const url = new URL(fromRequest ? fromRequest.url : String(input));
+    const method = (init?.method ?? fromRequest?.method ?? "GET").toUpperCase();
     const headers: Array<[string, string]> = [];
-    request.headers.forEach((value, name) => headers.push([name, value]));
-    const body = request.body ? new Uint8Array(await request.arrayBuffer()) : new Uint8Array(0);
+    new Headers(init?.headers ?? fromRequest?.headers).forEach((value, name) =>
+      headers.push([name, value]),
+    );
+    const body = await readRequestBody(init?.body, fromRequest, method);
+    const signal = init?.signal ?? fromRequest?.signal ?? null;
+    if (this.#closed) throw new TypeError(this.#closed.message);
+    this.#probeIfQuiet();
+    const stream = this.#allocateStream();
     const response = new Promise<Response>((resolve, reject) => {
       this.#http.set(stream, { resolve, reject, head: null, body: [] });
     });
     this.#sendTunnel(
       encodeTunnelJson(TunnelMessageType.open, stream, {
         kind: "http",
-        method: request.method,
+        method,
         path: url.pathname + url.search,
         headers,
       }),
@@ -286,8 +301,8 @@ export class RelayTunnelClient {
       error.name = "AbortError";
       this.#finishHttp(stream, error);
     };
-    if (request.signal.aborted) abort();
-    else request.signal.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
     return response;
   };
 
@@ -304,7 +319,8 @@ export class RelayTunnelClient {
     const list =
       protocols === undefined ? [] : typeof protocols === "string" ? [protocols] : [...protocols];
     if (this.#closed) queueMicrotask(() => socket.handleFailure());
-    else
+    else {
+      this.#probeIfQuiet();
       this.#sendTunnel(
         encodeTunnelJson(TunnelMessageType.open, stream, {
           kind: "ws",
@@ -312,6 +328,7 @@ export class RelayTunnelClient {
           protocols: list,
         }),
       );
+    }
     return socket as unknown as WebSocket;
   }
 
@@ -322,8 +339,34 @@ export class RelayTunnelClient {
   }
 
   #sendTunnel(plaintext: Uint8Array) {
-    if (this.#closed || this.#socket.readyState !== WebSocket.OPEN) return;
+    if (this.#closed) return;
+    if (this.#socket.readyState !== WebSocket.OPEN) {
+      return this.#fail(new RelayTunnelClientError("closed", "The relay connection is gone."));
+    }
     this.#socket.send(encodeRelayFrame(CHANNEL, this.#send.encrypt(plaintext)));
+  }
+
+  #heard() {
+    this.#lastInbound = Date.now();
+    if (this.#probeTimer) clearTimeout(this.#probeTimer);
+    this.#probeTimer = null;
+  }
+
+  #probeIfQuiet() {
+    if (Date.now() - this.#lastInbound > QUIET_BEFORE_PROBE_MS) this.#probe();
+  }
+
+  /** Asks the relay for a pong; any message from it within the timeout counts. */
+  #probe() {
+    if (this.#closed || this.#probeTimer) return;
+    if (this.#socket.readyState !== WebSocket.OPEN) {
+      return this.#fail(new RelayTunnelClientError("closed", "The relay connection is gone."));
+    }
+    this.#socket.send(JSON.stringify({ type: "ping" }));
+    this.#probeTimer = setTimeout(
+      () => this.#fail(new RelayTunnelClientError("closed", "The relay stopped answering.")),
+      PROBE_TIMEOUT_MS,
+    );
   }
 
   #onPayload(payload: Uint8Array) {
@@ -382,6 +425,8 @@ export class RelayTunnelClient {
   #fail(error: RelayTunnelClientError) {
     if (this.#closed) return;
     this.#closed = error;
+    clearInterval(this.#keepalive);
+    if (this.#probeTimer) clearTimeout(this.#probeTimer);
     for (const stream of this.#http.keys()) this.#finishHttp(stream, new TypeError(error.message));
     for (const socket of this.#sockets.values()) socket.handleFailure();
     this.#sockets.clear();
@@ -693,4 +738,26 @@ class LazyRelayWebSocket extends SocketEvents {
     this.readyState = 3;
     this.emit({ type: "close", code, reason, wasClean: true });
   }
+}
+
+/**
+ * The body as bytes without going through `Request`: React Native's fetch polyfill has no
+ * `Request.body` and cannot always turn a text body into an ArrayBuffer.
+ */
+async function readRequestBody(
+  body: RequestInit["body"] | undefined,
+  request: Request | null,
+  method: string,
+): Promise<Uint8Array> {
+  if (method === "GET" || method === "HEAD") return new Uint8Array(0);
+  if (body === undefined || body === null) {
+    return request ? new TextEncoder().encode(await request.text()) : new Uint8Array(0);
+  }
+  if (typeof body === "string") return new TextEncoder().encode(body);
+  if (body instanceof URLSearchParams) return new TextEncoder().encode(body.toString());
+  if (body instanceof ArrayBuffer) return new Uint8Array(body);
+  if (ArrayBuffer.isView(body)) {
+    return new Uint8Array(body.buffer, body.byteOffset, body.byteLength).slice();
+  }
+  throw new TypeError("This request body type cannot be sent through the relay.");
 }

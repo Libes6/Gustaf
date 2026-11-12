@@ -13,13 +13,16 @@ export type RelayRole = "host" | "client";
 export type RelayClientMessage =
   | { readonly type: "hello"; readonly token: string; readonly role: RelayRole }
   | { readonly type: "open"; readonly channel: number; readonly hostDeviceId: string }
-  | { readonly type: "close"; readonly channel: number; readonly reason?: string };
+  | { readonly type: "close"; readonly channel: number; readonly reason?: string }
+  /** A browser-style WebSocket cannot ping, so liveness is a control message. */
+  | { readonly type: "ping" };
 
 export type RelayServerMessage =
   | { readonly type: "ready"; readonly deviceId: string }
   | { readonly type: "open"; readonly channel: number; readonly clientDeviceId: string }
   | { readonly type: "close"; readonly channel: number; readonly reason?: string }
-  | { readonly type: "error"; readonly code: string; readonly message?: string };
+  | { readonly type: "error"; readonly code: string; readonly message?: string }
+  | { readonly type: "pong" };
 
 /** Close reasons the relay sends for a channel it ends itself. */
 export type RelayCloseReason = "host_offline" | "not_found" | "limit" | "peer_closed" | "replaced";
@@ -34,6 +37,8 @@ export function parseRelayServerMessage(text: string): RelayServerMessage | null
   if (typeof value !== "object" || value === null) return null;
   const message = value as Record<string, unknown>;
   switch (message.type) {
+    case "pong":
+      return { type: "pong" };
     case "ready":
       return typeof message.deviceId === "string"
         ? { type: "ready", deviceId: message.deviceId }

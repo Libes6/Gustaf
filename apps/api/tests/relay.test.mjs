@@ -98,6 +98,9 @@ NodeTest.test(
       const client = await connect("pixel", "client");
       NodeAssert.deepEqual(client.first, { type: "ready", deviceId: "pixel" });
 
+      client.socket.send(JSON.stringify({ type: "ping" }));
+      NodeAssert.deepEqual(await client.inbox.next(), { type: "pong" });
+
       client.socket.send(JSON.stringify({ type: "open", channel: 5, hostDeviceId: "laptop" }));
       const opened = await host.inbox.next();
       NodeAssert.equal(opened.type, "open");

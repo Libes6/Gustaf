@@ -271,6 +271,16 @@ const make = Effect.gen(function* () {
       const relayUrl = readRelayUrl(input.relayUrl);
       if (!relayUrl) return yield* new RelayHostError({ reason: "invalid_relay_url" });
       const next = { relayUrl, deviceId: input.deviceId, token: input.token };
+      // The shell sends the credential on every start; an unchanged one keeps the live connection.
+      if (
+        engine !== null &&
+        credential?.relayUrl === next.relayUrl &&
+        credential.deviceId === next.deviceId &&
+        credential.token === next.token &&
+        connection?.status !== "unauthorized"
+      ) {
+        return yield* status();
+      }
       yield* secrets.set(CREDENTIAL_SECRET, encodeJson(next)).pipe(Effect.mapError(storageError));
       credential = next;
       startEngine();

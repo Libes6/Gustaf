@@ -201,6 +201,10 @@ function PairingForm({
     }
     setRelayStatus(null);
     setScannerLocked(false);
+    // Filled in so "add as a route" can resubmit the same code for a computer saved another way.
+    const { host, code } = parsePairingUrl(pairingUrl);
+    setHostInput(host);
+    setCodeInput(code);
     await submitPairingUrl(pairingUrl, routeFor);
   };
 

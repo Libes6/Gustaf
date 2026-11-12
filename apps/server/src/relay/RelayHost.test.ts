@@ -72,9 +72,7 @@ describe("RelayHost", () => {
   // Live: real sockets to a loopback relay.
   it.live("admits a new phone once per QR code and only after the user allows it", () =>
     Effect.gen(function* () {
-      const relay = yield* Effect.acquireRelease(Effect.promise(startRelay), (started) =>
-        Effect.promise(() => started[Symbol.asyncDispose]()),
-      );
+      const relay = yield* Effect.acquireDisposable(Effect.promise(startRelay));
       const host = yield* RelayHost.RelayHost;
       yield* host.setCredential({ relayUrl: relay.url, deviceId: "laptop", token: HOST_TOKEN });
       const phone = generateNoiseKeyPair(random);

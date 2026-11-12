@@ -176,6 +176,8 @@ export class RelayHub {
   }
 
   private control(peer: Peer, message: Record<string, unknown> | null) {
+    // Clients cannot send WebSocket pings from a browser-style API; this is how they detect a dead socket.
+    if (message?.type === "ping") return this.send(peer, { type: "pong" });
     if (!message || !isChannel(message.channel)) return this.fail(peer.socket, "bad_message");
     const channel = message.channel;
     if (message.type === "close") {
