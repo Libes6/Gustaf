@@ -108,6 +108,8 @@ import {
   encodeThreadHistoryCursor,
   olderHistoryPagePolicy,
   selectHistoryPageFromCursor,
+  findCursorEndIndex,
+  decodeThreadHistoryCursor,
   selectRecentTimelineWindow,
   THREAD_HISTORY_PAGE_POLICY,
   THREAD_HISTORY_INLINE_WORK_ITEM_LIMIT,
@@ -5981,6 +5983,16 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             const selection = yield* Effect.try({
               try: () => {
                 const policy = olderHistoryPagePolicy({ items: indexed, cursor, throughEntryId });
+                // Folding can hide the cursor's row: a snapshot folds no work in a thread with no
+                // user turn. The page then ends at the first row kept from the cursor on.
+                const cursorRow =
+                  indexed[findCursorEndIndex(indexed, decodeThreadHistoryCursor(cursor))];
+                const end =
+                  cursorRow === undefined
+                    ? -1
+                    : historyItems.findIndex(
+                        (row) => row.canonicalPosition >= cursorRow.canonicalPosition,
+                      );
                 const page =
                   workMode === "work"
                     ? selectDeferredWorkPage({
@@ -5993,6 +6005,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                     : selectHistoryPageFromCursor({
                         items: historyItems,
                         cursor,
+                        exclusiveEndIndex: end === -1 ? historyItems.length : end,
                         snapshotSequence,
                         rowEncodedBytes: () => 0,
                         policy,
