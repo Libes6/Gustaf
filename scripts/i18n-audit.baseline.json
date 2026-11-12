@@ -2,7 +2,7 @@
   "totals": {
     "web": {
       "files": 261,
-      "strings": 940
+      "strings": 941
     },
     "mobile": {
       "files": 235,
@@ -994,6 +994,7 @@
       "diff layout",
       "diff whitespace changes",
       "follow-up behavior",
+      "keep computer awake",
       "proactive panels",
       "project grouping",
       "project order",
