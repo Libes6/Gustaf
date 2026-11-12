@@ -1076,6 +1076,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 );
               }}
             />
+            {!isSearching && selectedEntry?.driverKind === "ollama" ? (
+              <p className="shrink-0 border-t border-border/70 px-3 py-2 text-xs leading-snug text-muted-foreground">
+                {t("chatB.ModelPickerContent.ollamaChatOnly")}
+              </p>
+            ) : null}
             <ModelPickerProviderNotices
               setupEntries={providerSetupEntries}
               updateRequiredNotices={updateRequiredNotices}
