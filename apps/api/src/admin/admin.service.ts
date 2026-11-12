@@ -38,11 +38,12 @@ const keysetBefore = (
   return sql`(${column}, ${id}) < (${String(at)}::timestamptz, ${String(key)})`;
 };
 
-const activeSessions = sql<number>`(select count(*)::int from ${session} where ${session.userId} = ${user.id} and ${session.expiresAt} > now())`;
-const activeDevices = sql<number>`(select count(*)::int from ${device} where ${device.userId} = ${user.id} and ${device.revokedAt} is null)`;
+// Correlated subqueries are spelled out: Drizzle leaves single-table columns unqualified.
+const activeSessions = sql<number>`(select count(*)::int from session s where s.user_id = "user".id and s.expires_at > now())`;
+const activeDevices = sql<number>`(select count(*)::int from device d where d.user_id = "user".id and d.revoked_at is null)`;
 const lastSeen = sql<Date | null>`greatest(
-  (select max(${session.updatedAt}) from ${session} where ${session.userId} = ${user.id}),
-  (select max(${device.lastSeenAt}) from ${device} where ${device.userId} = ${user.id})
+  (select max(s.updated_at) from session s where s.user_id = "user".id),
+  (select max(d.last_seen_at) from device d where d.user_id = "user".id)
 )`.mapWith(user.createdAt);
 
 const userColumns = {
