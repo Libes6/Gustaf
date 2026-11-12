@@ -187,6 +187,10 @@
       "types": "./src/relayNoise.ts",
       "import": "./src/relayNoise.ts"
     },
+    "./relayTunnelClient": {
+      "types": "./src/relayTunnelClient.ts",
+      "import": "./src/relayTunnelClient.ts"
+    },
     "./relayTunnel": {
       "types": "./src/relayTunnel.ts",
       "import": "./src/relayTunnel.ts"
