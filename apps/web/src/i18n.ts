@@ -555,6 +555,8 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
 }
 
 export function translateProviderMessage(language: UiLanguage, message: string): string {
+  const mcpStartup = /^MCP server (.+) failed to start\.?$/.exec(message);
+  if (mcpStartup) return translate(language, "chatB.provider.mcpStartupFailed").replace("{name}", mcpStartup[1]!);
   const knownMessages = {
     "Turn failed to start": "chatB.provider.startFailedTitle",
     "Claude steer cancelled.": "chatB.provider.steerCancelled",

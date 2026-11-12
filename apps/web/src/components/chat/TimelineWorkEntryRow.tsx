@@ -305,7 +305,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? workEntry.toolLifecycleStatus === "inProgress"
         ? t("chatB.TimelineWorkEntryRow.thinking")
         : t("chatB.TimelineWorkEntryRow.thought")
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
+      : questionHeading || translateProviderMessage(language, displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)

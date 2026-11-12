@@ -3,6 +3,7 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "chatB." and both languages list the same keys.
 export const chatBMessages = {
   en: {
+    "chatB.provider.mcpStartupFailed": "MCP server {name} failed to start",
     "chatB.provider.startFailedTitle": "Turn failed to start",
     "chatB.provider.steerCancelled": "Claude steer cancelled.",
     "chatB.provider.steerAccepted": "Claude steer accepted.",
@@ -766,6 +767,7 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.appAccessRequest": "App access request",
   },
   ru: {
+    "chatB.provider.mcpStartupFailed": "Не удалось запустить MCP-сервер {name}",
     "chatB.provider.startFailedTitle": "Не удалось запустить ход",
     "chatB.provider.steerCancelled": "Уточнение для Claude отменено.",
     "chatB.provider.steerAccepted": "Claude принял уточнение.",
