@@ -401,5 +401,13 @@
   "Keyboard": "Клавиатура",
   "T3 Account": "Аккаунт",
   "No environments": "Нет окружений",
-  "Pair environment": "Сопряжение с окружением"
+  "Pair environment": "Сопряжение с окружением",
+  "While agents work": "Пока работают агенты",
+  "Always": "Всегда",
+  "Keep computer awake": "Не давать компьютеру засыпать",
+  "The computer sleeps as usual, which pauses running agents.": "Компьютер засыпает как обычно, и работающие агенты приостанавливаются.",
+  "Keeps the computer awake while agents work and lets it sleep a minute after they finish. Closing a laptop lid still puts it to sleep.": "Компьютер не засыпает, пока работают агенты, и может уснуть через минуту после их завершения. Закрытая крышка ноутбука всё равно усыпляет его.",
+  "Keeps the computer awake as long as Gustaf runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.": "Компьютер не засыпает, пока запущен Gustaf, например чтобы подключаться к нему с телефона. Закрытая крышка ноутбука всё равно усыпляет его.",
+  "Update every selected server to change this setting.": "Чтобы изменить эту настройку, обновите все выбранные серверы.",
+  "Environment-wide setting. Select All projects to change it.": "Настройка всего окружения. Чтобы изменить её, выберите «Все проекты»."
 }
