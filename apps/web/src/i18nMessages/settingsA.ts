@@ -3,9 +3,6 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "settingsA." and both languages list the same keys.
 export const settingsAMessages = {
   en: {
-    "settingsA.connectionsSettings.preventSleep": "Prevent Mac from sleeping",
-    "settingsA.connectionsSettings.preventSleepDescription":
-      "Keep this Mac awake while connected to power and remote access is enabled. The display may turn off.",
     "settingsA.connectionsSettings.showingAccessFor": "Showing access for",
     "settingsA.connectionsSettings.environmentLabel": "Environment",
     "settingsA.connectionsSettings.offline": "Offline",
@@ -757,9 +754,6 @@ export const settingsAMessages = {
     "settingsA.chatGptUsage.manageUsage": "Manage usage",
   },
   ru: {
-    "settingsA.connectionsSettings.preventSleep": "Не переводить Mac в режим сна",
-    "settingsA.connectionsSettings.preventSleepDescription":
-      "Не переводить Mac в сон при питании от сети и включённом удалённом доступе. Экран может выключаться.",
     "settingsA.connectionsSettings.showingAccessFor": "Доступ для",
     "settingsA.connectionsSettings.environmentLabel": "Окружение",
     "settingsA.connectionsSettings.offline": "Не в сети",

@@ -12,8 +12,6 @@
     "notification:allow-notify",
     "allow-dropped-paths",
     "allow-drag-window",
-    "allow-get-prevent-sleep",
-    "allow-set-prevent-sleep",
     "allow-read-connection-catalog",
     "allow-write-connection-catalog",
     "allow-reveal-window",

@@ -686,6 +686,18 @@ export const settingsDMessages = {
     "settingsD.settingsPanels.providerUpdatesDescription":
       "Check installed provider CLIs for newer available versions and fetch model catalog updates. When off, new models may not appear.",
     "settingsD.settingsPanels.checkProviderVersions": "Check provider versions",
+    "settingsD.settingsPanels.keepAwake": "Keep computer awake",
+    "settingsD.settingsPanels.keepAwakeOff": "Off",
+    "settingsD.settingsPanels.keepAwakeWhileWorking": "While agents work",
+    "settingsD.settingsPanels.keepAwakeAlways": "Always",
+    "settingsD.settingsPanels.keepAwakeOffDescription":
+      "The computer sleeps as usual, which pauses running agents.",
+    "settingsD.settingsPanels.keepAwakeWhileWorkingDescription":
+      "Keeps the computer awake while agents work and lets it sleep a minute after they finish. Closing a laptop lid still puts it to sleep.",
+    "settingsD.settingsPanels.keepAwakeAlwaysDescription":
+      "Keeps the computer awake as long as Gustaf runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.",
+    "settingsD.settingsPanels.differentKeepAwakeModes":
+      "Environments use different settings. Choose one to apply it to all.",
     "settingsD.settingsPanels.continueAfterRestartsDescription":
       "Automatically resume interrupted threads after an update, crash, or machine restart on the selected environments.",
     "settingsD.settingsPanels.restartContinuationRequired":
@@ -1528,6 +1540,18 @@ export const settingsDMessages = {
     "settingsD.settingsPanels.providerUpdatesDescription":
       "Проверять установленные CLI провайдеров на наличие новых версий и загружать обновления каталога моделей. Если выключено, новые модели могут не появиться.",
     "settingsD.settingsPanels.checkProviderVersions": "Проверять версии провайдеров",
+    "settingsD.settingsPanels.keepAwake": "Не давать компьютеру засыпать",
+    "settingsD.settingsPanels.keepAwakeOff": "Выключено",
+    "settingsD.settingsPanels.keepAwakeWhileWorking": "Пока работают агенты",
+    "settingsD.settingsPanels.keepAwakeAlways": "Всегда",
+    "settingsD.settingsPanels.keepAwakeOffDescription":
+      "Компьютер засыпает как обычно, и работающие агенты приостанавливаются.",
+    "settingsD.settingsPanels.keepAwakeWhileWorkingDescription":
+      "Компьютер не засыпает, пока работают агенты, и может уснуть через минуту после их завершения. Закрытая крышка ноутбука всё равно усыпляет его.",
+    "settingsD.settingsPanels.keepAwakeAlwaysDescription":
+      "Компьютер не засыпает, пока запущен Gustaf, например чтобы подключаться к нему с телефона. Закрытая крышка ноутбука всё равно усыпляет его.",
+    "settingsD.settingsPanels.differentKeepAwakeModes":
+      "В окружениях разные настройки. Выберите вариант, чтобы применить его ко всем.",
     "settingsD.settingsPanels.continueAfterRestartsDescription":
       "Автоматически возобновлять прерванные треды после обновления, сбоя или перезапуска машины в выбранных окружениях.",
     "settingsD.settingsPanels.restartContinuationRequired":
