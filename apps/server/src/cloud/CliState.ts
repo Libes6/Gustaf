@@ -52,26 +52,6 @@ export const setCliDesiredCloudLink = Effect.fn("cloud.cli_state.set_desired")(f
   }
 });
 
-export const dropRevokedCloudLink = Effect.gen(function* () {
-  const secrets = yield* ServerSecretStore.ServerSecretStore;
-  if (Option.isNone(yield* secrets.get(CLOUD_LINK_REVOKED))) {
-    return false;
-  }
-  yield* Effect.all(
-    [
-      secrets.remove(CLOUD_LINKED_USER_ID),
-      secrets.remove(RELAY_ENVIRONMENT_CREDENTIAL_SECRET),
-      secrets.remove(CLOUD_MINT_PUBLIC_KEY),
-      secrets.remove(CLOUD_ENDPOINT_RUNTIME_CONFIG),
-      secrets.remove(CLOUD_ENDPOINT_CONFIRMED_ORIGIN),
-    ],
-    { concurrency: "unbounded" },
-  );
-  // Last, so a failed removal above leaves the mark for the next attempt.
-  yield* secrets.remove(CLOUD_LINK_REVOKED);
-  return true;
-});
-
 export const clearPersistedCloudLink = Effect.gen(function* () {
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   yield* Effect.all(

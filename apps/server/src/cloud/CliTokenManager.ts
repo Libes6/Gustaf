@@ -40,11 +40,6 @@ import { renderLoopbackAuthorizationCompleteHtml } from "./cliAuthHtml.ts";
 const CLOUD_CLI_OAUTH_TOKEN_SECRET = "cloud-cli-oauth-token";
 const CLOUD_CLI_OAUTH_CALLBACK_TIMEOUT = Duration.minutes(10);
 const CLOUD_CLI_OAUTH_REFRESH_EARLY_MS = Duration.toMillis(Duration.minutes(5));
-const DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
-// RFC 8628 defaults, used only when Clerk omits the field.
-const DEVICE_AUTHORIZATION_DEFAULT_INTERVAL = Duration.seconds(5);
-// RFC 8628 §3.5: a slow_down response means "add 5 seconds to the interval".
-const DEVICE_AUTHORIZATION_SLOW_DOWN_INCREMENT = Duration.seconds(5);
 // A stalled OAuth request holds the semaphore and blocks all credential calls.
 const OAUTH_REQUEST_TIMEOUT = Duration.seconds(10);
 const boldTerminalText = (value: string): string => `\u001b[1m${value}\u001b[22m`;
@@ -141,10 +136,6 @@ const OAuthTokenResponse = Schema.Struct({
   token_type: Schema.String,
 });
 
-const OAuthErrorResponse = Schema.Struct({
-  error: Schema.String,
-  error_description: Schema.optional(Schema.String),
-});
 const OAuthRefreshErrorCode = Schema.Literals([
   "invalid_grant",
   "invalid_client",
@@ -160,15 +151,6 @@ const decodeOAuthRefreshErrorResponse = Schema.decodeUnknownOption(
 
 const isPermanentRefreshStatus = (status: number): boolean =>
   status >= 400 && status < 500 && status !== 408 && status !== 429;
-
-const DeviceAuthorizationResponse = Schema.Struct({
-  device_code: Schema.String,
-  user_code: Schema.String,
-  verification_uri: Schema.String,
-  verification_uri_complete: Schema.optional(Schema.String),
-  expires_in: Schema.Number,
-  interval: Schema.optional(Schema.Number),
-});
 
 const OidcIdentityClaimsJson = Schema.fromJsonString(
   Schema.Struct({
@@ -376,97 +358,6 @@ const makePkceRequest = Effect.gen(function* () {
   const state = Base64Url.encode(yield* random.randomBytes(16));
   return { verifier, challenge, state };
 });
-
-export interface DeviceAuthorizationPrompt {
-  readonly verificationUri: string;
-  readonly verificationUriComplete: string | undefined;
-  readonly userCode: string;
-  readonly expiresIn: Duration.Duration;
-}
-
-const isTransportError = (error: unknown) =>
-  HttpClientError.isHttpClientError(error) && error.reason._tag === "TransportError";
-
-const pollDeviceToken = Effect.fn("cloud.cli_token.poll_device_token")(function* (
-  metadata: Pick<CloudCliOAuthConfig, "tokenEndpoint" | "clientId">,
-  deviceCode: string,
-  initialInterval: Duration.Duration,
-) {
-  const httpClient = yield* HttpClient.HttpClient;
-  const params = {
-    grant_type: DEVICE_CODE_GRANT_TYPE,
-    device_code: deviceCode,
-    client_id: metadata.clientId,
-  };
-  let interval = initialInterval;
-  while (true) {
-    yield* Effect.sleep(interval);
-    const response = yield* HttpClientRequest.post(metadata.tokenEndpoint).pipe(
-      HttpClientRequest.bodyUrlParams(params),
-      httpClient.execute,
-      Effect.asSome,
-      Effect.catchIf(isTransportError, () => Effect.succeedNone),
-    );
-    // Retry transport errors and 5xx while the device code is valid, backing off per RFC 8628 §3.5. Drain bodies to reuse connections.
-    if (Option.isNone(response) || response.value.status >= 500) {
-      if (Option.isSome(response)) yield* Effect.ignore(response.value.text);
-      interval = Duration.sum(interval, DEVICE_AUTHORIZATION_SLOW_DOWN_INCREMENT);
-      continue;
-    }
-    if (response.value.status >= 200 && response.value.status < 300) {
-      return yield* readTokenResponse(response.value, params);
-    }
-    const failure = yield* HttpClientResponse.schemaBodyJson(OAuthErrorResponse)(response.value);
-    switch (failure.error) {
-      case "authorization_pending":
-        continue;
-      case "slow_down":
-        interval = Duration.sum(interval, DEVICE_AUTHORIZATION_SLOW_DOWN_INCREMENT);
-        continue;
-      case "expired_token":
-        return yield* new CloudCliAuthorizationTimeoutError({ cause: failure });
-      case "access_denied":
-        return yield* new CloudCliAuthorizationDeniedError();
-      default:
-        return yield* new CloudCliAuthorizationError({
-          cause: failure.error_description ?? failure.error,
-        });
-    }
-  }
-});
-
-export const deviceAuthorizationLogin = Effect.fn("cloud.cli_token.device_authorization_login")(
-  function* <E, R>(showPrompt: (prompt: DeviceAuthorizationPrompt) => Effect.Effect<void, E, R>) {
-    const metadata = yield* cloudCliOAuthConfig;
-    const httpClient = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-    const authorization = yield* HttpClientRequest.post(metadata.deviceAuthorizationEndpoint).pipe(
-      HttpClientRequest.bodyUrlParams({
-        client_id: metadata.clientId,
-        scope: metadata.scopes.join(" "),
-      }),
-      httpClient.execute,
-      Effect.flatMap(HttpClientResponse.schemaBodyJson(DeviceAuthorizationResponse)),
-      Effect.timeout(OAUTH_REQUEST_TIMEOUT),
-    );
-    const expiresIn = Duration.seconds(authorization.expires_in);
-    const interval =
-      authorization.interval === undefined
-        ? DEVICE_AUTHORIZATION_DEFAULT_INTERVAL
-        : Duration.seconds(authorization.interval);
-    yield* showPrompt({
-      verificationUri: authorization.verification_uri,
-      verificationUriComplete: authorization.verification_uri_complete,
-      userCode: authorization.user_code,
-      expiresIn,
-    });
-    return yield* pollDeviceToken(metadata, authorization.device_code, interval).pipe(
-      Effect.timeout(expiresIn),
-      Effect.catchTags({
-        TimeoutError: (cause) => Effect.fail(new CloudCliAuthorizationTimeoutError({ cause })),
-      }),
-    );
-  },
-);
 
 /** @public */
 export const make = Effect.gen(function* () {
