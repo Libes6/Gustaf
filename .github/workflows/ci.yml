@@ -19,6 +19,20 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  # Untranslated interface copy may only go down; see the top of scripts/i18n-audit.mjs.
+  i18n-audit:
+    name: i18n audit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - run: node --test scripts/i18n-audit.test.mjs
+      - run: node scripts/i18n-audit.mjs --check
+
   warm-cache:
     name: Warm Rust cache (${{ matrix.platform }})
     if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
