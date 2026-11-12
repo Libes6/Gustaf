@@ -8,6 +8,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { SettingsTarget } from "./settings-environment-filter";
 import {
+  keepAwakeSupport,
   managedSettingReason,
   planMobileScopedSettingsClear,
   planMobileScopedSettingsPatch,
@@ -56,15 +57,32 @@ describe("mobile usage-limit settings across environments", () => {
   );
 });
 
-function environment(environmentId: EnvironmentId, settings: ServerSettings): SettingsTarget {
+function environment(
+  environmentId: EnvironmentId,
+  settings: ServerSettings,
+  capabilities: Record<string, boolean> = {},
+): SettingsTarget {
   return {
     environmentId,
     serverConfig: {
       settings,
-      environment: { capabilities: { projectSettingsOverrides: true } },
+      environment: { capabilities: { projectSettingsOverrides: true, ...capabilities } },
     },
   } as SettingsTarget;
 }
+
+describe("mobile keep awake support", () => {
+  const current = environment(firstId, DEFAULT_SERVER_SETTINGS, { keepAwake: true });
+  const older = environment(secondId, DEFAULT_SERVER_SETTINGS);
+  it.each([
+    [[current], "supported"],
+    [[current, older], "outdated"],
+    [[older], "hidden"],
+    [[], "hidden"],
+  ] as const)("reports %# as %s", (environments, expected) => {
+    expect(keepAwakeSupport(resolveMobileSettingsTargets(environments, null))).toBe(expected);
+  });
+});
 
 describe("mobile project settings scope", () => {
   it("edits each checkout's own override without changing either environment default", () => {

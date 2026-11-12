@@ -6,6 +6,7 @@ import { readEnvironmentScope, useEnvironmentsWithScope } from "../../state/sess
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { AppText as Text } from "../../components/ui/AppText";
 import {
+  type KeepAwakeMode,
   type ResponseStreamingMode,
   type ServerSettings,
   type ServerSettingsPatch,
@@ -34,6 +35,7 @@ import { SettingsProjectOverridesSection } from "./components/SettingsProjectOve
 import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
 import { useSettingsWriter } from "./useSettingsWriter";
 import {
+  keepAwakeSupport,
   managedSettingReason,
   planMobileScopedSettingsClear,
   planMobileScopedSettingsPatch,
@@ -129,6 +131,32 @@ const STREAMING_CHOICES: ReadonlyArray<{
     mode: "paragraph",
     label: "Finished paragraphs",
     description: "Show each paragraph or code block as it completes.",
+  },
+];
+
+const KEEP_AWAKE_CHOICES: ReadonlyArray<{
+  readonly mode: KeepAwakeMode;
+  readonly label: string;
+  readonly description: string;
+}> = [
+  {
+    mode: "off",
+    label: t("Off"),
+    description: t("The computer sleeps as usual, which pauses running agents."),
+  },
+  {
+    mode: "while-agents-work",
+    label: t("While agents work"),
+    description: t(
+      "Keeps the computer awake while agents work and lets it sleep a minute after they finish. Closing a laptop lid still puts it to sleep.",
+    ),
+  },
+  {
+    mode: "always",
+    label: t("Always"),
+    description: t(
+      "Keeps the computer awake as long as Gustaf runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.",
+    ),
   },
 ];
 
@@ -273,6 +301,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
     RUNTIME_MODE_CHOICES,
     targets.map((target) => target.environment.serverConfig.managedPolicy),
   );
+  const keepAwake = keepAwakeSupport(targets);
   const disabledFor = (key: string) =>
     disabled ||
     managed(key) !== undefined ||
@@ -557,6 +586,36 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     />
                   </View>
                 </SettingsSection>
+                {keepAwake === "hidden" ? null : (
+                  <SettingsSection
+                    title={t("Keep computer awake")}
+                    footer={
+                      managed("keepAwake") ??
+                      (keepAwake === "outdated"
+                        ? t("Update every selected server to change this setting.")
+                        : projectSelected
+                          ? t("Environment-wide setting. Select All projects to change it.")
+                          : undefined)
+                    }
+                    trailing={
+                      pendingWrites === 0 && uniform("keepAwake") === null ? (
+                        <MixedValuesLabel projectSelected={projectSelected} />
+                      ) : null
+                    }
+                  >
+                    {KEEP_AWAKE_CHOICES.map((choice, index) => (
+                      <SettingsChoiceRow
+                        key={choice.mode}
+                        label={choice.label}
+                        description={choice.description}
+                        selected={uniform("keepAwake") === choice.mode}
+                        separated={index > 0}
+                        disabled={disabledFor("keepAwake") || keepAwake === "outdated"}
+                        onPress={() => write({ keepAwake: choice.mode })}
+                      />
+                    ))}
+                  </SettingsSection>
+                )}
               </>
             ) : null}
           </>
