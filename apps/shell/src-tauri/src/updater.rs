@@ -29,6 +29,8 @@ struct ReleaseNote {
     version: String,
     items: Vec<String>,
     total_items: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    footer: Option<String>,
 }
 
 /// `DesktopUpdateState` in `packages/contracts/src/ipc.ts`; the web app reads these names.
@@ -148,25 +150,42 @@ fn self_updating_install() -> bool {
 }
 
 /// The feed's notes are the release's Markdown; the button lists its bullet points.
+/// `scripts/release-notes.mjs` closes generated notes with `Plus N bug fixes and improvements.`
 fn release_notes(version: &str, body: Option<&str>) -> Vec<ReleaseNote> {
-    let items: Vec<String> = body
-        .unwrap_or_default()
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            line.strip_prefix("- ").or_else(|| line.strip_prefix("* "))
-        })
-        .map(|item| item.trim().to_owned())
-        .filter(|item| !item.is_empty())
-        .collect();
-    if items.is_empty() {
+    let mut items = Vec::new();
+    let mut footer = None;
+    let mut omitted = 0;
+    for line in body.unwrap_or_default().lines().map(str::trim) {
+        if let Some(item) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+            let item = item.trim();
+            if !item.is_empty() {
+                items.push(item.to_owned());
+            }
+        } else if let Some(count) = omitted_count(line) {
+            omitted = count;
+            footer = Some(line.to_owned());
+        }
+    }
+    if items.is_empty() && footer.is_none() {
         return Vec::new();
     }
     vec![ReleaseNote {
         version: version.to_owned(),
-        total_items: items.len(),
+        total_items: items.len() + omitted,
         items,
+        footer,
     }]
+}
+
+fn omitted_count(line: &str) -> Option<usize> {
+    let rest = line.strip_prefix("Plus ")?;
+    let (count, rest) = rest.split_once(' ')?;
+    matches!(
+        rest,
+        "bug fix and improvements." | "bug fixes and improvements."
+    )
+    .then(|| count.parse().ok())
+    .flatten()
 }
 
 fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -482,9 +501,36 @@ mod tests {
                 version: "0.8.4".into(),
                 items: vec!["Update button in the sidebar".into(), "Nested point".into()],
                 total_items: 2,
+                footer: None,
             }]
         );
         assert!(release_notes("0.8.4", Some("Bug fixes.")).is_empty());
         assert!(release_notes("0.8.4", None).is_empty());
+    }
+
+    #[test]
+    fn release_notes_count_the_fixes_of_the_closing_line() {
+        assert_eq!(
+            release_notes(
+                "0.10.0",
+                Some("- Cloud API\n- Mobile client\n\nPlus 3 bug fixes and improvements.\n")
+            ),
+            vec![ReleaseNote {
+                version: "0.10.0".into(),
+                items: vec!["Cloud API".into(), "Mobile client".into()],
+                total_items: 5,
+                footer: Some("Plus 3 bug fixes and improvements.".into()),
+            }]
+        );
+        assert_eq!(
+            release_notes("0.10.1", Some("Plus 1 bug fix and improvements.\n")),
+            vec![ReleaseNote {
+                version: "0.10.1".into(),
+                items: Vec::new(),
+                total_items: 1,
+                footer: Some("Plus 1 bug fix and improvements.".into()),
+            }]
+        );
+        assert!(release_notes("0.10.1", Some("Plus many bug fixes and improvements.")).is_empty());
     }
 }
