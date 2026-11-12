@@ -220,19 +220,19 @@ const make = Effect.gen(function* () {
     readonly hello: { readonly name: string; readonly pairingSecret?: string };
   }) {
     const now = yield* Clock.currentTimeMillis;
-    if (devices.some((device) => device.key === client.clientKey)) return ready();
+    const known = devices.some((device) => device.key === client.clientKey);
     const secret = client.hello.pairingSecret;
     const current = offer;
-    if (
-      !secret ||
-      !current ||
-      Date.parse(current.view.expiresAt) <= now ||
-      !bytesEqual(new TextEncoder().encode(secret), new TextEncoder().encode(current.secret))
-    ) {
-      return reject("unknown_device");
-    }
+    const scanned =
+      secret !== undefined &&
+      current !== null &&
+      Date.parse(current.view.expiresAt) > now &&
+      bytesEqual(new TextEncoder().encode(secret), new TextEncoder().encode(current.secret));
+    if (!scanned) return known ? ready() : reject("unknown_device");
     // One scan, one device: a second phone needs a fresh code.
     offer = null;
+    // An allowed phone that scans again (say, after removing the computer) needs no new approval.
+    if (known) return ready((yield* issuePairingToken(client.hello.name)).credential);
     return waitForUser(client.clientKey, client.hello.name);
   });
 
