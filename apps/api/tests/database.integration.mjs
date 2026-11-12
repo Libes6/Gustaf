@@ -1,4 +1,5 @@
 import * as NodeAssert from "node:assert/strict";
+import * as NodeFS from "node:fs";
 import * as NodeTest from "node:test";
 import { createApp } from "../dist/app.js";
 import { readConfig } from "../dist/config.js";
@@ -19,11 +20,14 @@ NodeTest.test(
       const result = await database.pool.query(
         "select count(*)::int as count from drizzle.__drizzle_migrations",
       );
-      NodeAssert.equal(result.rows[0].count, 0);
+      const journal = JSON.parse(
+        NodeFS.readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"),
+      );
+      NodeAssert.equal(result.rows[0].count, journal.entries.length);
     } finally {
       await database.onModuleDestroy();
     }
-    const app = await createApp(readConfig({ DATABASE_URL: databaseUrl }));
+    const app = await createApp(readConfig({ DATABASE_URL: databaseUrl, AUTH_ENABLED: "0" }));
     app.useLogger(false);
     try {
       await app.listen(0, "127.0.0.1");

@@ -17,8 +17,8 @@ pnpm --filter @gustaf/api start
 
 API слушает `127.0.0.1:3100`. `/health/live` проверяет процесс, `/health/ready`
 проверяет запрос к PostgreSQL и возвращает 503 при ошибке. Readiness не подтверждает
-наличие будущих предметных таблиц. Схема пока пустая: auth выбирается следующим этапом.
-Миграционный runner создаёт только служебный журнал Drizzle.
+наличие предметных таблиц. Для локального запуска без GitHub OAuth app задайте
+`AUTH_ENABLED=0`: останутся только health-маршруты.
 
 Для разработки в двух терминалах: `pnpm --filter @gustaf/api dev` компилирует
 изменения; `pnpm --filter @gustaf/api start:watch` перезапускает собранный сервер.
@@ -42,7 +42,23 @@ docker compose -p gustaf-cloud-dev -f apps/api/compose.yaml down
 
 После добавления таблиц в `src/**/*.schema.ts`: `pnpm --filter @gustaf/api db:generate`, проверить SQL,
 собрать API и выполнить `db:migrate` отдельным шагом перед запуском новой версии.
-Миграции не запускаются автоматически каждым API-процессом. Таблицы появятся вместе с первым предметным модулем.
+Миграции не запускаются автоматически каждым API-процессом.
+
+## Аккаунты и устройства
+
+Вход через GitHub OAuth на Better Auth (`apps/api/src/auth/auth.ts`), маршруты библиотеки
+под `/v1/auth/*`. Браузер получает cookie сессии; десктоп и мобильное приложение берут
+токен из заголовка `set-auth-token` и отправляют `Authorization: Bearer <token>`.
+Устройства имеют собственный токен `gdt_…`: он показывается один раз, в базе хранится
+SHA-256, ротация и отзыв действуют сразу. Чужие ресурсы отвечают 404.
+
+GitHub → Settings → Developer settings → OAuth Apps → New OAuth App:
+Homepage URL — `PUBLIC_BASE_URL`, Authorization callback URL —
+`<PUBLIC_BASE_URL>/v1/auth/callback/github`. Для локальной разработки нужен отдельный
+OAuth app с `http://localhost:3100`. Переменные: `BETTER_AUTH_SECRET`,
+`PUBLIC_BASE_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, при необходимости
+`AUTH_TRUSTED_ORIGINS` (см. `.env.example`). Без них процесс с включённым auth
+не стартует; `AUTH_ENABLED=0` выключает аккаунты целиком.
 
 ## Docker и GitHub Actions
 
@@ -82,6 +98,9 @@ GitHub runner выпускает linux/amd64; подтвердите эту ар
    с read:packages. Не использовать GitHub Actions GITHUB_TOKEN как постоянный пароль.
 6. Ports Exposes: `3100`; домен `https://api.libes6.ru` с target port 3100.
    DATABASE_URL — внутренний URL базы; HOST=0.0.0.0, PORT=3100.
+   Для аккаунтов: секреты `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`, переменные
+   `PUBLIC_BASE_URL=https://api.libes6.ru`, `GITHUB_CLIENT_ID`, `AUTH_TRUSTED_ORIGINS`.
+   Задать их (или `AUTH_ENABLED=0`) до деплоя версии с auth, иначе контейнер не стартует.
    Не создавать host port mapping 3100: наружу приложение отдаёт proxy.
 7. Healthcheck: GET `/health/ready`, порт 3100, ожидаемый код 200.
 8. Выполнить Deploy, проверить выбранный SHA в логах деплоя и

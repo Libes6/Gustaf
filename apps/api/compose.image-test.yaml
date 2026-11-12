@@ -16,6 +16,10 @@ services:
     image: ${API_IMAGE:-gustaf-api:local}
     environment:
       DATABASE_URL: postgresql://gustaf:image_test_only@postgres:5432/gustaf_cloud
+      BETTER_AUTH_SECRET: image-test-only-not-a-real-secret-000
+      PUBLIC_BASE_URL: http://localhost:3100
+      GITHUB_CLIENT_ID: image-test-only
+      GITHUB_CLIENT_SECRET: image-test-only
     depends_on:
       postgres:
         condition: service_healthy
