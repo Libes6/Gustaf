@@ -23,7 +23,6 @@
   "src/cloud/CloudLink.lifecycle.test.ts": 0.9,
   "src/cloud/CloudLink.test.ts": 1.1,
   "src/cloud/bootService.test.ts": 0.5,
-  "src/cloud/http.test.ts": 1.2,
   "src/cloud/managedTunnelStartup.test.ts": 0.5,
   "src/cloud/selfUpdate.test.ts": 0.6,
   "src/codexModelOptions.test.ts": 0.6,

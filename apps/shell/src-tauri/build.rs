@@ -4,8 +4,6 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "dropped_paths",
             "drag_window",
-            "get_prevent_sleep",
-            "set_prevent_sleep",
             "read_connection_catalog",
             "write_connection_catalog",
             "reveal_window",

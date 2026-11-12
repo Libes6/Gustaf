@@ -2,8 +2,6 @@ mod bridge;
 mod connection_storage;
 mod local_env;
 mod network;
-#[cfg(target_os = "macos")]
-mod power;
 mod server_process;
 mod shell_settings;
 mod updater;
@@ -320,8 +318,6 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(app_menu);
-    #[cfg(target_os = "macos")]
-    let builder = builder.manage(power::PowerState::default());
     builder
         // Must be the first plugin. A second launch would start a second server on the same data.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -336,10 +332,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
             bridge::drag_window,
-            #[cfg(target_os = "macos")]
-            power::get_prevent_sleep,
-            #[cfg(target_os = "macos")]
-            power::set_prevent_sleep,
             connection_storage::read_connection_catalog,
             connection_storage::write_connection_catalog,
             bridge::reveal_window,
@@ -369,8 +361,6 @@ pub fn run() {
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
-            #[cfg(target_os = "macos")]
-            power::apply(&app.state::<power::PowerState>(), &settings)?;
             let (server, pairing_url) = match start_server(app, &settings) {
                 Ok(started) => started,
                 Err(reason) => {
