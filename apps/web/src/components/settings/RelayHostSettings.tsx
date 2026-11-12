@@ -57,22 +57,17 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- readStatus is rebuilt every render; polling restarts only for another environment.
   }, [environmentId]);
 
-  const act = async (work: () => Promise<{ _tag: string; value?: unknown }>) => {
+  const act = (work: () => Promise<{ _tag: string; value?: unknown }>) => {
     if (busy) return;
     setBusy(true);
-    try {
-      const result = await work();
-      if (
-        result._tag === "Success" &&
-        result.value &&
-        typeof result.value === "object" &&
-        "connection" in result.value
-      ) {
-        setStatus(result.value as RelayHostStatus);
-      }
-    } finally {
-      setBusy(false);
-    }
+    void work()
+      .then((result) => {
+        const value = result._tag === "Success" ? result.value : null;
+        if (value && typeof value === "object" && "connection" in value) {
+          setStatus(value as RelayHostStatus);
+        }
+      })
+      .finally(() => setBusy(false));
   };
 
   const showOffer = () =>
@@ -105,7 +100,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
         }
         control={
           online && !status.offer ? (
-            <Button size="sm" disabled={busy} onClick={() => void showOffer()}>
+            <Button size="sm" disabled={busy} onClick={showOffer}>
               {t("settingsD.relay.connectPhone")}
             </Button>
           ) : null
@@ -140,9 +135,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
                 variant="outline"
                 disabled={busy}
                 onClick={() =>
-                  void act(() =>
-                    decide({ environmentId, input: { id: pending.id, approve: false } }),
-                  )
+                  act(() => decide({ environmentId, input: { id: pending.id, approve: false } }))
                 }
               >
                 {t("settingsD.relay.reject")}
@@ -151,9 +144,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
                 size="sm"
                 disabled={busy}
                 onClick={() =>
-                  void act(() =>
-                    decide({ environmentId, input: { id: pending.id, approve: true } }),
-                  )
+                  act(() => decide({ environmentId, input: { id: pending.id, approve: true } }))
                 }
               >
                 {t("settingsD.relay.allow")}
@@ -179,9 +170,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
               size="sm"
               variant="destructive-outline"
               disabled={busy}
-              onClick={() =>
-                void act(() => revokeDevice({ environmentId, input: { key: device.key } }))
-              }
+              onClick={() => act(() => revokeDevice({ environmentId, input: { key: device.key } }))}
             >
               {t("settingsD.account.revoke")}
             </Button>
