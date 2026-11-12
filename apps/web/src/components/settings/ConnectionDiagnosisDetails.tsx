@@ -4,6 +4,7 @@ import {
   type ConnectionDiagnosis,
   connectionDiagnosisText,
   connectionRoutes,
+  hasOnlyLanRoutes,
   hasRelayRoute,
   presentConnectionDiagnosis,
 } from "@t3tools/client-runtime/connection";
@@ -43,6 +44,7 @@ export function useConnectionDiagnosis(environment: EnvironmentPresentation) {
           hostLabel: environment.label,
           state,
           via: relayOnly ? "relay" : "direct",
+          lanOnly: hasOnlyLanRoutes(environment.entry),
           // With a direct route as well, the relay's health says nothing about the route in use.
           relayStatus: relayOnly ? Option.getOrNull(relayStatus ?? Option.none()) : null,
           clientVersion: APP_VERSION,

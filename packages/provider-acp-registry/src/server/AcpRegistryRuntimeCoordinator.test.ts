@@ -4,6 +4,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
+import * as TestClock from "effect/testing/TestClock";
 
 import type { AcpRegistryAvailableCommands } from "./probe.ts";
 import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.ts";
@@ -255,6 +256,27 @@ describe("AcpRegistryRuntimeCoordinator", () => {
       yield* Deferred.await(cleared);
       expect(Option.isNone(yield* coordinator.getUrlAuthAction(instanceId))).toBe(true);
       yield* Fiber.interrupt(consumer);
+    }).pipe(Effect.provide(AcpRegistryRuntimeCoordinator.layer), Effect.scoped),
+  );
+
+  it.effect("remembers a model the plan rejected per instance until it expires or is cleared", () =>
+    Effect.gen(function* () {
+      const coordinator = yield* AcpRegistryRuntimeCoordinator.AcpRegistryRuntimeCoordinator;
+      const kimi = ProviderInstanceId.make("acpRegistry_kimi_code");
+      const other = ProviderInstanceId.make("acpRegistry_other");
+
+      yield* coordinator.recordModelAccessDenied(kimi, "k3.1-pro-highspeed");
+      expect([...(yield* coordinator.getModelAccessDenials(kimi))]).toEqual(["k3.1-pro-highspeed"]);
+      expect((yield* coordinator.getModelAccessDenials(other)).size).toBe(0);
+
+      yield* TestClock.adjust("23 hours");
+      expect((yield* coordinator.getModelAccessDenials(kimi)).size).toBe(1);
+      yield* TestClock.adjust("1 hour");
+      expect((yield* coordinator.getModelAccessDenials(kimi)).size).toBe(0);
+
+      yield* coordinator.recordModelAccessDenied(kimi, "k2.7-code-highspeed");
+      yield* coordinator.clearModelAccessDenials(kimi);
+      expect((yield* coordinator.getModelAccessDenials(kimi)).size).toBe(0);
     }).pipe(Effect.provide(AcpRegistryRuntimeCoordinator.layer), Effect.scoped),
   );
 });

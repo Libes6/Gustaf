@@ -3,7 +3,7 @@ import * as NodeCrypto from "node:crypto";
 import { ConsoleLogger, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import { readConfig } from "./config.js";
+import type { AppConfig } from "./config.js";
 import { DatabaseService } from "./database/database.service.js";
 import { HealthController } from "./health.controller.js";
 
@@ -11,7 +11,15 @@ import { HealthController } from "./health.controller.js";
 // oxlint-disable-next-line typescript/no-extraneous-class -- Nest requires a decorated module class.
 class AppModule {}
 
-export async function createApp(config: ReturnType<typeof readConfig>) {
+const SAFE_REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+export function resolveRequestId(incoming: string | string[] | undefined) {
+  return typeof incoming === "string" && SAFE_REQUEST_ID.test(incoming)
+    ? incoming
+    : NodeCrypto.randomUUID();
+}
+
+export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustProxy">) {
   const logger = new ConsoleLogger("GustafCloud", { json: true });
   const app = await NestFactory.create<NestExpressApplication>(
     {
@@ -23,10 +31,16 @@ export async function createApp(config: ReturnType<typeof readConfig>) {
     },
     { logger, abortOnError: false },
   );
-  app.getHttpAdapter().getInstance().disable("x-powered-by");
+  app.disable("x-powered-by");
+  // Coolify's Traefik terminates TLS; this makes req.ip and req.secure reflect the client.
+  app.set("trust proxy", config.trustProxy);
   app.use(
     (
-      req: { method: string },
+      req: {
+        method: string;
+        secure: boolean;
+        headers: Record<string, string | string[] | undefined>;
+      },
       res: {
         setHeader: (key: string, value: string) => void;
         statusCode: number;
@@ -34,8 +48,13 @@ export async function createApp(config: ReturnType<typeof readConfig>) {
       },
       next: () => void,
     ) => {
-      const requestId = NodeCrypto.randomUUID();
+      const requestId = resolveRequestId(req.headers["x-request-id"]);
       res.setHeader("x-request-id", requestId);
+      res.setHeader("x-content-type-options", "nosniff");
+      res.setHeader("x-frame-options", "DENY");
+      res.setHeader("referrer-policy", "no-referrer");
+      res.setHeader("cross-origin-resource-policy", "same-origin");
+      if (req.secure) res.setHeader("strict-transport-security", "max-age=31536000");
       res.once("finish", () =>
         logger.log({ requestId, method: req.method, status: res.statusCode }),
       );

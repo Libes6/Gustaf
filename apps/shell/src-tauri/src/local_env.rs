@@ -198,7 +198,7 @@ fn urlencoding_encode(value: &str) -> String {
 
 fn exposure_state_value(settings: &ShellSettings, http_base_url: &str) -> Value {
     let advertised_host = if settings.exposure_mode == ExposureMode::NetworkAccessible {
-        network::lan_ipv4_addresses().into_iter().next()
+        network::network_snapshot().lan.into_iter().next()
     } else {
         None
     };
@@ -269,67 +269,86 @@ pub(crate) fn set_local_environment_enabled(_enabled: bool) -> Result<(), String
     Err("Disabling the local environment is not supported in this Gustaf build yet.".into())
 }
 
-#[tauri::command]
-pub(crate) fn server_exposure_state(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, LocalEnvironmentState>,
-) -> Result<Value, String> {
-    let settings = read_settings(&app);
-    let endpoint = state.http_base_url()?;
-    Ok(exposure_state_value(&settings, &endpoint))
+/// The network helpers shell out (`ifconfig`, `tailscale`); sync commands would
+/// run them on the main thread and freeze the window.
+async fn off_main_thread<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| format!("background task failed: {error}"))?
 }
 
 #[tauri::command]
-pub(crate) fn set_server_exposure_mode(
+pub(crate) async fn server_exposure_state(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, LocalEnvironmentState>,
+) -> Result<Value, String> {
+    let endpoint = state.http_base_url()?;
+    off_main_thread(move || Ok(exposure_state_value(&read_settings(&app), &endpoint))).await
+}
+
+#[tauri::command]
+pub(crate) async fn set_server_exposure_mode(
     mode: String,
     app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
     let parsed =
         ExposureMode::parse(&mode).ok_or_else(|| format!("unknown exposure mode: {mode}"))?;
-    let mut settings = read_settings(&app);
-    settings.exposure_mode = parsed;
-    write_settings(&app, &settings)?;
     let endpoint = state.http_base_url()?;
-    let value = exposure_state_value(&settings, &endpoint);
-    schedule_relaunch(app);
-    Ok(value)
+    off_main_thread(move || {
+        let mut settings = read_settings(&app);
+        settings.exposure_mode = parsed;
+        write_settings(&app, &settings)?;
+        let value = exposure_state_value(&settings, &endpoint);
+        schedule_relaunch(app);
+        Ok(value)
+    })
+    .await
 }
 
 #[tauri::command]
-pub(crate) fn set_tailscale_serve_enabled(
+pub(crate) async fn set_tailscale_serve_enabled(
     enabled: bool,
     port: Option<u16>,
     app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
-    let mut settings = read_settings(&app);
-    settings.tailscale_serve_enabled = enabled;
-    if let Some(port) = port {
-        settings.tailscale_serve_port = port;
-    } else if settings.tailscale_serve_port == 0 {
-        settings.tailscale_serve_port = DEFAULT_TAILSCALE_SERVE_PORT;
-    }
-    write_settings(&app, &settings)?;
     let endpoint = state.http_base_url()?;
-    let value = exposure_state_value(&settings, &endpoint);
-    schedule_relaunch(app);
-    Ok(value)
+    off_main_thread(move || {
+        let mut settings = read_settings(&app);
+        settings.tailscale_serve_enabled = enabled;
+        if let Some(port) = port {
+            settings.tailscale_serve_port = port;
+        } else if settings.tailscale_serve_port == 0 {
+            settings.tailscale_serve_port = DEFAULT_TAILSCALE_SERVE_PORT;
+        }
+        write_settings(&app, &settings)?;
+        let value = exposure_state_value(&settings, &endpoint);
+        schedule_relaunch(app);
+        Ok(value)
+    })
+    .await
 }
 
 #[tauri::command]
-pub(crate) fn advertised_endpoints(
+pub(crate) async fn advertised_endpoints(
     app: tauri::AppHandle,
     state: tauri::State<'_, LocalEnvironmentState>,
 ) -> Result<Value, String> {
-    let settings = read_settings(&app);
     let http_base = state.http_base_url()?;
-    Ok(network::advertised_endpoints_json(
-        &http_base,
-        settings.exposure_mode.as_bridge_str(),
-        settings.tailscale_serve_enabled,
-        settings.tailscale_serve_port,
-    ))
+    off_main_thread(move || {
+        let settings = read_settings(&app);
+        Ok(network::advertised_endpoints_json(
+            &http_base,
+            settings.exposure_mode.as_bridge_str(),
+            settings.tailscale_serve_enabled,
+            settings.tailscale_serve_port,
+            &network::network_snapshot(),
+        ))
+    })
+    .await
 }
 
 #[tauri::command]

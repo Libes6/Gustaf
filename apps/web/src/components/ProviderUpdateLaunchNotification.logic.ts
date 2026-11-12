@@ -201,7 +201,7 @@ export function getProviderUpdateRunOutcome(
   run: ProviderUpdateRun,
 ):
   | { readonly status: "interrupted" | "updated" }
-  | { readonly status: "failed"; readonly line: string } {
+  | { readonly status: "failed" | "unverified"; readonly line: string } {
   if (isAtomCommandInterrupted(run.result)) return { status: "interrupted" };
   const label = `${run.machineLabel} · ${PROVIDER_DISPLAY_NAMES[run.driver] ?? run.driver}`;
   if (run.result._tag === "Failure") {
@@ -214,16 +214,16 @@ export function getProviderUpdateRunOutcome(
   const updateState = run.result.value.providers.find(
     (provider) => provider.instanceId === run.instanceId,
   )?.updateState;
-  return updateState?.status === "succeeded"
-    ? { status: "updated" }
-    : {
-        status: "failed",
-        line: `${label}: ${updateState?.message ?? "Provider update did not finish."}`,
-      };
+  if (updateState?.status === "succeeded") return { status: "updated" };
+  return {
+    // The command ran; the provider just could not be shown to be current.
+    status: updateState?.status === "unchanged" ? "unverified" : "failed",
+    line: `${label}: ${updateState?.message ?? "Provider update did not finish."}`,
+  };
 }
 
 export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdateRun>): {
-  readonly type: "success" | "error";
+  readonly type: "success" | "warning" | "error";
   readonly title: string;
   readonly description: string;
 } | null {
@@ -236,11 +236,24 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
   const failureLines = settled.flatMap((outcome) =>
     outcome.status === "failed" ? [outcome.line] : [],
   );
-  if (failureLines.length === 0) {
+  const unverifiedLines = settled.flatMap((outcome) =>
+    outcome.status === "unverified" ? [outcome.line] : [],
+  );
+  if (failureLines.length === 0 && unverifiedLines.length === 0) {
     return {
       type: "success",
       title: settled.length === 1 ? "Provider updated" : `${settled.length} providers updated`,
       description: getProviderUpdatedDescription(settled.length),
+    };
+  }
+  if (failureLines.length === 0) {
+    return {
+      type: "warning",
+      title:
+        unverifiedLines.length === 1
+          ? "Provider update could not be verified"
+          : `${unverifiedLines.length} provider updates could not be verified`,
+      description: unverifiedLines.join("\n"),
     };
   }
   return {
@@ -251,7 +264,7 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
         : settled.length === 1
           ? "Provider update failed"
           : "Provider updates failed",
-    description: failureLines.join("\n"),
+    description: [...failureLines, ...unverifiedLines].join("\n"),
   };
 }
 
@@ -373,9 +386,10 @@ export function getProviderUpdateSidebarPillView(
         unchangedProviders.length === 1
           ? `${unchangedProviderName} still needs an update`
           : `${unchangedProviders.length} providers still need updates`,
-      description: `${formatProviderList(unchangedProviders)} ${
-        unchangedProviders.length === 1 ? "still appears" : "still appear"
-      } outdated. Review provider settings for details.`,
+      description:
+        unchangedProviders.length === 1 && unchangedProvider.updateState?.message
+          ? unchangedProvider.updateState.message
+          : `${formatProviderList(unchangedProviders)} still appear outdated. Review provider settings for details.`,
       dismissible: true,
     });
   }

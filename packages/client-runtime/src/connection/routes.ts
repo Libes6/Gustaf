@@ -191,6 +191,10 @@ export function connectionRouteAddress(route: ConnectionRoute): string | null {
   return routeHttpBaseUrl(route);
 }
 
+/** Private network addresses only work while this device shares the host's network. */
+export const hasOnlyLanRoutes = (entry: ConnectionCatalogEntry) =>
+  connectionRoutes(entry).every((route) => connectionRouteKind(route) === "lan");
+
 /** Learned routes alone must not make relay environments manually retryable. */
 export const hasSavedBearerRoute = (entry: ConnectionCatalogEntry) =>
   connectionRoutes(entry).some((r) => !isLearned(r) && r.target._tag === "BearerConnectionTarget");

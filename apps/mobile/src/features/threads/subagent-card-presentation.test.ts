@@ -22,7 +22,7 @@ describe("subagent card", () => {
     expect(subagentCardElapsed([unfinished], DateTime.toEpochMillis(later))).toBeNull();
     expect(
       subagentCardElapsed([{ ...unfinished, status: "running" }], DateTime.toEpochMillis(later)),
-    ).toBe("2m");
+    ).toBe("2m 00s");
     expect(
       subagentCardElapsed([{ ...unfinished, status: "idle" }], DateTime.toEpochMillis(later)),
     ).toBeNull();

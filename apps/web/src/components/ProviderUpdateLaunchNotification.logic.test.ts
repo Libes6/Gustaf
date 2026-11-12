@@ -297,7 +297,7 @@ it("does not offer incompatible latest versions and restores suggestions after p
 
 describe("getProviderUpdateRunToastView", () => {
   const updateState = (
-    status: "succeeded" | "failed",
+    status: "succeeded" | "failed" | "unchanged",
     message: string,
   ): ServerProvider["updateState"] => ({
     status,
@@ -352,6 +352,29 @@ describe("getProviderUpdateRunToastView", () => {
       type: "error",
       title: "2 of 3 provider updates failed",
       description: "Mac Studio · Claude: npm exited with code 1.\nLaptop · Codex: WebSocket closed",
+    });
+  });
+
+  it("warns instead of failing when the update ran but could not be verified", () => {
+    const view = getProviderUpdateRunToastView([
+      run(
+        "Mac Studio",
+        "codex",
+        AsyncResult.success({
+          providers: [
+            provider({
+              driver: driver("codex"),
+              updateState: updateState("unchanged", "found version 1.0.0, expected 2.0.0."),
+            }),
+          ],
+        }),
+      ),
+    ]);
+
+    expect(view).toEqual({
+      type: "warning",
+      title: "Provider update could not be verified",
+      description: "Mac Studio · Codex: found version 1.0.0, expected 2.0.0.",
     });
   });
 });

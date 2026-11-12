@@ -399,6 +399,7 @@ export const settingsCMessages = {
     "settingsC.providerInstanceCard.enableAria": "Enable {name}",
     "settingsC.providerInstanceCard.deleteInstanceAria": "Delete instance {id}",
     "settingsC.providerInstanceCard.continueAuth": "Continue authentication",
+    "settingsC.providerInstanceCard.ollamaChatOnly": "Chat only: no terminal, files or MCP tools",
     "settingsC.providerInstanceCard.driver": "Driver",
     "settingsC.providerInstanceCard.status": "Status",
     "settingsC.providerInstanceCard.displayName": "Display name",
@@ -1015,6 +1016,8 @@ export const settingsCMessages = {
     "settingsC.providerInstanceCard.enableAria": "Включить {name}",
     "settingsC.providerInstanceCard.deleteInstanceAria": "Удалить экземпляр {id}",
     "settingsC.providerInstanceCard.continueAuth": "Продолжить аутентификацию",
+    "settingsC.providerInstanceCard.ollamaChatOnly":
+      "Только чат: без терминала, файлов и MCP-инструментов",
     "settingsC.providerInstanceCard.driver": "Драйвер",
     "settingsC.providerInstanceCard.status": "Статус",
     "settingsC.providerInstanceCard.displayName": "Отображаемое имя",

@@ -1120,6 +1120,13 @@ export function ProviderInstanceCard({
     </Popover>
   ) : null;
 
+  const chatOnlyNote =
+    instance.driver === "ollama" ? (
+      <span className="mt-0.5 block text-xs leading-normal text-muted-foreground/80">
+        {t("settingsC.providerInstanceCard.ollamaChatOnly")}
+      </span>
+    ) : null;
+
   if (mode === "list") {
     return (
       <div
@@ -1180,6 +1187,7 @@ export function ProviderInstanceCard({
                 </span>
               </ProviderStatusDiagnostic>
             </span>
+            {chatOnlyNote}
           </span>
         </div>
         <span className="flex h-5 shrink-0 items-center gap-1">
@@ -1260,6 +1268,7 @@ export function ProviderInstanceCard({
           {editorStatusNode}
         </div>
       </ProviderStatusDiagnostic>
+      {chatOnlyNote}
       {urlAuthAction && onAcceptUrlAuth ? (
         <div className="grid max-w-xl gap-1.5 pt-1 text-xs">
           <p>{urlAuthAction.message}</p>

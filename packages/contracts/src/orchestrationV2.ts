@@ -679,6 +679,8 @@ export type OrchestrationV2ThreadLaunchWorkspaceStrategy =
   typeof OrchestrationV2ThreadLaunchWorkspaceStrategy.Type;
 
 export const ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE = "workspace_preparation_failed";
+/** The provider rejected the selected model because the account's plan does not include it. */
+export const PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE = "model_not_in_subscription";
 
 export const OrchestrationV2Run = Schema.Struct({
   id: RunId,

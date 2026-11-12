@@ -81,6 +81,7 @@ type ModelPickerItem = {
   continuationGroupKey?: string | undefined;
   isLegacy?: boolean | undefined;
   isUnavailable?: boolean | undefined;
+  notInSubscription?: boolean | undefined;
 };
 
 export function resolveModelPickerSelectedModel(input: {
@@ -379,12 +380,19 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     keybindings: providedKeybindings,
     modelOptionsByInstance,
     instanceEntries,
-    getModelDisabledReason,
+    getModelDisabledReason: getCallerDisabledReason,
     onInstanceModelChange,
     onToggleModel,
     onRequestClose,
     onOpenProviderSetup,
   } = props;
+  const getModelDisabledReason = (instanceId: ProviderInstanceId, slug: string) =>
+    getCallerDisabledReason?.(instanceId, slug) ??
+    (modelOptionsByInstance
+      .get(instanceId)
+      ?.some((option) => option.slug === slug && option.notInSubscription)
+      ? t("chatB.ModelListRow.notInSubscription")
+      : null);
   const [searchQuery, setSearchQuery] = useState("");
   const modelListRef = useRef<LegendListRef | null>(null);
   const pickerContentRef = useRef<HTMLDivElement>(null);
@@ -490,7 +498,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     instanceId: ProviderInstanceId,
     additive = false,
   ): string | null => {
-    if (getModelDisabledReason?.(instanceId, modelSlug)) {
+    if (getModelDisabledReason(instanceId, modelSlug)) {
       return null;
     }
     const options = modelOptionsByInstance.get(instanceId);
@@ -573,6 +581,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           ...(model.badge ? { badge: model.badge } : {}),
           ...(model.isLegacy ? { isLegacy: true } : {}),
           ...(model.isUnavailable ? { isUnavailable: true } : {}),
+          ...(model.notInSubscription ? { notInSubscription: true } : {}),
           instanceId,
           driverKind: entry.driverKind,
           instanceDisplayName: entry.displayName,
@@ -739,7 +748,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   });
 
   const modelJumpModelKeys = visibleModels
-    .filter((model) => !getModelDisabledReason?.(model.instanceId, model.slug))
+    .filter((model) => !getModelDisabledReason(model.instanceId, model.slug))
     .slice(0, MODEL_PICKER_JUMP_KEYBINDING_COMMANDS.length)
     .map((model) => modelPickerModelKey(model.instanceId, model.slug));
   const allItemKeys = ((): string[] => [
@@ -1044,8 +1053,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 if (!model) {
                   return null;
                 }
-                const disabledReason =
-                  getModelDisabledReason?.(model.instanceId, model.slug) ?? null;
+                const disabledReason = getModelDisabledReason(model.instanceId, model.slug);
                 return (
                   <ModelListRow
                     key={modelKey}
@@ -1068,7 +1076,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     favoriteStarOnHover={selectedInstanceId === "favorites" && !isSearching}
                     showInstanceBadge={badgedInstanceIds.has(model.instanceId)}
                     showNewBadge={model.badge === "new"}
-                    unavailable={model.isUnavailable === true}
+                    unavailable={model.isUnavailable === true || model.notInSubscription === true}
                     jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
                     disabledReason={disabledReason}
                     onToggleFavorite={toggleFavorite}
@@ -1076,6 +1084,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 );
               }}
             />
+            {!isSearching && selectedEntry?.driverKind === "ollama" ? (
+              <p className="shrink-0 border-t border-border/70 px-3 py-2 text-xs leading-snug text-muted-foreground">
+                {t("chatB.ModelPickerContent.ollamaChatOnly")}
+              </p>
+            ) : null}
             <ModelPickerProviderNotices
               setupEntries={providerSetupEntries}
               updateRequiredNotices={updateRequiredNotices}

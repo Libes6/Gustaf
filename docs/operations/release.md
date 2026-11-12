@@ -353,6 +353,33 @@ production, exclude devices, and use Play App Signing" permission, which downloa
 APKs requires. The job reads tracks without opening a Play edit, so it can share the service
 account EAS Submit uses.
 
+## Gustaf Android release APK
+
+Every `vX.Y.Z` release gets a signed production APK (`io.github.libes6.gustaf`, arm64-v8a and
+armeabi-v7a) from `.github/workflows/mobile-android-release.yml`. The `release` job in `ci.yml`
+dispatches it after publishing, because a release published with `GITHUB_TOKEN` fires no
+`release` event; a release published by hand triggers it directly. It builds the tag's source
+with `APP_VARIANT=production` and attaches three assets to the release:
+
+- `Gustaf-<version>-Android.apk` and its `.sha256`
+- `latest-android.json`: `version`, `versionCode`, `apkUrl`, `sha256`, `size` and `pubDate`. The
+  newest copy is always at
+  `https://github.com/Libes6/Gustaf/releases/latest/download/latest-android.json`.
+
+The tag sets the app version and `versionCode = X*10000 + Y*100 + Z`
+(`apps/mobile/androidVersion.ts`), so minor and patch must stay below 100. Android refuses an
+update with a lower or equal `versionCode`. Tags created before this workflow existed cannot be
+built by it.
+
+To rebuild, run **Gustaf Android release** from the Actions tab with the tag, or leave it empty
+for the latest release. The upload replaces the existing assets.
+
+Signing uses the `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS`
+secrets, and the job fails unless the APK's certificate SHA-256 equals `EXPECTED_CERT_SHA256` in
+the workflow. Never regenerate or replace this key: installed apps accept updates only from the
+same certificate, so a new key forces every user to uninstall and lose app data. Keep an offline
+backup of the keystore.
+
 ## Hosted web app release deployment
 
 The hosted app is intentionally not deployed by Vercel's Git integration. The

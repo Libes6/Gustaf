@@ -11,6 +11,8 @@ const TEST_EXCLUDE = [
   "**/dist/**",
   "**/dist-electron/**",
   "**/.{idea,git,cache,output,temp}/**",
+  // A node:test file; CI runs it with `node --test`.
+  "**/scripts/i18n-audit.test.mjs",
 ];
 
 // Directories whose tests belong to a package's own test config.

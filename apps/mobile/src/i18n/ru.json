@@ -170,6 +170,8 @@
   "No transcription model matches.": "Нет подходящих моделей транскрипции.",
   "Routes": "Маршруты",
   "Add route": "Добавить маршрут",
+  "Add this address as a route to {name}": "Добавить этот адрес как маршрут к «{name}»",
+  "{name} is already saved on this device. This address can be added to it as another route.": "«{name}» уже сохранено на этом устройстве. Этот адрес можно добавить к нему как ещё один маршрут.",
   "In use": "Используется",
   "Check for updates": "Проверить обновления",
   "Base branch": "Базовая ветка",
@@ -409,5 +411,13 @@
   "Keeps the computer awake while agents work and lets it sleep a minute after they finish. Closing a laptop lid still puts it to sleep.": "Компьютер не засыпает, пока работают агенты, и может уснуть через минуту после их завершения. Закрытая крышка ноутбука всё равно усыпляет его.",
   "Keeps the computer awake as long as Gustaf runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.": "Компьютер не засыпает, пока запущен Gustaf, например чтобы подключаться к нему с телефона. Закрытая крышка ноутбука всё равно усыпляет его.",
   "Update every selected server to change this setting.": "Чтобы изменить эту настройку, обновите все выбранные серверы.",
-  "Environment-wide setting. Select All projects to change it.": "Настройка всего окружения. Чтобы изменить её, выберите «Все проекты»."
+  "Environment-wide setting. Select All projects to change it.": "Настройка всего окружения. Чтобы изменить её, выберите «Все проекты».",
+  "Working for": "Работает уже",
+  "Thinking": "Думает",
+  "Thought": "Размышления",
+  "Worked for": "Работа заняла",
+  "Worked": "Работа завершена",
+  "You stopped after": "Остановлено через",
+  "You stopped this response": "Ответ остановлен",
+  "Running for": "Выполняется уже"
 }

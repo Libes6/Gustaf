@@ -71,6 +71,7 @@ export interface AppModelOption {
   isDefault?: boolean;
   isLegacy?: boolean;
   isUnavailable?: boolean;
+  notInSubscription?: boolean;
 }
 
 function appendUnavailableDynamicModelSelection(
@@ -108,6 +109,7 @@ function toAppModelOption(
   if (model.badge) option.badge = model.badge;
   if (model.isDefault) option.isDefault = true;
   if (model.isLegacy) option.isLegacy = true;
+  if (model.unavailableReason === "not_in_subscription") option.notInSubscription = true;
   return option;
 }
 

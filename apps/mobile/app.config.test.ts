@@ -2,7 +2,13 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
-  loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
+  loadRepoEnv: () => ({
+    APP_VARIANT: process.env.APP_VARIANT,
+    // app.config copies this back into process.env, where undefined would become "undefined".
+    ...(process.env.GUSTAF_VERSION_NAME
+      ? { GUSTAF_VERSION_NAME: process.env.GUSTAF_VERSION_NAME }
+      : {}),
+  }),
 }));
 
 afterEach(() => {
@@ -47,4 +53,11 @@ it("carries nothing that belongs to T3's services", async () => {
   expect(config.owner).toBeUndefined();
   expect(config.extra?.eas?.projectId).toBeUndefined();
   expect(JSON.stringify(config)).not.toMatch(/t3\.codes|pingdotgg|com\.t3tools/);
+});
+
+it("takes the app version and versionCode from the release tag", async () => {
+  vi.stubEnv("GUSTAF_VERSION_NAME", "v0.11.2");
+  const config = await loadConfig("production");
+  expect(config.version).toBe("0.11.2");
+  expect(config.android?.versionCode).toBe(1102);
 });

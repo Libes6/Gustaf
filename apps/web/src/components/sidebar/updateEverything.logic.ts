@@ -529,7 +529,7 @@ export function collectUpdateEverythingResult(input: {
   }>;
   readonly providers: ReadonlyArray<
     | { readonly status: "interrupted" | "updated" }
-    | { readonly status: "failed"; readonly line: string }
+    | { readonly status: "failed" | "unverified"; readonly line: string }
   >;
 }): UpdateEverythingResult {
   return {
