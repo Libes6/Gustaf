@@ -14,6 +14,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /runtime/ ./
 USER node
 EXPOSE 3100
-HEALTHCHECK --interval=10s --timeout=4s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "dist/main.js"]
+HEALTHCHECK --interval=10s --timeout=4s --start-period=60s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health/live',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# Runs pending migrations (unless RUN_MIGRATIONS=0) and exits non-zero on failure before listening.
+CMD ["node", "dist/start.js"]
