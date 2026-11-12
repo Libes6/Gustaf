@@ -22,11 +22,13 @@
     "drizzle-orm": "0.45.4",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "ws": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "^8.15.5",
+    "@types/ws": "catalog:",
     "drizzle-kit": "0.31.8",
     "typescript": "6.0.3"
   }

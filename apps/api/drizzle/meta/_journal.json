@@ -22,6 +22,13 @@
       "when": 1794503291433,
       "tag": "0002_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794506481603,
+      "tag": "0003_relay_usage",
+      "breakpoints": true
     }
   ]
 }

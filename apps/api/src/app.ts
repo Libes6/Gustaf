@@ -21,6 +21,8 @@ import { DeviceGuard, DevicesController } from "./devices/devices.controller.js"
 import { DevicesService } from "./devices/devices.service.js";
 import { HealthController } from "./health.controller.js";
 import { OwnershipService } from "./ownership.js";
+import { RelayController } from "./relay/relay.controller.js";
+import { RelayService } from "./relay/relay.service.js";
 
 @Module({})
 // oxlint-disable-next-line typescript/no-extraneous-class -- Nest requires a decorated module class.
@@ -44,7 +46,13 @@ export async function createApp(
   };
   const accounts = config.auth
     ? {
-        controllers: [AccountController, DevicesController, AppSignInController, AdminController],
+        controllers: [
+          AccountController,
+          DevicesController,
+          AppSignInController,
+          AdminController,
+          RelayController,
+        ],
         providers: [
           {
             provide: AUTH,
@@ -62,6 +70,12 @@ export async function createApp(
             provide: AdminService,
             useFactory: (db: DatabaseService) => new AdminService(db, config.build),
             inject: [DatabaseService],
+          },
+          {
+            provide: RelayService,
+            useFactory: (db: DatabaseService, devices: DevicesService) =>
+              new RelayService(db, devices, config.auth!.relayMonthlyBytes),
+            inject: [DatabaseService, DevicesService],
           },
         ],
       }
@@ -127,6 +141,10 @@ export async function createApp(
             ? next()
             : authHandler(req, res),
       );
+  }
+  if (config.auth) {
+    const relay = app.get(RelayService);
+    app.getHttpServer().on("upgrade", relay.upgrade);
   }
   app.enableShutdownHooks();
   return app;

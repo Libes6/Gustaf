@@ -54,6 +54,10 @@ function readAuthConfig(env: NodeJS.ProcessEnv) {
     }
   }
   const adminOrigins = readAdminOrigins(env);
+  const relayMonthlyGb = Number(env.RELAY_MONTHLY_GB?.trim() || 100);
+  if (!Number.isFinite(relayMonthlyGb) || relayMonthlyGb <= 0) {
+    throw new Error("RELAY_MONTHLY_GB must be a positive number");
+  }
   return {
     secret,
     publicBaseUrl,
@@ -63,6 +67,7 @@ function readAuthConfig(env: NodeJS.ProcessEnv) {
     trustedOrigins: [...new Set([...trustedOrigins, ...adminOrigins])],
     adminGithubLogins: parseGithubLogins(env.ADMIN_GITHUB_LOGINS),
     adminOrigins,
+    relayMonthlyBytes: Math.round(relayMonthlyGb * 1024 ** 3),
   };
 }
 

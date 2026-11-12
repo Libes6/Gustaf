@@ -5,6 +5,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -150,3 +151,16 @@ export const auditLog = pgTable("audit_log", {
   targetId: text("target_id").notNull(),
   meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
 });
+
+// Relay traffic per user and calendar month (UTC), counted in bytes; the relay never sees content.
+export const relayUsage = pgTable(
+  "relay_usage",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.month] })],
+);

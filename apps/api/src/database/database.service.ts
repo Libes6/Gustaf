@@ -1,9 +1,9 @@
-import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
+import { Injectable, Logger, type OnApplicationShutdown } from "@nestjs/common";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 
 @Injectable()
-export class DatabaseService implements OnModuleDestroy {
+export class DatabaseService implements OnApplicationShutdown {
   readonly pool: pg.Pool;
   readonly db;
   private readonly logger = new Logger(DatabaseService.name);
@@ -20,7 +20,8 @@ export class DatabaseService implements OnModuleDestroy {
     this.db = drizzle(this.pool);
   }
 
-  async onModuleDestroy() {
+  // The last shutdown phase, so other services can still write in beforeApplicationShutdown.
+  async onApplicationShutdown() {
     await this.pool.end();
   }
 }
