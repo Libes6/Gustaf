@@ -64,7 +64,6 @@ import {
   formatSearchToolLabel,
 } from "@t3tools/shared/toolActivity";
 import { claudeResumeCompactionAge } from "@t3tools/shared/claudeCompaction";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import { truncate } from "@t3tools/shared/String";
 import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import type { McpAppReference } from "@t3tools/shared/mcpApp";
@@ -74,6 +73,7 @@ import {
   mcpAppFromToolItem,
 } from "@t3tools/shared/toolOutput";
 import * as DateTime from "effect/DateTime";
+import { formatElapsed, t } from "../i18n";
 import {
   IDLE_COMPACTION_TITLES,
   IDLE_COMPACTING_LABELS,
@@ -258,7 +258,7 @@ function compactWorkEntryText(value: string): string {
 export function workEntryRowLabel(entry: WorkLogPresentationEntry, expanded = false): string {
   if (entry.itemType === "fork") return entry.label;
   if (expanded && entry.itemType === "reasoning")
-    return entry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought";
+    return entry.toolLifecycleStatus === "inProgress" ? t("Thinking") : t("Thought");
   const presentation = resolveWorkEntryToolPresentation(entry);
   if (presentation) return presentation.displayName;
   if (entry.command?.trim()) return compactWorkEntryText(commandDisplayText(entry.command));
@@ -592,7 +592,7 @@ function itemSummary(
   if (title) return toolPresentation?.displayName ?? capitalizePhrase(title);
   switch (item.type) {
     case "reasoning":
-      return "Thinking";
+      return t("Thinking");
     case "command_execution":
       return "Command";
     case "file_change":
@@ -857,8 +857,8 @@ function toFeedActivity(
 function singleToolCallLabel(activity: ThreadFeedActivity, expanded: boolean): string {
   if (activity.workEntry.itemType === "reasoning")
     return expanded
-      ? "Thought"
-      : compactWorkEntryText(activity.workEntry.detail ?? "") || "Thought";
+      ? t("Thought")
+      : compactWorkEntryText(activity.workEntry.detail ?? "") || t("Thought");
   const presentation = resolveWorkEntryToolPresentation(activity.workEntry, "completed");
   if (presentation) return presentation.displayName;
   const command = activity.workEntry.command?.trim();
@@ -1201,7 +1201,7 @@ function deriveThreadFeedRunFolds(
               lastEntryEnd,
             ) ?? lastEntryEnd,
           );
-    const duration = elapsedMs === null ? null : formatDuration(elapsedMs);
+    const duration = elapsedMs === null ? null : formatElapsed(elapsedMs);
     const interrupted =
       latestRunMatches && (latestRun.status === "interrupted" || latestRun.status === "cancelled");
     const deferredWorkItemIds = group.entries.flatMap((entry) =>
@@ -1220,11 +1220,11 @@ function deriveThreadFeedRunFolds(
       hiddenEntryIds,
       label: interrupted
         ? duration
-          ? `You stopped after ${duration}`
-          : "You stopped this response"
+          ? `${t("You stopped after")} ${duration}`
+          : t("You stopped this response")
         : duration
-          ? `Worked for ${duration}`
-          : "Worked",
+          ? `${t("Worked for")} ${duration}`
+          : t("Worked"),
     });
   }
   const covered = new Set(
@@ -1953,8 +1953,8 @@ function appendToolGroupRows(
   const summary = live
     ? (expanded || thought) && latestActivity.workEntry.itemType === "reasoning"
       ? latestActivity.lifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
+        ? t("Thinking")
+        : t("Thought")
       : liveToolActivitySummary(latestActivity, live)
     : singleActivity !== null &&
         singleActivity.toolLike &&
@@ -2048,7 +2048,7 @@ function liveToolActivitySummary(activity: ThreadFeedActivity, presentTense: boo
   const status = liveActivityToolStatus(activity.lifecycleStatus, presentTense);
   if (activity.workEntry.itemType === "reasoning") {
     return compactWorkEntryText(
-      activity.workEntry.detail?.trim() || (status === "inProgress" ? "Thinking" : "Thought"),
+      activity.workEntry.detail?.trim() || (status === "inProgress" ? t("Thinking") : t("Thought")),
     );
   }
   const presentation = resolveWorkEntryToolPresentation({

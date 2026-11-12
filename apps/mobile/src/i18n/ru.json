@@ -401,5 +401,13 @@
   "Keyboard": "Клавиатура",
   "T3 Account": "Аккаунт",
   "No environments": "Нет окружений",
-  "Pair environment": "Сопряжение с окружением"
+  "Pair environment": "Сопряжение с окружением",
+  "Working for": "Работает уже",
+  "Thinking": "Думает",
+  "Thought": "Размышления",
+  "Worked for": "Работа заняла",
+  "Worked": "Работа завершена",
+  "You stopped after": "Остановлено через",
+  "You stopped this response": "Ответ остановлен",
+  "Running for": "Выполняется уже"
 }

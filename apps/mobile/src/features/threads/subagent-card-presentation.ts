@@ -1,7 +1,7 @@
 import { isActiveSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
 import type { OrchestrationV2Subagent } from "@t3tools/contracts";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import * as DateTime from "effect/DateTime";
+import { formatElapsed } from "../../i18n";
 
 export function subagentCardDetail(detail: string | null): string | null {
   if (!detail || /^Child task ended with status\b/i.test(detail)) return null;
@@ -29,5 +29,5 @@ export function subagentCardElapsed(
     agent.completedAt ? [DateTime.toEpochMillis(agent.completedAt)] : [],
   );
   const duration = (live ? nowMs : Math.max(...ends)) - Math.min(...starts);
-  return duration > 0 ? formatDuration(duration) : null;
+  return duration > 0 ? formatElapsed(duration) : null;
 }
