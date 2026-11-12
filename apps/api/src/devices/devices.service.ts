@@ -1,13 +1,21 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
-import { device } from "../database/tables.schema.js";
+import { device, user } from "../database/tables.schema.js";
 import { OwnershipService } from "../ownership.js";
 import { createDeviceToken, hashDeviceToken } from "./device-token.js";
 
 type Device = typeof device.$inferSelect;
 const KINDS = new Set<string>(device.kind.enumValues);
 const LAST_SEEN_RESOLUTION = sql`interval '1 minute'`;
+
+// Credentials of devices revoked by an admin or owned by a banned user do not authenticate.
+const usable = (tokenHash: string) =>
+  and(
+    eq(device.tokenHash, tokenHash),
+    isNull(device.revokedAt),
+    notExists(sql`(select 1 from ${user} where ${user.id} = ${device.userId} and ${user.banned})`),
+  );
 
 export function presentDevice(row: Device) {
   return {
@@ -43,7 +51,7 @@ export class DevicesService {
     const rows = await this.database.db
       .select()
       .from(device)
-      .where(eq(device.userId, userId))
+      .where(and(eq(device.userId, userId), isNull(device.revokedAt)))
       .orderBy(asc(device.createdAt));
     return rows.map(presentDevice);
   }
@@ -83,7 +91,7 @@ export class DevicesService {
       .set({ lastSeenAt: sql`now()` })
       .where(
         and(
-          eq(device.tokenHash, tokenHash),
+          usable(tokenHash),
           or(
             isNull(device.lastSeenAt),
             lt(device.lastSeenAt, sql`now() - ${LAST_SEEN_RESOLUTION}`),
@@ -92,10 +100,7 @@ export class DevicesService {
       )
       .returning();
     if (touched) return touched;
-    const [row] = await this.database.db
-      .select()
-      .from(device)
-      .where(eq(device.tokenHash, tokenHash));
+    const [row] = await this.database.db.select().from(device).where(usable(tokenHash));
     return row;
   }
 }

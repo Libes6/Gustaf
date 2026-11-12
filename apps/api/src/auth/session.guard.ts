@@ -27,7 +27,8 @@ export class SessionGuard implements CanActivate {
     const userSession = await this.auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
-    if (!userSession) throw new UnauthorizedException();
+    // Banning deletes the sessions; this covers a ban written while a request was in flight.
+    if (!userSession || userSession.user.banned) throw new UnauthorizedException();
     request.userSession = userSession;
     return true;
   }

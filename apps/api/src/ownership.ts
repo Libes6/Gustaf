@@ -19,7 +19,8 @@ export class OwnershipService {
   async device(userId: string, deviceId: string) {
     if (!UUID.test(deviceId)) throw new NotFoundException();
     const [row] = await this.database.db.select().from(device).where(eq(device.id, deviceId));
-    return ownedOrNotFound(userId, row);
+    // A device revoked by an admin is gone for its owner.
+    return ownedOrNotFound(userId, row?.revokedAt ? undefined : row);
   }
 
   async session(userId: string, sessionId: string) {
