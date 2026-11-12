@@ -1,10 +1,14 @@
 import "reflect-metadata";
 import * as NodeCrypto from "node:crypto";
+import type * as NodeHttp from "node:http";
 import { ConsoleLogger, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { toNodeHandler } from "better-auth/node";
 import { AccountController } from "./account.controller.js";
+import { APP_SIGN_IN_PATH } from "./auth/app-sign-in.js";
+import { AppSignInController } from "./auth/app-sign-in.controller.js";
+import { AppSignInService } from "./auth/app-sign-in.service.js";
 import { AUTH, AUTH_BASE_PATH, type Auth, createAuth } from "./auth/auth.js";
 import { SessionGuard } from "./auth/session.guard.js";
 import type { AppConfig } from "./config.js";
@@ -34,7 +38,7 @@ export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustPr
   };
   const accounts = config.auth
     ? {
-        controllers: [AccountController, DevicesController],
+        controllers: [AccountController, DevicesController, AppSignInController],
         providers: [
           {
             provide: AUTH,
@@ -42,6 +46,7 @@ export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustPr
             inject: [DatabaseService],
           },
           SessionGuard,
+          AppSignInService,
           DeviceGuard,
           DevicesService,
           OwnershipService,
@@ -88,10 +93,19 @@ export async function createApp(config: Pick<AppConfig, "databaseUrl" | "trustPr
   );
   if (config.auth) {
     // Better Auth reads the raw body itself, so it is mounted before Nest's JSON parser.
+    // The app sign-in handoff is ours and falls through to Nest.
+    const authHandler = toNodeHandler(app.get<Auth>(AUTH));
     app
       .getHttpAdapter()
       .getInstance()
-      .all(`${AUTH_BASE_PATH}/*splat`, toNodeHandler(app.get<Auth>(AUTH)));
+      .all(
+        `${AUTH_BASE_PATH}/*splat`,
+        (
+          req: NodeHttp.IncomingMessage & { path: string },
+          res: NodeHttp.ServerResponse,
+          next: () => void,
+        ) => (req.path.startsWith(`${APP_SIGN_IN_PATH}/`) ? next() : authHandler(req, res)),
+      );
   }
   app.enableShutdownHooks();
   return app;

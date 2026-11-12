@@ -84,3 +84,37 @@ export const device = pgTable(
   },
   (table) => [index("device_user_id_idx").on(table.userId)],
 );
+
+// App sign-in handoff (docs/internals/app-sign-in.md). The request id and the code are stored
+// only as SHA-256 hashes; expired rows are deleted by the next write.
+export const appSignInRequest = pgTable(
+  "app_sign_in_request",
+  {
+    id: text("id").primaryKey(),
+    redirectUri: text("redirect_uri").notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    state: text("state").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("app_sign_in_request_expires_at_idx").on(table.expiresAt)],
+);
+
+export const appAuthCode = pgTable(
+  "app_auth_code",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => session.id, { onDelete: "cascade" }),
+    codeChallenge: text("code_challenge").notNull(),
+    redirectUri: text("redirect_uri").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (table) => [index("app_auth_code_expires_at_idx").on(table.expiresAt)],
+);
