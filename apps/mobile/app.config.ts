@@ -1,6 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
+import { androidReleaseVersion } from "./androidVersion.ts";
 
 type AppVariant = "development" | "preview" | "production";
 
@@ -113,6 +114,10 @@ function resolveAppVariant(value: string | undefined): AppVariant {
 }
 
 const variant = VARIANT_CONFIG[APP_VARIANT];
+// Set by the release workflow from the tag; local builds keep the defaults.
+const releaseVersion = repoEnv.GUSTAF_VERSION_NAME
+  ? androidReleaseVersion(repoEnv.GUSTAF_VERSION_NAME)
+  : undefined;
 const iosBundleIdentifier = isIosPersonalTeamBuild
   ? personalTeamBundleIdentifier!
   : variant.iosBundleIdentifier;
@@ -230,7 +235,7 @@ const config: ExpoConfig = {
   slug: "gustaf",
   platforms: ["ios", "android"],
   scheme: variant.scheme,
-  version: repoEnv.T3CODE_MOBILE_VERSION ?? "0.1.0",
+  version: releaseVersion?.versionName ?? repoEnv.T3CODE_MOBILE_VERSION ?? "0.1.0",
   runtimeVersion: {
     // Skip costly fingerprinting on dev launches; preview and production OTAs require matching native projects.
     policy: runtimeVersionPolicy,
@@ -283,6 +288,7 @@ const config: ExpoConfig = {
   android: {
     icon: variant.assets.appIcon,
     package: variant.androidPackage,
+    ...(releaseVersion ? { versionCode: releaseVersion.versionCode } : {}),
     ...(repoEnv.T3CODE_ANDROID_GOOGLE_SERVICES_FILE
       ? { googleServicesFile: repoEnv.T3CODE_ANDROID_GOOGLE_SERVICES_FILE }
       : {}),
