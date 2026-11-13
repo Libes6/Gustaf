@@ -33,7 +33,11 @@ import {
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
-import { autoConnectReport, devAutoConnectAttemptAtom } from "./devAutoConnect";
+import {
+  autoConnectReport,
+  devAutoConnectAttemptAtom,
+  relayLinkAttemptAtom,
+} from "./devAutoConnect";
 import { splitEnvironmentSections } from "./environmentSections";
 import { leaveSettingsPage } from "../settings/settings-navigation";
 import { workspaceHasColumns } from "../layout/workspace/workspace-selection-store";
@@ -43,20 +47,24 @@ type ConnectionsNewRouteParams = {
   readonly mode?: string;
   readonly pairingUrl?: string;
   readonly autoConnect?: string;
+  readonly relayLink?: string;
   readonly routeFor?: EnvironmentId;
 };
 
+// Module scope outlives remounts, so an opened link starts one pairing at a time.
 export function ConnectionsNewRouteScreen({
   route,
 }: StaticScreenProps<ConnectionsNewRouteParams | undefined>) {
   const params = route.params ?? {};
   // Dev-only prefill prevents production links from supplying an attacker-chosen host and token.
   const routePairingUrl = __DEV__ ? (params.pairingUrl?.trim() ?? "") : "";
+  const relayLink = params.relayLink?.trim() ?? "";
   // A new prefill link replaces whatever the form held.
   return (
     <PairingForm
-      key={routePairingUrl}
+      key={relayLink || routePairingUrl}
       routePairingUrl={routePairingUrl}
+      relayLink={relayLink}
       routeFor={params.routeFor}
     />
   );
@@ -64,9 +72,11 @@ export function ConnectionsNewRouteScreen({
 
 function PairingForm({
   routePairingUrl,
+  relayLink,
   routeFor,
 }: {
   readonly routePairingUrl: string;
+  readonly relayLink: string;
   readonly routeFor: EnvironmentId | undefined;
 }) {
   const {
@@ -96,13 +106,19 @@ function PairingForm({
     routePairingUrl,
     ownAttempt,
   );
-  const connecting = isSubmitting || autoConnect.connecting;
+  const relayAttempt = useAtomValue(relayLinkAttemptAtom);
+  const relayFromLink =
+    relayAttempt !== null && relayAttempt.relayLink === relayLink ? relayAttempt : null;
+  const connecting =
+    isSubmitting || autoConnect.connecting || relayFromLink?.status === "connecting";
   const pairingConnectionError =
     alreadySavedLabel !== undefined
       ? t(
           "{name} is already saved on this device. This address can be added to it as another route.",
         ).replace("{name}", alreadySavedLabel)
-      : (submitError ?? autoConnect.error);
+      : (submitError ??
+        autoConnect.error ??
+        (relayFromLink?.status === "failed" ? relayFromLink.error : null));
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const screenFocused = useIsFocused();
   const [scannerLocked, setScannerLocked] = useState(false);
@@ -321,6 +337,7 @@ function PairingForm({
               )}
             >
               {relayStatus ??
+                (relayFromLink?.status === "connecting" ? relayFromLink.message : null) ??
                 pairingConnectionError ??
                 "For machines on your local network or tailnet. The machine keeps its own provider credentials."}
             </Text>

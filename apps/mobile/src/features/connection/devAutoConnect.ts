@@ -1,7 +1,9 @@
 import type { NavigationState, PartialState } from "@react-navigation/native";
 import { CommonActions, StackActions } from "@react-navigation/native";
 import { Atom } from "effect/reactivity";
+import { parseRelayPairingLink } from "@t3tools/shared/relayTunnel";
 
+import { t } from "../../i18n";
 import { findLinkedRoute, updateLinkedRoute } from "../../lib/appLinking";
 import { rootNavigationRef, whenRootNavigationReady } from "../../lib/rootNavigation";
 import { appAtomRegistry } from "../../state/atom-registry";
@@ -107,6 +109,112 @@ export function startDevAutoConnect(
     // clean instead of showing an earlier auto-connect's failure for the same URL.
     appAtomRegistry.set(devAutoConnectAttemptAtom, null);
   }
+  return state;
+}
+
+// Registered schemes (`gustaf-dev`, `gustaf-preview`) are rewritten; the parser accepts only `gustaf:`.
+const RELAY_PAIR_PATH = /^(?:[a-z][\w+.-]*:\/\/)?\/?(?:[^/?#]+\/--\/)?relay-pair(?=[?#]|$)/i;
+
+export function relayPairingLinkFromPath(path: string): string | null {
+  const trimmed = path.trim();
+  const match = RELAY_PAIR_PATH.exec(trimmed);
+  if (!match) return null;
+  const link = `gustaf://relay-pair${trimmed.slice(match[0].length)}`;
+  return parseRelayPairingLink(link) === null ? null : link;
+}
+
+export function takeRelayPairingLink(
+  state: PartialState<NavigationState> | undefined,
+  path: string,
+): PartialState<NavigationState> | undefined {
+  const relayLink = relayPairingLinkFromPath(path);
+  if (relayLink === null) return state;
+  // The link's query fields become one opaque param that the form hands to `pairOverRelay`.
+  const updated = updateLinkedRoute(state, PAIRING_FORM_ROUTES, (route) => ({
+    ...route,
+    params: { relayLink },
+  }));
+  if (findLinkedRoute(updated, PAIRING_FORM_ROUTES)) return updated;
+  const routes = (state?.routes ?? []).filter((route) => route.name !== "NotFound");
+  if (routes[0]?.name !== "Home") routes.unshift({ name: "Home" });
+  routes.push({ name: "ConnectionsNew", params: { relayLink } });
+  return { index: routes.length - 1, routes };
+}
+
+export type RelayLinkAttempt =
+  | { readonly relayLink: string; readonly status: "connecting"; readonly message: string }
+  | { readonly relayLink: string; readonly status: "failed"; readonly error: string };
+
+export const relayLinkAttemptAtom = Atom.make<RelayLinkAttempt | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("mobile:relay-link-attempt"),
+);
+
+const relayLinksStarted = new Set<string>();
+
+async function pairRelayLink(relayLink: string) {
+  const stillThisLink = () => appAtomRegistry.get(relayLinkAttemptAtom)?.relayLink === relayLink;
+  appAtomRegistry.set(relayLinkAttemptAtom, {
+    relayLink,
+    status: "connecting",
+    message: t("Connecting to the computer through the Gustaf relay…"),
+  });
+  try {
+    const [{ pairOverRelay }, { connectRelayPairing }] = await Promise.all([
+      import("../relay/relayTunnels"),
+      import("./relayRoute"),
+    ]);
+    const pairingUrl = await pairOverRelay(relayLink, (safetyCode) => {
+      if (!stillThisLink()) return;
+      appAtomRegistry.set(relayLinkAttemptAtom, {
+        relayLink,
+        status: "connecting",
+        message: t(
+          "Allow this phone on the computer to finish pairing. The computer shows the same safety code: {code}",
+        ).replace("{code}", safetyCode),
+      });
+    });
+    if (!stillThisLink()) return;
+    const outcome = await connectRelayPairing(pairingUrl, undefined, pairEnvironment);
+    if (!stillThisLink()) return;
+    if (!outcome.ok) {
+      relayLinksStarted.delete(relayLink);
+      appAtomRegistry.set(relayLinkAttemptAtom, {
+        relayLink,
+        status: "failed",
+        error: outcome.error ?? t("Pairing over the relay failed."),
+      });
+      return;
+    }
+    whenRootNavigationReady(() => {
+      if (!stillThisLink()) return;
+      appAtomRegistry.set(relayLinkAttemptAtom, null);
+      const current = rootNavigationRef.getCurrentRoute()?.name;
+      if (current === undefined || !PAIRING_FORM_ROUTES.includes(current)) return;
+      if (!rootNavigationRef.canGoBack()) rootNavigationRef.dispatch(StackActions.replace("Home"));
+      else leaveSettingsPage(rootNavigationRef, workspaceHasColumns(), "SettingsEnvironments");
+    });
+  } catch (error) {
+    if (!stillThisLink()) return;
+    relayLinksStarted.delete(relayLink);
+    appAtomRegistry.set(relayLinkAttemptAtom, {
+      relayLink,
+      status: "failed",
+      error: error instanceof Error ? error.message : t("Pairing over the relay failed."),
+    });
+  }
+}
+
+/** A camera QR starts the same relay pairing an in-app scan starts, once per link. */
+export function startRelayPairingLink(
+  state: PartialState<NavigationState> | undefined,
+): PartialState<NavigationState> | undefined {
+  const route = findLinkedRoute(state, PAIRING_FORM_ROUTES);
+  const relayLink = (route?.params as { readonly relayLink?: unknown } | undefined)?.relayLink;
+  if (typeof relayLink !== "string" || parseRelayPairingLink(relayLink) === null) return state;
+  if (relayLinksStarted.has(relayLink)) return state;
+  relayLinksStarted.add(relayLink);
+  void pairRelayLink(relayLink);
   return state;
 }
 

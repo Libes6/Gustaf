@@ -58,6 +58,8 @@ import { takeScheduledTaskNewLink } from "./features/settings/scheduled-task-edi
 import {
   pairingFormLinkAction,
   startDevAutoConnect,
+  startRelayPairingLink,
+  takeRelayPairingLink,
   withoutPairingTarget,
 } from "./features/connection/devAutoConnect";
 import {
@@ -126,7 +128,9 @@ function getAppStateFromPath(path: string, options: Parameters<typeof getStateFr
     (state) => restoreSettingsLinkState(state, settingsLinkPage()),
     takeThreadPromptLink,
     takeNewTaskPromptLink,
+    (state) => takeRelayPairingLink(state, path),
     withoutPairingTarget,
+    startRelayPairingLink,
     startDevAutoConnect,
     takeScheduledTaskNewLink,
   );

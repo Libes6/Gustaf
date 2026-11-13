@@ -115,7 +115,7 @@ describe("resolveBoundEndpoints", () => {
     ]);
   });
 
-  it("skips container and VM networks, which only this machine reaches", () => {
+  it("skips container, VM, and VPN fake-IP networks, which only this machine reaches", () => {
     const interfaces = {
       ...INTERFACES,
       docker0: virtualInterface("172.17.0.1"),
@@ -124,6 +124,8 @@ describe("resolveBoundEndpoints", () => {
       "vEthernet (WSL)": virtualInterface("172.24.0.1"),
       bridge100: virtualInterface("192.168.64.1"),
       vmbr0: virtualInterface("192.168.1.20"),
+      utun5: vpnInterface("198.18.0.1"),
+      Meta: vpnInterface("198.19.255.254"),
     };
     expect(
       resolveBoundEndpoints({ platform: "linux", host: "0.0.0.0", port: 3773, interfaces }),

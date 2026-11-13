@@ -1,5 +1,6 @@
 import * as NodeModule from "node:module";
 import type { NavigationState, PartialState } from "@react-navigation/native";
+import { formatRelayPairingLink } from "@t3tools/shared/relayTunnel";
 import { expect, it, vi } from "vite-plus/test";
 
 const requireFromNative = NodeModule.createRequire(
@@ -68,7 +69,9 @@ import {
   autoConnectReport,
   devAutoConnectAttemptAtom,
   pairingFormLinkAction,
+  relayPairingLinkFromPath,
   startDevAutoConnect,
+  takeRelayPairingLink,
 } from "./devAutoConnect";
 
 const PAIRING_URL = "http://192.168.1.10:3773/pair#token=abc";
@@ -253,4 +256,35 @@ it("a pairing link fills the pairing form already on screen instead of stacking 
     key: open.routes[2]!.key,
     params: { pairingUrl: PAIRING_URL },
   });
+});
+
+const RELAY_LINK = formatRelayPairingLink({
+  relayUrl: "https://api.libes6.ru",
+  hostDeviceId: "host1",
+  hostKey: "A".repeat(43),
+  secret: "b".repeat(43),
+  hostName: "Desk",
+});
+const RELAY_QUERY = RELAY_LINK.slice("gustaf://relay-pair".length);
+
+it("a relay QR opened from the camera lands on the add-route form with the link", () => {
+  const linking = {
+    initialRouteName: "Home",
+    screens: {
+      Home: "",
+      ConnectionsNew: { path: "connections/new", alias: ["relay-pair"] },
+      NotFound: "*",
+    },
+  };
+  for (const scheme of ["", "gustaf://", "gustaf-dev://", "gustaf-preview://"]) {
+    expect(relayPairingLinkFromPath(`${scheme}relay-pair${RELAY_QUERY}`)).toBe(RELAY_LINK);
+  }
+  expect(relayPairingLinkFromPath("relay-pair?v=0")).toBeNull();
+
+  const path = `relay-pair${RELAY_QUERY}`;
+  const state = takeRelayPairingLink(getStateFromPath(path, linking), path);
+  expect(state?.routes).toMatchObject([
+    { name: "Home" },
+    { name: "ConnectionsNew", params: { relayLink: RELAY_LINK } },
+  ]);
 });
