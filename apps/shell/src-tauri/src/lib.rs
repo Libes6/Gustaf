@@ -2,6 +2,7 @@ mod account;
 mod bridge;
 mod cloud_api;
 mod connection_storage;
+mod diagnostics;
 mod ipc_scope;
 mod local_env;
 mod network;
@@ -162,6 +163,7 @@ fn start_server(
                 }
             } else {
                 eprintln!("{line}");
+                diagnostics::record(&line);
                 if let Ok(mut tail) = reader_tail.lock() {
                     if tail.len() == LOG_TAIL_LINES {
                         tail.pop_front();
@@ -213,15 +215,53 @@ fn start_server(
 }
 
 /// Without a window there is nothing else to show the reason in; leaving silently looked like a crash.
+/// Signed in, the user can send exactly the text shown here as a problem report.
 fn report_start_failure(app: &tauri::AppHandle, reason: &str) {
     eprintln!("Gustaf could not start: {reason}");
     let handle = app.clone();
-    app.dialog()
-        .message(format!("Gustaf could not start.\n\n{reason}"))
-        .title("Gustaf")
-        .kind(MessageDialogKind::Error)
-        .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
-        .show(move |_| handle.exit(1));
+    let text = format!("Gustaf could not start.\n\n{reason}");
+    // The account check reads the keyring, which can block; the dialog shows from any thread.
+    thread::spawn(move || {
+        if !account::has_session(&handle) {
+            let exit = handle.clone();
+            handle
+                .dialog()
+                .message(text)
+                .title("Gustaf")
+                .kind(MessageDialogKind::Error)
+                .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
+                .show(move |_| exit.exit(1));
+            return;
+        }
+        let exit = handle.clone();
+        handle
+            .dialog()
+            .message(format!(
+                "{text}\n\nYou can send this message to the Gustaf team as a problem report."
+            ))
+            .title("Gustaf")
+            .kind(MessageDialogKind::Error)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Send report and quit".to_owned(),
+                "Quit".to_owned(),
+            ))
+            .show(move |send| {
+                if !send {
+                    exit.exit(1);
+                    return;
+                }
+                let outcome = match account::send_problem_report(&exit, &text, None) {
+                    Ok(()) => "The report was sent. Thank you.".to_owned(),
+                    Err(error) => format!("The report could not be sent: {error}"),
+                };
+                let quit = exit.clone();
+                exit.dialog()
+                    .message(outcome)
+                    .title("Gustaf")
+                    .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
+                    .show(move |_| quit.exit(1));
+            });
+    });
 }
 
 fn is_external_browser_url(url: &tauri::Url) -> bool {
@@ -425,6 +465,8 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            account::client_config,
+            account::account_report_problem,
         ])
         .setup(|app| {
             updater::initialize(app)?;
@@ -477,6 +519,7 @@ pub fn run() {
             app.manage(LocalEnvironmentState::new(local));
             let relay_app = app.handle().clone();
             std::thread::spawn(move || account::sync_relay_credential(&relay_app));
+            account::run_heartbeat(app.handle().clone());
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
             #[cfg(target_os = "macos")]
             let window = window

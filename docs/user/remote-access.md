@@ -1,56 +1,43 @@
 # Remote access
 
-Connect a phone, browser, or another desktop app to T3 Code running on a different
+Connect a phone, browser, or another desktop app to Gustaf running on a different
 machine. That machine must stay running and reachable while you work.
 
-## T3 Connect
-
-T3 Connect makes an environment available to your other devices without setting
-up router forwarding. In the desktop app on the host, open **Settings →
-Sharing & access**, sign in, and enable **T3 Connect** for that environment.
-The `t3` command does not set up T3 Connect in Gustaf; a command-line host uses
-the [local network](#pair-over-a-lan-or-private-network) instead.
-
-Keep the desktop app running with its local environment enabled. Closing the
-desktop app's last window stops its local server. Saving your sign-in alone does
-not start a server or make the machine reachable.
-
-On your other device, sign in to the same T3 Connect account and choose the
-environment. On the app.t3.codes home page with no computer added yet, signing
-in adds compatible computers linked to your account.
-
-T3 Connect renews access credentials when needed without disconnecting a healthy
-connection. Pull request diffs and provider settings keep working after the
-previous credential expires. A failed renewal affects that request; it does not
-disconnect an otherwise healthy conversation.
-
-### More machines with T3 Chat
-
-Each T3 Connect account can link up to 3 machines. Phones and browsers do not
-count. A paid T3 Chat plan raises the limit to 10 machines with Pro, or 100 with
-Premier.
-
-To link T3 Chat, open your account menu on the web or desktop app, go to
-**T3 Chat**, and select **Link T3 Chat**. Sign in to T3 Chat in the window that
-opens and approve. The new limit applies the next time you add a machine. If you
-cancel or downgrade T3 Chat, machines you already linked stay linked, but you
-cannot add more until you are under the limit again.
+Keep the desktop app running, with its local environment on, while you work from another device.
+Closing the desktop app's last window stops its local server.
 
 ## Gustaf relay
 
-Reach your computer from a phone on any network, also while either device is on a VPN. Traffic goes
-through the Gustaf cloud end-to-end encrypted: the relay sees which of your devices talk and how
-much, not what they say.
+Reach the computer from the Android app on any network, including while either device is on a VPN.
+Sign in with GitHub. Traffic is end-to-end encrypted: the relay sees which of your devices are
+connected and how much they send, not prompts, files, or tool output.
 
-1. In the desktop app, sign in under **Settings → Account** and register this computer.
+1. On the computer, open **Settings → Account**, choose **Sign in with GitHub**, and register this
+   computer.
 2. On the phone, sign in under **Settings → Account** and register the phone.
 3. On the computer, open **Settings → Remote access** and choose **Connect a phone**.
-4. On the phone, add an environment and scan the code, then choose **Allow device** on the computer.
+4. On the phone, open **Add route** and scan the code.
+5. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
 
-The code works once, for five minutes. Later connections need nothing. To check that nobody sits
-between the devices, compare the safety code on both screens (**Details** on the computer). Revoke a
-phone in the same section. If the phone also reaches the computer directly, add that address as
-another route to the same environment.
+The code works once, for five minutes. Later connections use the phone's saved key. If the codes
+differ, choose **Reject**. Revoke a phone under **Details** in the same section. If the phone can
+also reach the computer on the local network or Tailscale, add that address as another route. The
+app uses a direct route when one answers.
+
+## Relay troubleshooting
+
+Remote access stays off until this computer is registered to your account.
+
+The scan code expires after five minutes and after one use. Choose **Connect a phone** again for a
+new one.
+
+Compare the safety code on the phone with **Details** on the computer. Matching codes mean the
+relay is not sitting between the two devices.
+
+A phone you revoked cannot open the tunnel until you pair it again from this computer.
+
+When this account has used its monthly relay allowance, new relay connections are refused until
+the next month. Use a direct route instead. Open connections are left to finish.
 
 ## Pair over a LAN or private network
 
@@ -60,30 +47,30 @@ On a desktop host, open **Settings → Sharing & access**, enable **Network acce
 then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
-For a command-line host, run `t3 up`. It asks whether to allow the local
-network and, on Linux and macOS, runs T3 Code as a
+For a command-line host, run `gustaf up`. It asks whether to allow the local
+network and, on Linux and macOS, runs Gustaf as a
 [background service](./background-service.md). Run it again to change your
-choice, and `t3 status` to see it. To skip the question, run:
+choice, and `gustaf status` to see it. To skip the question, run:
 
 ```bash
-t3 up --lan
+gustaf up --lan
 ```
 
 `--no-lan` turns it off, and `--yes` keeps the current setting. Without a
 terminal, a needed restart runs without asking and stops running agent turns,
 and a machine with nothing set up needs `--lan`, `--no-lan`, or `--yes`.
-`t3 status --json` prints the settings for scripts. The background service is
-not available on Windows, so there `t3 up` prints the `t3 serve` command to keep
+`gustaf status --json` prints the settings for scripts. The background service is
+not available on Windows, so there `gustaf up` prints the `gustaf serve` command to keep
 running in a terminal.
 
-For a server in a terminal, run `t3 serve --lan`. Either way, T3 Code then
+For a server in a terminal, run `gustaf serve --lan`. Either way, Gustaf then
 accepts connections from your local network and tailnet, so a pairing code is
 all that keeps other devices on them out.
 
 If a server is already running, generate a fresh link without restarting it:
 
 ```bash
-t3 pair
+gustaf pair
 ```
 
 Scan the QR code on your phone or paste the pairing URL into **Add environment**
@@ -91,9 +78,8 @@ in the receiving app. Connection settings are under **Settings → Environments*
 on web and desktop and **Settings → Environments** on mobile. A loopback address
 such as `127.0.0.1` reaches only the device opening the link.
 
-On a computer with the desktop app, you can open the printed `t3code://pair`
-app link instead. The desktop app asks you to confirm the server address, then
-adds it.
+Paste that URL into the other Gustaf app. It asks you to confirm the server
+address, then adds it.
 
 If your HTTPS endpoint uses a certificate from your own certificate authority,
 install that CA on Android as a **CA certificate** in its security settings; the
@@ -108,43 +94,43 @@ another link to share.
 ### Reach one machine several ways
 
 A machine can have more than one route: LAN, Tailscale, another VPN, a public
-URL, SSH, or T3 Connect. Tailscale shares its `100.64.0.0/10` address range with
+URL, SSH, or the Gustaf relay. Tailscale shares its `100.64.0.0/10` address range with
 other VPNs such as Cloudflare WARP, so an address in that range shows as VPN
 unless the machine confirms it is on Tailscale. To add a route, choose **Add
-route** in the machine's route list, or next to it in the T3 Connect list.
+route** in the machine's route list.
 A pairing link for a saved machine is refused when it comes from an address
 that machine does not have yet; add that address with **Add route** instead.
 Pairing again over an address the machine already has still works. A new route
 is placed by speed, in that order, and you can reorder routes at any time.
 
-While connected through T3 Connect or a paired address, T3 Code also learns the
+While connected over a paired address, Gustaf also learns the
 machine's current LAN and Tailscale addresses and adds them as routes, so
-pairing once through T3 Connect is enough to use the LAN at home. When the
+pairing once is enough to use the LAN at home. When the
 machine's LAN address changes, for example after it joins another Wi-Fi network,
 the learned route follows it. The machine must allow network access for its LAN
 address to be learned: **Network access** in the desktop app, or the
-[local network](./background-service.md#local-network-access) choice in `t3 up`.
+[local network](./background-service.md#local-network-access) choice in `gustaf up`.
 You can reorder a learned route, but not remove it; it
 goes away with the route it was learned through, or when the machine stops
 reporting that address.
 
-T3 Code connects over the first route that answers. Away from home, a LAN
+Gustaf connects over the first route that answers. Away from home, a LAN
 address that does not answer is checked briefly and skipped. It is only tried
 again, after the other routes, if none of them connect. While connected over a
-later route, T3 Code checks the earlier ones when your network changes, when you
+later route, Gustaf checks the earlier ones when your network changes, when you
 return to the app, and every minute, and moves back as soon as one works.
 
 On web and desktop, select the route count under the machine's name in
 **Settings → Environments** to see its routes. Drag a route to change the order,
 or remove it. On mobile, open the machine under **Settings → Environments** and
-choose **Edit**. Signing out of T3 Connect removes only that route; a machine
-you can still reach another way stays saved.
+choose **Edit**. Removing the relay route leaves a machine you can still reach
+another way.
 
 Open **Permissions** next to **Routes** in web or desktop, or **Your permissions**
 in the mobile route details, to see what your current connection can do on that
 environment. For a remote environment, this is in its route details. Permissions
 shown there apply only to the route marked **In use**; other routes are not
-checked. Direct pairing and T3 Connect have separate sessions and may grant
+checked. A direct route and the relay have separate sessions and may grant
 different permissions.
 
 ### Balance new threads across machines
@@ -173,13 +159,13 @@ HTTPS** in **Settings → Sharing & access**. Turn it off there to remove that r
 To start a command-line server with Tailscale HTTPS:
 
 ```bash
-t3 serve --tailscale-serve
+gustaf serve --tailscale-serve
 ```
 
 For an already-running server:
 
 ```bash
-t3 pair --tailscale
+gustaf pair --tailscale
 ```
 
 The pairing link uses an address such as `https://machine.tailnet.ts.net/`.
@@ -191,28 +177,23 @@ tailscale serve --https=443 --set-path=/ off
 ```
 
 If that port is already in use, choose another with
-`--tailscale-serve-port`. See `t3 pair --help` for other pairing options.
+`--tailscale-serve-port`. See `gustaf pair --help` for other pairing options.
 
-### Hosted web app
-
-[app.t3.codes](https://app.t3.codes) needs an HTTPS endpoint. It connects directly
-to your server; a hosted pairing link does not make an unreachable backend
-reachable or convert HTTP to HTTPS.
-
-For a plain HTTP LAN endpoint, use the direct pairing URL in a browser that can
-open it, or pair from the desktop app. On mobile, an IP address entered without a
-scheme uses HTTP, so include `https://` when your server uses HTTPS.
+On mobile, an IP address entered without a scheme uses HTTP, so include `https://`
+when your server uses HTTPS. A browser on another device can open a direct
+pairing URL only when that browser can reach the address. Gustaf does not host
+a website that connects to your computer for you.
 
 ## Desktop-managed SSH
 
 In the desktop app, open **Settings → Environments → Add environment**, choose
-**SSH**, and enter a host or SSH alias such as `user@example.com`. T3 Code starts
+**SSH**, and enter a host or SSH alias such as `user@example.com`. Gustaf starts
 or reuses a server there and opens the port forward for you. Projects, provider
 credentials, and agent work stay on the remote machine.
 
 The remote host must be Linux or an Apple Silicon Mac with `curl` or `wget`,
 `tar`, `sha256sum` or `shasum`, and [provider setup](./install.md#providers).
-The first launch downloads T3 Code's server to `~/.t3/runtime` on the host, so
+The first launch downloads Gustaf's server to `~/.t3/runtime` on the host, so
 it takes longer than later ones.
 Provider CLIs must be on the `PATH` of a non-interactive login shell there;
 check with:
@@ -222,13 +203,13 @@ ssh user@example.com 'sh -lc "command -v claude codex"'
 ```
 
 If SSH reconnecting fails after an app update, retry the launch once. Removing
-the connection stops a server that T3 Code launched; a server that was already
+the connection stops a server that Gustaf launched; a server that was already
 running is left alone.
 
 Each desktop app keeps one session on the host for its SSH connection and reuses
 it when it reconnects. Revoke sessions you no longer use in **Settings →
-Sharing & access** on the host, or on a headless host with `t3 auth session list` and
-`t3 auth session revoke <id>`. A desktop that can still sign in over SSH pairs
+Sharing & access** on the host, or on a headless host with `gustaf auth session list` and
+`gustaf auth session revoke <id>`. A desktop that can still sign in over SSH pairs
 again on its next connect.
 
 For Antigravity's Google callback on a remote host, see
@@ -264,13 +245,13 @@ apps.
 ### Local servers
 
 The browser lists ports held by processes your terminals and agents started.
-T3 Code reads which process holds each port and never connects to it, so a
+Gustaf reads which process holds each port and never connects to it, so a
 listed port opens as `http://localhost:<port>` and might not be a web page. For
 an HTTPS server or a specific path, set the **Preview URL** on the project
-script that starts it; T3 Code checks that address and opens it as written.
+script that starts it; Gustaf checks that address and opens it as written.
 
 To stop listing ports, set `T3CODE_PORT_DISCOVERY=0` in the environment that
-starts the T3 Code server, such as
+starts the Gustaf server, such as
 [`service.env`](./background-service.md#configure-the-service-environment) for
 the background service, and restart it. Script preview URLs still appear.
 
@@ -283,36 +264,36 @@ the server says so at startup, and browser tabs and HTML previews show the
 command to run on the host:
 
 ```sh
-sudo t3 browser setup
+sudo gustaf browser setup
 ```
 
 The server shows the exact line for how you started it, and keeps your `PATH`
-when you started it with `npx` and Node is installed only for your user. Where `t3` is not on your `PATH`, such as with only the
-desktop app installed, it names the full path of the app's own `t3` instead. It allows Chrome's sandbox with an AppArmor profile and installs
+when you started it with `npx` and Node is installed only for your user. Where `gustaf` is not on your `PATH`, such as with only the
+desktop app installed, it names the full path of the app's own `gustaf` instead. It allows Chrome's sandbox with an AppArmor profile and installs
 any missing libraries and system fonts with apt; pages that load without text
 can mean the host has no fonts. It is safe to run again. Without `sudo`, it only
 reports what it would change.
 
 The browser runs in Chrome's sandbox by default. Chrome cannot start that sandbox
-as root. If your T3 server runs as root, run it as a nonroot user to keep
-sandboxing enabled. `t3 browser setup` does not fix this root restriction.
+as root. If your Gustaf server runs as root, run it as a nonroot user to keep
+sandboxing enabled. `gustaf browser setup` does not fix this root restriction.
 
 If you need to run as root, or cannot enable the sandbox on your host, set
-`T3CODE_SERVER_BROWSER_SANDBOX=0` in the **T3 server's environment** and restart
+`T3CODE_SERVER_BROWSER_SANDBOX=0` in the **Gustaf server's environment** and restart
 the server. This disables Chrome's sandbox. For a manual launch:
 
 ```sh
-T3CODE_SERVER_BROWSER_SANDBOX=0 t3 serve
+T3CODE_SERVER_BROWSER_SANDBOX=0 gustaf serve
 ```
 
 For a systemd service, add `Environment=T3CODE_SERVER_BROWSER_SANDBOX=0` under
 `[Service]` in its configuration, run `sudo systemctl daemon-reload`, then restart
-your T3 service. Setting the variable in an agent's terminal does not change the
-environment of an already running T3 server.
+your Gustaf service. Setting the variable in an agent's terminal does not change the
+environment of an already running Gustaf server.
 
 ## Connect an outside agent
 
-Claude Code, Codex, ChatGPT and other agents T3 Code did not start can drive
+Claude Code, Codex, ChatGPT and other agents Gustaf did not start can drive
 threads on an environment through its MCP server. See
 [outside agents](./outside-agents.md) for setup.
 
@@ -330,11 +311,11 @@ off, its result arrives once it is back on.
 
 On the machine you will work from, open **Settings → Environments → Linked environments**,
 choose **Link**, and pick the other machine or enter its address. The list
-holds the machines this app knows and those on your T3 Connect account. If this
+holds the machines this app knows. If this
 app is connected to that machine with a session that manages access there, it
 makes the pairing code itself; otherwise paste one from that machine's
 **Settings → Sharing & access**. From a terminal, use
-`t3 environment link <address> --pairing-code <code> --access <mode>`.
+`gustaf environment link <address> --pairing-code <code> --access <mode>`.
 
 You can also ask an agent to link a machine by name, such as "delegate this to
 my vps". It shows a card in the thread where you pick the machine the same way
@@ -364,11 +345,11 @@ fails with that reason.
 On the host, **Settings → Sharing & access** lets authorized administrators create
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
-management is available through `t3 auth --help`.
+management is available through `gustaf auth --help`.
 
 When the app connects to more than one environment, choose one at the top of the
 page. A desktop app with **Local environment** off can manage a background
-service on the same machine this way, including its T3 Connect link.
+service on the same machine this way.
 
 A session with an open connection stays listed after its access credential
 expires.
@@ -376,13 +357,13 @@ expires.
 To choose a token's permissions, pass `--scope` once for each scope you want:
 
 ```sh
-t3 pair --scope orchestration:read --scope relay:read
+gustaf pair --scope orchestration:read --scope relay:read
 ```
 
 The selected scopes replace the default permissions. The same option works with
-`t3 auth pairing create` and `t3 auth session issue`; each command's
+`gustaf auth pairing create` and `gustaf auth session issue`; each command's
 `--help` lists the available scopes. Without `--scope`, pairing tokens and issued
-bearer sessions get every permission, including managing access and T3 Connect.
+bearer sessions get every permission, including managing access and the relay.
 A terminal or a full-access agent on the host can reach those as well, so a
 client that should not manage access also needs to go without `terminal:operate`
 and `orchestration:operate`.
@@ -405,7 +386,7 @@ worktree still creates that branch and worktree with `orchestration:operate`,
 and the agent it runs can use Git however the environment allows.
 
 Settings changes, provider management, environment maintenance, access
-management, and T3 Connect management can each be granted separately. New
+management, and relay access can each be granted separately. New
 pairings without `--scope` include all of them. Existing clients keep the
 permissions they paired with and can stay connected after an update, but newly
 separated features may require pairing again with the permissions they need.
@@ -416,43 +397,21 @@ link to change a client's permissions.
 local changes. Add `filesystem:write` to allow editing files or saving plans to
 the workspace. These scopes control direct file access from the client.
 
-To remove an environment from T3 Connect, open your account menu's **T3 Connect**
-page, or **Settings → T3 Connect** on mobile, and choose **Deregister**. This
-revokes its cloud access and frees its host space even when the environment is
-offline or has been wiped. When T3 Connect rejects a host's link, the host
-shows that it was removed from T3 Connect. To link it again, turn on
-**T3 Connect** in **Settings → Sharing & access** on a desktop host.
 Removing an environment from a device's connection settings only forgets it on
-that device and doesn't change your T3 Connect account. A device keeps a saved
-environment after it's deregistered until you remove it from that device.
-
-When idle tunnel cleanup is enabled, T3 Connect removes a linked environment's
-tunnel after it stays offline for several minutes. The environment stays linked
-and keeps the same address. When the host starts again or wakes, T3 Connect
-creates a replacement tunnel on its own. You do not need to pair again. Cleanup
-usually runs five to ten minutes after the tunnel goes down.
-
-T3 Connect also removes the tunnel of an environment running an older version of
-T3 Code once it has been offline for seven days. That environment shows a message
-asking you to update. Start T3 Code on that computer and update it to the latest
-version; it reconnects at the same address without pairing again.
+that device. A saved environment stays until you remove it there.
 
 Treat pairing URLs and authorization codes as passwords. Do not include them in
 screenshots, logs, or bug reports.
 
-## T3 Connect troubleshooting
-
-When a T3 Connect connection fails, see
-[T3 Connect troubleshooting](./t3-connect-troubleshooting.md). It explains each
-error, where the problem is, and how to fix it.
+If the relay will not connect, see [Relay troubleshooting](#relay-troubleshooting).
 
 ## Using the Desktop App as a Remote Only
 
 If a computer should only drive work running elsewhere, turn off its local environment. In the
 desktop app, open **Settings → Environments** and switch off **Local
-environment**. T3 Code restarts without a local server: no local agents or terminals run, WSL
+environment**. Gustaf restarts without a local server: no local agents or terminals run, WSL
 backends stay off, and other devices can no longer connect to this computer. Your projects,
-history, and saved connections are kept, and you keep working through pairing, T3 Connect, or SSH.
+history, and saved connections are kept, and you keep working through pairing, the relay, or SSH.
 
 Switch **Local environment** back on in the same place to restart with your previous local
 settings.

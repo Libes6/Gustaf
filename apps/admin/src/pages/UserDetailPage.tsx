@@ -23,6 +23,7 @@ import {
 } from "../components/ui/table";
 import { UserAvatar } from "../components/user-avatar";
 import { formatBytes, formatDateTime } from "../lib/format";
+import { formatDeviceBuild } from "../lib/versions";
 import { availableUserActions, normalizeBanReason, otherRole, type UserAction } from "../lib/rules";
 import { strings } from "../strings";
 import { UserAiUsage } from "./AiUsagePage";
@@ -149,6 +150,7 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
               <TableRow>
                 <TableHead>{strings.devices.columns.device}</TableHead>
                 <TableHead>{strings.devices.columns.kind}</TableHead>
+                <TableHead>{strings.devices.columns.version}</TableHead>
                 <TableHead>{strings.devices.columns.lastSeen}</TableHead>
                 <TableHead className="max-sm:hidden">{strings.devices.columns.created}</TableHead>
                 <TableHead>{strings.devices.columns.status}</TableHead>
@@ -159,6 +161,9 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
                 <TableRow key={device.id}>
                   <TableCell className="font-medium">{device.name}</TableCell>
                   <TableCell>{strings.kinds[device.kind]}</TableCell>
+                  <TableCell title={device.osVersion ?? undefined}>
+                    {formatDeviceBuild(device)}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDateTime(device.lastSeenAt)}
                   </TableCell>

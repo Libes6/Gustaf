@@ -23,7 +23,35 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
       version: env.GUSTAF_VERSION?.trim() || "dev",
       commit: env.GUSTAF_COMMIT?.trim() || "unknown",
     },
+    ops: readOpsConfig(env),
   };
+}
+
+// Optional sources for the admin system and releases pages; without them those parts say so.
+function readOpsConfig(env: NodeJS.ProcessEnv) {
+  const coolifyUrl = env.COOLIFY_URL?.trim();
+  const coolifyToken = env.COOLIFY_API_TOKEN?.trim();
+  const coolifyDatabase = env.COOLIFY_DATABASE_UUID?.trim();
+  let coolify: { url: string; token: string; databaseUuid: string } | null = null;
+  if (coolifyUrl && coolifyToken && coolifyDatabase) {
+    let url: URL | undefined;
+    try {
+      url = new URL(coolifyUrl);
+    } catch {}
+    if (!url || !["https:", "http:"].includes(url.protocol)) {
+      throw new Error("COOLIFY_URL must be an absolute URL, e.g. https://coolify.example.com");
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(coolifyDatabase)) {
+      throw new Error("COOLIFY_DATABASE_UUID must be the database UUID from Coolify");
+    }
+    const base = url.href.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
+    coolify = { url: base, token: coolifyToken, databaseUuid: coolifyDatabase };
+  }
+  const releasesRepo = env.GITHUB_RELEASES_REPO?.trim() || "Libes6/Gustaf";
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(releasesRepo)) {
+    throw new Error("GITHUB_RELEASES_REPO must be owner/name");
+  }
+  return { coolify, githubToken: env.GITHUB_TOKEN?.trim() || null, releasesRepo };
 }
 
 const AUTH_REQUIRED = [

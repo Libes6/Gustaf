@@ -15,7 +15,7 @@ import { back, currentCursor, FIRST_PAGE, forward } from "../lib/pagination";
 import { strings } from "../strings";
 import { isApiError } from "./client";
 import { api } from "./instance";
-import type { DeviceKind, Page, UsagePeriod } from "./types";
+import type { DeviceKind, Page, ReportStatus, UsagePeriod } from "./types";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -26,6 +26,15 @@ export const queryKeys = {
   devices: (query: string, kind: DeviceKind | undefined) =>
     ["admin", "devices", { query, kind }] as const,
   audit: ["admin", "audit"] as const,
+  announcements: ["admin", "announcements"] as const,
+  minimumVersions: ["admin", "minimum-versions"] as const,
+  featureFlags: ["admin", "feature-flags"] as const,
+  relay: ["admin", "relay"] as const,
+  system: ["admin", "system"] as const,
+  releases: ["admin", "releases"] as const,
+  reports: (status: ReportStatus | undefined) => ["admin", "reports", { status }] as const,
+  reportCounts: ["admin", "report-counts"] as const,
+  report: (id: string) => ["admin", "report", id] as const,
   aiUsage: (days: UsagePeriod, userId: string | undefined) =>
     ["admin", "ai-usage", { days, userId }] as const,
 };
@@ -61,6 +70,19 @@ export function useMe() {
 
 export function useOverview() {
   return useQuery({ queryKey: queryKeys.overview, queryFn: api.overview });
+}
+
+export function useRelayHealth() {
+  return useQuery({ queryKey: queryKeys.relay, queryFn: api.relay });
+}
+
+export function useSystemStatus() {
+  return useQuery({ queryKey: queryKeys.system, queryFn: api.system });
+}
+
+// The API caches GitHub for an hour; refetching sooner only re-reads that cache.
+export function useReleaseStats() {
+  return useQuery({ queryKey: queryKeys.releases, queryFn: api.releases, staleTime: 10 * 60_000 });
 }
 
 export function useAiUsage(days: UsagePeriod, userId?: string) {
@@ -112,6 +134,34 @@ export function useDevices(query: string, kind: DeviceKind | undefined) {
 
 export function useAudit() {
   return usePagedList(queryKeys.audit, (cursor) => api.listAudit({ cursor }));
+}
+
+export function useAnnouncements() {
+  return useQuery({ queryKey: queryKeys.announcements, queryFn: api.listAnnouncements });
+}
+
+export function useMinimumVersions() {
+  return useQuery({ queryKey: queryKeys.minimumVersions, queryFn: api.listMinimumVersions });
+}
+
+export function useFeatureFlags() {
+  return useQuery({ queryKey: queryKeys.featureFlags, queryFn: api.listFeatureFlags });
+}
+
+export function useReports(status: ReportStatus | undefined) {
+  return usePagedList(queryKeys.reports(status), (cursor) => api.listReports({ status, cursor }));
+}
+
+export function useReportCounts() {
+  return useQuery({
+    queryKey: queryKeys.reportCounts,
+    queryFn: api.reportCounts,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useReport(id: string) {
+  return useQuery({ queryKey: queryKeys.report(id), queryFn: () => api.getReport(id) });
 }
 
 /** An admin action: toast on success or failure, then refresh every admin view. */

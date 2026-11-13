@@ -1,153 +1,145 @@
-# T3 Code
+# Gustaf
 
-T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
+Gustaf runs coding agents on your computer with the subscriptions you already have, and lets you
+follow and steer them from a desktop app or your phone.
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Google Antigravity, and fx. If they're set up on your computer, T3 Code can control them.
+- **Desktop app** for macOS (Apple Silicon), Windows and Linux, built on Tauri. It runs the Gustaf
+  server locally and updates itself from GitHub Releases.
+- **Android app** that connects to your computer over the local network, Tailscale, or the
+  end-to-end encrypted Gustaf relay.
+- **Interface** in English and Russian.
 
-## "Wait, what are you selling me?"
+## Supported agents
 
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
+Gustaf drives the agent CLIs installed and signed in on your computer. It does not resell model
+access; each agent uses your own account.
 
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the editor that you want.
+- Codex: install the [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
+- Claude Code: install [Claude Code](https://claude.com/product/claude-code) and run
+  `claude auth login`
+- Cursor: install the [Cursor CLI](https://cursor.com/cli) and run `agent login`
+- Grok Build: install the [Grok Build CLI](https://x.ai/cli) and run `grok login`
+- OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+- Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**
+  ([guide](./docs/user/providers-antigravity.md))
+- Kiro: install the Kiro CLI and run `kiro-cli login` ([guide](./docs/user/providers-kiro.md))
+- Pi, Muse Code, fx, and agents from the ACP Registry ([Pi](./docs/user/providers-pi.md),
+  [Muse Code](./docs/user/providers-muse.md), [fx](./docs/user/providers-fx.md),
+  [ACP](./docs/user/providers-acp.md))
+- Ollama: chat only, against a local Ollama server
 
-## Installation
+Enable and check each agent under **Settings → Providers**. You can launch Gustaf first and set up
+agents afterwards.
 
-> [!WARNING]
-> T3 Code currently supports Codex, Claude, Cursor, Grok Build, OpenCode, Antigravity, and fx. Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
-> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
-> - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
-> - fx: install [fx](https://fx.sh) and run `fx login` on the machine running the T3 Code server ([setup guide](./docs/user/providers-fx.md))
+## Download and install
 
-### Command line
+Get the latest version from [GitHub Releases](https://github.com/Libes6/Gustaf/releases/latest).
 
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
-```
+| Platform              | File                                                     |
+| --------------------- | -------------------------------------------------------- |
+| macOS (Apple Silicon) | `Gustaf-<version>-macOS-arm64.dmg`                       |
+| Windows (x64)         | `Gustaf-<version>-Windows-x64-setup.exe` or `.msi`       |
+| Linux (x64)           | `Gustaf-<version>-Linux-x64.AppImage`, `.deb`, or `.rpm` |
+| Android               | `Gustaf-<version>-Android.apk`                           |
 
-On Windows, in PowerShell:
+`SHA256SUMS.txt` in each release lists the checksums of every file.
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
-```
+### macOS
 
-Then run `gustaf` to start the server and open the local web app. `gustaf service install` keeps it running in the background, `gustaf update` moves to a newer release, and `gustaf --help` has the full reference.
+Open the `.dmg` and drag Gustaf to Applications. The app is not notarized by Apple, so the first
+launch may be blocked: open **System Settings → Privacy & Security** and choose **Open Anyway**.
 
-To try it once without installing, run `npx t3@latest`. It offers to install the `gustaf` command for you.
+### Windows
 
-### Desktop app
+Run the installer. If SmartScreen warns about an unknown publisher, choose **More info → Run
+anyway**.
 
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
+### Linux
 
-#### Windows (`winget`)
+Install the `.deb` (`sudo apt install ./Gustaf-*.deb`) or `.rpm` (`sudo dnf install ./Gustaf-*.rpm`),
+or make the AppImage executable (`chmod +x Gustaf-*.AppImage`) and run it.
 
-```bash
-winget install T3Tools.T3Code
-```
+### Android
 
-#### Windows (`scoop`)
+Download the `.apk` on the phone and open it. Android asks you to allow installing unknown apps for
+the browser or file manager you opened it from; allow it for that app, then install. To update,
+install a newer APK over the existing one.
 
-```bash
-scoop install extras/t3code
-```
+### Updates
 
-#### macOS (Homebrew)
+The desktop app checks GitHub Releases for new versions and installs signed updates.
 
-```bash
-brew install --cask t3-code
-```
+## Connect your phone
 
-#### Debian, Ubuntu (`.deb`)
+The phone controls agents running on your computer, so the desktop app must be running. There are
+three ways to reach it. A phone can keep several routes to the same computer and prefers direct
+ones, so at home it uses the local network.
 
-Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), then:
+- **Gustaf relay** works from any network, also while either device is on a VPN. Traffic is
+  end-to-end encrypted between the phone and the computer; the relay only forwards ciphertext. It
+  needs a Gustaf account, which you sign in to with GitHub under **Settings → Account** on both
+  devices. Then choose **Connect a phone** in the **Remote access** section of the computer's
+  settings, scan the code with the phone, and allow the device on the computer.
+- **Local network**: allow network access under **Settings → Sharing & access** on the computer,
+  choose **Create pairing link**, and scan it from the phone.
+- **Tailscale**: with Tailscale on both devices, pair over the computer's tailnet address the same
+  way.
 
-```bash
-sudo apt install ./T3-Code-*.deb
-```
+See [Remote access](./docs/user/remote-access.md) for details.
 
-#### Arch Linux (AUR)
-
-Stable:
-
-```bash
-yay -S t3code-bin
-```
-
-Nightly:
-
-```bash
-yay -S t3code-nightly-bin
-```
-
-The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
-
-#### Nix (nixpkgs)
-
-```bash
-nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code
-```
-
-The package is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code)
-and includes the desktop app (`t3code-desktop`) and the `gustaf` command.
-See [Nix installation](./docs/user/install.md#nix-nixpkgs) for NixOS configuration and updates.
-
-## Some notes
-
-We are very very early in this project. Expect bugs.
-
-We are (mostly) not accepting contributions yet. Small fixes may be considered. Big features will not be.
-
-## Documentation
-
-Full docs live in [docs/](./docs). There's no docs site yet.
-
-- [FAQ](./docs/user/faq.md)
-- [Install and first run](./docs/user/install.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Project settings](./docs/user/project-settings.md)
-- [Appearance preferences](./docs/user/appearance.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Connect Claude Code, Codex, ChatGPT and other agents over MCP](./docs/user/outside-agents.md)
-- [Keeping app and server in sync](./docs/user/updating.md)
-- [Source control integrations](./docs/user/source-control.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- [Run T3 Code as a background service](./docs/user/background-service.md)
-
-Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
-
-## If you REALLY want to contribute still.... read this first
+## Build from source
 
 ### Install `vp`
 
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
+Gustaf uses [Vite+](https://viteplus.dev/guide/). Install its global `vp` command, which also
+provides the Node version pinned in `package.json` (Node 26).
 
-#### macOS / Linux
+macOS and Linux:
 
 ```bash
 curl -fsSL https://vite.plus | bash
 ```
 
-#### Windows
+Windows:
 
-```bash
+```powershell
 irm https://vite.plus/ps1 | iex
 ```
 
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
-
-### Install dependencies
+### Run in development
 
 ```bash
-vp i
+vp i          # install dependencies
+vp run dev    # start the server and the web client
 ```
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
+Open the pairing URL the dev runner prints.
 
-Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
+To run the desktop app, install the stable [Rust](https://rust-lang.org/install) toolchain (on Linux,
+also run `apps/shell/scripts/install-linux-deps.sh`), then:
 
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+```bash
+pnpm --filter @gustaf/shell dev     # desktop app against the dev server
+pnpm --filter @gustaf/shell build   # installers in apps/shell/src-tauri/target/release/bundle
+```
+
+More in [Development](./docs/operations/development.md). The Android app is built from
+[`apps/mobile`](./apps/mobile/README.md). Architecture starts at
+[docs/internals/overview.md](./docs/internals/overview.md).
+
+## Documentation
+
+Docs live in [docs/](./docs):
+
+- [FAQ](./docs/user/faq.md)
+- [Remote access](./docs/user/remote-access.md)
+- [Permission modes](./docs/user/permission-modes.md)
+- [Keyboard shortcuts](./docs/user/keybindings.md)
+- [Project settings](./docs/user/project-settings.md)
+- [Appearance](./docs/user/appearance.md)
+- [Source control integrations](./docs/user/source-control.md)
+- [Connect outside agents over MCP](./docs/user/outside-agents.md)
+
+## License
+
+[MIT](./LICENSE)

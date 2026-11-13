@@ -104,6 +104,10 @@ export const device = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     tokenRotatedAt: timestamp("token_rotated_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    // Reported by the app's heartbeat; null until the device first sends one.
+    appVersion: text("app_version"),
+    platform: text("platform"),
+    osVersion: text("os_version"),
     // Set by an admin; the row stays for the admin view, the token stops working.
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
@@ -166,6 +170,86 @@ export const relayUsage = pgTable(
     bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
+);
+
+// Client config (GET /v1/client-config): announcements, minimum versions and feature flags,
+// edited in the admin app and read by every desktop and mobile client.
+export const clientKind = pgEnum("client_kind", ["desktop", "mobile"]);
+export const clientTarget = pgEnum("client_target", ["all", "desktop", "mobile"]);
+export const announcementLevel = pgEnum("announcement_level", ["info", "warning", "critical"]);
+export const featureFlagMode = pgEnum("feature_flag_mode", ["off", "everyone", "listed"]);
+
+export const announcement = pgTable("announcement", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  textEn: text("text_en").notNull(),
+  textRu: text("text_ru").notNull(),
+  level: announcementLevel("level").notNull().default("info"),
+  link: text("link"),
+  target: clientTarget("target").notNull().default("all"),
+  // Inclusive bounds; a client that does not send its version never sees a ranged announcement.
+  minVersion: text("min_version"),
+  maxVersion: text("max_version"),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const minimumVersion = pgTable("minimum_version", {
+  kind: clientKind("kind").primaryKey(),
+  version: text("version").notNull(),
+  message: text("message"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const featureFlag = pgTable("feature_flag", {
+  key: text("key").primaryKey(),
+  description: text("description").notNull().default(""),
+  mode: featureFlagMode("mode").notNull().default("off"),
+  // Lowercased GitHub logins, used when mode is "listed".
+  logins: text("logins").array().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Relay totals per UTC day: bytes and connection outcomes by metric name (relay.daily.ts).
+// Aggregate only; no user, device or address is stored.
+export const relayDaily = pgTable(
+  "relay_daily",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    metric: text("metric").notNull(),
+    value: bigint("value", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.metric] })],
+);
+
+// "Report a problem" from the apps. Logs are only present when the user chose to attach them.
+export const bugReportClient = pgEnum("bug_report_client", ["desktop", "mobile"]);
+export const bugReportStatus = pgEnum("bug_report_status", ["new", "seen", "closed"]);
+
+export const bugReport = pgTable(
+  "bug_report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    deviceId: uuid("device_id").references(() => device.id, { onDelete: "set null" }),
+    client: bugReportClient("client").notNull(),
+    appVersion: text("app_version").notNull(),
+    platform: text("platform").notNull(),
+    message: text("message").notNull(),
+    logs: text("logs"),
+    status: bugReportStatus("status").notNull().default("new"),
+    adminNote: text("admin_note"),
+    ...timestamps,
+  },
+  (table) => [
+    index("bug_report_status_created_at_idx").on(table.status, table.createdAt),
+    index("bug_report_user_id_created_at_idx").on(table.userId, table.createdAt),
+  ],
 );
 
 // AI usage counted by each user's computers (docs/internals/ai-usage.md). One row per user, UTC

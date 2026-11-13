@@ -1,5 +1,11 @@
 import type {
   AdminDevice,
+  Announcement,
+  AnnouncementInput,
+  ClientKind,
+  FeatureFlag,
+  FeatureFlagInput,
+  MinimumVersion,
   AiUsageSummary,
   AdminUser,
   AdminUserDetail,
@@ -8,7 +14,14 @@ import type {
   Me,
   Overview,
   Page,
+  RelayHealth,
+  ReleaseStats,
+  ReportCounts,
+  ReportDetail,
+  ReportStatus,
+  ReportSummary,
   Role,
+  SystemStatus,
   UsagePeriod,
 } from "./types";
 
@@ -137,6 +150,8 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
   }
 
   const user = (id: string) => `/v1/admin/users/${encodeURIComponent(id)}`;
+  const announcement = (id: string) => `/v1/admin/announcements/${encodeURIComponent(id)}`;
+  const featureFlag = (key: string) => `/v1/admin/feature-flags/${encodeURIComponent(key)}`;
 
   return {
     me: () => request<Me>("GET", "/v1/me"),
@@ -177,6 +192,44 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
 
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),
+
+    listAnnouncements: () =>
+      request<{ items: ReadonlyArray<Announcement> }>("GET", "/v1/admin/announcements"),
+    createAnnouncement: (input: AnnouncementInput) =>
+      request<Announcement>("POST", "/v1/admin/announcements", { body: input }),
+    updateAnnouncement: (id: string, input: AnnouncementInput) =>
+      request<Announcement>("PATCH", announcement(id), { body: input }),
+    deleteAnnouncement: (id: string) => request<unknown>("DELETE", announcement(id)),
+
+    listMinimumVersions: () =>
+      request<{ items: ReadonlyArray<MinimumVersion> }>("GET", "/v1/admin/minimum-versions"),
+    setMinimumVersion: (kind: ClientKind, input: { version: string; message: string | null }) =>
+      request<MinimumVersion>("PATCH", `/v1/admin/minimum-versions/${kind}`, { body: input }),
+    clearMinimumVersion: (kind: ClientKind) =>
+      request<unknown>("DELETE", `/v1/admin/minimum-versions/${kind}`),
+
+    listFeatureFlags: () =>
+      request<{ items: ReadonlyArray<FeatureFlag> }>("GET", "/v1/admin/feature-flags"),
+    createFeatureFlag: (key: string, input: FeatureFlagInput) =>
+      request<FeatureFlag>("POST", "/v1/admin/feature-flags", { body: { key, ...input } }),
+    updateFeatureFlag: (key: string, input: FeatureFlagInput) =>
+      request<FeatureFlag>("PATCH", featureFlag(key), { body: input }),
+    deleteFeatureFlag: (key: string) => request<unknown>("DELETE", featureFlag(key)),
+
+    relay: () => request<RelayHealth>("GET", "/v1/admin/relay"),
+    system: () => request<SystemStatus>("GET", "/v1/admin/system"),
+    releases: () => request<ReleaseStats>("GET", "/v1/admin/releases"),
+    listReports: (params: PageParams & { status?: ReportStatus | undefined }) =>
+      request<Page<ReportSummary>>("GET", "/v1/admin/reports", {
+        params: { status: params.status, ...pageParams(params) },
+      }),
+    reportCounts: () => request<ReportCounts>("GET", "/v1/admin/reports/counts"),
+    getReport: (id: string) =>
+      request<ReportDetail>("GET", `/v1/admin/reports/${encodeURIComponent(id)}`),
+    updateReport: (
+      id: string,
+      change: { readonly status?: ReportStatus; readonly note?: string | null },
+    ) => request<unknown>("PATCH", `/v1/admin/reports/${encodeURIComponent(id)}`, { body: change }),
   };
 }
 
