@@ -6,6 +6,7 @@ export const strings = {
     overview: "Overview",
     users: "Users",
     devices: "Devices",
+    aiUsage: "AI usage",
     audit: "Audit log",
     signOut: "Sign out",
   },
@@ -104,6 +105,29 @@ export const strings = {
   },
   roles: { user: "User", admin: "Admin" },
   kinds: { computer: "Computer", phone: "Phone" },
+  aiUsage: {
+    title: "AI usage",
+    description:
+      "Counted on each user's registered computers and reported as totals per day, provider and model. Computers with telemetry turned off do not report.",
+    periodLabel: "Period",
+    periods: { 1: "Today (UTC)", 7: "Last 7 days", 30: "Last 30 days", 90: "Last 90 days" },
+    turns: "Turns",
+    inputTokens: "Input tokens",
+    outputTokens: "Output tokens",
+    users: "Users",
+    unknown: "Unknown",
+    measured: (measured: number, turns: number) =>
+      measured === turns
+        ? "All turns measured"
+        : `Tokens measured in ${measured} of ${turns} turns`,
+    byModel: "By provider and model",
+    byUser: "By user",
+    provider: "Provider",
+    model: "Model",
+    user: "User",
+    unnamedModel: "Unlisted model",
+    empty: "No AI usage reported in this period.",
+  },
   actions: {
     ban: "Ban",
     unban: "Unban",

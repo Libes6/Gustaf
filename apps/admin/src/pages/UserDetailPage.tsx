@@ -25,6 +25,7 @@ import { UserAvatar } from "../components/user-avatar";
 import { formatBytes, formatDateTime } from "../lib/format";
 import { availableUserActions, normalizeBanReason, otherRole, type UserAction } from "../lib/rules";
 import { strings } from "../strings";
+import { UserAiUsage } from "./AiUsagePage";
 import { useMeContext } from "./AppLayout";
 
 export function UserDetailPage() {
@@ -135,6 +136,8 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
           </dl>
         )}
       </Card>
+
+      <UserAiUsage userId={user.id} />
 
       <Card className="p-0">
         <CardTitle className="px-4 pt-4">{strings.users.devices}</CardTitle>

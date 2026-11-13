@@ -23,6 +23,8 @@ import { HealthController } from "./health.controller.js";
 import { OwnershipService } from "./ownership.js";
 import { RelayController } from "./relay/relay.controller.js";
 import { RelayService } from "./relay/relay.service.js";
+import { UsageController } from "./usage/usage.controller.js";
+import { UsageService } from "./usage/usage.service.js";
 
 @Module({})
 // oxlint-disable-next-line typescript/no-extraneous-class -- Nest requires a decorated module class.
@@ -52,6 +54,7 @@ export async function createApp(
           AppSignInController,
           AdminController,
           RelayController,
+          UsageController,
         ],
         providers: [
           {
@@ -64,6 +67,7 @@ export async function createApp(
           DeviceGuard,
           DevicesService,
           OwnershipService,
+          UsageService,
           { provide: ADMIN_ORIGINS, useValue: config.auth.adminOrigins },
           AdminGuard,
           {
