@@ -1,7 +1,11 @@
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { canMaintainEnvironment, findEnvironmentUpdate } from "./environment-maintenance";
+import {
+  canMaintainEnvironment,
+  findEnvironmentUpdate,
+  supportsEnvironmentUpdate,
+} from "./environment-maintenance";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -55,10 +59,25 @@ describe("environment maintenance access", () => {
 });
 
 describe("environment release checks", () => {
+  it.each([
+    ["0.12.0", "0.13.0"],
+    ["0.13.0", null],
+    ["0.14.0", null],
+  ])("checks the desktop manifest against Gustaf %s", async (current, expected) => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ version: "0.13.0" }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await findEnvironmentUpdate(current!, new AbortController().signal, true)).toBe(
+      expected,
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "https://github.com/Libes6/Gustaf/releases/latest/download/latest.json",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
   const signal = new AbortController().signal;
   const feed = (...tags: ReadonlyArray<string>) =>
     new Response(
-      `<feed><id>tag:github.com,2008:https://github.com/pingdotgg/t3code/releases</id>${tags
+      `<feed><id>tag:github.com,2008:https://github.com/Libes6/Gustaf/releases</id>${tags
         .map((tag) => `<entry><id>tag:github.com,2008:Repository/1/${tag}</id></entry>`)
         .join("")}</feed>`,
     );
@@ -67,7 +86,7 @@ describe("environment release checks", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) =>
-        url === "https://github.com/pingdotgg/t3code/releases.atom"
+        url === "https://github.com/Libes6/Gustaf/releases.atom"
           ? feed(
               "desktop-preview",
               "v1.0.0-preview.20260924.3",
@@ -93,11 +112,11 @@ describe("environment release checks", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        if (url === "https://github.com/pingdotgg/t3code/releases.atom") return feed(...nightlies);
-        if (url === "https://api.github.com/repos/pingdotgg/t3code/releases?per_page=100&page=1") {
+        if (url === "https://github.com/Libes6/Gustaf/releases.atom") return feed(...nightlies);
+        if (url === "https://api.github.com/repos/Libes6/Gustaf/releases?per_page=100&page=1") {
           return Response.json(Array.from({ length: 100 }, () => ({ tag_name: "v2.0.0" })));
         }
-        if (url === "https://api.github.com/repos/pingdotgg/t3code/releases?per_page=100&page=2") {
+        if (url === "https://api.github.com/repos/Libes6/Gustaf/releases?per_page=100&page=2") {
           return Response.json([
             { tag_name: "v1.0.0-preview.20260925.1", draft: true },
             { tag_name: "v1.0.0-preview.20260924.3" },
@@ -128,4 +147,11 @@ describe("environment release checks", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "invalid" })));
     await expect(findEnvironmentUpdate("1.0.0", signal)).rejects.toThrow();
   });
+});
+
+it("requires desktop updates on the computer, even when an old bridge offers remote installation", () => {
+  expect(
+    supportsEnvironmentUpdate({ serverSelfUpdate: "desktop-managed", desktopAppUpdate: true }),
+  ).toBe(false);
+  expect(supportsEnvironmentUpdate({ serverSelfUpdate: "boot-service" })).toBe(true);
 });

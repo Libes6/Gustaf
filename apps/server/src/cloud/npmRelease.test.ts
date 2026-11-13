@@ -36,6 +36,7 @@ const makeService = Effect.fnUntraced(function* (
   run: ProcessRunner.ProcessRunner["Service"]["run"],
   publicRegistry: HttpClient.HttpClient = noPublicRegistry,
   npmInstalled = true,
+  appVersion?: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -47,6 +48,7 @@ const makeService = Effect.fnUntraced(function* (
     Effect.provideService(ProcessRunner.ProcessRunner, { run }),
     Effect.provideService(HttpClient.HttpClient, publicRegistry),
     Effect.provideService(HostProcess.Environment, {
+      ...(appVersion ? { GUSTAF_APP_VERSION: appVersion } : {}),
       PATH: npmInstalled ? npmBin : "",
       PATHEXT: ".CMD",
     }),
@@ -195,4 +197,23 @@ it.effect.each(["--registry=https://example.com", "../other", "other-package@lat
       const service = yield* makeService(() => Effect.die("invalid specs must not spawn npm"));
       expect(Result.isFailure(yield* service.get({ spec }).pipe(Effect.result))).toBe(true);
     }),
+);
+
+it.effect("checks the Gustaf desktop feed instead of npm when the shell supplies its version", () =>
+  Effect.gen(function* () {
+    const urls: string[] = [];
+    const service = yield* makeService(
+      () => Effect.die("must not query upstream npm"),
+      HttpClient.make((request) => {
+        urls.push(request.url);
+        return Effect.succeed(
+          HttpClientResponse.fromWeb(request, Response.json({ version: "0.14.0" })),
+        );
+      }),
+      true,
+      "0.13.0",
+    );
+    expect(yield* service.get({ spec: "latest" })).toEqual({ version: "0.14.0" });
+    expect(urls).toEqual(["https://github.com/Libes6/Gustaf/releases/latest/download/latest.json"]);
+  }).pipe(Effect.scoped),
 );

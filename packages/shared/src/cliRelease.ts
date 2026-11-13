@@ -1,9 +1,9 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { compareSemverVersions } from "./semver.ts";
+import { compareSemverVersions, parseSemver } from "./semver.ts";
 
-const CLI_RELEASE_REPOSITORY = "pingdotgg/t3code";
+const CLI_RELEASE_REPOSITORY = "Libes6/Gustaf";
 export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
@@ -161,4 +161,27 @@ const decodeNpmReleaseMigrationManifest = Schema.decodeUnknownOption(NpmReleaseM
 export function npmReleaseDatabaseMigration(manifest: unknown): number | undefined {
   return Option.getOrUndefined(decodeNpmReleaseMigrationManifest(manifest))?.t3code
     .databaseMigration;
+}
+
+export const GUSTAF_UPDATE_MANIFEST_URL =
+  "https://github.com/Libes6/Gustaf/releases/latest/download/latest.json";
+
+export async function latestGustafRelease(signal?: AbortSignal): Promise<string> {
+  // @effect-diagnostics-next-line globalFetch:off -- Shared browser/native boundary uses the client fetch and cancellation signal.
+  const response = await fetch(GUSTAF_UPDATE_MANIFEST_URL, signal ? { signal } : {});
+  if (!response.ok) throw new Error(`Could not check releases (${response.status}). Try again.`);
+  const manifest: unknown = await response.json();
+  const version =
+    manifest !== null && typeof manifest === "object" && "version" in manifest
+      ? manifest.version
+      : undefined;
+  if (typeof version !== "string" || !parseSemver(version)) {
+    throw new Error("Invalid Gustaf release manifest.");
+  }
+  return version;
+}
+
+export async function findGustafUpdate(currentVersion: string, signal: AbortSignal) {
+  const version = await latestGustafRelease(signal);
+  return compareSemverVersions(version, currentVersion) > 0 ? version : null;
 }

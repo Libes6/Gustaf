@@ -204,7 +204,9 @@ export const make = Effect.gen(function* () {
   // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
 
   const desktopAppUpdate =
-    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
+    serverSelfUpdate === "desktop-managed" &&
+    serverConfig.desktopTelemetryControlFd !== undefined &&
+    !(yield* HostProcess.Environment).GUSTAF_APP_VERSION?.trim();
 
   const databaseMigration = databaseMigrationHead(serverConfig.dbPath);
   // The Gustaf shell names its own release; the runtime's version stays T3's for CLI updates.
