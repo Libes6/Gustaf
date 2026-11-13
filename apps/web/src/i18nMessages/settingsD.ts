@@ -859,6 +859,19 @@ export const settingsDMessages = {
     "settingsD.account.actionFailed": "Account action failed",
     "settingsD.account.devicesFailed": "Could not load devices",
     "settingsD.account.sidebarSignIn": "Sign in",
+    "settingsD.reportProblem.title": "Report a problem",
+    "settingsD.reportProblem.rowDescription": "Tell the Gustaf team what went wrong.",
+    "settingsD.reportProblem.open": "Report…",
+    "settingsD.reportProblem.description":
+      "Describe what happened and what you expected. The report is sent with your account, the app version and your platform.",
+    "settingsD.reportProblem.messageLabel": "What went wrong",
+    "settingsD.reportProblem.placeholder": "What did you do, and what happened?",
+    "settingsD.reportProblem.attachLogs": "Attach logs",
+    "settingsD.reportProblem.attachLogsHint":
+      "Recent app and server logs. Tokens and passwords are removed, but logs can include file names from this computer.",
+    "settingsD.reportProblem.cancel": "Cancel",
+    "settingsD.reportProblem.send": "Send report",
+    "settingsD.reportProblem.sent": "Report sent. Thank you!",
     "settingsD.relay.title": "Remote access",
     "settingsD.relay.anyNetwork": "Reach this computer from any network",
     "settingsD.relay.description":
@@ -1766,6 +1779,19 @@ export const settingsDMessages = {
     "settingsD.account.actionFailed": "Не удалось выполнить действие с аккаунтом",
     "settingsD.account.devicesFailed": "Не удалось загрузить устройства",
     "settingsD.account.sidebarSignIn": "Войти",
+    "settingsD.reportProblem.title": "Сообщить о проблеме",
+    "settingsD.reportProblem.rowDescription": "Расскажите команде Gustaf, что пошло не так.",
+    "settingsD.reportProblem.open": "Сообщить…",
+    "settingsD.reportProblem.description":
+      "Опишите, что произошло и чего вы ожидали. Вместе с сообщением отправятся ваш аккаунт, версия приложения и платформа.",
+    "settingsD.reportProblem.messageLabel": "Что пошло не так",
+    "settingsD.reportProblem.placeholder": "Что вы делали и что произошло?",
+    "settingsD.reportProblem.attachLogs": "Приложить логи",
+    "settingsD.reportProblem.attachLogsHint":
+      "Свежие логи приложения и сервера. Токены и пароли вырезаются, но в логах могут остаться имена файлов с этого компьютера.",
+    "settingsD.reportProblem.cancel": "Отмена",
+    "settingsD.reportProblem.send": "Отправить",
+    "settingsD.reportProblem.sent": "Отчёт отправлен. Спасибо!",
     "settingsD.relay.title": "Удалённый доступ",
     "settingsD.relay.anyNetwork": "Доступ к компьютеру из любой сети",
     "settingsD.relay.description":

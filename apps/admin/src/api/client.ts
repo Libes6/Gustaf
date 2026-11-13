@@ -7,6 +7,10 @@ import type {
   Me,
   Overview,
   Page,
+  ReportCounts,
+  ReportDetail,
+  ReportStatus,
+  ReportSummary,
   Role,
 } from "./types";
 
@@ -170,6 +174,18 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
 
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),
+
+    listReports: (params: PageParams & { status?: ReportStatus | undefined }) =>
+      request<Page<ReportSummary>>("GET", "/v1/admin/reports", {
+        params: { status: params.status, ...pageParams(params) },
+      }),
+    reportCounts: () => request<ReportCounts>("GET", "/v1/admin/reports/counts"),
+    getReport: (id: string) =>
+      request<ReportDetail>("GET", `/v1/admin/reports/${encodeURIComponent(id)}`),
+    updateReport: (
+      id: string,
+      change: { readonly status?: ReportStatus; readonly note?: string | null },
+    ) => request<unknown>("PATCH", `/v1/admin/reports/${encodeURIComponent(id)}`, { body: change }),
   };
 }
 

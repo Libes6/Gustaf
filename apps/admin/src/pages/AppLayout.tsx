@@ -1,7 +1,7 @@
 import { Link, Outlet, useRouteContext } from "@tanstack/react-router";
 import { LogOutIcon, ShieldIcon } from "lucide-react";
 
-import { useSignOut } from "../api/queries";
+import { useReportCounts, useSignOut } from "../api/queries";
 import { Button } from "../components/ui/button";
 import { strings } from "../strings";
 
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/users", label: strings.nav.users, exact: false },
   { to: "/devices", label: strings.nav.devices, exact: false },
   { to: "/audit", label: strings.nav.audit, exact: false },
+  { to: "/reports", label: strings.nav.reports, exact: false },
 ] as const;
 
 export function useMeContext() {
@@ -19,6 +20,7 @@ export function useMeContext() {
 export function AppLayout() {
   const me = useMeContext();
   const signOut = useSignOut();
+  const newReports = useReportCounts().data?.new ?? 0;
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-sm">
@@ -39,6 +41,17 @@ export function AppLayout() {
                 className="rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-foreground"
               >
                 {item.label}
+                {item.to === "/reports" && newReports > 0 ? (
+                  <>
+                    <span
+                      aria-hidden
+                      className="ms-1.5 rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground tabular-nums"
+                    >
+                      {newReports}
+                    </span>
+                    <span className="sr-only">{strings.nav.unreadReports(newReports)}</span>
+                  </>
+                ) : null}
               </Link>
             ))}
           </nav>

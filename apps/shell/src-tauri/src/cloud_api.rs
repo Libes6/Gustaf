@@ -108,6 +108,9 @@ fn send(request: ureq::Request, body: Option<Value>) -> Result<ureq::Response, A
     match result {
         Ok(response) => Ok(response),
         Err(ureq::Error::Status(401, _)) => Err(ApiError::Unauthorized),
+        Err(ureq::Error::Status(429, _)) => Err(ApiError::Failed(
+            "Too many requests to the Gustaf cloud. Try again later.".to_owned(),
+        )),
         Err(ureq::Error::Status(status, _)) => Err(ApiError::Failed(format!(
             "The Gustaf cloud answered with HTTP {status}."
         ))),
@@ -176,6 +179,28 @@ pub(crate) fn revoke_device(token: &str, device_id: &str) -> Result<(), ApiError
     send(
         request("DELETE", &format!("/v1/devices/{device_id}"), Some(token)),
         None,
+    )
+    .map(drop)
+}
+
+/// "Report a problem". The device id is only a hint; the cloud keeps it when it is this user's.
+pub(crate) fn send_report(
+    token: &str,
+    message: &str,
+    logs: Option<&str>,
+    app_version: &str,
+    device_id: Option<&str>,
+) -> Result<(), ApiError> {
+    send(
+        request("POST", "/v1/reports", Some(token)),
+        Some(json!({
+            "client": "desktop",
+            "message": message,
+            "logs": logs,
+            "appVersion": app_version,
+            "platform": format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+            "deviceId": device_id,
+        })),
     )
     .map(drop)
 }

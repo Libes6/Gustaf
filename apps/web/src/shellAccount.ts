@@ -33,6 +33,11 @@ export interface ShellAccount {
   readonly listDevices: () => Promise<readonly ShellAccountDevice[]>;
   readonly registerThisComputer: () => Promise<ShellAccountState>;
   readonly revokeDevice: (deviceId: string) => Promise<ShellAccountState>;
+  /** Sends a problem report with the account session; logs are read, redacted and capped by the shell. */
+  readonly reportProblem: (report: {
+    readonly message: string;
+    readonly attachLogs: boolean;
+  }) => Promise<void>;
 }
 
 export function shellAccount(): ShellAccount | undefined {
