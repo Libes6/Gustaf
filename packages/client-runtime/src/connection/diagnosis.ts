@@ -156,7 +156,7 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
-  const checkHost = `On ${host}, check Settings > Sharing & access or run \`t3 connect status\`.`;
+  const checkHost = `On ${host}, check Settings > Sharing & access or run \`gustaf connect status\`.`;
   switch (located.cause) {
     case "offline":
       return ["Connect this device to the internet. Gustaf reconnects on its own."];

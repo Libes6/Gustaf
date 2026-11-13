@@ -129,7 +129,7 @@ export const settingsBMessages = {
       "This app has no address for {label} that another machine can reach. Enter its https or Tailscale address.",
     "settingsB.LinkedEnvironmentsSettings.pairingCode": "Pairing code",
     "settingsB.LinkedEnvironmentsSettings.codeFromEnvironment":
-      "From that environment's Connections, or t3 pair there",
+      "From that environment's Connections, or gustaf pair there",
     "settingsB.LinkedEnvironmentsSettings.pasteCode": "Paste the code",
     "settingsB.LinkedEnvironmentsSettings.createLinkOn":
       "Create a link on {label}: Settings → Connections → Create link, then paste its code here.",
@@ -657,7 +657,7 @@ export const settingsBMessages = {
       "В приложении нет адреса {label}, по которому до машины можно достучаться с другой машины. Введите её адрес https или Tailscale.",
     "settingsB.LinkedEnvironmentsSettings.pairingCode": "Код сопряжения",
     "settingsB.LinkedEnvironmentsSettings.codeFromEnvironment":
-      "Из раздела «Подключения» того окружения или командой t3 pair там",
+      "Из раздела «Подключения» того окружения или командой gustaf pair там",
     "settingsB.LinkedEnvironmentsSettings.pasteCode": "Вставьте код",
     "settingsB.LinkedEnvironmentsSettings.createLinkOn":
       "Создайте связь на {label}: Настройки → Подключения → Создать связь, затем вставьте её код сюда.",

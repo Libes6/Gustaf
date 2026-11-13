@@ -100,7 +100,7 @@ const NOTHING_TO_CLOSE: ReadonlySet<TailscaleStderrDiagnostic | undefined> = new
 
 /**
  * Turns off the Tailscale Serve routes that forward to the server at `target`, such as one
- * `t3 pair --tailscale` left from before the policy, and keeps every other route. Runs before the
+ * `gustaf pair --tailscale` left from before the policy, and keeps every other route. Runs before the
  * server binds, and fails unless a fresh read shows no route here, since `off` can exit 0 and
  * leave it. Without the CLI, or with Tailscale down or logged out, nothing forwards.
  */
