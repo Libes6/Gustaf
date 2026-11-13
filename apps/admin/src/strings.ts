@@ -52,6 +52,8 @@ export const strings = {
     devicesHint: (active: number, computers: number, phones: number) =>
       `${active} active in 7 days · ${computers} computers · ${phones} phones`,
     sessions: "Active sessions",
+    relay: "Relay traffic this month",
+    relayHint: (users: number) => `${users} users`,
     signups: "Sign-ups, last 30 days",
     signupsSummary: (total: number) => `${total} sign-ups in the last 30 days`,
     signupsEmpty: "No sign-ups in the last 30 days.",
@@ -88,6 +90,8 @@ export const strings = {
     banReason: "Ban reason",
     devices: "Devices",
     devicesEmpty: "No devices.",
+    relay: "Relay traffic",
+    relayEmpty: "No relay traffic.",
     sessions: "Sessions",
     sessionsEmpty: "No active sessions.",
     revoked: "Revoked",

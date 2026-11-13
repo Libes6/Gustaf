@@ -25,7 +25,7 @@ NodeTest.test(
       );
       NodeAssert.equal(result.rows[0].count, journal.entries.length);
     } finally {
-      await database.onModuleDestroy();
+      await database.onApplicationShutdown();
     }
     const app = await createApp(readConfig({ DATABASE_URL: databaseUrl, AUTH_ENABLED: "0" }));
     app.useLogger(false);

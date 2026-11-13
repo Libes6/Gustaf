@@ -180,7 +180,8 @@ export async function openAttachmentInViewer(input: {
     if (/^(file|content):/.test(input.uri)) {
       await new File(input.uri).copy(cached.file);
     } else {
-      await File.downloadFileAsync(input.uri, cached.file, { signal: input.signal });
+      const { downloadFile } = await import("../features/relay/relayAssetFiles");
+      await downloadFile(input.uri, cached.file, input.signal);
     }
     if (input.signal.aborted) return;
     const endHandoff = beginForegroundHandoff();
@@ -207,14 +208,14 @@ export async function downloadAttachmentForPreview(input: {
   readonly signal: AbortSignal;
 }): Promise<AttachmentPreviewFile | null> {
   if (input.signal.aborted) return null;
-  const { File } = await import("expo-file-system");
   const cached = await createCachedAttachmentFile(input.attachment);
   try {
     if (input.signal.aborted) {
       cached.preview.dispose();
       return null;
     }
-    await File.downloadFileAsync(input.url, cached.file, { signal: input.signal });
+    const { downloadFile } = await import("../features/relay/relayAssetFiles");
+    await downloadFile(input.url, cached.file, input.signal);
     if (input.signal.aborted) {
       cached.preview.dispose();
       return null;

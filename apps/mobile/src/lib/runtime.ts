@@ -8,6 +8,7 @@ import * as Dpop from "../features/cloud/dpop";
 import * as ManagedRelayLayer from "../features/cloud/managedRelayLayer";
 import { resolveCloudPublicConfig } from "../features/cloud/publicConfig";
 import * as Tracing from "../features/observability/tracing";
+import { layerRelayWebSocket, relayAwareFetch } from "../features/relay/relayLayers";
 import * as NativeWebSocket from "../native/nativeWebSocket";
 import * as Persistence from "../persistence/layer";
 import { disposeOnFoundationReplace, type FoundationHotModule } from "./foundation-fast-refresh";
@@ -19,11 +20,13 @@ function configuredRelayUrl(): string {
   return resolveCloudPublicConfig().relay.url ?? "http://relay.invalid";
 }
 
-const layerHttpClient = layerRemoteHttpClient(fetch);
+// Environments paired over the Gustaf relay live at a virtual origin the tunnel intercepts.
+const layerHttpClient = layerRemoteHttpClient(relayAwareFetch);
+const layerWebSocket = layerRelayWebSocket(NativeWebSocket.layer);
 
 type RuntimeLayerSource =
   | ReturnType<typeof ManagedRelayLayer.layer>
-  | typeof NativeWebSocket.layer
+  | typeof layerWebSocket
   | typeof Dpop.layer
   | typeof layerHttpClient
   | typeof Persistence.layer
@@ -31,7 +34,7 @@ type RuntimeLayerSource =
 
 const layerRuntime = Layer.merge(
   ManagedRelayLayer.layer(configuredRelayUrl()),
-  NativeWebSocket.layer,
+  layerWebSocket,
 ).pipe(
   Layer.provideMerge(Dpop.layer),
   Layer.provideMerge(layerHttpClient),

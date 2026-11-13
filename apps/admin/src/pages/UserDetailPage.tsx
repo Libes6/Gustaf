@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { UserAvatar } from "../components/user-avatar";
-import { formatDateTime } from "../lib/format";
+import { formatBytes, formatDateTime } from "../lib/format";
 import { availableUserActions, normalizeBanReason, otherRole, type UserAction } from "../lib/rules";
 import { strings } from "../strings";
 import { useMeContext } from "./AppLayout";
@@ -119,6 +119,21 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
             <Field label={strings.users.banReason}>{user.banReason ?? strings.common.none}</Field>
           ) : null}
         </dl>
+      </Card>
+
+      <Card>
+        <CardTitle>{strings.users.relay}</CardTitle>
+        {user.relay.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">{strings.users.relayEmpty}</p>
+        ) : (
+          <dl className="mt-2 divide-y">
+            {user.relay.map((usage) => (
+              <Field key={usage.month} label={usage.month}>
+                {formatBytes(usage.bytes)}
+              </Field>
+            ))}
+          </dl>
+        )}
       </Card>
 
       <Card className="p-0">

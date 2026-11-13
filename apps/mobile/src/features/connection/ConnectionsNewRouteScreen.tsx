@@ -25,6 +25,7 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/ui/AppText";
 import { FrostedCutout } from "../../components/ui/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
+import { isRelayPairingLink, pairOverRelay } from "../relay/relayTunnels";
 import {
   type PairingOutcome,
   useRemoteConnections,
@@ -106,6 +107,8 @@ function PairingForm({
   const [scannerLocked, setScannerLocked] = useState(false);
   // A good scan parks the camera so it can't re-read the code over later edits.
   const [scanComplete, setScanComplete] = useState(false);
+  // Pairing through the Gustaf relay: connecting, then waiting for the computer's approval.
+  const [relayStatus, setRelayStatus] = useState<string | null>(null);
 
   const headerIconColor = useUniwindTheme()["--color-icon"];
 
@@ -150,6 +153,10 @@ function PairingForm({
     }
 
     setScannerLocked(true);
+    if (isRelayPairingLink(data)) {
+      void handleRelayScan(data);
+      return;
+    }
 
     try {
       const pairingUrl = extractPairingUrlFromQrPayload(data);
@@ -171,9 +178,48 @@ function PairingForm({
     }
   };
 
+  const handleRelayScan = async (link: string) => {
+    setScanComplete(true);
+    setOwnAttempt(true);
+    setSubmitError(null);
+    setAlreadySaved(undefined);
+    setIsSubmitting(true);
+    setRelayStatus(t("Connecting to the computer through the Gustaf relay…"));
+    let pairingUrl: string;
+    try {
+      pairingUrl = await pairOverRelay(link, (safetyCode) =>
+        setRelayStatus(
+          t(
+            "Allow this phone on the computer to finish pairing. The computer shows the same safety code: {code}",
+          ).replace("{code}", safetyCode),
+        ),
+      );
+    } catch (error) {
+      setIsSubmitting(false);
+      setRelayStatus(null);
+      setScanComplete(false);
+      setScannerLocked(false);
+      setSubmitError(error instanceof Error ? error.message : t("Pairing over the relay failed."));
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setRelayStatus(null);
+    setScannerLocked(false);
+    // Filled in so "add as a route" can resubmit the same code for a computer saved another way.
+    const { host, code } = parsePairingUrl(pairingUrl);
+    setHostInput(host);
+    setCodeInput(code);
+    await submitPairingUrl(pairingUrl, routeFor);
+  };
+
   // The duplicate check runs before the code is redeemed, so the same code can add the route.
-  const handleSubmit = async (targetEnvironmentId = routeFor) => {
-    const pairingUrl = buildPairingUrl(hostInput, codeInput);
+  const handleSubmit = (targetEnvironmentId = routeFor) =>
+    submitPairingUrl(buildPairingUrl(hostInput, codeInput), targetEnvironmentId);
+
+  const submitPairingUrl = async (
+    pairingUrl: string,
+    targetEnvironmentId: EnvironmentId | undefined,
+  ) => {
     setOwnAttempt(true);
     setSubmitError(null);
     setAlreadySaved(undefined);
@@ -271,7 +317,8 @@ function PairingForm({
                 pairingConnectionError ? "text-danger-foreground" : "text-foreground-muted",
               )}
             >
-              {pairingConnectionError ??
+              {relayStatus ??
+                pairingConnectionError ??
                 "For machines on your local network or tailnet. The machine keeps its own provider credentials."}
             </Text>
             {alreadySaved !== undefined && alreadySavedLabel !== undefined ? (

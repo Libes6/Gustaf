@@ -60,6 +60,10 @@ OAuth app с `http://localhost:3100`. Переменные: `BETTER_AUTH_SECRET`
 `AUTH_TRUSTED_ORIGINS` (см. `.env.example`). Без них процесс с включённым auth
 не стартует; `AUTH_ENABLED=0` выключает аккаунты целиком.
 
+Релей (`/v1/relay`, WebSocket) работает при включённых аккаунтах. `RELAY_MONTHLY_GB` (по
+умолчанию 100) — месячный объём трафика на пользователя, после него новые каналы
+отклоняются. Учёт — таблица `relay_usage`. Устройство протокола: `docs/internals/relay.md`.
+
 ## Docker и GitHub Actions
 
 Из корня: `docker build -f apps/api/Dockerfile -t gustaf-api:local .`.

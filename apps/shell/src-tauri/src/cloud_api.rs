@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-const API_BASE: &str = "https://api.libes6.ru";
+pub(crate) const API_BASE: &str = "https://api.libes6.ru";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct CloudUser {

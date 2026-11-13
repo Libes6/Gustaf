@@ -4,6 +4,7 @@ import {
   isSharedAddressSpaceHost,
   isTailnetHost,
 } from "@t3tools/shared/hostClassification";
+import { relayHostFromUrl } from "@t3tools/shared/relayTunnelClient";
 import type { DesktopSshEnvironmentTarget } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 
@@ -91,6 +92,8 @@ export function connectionRouteKind(route: ConnectionRoute): ConnectionRouteKind
     case "BearerConnectionTarget": {
       const hostname = routeHostname(route);
       if (hostname === null) return "public";
+      // The Gustaf relay's virtual origin: last resort behind every direct route.
+      if (isGustafRelayRoute(route)) return "relay";
       if (isLocalLoopbackHost(hostname)) return "loopback";
       const profile = Option.getOrNull(route.profile);
       const tailscale =
@@ -160,10 +163,15 @@ function routeAddressKey(route: ConnectionRoute): string | null {
   }
 }
 
+function isGustafRelayRoute(route: ConnectionRoute): boolean {
+  const httpBaseUrl = routeHttpBaseUrl(route);
+  return httpBaseUrl !== null && relayHostFromUrl(httpBaseUrl) !== null;
+}
+
 export function connectionRouteLabel(route: ConnectionRoute): string {
   switch (connectionRouteKind(route)) {
     case "relay":
-      return "T3 Connect";
+      return isGustafRelayRoute(route) ? "Gustaf relay" : "T3 Connect";
     case "loopback":
       return "This device";
     case "lan":

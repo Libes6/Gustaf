@@ -183,6 +183,18 @@
       "types": "./src/relaySigning.ts",
       "import": "./src/relaySigning.ts"
     },
+    "./relayNoise": {
+      "types": "./src/relayNoise.ts",
+      "import": "./src/relayNoise.ts"
+    },
+    "./relayTunnelClient": {
+      "types": "./src/relayTunnelClient.ts",
+      "import": "./src/relayTunnelClient.ts"
+    },
+    "./relayTunnel": {
+      "types": "./src/relayTunnel.ts",
+      "import": "./src/relayTunnel.ts"
+    },
     "./dpop": {
       "types": "./src/dpop.ts",
       "import": "./src/dpop.ts"
@@ -549,6 +561,7 @@
     "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
+    "@noble/ciphers": "catalog:",
     "@noble/curves": "catalog:",
     "@noble/hashes": "catalog:",
     "@t3tools/contracts": "workspace:*",

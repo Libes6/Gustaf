@@ -36,6 +36,22 @@ opens and approve. The new limit applies the next time you add a machine. If you
 cancel or downgrade T3 Chat, machines you already linked stay linked, but you
 cannot add more until you are under the limit again.
 
+## Gustaf relay
+
+Reach your computer from a phone on any network, also while either device is on a VPN. Traffic goes
+through the Gustaf cloud end-to-end encrypted: the relay sees which of your devices talk and how
+much, not what they say.
+
+1. In the desktop app, sign in under **Settings → Account** and register this computer.
+2. On the phone, sign in under **Settings → Account** and register the phone.
+3. On the computer, open **Settings → Remote access** and choose **Connect a phone**.
+4. On the phone, add an environment and scan the code, then choose **Allow device** on the computer.
+
+The code works once, for five minutes. Later connections need nothing. To check that nobody sits
+between the devices, compare the safety code on both screens (**Details** on the computer). Revoke a
+phone in the same section. If the phone also reaches the computer directly, add that address as
+another route to the same environment.
+
 ## Pair over a LAN or private network
 
 Use direct pairing when the other device can reach the host's network address.
