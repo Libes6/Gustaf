@@ -1,3 +1,4 @@
+import * as WorktreeInventory from "../../../workspace/WorktreeInventory.ts";
 import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Project from "../../../project/ProjectService.ts";
@@ -10,6 +11,23 @@ import * as WorktreeMcpService from "../../WorktreeMcpService.ts";
 import { WorktreeToolkit } from "./tools.ts";
 
 const handlers = {
+  t3_worktree_inventory: McpToolAccess.reads((input) =>
+    Effect.gen(function* () {
+      const context = yield* McpInvocationContext.McpInvocationContext;
+      if (!context.capabilities.has("worktree"))
+        return yield* new OrchestratorMcpFailure({
+          code: "capability_denied",
+          message: "This credential cannot inspect worktrees.",
+        });
+      const {
+        projection: { thread },
+      } = yield* readThread(input.threadId);
+      const inventory = yield* WorktreeInventory.WorktreeInventory;
+      return yield* inventory
+        .list({ projectIds: [thread.projectId], inspectPath: input.inspectPath })
+        .pipe(Effect.mapError(unavailable));
+    }),
+  ),
   t3_worktree_list: McpToolAccess.reads((input) =>
     Effect.gen(function* () {
       const context = yield* McpInvocationContext.McpInvocationContext;
