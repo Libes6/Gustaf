@@ -442,5 +442,10 @@
   "this device will lose access to your account.": "устройство потеряет доступ к аккаунту.",
   "Sign out?": "Выйти?",
   "This phone will forget your account.": "Телефон забудет ваш аккаунт.",
-  "Register this phone": "Добавить этот телефон"
+  "Register this phone": "Добавить этот телефон",
+  "Copy model reference": "Скопировать ссылку на модель",
+  "Share model reference": "Поделиться ссылкой на модель",
+  "Mentions": "Упоминания",
+  "Commands": "Команды",
+  "Skills": "Навыки"
 }

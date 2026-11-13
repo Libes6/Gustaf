@@ -41,6 +41,7 @@ export const chatAMessages = {
     "chatA.chatComposer.foldersOnlyLocal":
       "Folders can only be referenced on a server running on this computer",
     "chatA.chatComposer.replyingTo": "Replying to",
+    "chatA.modelMentionChip.accessibleLabel": "Model {label}",
     "chatA.chatComposer.replyingToNamed": "Replying to {names}",
     "chatA.chatComposer.cancelReply": "Cancel reply",
     "chatA.responseReplyCard.goTo": "Go to the response this replies to: {label}",
@@ -307,6 +308,7 @@ export const chatAMessages = {
     "chatA.chatComposer.foldersOnlyLocal":
       "Папки можно упомянуть только на сервере, запущенном на этом компьютере",
     "chatA.chatComposer.replyingTo": "Ответ на сообщение",
+    "chatA.modelMentionChip.accessibleLabel": "Модель {label}",
     "chatA.chatComposer.replyingToNamed": "Ответ: {names}",
     "chatA.chatComposer.cancelReply": "Отменить ответ",
     "chatA.responseReplyCard.goTo": "Перейти к ответу, на который это отвечает: {label}",
