@@ -1,4 +1,4 @@
-import { formatElapsed, t } from "../../i18n";
+import { formatElapsed, localizeSnoozePresetLabel, t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import type { ThreadRowProviderInstance } from "./thread-provider-instance";
 import {
@@ -156,7 +156,7 @@ const SLIM_MENU_ACTIONS: MenuAction[] = [
 ];
 
 const SNOOZED_MENU_ACTIONS: MenuAction[] = [
-  { id: "unsnooze", title: "Wake thread", image: "clock" },
+  { id: "unsnooze", title: t("Wake thread"), image: "clock" },
   { id: "delete", title: t("Delete"), image: "trash", attributes: { destructive: true } },
 ];
 
@@ -262,7 +262,7 @@ const SHELF_LABEL = { working: "Working", snoozed: "Snoozed", settled: "Settled"
 function ThreadListV2ShelfHeader(
   props: ThreadListV2ShelfHeaderProps & { readonly kind: keyof typeof SHELF_LABEL },
 ) {
-  const label = SHELF_LABEL[props.kind];
+  const label = t(SHELF_LABEL[props.kind]);
   return (
     <ThreadListV2Section
       label={props.expanded ? label : `${label} (${props.count})`}
@@ -272,7 +272,9 @@ function ThreadListV2ShelfHeader(
         expanded: props.expanded,
         disabled: props.disabled,
         onToggle: props.onToggle,
-        accessibilityLabel: `${props.count} ${props.kind} ${props.count === 1 ? "thread" : "threads"}`,
+        accessibilityLabel: t("{shelf}, threads: {count}")
+          .replace("{shelf}", label)
+          .replace("{count}", String(props.count)),
         accessibilityHint: `${props.expanded ? "Collapses" : "Expands"} the ${props.kind} threads.`,
       }}
     />
@@ -499,7 +501,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
                 : rowAppearance.tertiaryForegroundClassName,
             )}
           >
-            Sends on reconnect
+            {t("Sends on reconnect")}
           </Text>
         </View>
       ) : null}
@@ -560,7 +562,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   return (
     <>
       {props.showPendingDivider ? (
-        <ThreadListV2SectionDivider label="Unsent" pane={props.pane} />
+        <ThreadListV2SectionDivider label={t("Unsent")} pane={props.pane} />
       ) : null}
       <ThreadSwipeable
         dormant={dormant}
@@ -822,7 +824,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     () => [
       ...snoozePresets.map((preset) => ({
         id: `snooze:${preset.id}`,
-        title: preset.label,
+        title: localizeSnoozePresetLabel(preset),
         subtitle: preset.whenLabel,
       })),
       { id: "snooze:custom", title: t("Custom…") },
@@ -1014,7 +1016,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           thread.title,
         );
         void copyThreadReference(target).then((didCopy) => {
-          if (!didCopy) Dialog.alert(target.failureTitle, "Try copying this thread again.");
+          if (!didCopy) Dialog.alert(t(target.failureTitle), t("Try copying this thread again."));
         });
       }
       if (nativeEvent.event === "copy-thread-id") {
@@ -1035,8 +1037,8 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         handleSnooze(snoozeSelection.preset.snoozedUntil);
       } else if (snoozeSelection._tag === "expired") {
         Dialog.alert(
-          "Could not snooze thread",
-          "That snooze time has passed. Choose another time.",
+          t("Could not snooze thread"),
+          t("That snooze time has passed. Choose another time."),
         );
       }
     },
@@ -1103,13 +1105,13 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     () =>
       swipeActions.secondary === "snooze"
         ? {
-            accessibilityLabel: `Choose when to snooze ${thread.title}`,
+            accessibilityLabel: t("Choose when to snooze {title}").replace("{title}", thread.title),
             icon: "clock" as const,
             label: t("Snooze"),
             menu: {
               actions: snoozePresetActions,
               onPressAction: handleMenuAction,
-              title: "Snooze until",
+              title: t("Snooze until"),
             },
             onPress: () => undefined,
           }
@@ -1197,7 +1199,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
                     : "text-warning-foreground",
                 )}
               >
-                Woke
+                {t("Woke")}
               </Text>
             </Pressable>
           ) : statusLabel ? (
