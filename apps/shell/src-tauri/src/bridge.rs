@@ -135,6 +135,14 @@ const INIT_SCRIPT: &str = r#"(() => {
   // Same surface the web client expects from Electron's preload. Methods we have
   // not ported yet stay absent; callers use optional chaining. `preview` is omitted
   // on purpose (in-app browser is a separate project).
+  const sshPromptListeners = new Set();
+  window.__gustafSshPasswordPrompt = (request) => {
+    for (const listener of sshPromptListeners) listener(request);
+  };
+  const ssh = (method, input) => invoke("ssh_request", {
+    method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
+  });
+
   window.desktopBridge = {
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
@@ -149,9 +157,22 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
-    // SSH environments are not ported; the page subscribes while it starts.
-    onSshPasswordPrompt: () => () => {},
-    resolveSshPasswordPrompt: async () => {},
+    discoverSshHosts: () => ssh("discover"),
+    resolveSshHost: (alias) => ssh("resolve", alias),
+    ensureSshEnvironment: async (target, options) => {
+      const result = await ssh("ensure", { target, options });
+      if (result.type === "ssh-password-prompt-cancelled") throw new Error(result.message);
+      return result;
+    },
+    disconnectSshEnvironment: (target) => ssh("disconnect", target),
+    fetchSshEnvironmentDescriptor: (httpBaseUrl) => ssh("descriptor", { httpBaseUrl }),
+    bootstrapSshBearerSession: (httpBaseUrl, credential) => ssh("bootstrap", { httpBaseUrl, credential }),
+    fetchSshSessionState: (httpBaseUrl, bearerToken) => ssh("session", { httpBaseUrl, bearerToken }),
+    onSshPasswordPrompt: (listener) => {
+      sshPromptListeners.add(listener);
+      return () => sshPromptListeners.delete(listener);
+    },
+    resolveSshPasswordPrompt: (requestId, password) => ssh("resolve-password", { requestId, password }),
     getSystemLocale: () => navigator.language || "en-US",
     getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
     // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.

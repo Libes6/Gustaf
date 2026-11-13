@@ -9,6 +9,7 @@ mod local_env;
 mod network;
 mod server_process;
 mod shell_settings;
+mod ssh;
 mod updater;
 
 use std::collections::VecDeque;
@@ -437,6 +438,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
+            ssh::ssh_request,
             bridge::dropped_paths,
             bridge::drag_window,
             connection_storage::read_connection_catalog,
@@ -476,6 +478,7 @@ pub fn run() {
         ])
         .setup(|app| {
             updater::initialize(app)?;
+            app.manage(ssh::SshState::default());
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
@@ -572,6 +575,7 @@ pub fn run() {
         .expect("error while running Gustaf")
         .run(|app, event| {
             if matches!(event, RunEvent::Exit) {
+                ssh::stop(app);
                 stop_server(app);
             }
         });

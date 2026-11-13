@@ -6,6 +6,8 @@ import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
@@ -86,6 +88,30 @@ function commandArgs(command: ChildProcess.Command): ReadonlyArray<string> {
 const ARCHIVE = { archiveVersion: "1.2.3-preview.20260911.4" } as const;
 
 describe("ssh tunnel scripts", () => {
+  it.live("uses the installed fork CLI with literal arguments before downloading an archive", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "gustaf-ssh-runner-" });
+      const executable = path.join(directory, "gustaf cli");
+      yield* fs.writeFileString(executable, '#!/bin/sh\nprintf "%s\\n" "$@"\n');
+      yield* fs.chmod(executable, 0o700);
+      const script = SshTunnel.buildRemoteT3RunnerScript({
+        ...ARCHIVE,
+        installedCommand: executable,
+      });
+      const child = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-s", "--", "argument with spaces", "$(echo unsafe)"], {
+          stdin: { stream: Stream.make(new TextEncoder().encode(script)), endOnDone: true },
+        }),
+      );
+      const output = yield* child.stdout.pipe(Stream.decodeText(), Stream.runCollect);
+      assert.equal(output.join(""), "argument with spaces\n$(echo unsafe)\n");
+      assert.equal(yield* child.exitCode, 0);
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+
   it("rejects archive versions that are not a single exact version segment", () => {
     for (const archiveVersion of [
       "../other",
@@ -349,6 +375,60 @@ describe("ssh tunnel scripts", () => {
         }
       }).pipe(Effect.provide(layer), Effect.scoped);
     }),
+  );
+
+  it.effect.each([false, true])(
+    "pairing cancellation closes only a new tunnel, existing=%s",
+    (existing) =>
+      Effect.gen(function* () {
+        let killed = 0;
+        const target = { alias: "devbox", hostname: "devbox", username: null, port: null };
+        const spawner = ChildProcessSpawner.make((command) =>
+          Effect.sync(() => {
+            const args = commandArgs(command);
+            if (args.includes("-G")) return makeSuccessfulProcess("");
+            if (args.includes("-N"))
+              return makeRunningProcess(() => {
+                killed++;
+              });
+            if (args.some((arg, index) => arg === "-s" && args[index + 1] === "--"))
+              return makeSuccessfulProcess('{"remotePort":3773}\n');
+            return {
+              ...makeSuccessfulProcess(""),
+              exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(255)),
+              stderr: Stream.make(
+                new TextEncoder().encode("Permission denied (publickey,password)"),
+              ),
+            };
+          }),
+        );
+        const layer = Layer.mergeAll(
+          NodeServices.layer,
+          NodeCrypto.layer,
+          Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          Layer.succeed(HttpClient.HttpClient, testHttpClient),
+          Layer.succeed(NetService.NetService, testNetService),
+          Layer.succeed(
+            SshAuth.SshPasswordPrompt,
+            SshAuth.SshPasswordPrompt.of({
+              isAvailable: true,
+              request: () => Effect.succeed(null),
+            }),
+          ),
+          SshTunnel.SshEnvironmentManager.layer({ resolveCliRunner: Effect.succeed(ARCHIVE) }),
+        );
+        yield* Effect.gen(function* () {
+          const manager = yield* SshTunnel.SshEnvironmentManager;
+          if (existing) yield* manager.ensureEnvironment(target);
+          const result = yield* Effect.result(
+            manager.ensureEnvironment(target, { issuePairingToken: true }),
+          );
+          assert.isTrue(Result.isFailure(result));
+          if (Result.isFailure(result)) assert.instanceOf(result.failure, SshPasswordPromptError);
+          assert.equal(killed, existing ? 0 : 1);
+        }).pipe(Effect.provide(layer), Effect.scoped);
+        assert.equal(killed, 1);
+      }),
   );
 
   it.effect.each(["local tunnel", "remote server"] as const)(
