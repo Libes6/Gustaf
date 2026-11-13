@@ -115,22 +115,26 @@ fn run_tailscale_status_json() -> Option<Value> {
     serde_json::from_slice(&stdout).ok()
 }
 
-/// A Dock launch on macOS has a minimal PATH, so also try the app bundle CLI.
+/// A Dock launch on macOS has a minimal PATH, so also try the login-shell PATH
+/// (Homebrew) and the app bundle CLI.
 fn tailscale_binary() -> Option<PathBuf> {
     let exe = if cfg!(windows) {
         "tailscale.exe"
     } else {
         "tailscale"
     };
-    let on_path = std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path)
+    let find_in = |path: &std::ffi::OsStr| {
+        std::env::split_paths(path)
             .map(|dir| dir.join(exe))
             .find(|candidate| candidate.is_file())
-    });
-    on_path.or_else(|| {
-        let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
-        (cfg!(target_os = "macos") && app.is_file()).then_some(app)
-    })
+    };
+    std::env::var_os("PATH")
+        .and_then(|path| find_in(&path))
+        .or_else(|| {
+            let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
+            (cfg!(target_os = "macos") && app.is_file()).then_some(app)
+        })
+        .or_else(|| crate::login_shell_path().and_then(|path| find_in(path.as_ref())))
 }
 
 /// Runs a helper without a console window and kills it after `HELPER_TIMEOUT`.
@@ -339,24 +343,28 @@ pub(crate) fn advertised_endpoints_json(
         }
     }
 
-    // Serve proxies to loopback, so it is published in both exposure modes.
-    if tailscale_serve_enabled {
-        if let Some(dns) = &network.magic_dns_name {
-            let https = if tailscale_serve_port == 443 {
-                format!("https://{dns}")
-            } else {
-                format!("https://{dns}:{tailscale_serve_port}")
-            };
-            endpoints.push(endpoint(
-                &format!("tailscale-serve:{https}"),
-                "Tailscale Serve",
-                &https,
-                "private-network",
-                "desktop-addon",
-                false,
-                "HTTPS endpoint via Tailscale Serve.",
-            ));
+    // Serve proxies to loopback, so it is listed in both exposure modes. The web
+    // settings find it by the `tailscale-magicdns:` id and offer to turn Serve on
+    // while it is unavailable.
+    if let Some(dns) = &network.magic_dns_name {
+        let https = if tailscale_serve_port == 443 {
+            format!("https://{dns}")
+        } else {
+            format!("https://{dns}:{tailscale_serve_port}")
+        };
+        let mut serve = endpoint(
+            &format!("tailscale-magicdns:{https}"),
+            "Tailscale HTTPS",
+            &https,
+            "private-network",
+            "desktop-addon",
+            false,
+            "HTTPS endpoint via Tailscale Serve.",
+        );
+        if !tailscale_serve_enabled {
+            serve["status"] = json!("unavailable");
         }
+        endpoints.push(serve);
     }
 
     Value::Array(endpoints)
@@ -480,6 +488,30 @@ mod tests {
             urls,
             ["http://127.0.0.1:3773/", "https://box.tail1234.ts.net/"]
         );
+        let serve = &endpoints[1];
+        assert_eq!(
+            serve["id"],
+            "tailscale-magicdns:https://box.tail1234.ts.net"
+        );
+        assert_eq!(serve["status"], "available");
+    }
+
+    #[test]
+    fn serve_endpoint_is_offered_as_unavailable_while_serve_is_off() {
+        let network = NetworkSnapshot {
+            magic_dns_name: Some("box.tail1234.ts.net".into()),
+            ..NetworkSnapshot::default()
+        };
+        let endpoints = advertised_endpoints_json(
+            "http://127.0.0.1:3773/",
+            "local-only",
+            false,
+            8443,
+            &network,
+        );
+        let serve = &endpoints.as_array().unwrap()[1];
+        assert_eq!(serve["httpBaseUrl"], "https://box.tail1234.ts.net:8443/");
+        assert_eq!(serve["status"], "unavailable");
     }
 
     #[test]

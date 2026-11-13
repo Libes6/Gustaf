@@ -12,7 +12,7 @@ mod updater;
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Command, Stdio};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -93,10 +93,19 @@ fn pairing_url_from_line(line: &str) -> Option<&str> {
     url.starts_with("http://").then_some(url)
 }
 
-fn login_shell_path() -> Option<String> {
+/// Read once: the shell takes seconds to start and the network helpers ask again.
+pub(crate) fn login_shell_path() -> Option<String> {
+    static PATH: OnceLock<Option<String>> = OnceLock::new();
+    PATH.get_or_init(read_login_shell_path).clone()
+}
+
+fn read_login_shell_path() -> Option<String> {
     // A Dock launch does not inherit the shell PATH, so codex, claude, and cursor disappear.
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
-    let mut child = Command::new(shell)
+    let mut command = Command::new(shell);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
+    let mut child = command
         .args(["-lic", "printf %s \"$PATH\""])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
