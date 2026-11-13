@@ -9,7 +9,7 @@ import { formatBytes, formatCount, formatDateTime, formatDay, shortCommit } from
 import { strings } from "../strings";
 import { PageTitle } from "./AppLayout";
 
-function Stat({
+export function Stat({
   title,
   value,
   hint,
@@ -75,7 +75,13 @@ function SignupChart({ days }: { readonly days: Overview["signupsByDay"] }) {
   );
 }
 
-function Row({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
+export function Row({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 py-1.5 text-sm">
       <dt className="text-muted-foreground">{label}</dt>

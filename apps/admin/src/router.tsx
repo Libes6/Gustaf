@@ -6,6 +6,9 @@ import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { RelayPage } from "./pages/RelayPage";
+import { ReleasesPage } from "./pages/ReleasesPage";
+import { SystemPage } from "./pages/SystemPage";
 import { UserDetailPage } from "./pages/UserDetailPage";
 import { UsersPage } from "./pages/UsersPage";
 import { strings } from "./strings";
@@ -49,6 +52,24 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const relayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/relay",
+  component: RelayPage,
+});
+
+const systemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/system",
+  component: SystemPage,
+});
+
+const releasesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/releases",
+  component: ReleasesPage,
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     overviewRoute,
@@ -56,6 +77,9 @@ export const router = createRouter({
     userRoute,
     devicesRoute,
     auditRoute,
+    relayRoute,
+    systemRoute,
+    releasesRoute,
   ]),
   // The real value arrives through RouterProvider once /v1/me confirms an admin.
   context: { me: undefined! },

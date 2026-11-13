@@ -90,3 +90,116 @@ export interface AuditEntry {
   readonly targetId: string;
   readonly meta: unknown;
 }
+
+/** Relay outcome names, in the API's order; see apps/api/src/relay/relay.hub.ts. */
+export const RELAY_FAILURES = [
+  "rate_limited",
+  "hello_timeout",
+  "bad_hello",
+  "unauthorized",
+  "unavailable",
+  "not_a_computer",
+  "socket_limit",
+  "host_offline",
+  "channel_limit",
+  "budget_exceeded",
+  "protocol_error",
+  "too_slow",
+  "revoked",
+] as const;
+export type RelayFailure = (typeof RELAY_FAILURES)[number];
+export type RelayEvent = "attempt" | "connected" | "channel_opened" | RelayFailure;
+
+export interface RelayHealth {
+  readonly live: {
+    readonly hostsOnline: number;
+    readonly clientsOnline: number;
+    readonly openTunnels: number;
+    readonly since: string;
+    readonly counts: Readonly<Record<RelayEvent, number>>;
+  };
+  readonly monthlyLimitBytes: number;
+  /** The last 30 UTC days, oldest first. */
+  readonly days: ReadonlyArray<
+    { readonly date: string; readonly bytes: number } & Readonly<Record<RelayEvent, number>>
+  >;
+  readonly topUsers: ReadonlyArray<{
+    readonly userId: string;
+    readonly name: string;
+    readonly githubLogin: string | null;
+    readonly bytes: number;
+    readonly percent: number;
+  }>;
+}
+
+export type BackupStatus =
+  | { readonly status: "not_configured" }
+  | { readonly status: "error"; readonly message: string }
+  | {
+      readonly status: "ok";
+      readonly fetchedAt: string;
+      readonly schedules: number;
+      readonly enabled: number;
+      readonly frequency: string | null;
+      readonly last: {
+        readonly status: string;
+        readonly startedAt: string;
+        readonly finishedAt: string | null;
+        readonly sizeBytes: number | null;
+      } | null;
+    };
+
+export interface SystemStatus {
+  readonly build: {
+    readonly version: string;
+    readonly commit: string;
+    readonly startedAt: string;
+    readonly uptimeSeconds: number;
+    readonly node: string;
+  };
+  readonly memory: {
+    readonly rssBytes: number;
+    readonly heapUsedBytes: number;
+    readonly heapTotalBytes: number;
+    readonly externalBytes: number;
+  };
+  readonly disk: { readonly totalBytes: number; readonly freeBytes: number } | null;
+  readonly database: {
+    readonly sizeBytes: number;
+    readonly tables: ReadonlyArray<{
+      readonly name: string;
+      readonly bytes: number;
+      readonly rows: number | null;
+    }>;
+  } | null;
+  readonly backups: BackupStatus;
+}
+
+export type Platform = "macos" | "windows" | "linux" | "android" | "ios" | "other";
+
+export interface ReleaseAsset {
+  readonly name: string;
+  readonly platform: Platform;
+  readonly kind: "installer" | "update" | "metadata";
+  readonly downloads: number;
+  readonly sizeBytes: number;
+}
+
+export type ReleaseStats =
+  | { readonly status: "error"; readonly message: string }
+  | {
+      readonly status: "ok";
+      readonly fetchedAt: string;
+      readonly total: number;
+      readonly byPlatform: Readonly<
+        Record<Platform, { readonly installer: number; readonly update: number }>
+      >;
+      readonly releases: ReadonlyArray<{
+        readonly tag: string;
+        readonly name: string | null;
+        readonly publishedAt: string | null;
+        readonly prerelease: boolean;
+        readonly downloads: number;
+        readonly assets: ReadonlyArray<ReleaseAsset>;
+      }>;
+    };

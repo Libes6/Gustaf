@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  date,
   index,
   jsonb,
   pgEnum,
@@ -163,4 +164,16 @@ export const relayUsage = pgTable(
     bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
+);
+
+// Relay totals per UTC day: bytes and connection outcomes by metric name (relay.daily.ts).
+// Aggregate only; no user, device or address is stored.
+export const relayDaily = pgTable(
+  "relay_daily",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    metric: text("metric").notNull(),
+    value: bigint("value", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.metric] })],
 );

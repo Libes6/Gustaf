@@ -7,6 +7,7 @@ import {
   errorMessage,
   formatBytes,
   formatDay,
+  formatDuration,
   formatMeta,
   formatRelative,
   hasMeta,
@@ -33,6 +34,12 @@ describe("formatting", () => {
     expect(formatBytes(1023)).toBe("1023 B");
     expect(formatBytes(1536)).toBe("1.5 KB");
     expect(formatBytes(100 * 1024 ** 3)).toBe("100.0 GB");
+  });
+
+  it("formats uptime with the two largest units", () => {
+    expect(formatDuration(30)).toBe("0m");
+    expect(formatDuration(5 * 3600 + 12 * 60)).toBe("5h 12m");
+    expect(formatDuration(3 * 86400 + 4 * 3600 + 59)).toBe("3d 4h");
   });
 
   it("shortens full commit hashes only", () => {

@@ -7,7 +7,10 @@ import type {
   Me,
   Overview,
   Page,
+  RelayHealth,
+  ReleaseStats,
   Role,
+  SystemStatus,
 } from "./types";
 
 // Every HTTP detail of the cloud API lives in this module, so a route rename is a one-place change.
@@ -170,6 +173,10 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
 
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),
+
+    relay: () => request<RelayHealth>("GET", "/v1/admin/relay"),
+    system: () => request<SystemStatus>("GET", "/v1/admin/system"),
+    releases: () => request<ReleaseStats>("GET", "/v1/admin/releases"),
   };
 }
 

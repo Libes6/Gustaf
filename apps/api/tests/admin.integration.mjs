@@ -50,10 +50,13 @@ NodeTest.test(
       );
 
       NodeAssert.equal((await api("/v1/admin/overview")).status, 401);
-      NodeAssert.equal(
-        (await api("/v1/admin/users", { auth: { bearer: user.bearer } })).status,
-        403,
-      );
+      for (const path of ["users", "relay", "system", "releases"]) {
+        NodeAssert.equal(
+          (await api(`/v1/admin/${path}`, { auth: { bearer: user.bearer } })).status,
+          403,
+          path,
+        );
+      }
       NodeAssert.equal(
         (
           await api(`/v1/admin/users/${me.body.user.id}/ban`, {
@@ -437,5 +440,29 @@ NodeTest.test("overview numbers match the database", async () => {
     NodeAssert.equal(body.build.version, "dev");
     NodeAssert.equal(body.build.commit, "unknown");
     NodeAssert.ok(!Number.isNaN(Date.parse(body.build.startedAt)));
+
+    const today = new Date().toISOString().slice(0, 10);
+    await pool.query(
+      `insert into relay_daily (day, metric, value) values ($1, 'bytes', 700), ($1, 'unauthorized', 2)
+       on conflict (day, metric) do update set value = relay_daily.value + excluded.value`,
+      [today],
+    );
+    const relay = await adminApi("/v1/admin/relay");
+    NodeAssert.equal(relay.status, 200);
+    NodeAssert.equal(relay.body.days.length, 30);
+    NodeAssert.equal(relay.body.days.at(-1).date, today);
+    NodeAssert.ok(relay.body.days.at(-1).bytes >= 700);
+    NodeAssert.ok(relay.body.days.at(-1).unauthorized >= 2);
+    const top = relay.body.topUsers.find((row) => row.userId === userId);
+    NodeAssert.equal(top.bytes, 5000);
+    NodeAssert.equal(top.percent, (5000 / relay.body.monthlyLimitBytes) * 100);
+    NodeAssert.equal(relay.body.live.hostsOnline, 0);
+
+    const system = await adminApi("/v1/admin/system");
+    NodeAssert.equal(system.status, 200);
+    NodeAssert.ok(system.body.database.sizeBytes > 0);
+    NodeAssert.ok(system.body.database.tables.some((table) => table.name === "user"));
+    NodeAssert.ok(system.body.disk.totalBytes >= system.body.disk.freeBytes);
+    NodeAssert.deepEqual(system.body.backups, { status: "not_configured" });
   });
 });
