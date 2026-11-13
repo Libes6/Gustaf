@@ -49,14 +49,21 @@ const INIT_SCRIPT: &str = r#"(() => {
   });
 
   const pickFolder = async (options) => {
+    const initialPath = await invoke("wsl_path", {
+      path: options?.initialPath ?? "",
+      toWindows: true,
+      targetEnvironmentId: options?.targetEnvironmentId ?? null,
+    });
     const picked = await invoke("plugin:dialog|open", {
       options: {
         directory: true,
         multiple: false,
-        ...(options?.initialPath ? { defaultPath: options.initialPath } : {}),
+        ...(initialPath ? { defaultPath: initialPath } : {}),
       },
     });
-    return typeof picked === "string" && picked.length > 0 ? picked : null;
+    return typeof picked === "string" && picked.length > 0
+      ? invoke("wsl_path", { path: picked, toWindows: false, targetEnvironmentId: options?.targetEnvironmentId ?? null })
+      : null;
   };
 
   const droppedPaths = async () => {
@@ -191,38 +198,10 @@ const INIT_SCRIPT: &str = r#"(() => {
     openExternal: updater.openExternal,
     openSystemSettings: async () => false,
     checkSystemPermission: async () => false,
-    getWslState: async () => ({
-      enabled: false,
-      distro: null,
-      available: false,
-      wslOnly: false,
-      distros: [],
-      preflightError: null,
-    }),
-    setWslBackendEnabled: async () => ({
-      enabled: false,
-      distro: null,
-      available: false,
-      wslOnly: false,
-      distros: [],
-      preflightError: null,
-    }),
-    setWslDistro: async () => ({
-      enabled: false,
-      distro: null,
-      available: false,
-      wslOnly: false,
-      distros: [],
-      preflightError: null,
-    }),
-    setWslOnly: async () => ({
-      enabled: false,
-      distro: null,
-      available: false,
-      wslOnly: false,
-      distros: [],
-      preflightError: null,
-    }),
+    getWslState: () => invoke("wsl_state"),
+    setWslBackendEnabled: (enabled) => invoke("set_wsl_backend_enabled", { enabled }),
+    setWslDistro: (distro) => invoke("set_wsl_distro", { distro }),
+    setWslOnly: (enabled) => invoke("set_wsl_only", { enabled }),
     getUpdateState: updater.getUpdateState,
     setUpdateChannel: async () => updater.getUpdateState(),
     checkForUpdate: updater.checkForUpdate,

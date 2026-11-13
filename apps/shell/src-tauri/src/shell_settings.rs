@@ -39,6 +39,12 @@ impl ExposureMode {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ShellSettings {
+    #[serde(default)]
+    pub wsl_backend_enabled: bool,
+    #[serde(default)]
+    pub wsl_distro: Option<String>,
+    #[serde(default)]
+    pub wsl_only: bool,
     pub exposure_mode: ExposureMode,
     pub tailscale_serve_enabled: bool,
     pub tailscale_serve_port: u16,
@@ -47,6 +53,9 @@ pub(crate) struct ShellSettings {
 impl Default for ShellSettings {
     fn default() -> Self {
         Self {
+            wsl_backend_enabled: false,
+            wsl_distro: None,
+            wsl_only: false,
             exposure_mode: ExposureMode::LocalOnly,
             tailscale_serve_enabled: false,
             tailscale_serve_port: DEFAULT_TAILSCALE_SERVE_PORT,
@@ -90,6 +99,22 @@ pub(crate) fn save(app: &tauri::AppHandle, settings: &ShellSettings) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::{ExposureMode, ShellSettings};
+
+    #[test]
+    fn reads_older_settings_and_round_trips_wsl_preferences() {
+        let raw = r#"{"exposureMode":"local-only","tailscaleServeEnabled":false,"tailscaleServePort":443}"#;
+        let mut settings: ShellSettings = serde_json::from_str(raw).unwrap();
+        assert!(!settings.wsl_backend_enabled);
+        assert!(!settings.wsl_only);
+        assert!(settings.wsl_distro.is_none());
+        settings.wsl_backend_enabled = true;
+        settings.wsl_only = true;
+        settings.wsl_distro = Some("Ubuntu Dev".into());
+        let saved = serde_json::to_string(&settings).unwrap();
+        let restored: ShellSettings = serde_json::from_str(&saved).unwrap();
+        assert!(restored.wsl_backend_enabled && restored.wsl_only);
+        assert_eq!(restored.wsl_distro.as_deref(), Some("Ubuntu Dev"));
+    }
 
     #[test]
     fn round_trips_default_settings_json() {

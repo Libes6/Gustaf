@@ -218,7 +218,7 @@ fn exposure_state_value(settings: &ShellSettings, http_base_url: &str) -> Value 
     })
 }
 
-fn schedule_relaunch(app: tauri::AppHandle) {
+pub(crate) fn schedule_relaunch(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(250));
         crate::stop_server(&app);

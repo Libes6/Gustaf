@@ -2,7 +2,7 @@
 //! ignores a polite request to stop or the shell itself dies.
 
 use std::io;
-use std::process::{Child, ChildStdout, Command};
+use std::process::{Child, ChildStdin, ChildStdout, Command};
 use std::time::Duration;
 #[cfg(unix)]
 use std::time::Instant;
@@ -12,6 +12,7 @@ pub(crate) const STOP_GRACE: Duration = Duration::from_secs(8);
 
 pub(crate) struct Server {
     child: Child,
+    stdin: Option<ChildStdin>,
     #[cfg(windows)]
     job: windows_job::Job,
 }
@@ -20,16 +21,27 @@ impl Server {
     pub(crate) fn spawn(command: &mut Command) -> io::Result<Self> {
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(command, 0);
-        let child = command.spawn()?;
+        let mut child = command.spawn()?;
+        let stdin = child.stdin.take();
         // Windows has no process group to signal. A job with kill-on-close takes the
         // server's children down with it, also when the shell is killed.
         #[cfg(windows)]
         let job = windows_job::Job::containing(&child)?;
         Ok(Self {
             child,
+            stdin,
             #[cfg(windows)]
             job,
         })
+    }
+
+    pub(crate) fn write_stdin(&mut self, script: &str) -> Result<(), String> {
+        use std::io::Write;
+        self.stdin
+            .as_mut()
+            .ok_or("server stdin is missing")?
+            .write_all(script.as_bytes())
+            .map_err(|e| e.to_string())
     }
 
     pub(crate) fn take_stdout(&mut self) -> Option<ChildStdout> {
@@ -45,6 +57,19 @@ impl Server {
         if !matches!(self.child.try_wait(), Ok(None)) {
             return;
         }
+        let wsl = self.stdin.take().is_some();
+        #[cfg(windows)]
+        if wsl {
+            let deadline = std::time::Instant::now() + grace;
+            while std::time::Instant::now() < deadline {
+                if !matches!(self.child.try_wait(), Ok(None)) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = wsl;
         #[cfg(unix)]
         {
             let group = i32::try_from(self.child.id()).ok().map(|pid| -pid);

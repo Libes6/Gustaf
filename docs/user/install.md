@@ -141,9 +141,16 @@ add it again. If you already have another `t3`, it stays as it is.
 ### Windows Subsystem for Linux
 
 Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
-there. Install the provider CLIs inside that distro. T3 Code installs its own
-server runtime there automatically; the first launch after an app update can
-take longer.
+there. Install the provider CLIs inside that distro. Gustaf requires the matching
+Linux runtime (the complete runtime directory, including `t3` and its dependencies)
+at `~/.gustaf/runtime` inside the selected distro. The Windows executable cannot
+run as a Linux server. Keep this runtime in sync when updating Gustaf.
+
+Changing the WSL settings restarts Gustaf. WSL normally appears
+as a second environment alongside Windows. WSL-only mode uses it as the primary
+environment; if it cannot start, Gustaf shows the failure and falls back to Windows.
+Disabling WSL also turns off WSL-only mode. Linux state stays inside that distro
+under `~/.gustaf`, separate from the Windows server's data.
 
 ### Open a project from a terminal
 

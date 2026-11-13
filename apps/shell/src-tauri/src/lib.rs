@@ -8,6 +8,8 @@ mod network;
 mod server_process;
 mod shell_settings;
 mod updater;
+mod wsl;
+mod wsl_support;
 
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -134,12 +136,26 @@ fn start_server(
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
-    command.stdin(Stdio::null()).stdout(Stdio::piped());
+    command.stdin(Stdio::null());
+    spawn_server(command, None)
+}
+
+fn spawn_server(
+    mut command: Command,
+    script: Option<&str>,
+) -> Result<(Server, tauri::Url), String> {
+    command.stdout(Stdio::piped());
+    if script.is_some() {
+        command.stdin(Stdio::piped());
+    }
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
 
     let mut server = Server::spawn(&mut command)
         .map_err(|error| format!("The server program could not be started: {error}"))?;
+    if let Some(script) = script {
+        server.write_stdin(script)?;
+    }
     let stdout = server.take_stdout().expect("piped server stdout");
     let log_tail = Arc::new(Mutex::new(VecDeque::<String>::new()));
     let (send_url, receive_url) = mpsc::sync_channel(1);
@@ -260,6 +276,9 @@ fn set_dock_icon() {
 
 /// The server holds files inside the app bundle, so it has to end before an update replaces them.
 pub(crate) fn stop_server(app: &tauri::AppHandle) {
+    if let Some(wsl) = app.try_state::<wsl::WslRuntime>() {
+        wsl.stop();
+    }
     if let Some(server) = app.try_state::<Mutex<Option<Server>>>() {
         let _ = server.lock().map(|mut server| server.take());
     }
@@ -346,6 +365,11 @@ pub fn run() {
             local_env::local_environment_bearer_token,
             local_env::local_environment_enabled,
             local_env::set_local_environment_enabled,
+            wsl::wsl_state,
+            wsl::set_wsl_backend_enabled,
+            wsl::set_wsl_distro,
+            wsl::set_wsl_only,
+            wsl::wsl_path,
             local_env::server_exposure_state,
             local_env::set_server_exposure_mode,
             local_env::set_tailscale_serve_enabled,
@@ -370,9 +394,35 @@ pub fn run() {
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
             set_dock_icon();
-            let settings = shell_settings::load(app.handle());
+            let mut settings = shell_settings::load(app.handle());
+            let mut wsl = wsl::WslRuntime::start(&settings);
+            if cfg!(windows) && settings.wsl_backend_enabled && settings.wsl_only && !wsl.ready() {
+                let reason = wsl.error().unwrap_or_else(|| "WSL is unavailable".into());
+                let russian = app
+                    .path()
+                    .app_local_data_dir()
+                    .ok()
+                    .and_then(|dir| std::fs::read(dir.join("client-settings.json")).ok())
+                    .and_then(|raw| serde_json::from_slice::<serde_json::Value>(&raw).ok())
+                    .is_none_or(|value| value["uiLanguage"] != "en");
+                let fallback = if russian {
+                    "Gustaf будет использовать окружение Windows."
+                } else {
+                    "Gustaf will use the Windows backend."
+                };
+                app.dialog()
+                    .message(format!("WSL: {reason}\n{fallback}"))
+                    .title("Gustaf")
+                    .blocking_show();
+                settings.wsl_backend_enabled = false;
+                settings.wsl_only = false;
+                shell_settings::save(app.handle(), &settings)?;
+            }
             app.manage(Mutex::new(settings.clone()));
-            let (server, pairing_url) = match start_server(app, &settings) {
+            let (server, pairing_url) = match wsl
+                .take_primary(&settings)
+                .unwrap_or_else(|| start_server(app, &settings))
+            {
                 Ok(started) => started,
                 Err(reason) => {
                     report_start_failure(app.handle(), &reason);
@@ -389,13 +439,18 @@ pub fn run() {
                     return Ok(());
                 }
             };
-            let bootstraps = serde_json::json!([{
+            let mut bootstraps = serde_json::json!([{
                 "id": "primary",
                 "label": "This computer",
+                "runningDistro": if settings.wsl_only { wsl.running_distro.clone() } else { None },
                 "httpBaseUrl": local.http_base_url,
                 "wsBaseUrl": local.ws_base_url,
                 "bootstrapToken": local.bootstrap_token,
             }]);
+            if let Some(bootstrap) = wsl.bootstrap() {
+                bootstraps.as_array_mut().unwrap().push(bootstrap);
+            }
+            app.manage(wsl);
             let app_url = local.app_url.clone();
             let Some(port) = app_url.port() else {
                 report_start_failure(

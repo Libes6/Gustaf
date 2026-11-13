@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wsl-state"
+description = "Enables the wsl_state command without any pre-configured scope."
+commands.allow = ["wsl_state"]
+
+[[permission]]
+identifier = "deny-wsl-state"
+description = "Denies the wsl_state command without any pre-configured scope."
+commands.deny = ["wsl_state"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wsl-path"
+description = "Enables the wsl_path command without any pre-configured scope."
+commands.allow = ["wsl_path"]
+
+[[permission]]
+identifier = "deny-wsl-path"
+description = "Denies the wsl_path command without any pre-configured scope."
+commands.deny = ["wsl_path"]
