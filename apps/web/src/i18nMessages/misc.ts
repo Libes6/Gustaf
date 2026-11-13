@@ -1165,6 +1165,14 @@ export const miscMessages = {
     "misc.t3ChatProfile.notLinked": "Not linked",
     "misc.t3ChatProfile.serverNoSupport":
       "This Gustaf Connect server does not support T3 Chat linking.",
+    "misc.clientConfig.updateRequired": "Update Gustaf",
+    "misc.clientConfig.updateRequiredBody":
+      "This version is no longer supported. Install the latest update to keep using Gustaf.",
+    "misc.clientConfig.minimumVersion": "Required version",
+    "misc.clientConfig.checkForUpdate": "Check for update",
+    "misc.clientConfig.learnMore": "Learn more",
+    "misc.clientConfig.dismiss": "Dismiss",
+    "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
     "misc.attachmentFilePreview.attachment": "Вложение",
@@ -2336,5 +2344,13 @@ export const miscMessages = {
     "misc.t3ChatProfile.notLinked": "Не связан",
     "misc.t3ChatProfile.serverNoSupport":
       "Этот сервер Gustaf Connect не поддерживает привязку T3 Chat.",
+    "misc.clientConfig.updateRequired": "Обновите Gustaf",
+    "misc.clientConfig.updateRequiredBody":
+      "Эта версия больше не поддерживается. Установите последнее обновление, чтобы продолжить работу.",
+    "misc.clientConfig.minimumVersion": "Нужная версия",
+    "misc.clientConfig.checkForUpdate": "Проверить обновление",
+    "misc.clientConfig.learnMore": "Подробнее",
+    "misc.clientConfig.dismiss": "Скрыть",
+    "misc.clientConfig.announcements": "Объявления",
   },
 } as const satisfies Record<UiLanguage, Record<string, string>>;

@@ -9,6 +9,9 @@ const NAV = [
   { to: "/", label: strings.nav.overview, exact: true },
   { to: "/users", label: strings.nav.users, exact: false },
   { to: "/devices", label: strings.nav.devices, exact: false },
+  { to: "/announcements", label: strings.nav.announcements, exact: false },
+  { to: "/versions", label: strings.nav.versions, exact: false },
+  { to: "/flags", label: strings.nav.flags, exact: false },
   { to: "/audit", label: strings.nav.audit, exact: false },
 ] as const;
 

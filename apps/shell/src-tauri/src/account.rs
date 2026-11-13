@@ -720,3 +720,32 @@ mod tests {
         }
     }
 }
+
+/// Never fails for want of an account: without a readable credential it asks signed out.
+#[tauri::command]
+pub(crate) async fn client_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    off_main_thread(move || {
+        let credential = read_account(&app, |account| {
+            account
+                .device
+                .as_ref()
+                .map(|device| device.token.clone())
+                .or_else(|| {
+                    account
+                        .session
+                        .as_ref()
+                        .map(|session| session.token.clone())
+                })
+        })
+        .ok()
+        .flatten();
+        let version = app.package_info().version.to_string();
+        cloud_api::client_config(
+            &version,
+            crate::local_env::client_platform(),
+            credential.as_deref(),
+        )
+        .map_err(String::from)
+    })
+    .await
+}

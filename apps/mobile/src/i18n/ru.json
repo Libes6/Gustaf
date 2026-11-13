@@ -467,5 +467,10 @@
   "Arrange": "Упорядочить",
   "Model unavailable. Open model settings.": "Модель недоступна. Открыть настройки модели.",
   "Stop agent": "Остановить агента",
-  "Choose how to send this message": "Выбрать способ отправки сообщения"
+  "Choose how to send this message": "Выбрать способ отправки сообщения",
+  "Update Gustaf": "Обновите Gustaf",
+  "This version is no longer supported. Install the latest update to keep using Gustaf.": "Эта версия больше не поддерживается. Установите последнее обновление, чтобы продолжить работу.",
+  "Required version": "Нужная версия",
+  "Download update": "Скачать обновление",
+  "Learn more": "Подробнее"
 }

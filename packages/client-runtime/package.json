@@ -171,6 +171,10 @@
       "types": "./src/queuedRunEdit.ts",
       "default": "./src/queuedRunEdit.ts"
     },
+    "./client-config": {
+      "types": "./src/clientConfig.ts",
+      "default": "./src/clientConfig.ts"
+    },
     "./clock": {
       "types": "./src/clock.ts",
       "default": "./src/clock.ts"

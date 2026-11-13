@@ -164,3 +164,44 @@ export const relayUsage = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
 );
+
+// Client config (GET /v1/client-config): announcements, minimum versions and feature flags,
+// edited in the admin app and read by every desktop and mobile client.
+export const clientKind = pgEnum("client_kind", ["desktop", "mobile"]);
+export const clientTarget = pgEnum("client_target", ["all", "desktop", "mobile"]);
+export const announcementLevel = pgEnum("announcement_level", ["info", "warning", "critical"]);
+export const featureFlagMode = pgEnum("feature_flag_mode", ["off", "everyone", "listed"]);
+
+export const announcement = pgTable("announcement", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  textEn: text("text_en").notNull(),
+  textRu: text("text_ru").notNull(),
+  level: announcementLevel("level").notNull().default("info"),
+  link: text("link"),
+  target: clientTarget("target").notNull().default("all"),
+  // Inclusive bounds; a client that does not send its version never sees a ranged announcement.
+  minVersion: text("min_version"),
+  maxVersion: text("max_version"),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const minimumVersion = pgTable("minimum_version", {
+  kind: clientKind("kind").primaryKey(),
+  version: text("version").notNull(),
+  message: text("message"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const featureFlag = pgTable("feature_flag", {
+  key: text("key").primaryKey(),
+  description: text("description").notNull().default(""),
+  mode: featureFlagMode("mode").notNull().default("off"),
+  // Lowercased GitHub logins, used when mode is "listed".
+  logins: text("logins").array().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

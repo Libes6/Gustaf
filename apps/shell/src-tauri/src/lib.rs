@@ -425,6 +425,7 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            account::client_config,
         ])
         .setup(|app| {
             updater::initialize(app)?;

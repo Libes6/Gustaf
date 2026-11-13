@@ -14,6 +14,11 @@ import { AppSignInController } from "./auth/app-sign-in.controller.js";
 import { AppSignInService } from "./auth/app-sign-in.service.js";
 import { AUTH, AUTH_BASE_PATH, type Auth, createAuth } from "./auth/auth.js";
 import { SessionGuard } from "./auth/session.guard.js";
+import {
+  AdminClientConfigController,
+  ClientConfigController,
+} from "./client-config/client-config.controller.js";
+import { ClientConfigService } from "./client-config/client-config.service.js";
 import type { AppConfig } from "./config.js";
 import { corsMiddleware } from "./cors.js";
 import { DatabaseService } from "./database/database.service.js";
@@ -52,6 +57,7 @@ export async function createApp(
           AppSignInController,
           AdminController,
           RelayController,
+          AdminClientConfigController,
         ],
         providers: [
           {
@@ -83,8 +89,8 @@ export async function createApp(
   const app = await NestFactory.create<NestExpressApplication>(
     {
       module: AppModule,
-      controllers: [HealthController, ...accounts.controllers],
-      providers: [database, ...accounts.providers],
+      controllers: [HealthController, ClientConfigController, ...accounts.controllers],
+      providers: [database, ClientConfigService, ...accounts.providers],
     },
     { logger, abortOnError: false },
   );
