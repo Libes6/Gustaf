@@ -15,6 +15,8 @@ import { CurrentSession, type UserSession } from "../auth/session.guard.js";
 import { readBanReason, readPage, readRole, readSearch } from "./admin-rules.js";
 import { AdminGuard } from "./admin.guard.js";
 import { AdminService } from "./admin.service.js";
+import { readUsagePeriod } from "../usage/usage-rules.js";
+import { UsageService } from "../usage/usage.service.js";
 
 type ListQuery = { limit?: unknown; cursor?: unknown; query?: unknown; kind?: unknown };
 
@@ -27,7 +29,10 @@ function readKind(kind: unknown) {
 @Controller("v1/admin")
 @UseGuards(AdminGuard)
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly usage: UsageService,
+  ) {}
 
   @Get("overview")
   overview() {
@@ -91,6 +96,18 @@ export class AdminController {
   @HttpCode(204)
   async revokeDevice(@CurrentSession() { user }: UserSession, @Param("id") id: string) {
     await this.admin.revokeDevice(user.id, id);
+  }
+
+  @Get("ai-usage")
+  aiUsage(@Query() query: { days?: unknown; userId?: unknown }) {
+    const { userId } = query;
+    if (
+      userId !== undefined &&
+      (typeof userId !== "string" || userId === "" || userId.length > 128)
+    ) {
+      throw new BadRequestException("userId is invalid");
+    }
+    return this.usage.summary(readUsagePeriod(query.days), userId);
   }
 
   @Get("audit")

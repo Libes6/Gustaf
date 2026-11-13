@@ -1,5 +1,6 @@
 import type {
   AdminDevice,
+  AiUsageSummary,
   AdminUser,
   AdminUserDetail,
   AuditEntry,
@@ -8,6 +9,7 @@ import type {
   Overview,
   Page,
   Role,
+  UsagePeriod,
 } from "./types";
 
 // Every HTTP detail of the cloud API lives in this module, so a route rename is a one-place change.
@@ -167,6 +169,11 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
       }),
     revokeDevice: (id: string) =>
       request<unknown>("POST", `/v1/admin/devices/${encodeURIComponent(id)}/revoke`),
+
+    aiUsage: (params: { days: UsagePeriod; userId?: string | undefined }) =>
+      request<AiUsageSummary>("GET", "/v1/admin/ai-usage", {
+        params: { days: params.days, userId: params.userId },
+      }),
 
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),

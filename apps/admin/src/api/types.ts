@@ -90,3 +90,31 @@ export interface AuditEntry {
   readonly targetId: string;
   readonly meta: unknown;
 }
+
+export type UsagePeriod = 1 | 7 | 30 | 90;
+
+/** Token sums cover only `measuredTurns`; with none measured the token counts are unknown. */
+export interface AiUsageCounts {
+  readonly turns: number;
+  readonly measuredTurns: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+export interface AiUsageSummary {
+  readonly days: UsagePeriod;
+  /** First UTC day (`YYYY-MM-DD`) of the period, which ends today. */
+  readonly from: string;
+  readonly totals: AiUsageCounts & { readonly users: number };
+  readonly byModel: ReadonlyArray<
+    AiUsageCounts & {
+      readonly provider: string;
+      /** Null when the computer could not name a catalog model. */
+      readonly model: string | null;
+      readonly users: number;
+    }
+  >;
+  readonly byUser: ReadonlyArray<
+    AiUsageCounts & { readonly userId: string; readonly name: string; readonly email: string }
+  >;
+}
