@@ -35,9 +35,9 @@ On Windows, in PowerShell:
 irm https://t3.codes/install.ps1 | iex
 ```
 
-Then run `t3` to start the server and open the local web app. `t3 service install` keeps it running in the background, `t3 update` moves to a newer release, and `t3 --help` has the full reference.
+Then run `gustaf` to start the server and open the local web app. `gustaf service install` keeps it running in the background, `gustaf update` moves to a newer release, and `gustaf --help` has the full reference.
 
-To try it once without installing, run `npx t3@latest`. It offers to install the `t3` command for you.
+To try it once without installing, run `npx t3@latest`. It offers to install the `gustaf` command for you.
 
 ### Desktop app
 
@@ -92,7 +92,7 @@ nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code
 ```
 
 The package is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code)
-and includes the desktop app (`t3code-desktop`) and the `t3` command.
+and includes the desktop app (`t3code-desktop`) and the `gustaf` command.
 See [Nix installation](./docs/user/install.md#nix-nixpkgs) for NixOS configuration and updates.
 
 ## Some notes

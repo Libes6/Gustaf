@@ -357,7 +357,7 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.publishDescription":
       "Send activity to mobile notifications and Live Activities without Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedRunLinkCommand":
-      "This environment was removed from Gustaf Connect. Run `t3 connect link` on the host to link it again.",
+      "This environment was removed from Gustaf Connect. Run `gustaf connect link` on the host to link it again.",
     "settingsD.savedEnvironmentRows.publishAriaLabel": "Publish agent activity to mobile clients",
     "settingsD.savedEnvironmentRows.holdAriaLabel":
       "Hold webhook requests while this environment is offline",
@@ -1245,7 +1245,7 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.publishDescription":
       "Отправляйте активность в мобильные уведомления и Live Activities без Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedRunLinkCommand":
-      "Это окружение удалено из Gustaf Connect. Выполните `t3 connect link` на хосте, чтобы привязать его снова.",
+      "Это окружение удалено из Gustaf Connect. Выполните `gustaf connect link` на хосте, чтобы привязать его снова.",
     "settingsD.savedEnvironmentRows.publishAriaLabel":
       "Публиковать активность агента в мобильных клиентах",
     "settingsD.savedEnvironmentRows.holdAriaLabel":
