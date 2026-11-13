@@ -1,6 +1,12 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import {
+  CLI_RELEASE_CHECKSUMS_FILE,
+  cliArchiveFileName,
+  cliArchivePlatformKey,
+} from "@t3tools/shared/cliRelease";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as NetService from "@t3tools/shared/Net";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -110,6 +116,73 @@ describe("ssh tunnel scripts", () => {
       assert.equal(output.join(""), "argument with spaces\n$(echo unsafe)\n");
       assert.equal(yield* child.exitCode, 0);
     }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+
+  const hostArchiveKey = cliArchivePlatformKey(
+    HostProcess.Platform.defaultValue(),
+    HostProcess.Architecture.defaultValue(),
+  );
+  it.live.skipIf(hostArchiveKey === undefined || hostArchiveKey.startsWith("win32"))(
+    "installs this host's Gustaf release archive into the runtime versions and runs it",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "gustaf-ssh-archive-" });
+        const version = "1.2.3";
+        const archive = cliArchiveFileName(version, hostArchiveKey!);
+        const stem = archive.replace(/\.tar\.gz$/, "");
+        yield* fs.makeDirectory(path.join(root, "stage", stem), { recursive: true });
+        yield* fs.makeDirectory(path.join(root, "release", `v${version}`), { recursive: true });
+        const program = path.join(root, "stage", stem, "gustaf");
+        yield* fs.writeFileString(program, '#!/bin/sh\nprintf "gustaf %s\\n" "$*"\n');
+        yield* fs.chmod(program, 0o755);
+        const archivePath = path.join(root, "release", `v${version}`, archive);
+        const tar = yield* spawner.spawn(
+          ChildProcess.make("tar", ["-czf", archivePath, "-C", path.join(root, "stage"), stem]),
+        );
+        assert.equal(yield* tar.exitCode, 0);
+        const archiveBytes = yield* fs.readFile(archivePath);
+        const digest = yield* Effect.promise(() =>
+          crypto.subtle.digest("SHA-256", new Uint8Array(archiveBytes)),
+        );
+        const hex = Array.from(new Uint8Array(digest), (byte) =>
+          byte.toString(16).padStart(2, "0"),
+        ).join("");
+        yield* fs.writeFileString(
+          path.join(root, "release", `v${version}`, CLI_RELEASE_CHECKSUMS_FILE),
+          `${hex}  ${archive}\n`,
+        );
+
+        // curl reads file:// URLs, so a folder laid out as GitHub release downloads stands in.
+        const script = SshTunnel.buildRemoteT3RunnerScript({
+          archiveVersion: version,
+          releaseBaseUrl: `file://${path.join(root, "release")}`,
+        });
+        const child = yield* spawner.spawn(
+          ChildProcess.make("sh", ["-s", "--", "serve", "--port", "1"], {
+            env: { HOME: root },
+            extendEnv: true,
+            stdin: { stream: Stream.make(new TextEncoder().encode(script)), endOnDone: true },
+          }),
+        );
+        const [output, errors] = yield* Effect.all(
+          [
+            child.stdout.pipe(Stream.decodeText(), Stream.mkString),
+            child.stderr.pipe(Stream.decodeText(), Stream.mkString),
+          ],
+          { concurrency: "unbounded" },
+        );
+        assert.equal(yield* child.exitCode, 0, errors);
+        assert.equal(output, "gustaf serve --port 1\n");
+        const versionDir = path.join(root, ".t3/runtime/versions", version);
+        assert.isTrue(yield* fs.exists(path.join(versionDir, "gustaf")));
+        assert.equal(
+          yield* fs.readFileString(path.join(versionDir, ".install-complete")),
+          `${version}\n`,
+        );
+      }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
 
   it("rejects archive versions that are not a single exact version segment", () => {

@@ -50,11 +50,11 @@ interface ManagedChild {
 
 const runtimePaths = (baseDir: string, version: string) => {
   const versionDir = NodePath.join(baseDir, "runtime", "versions", version);
-  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
-  const executableName = process.platform === "win32" ? "t3.exe" : "t3";
   return {
     versionDir,
-    entryPath: NodePath.join(versionDir, executableName),
+    // `cliExecutableName` in @t3tools/shared/cliRelease; this launcher loads no Effect modules.
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
+    entryPath: NodePath.join(versionDir, process.platform === "win32" ? "gustaf.exe" : "gustaf"),
     sentinelPath: NodePath.join(versionDir, ".install-complete"),
   };
 };

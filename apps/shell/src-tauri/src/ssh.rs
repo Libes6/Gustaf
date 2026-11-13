@@ -77,6 +77,8 @@ impl Worker {
     fn start(app: tauri::AppHandle) -> Result<Self, String> {
         let mut command = command(&app)?;
         command
+            // Remote hosts download the runtime of this app's release.
+            .env("GUSTAF_APP_VERSION", app.package_info().version.to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());

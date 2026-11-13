@@ -1,8 +1,8 @@
 {
   "totals": {
     "web": {
-      "files": 259,
-      "strings": 932
+      "files": 258,
+      "strings": 929
     },
     "mobile": {
       "files": 235,
@@ -109,11 +109,6 @@
       "Setup Required"
     ],
     "apps/web/src/components/HostedEmptyState.tsx": ["Open Environments"],
-    "apps/web/src/components/InstallT3Commands.tsx": [
-      ". If",
-      "Skip the install if you already have",
-      "is not found after installing, add the folder the installer names to your PATH."
-    ],
     "apps/web/src/components/ManagedPolicy.tsx": ["This environment is managed by"],
     "apps/web/src/components/ProjectScriptsControl.tsx": ["Run"],
     "apps/web/src/components/PullRequestThreadDialog.tsx": [

@@ -16,7 +16,9 @@ const architecture = NodeProcess.arch;
 const windows = platform === "win";
 const suffix = windows ? ".exe" : "";
 const platformKey = `${NodeProcess.platform}-${architecture}`;
-const stem = `t3-${version}-${platformKey}`;
+const stem = `gustaf-${version}-${platformKey}`;
+// The release job publishes this archive as the `gustaf` CLI for this platform.
+const cliArchiveDir = NodePath.join(root, "release/gustaf-cli");
 const stage = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "gustaf-runtime-"));
 
 const env = {
@@ -63,6 +65,9 @@ try {
   ]);
   const archive = NodePath.join(stage, `${stem}.${windows ? "zip" : "tar.gz"}`);
   node(["scripts/smoke-cli-archive.ts", "--archive", archive, "--expect-version", version]);
+  NodeFS.rmSync(cliArchiveDir, { recursive: true, force: true });
+  NodeFS.mkdirSync(cliArchiveDir, { recursive: true });
+  NodeFS.copyFileSync(archive, NodePath.join(cliArchiveDir, NodePath.basename(archive)));
 
   const tar = windows ? NodePath.join(process.env.SystemRoot, "System32", "tar.exe") : "tar";
   run(tar, ["-xf", archive, "-C", stage]);
@@ -84,6 +89,11 @@ try {
   const runtime = NodePath.join(shellDir, "runtime");
   NodeFS.rmSync(runtime, { recursive: true, force: true });
   NodeFS.cpSync(extracted, runtime, { recursive: true, verbatimSymlinks: true });
+  // The shell and the `gustaf` launchers installed from Settings run runtime/t3.
+  NodeFS.renameSync(
+    NodePath.join(runtime, `gustaf${suffix}`),
+    NodePath.join(runtime, `t3${suffix}`),
+  );
 } finally {
   NodeFS.rmSync(stage, { recursive: true, force: true });
 }
