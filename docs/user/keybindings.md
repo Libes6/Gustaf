@@ -198,10 +198,7 @@ Keep that condition when remapping them if you want the same behavior.
 
 ## Desktop quit shortcut
 
-Use `Cmd+Q` on macOS or `Ctrl+Q` on Windows and Linux. In the default **Hold** mode,
-hold for 1.2 seconds or press twice within 500 milliseconds. Holding requires
-keyboard repeat; if repeat is disabled, use two presses or the application menu.
-
-Change **Settings → General → Confirmations → Quit shortcut** to **Direct** for a
-single press or **Double press** for two presses only. Choosing **Quit** from the
-application menu always quits immediately.
+Use `Cmd+Q` on macOS. Quitting, or closing the window, stops every agent that is
+still working. When one is, Gustaf asks first and says how many; choose
+**Keep working** to stay. The same question comes before a **Settings → Connections**
+change that restarts the app.

@@ -4,6 +4,7 @@ mod cli_command;
 mod cloud_api;
 mod connection_storage;
 mod diagnostics;
+mod exit_guard;
 mod ipc_scope;
 mod local_env;
 mod network;
@@ -371,13 +372,24 @@ pub(crate) fn stop_server(app: &tauri::AppHandle) {
     }
 }
 
+#[cfg(target_os = "macos")]
+const QUIT_MENU_ID: &str = "quit";
+
 /// The default menu binds Cmd+W to "Close Window", which ends the app and every running agent.
 /// The web app uses that shortcut to close a panel, so this menu leaves it out.
+/// Quit is not the predefined item: that one ends the app at once, with no chance to ask.
 #[cfg(target_os = "macos")]
 fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, PredefinedMenuItem as Item, Submenu};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem as Item, Submenu};
 
     let name = app.package_info().name.clone();
+    let quit = MenuItem::with_id(
+        app,
+        QUIT_MENU_ID,
+        format!("Quit {name}"),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
     Menu::with_items(
         app,
         &[
@@ -394,7 +406,7 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
                     &Item::hide_others(app, None)?,
                     &Item::show_all(app, None)?,
                     &Item::separator(app)?,
-                    &Item::quit(app, None)?,
+                    &quit,
                 ],
             )?,
             &Submenu::with_items(
@@ -426,7 +438,11 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.menu(app_menu);
+    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_MENU_ID {
+            exit_guard::request_quit(app);
+        }
+    });
     builder
         // Must be the first plugin. A second launch would start a second server on the same data.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -577,11 +593,21 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while running Gustaf")
-        .run(|app, event| {
-            if matches!(event, RunEvent::Exit) {
+        .run(|app, event| match event {
+            // Closing the only window ends the app (on macOS too), so it asks like Quit does.
+            RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "main" => {
+                api.prevent_close();
+                exit_guard::request_quit(app);
+            }
+            RunEvent::Exit => {
                 ssh::stop(app);
                 stop_server(app);
             }
+            _ => {}
         });
 }
 
