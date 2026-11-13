@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Socket from "effect/socket/Socket";
 
-import { relayTunnels } from "./relayTunnels";
+import { relayTunnels } from "./relayPool";
 
 /** Sockets to a virtual relay origin go through the tunnel; every other URL keeps `base`. */
 export const layerRelayWebSocket = <E, R>(

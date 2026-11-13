@@ -12,14 +12,12 @@ import {
 import {
   RelayTunnelClient,
   RelayTunnelClientError,
-  RelayTunnelPool,
   relayVirtualBaseUrl,
 } from "@t3tools/shared/relayTunnelClient";
-import * as ExpoCrypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 
 import { loadPhoneDevice } from "../account/accountStorage";
-import { phoneDisplayName } from "../account/useAccount";
+import { relayTunnels } from "./relayPool";
 
 // The phone's Noise key never leaves the keychain; computers know it as this phone.
 const PHONE_KEY_STORAGE = "gustaf.relay.phone-key";
@@ -31,12 +29,18 @@ interface RelayHostRecord {
   readonly hostName: string;
 }
 
-const randomBytes = (length: number) => ExpoCrypto.getRandomBytes(length);
+async function phoneNative() {
+  const [{ getRandomBytes }, { phoneDisplayName }] = await Promise.all([
+    import("expo-crypto"),
+    import("../account/useAccount"),
+  ]);
+  return { name: phoneDisplayName(), randomBytes: (length: number) => getRandomBytes(length) };
+}
 
 async function phoneKeyPair() {
   const stored = await SecureStore.getItemAsync(PHONE_KEY_STORAGE);
   if (stored) return noiseKeyPairFromSecret(fromBase64Url(stored));
-  const created = generateNoiseKeyPair(randomBytes);
+  const created = generateNoiseKeyPair((await phoneNative()).randomBytes);
   await SecureStore.setItemAsync(PHONE_KEY_STORAGE, toBase64Url(created.secretKey));
   return created;
 }
@@ -72,12 +76,12 @@ async function phoneCredential() {
   return device.token;
 }
 
-/** Every request and socket to a `*.relay.gustaf.invalid` environment goes through here. */
-export const relayTunnels = new RelayTunnelPool(async (hostDeviceId) => {
-  const [deviceToken, clientKeyPair, hosts] = await Promise.all([
+export async function relayClientOptions(hostDeviceId: string) {
+  const [deviceToken, clientKeyPair, hosts, native] = await Promise.all([
     phoneCredential(),
     phoneKeyPair(),
     loadHosts(),
+    phoneNative(),
   ]);
   const host = hosts[hostDeviceId];
   if (!host)
@@ -91,10 +95,9 @@ export const relayTunnels = new RelayTunnelPool(async (hostDeviceId) => {
     hostDeviceId,
     hostKey: host.hostKey,
     clientKeyPair,
-    name: phoneDisplayName(),
-    randomBytes,
+    ...native,
   };
-});
+}
 
 export const isRelayPairingLink = (value: string) => parseRelayPairingLink(value) !== null;
 
@@ -109,16 +112,19 @@ export async function pairOverRelay(
 ): Promise<string> {
   const offer = parseRelayPairingLink(link);
   if (!offer) throw new Error("This QR code is not a Gustaf relay code.");
-  const [deviceToken, clientKeyPair] = await Promise.all([phoneCredential(), phoneKeyPair()]);
+  const [deviceToken, clientKeyPair, native] = await Promise.all([
+    phoneCredential(),
+    phoneKeyPair(),
+    phoneNative(),
+  ]);
   const client = await RelayTunnelClient.connect({
     relayUrl: offer.relayUrl,
     deviceToken,
     hostDeviceId: offer.hostDeviceId,
     hostKey: offer.hostKey,
     clientKeyPair,
-    name: phoneDisplayName(),
+    ...native,
     pairingSecret: offer.secret,
-    randomBytes,
     onPending: () =>
       onPending(relaySafetyCode(clientKeyPair.publicKey, fromBase64Url(offer.hostKey))),
   });
