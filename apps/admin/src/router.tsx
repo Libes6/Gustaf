@@ -2,6 +2,7 @@ import { createRootRouteWithContext, createRoute, createRouter } from "@tanstack
 
 import type { Me } from "./api/types";
 import { EmptyState } from "./components/states";
+import { AiUsagePage } from "./pages/AiUsagePage";
 import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
@@ -9,6 +10,8 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { RelayPage } from "./pages/RelayPage";
 import { ReleasesPage } from "./pages/ReleasesPage";
 import { SystemPage } from "./pages/SystemPage";
+import { ReportDetailPage } from "./pages/ReportDetailPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { UserDetailPage } from "./pages/UserDetailPage";
 import { UsersPage } from "./pages/UsersPage";
 import { strings } from "./strings";
@@ -46,6 +49,12 @@ const devicesRoute = createRoute({
   component: DevicesPage,
 });
 
+const aiUsageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ai-usage",
+  component: AiUsagePage,
+});
+
 const auditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/audit",
@@ -70,16 +79,31 @@ const releasesRoute = createRoute({
   component: ReleasesPage,
 });
 
+const reportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reports",
+  component: ReportsPage,
+});
+
+const reportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reports/$reportId",
+  component: ReportDetailPage,
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     overviewRoute,
     usersRoute,
     userRoute,
     devicesRoute,
+    aiUsageRoute,
     auditRoute,
     relayRoute,
     systemRoute,
     releasesRoute,
+    reportsRoute,
+    reportRoute,
   ]),
   // The real value arrives through RouterProvider once /v1/me confirms an admin.
   context: { me: undefined! },

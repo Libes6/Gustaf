@@ -17,6 +17,7 @@ import { Button } from "../ui/button";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { isThisComputerRegistered, orderDevices } from "./AccountSettings.logic";
+import { ReportProblemDialog } from "./ReportProblemDialog";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
@@ -75,6 +76,7 @@ function AccountSettings({ account }: { account: ShellAccount }) {
   const t = useT();
   const query = useEnvironmentQuery(shellAccountAtom);
   const [pending, setPending] = useState<Pending>(null);
+  const [reporting, setReporting] = useState(false);
   // A sign-in the user cancelled rejects too; that is not an error worth a toast.
   const cancelledSignIn = useRef(false);
 
@@ -193,6 +195,18 @@ function AccountSettings({ account }: { account: ShellAccount }) {
               ) : null
             }
           />
+          <SettingsRow
+            title={t("settingsD.reportProblem.title")}
+            description={t("settingsD.reportProblem.rowDescription")}
+            control={
+              <Button size="sm" variant="outline" onClick={() => setReporting(true)}>
+                {t("settingsD.reportProblem.open")}
+              </Button>
+            }
+          />
+          {reporting ? (
+            <ReportProblemDialog account={account} onClose={() => setReporting(false)} />
+          ) : null}
           {orderDevices(devices ?? []).map((device) => (
             <SettingsRow
               key={device.id}

@@ -15,7 +15,7 @@ import { back, currentCursor, FIRST_PAGE, forward } from "../lib/pagination";
 import { strings } from "../strings";
 import { isApiError } from "./client";
 import { api } from "./instance";
-import type { DeviceKind, Page } from "./types";
+import type { DeviceKind, Page, ReportStatus, UsagePeriod } from "./types";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -29,6 +29,11 @@ export const queryKeys = {
   relay: ["admin", "relay"] as const,
   system: ["admin", "system"] as const,
   releases: ["admin", "releases"] as const,
+  reports: (status: ReportStatus | undefined) => ["admin", "reports", { status }] as const,
+  reportCounts: ["admin", "report-counts"] as const,
+  report: (id: string) => ["admin", "report", id] as const,
+  aiUsage: (days: UsagePeriod, userId: string | undefined) =>
+    ["admin", "ai-usage", { days, userId }] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -77,6 +82,14 @@ export function useReleaseStats() {
   return useQuery({ queryKey: queryKeys.releases, queryFn: api.releases, staleTime: 10 * 60_000 });
 }
 
+export function useAiUsage(days: UsagePeriod, userId?: string) {
+  return useQuery({
+    queryKey: queryKeys.aiUsage(days, userId),
+    queryFn: () => api.aiUsage({ days, userId }),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useUser(id: string) {
   return useQuery({ queryKey: queryKeys.user(id), queryFn: () => api.getUser(id) });
 }
@@ -118,6 +131,22 @@ export function useDevices(query: string, kind: DeviceKind | undefined) {
 
 export function useAudit() {
   return usePagedList(queryKeys.audit, (cursor) => api.listAudit({ cursor }));
+}
+
+export function useReports(status: ReportStatus | undefined) {
+  return usePagedList(queryKeys.reports(status), (cursor) => api.listReports({ status, cursor }));
+}
+
+export function useReportCounts() {
+  return useQuery({
+    queryKey: queryKeys.reportCounts,
+    queryFn: api.reportCounts,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useReport(id: string) {
+  return useQuery({ queryKey: queryKeys.report(id), queryFn: () => api.getReport(id) });
 }
 
 /** An admin action: toast on success or failure, then refresh every admin view. */

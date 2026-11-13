@@ -1,6 +1,6 @@
 {
-  "id": "3a060b9a-a62e-4480-9285-2682af69118d",
-  "prevId": "7693ec67-244d-4263-8384-f60d24d2bc23",
+  "id": "feb5e87c-3df7-47c4-8164-1d1cd70e4b5c",
+  "prevId": "6e0c0ec5-cee0-4031-8d22-82854687466e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -118,6 +118,166 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ai_usage_daily": {
+      "name": "ai_usage_daily",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turns": {
+          "name": "turns",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "measured_turns": {
+          "name": "measured_turns",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input_tokens": {
+          "name": "input_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "output_tokens": {
+          "name": "output_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "ai_usage_daily_day_idx": {
+          "name": "ai_usage_daily_day_idx",
+          "columns": [
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ai_usage_daily_user_id_user_id_fk": {
+          "name": "ai_usage_daily_user_id_user_id_fk",
+          "tableFrom": "ai_usage_daily",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ai_usage_daily_user_id_day_provider_model_pk": {
+          "name": "ai_usage_daily_user_id_day_provider_model_pk",
+          "columns": ["user_id", "day", "provider", "model"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ai_usage_daily_counts_check": {
+          "name": "ai_usage_daily_counts_check",
+          "value": "\"ai_usage_daily\".\"turns\" >= 0 and \"ai_usage_daily\".\"measured_turns\" between 0 and \"ai_usage_daily\".\"turns\" and \"ai_usage_daily\".\"input_tokens\" >= 0 and \"ai_usage_daily\".\"output_tokens\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_usage_report": {
+      "name": "ai_usage_report",
+      "schema": "",
+      "columns": {
+        "device_id": {
+          "name": "device_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ai_usage_report_received_at_idx": {
+          "name": "ai_usage_report_received_at_idx",
+          "columns": [
+            {
+              "expression": "received_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ai_usage_report_device_id_device_id_fk": {
+          "name": "ai_usage_report_device_id_device_id_fk",
+          "tableFrom": "ai_usage_report",
+          "tableTo": "device",
+          "columnsFrom": ["device_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ai_usage_report_device_id_batch_id_pk": {
+          "name": "ai_usage_report_device_id_batch_id_pk",
+          "columns": ["device_id", "batch_id"]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -352,6 +512,159 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.bug_report": {
+      "name": "bug_report",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client": {
+          "name": "client",
+          "type": "bug_report_client",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "app_version": {
+          "name": "app_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logs": {
+          "name": "logs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "bug_report_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'new'"
+        },
+        "admin_note": {
+          "name": "admin_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "bug_report_status_created_at_idx": {
+          "name": "bug_report_status_created_at_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bug_report_user_id_created_at_idx": {
+          "name": "bug_report_user_id_created_at_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bug_report_user_id_user_id_fk": {
+          "name": "bug_report_user_id_user_id_fk",
+          "tableFrom": "bug_report",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bug_report_device_id_device_id_fk": {
+          "name": "bug_report_device_id_device_id_fk",
+          "tableFrom": "bug_report",
+          "tableTo": "device",
+          "columnsFrom": ["device_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.device": {
       "name": "device",
       "schema": "",
@@ -408,6 +721,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "app_version": {
+          "name": "app_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "os_version": {
+          "name": "os_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "revoked_at": {
           "name": "revoked_at",
           "type": "timestamp with time zone",
@@ -451,43 +782,6 @@
           "columns": ["token_hash"]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.relay_daily": {
-      "name": "relay_daily",
-      "schema": "",
-      "columns": {
-        "day": {
-          "name": "day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metric": {
-          "name": "metric",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "relay_daily_day_metric_pk": {
-          "name": "relay_daily_day_metric_pk",
-          "columns": ["day", "metric"]
-        }
-      },
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -805,6 +1099,16 @@
     }
   },
   "enums": {
+    "public.bug_report_client": {
+      "name": "bug_report_client",
+      "schema": "public",
+      "values": ["desktop", "mobile"]
+    },
+    "public.bug_report_status": {
+      "name": "bug_report_status",
+      "schema": "public",
+      "values": ["new", "seen", "closed"]
+    },
     "public.device_kind": {
       "name": "device_kind",
       "schema": "public",

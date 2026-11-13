@@ -28,6 +28,7 @@ const CALLBACK_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_REQUEST_HEAD: usize = 8 * 1024;
 const ACCOUNT_FILE: &str = "account.encrypted.json";
 const ACCOUNT_KEY_ENTRY: &str = "account-key";
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 #[derive(Default)]
 pub(crate) struct AccountStore {
@@ -426,6 +427,7 @@ pub(crate) async fn account_sign_in(app: tauri::AppHandle) -> Result<AccountStat
             });
             account.state()
         })
+        .inspect(|_| heartbeat_in_background(&app))
     })
     .await
 }
@@ -494,6 +496,7 @@ pub(crate) async fn account_register_device(app: tauri::AppHandle) -> Result<Acc
             account.state()
         })?;
         sync_relay_credential(&app);
+        heartbeat_in_background(&app);
         Ok(state)
     })
     .await
@@ -540,6 +543,33 @@ pub(crate) fn sync_relay_credential(app: &tauri::AppHandle) {
     }
 }
 
+/// Sends this computer's version and platform when it holds a device credential. Best effort:
+/// failures are only logged.
+fn send_heartbeat(app: &tauri::AppHandle) {
+    let Ok(Some(token)) = read_account(app, |account| {
+        account.device.as_ref().map(|device| device.token.clone())
+    }) else {
+        return;
+    };
+    let version = app.package_info().version.to_string();
+    if let Err(error) = cloud_api::send_heartbeat(&token, &version) {
+        eprintln!("[gustaf] device heartbeat failed: {}", String::from(error));
+    }
+}
+
+fn heartbeat_in_background(app: &tauri::AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || send_heartbeat(&app));
+}
+
+/// On start and then once a day for as long as the app runs.
+pub(crate) fn run_heartbeat(app: tauri::AppHandle) {
+    std::thread::spawn(move || loop {
+        send_heartbeat(&app);
+        std::thread::sleep(HEARTBEAT_INTERVAL);
+    });
+}
+
 #[tauri::command]
 pub(crate) async fn account_revoke_device(
     app: tauri::AppHandle,
@@ -565,6 +595,63 @@ pub(crate) async fn account_revoke_device(
             sync_relay_credential(&app);
         }
         Ok(state)
+    })
+    .await
+}
+
+const REPORT_MESSAGE_CHARS: usize = 5000;
+
+pub(crate) fn has_session(app: &tauri::AppHandle) -> bool {
+    session_token(app).is_ok()
+}
+
+/// Blocking. `logs` are already redacted; the message is redacted here as well, since the
+/// start-failure report sends server output as its message.
+pub(crate) fn send_problem_report(
+    app: &tauri::AppHandle,
+    message: &str,
+    logs: Option<&str>,
+) -> Result<(), String> {
+    let message =
+        crate::diagnostics::redact(message.trim(), crate::diagnostics::home_dir().as_deref());
+    if message.is_empty() {
+        return Err("Describe the problem first.".to_owned());
+    }
+    let message: String = message.chars().take(REPORT_MESSAGE_CHARS).collect();
+    let token = session_token(app)?;
+    let device_id = read_account(app, |account| {
+        account.device.as_ref().map(|device| device.id.clone())
+    })?;
+    forget_rejected_session(
+        app,
+        cloud_api::send_report(
+            &token,
+            &message,
+            logs,
+            &app.package_info().version.to_string(),
+            device_id.as_deref(),
+        ),
+    )
+}
+
+#[tauri::command]
+pub(crate) async fn account_report_problem(
+    app: tauri::AppHandle,
+    message: String,
+    attach_logs: bool,
+) -> Result<(), String> {
+    if message.chars().count() > REPORT_MESSAGE_CHARS {
+        return Err(format!(
+            "The description is longer than {REPORT_MESSAGE_CHARS} characters."
+        ));
+    }
+    off_main_thread(move || {
+        let logs = if attach_logs {
+            crate::diagnostics::collect(app.path().app_local_data_dir().ok().as_deref())
+        } else {
+            None
+        };
+        send_problem_report(&app, &message, logs.as_deref())
     })
     .await
 }

@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
 import { Card, CardTitle } from "../components/ui/card";
 import { formatBytes, formatCount, formatDateTime, formatDay, shortCommit } from "../lib/format";
+import { formatPlatform, groupVersions } from "../lib/versions";
 import { strings } from "../strings";
 import { PageTitle } from "./AppLayout";
 
@@ -75,6 +76,57 @@ function SignupChart({ days }: { readonly days: Overview["signupsByDay"] }) {
   );
 }
 
+function VersionChart({ rows }: { readonly rows: Overview["versions"] }) {
+  const groups = groupVersions(rows);
+  if (groups.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        {strings.overview.versionsEmpty}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-5">
+      {groups.map((group) => (
+        <section key={group.kind}>
+          <h3 className="text-xs font-medium text-muted-foreground">
+            {strings.overview.versionsTotal(strings.kinds[group.kind], group.total)}
+          </h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {group.versions.map((entry, index) => (
+              <li
+                key={entry.version}
+                aria-label={strings.overview.versionDevices(entry.version, entry.devices)}
+              >
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="font-mono text-xs">{entry.version}</span>
+                    {index === 0 ? (
+                      <Badge variant="success">{strings.overview.latest}</Badge>
+                    ) : null}
+                  </span>
+                  <span className="tabular-nums">{formatCount(entry.devices)}</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-border">
+                  <div
+                    className={index === 0 ? "h-full bg-success" : "h-full bg-primary"}
+                    style={{ width: `${(entry.devices / group.total) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 truncate text-xs text-muted-foreground tabular-nums">
+                  {entry.platforms
+                    .map(({ platform, devices }) => `${formatPlatform(platform)} ${devices}`)
+                    .join(" · ")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function Row({
   label,
   children,
@@ -131,10 +183,25 @@ function OverviewContent({ data }: { readonly data: Overview }) {
           hint={strings.overview.relayHint(data.relay.users)}
         />
       </div>
-      <Card>
-        <CardTitle>{strings.overview.signups}</CardTitle>
-        <SignupChart days={data.signupsByDay} />
-      </Card>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Stat
+          title={strings.overview.activeToday}
+          value={formatCount(data.activeUsers.today)}
+          hint={strings.overview.activeHint}
+        />
+        <Stat title={strings.overview.active7d} value={formatCount(data.activeUsers.last7d)} />
+        <Stat title={strings.overview.active30d} value={formatCount(data.activeUsers.last30d)} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>{strings.overview.signups}</CardTitle>
+          <SignupChart days={data.signupsByDay} />
+        </Card>
+        <Card>
+          <CardTitle>{strings.overview.versions}</CardTitle>
+          <VersionChart rows={data.versions} />
+        </Card>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardTitle>{strings.overview.build}</CardTitle>

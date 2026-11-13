@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatMeta,
   formatRelative,
+  formatTokens,
   hasMeta,
   shortCommit,
 } from "./format";
@@ -40,6 +41,12 @@ describe("formatting", () => {
     expect(formatDuration(30)).toBe("0m");
     expect(formatDuration(5 * 3600 + 12 * 60)).toBe("5h 12m");
     expect(formatDuration(3 * 86400 + 4 * 3600 + 59)).toBe("3d 4h");
+  });
+
+  it("shows unmeasured tokens as unknown, not zero", () => {
+    expect(formatTokens(0, 0)).toBe(strings.aiUsage.unknown);
+    expect(formatTokens(0, 2)).toBe("0");
+    expect(formatTokens(12345, 1)).toBe("12,345");
   });
 
   it("shortens full commit hashes only", () => {

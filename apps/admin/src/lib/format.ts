@@ -23,6 +23,11 @@ export function formatCount(value: number): string {
   return count.format(value);
 }
 
+/** Tokens of the measured turns; with no measured turn the count is unknown, not zero. */
+export function formatTokens(tokens: number, measuredTurns: number): string {
+  return measuredTurns === 0 ? strings.aiUsage.unknown : count.format(tokens);
+}
+
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
 
 export function formatBytes(bytes: number): string {

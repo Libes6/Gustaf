@@ -1,5 +1,6 @@
 import type {
   AdminDevice,
+  AiUsageSummary,
   AdminUser,
   AdminUserDetail,
   AuditEntry,
@@ -9,8 +10,13 @@ import type {
   Page,
   RelayHealth,
   ReleaseStats,
+  ReportCounts,
+  ReportDetail,
+  ReportStatus,
+  ReportSummary,
   Role,
   SystemStatus,
+  UsagePeriod,
 } from "./types";
 
 // Every HTTP detail of the cloud API lives in this module, so a route rename is a one-place change.
@@ -171,12 +177,28 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
     revokeDevice: (id: string) =>
       request<unknown>("POST", `/v1/admin/devices/${encodeURIComponent(id)}/revoke`),
 
+    aiUsage: (params: { days: UsagePeriod; userId?: string | undefined }) =>
+      request<AiUsageSummary>("GET", "/v1/admin/ai-usage", {
+        params: { days: params.days, userId: params.userId },
+      }),
+
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),
 
     relay: () => request<RelayHealth>("GET", "/v1/admin/relay"),
     system: () => request<SystemStatus>("GET", "/v1/admin/system"),
     releases: () => request<ReleaseStats>("GET", "/v1/admin/releases"),
+    listReports: (params: PageParams & { status?: ReportStatus | undefined }) =>
+      request<Page<ReportSummary>>("GET", "/v1/admin/reports", {
+        params: { status: params.status, ...pageParams(params) },
+      }),
+    reportCounts: () => request<ReportCounts>("GET", "/v1/admin/reports/counts"),
+    getReport: (id: string) =>
+      request<ReportDetail>("GET", `/v1/admin/reports/${encodeURIComponent(id)}`),
+    updateReport: (
+      id: string,
+      change: { readonly status?: ReportStatus; readonly note?: string | null },
+    ) => request<unknown>("PATCH", `/v1/admin/reports/${encodeURIComponent(id)}`, { body: change }),
   };
 }
 
