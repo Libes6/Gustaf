@@ -28,6 +28,7 @@ const CALLBACK_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_REQUEST_HEAD: usize = 8 * 1024;
 const ACCOUNT_FILE: &str = "account.encrypted.json";
 const ACCOUNT_KEY_ENTRY: &str = "account-key";
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 #[derive(Default)]
 pub(crate) struct AccountStore {
@@ -426,6 +427,7 @@ pub(crate) async fn account_sign_in(app: tauri::AppHandle) -> Result<AccountStat
             });
             account.state()
         })
+        .inspect(|_| heartbeat_in_background(&app))
     })
     .await
 }
@@ -494,6 +496,7 @@ pub(crate) async fn account_register_device(app: tauri::AppHandle) -> Result<Acc
             account.state()
         })?;
         sync_relay_credential(&app);
+        heartbeat_in_background(&app);
         Ok(state)
     })
     .await
@@ -538,6 +541,33 @@ pub(crate) fn sync_relay_credential(app: &tauri::AppHandle) {
     if let Err(error) = result {
         eprintln!("[gustaf] relay credential handoff failed: {error}");
     }
+}
+
+/// Sends this computer's version and platform when it holds a device credential. Best effort:
+/// failures are only logged.
+fn send_heartbeat(app: &tauri::AppHandle) {
+    let Ok(Some(token)) = read_account(app, |account| {
+        account.device.as_ref().map(|device| device.token.clone())
+    }) else {
+        return;
+    };
+    let version = app.package_info().version.to_string();
+    if let Err(error) = cloud_api::send_heartbeat(&token, &version) {
+        eprintln!("[gustaf] device heartbeat failed: {}", String::from(error));
+    }
+}
+
+fn heartbeat_in_background(app: &tauri::AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || send_heartbeat(&app));
+}
+
+/// On start and then once a day for as long as the app runs.
+pub(crate) fn run_heartbeat(app: tauri::AppHandle) {
+    std::thread::spawn(move || loop {
+        send_heartbeat(&app);
+        std::thread::sleep(HEARTBEAT_INTERVAL);
+    });
 }
 
 #[tauri::command]

@@ -849,7 +849,8 @@ export const settingsDMessages = {
     "settingsD.account.signOut": "Sign out",
     "settingsD.account.unnamed": "GitHub account",
     "settingsD.account.devices": "Devices",
-    "settingsD.account.devicesDescription": "Computers and phones linked to this account.",
+    "settingsD.account.devicesDescription":
+      "Computers and phones linked to this account. A registered computer reports its AI usage totals (provider, model, turns, token counts) to this account; set T3CODE_TELEMETRY_ENABLED=false to stop.",
     "settingsD.account.noDevices": "No devices are linked to this account yet.",
     "settingsD.account.thisComputer": "This computer",
     "settingsD.account.registerThisComputer": "Register this computer",
@@ -1768,7 +1769,8 @@ export const settingsDMessages = {
     "settingsD.account.signOut": "Выйти",
     "settingsD.account.unnamed": "Аккаунт GitHub",
     "settingsD.account.devices": "Устройства",
-    "settingsD.account.devicesDescription": "Компьютеры и телефоны, привязанные к этому аккаунту.",
+    "settingsD.account.devicesDescription":
+      "Компьютеры и телефоны, привязанные к этому аккаунту. Зарегистрированный компьютер отправляет в аккаунт сводку использования ИИ (провайдер, модель, число ходов, токены); чтобы отключить, задайте T3CODE_TELEMETRY_ENABLED=false.",
     "settingsD.account.noDevices": "К этому аккаунту пока не привязано ни одного устройства.",
     "settingsD.account.thisComputer": "Этот компьютер",
     "settingsD.account.registerThisComputer": "Зарегистрировать этот компьютер",

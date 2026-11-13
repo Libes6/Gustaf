@@ -28,6 +28,34 @@ export function presentDevice(row: Device) {
   };
 }
 
+const DESKTOP_PLATFORM = /^(macos|windows|linux)-(arm64|x64)$/;
+const PHONE_PLATFORMS = new Set(["android", "ios"]);
+const APP_VERSION = /^[0-9][0-9A-Za-z.+-]{0,31}$/;
+const OS_VERSION = /^[\x20-\x7e]{1,64}$/;
+
+// The app reports only its build and platform: never names, paths or anything the user typed.
+export function readHeartbeat(kind: Device["kind"], body: unknown) {
+  const { appVersion, platform, osVersion } = (body ?? {}) as Record<string, unknown>;
+  if (typeof appVersion !== "string" || !APP_VERSION.test(appVersion)) {
+    throw new BadRequestException("appVersion must be a version of at most 32 characters");
+  }
+  const validPlatform =
+    typeof platform === "string" &&
+    (kind === "computer" ? DESKTOP_PLATFORM.test(platform) : PHONE_PLATFORMS.has(platform));
+  if (!validPlatform) {
+    throw new BadRequestException(
+      kind === "computer"
+        ? "platform must be macos, windows or linux with arm64 or x64, like macos-arm64"
+        : "platform must be android or ios",
+    );
+  }
+  const trimmedOs = typeof osVersion === "string" ? osVersion.trim() : "";
+  if (osVersion !== undefined && osVersion !== null && !OS_VERSION.test(trimmedOs)) {
+    throw new BadRequestException("osVersion must be at most 64 printable characters");
+  }
+  return { appVersion, platform: platform as string, osVersion: trimmedOs || null };
+}
+
 export function readDeviceInput(body: unknown) {
   const { name, kind } = (body ?? {}) as Record<string, unknown>;
   const trimmed = typeof name === "string" ? name.trim() : "";
@@ -81,6 +109,10 @@ export class DevicesService {
     await this.database.db
       .delete(device)
       .where(and(eq(device.id, deviceId), eq(device.userId, userId)));
+  }
+
+  async heartbeat(deviceId: string, input: ReturnType<typeof readHeartbeat>) {
+    await this.database.db.update(device).set(input).where(eq(device.id, deviceId));
   }
 
   async stillUsable(deviceIds: ReadonlyArray<string>) {

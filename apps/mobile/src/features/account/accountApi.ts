@@ -93,6 +93,13 @@ export class AccountApiError extends Schema.TaggedError<AccountApiError>()("Acco
   }
 }
 
+/** What the phone reports about itself: never names, paths or anything the user typed. */
+export interface AccountHeartbeat {
+  readonly appVersion: string;
+  readonly platform: "android" | "ios";
+  readonly osVersion: string | null;
+}
+
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface AccountApi {
@@ -110,6 +117,8 @@ export interface AccountApi {
   ) => Promise<{ readonly device: AccountDevice; readonly token: string }>;
   readonly revokeDevice: (token: string, deviceId: string) => Promise<void>;
   readonly sendReport: (token: string, report: ProblemReport) => Promise<void>;
+  /** Authenticated by the phone's device credential, not the session. */
+  readonly heartbeat: (deviceToken: string, report: AccountHeartbeat) => Promise<void>;
 }
 
 /** "Report a problem" from the phone: the message only, the app keeps no log of its own. */
@@ -166,6 +175,9 @@ export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
     },
     sendReport: async (token, report) => {
       await request("POST", "/v1/reports", { token, body: { client: "mobile", ...report } });
+    },
+    heartbeat: async (deviceToken, report) => {
+      await request("POST", "/v1/devices/heartbeat", { token: deviceToken, body: report });
     },
   };
 }

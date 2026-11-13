@@ -175,6 +175,27 @@ pub(crate) fn register_computer(
     Ok((registered.device, registered.token))
 }
 
+/// `macos-arm64`, `windows-x64`, `linux-x64`; the cloud rejects anything else for a computer.
+pub(crate) fn platform_name(os: &str, arch: &str) -> Option<String> {
+    let arch = match arch {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        _ => return None,
+    };
+    matches!(os, "macos" | "windows" | "linux").then(|| format!("{os}-{arch}"))
+}
+
+/// Reports this computer's app version and platform with its own device credential.
+pub(crate) fn send_heartbeat(device_token: &str, app_version: &str) -> Result<(), ApiError> {
+    let platform = platform_name(std::env::consts::OS, std::env::consts::ARCH)
+        .ok_or_else(|| ApiError::Failed("This platform is not reported.".to_owned()))?;
+    send(
+        request("POST", "/v1/devices/heartbeat", Some(device_token)),
+        Some(json!({ "appVersion": app_version, "platform": platform })),
+    )
+    .map(drop)
+}
+
 pub(crate) fn revoke_device(token: &str, device_id: &str) -> Result<(), ApiError> {
     send(
         request("DELETE", &format!("/v1/devices/{device_id}"), Some(token)),
@@ -232,6 +253,24 @@ mod tests {
             ]
             .map(|(key, value)| (key.to_owned(), value.to_owned()))
         );
+    }
+
+    #[test]
+    fn platform_names_match_what_the_cloud_accepts() {
+        assert_eq!(
+            platform_name("macos", "aarch64").as_deref(),
+            Some("macos-arm64")
+        );
+        assert_eq!(
+            platform_name("windows", "x86_64").as_deref(),
+            Some("windows-x64")
+        );
+        assert_eq!(
+            platform_name("linux", "x86_64").as_deref(),
+            Some("linux-x64")
+        );
+        assert_eq!(platform_name("linux", "riscv64"), None);
+        assert_eq!(platform_name("freebsd", "x86_64"), None);
     }
 
     #[test]

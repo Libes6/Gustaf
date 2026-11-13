@@ -15,7 +15,7 @@ import { back, currentCursor, FIRST_PAGE, forward } from "../lib/pagination";
 import { strings } from "../strings";
 import { isApiError } from "./client";
 import { api } from "./instance";
-import type { DeviceKind, Page, ReportStatus } from "./types";
+import type { DeviceKind, Page, ReportStatus, UsagePeriod } from "./types";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -29,6 +29,8 @@ export const queryKeys = {
   reports: (status: ReportStatus | undefined) => ["admin", "reports", { status }] as const,
   reportCounts: ["admin", "report-counts"] as const,
   report: (id: string) => ["admin", "report", id] as const,
+  aiUsage: (days: UsagePeriod, userId: string | undefined) =>
+    ["admin", "ai-usage", { days, userId }] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -62,6 +64,14 @@ export function useMe() {
 
 export function useOverview() {
   return useQuery({ queryKey: queryKeys.overview, queryFn: api.overview });
+}
+
+export function useAiUsage(days: UsagePeriod, userId?: string) {
+  return useQuery({
+    queryKey: queryKeys.aiUsage(days, userId),
+    queryFn: () => api.aiUsage({ days, userId }),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useUser(id: string) {

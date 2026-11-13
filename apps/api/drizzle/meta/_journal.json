@@ -31,10 +31,24 @@
       "breakpoints": true
     },
     {
+      "idx": 4,
+      "version": "7",
+      "when": 1794571816803,
+      "tag": "0004_ai_usage",
+      "breakpoints": true
+    },
+    {
       "idx": 5,
       "version": "7",
-      "when": 1794572096759,
-      "tag": "0005_bug_reports",
+      "when": 1794578410574,
+      "tag": "0005_device_heartbeat",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794578495557,
+      "tag": "0006_bug_reports",
       "breakpoints": true
     }
   ]

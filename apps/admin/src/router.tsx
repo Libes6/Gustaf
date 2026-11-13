@@ -2,6 +2,7 @@ import { createRootRouteWithContext, createRoute, createRouter } from "@tanstack
 
 import type { Me } from "./api/types";
 import { EmptyState } from "./components/states";
+import { AiUsagePage } from "./pages/AiUsagePage";
 import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
@@ -45,6 +46,12 @@ const devicesRoute = createRoute({
   component: DevicesPage,
 });
 
+const aiUsageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ai-usage",
+  component: AiUsagePage,
+});
+
 const auditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/audit",
@@ -69,6 +76,7 @@ export const router = createRouter({
     usersRoute,
     userRoute,
     devicesRoute,
+    aiUsageRoute,
     auditRoute,
     reportsRoute,
     reportRoute,

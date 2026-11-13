@@ -1,6 +1,6 @@
 import * as NodeAssert from "node:assert/strict";
 import * as NodeTest from "node:test";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
 import { createApp } from "../dist/app.js";
 import { readConfig } from "../dist/config.js";
 import {
@@ -8,6 +8,8 @@ import {
   hashDeviceToken,
   readDeviceToken,
 } from "../dist/devices/device-token.js";
+import { readHeartbeat } from "../dist/devices/devices.service.js";
+import { DevicesController } from "../dist/devices/devices.controller.js";
 import { ownedOrNotFound } from "../dist/ownership.js";
 
 const auth = {
@@ -74,6 +76,46 @@ NodeTest.test("device tokens are random, stored only as a hash and parsed strict
   ]) {
     NodeAssert.equal(readDeviceToken(header), undefined);
   }
+});
+
+NodeTest.test("heartbeats accept only a version and a platform matching the device kind", () => {
+  NodeAssert.deepEqual(
+    readHeartbeat("computer", { appVersion: "0.9.0", platform: "windows-x64", osVersion: " 11 " }),
+    { appVersion: "0.9.0", platform: "windows-x64", osVersion: "11" },
+  );
+  NodeAssert.deepEqual(readHeartbeat("phone", { appVersion: "1.2.0-beta.1", platform: "ios" }), {
+    appVersion: "1.2.0-beta.1",
+    platform: "ios",
+    osVersion: null,
+  });
+  for (const [kind, body] of [
+    ["computer", undefined],
+    ["computer", { appVersion: "v1", platform: "linux-x64" }],
+    ["computer", { appVersion: "1.0.0", platform: "ios" }],
+    ["phone", { appVersion: "1.0.0", platform: "linux-arm64" }],
+    ["phone", { appVersion: "1.0.0", platform: "android", osVersion: "16\n1" }],
+    ["phone", { appVersion: "1.0.0", platform: "android", osVersion: 16 }],
+  ]) {
+    NodeAssert.throws(() => readHeartbeat(kind, body), BadRequestException, JSON.stringify(body));
+  }
+});
+
+NodeTest.test("heartbeats are rate limited per device", async () => {
+  const writes = [];
+  const controller = new DevicesController({
+    heartbeat: async (id, input) => writes.push([id, input]),
+  });
+  const body = { appVersion: "1.0.0", platform: "android" };
+  for (let i = 0; i < 30; i += 1) {
+    await controller.heartbeat({ id: "d1", kind: "phone" }, body);
+  }
+  await NodeAssert.rejects(controller.heartbeat({ id: "d1", kind: "phone" }, body), (error) => {
+    NodeAssert.ok(error instanceof HttpException);
+    NodeAssert.equal(error.getStatus(), 429);
+    return true;
+  });
+  await controller.heartbeat({ id: "d2", kind: "phone" }, body);
+  NodeAssert.equal(writes.length, 31);
 });
 
 NodeTest.test("ownership answers 404 for missing and foreign resources alike", () => {
