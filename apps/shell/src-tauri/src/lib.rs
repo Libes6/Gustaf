@@ -83,6 +83,7 @@ fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<C
         .arg("--no-auto-bootstrap-project-from-cwd")
         .arg("--base-dir")
         .arg(data_dir)
+        .env("GUSTAF_APP_VERSION", app.package_info().version.to_string())
         .env_remove("VITE_DEV_SERVER_URL");
     apply_exposure_args(&mut command, settings);
     Ok(command)
