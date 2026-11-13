@@ -8,11 +8,11 @@ script and no npm package.
 
 ## Desktop app
 
-| System              | File                                                                 |
-| ------------------- | -------------------------------------------------------------------- |
-| macOS Apple Silicon | `Gustaf-<version>-macOS-arm64.dmg`                                   |
-| Windows x64         | `Gustaf-<version>-Windows-x64-setup.exe` or the `.msi` beside it     |
-| Linux x64           | `Gustaf-<version>-Linux-x64.AppImage`, `.deb`, or `.rpm`             |
+| System              | File                                                             |
+| ------------------- | ---------------------------------------------------------------- |
+| macOS Apple Silicon | `Gustaf-<version>-macOS-arm64.dmg`                               |
+| Windows x64         | `Gustaf-<version>-Windows-x64-setup.exe` or the `.msi` beside it |
+| Linux x64           | `Gustaf-<version>-Linux-x64.AppImage`, `.deb`, or `.rpm`         |
 
 Intel Macs are not published. Linux and Windows builds are x64 only.
 
@@ -44,13 +44,13 @@ your `PATH`.
 
 <a id="the-gustaf-command"></a>
 
-| Task                                             | Command                                                   |
-| ------------------------------------------------ | --------------------------------------------------------- |
-| Start the server without a browser               | `gustaf serve`                                            |
-| Allow the local network                          | `gustaf serve --lan`                                      |
-| Pair another device                              | `gustaf pair`                                             |
+| Task                                             | Command                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| Start the server without a browser               | `gustaf serve`                                                |
+| Allow the local network                          | `gustaf serve --lan`                                          |
+| Pair another device                              | `gustaf pair`                                                 |
 | Keep it running in the background (macOS, Linux) | `gustaf service install` ([details](./background-service.md)) |
-| Move a command-line install to a newer release   | `gustaf update`                                           |
+| Move a command-line install to a newer release   | `gustaf update`                                               |
 
 Run `gustaf help` for the full reference. To start in a new working directory, use an explicit
 path such as `gustaf ./my-project`. A bare directory name is accepted only if it already exists.
@@ -69,6 +69,14 @@ gustaf app
 This opens a new thread for the current directory, adding the project if needed. Pass a path, such
 as `gustaf app ../my-project`, to open another directory. It requires the desktop app. If the
 command cannot reach the app, start or update the desktop app and try again.
+
+### Drop a folder on the sidebar
+
+Drag one or more folders from Finder, Explorer, or your file manager onto the
+sidebar. Each one opens as a project on this computer, the same as `gustaf app`.
+Files dropped on a thread still attach to that thread. Browsers do not share
+folder paths, so in the web app use **Add project** instead. In the Gustaf
+desktop app this works on macOS.
 
 ## Android app
 
@@ -107,7 +115,7 @@ you connect from a phone or another computer.
 | Grok Build  | Install [Grok Build CLI](https://x.ai/cli), then run `grok login`.                                                                                        |
 | Kiro        | Install [Kiro CLI](https://kiro.dev/docs/cli/), then run `kiro-cli login`.                                                                                |
 | OpenCode    | Install [OpenCode](https://opencode.ai), then run `opencode auth login`.                                                                                  |
-| Antigravity | Install and sign in with Google from Gustaf's provider settings.                                                                                         |
+| Antigravity | Install and sign in with Google from Gustaf's provider settings.                                                                                          |
 | Pi          | Install [Pi](./providers-pi.md#set-up-pi) with Node.js 22.19 or newer, then run `pi` and `/login`.                                                        |
 | Muse Code   | Install [Muse Code](https://dev.meta.ai/docs/muse-code) on the server, run `muse login`, then enable it in Settings → Providers.                          |
 | fx          | Install [fx](https://fx.sh) with `curl -fsSL https://fx.sh/setup.sh \| bash`, then run `fx login`.                                                        |

@@ -258,6 +258,9 @@ export interface ChatMarkdownContextReference {
   kind: string;
   contextId: string;
   label: string;
+  /** Whether it starts or ends its block, for a reference that renders as a block. */
+  leading?: boolean;
+  trailing?: boolean;
 }
 
 const EMPTY_MARKDOWN_SKILLS: ReadonlyArray<ServerProviderSkill> = [];
@@ -960,6 +963,15 @@ function selectInlineCode(event: ReactMouseEvent<HTMLElement>) {
   window.getSelection()?.selectAllChildren(event.currentTarget);
 }
 
+// A reply card is a block. These say nothing else shares its paragraph or list item on that side.
+const LIST_MARKER = String.raw`(?:[-*+]|\d+[.)])[ \t]+`;
+const CITATION_LEADS_BLOCK = new RegExp(
+  String.raw`(?:(?:^|\n[ \t]*\n)[ \t>]*(?:${LIST_MARKER})?|\n[ \t>]*${LIST_MARKER})$`,
+);
+const CITATION_ENDS_BLOCK = new RegExp(
+  String.raw`^[ \t]*(?:$|\n[ \t]*(?:\n|$)|\n[ \t>]*${LIST_MARKER})`,
+);
+
 const CHAT_MARKDOWN_COMPONENTS = {
   h1: markdownHeadingRenderer(1),
   h2: markdownHeadingRenderer(2),
@@ -978,8 +990,12 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <div {...props}>{children}</div>;
   },
   p: function MarkdownParagraph({ node: _node, children, ...props }) {
-    const { skills, threadRef } = use(ChatMarkdownRendererContext);
-    return <p {...props}>{renderSkillInlineMarkdownChildren(children, skills, threadRef)}</p>;
+    const { skills, threadRef, environmentId } = use(ChatMarkdownRendererContext);
+    return (
+      <p {...props}>
+        {renderSkillInlineMarkdownChildren(children, skills, threadRef, environmentId)}
+      </p>
+    );
   },
   blockquote: function MarkdownBlockquote({ node: _node, children, ...props }) {
     const alert =
@@ -1014,12 +1030,12 @@ const CHAT_MARKDOWN_COMPONENTS = {
     );
   },
   li: function MarkdownListItem({ node, children, ...props }) {
-    const { skills, threadRef } = use(ChatMarkdownRendererContext);
+    const { skills, threadRef, environmentId } = use(ChatMarkdownRendererContext);
     // Resolve checkbox markers by offset to avoid rerendering list items on every streamed token.
     const isTaskItem = String(props.className ?? "").includes("task-list-item");
     return (
       <li {...props} data-list-item-offset={isTaskItem ? node?.position?.start.offset : undefined}>
-        {renderSkillInlineMarkdownChildren(children, skills, threadRef)}
+        {renderSkillInlineMarkdownChildren(children, skills, threadRef, environmentId)}
       </li>
     );
   },
@@ -1079,6 +1095,10 @@ const CHAT_MARKDOWN_COMPONENTS = {
     const text = use(ChatMarkdownTextContext);
     const citation = href ? parseAssistantCitationHref(href) : null;
     if (citation) return <AssistantCitationChip citation={citation} />;
+    const before = node?.position?.start.offset;
+    const after = node?.position?.end.offset;
+    const leading = before !== undefined && CITATION_LEADS_BLOCK.test(text.slice(0, before));
+    const trailing = after !== undefined && CITATION_ENDS_BLOCK.test(text.slice(after));
     const threadLink = href ? parseThreadLinkHref(href) : null;
     if (threadLink) {
       const written = hastPlainTextDeep(node);
@@ -1094,7 +1114,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
     if (contextReference) {
       const label = hastPlainTextDeep(node) || contextReference.contextId;
       return renderContextReference ? (
-        renderContextReference({ ...contextReference, label })
+        renderContextReference({ ...contextReference, label, leading, trailing })
       ) : (
         <span>{label}</span>
       );

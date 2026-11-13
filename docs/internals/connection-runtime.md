@@ -75,6 +75,10 @@ connection nor overwrite newer live data during a reconnect. Loading and
 resuming snapshots belongs to the shared state services, so every view agrees
 on which data is current.
 
+The mobile splash screen waits, for a bounded time, until every enabled
+environment has read its cached shell and Home's list has laid out those rows,
+so the first frame holds all cached rows.
+
 Shell snapshots can leave rows out when the client asks. Servers that advertise
 `shellThreadFamilies` leave out idle subagent children: a child stays while it
 has a live or queued run, a pending request or background work, or a subagent

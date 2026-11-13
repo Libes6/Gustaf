@@ -1,5 +1,6 @@
 mod account;
 mod bridge;
+mod cli_command;
 mod cloud_api;
 mod connection_storage;
 mod diagnostics;
@@ -466,6 +467,10 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            cli_command::cli_command_state,
+            cli_command::cli_command_install,
+            cli_command::cli_command_uninstall,
+            cli_command::cli_command_add_to_path,
             account::client_config,
             account::account_report_problem,
         ])

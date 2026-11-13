@@ -1,4 +1,4 @@
-import type { AssistantCitation } from "@t3tools/contracts";
+import type { AssistantCitation, ResponseContextRecord } from "@t3tools/contracts";
 import {
   assistantCitationLabel,
   serializeAssistantCitation,
@@ -33,6 +33,68 @@ import { composerFloatingLayerProps } from "./composerEventScope";
 import { observeResize } from "~/lib/observeResize";
 import { textDirection } from "~/textDirection";
 import { useT } from "~/useUiLanguage";
+
+/**
+ * The response a message replies to, as a card that goes to it: its subagents, when it had any,
+ * and how it starts. `leading` and `trailing` say it starts or ends its block, which has spacing.
+ */
+export function ResponseReplyCard({
+  record,
+  copyMarkdown,
+  leading,
+  trailing,
+}: {
+  record: ResponseContextRecord;
+  copyMarkdown: string;
+  leading: boolean;
+  trailing: boolean;
+}) {
+  const t = useT();
+  const navigate = useNavigate();
+  const { citation } = record;
+  const title = record.subagents?.map((subagent) => subagent.title).join(", ");
+  return (
+    <span
+      data-markdown-copy={copyMarkdown}
+      className={cn("block", !leading && "mt-[0.65rem]", !trailing && "mb-[0.65rem]")}
+    >
+      <Link
+        to="/$environmentId/$threadId"
+        params={{ environmentId: citation.environmentId, threadId: citation.threadId }}
+        hash={assistantCitationHash(citation)}
+        resetScroll={false}
+        onClick={(event: ReactMouseEvent<HTMLAnchorElement>) => {
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+          event.preventDefault();
+          void navigate(assistantCitationNavigation(citation));
+        }}
+        data-markdown-copy={copyMarkdown}
+        // The response is findable in its own message; here it is clamped and mostly hidden.
+        data-thread-find-ignore
+        aria-label={t("chatA.responseReplyCard.goTo").replace("{label}", record.label)}
+        // The message's markdown styles colour and underline links; a card is neither.
+        className="block min-w-0 rounded-lg bg-black/10 px-2.5 py-1.5 text-start text-sm text-muted-foreground! no-underline! wrap-break-word hover:bg-black/14 focus-visible:outline-2 focus-visible:outline-ring dark:bg-black/35 dark:hover:bg-black/50"
+      >
+        {title ? (
+          <span className="block truncate text-xs font-medium text-foreground/80" dir="auto">
+            {title}
+          </span>
+        ) : null}
+        <span className="line-clamp-2" dir={textDirection(citation.text)}>
+          {citation.text.replace(/\s+/g, " ")}
+        </span>
+      </Link>
+    </span>
+  );
+}
 
 export function AssistantCitationChip({
   citation,
