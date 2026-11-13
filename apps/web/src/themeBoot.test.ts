@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import indexHtml from "../index.html?raw";
+import bootScript from "../public/theme-boot.js?raw";
 import {
   CUSTOM_THEMES_STORAGE_KEY,
   getDefaultThemeColors,
@@ -20,12 +20,6 @@ import {
 
 const THEME_STORAGE_KEY = "t3code:theme";
 const DEFAULT_DARK_CHROME = getDefaultThemeColors("dark").chrome;
-
-const bootScript = (() => {
-  const match = indexHtml.match(/<script>([\s\S]*?)<\/script>/);
-  if (!match?.[1]) throw new Error("Could not find the inline boot script in index.html");
-  return match[1];
-})();
 
 type BootResult = {
   isDark: boolean;

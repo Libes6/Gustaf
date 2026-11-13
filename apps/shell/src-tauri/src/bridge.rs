@@ -395,7 +395,7 @@ pub(crate) fn set_window_theme(
 // Serialize writes so a rapid series of settings changes cannot share a temp file.
 pub(crate) struct ClientSettingsFile(pub std::sync::Mutex<()>);
 
-fn client_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn client_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_local_data_dir()
         .map(|dir| dir.join("client-settings.json"))

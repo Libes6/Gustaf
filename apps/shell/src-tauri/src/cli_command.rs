@@ -72,9 +72,11 @@ pub(crate) struct Layout {
 
 impl Layout {
     fn launcher(&self) -> PathBuf {
-        self.data_dir
-            .join("bin")
-            .join(if cfg!(windows) { "gustaf.cmd" } else { "gustaf" })
+        self.data_dir.join("bin").join(if cfg!(windows) {
+            "gustaf.cmd"
+        } else {
+            "gustaf"
+        })
     }
 }
 

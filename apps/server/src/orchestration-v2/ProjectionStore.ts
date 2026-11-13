@@ -518,6 +518,7 @@ export interface ProjectionStoreV2Shape {
   >;
   /** Threads that are not deleted, archived ones included. */
   readonly countThreads: () => Effect.Effect<number, ProjectionStoreV2Error>;
+  readonly countWorkingThreads: () => Effect.Effect<number, ProjectionStoreV2Error>;
   /** Every active thread, in shell order. */
   readonly listActiveShellIndex: () => Effect.Effect<
     ReadonlyArray<ActiveShellIndexEntry>,
@@ -7258,6 +7259,15 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return rows[0]?.count ?? 0;
     }, Effect.mapError(shellSnapshotReadError));
 
+    // The statuses of `isActiveRun`: a run in any of them ends when the server stops.
+    const countWorkingThreads = Effect.fn("ProjectionStore.countWorkingThreads")(function* () {
+      const rows = yield* sql<{ readonly count: number }>`
+        SELECT COUNT(DISTINCT thread_id) AS count FROM orchestration_v2_projection_runs
+        WHERE status IN ('preparing', 'starting', 'running', 'waiting')
+      `;
+      return rows[0]?.count ?? 0;
+    }, Effect.mapError(shellSnapshotReadError));
+
     const listActiveShellIndex = Effect.fn("ProjectionStore.listActiveShellIndex")(function* () {
       const rows = yield* sql<{
         readonly thread_id: string;
@@ -7534,6 +7544,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getPullRequestSnapshot: readOnReader(getPullRequestSnapshot),
       listActiveSubagentThreadIds: readOnReader(listActiveSubagentThreadIds),
       countThreads: readOnReader(countThreads),
+      countWorkingThreads: readOnReader(countWorkingThreads),
       listActiveShellIndex: readOnReader(listActiveShellIndex),
       readShellSnapshot: readOnReader(readShellSnapshot),
       listOlderSettledThreads: readOnReader(listOlderSettledThreads),

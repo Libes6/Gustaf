@@ -52,6 +52,7 @@ import {
 import {
   DpopFailureReason,
   AuthSessionId,
+  NonNegativeInt,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -686,6 +687,11 @@ const EnvironmentOrchestrationThreadHistoryQuery = Schema.Struct({
   compactIds: Schema.optionalKey(Schema.String),
 });
 
+// The desktop shell asks before quitting, which stops the server and every running turn.
+const EnvironmentOrchestrationWorkingThreads = Schema.Struct({
+  workingThreads: NonNegativeInt,
+});
+
 const EnvironmentOrchestrationThreadHistoryErrors = [
   EnvironmentRequestInvalidError,
   EnvironmentScopeRequiredError,
@@ -699,6 +705,13 @@ class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
       headers: OrchestrationProtocolHeaders,
       query: EnvironmentOrchestrationShellSnapshotQuery,
       success: OrchestrationV2ShellSnapshot,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("workingThreads", "/api/orchestration/working-threads", {
+      headers: OptionalBearerHeaders,
+      success: EnvironmentOrchestrationWorkingThreads,
       error: EnvironmentOrchestrationSnapshotErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )
