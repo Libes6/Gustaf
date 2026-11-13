@@ -24,6 +24,7 @@ import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 import * as ServerSelfUpdate from "./selfUpdate.ts";
 
 interface HarnessOptions {
+  readonly appVersion?: string;
   readonly mode?: "web" | "desktop";
   readonly managed?: boolean;
   readonly preflight?: "ready" | "blocked";
@@ -147,6 +148,7 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
       HttpClient.HttpClient,
       releaseHttpClient(order, urls, options.beforeDownload),
     ),
+    Effect.provideService(HostProcess.Environment, { GUSTAF_APP_VERSION: options.appVersion }),
     Effect.provideService(HostProcess.Platform, "linux"),
     Effect.provideService(HostProcess.Architecture, "x64"),
     Effect.provide(
@@ -457,3 +459,18 @@ it("a host crosses tracks only to a release that knows its whole database", () =
     }),
   ).toContain("Cannot confirm");
 });
+
+it.effect("Gustaf desktop updates stay on the desktop even with an update bridge", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness({
+      mode: "desktop",
+      appVersion: "0.13.0",
+      desktopAppUpdate: { available: true, run: () => Effect.die("must not install remotely") },
+    });
+    expect(
+      (yield* harness.selfUpdate.update({ targetVersion: "0.14.0" }).pipe(Effect.flip)).reason,
+    ).toBe("Update the Gustaf desktop app on this machine.");
+    expect(harness.urls).toEqual([]);
+    expect(harness.order).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);

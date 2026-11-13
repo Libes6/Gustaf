@@ -1,3 +1,4 @@
+import { findGustafUpdate } from "@t3tools/shared/cliRelease";
 import {
   AuthEnvironmentMaintainScope,
   sessionGrantsScope,
@@ -27,7 +28,7 @@ export function supportsEnvironmentUpdate(
 ) {
   return (
     capabilities.serverSelfUpdate !== undefined &&
-    (capabilities.serverSelfUpdate !== "desktop-managed" || capabilities.desktopAppUpdate === true)
+    capabilities.serverSelfUpdate !== "desktop-managed"
   );
 }
 
@@ -59,7 +60,12 @@ async function fetchReleases(url: string, accept: string, signal: AbortSignal) {
   return response;
 }
 
-export async function findEnvironmentUpdate(currentVersion: string, signal: AbortSignal) {
+export async function findEnvironmentUpdate(
+  currentVersion: string,
+  signal: AbortSignal,
+  desktopManaged = false,
+) {
+  if (desktopManaged) return findGustafUpdate(currentVersion, signal);
   const channel = cliReleaseChannelOf(currentVersion);
   // Public release pages avoid the anonymous API quota shared by devices on the same network.
   const response = await fetchReleases(

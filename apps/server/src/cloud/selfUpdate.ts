@@ -137,6 +137,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const releaseBaseUrl =
     mirror?.feedUrl ??
     Option.getOrUndefined(yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option));
+  const gustafDesktop = (yield* HostProcess.Environment).GUSTAF_APP_VERSION?.trim();
   const inFlight = yield* Ref.make(false);
 
   yield* pruneRuntimesOnStart({ baseDir: serverConfig.baseDir, managed: launcher.managed }).pipe(
@@ -169,6 +170,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
       return yield* failWith(policyRefusal);
     }
     if (capability === "desktop-managed") {
+      if (gustafDesktop) return yield* failWith("Update the Gustaf desktop app on this machine.");
       const unsafeCrossing = input.channel === undefined ? null : crossesTrackUnsafely(input);
       if (unsafeCrossing !== null) return yield* failWith(unsafeCrossing);
       if (desktopAppUpdate.available) {
