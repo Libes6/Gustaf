@@ -143,11 +143,14 @@ NodeTest.test("user and device lists page through every row exactly once", async
     }
     const devices = await adminApi(`/v1/admin/devices?query=${tag}&kind=phone&limit=1`);
     NodeAssert.deepEqual(Object.keys(devices.body.items[0]).sort(), [
+      "appVersion",
       "createdAt",
       "id",
       "kind",
       "lastSeenAt",
       "name",
+      "osVersion",
+      "platform",
       "revokedAt",
       "userId",
       "userName",
@@ -439,3 +442,86 @@ NodeTest.test("overview numbers match the database", async () => {
     NodeAssert.ok(!Number.isNaN(Date.parse(body.build.startedAt)));
   });
 });
+
+NodeTest.test(
+  "devices report version and platform with their own credential; overview groups them",
+  async () => {
+    await withAdmin(async ({ base, api, adminApi, pool }) => {
+      const user = await signIn(base, githubUser("nora"));
+      const auth = { bearer: user.bearer };
+      const mac = await registerDevice(api, auth, "Mac", "computer");
+      const phone = await registerDevice(api, auth, "Pixel", "phone");
+      const beat = (token, body) =>
+        api("/v1/devices/heartbeat", { auth: { bearer: token }, method: "POST", body });
+
+      // A session token is not a device credential.
+      NodeAssert.equal((await beat(user.bearer, { appVersion: "1.0.0" })).status, 401);
+      for (const body of [
+        {},
+        { appVersion: "1.0.0", platform: "android" },
+        { appVersion: "1.0.0", platform: "macos-sparc" },
+        { appVersion: "x".repeat(40), platform: "macos-arm64" },
+        { appVersion: "1.0.0", platform: "macos-arm64", osVersion: "x".repeat(65) },
+      ]) {
+        NodeAssert.equal((await beat(mac.token, body)).status, 400, JSON.stringify(body));
+      }
+      NodeAssert.equal(
+        (await beat(phone.token, { appVersion: "1.0.0", platform: "macos-arm64" })).status,
+        400,
+      );
+      NodeAssert.equal(
+        (
+          await beat(mac.token, {
+            appVersion: "0.9.0",
+            platform: "macos-arm64",
+            osVersion: " 15.1 ",
+          })
+        ).status,
+        204,
+      );
+      NodeAssert.equal(
+        (await beat(phone.token, { appVersion: "0.9.1", platform: "android" })).status,
+        204,
+      );
+
+      const userId = (await api("/v1/me", { auth })).body.user.id;
+      const detail = await adminApi(`/v1/admin/users/${userId}`);
+      const byName = Object.fromEntries(detail.body.devices.map((row) => [row.name, row]));
+      NodeAssert.deepEqual(
+        [byName.Mac.appVersion, byName.Mac.platform, byName.Mac.osVersion],
+        ["0.9.0", "macos-arm64", "15.1"],
+      );
+      NodeAssert.deepEqual(
+        [byName.Pixel.appVersion, byName.Pixel.platform, byName.Pixel.osVersion],
+        ["0.9.1", "android", null],
+      );
+      NodeAssert.ok(byName.Mac.lastSeenAt);
+
+      const overview = (await adminApi("/v1/admin/overview")).body;
+      const { rows: versions } = await pool.query(
+        `select kind::text, platform, app_version as version, count(*)::int as devices
+         from device where revoked_at is null and app_version is not null
+         group by 1, 2, 3 order by 1, 2, 3`,
+      );
+      NodeAssert.deepEqual(overview.versions, versions);
+      NodeAssert.ok(
+        overview.versions.some(
+          (row) => row.kind === "phone" && row.platform === "android" && row.version === "0.9.1",
+        ),
+      );
+      const { rows: active } = await pool.query(
+        `with activity as (
+           select user_id, last_seen_at as at from device where last_seen_at is not null
+           union all select user_id, updated_at from session
+         )
+         select
+           count(distinct user_id) filter (where at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc')::int as today,
+           count(distinct user_id) filter (where at > now() - interval '7 days')::int as "last7d",
+           count(distinct user_id) filter (where at > now() - interval '30 days')::int as "last30d"
+         from activity`,
+      );
+      NodeAssert.deepEqual(overview.activeUsers, active[0]);
+      NodeAssert.ok(overview.activeUsers.today >= 1);
+    });
+  },
+);

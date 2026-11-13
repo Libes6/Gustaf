@@ -62,6 +62,7 @@ function setup(
       }),
     ),
     revokeDevice: vi.fn<AccountApi["revokeDevice"]>(() => Promise.resolve()),
+    heartbeat: vi.fn<AccountApi["heartbeat"]>(() => Promise.resolve()),
   };
   const store = createAccountStore({
     api: { ...api, ...options.api },

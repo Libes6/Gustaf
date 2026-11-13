@@ -23,6 +23,19 @@ export interface Overview {
   };
   readonly sessions: { readonly active: number };
   readonly signupsByDay: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+  /** Distinct users with a device heartbeat or session refresh; today is the UTC day. */
+  readonly activeUsers: {
+    readonly today: number;
+    readonly last7d: number;
+    readonly last30d: number;
+  };
+  /** Active devices that reported a version, one row per kind, platform and version. */
+  readonly versions: ReadonlyArray<{
+    readonly kind: DeviceKind;
+    readonly platform: string;
+    readonly version: string;
+    readonly devices: number;
+  }>;
   readonly build: { readonly version: string; readonly commit: string; readonly startedAt: string };
   readonly db: { readonly ok: boolean; readonly migrations: number };
   readonly relay: { readonly bytesThisMonth: number; readonly users: number };
@@ -50,6 +63,10 @@ export interface UserDevice {
   readonly lastSeenAt: string | null;
   readonly createdAt: string;
   readonly revokedAt: string | null;
+  /** Null until the app sends its first heartbeat. */
+  readonly appVersion: string | null;
+  readonly platform: string | null;
+  readonly osVersion: string | null;
 }
 
 export interface UserSession {

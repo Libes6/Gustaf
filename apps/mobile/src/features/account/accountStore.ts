@@ -47,6 +47,7 @@ export interface AccountStoreDeps {
   readonly openAuthSession: (url: string, redirectUri: string) => Promise<AuthSessionResult>;
   readonly phoneName: () => string;
   readonly whenStorageReady?: () => Promise<void>;
+  readonly onPhoneRegistered?: () => void;
 }
 
 export type AccountStore = ReturnType<typeof createAccountStore>;
@@ -197,6 +198,7 @@ export function createAccountStore(deps: AccountStoreDeps) {
           phoneDeviceId: registered.device.id,
           devices: [...(state.devices ?? []), registered.device],
         });
+        deps.onPhoneRegistered?.();
       } catch (cause) {
         await fail(cause);
       }
