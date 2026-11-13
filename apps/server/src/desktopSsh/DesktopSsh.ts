@@ -18,6 +18,7 @@ import { resolveSshTarget, targetConnectionKey } from "@t3tools/ssh/command";
 import { discoverSshHosts } from "@t3tools/ssh/config";
 import { SshHttpBridgeError, SshPasswordPromptError } from "@t3tools/ssh/errors";
 import * as SshTunnel from "@t3tools/ssh/tunnel";
+import { CLI_RELEASE_BASE_URL_ENV } from "@t3tools/shared/cliRelease";
 import * as NetService from "@t3tools/shared/Net";
 import type * as Digest from "effect/crypto/Digest";
 import type * as FileSystem from "effect/FileSystem";
@@ -50,6 +51,16 @@ export const Request = Schema.Union([
     input: DesktopSshPasswordPromptResolutionInputSchema,
   }),
 ]);
+
+/** Remote hosts run upstream t3 archives, so they follow the runtime's version, not the Gustaf app's. */
+export const cliRunner = (
+  runtimeVersion: string,
+  env: Readonly<Record<string, string | undefined>>,
+): SshTunnel.RemoteT3RunnerOptions => ({
+  installedCommand: "gustaf",
+  archiveVersion: runtimeVersion,
+  releaseBaseUrl: env[CLI_RELEASE_BASE_URL_ENV]?.trim() || null,
+});
 
 export class DesktopSsh extends Context.Service<
   DesktopSsh,

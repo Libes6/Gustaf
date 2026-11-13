@@ -54,7 +54,7 @@ fn command(app: &tauri::AppHandle) -> Result<Command, String> {
         if let Some(path) = crate::login_shell_path() {
             command.env("PATH", path);
         }
-        command.arg(app.package_info().version.to_string());
+        let _ = app;
         Ok(command)
     }
     #[cfg(not(debug_assertions))]
@@ -65,10 +65,7 @@ fn command(app: &tauri::AppHandle) -> Result<Command, String> {
             .map_err(|error| error.to_string())?
             .join("runtime");
         let mut command = Command::new(runtime.join(if cfg!(windows) { "t3.exe" } else { "t3" }));
-        command
-            .arg("__desktop-ssh")
-            .arg(app.package_info().version.to_string())
-            .current_dir(runtime);
+        command.arg("__desktop-ssh").current_dir(runtime);
         if let Some(path) = crate::login_shell_path() {
             command.env("PATH", path);
         }

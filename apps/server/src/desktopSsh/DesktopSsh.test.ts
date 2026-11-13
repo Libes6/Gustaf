@@ -331,4 +331,17 @@ describe("Tauri SSH session", () => {
       }).pipe(Effect.provide(test.layer), Effect.scoped);
     }),
   );
+
+  it("downloads remote runtimes from upstream t3 releases at the runtime version", () => {
+    assert.deepStrictEqual(DesktopSsh.cliRunner("0.1.7", { GUSTAF_APP_VERSION: "0.12.0" }), {
+      installedCommand: "gustaf",
+      archiveVersion: "0.1.7",
+      releaseBaseUrl: null,
+    });
+    assert.strictEqual(
+      DesktopSsh.cliRunner("0.1.7", { T3CODE_RELEASE_BASE_URL: " https://mirror.example/dl " })
+        .releaseBaseUrl,
+      "https://mirror.example/dl",
+    );
+  });
 });

@@ -42,11 +42,7 @@ export async function runDesktopSsh() {
   const session = DesktopSsh.layer((prompt) => send({ prompt })).pipe(
     Layer.provide(
       SshTunnel.SshEnvironmentManager.layer({
-        resolveCliRunner: Effect.succeed({
-          installedCommand: "gustaf",
-          archiveVersion: process.argv[3] || packageJson.version,
-          releaseBaseUrl: "https://github.com/Libes6/Gustaf/releases/download",
-        }),
+        resolveCliRunner: Effect.succeed(DesktopSsh.cliRunner(packageJson.version, process.env)),
       }),
     ),
     Layer.provide(runtime),
