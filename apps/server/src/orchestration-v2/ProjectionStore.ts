@@ -1,3 +1,4 @@
+import type { WorktreeInventoryThread } from "@t3tools/contracts";
 import type { ProjectThreadAwarenessV2Input } from "@t3tools/shared/agentAwareness";
 import { pendingGuestMessageCount } from "@t3tools/contracts";
 import { applyThreadPullRequestLinkUpdate } from "../sourceControl/threadPullRequests.ts";
@@ -569,6 +570,9 @@ export interface ProjectionStoreV2Shape {
   readonly getThreadTitles: (
     threadIds: ReadonlyArray<ThreadId>,
   ) => Effect.Effect<Record<ThreadId, string>, ProjectionStoreV2Error>;
+  readonly getWorktreeInventoryThreads: (
+    projectIds?: ReadonlyArray<ProjectId>,
+  ) => Effect.Effect<ReadonlyArray<WorktreeInventoryThread>, ProjectionStoreV2Error>;
   readonly getThreadWorktreePaths: (options?: {
     readonly includeArchived?: boolean;
   }) => Effect.Effect<
@@ -6758,6 +6762,38 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
       );
 
+    const getWorktreeInventoryThreads = Effect.fn("ProjectionStore.getWorktreeInventoryThreads")(
+      function* (projectIds?: ReadonlyArray<ProjectId>) {
+        if (projectIds?.length === 0) return [];
+        const rows = yield* sql<PayloadRow>`
+          SELECT payload_json FROM orchestration_v2_projection_threads
+          WHERE json_extract(payload_json, '$.worktreePath') IS NOT NULL
+          ${projectIds === undefined ? sql`` : sql`AND ${sql.in("project_id", projectIds)}`}
+          ORDER BY thread_id
+        `;
+        return yield* Effect.forEach(rows, (row) =>
+          decodeThreadPayload(row.payload_json).pipe(
+            Effect.map((thread): WorktreeInventoryThread => ({
+              id: thread.id,
+              projectId: thread.projectId,
+              title: thread.title,
+              branch: thread.branch,
+              worktreePath: thread.worktreePath!,
+              archived: thread.archivedAt !== null,
+              deleted: thread.deletedAt !== null,
+              pullRequests: (thread.pullRequests ?? []).map((pr) => ({
+                number: pr.number,
+                url: pr.url,
+                title: pr.snapshot?.title ?? null,
+                state: pr.snapshot?.state ?? null,
+              })),
+            })),
+          ),
+        );
+      },
+      Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
+    );
+
     const getThreadWorktreePaths: ProjectionStoreV2Shape["getThreadWorktreePaths"] = (options) =>
       sql<{ readonly thread_id: string; readonly worktree_path: string }>`
         SELECT thread_id, json_extract(payload_json, '$.worktreePath') AS worktree_path
@@ -7509,6 +7545,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThreadTitles: readOnReader(getThreadTitles),
       getThreadLinkMetadata: readOnReader(getThreadLinkMetadata),
       getThreadWorktreePaths: readOnReader(getThreadWorktreePaths),
+      getWorktreeInventoryThreads: readOnReader(getWorktreeInventoryThreads),
       getOpenRemoteDelegatedTasks: getOpenRemoteDelegatedTasks.pipe(NodeSqliteClient.readOnly),
       getThreadProjection: readOnReader(getThreadProjection),
       getTurnStartContext: readOnReader(getTurnStartContext),

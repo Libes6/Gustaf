@@ -435,6 +435,14 @@ export class GitVcsDriver extends Context.Service<
     readonly pruneWorktrees: (input: {
       readonly cwd: string;
     }) => Effect.Effect<void, GitCommandError>;
+    readonly listWorktrees: (cwd: string) => Effect.Effect<
+      ReadonlyArray<{
+        readonly path: string;
+        readonly branch: string | null;
+        readonly prunable: boolean;
+      }>,
+      GitCommandError
+    >;
     readonly listWorktreePaths: (cwd: string) => Effect.Effect<string[], GitCommandError>;
     readonly deleteLocalBranch: (
       input: GitDeleteLocalBranchInput,

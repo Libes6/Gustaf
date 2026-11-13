@@ -1,6 +1,7 @@
 import {
   type EnvironmentId,
   type VcsListRefsInput,
+  type WorktreeInventoryInput,
   type VcsListRefsResult,
   type VcsStatusResult,
   WS_METHODS,
@@ -17,6 +18,7 @@ import { Atom, AtomRegistry } from "effect/reactivity";
 
 import {
   createEnvironmentRpcCommand,
+  createEnvironmentQueryAtomFamily,
   createEnvironmentRpcSubscriptionAtomFamily,
   createEnvironmentSubscriptionAtomFamily,
 } from "./runtime.ts";
@@ -257,6 +259,25 @@ function cachedVcsRefsChanges(
 export function createVcsEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | Persistence.EnvironmentCacheStore | R, E>,
 ) {
+  const worktreeInventory = createEnvironmentRpcCommand(runtime, {
+    label: "environment-data:vcs:worktree-inventory",
+    tag: WS_METHODS.vcsWorktreeInventory,
+  });
+  const worktreeInventoryQuery = createEnvironmentQueryAtomFamily(runtime, {
+    label: "environment-data:vcs:worktree-inventory-query",
+    staleTimeMs: 0,
+    execute: Effect.fn("VcsEnvironment.worktreeInventoryQuery")(function* (
+      input: WorktreeInventoryInput,
+    ) {
+      const registry = yield* AtomRegistry.AtomRegistry;
+      const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+      const result = yield* Effect.promise(() =>
+        worktreeInventory.run(registry, { environmentId: supervisor.target.environmentId, input }),
+      );
+      if (result._tag === "Failure") return yield* Effect.failCause(result.cause);
+      return result.value;
+    }),
+  });
   /**
    * One flat family on purpose: families hold entries via WeakRef, so a nested
    * per-environment family can be collected between lookups, dropping every
@@ -294,6 +315,8 @@ export function createVcsEnvironmentAtoms<R, E>(
 
   return {
     listRefs,
+    worktreeInventory,
+    worktreeInventoryQuery,
     // An uncached read for decisions that must match the repository now, not
     // the persisted list a picker renders from.
     readRefs: createEnvironmentRpcCommand(runtime, {

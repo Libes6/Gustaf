@@ -1,3 +1,4 @@
+import * as WorktreeInventory from "./workspace/WorktreeInventory.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import * as EnvironmentKeys from "./cloud/environmentKeys.ts";
 import * as AssetSigner from "./assets/AssetSigner.ts";
@@ -446,6 +447,14 @@ const layerReview = ReviewService.layer.pipe(
 );
 
 const layerVcs = Layer.empty.pipe(
+  Layer.provideMerge(
+    WorktreeInventory.layer.pipe(
+      Layer.provide(layerGitWorkflow),
+      Layer.provide(GitVcsDriver.layer),
+      Layer.provide(ProjectStore.layer),
+      Layer.provide(ProjectionStoreV2.layer),
+    ),
+  ),
   Layer.provideMerge(VcsProjectConfig.layer),
   Layer.provideMerge(layerVcsDriverRegistry),
   Layer.provideMerge(VcsProvisioningService.layer.pipe(Layer.provide(layerVcsDriverRegistry))),
