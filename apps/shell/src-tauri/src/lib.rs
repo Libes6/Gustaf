@@ -413,6 +413,8 @@ pub fn run() {
             }
             let platform = local_env::client_platform();
             app.manage(LocalEnvironmentState::new(local));
+            let relay_app = app.handle().clone();
+            std::thread::spawn(move || account::sync_relay_credential(&relay_app));
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
             #[cfg(target_os = "macos")]
             let window = window

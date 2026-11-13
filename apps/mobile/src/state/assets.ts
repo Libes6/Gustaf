@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import { Atom, AsyncResult } from "effect/reactivity";
 
 import { environmentCatalog } from "../connection/catalog";
+import { localAssetUri, useLocalAssetResult } from "../features/relay/relayAssetFiles";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { projectFaviconDatabaseCache } from "../lib/projectFaviconDatabaseCache";
 import { type AssetUrlState, deriveAssetUrlState } from "./asset-url-state";
@@ -74,10 +75,16 @@ export function useAssetUrlState(
       result,
       preparedConnection._tag === "Some" ? preparedConnection.value.httpBaseUrl : null,
     );
-  return deriveAssetUrlState({
+  const state = deriveAssetUrlState({
     connectionPhase,
     shared: shared._tag === "Failure" && result.waiting ? { _tag: "Loading" } : shared,
   });
+  const relayFile = useLocalAssetResult(state._tag === "Success" ? state.url : null);
+  if (state._tag !== "Success" || relayFile === null) return state;
+  if (AsyncResult.isSuccess(relayFile)) return { ...state, url: relayFile.value };
+  return AsyncResult.isFailure(relayFile)
+    ? { _tag: "Failure", reason: "failed" }
+    : { _tag: "Loading" };
 }
 
 export function useAssetUrl(
@@ -105,7 +112,7 @@ export function useRefreshAssetUrl(
       await createUrl({ environmentId, input: { resource } }),
       httpBaseUrl,
     );
-    return state._tag === "Success" ? state.url : null;
+    return state._tag === "Success" ? await localAssetUri(state.url) : null;
   };
 }
 
@@ -128,7 +135,7 @@ export async function refreshAssetUrl(
   const connection = appAtomRegistry.get(connectionAtom);
   if (connection._tag === "None") return null;
   const state = assetUrlStateFromResult(result, connection.value.httpBaseUrl);
-  return state._tag === "Success" ? state.url : null;
+  return state._tag === "Success" ? await localAssetUri(state.url) : null;
 }
 
 export interface AuthorizedAssetUrl {

@@ -26,6 +26,7 @@ import * as Clipboard from "expo-clipboard";
 
 import { AppText } from "../../components/ui/AppText";
 import { PdfPreview } from "../../components/PdfPreview";
+import { useLocalAssetUri } from "../relay/relayAssetFiles";
 import { downloadAndShareAttachment } from "../../lib/attachmentDownload";
 import { beginForegroundHandoff } from "../../lib/foreground-handoff";
 import { usePreviewStreamAccess } from "../../state/preview";
@@ -216,7 +217,7 @@ function PreviewStreamDocumentView({
   configuration,
   background,
   compact,
-  pdfUri,
+  pdfUri: remotePdfUri,
   onUnauthorized,
   onGone,
   onViewport,
@@ -234,6 +235,7 @@ function PreviewStreamDocumentView({
   readonly onStreaming: () => void;
   readonly onRecoverProcess: () => boolean;
 }) {
+  const pdfUri = useLocalAssetUri(remotePdfUri ?? null);
   const webView = useRef<WebView<object>>(null);
   const active = useRef(false);
   const failed = useRef(false);

@@ -19,6 +19,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     trustProxy: readTrustProxy(env.TRUST_PROXY),
     runMigrations: readFlag("RUN_MIGRATIONS", env.RUN_MIGRATIONS, true),
     auth: readFlag("AUTH_ENABLED", env.AUTH_ENABLED, true) ? readAuthConfig(env) : null,
+    build: {
+      version: env.GUSTAF_VERSION?.trim() || "dev",
+      commit: env.GUSTAF_COMMIT?.trim() || "unknown",
+    },
   };
 }
 
@@ -49,13 +53,63 @@ function readAuthConfig(env: NodeJS.ProcessEnv) {
       throw new Error(`AUTH_TRUSTED_ORIGINS entry "${origin}" must be an origin or a scheme://`);
     }
   }
+  const adminOrigins = readAdminOrigins(env);
+  const relayMonthlyGb = Number(env.RELAY_MONTHLY_GB?.trim() || 100);
+  if (!Number.isFinite(relayMonthlyGb) || relayMonthlyGb <= 0) {
+    throw new Error("RELAY_MONTHLY_GB must be a positive number");
+  }
   return {
     secret,
     publicBaseUrl,
     githubClientId: env.GITHUB_CLIENT_ID!.trim(),
     githubClientSecret: env.GITHUB_CLIENT_SECRET!.trim(),
-    trustedOrigins,
+    // The admin app signs in through Better Auth from its own origin.
+    trustedOrigins: [...new Set([...trustedOrigins, ...adminOrigins])],
+    adminGithubLogins: parseGithubLogins(env.ADMIN_GITHUB_LOGINS),
+    adminOrigins,
+    relayMonthlyBytes: Math.round(relayMonthlyGb * 1024 ** 3),
   };
+}
+
+export const ADMIN_DEV_ORIGIN = "http://localhost:5174";
+
+// Exact browser origins allowed to call the API with credentials (CORS) and to mutate /v1/admin.
+function readAdminOrigins(env: NodeJS.ProcessEnv) {
+  const origins: string[] = [];
+  const value = env.ADMIN_ORIGIN?.trim();
+  if (value) {
+    let url: URL | undefined;
+    try {
+      url = new URL(value);
+    } catch {}
+    const loopback = url && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (
+      !url ||
+      url.origin !== value.replace(/\/$/, "") ||
+      !(url.protocol === "https:" || (url.protocol === "http:" && loopback))
+    ) {
+      throw new Error(
+        "ADMIN_ORIGIN must be an https origin without a path, e.g. https://admin.example.com",
+      );
+    }
+    origins.push(url.origin);
+  }
+  if (env.NODE_ENV !== "production") origins.push(ADMIN_DEV_ORIGIN);
+  return [...new Set(origins)];
+}
+
+// GitHub logins are case-insensitive; an empty list promotes nobody.
+export function parseGithubLogins(value: string | undefined) {
+  const logins = new Set<string>();
+  for (const entry of (value ?? "").split(",")) {
+    const login = entry.trim().replace(/^@/, "").toLowerCase();
+    if (!login) continue;
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,38})$/.test(login)) {
+      throw new Error(`ADMIN_GITHUB_LOGINS entry "${entry.trim()}" is not a GitHub login`);
+    }
+    logins.add(login);
+  }
+  return logins;
 }
 
 function readPublicBaseUrl(value: string) {

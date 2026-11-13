@@ -11,6 +11,7 @@ import {
 } from "@t3tools/shared/projectFavicon";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
+import { useLocalAssetUri } from "../features/relay/relayAssetFiles";
 import { projectFaviconUrlAtom } from "../state/assets";
 import {
   countGlyphs,
@@ -52,7 +53,9 @@ export const ProjectFavicon = memo(function ProjectFavicon(props: {
           faviconPath: props.faviconPath,
         }),
   );
-  const renderableFaviconUrl = isProjectFaviconFallbackUrl(faviconUrl) ? null : faviconUrl;
+  const renderableFaviconUrl = useLocalAssetUri(
+    isProjectFaviconFallbackUrl(faviconUrl) ? null : faviconUrl,
+  );
   // Key remote images by revision so token rotation reuses the cache while changed icons reload.
   const cacheKey =
     renderableFaviconUrl && props.workspaceRoot

@@ -9,6 +9,7 @@ import { normalizeNativeMarkdownUrl } from "../lib/markdownLinks";
 import { useCallback } from "react";
 import * as Option from "effect/Option";
 
+import { localAssetUri } from "../features/relay/relayAssetFiles";
 import { assetEnvironment } from "../state/assets";
 import { environmentSession, usePreparedConnection } from "../state/session";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
@@ -56,7 +57,7 @@ export function useMarkdownImageSource(props: {
       if (result._tag !== "Success") throw new Error("Could not authorize Markdown image");
       const uri = resolveAssetUrl(httpBaseUrl, result.value.relativeUrl);
       if (uri === null) throw new Error("Markdown image URL is invalid");
-      return { uri };
+      return { uri: await localAssetUri(uri) };
     },
     [
       captured,

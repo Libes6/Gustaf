@@ -1,0 +1,16 @@
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.pnpmfile.cjs
+!tsconfig.base.json
+!tsconfig.effect.json
+!patches/
+!patches/**
+!apps/
+!apps/admin/
+!apps/admin/**
+**/node_modules
+**/dist
+**/.env*
+!apps/admin/.env.example

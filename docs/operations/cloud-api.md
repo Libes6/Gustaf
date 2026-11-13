@@ -60,6 +60,10 @@ OAuth app с `http://localhost:3100`. Переменные: `BETTER_AUTH_SECRET`
 `AUTH_TRUSTED_ORIGINS` (см. `.env.example`). Без них процесс с включённым auth
 не стартует; `AUTH_ENABLED=0` выключает аккаунты целиком.
 
+Релей (`/v1/relay`, WebSocket) работает при включённых аккаунтах. `RELAY_MONTHLY_GB` (по
+умолчанию 100) — месячный объём трафика на пользователя, после него новые каналы
+отклоняются. Учёт — таблица `relay_usage`. Устройство протокола: `docs/internals/relay.md`.
+
 ## Docker и GitHub Actions
 
 Из корня: `docker build -f apps/api/Dockerfile -t gustaf-api:local .`.
@@ -101,6 +105,9 @@ GitHub runner выпускает linux/amd64; подтвердите эту ар
    Для аккаунтов: секреты `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`, переменные
    `PUBLIC_BASE_URL=https://api.libes6.ru`, `GITHUB_CLIENT_ID`, `AUTH_TRUSTED_ORIGINS`.
    Задать их (или `AUTH_ENABLED=0`) до деплоя версии с auth, иначе контейнер не стартует.
+   Для админки: `ADMIN_ORIGIN=https://admin.libes6.ru` и `ADMIN_GITHUB_LOGINS` (GitHub-логины
+   администраторов через запятую). Пока они не заданы, CORS выключен и админов нет
+   (см. [admin-api.md](../internals/admin-api.md)).
    Не создавать host port mapping 3100: наружу приложение отдаёт proxy.
 7. Healthcheck: GET `/health/ready`, порт 3100, ожидаемый код 200.
 8. Выполнить Deploy, проверить выбранный SHA в логах деплоя и
@@ -131,4 +138,4 @@ Coolify `Gustaf / production`. Пароль базы хранится в runtime
 конфигурация tag могла уже измениться; проверить её перед повтором.
 Для отката выбрать предыдущий SHA tag в Coolify и выполнить Deploy.
 
-Админки пока нет: DNS admin резервирует адрес, но приложение ещё не развёрнуто.
+Админ-панель на `admin.libes6.ru` разворачивается отдельно: [admin.md](admin.md).

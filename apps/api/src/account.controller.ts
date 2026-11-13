@@ -27,8 +27,10 @@ export class AccountController {
   @Get("me")
   me(@CurrentSession() current: UserSession) {
     const { id, name, email, image, createdAt } = current.user;
+    const role = current.user.role === "admin" ? "admin" : "user";
     return {
-      user: { id, name, email, image, createdAt },
+      user: { id, name, email, image, createdAt, role },
+      role,
       session: { id: current.session.id, expiresAt: current.session.expiresAt },
     };
   }

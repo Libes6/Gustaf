@@ -14,16 +14,15 @@ function appScheme(): string {
 
 const apiUrl = resolveAccountApiUrl();
 
+export const phoneDisplayName = () =>
+  Constants.deviceName?.trim() || Device.modelName?.trim() || Device.deviceName?.trim() || "Phone";
+
 export const accountStore = createAccountStore({
   api: makeAccountApi(apiUrl, (input, init) => fetch(input, init)),
   apiUrl,
   redirectUri: accountRedirectUri(appScheme()),
   openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(url, redirectUri),
-  phoneName: () =>
-    Constants.deviceName?.trim() ||
-    Device.modelName?.trim() ||
-    Device.deviceName?.trim() ||
-    "Phone",
+  phoneName: phoneDisplayName,
   whenStorageReady: whenProtectedDataAvailable,
 });
 
