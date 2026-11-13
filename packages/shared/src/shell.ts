@@ -1047,7 +1047,7 @@ interface PathSetupInput {
 
 /**
  * The startup file (`~/...`, or absolute under `configHome`) and line that put `directory` last on
- * PATH for new zsh, bash, or fish terminals, so it never shadows another `t3`. Undefined on Windows (writing PATH there would flatten the registry's
+ * PATH for new zsh, bash, or fish terminals, so it never shadows another `gustaf`. Undefined on Windows (writing PATH there would flatten the registry's
  * `%VAR%` entries), for other shells, macOS bash, or unsafe paths.
  */
 export function pathSetup(

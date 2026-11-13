@@ -38,6 +38,7 @@ export type SettingsPath =
   | "/settings/secrets"
   | "/settings/maintenance"
   | "/settings/labs"
+  | "/settings/account"
   | "/settings/about"
   | "/settings/archived";
 
@@ -113,6 +114,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/secrets": "Secrets",
   "/settings/maintenance": "Maintenance",
   "/settings/labs": "Labs",
+  "/settings/account": "Account",
   "/settings/about": "About",
   "/settings/voice": "Voice",
   "/settings/archived": "Archive",
@@ -851,7 +853,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "account",
     title: "Account",
-    to: "/settings/about",
+    to: "/settings/account",
     searchTerms: ["sign in sign out log in GitHub cloud devices register this computer revoke"],
     shellAccountOnly: true,
   },
@@ -870,7 +872,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "cli-command",
-    title: "t3 command",
+    title: "gustaf command",
     to: "/settings/about",
     searchTerms: ["cli terminal shell path install command line"],
     desktopOnly: true,
@@ -1251,7 +1253,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "t3-connect",
     localEnvironmentOnly: true,
-    title: "T3 Connect",
+    title: "Gustaf Connect",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["managed tunnel cloud other devices remote tunnels limit t3 chat"],
@@ -1364,6 +1366,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,
+  "/settings/account": null,
   "/settings/about": null,
   "/settings/archived": "project-defaults",
 };

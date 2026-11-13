@@ -359,7 +359,7 @@ export const miscMessages = {
     "misc.mobileClientsUserProfilePage.description":
       "Mobile devices that get notifications from your environments.",
     "misc.mobileClientsUserProfilePage.emptyDescription":
-      "Install Gustaf on your phone and sign in to T3 Connect to get push notifications and Live Activities.",
+      "Install Gustaf on your phone and sign in to Gustaf Connect to get push notifications and Live Activities.",
     "misc.mobileClientsUserProfilePage.emptyTitle": "No mobile clients",
     "misc.mobileClientsUserProfilePage.liveActivities": "Live Activities",
     "misc.mobileClientsUserProfilePage.loadingAria": "Loading mobile clients",
@@ -1069,23 +1069,23 @@ export const miscMessages = {
     "misc.t3ConnectUserProfilePage.confirmOnT3Chat": "Confirm on",
     "misc.t3ConnectUserProfilePage.couldNotDeregister": "Could not deregister the server.",
     "misc.t3ConnectUserProfilePage.couldNotDeregisterTitle": "Could not deregister server",
-    "misc.t3ConnectUserProfilePage.couldNotLoad": "Could not load T3 Connect environments",
+    "misc.t3ConnectUserProfilePage.couldNotLoad": "Could not load Gustaf Connect environments",
     "misc.t3ConnectUserProfilePage.copyTraceId": "Copy trace ID",
     "misc.t3ConnectUserProfilePage.deregister": "Deregister",
     "misc.t3ConnectUserProfilePage.deregisterServer": "Deregister server",
     "misc.t3ConnectUserProfilePage.deregisterServerDescription":
-      "T3 Connect access will be revoked, any managed tunnel will be removed, and a host space will become available. Local connections on your devices are not changed.",
+      "Gustaf Connect access will be revoked, any managed tunnel will be removed, and a host space will become available. Local connections on your devices are not changed.",
     "misc.t3ConnectUserProfilePage.deregisterWillRemove":
       "“{label}” will be removed from this account.",
     "misc.t3ConnectUserProfilePage.deregisteredDescription":
-      "T3 Connect access was revoked and a host space is now available.",
+      "Gustaf Connect access was revoked and a host space is now available.",
     "misc.t3ConnectUserProfilePage.deregisteredTitle": "Server deregistered",
     "misc.t3ConnectUserProfilePage.deregistering": "Deregistering…",
     "misc.t3ConnectUserProfilePage.description":
       "Environments registered to your account. Connections on this device are managed in Settings.",
     "misc.t3ConnectUserProfilePage.emptyDescription":
-      "Link an environment from its local Settings to make it available through T3 Connect.",
-    "misc.t3ConnectUserProfilePage.emptyTitle": "No T3 Connect environments",
+      "Link an environment from its local Settings to make it available through Gustaf Connect.",
+    "misc.t3ConnectUserProfilePage.emptyTitle": "No Gustaf Connect environments",
     "misc.t3ConnectUserProfilePage.linkDateUnavailable": "Link date unavailable",
     "misc.t3ConnectUserProfilePage.linkedAt": "Linked {date}",
     "misc.t3ConnectUserProfilePage.linkT3Chat": "Link T3 Chat",
@@ -1093,11 +1093,11 @@ export const miscMessages = {
     "misc.t3ConnectUserProfilePage.managedTunnel": "Managed tunnel",
     "misc.t3ConnectUserProfilePage.opening": "Opening…",
     "misc.t3ConnectUserProfilePage.thenSelectRefresh": ", then select Refresh.",
-    "misc.t3ConnectUserProfilePage.title": "T3 Connect",
+    "misc.t3ConnectUserProfilePage.title": "Gustaf Connect",
     "misc.t3ConnectUserProfilePage.upgradeOnT3Chat": "Upgrade on T3 Chat",
     "misc.tunnelUsage.linkT3Chat": "Link T3 Chat",
     "misc.tunnelUsage.manageTunnels": "Manage tunnels",
-    "misc.tunnelUsage.meterAria": "T3 Connect tunnels in use",
+    "misc.tunnelUsage.meterAria": "Gustaf Connect tunnels in use",
     "misc.tunnelUsage.outOfTunnelsDescriptionDeregister":
       "Switch to Tailscale or deregister an environment you no longer use (sorry!)",
     "misc.tunnelUsage.outOfTunnelsDescriptionLink":
@@ -1164,7 +1164,15 @@ export const miscMessages = {
     "misc.projectFilePicker.noFiles": "No files found.",
     "misc.t3ChatProfile.notLinked": "Not linked",
     "misc.t3ChatProfile.serverNoSupport":
-      "This T3 Connect server does not support T3 Chat linking.",
+      "This Gustaf Connect server does not support T3 Chat linking.",
+    "misc.clientConfig.updateRequired": "Update Gustaf",
+    "misc.clientConfig.updateRequiredBody":
+      "This version is no longer supported. Install the latest update to keep using Gustaf.",
+    "misc.clientConfig.minimumVersion": "Required version",
+    "misc.clientConfig.checkForUpdate": "Check for update",
+    "misc.clientConfig.learnMore": "Learn more",
+    "misc.clientConfig.dismiss": "Dismiss",
+    "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
     "misc.attachmentFilePreview.attachment": "Вложение",
@@ -1523,7 +1531,7 @@ export const miscMessages = {
     "misc.mobileClientsUserProfilePage.description":
       "Мобильные устройства, которые получают уведомления из ваших окружений.",
     "misc.mobileClientsUserProfilePage.emptyDescription":
-      "Установите Gustaf на телефон и войдите в T3 Connect, чтобы получать push-уведомления и Live Activities.",
+      "Установите Gustaf на телефон и войдите в Gustaf Connect, чтобы получать push-уведомления и Live Activities.",
     "misc.mobileClientsUserProfilePage.emptyTitle": "Нет мобильных клиентов",
     "misc.mobileClientsUserProfilePage.liveActivities": "Live Activities",
     "misc.mobileClientsUserProfilePage.loadingAria": "Загрузка мобильных клиентов",
@@ -2239,23 +2247,23 @@ export const miscMessages = {
     "misc.t3ConnectUserProfilePage.confirmOnT3Chat": "Подтвердите на",
     "misc.t3ConnectUserProfilePage.couldNotDeregister": "Не удалось отключить сервер.",
     "misc.t3ConnectUserProfilePage.couldNotDeregisterTitle": "Не удалось отключить сервер",
-    "misc.t3ConnectUserProfilePage.couldNotLoad": "Не удалось загрузить окружения T3 Connect",
+    "misc.t3ConnectUserProfilePage.couldNotLoad": "Не удалось загрузить окружения Gustaf Connect",
     "misc.t3ConnectUserProfilePage.copyTraceId": "Копировать trace ID",
     "misc.t3ConnectUserProfilePage.deregister": "Отключить",
     "misc.t3ConnectUserProfilePage.deregisterServer": "Отключить сервер",
     "misc.t3ConnectUserProfilePage.deregisterServerDescription":
-      "Доступ T3 Connect будет отозван, управляемый туннель удалён, освободится слот хоста. Локальные подключения на устройствах не меняются.",
+      "Доступ Gustaf Connect будет отозван, управляемый туннель удалён, освободится слот хоста. Локальные подключения на устройствах не меняются.",
     "misc.t3ConnectUserProfilePage.deregisterWillRemove":
       "“{label}” будет удалено из этого аккаунта.",
     "misc.t3ConnectUserProfilePage.deregisteredDescription":
-      "Доступ T3 Connect отозван, слот хоста снова доступен.",
+      "Доступ Gustaf Connect отозван, слот хоста снова доступен.",
     "misc.t3ConnectUserProfilePage.deregisteredTitle": "Сервер отключён",
     "misc.t3ConnectUserProfilePage.deregistering": "Отключение…",
     "misc.t3ConnectUserProfilePage.description":
       "Окружения, зарегистрированные в аккаунте. Подключения на этом устройстве управляются в настройках.",
     "misc.t3ConnectUserProfilePage.emptyDescription":
-      "Привяжите окружение в его локальных настройках, чтобы оно было доступно через T3 Connect.",
-    "misc.t3ConnectUserProfilePage.emptyTitle": "Нет окружений T3 Connect",
+      "Привяжите окружение в его локальных настройках, чтобы оно было доступно через Gustaf Connect.",
+    "misc.t3ConnectUserProfilePage.emptyTitle": "Нет окружений Gustaf Connect",
     "misc.t3ConnectUserProfilePage.linkDateUnavailable": "Дата привязки недоступна",
     "misc.t3ConnectUserProfilePage.linkedAt": "Привязано {date}",
     "misc.t3ConnectUserProfilePage.linkT3Chat": "Привязать T3 Chat",
@@ -2263,11 +2271,11 @@ export const miscMessages = {
     "misc.t3ConnectUserProfilePage.managedTunnel": "Управляемый туннель",
     "misc.t3ConnectUserProfilePage.opening": "Открытие…",
     "misc.t3ConnectUserProfilePage.thenSelectRefresh": ", затем нажмите «Обновить».",
-    "misc.t3ConnectUserProfilePage.title": "T3 Connect",
+    "misc.t3ConnectUserProfilePage.title": "Gustaf Connect",
     "misc.t3ConnectUserProfilePage.upgradeOnT3Chat": "Повысить план на T3 Chat",
     "misc.tunnelUsage.linkT3Chat": "Привязать T3 Chat",
     "misc.tunnelUsage.manageTunnels": "Управление туннелями",
-    "misc.tunnelUsage.meterAria": "Используются туннели T3 Connect",
+    "misc.tunnelUsage.meterAria": "Используются туннели Gustaf Connect",
     "misc.tunnelUsage.outOfTunnelsDescriptionDeregister":
       "Перейдите на Tailscale или отключите ненужное окружение (извините!)",
     "misc.tunnelUsage.outOfTunnelsDescriptionLink":
@@ -2335,6 +2343,14 @@ export const miscMessages = {
     "misc.projectFilePicker.noFiles": "Файлы не найдены.",
     "misc.t3ChatProfile.notLinked": "Не связан",
     "misc.t3ChatProfile.serverNoSupport":
-      "Этот сервер T3 Connect не поддерживает привязку T3 Chat.",
+      "Этот сервер Gustaf Connect не поддерживает привязку T3 Chat.",
+    "misc.clientConfig.updateRequired": "Обновите Gustaf",
+    "misc.clientConfig.updateRequiredBody":
+      "Эта версия больше не поддерживается. Установите последнее обновление, чтобы продолжить работу.",
+    "misc.clientConfig.minimumVersion": "Нужная версия",
+    "misc.clientConfig.checkForUpdate": "Проверить обновление",
+    "misc.clientConfig.learnMore": "Подробнее",
+    "misc.clientConfig.dismiss": "Скрыть",
+    "misc.clientConfig.announcements": "Объявления",
   },
 } as const satisfies Record<UiLanguage, Record<string, string>>;

@@ -278,7 +278,7 @@ export const runRequestedReclaim = Effect.fn("DatabaseMaintenance.runRequestedRe
             .writeFileString(
               files.failure,
               error._tag === "DatabaseInUseError"
-                ? "Another program kept the database open. Close other Gustaf apps and t3 commands on this machine, then try again."
+                ? "Another program kept the database open. Close other Gustaf apps and gustaf commands on this machine, then try again."
                 : error.message,
             )
             .pipe(

@@ -40,6 +40,8 @@
     "allow-cli-command-state",
     "allow-cli-command-install",
     "allow-cli-command-uninstall",
-    "allow-cli-command-add-to-path"
+    "allow-cli-command-add-to-path",
+    "allow-client-config",
+    "allow-account-report-problem"
   ]
 }

@@ -6,6 +6,7 @@ import {
   type AccountDevice,
   type AccountUser,
   buildSignInUrl,
+  type ProblemReport,
   parseSignInRedirect,
 } from "./accountApi";
 import * as Storage from "./accountStorage";
@@ -47,6 +48,7 @@ export interface AccountStoreDeps {
   readonly openAuthSession: (url: string, redirectUri: string) => Promise<AuthSessionResult>;
   readonly phoneName: () => string;
   readonly whenStorageReady?: () => Promise<void>;
+  readonly onPhoneRegistered?: () => void;
 }
 
 export type AccountStore = ReturnType<typeof createAccountStore>;
@@ -197,8 +199,21 @@ export function createAccountStore(deps: AccountStoreDeps) {
           phoneDeviceId: registered.device.id,
           devices: [...(state.devices ?? []), registered.device],
         });
+        deps.onPhoneRegistered?.();
       } catch (cause) {
         await fail(cause);
+      }
+    },
+
+    /** Resolves when the cloud stored the report; rejects with the reason otherwise. */
+    async reportProblem(report: Omit<ProblemReport, "deviceId">) {
+      if (!token) throw new Error("session_expired");
+      try {
+        await deps.api.sendReport(token, { ...report, deviceId: state.phoneDeviceId });
+      } catch (cause) {
+        if (isAccountApiError(cause) && cause.status === 401)
+          await forgetLocally("session_expired");
+        throw cause;
       }
     },
 

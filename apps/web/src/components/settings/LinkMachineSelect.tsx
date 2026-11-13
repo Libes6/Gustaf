@@ -22,7 +22,7 @@ export function LinkMachineBadge({ machine }: { readonly machine: LinkableMachin
   if (machine.connected) return null;
   return (
     <Badge variant="outline" size="sm">
-      {machine.connectOnly ? "T3 Connect" : t("settingsB.LinkMachineSelect.notConnected")}
+      {machine.connectOnly ? "Gustaf Connect" : t("settingsB.LinkMachineSelect.notConnected")}
     </Badge>
   );
 }

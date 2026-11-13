@@ -3,6 +3,7 @@ mod bridge;
 mod cli_command;
 mod cloud_api;
 mod connection_storage;
+mod diagnostics;
 mod ipc_scope;
 mod local_env;
 mod network;
@@ -13,7 +14,7 @@ mod updater;
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Command, Stdio};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -83,6 +84,7 @@ fn server_command(app: &tauri::App, settings: &ShellSettings) -> tauri::Result<C
         .arg("--no-auto-bootstrap-project-from-cwd")
         .arg("--base-dir")
         .arg(data_dir)
+        .env("GUSTAF_APP_VERSION", app.package_info().version.to_string())
         .env_remove("VITE_DEV_SERVER_URL");
     apply_exposure_args(&mut command, settings);
     Ok(command)
@@ -94,10 +96,19 @@ fn pairing_url_from_line(line: &str) -> Option<&str> {
     url.starts_with("http://").then_some(url)
 }
 
+/// Read once: the shell takes seconds to start and the network helpers ask again.
 pub(crate) fn login_shell_path() -> Option<String> {
+    static PATH: OnceLock<Option<String>> = OnceLock::new();
+    PATH.get_or_init(read_login_shell_path).clone()
+}
+
+fn read_login_shell_path() -> Option<String> {
     // A Dock launch does not inherit the shell PATH, so codex, claude, and cursor disappear.
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
-    let mut child = Command::new(shell)
+    let mut command = Command::new(shell);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
+    let mut child = command
         .args(["-lic", "printf %s \"$PATH\""])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -154,6 +165,7 @@ fn start_server(
                 }
             } else {
                 eprintln!("{line}");
+                diagnostics::record(&line);
                 if let Ok(mut tail) = reader_tail.lock() {
                     if tail.len() == LOG_TAIL_LINES {
                         tail.pop_front();
@@ -205,15 +217,53 @@ fn start_server(
 }
 
 /// Without a window there is nothing else to show the reason in; leaving silently looked like a crash.
+/// Signed in, the user can send exactly the text shown here as a problem report.
 fn report_start_failure(app: &tauri::AppHandle, reason: &str) {
     eprintln!("Gustaf could not start: {reason}");
     let handle = app.clone();
-    app.dialog()
-        .message(format!("Gustaf could not start.\n\n{reason}"))
-        .title("Gustaf")
-        .kind(MessageDialogKind::Error)
-        .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
-        .show(move |_| handle.exit(1));
+    let text = format!("Gustaf could not start.\n\n{reason}");
+    // The account check reads the keyring, which can block; the dialog shows from any thread.
+    thread::spawn(move || {
+        if !account::has_session(&handle) {
+            let exit = handle.clone();
+            handle
+                .dialog()
+                .message(text)
+                .title("Gustaf")
+                .kind(MessageDialogKind::Error)
+                .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
+                .show(move |_| exit.exit(1));
+            return;
+        }
+        let exit = handle.clone();
+        handle
+            .dialog()
+            .message(format!(
+                "{text}\n\nYou can send this message to the Gustaf team as a problem report."
+            ))
+            .title("Gustaf")
+            .kind(MessageDialogKind::Error)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Send report and quit".to_owned(),
+                "Quit".to_owned(),
+            ))
+            .show(move |send| {
+                if !send {
+                    exit.exit(1);
+                    return;
+                }
+                let outcome = match account::send_problem_report(&exit, &text, None) {
+                    Ok(()) => "The report was sent. Thank you.".to_owned(),
+                    Err(error) => format!("The report could not be sent: {error}"),
+                };
+                let quit = exit.clone();
+                exit.dialog()
+                    .message(outcome)
+                    .title("Gustaf")
+                    .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
+                    .show(move |_| quit.exit(1));
+            });
+    });
 }
 
 fn is_external_browser_url(url: &tauri::Url) -> bool {
@@ -232,10 +282,63 @@ pub(crate) fn open_external_url(url: &tauri::Url) {
         command.arg("url.dll,FileProtocolHandler");
         command
     } else {
-        Command::new("xdg-open")
+        let mut command = Command::new("xdg-open");
+        if let Ok(app_dir) = std::env::var("APPDIR") {
+            // `vars()` panics on a non-UTF-8 entry; those are left as they are.
+            let vars = std::env::vars_os().filter_map(|(key, value)| {
+                Some((key.into_string().ok()?, value.into_string().ok()?))
+            });
+            for (key, value) in appimage_env_changes(vars, &app_dir) {
+                match value {
+                    Some(value) => command.env(key, value),
+                    None => command.env_remove(key),
+                };
+            }
+        }
+        command
     };
     command.arg(url.as_str());
     let _ = command.spawn();
+}
+
+/// The AppImage's AppRun points PATH, libraries and GTK modules into its mount; the browser
+/// started from here must load the system's. Returns the variables to change: `None` removes.
+fn appimage_env_changes(
+    vars: impl Iterator<Item = (String, String)>,
+    app_dir: &str,
+) -> Vec<(String, Option<String>)> {
+    let app_dir = app_dir.trim_end_matches('/');
+    if app_dir.is_empty() {
+        return Vec::new();
+    }
+    let under_app_dir = |segment: &str| {
+        segment == app_dir
+            || segment
+                .strip_prefix(app_dir)
+                .is_some_and(|rest| rest.starts_with('/'))
+    };
+    vars.filter_map(|(key, value)| {
+        if matches!(key.as_str(), "APPIMAGE" | "APPDIR" | "ARGV0" | "OWD") {
+            return Some((key, None));
+        }
+        if !value.contains(app_dir) {
+            return None;
+        }
+        let segments: Vec<&str> = value.split(':').collect();
+        let kept: Vec<&str> = segments
+            .iter()
+            .copied()
+            .filter(|segment| !segment.is_empty() && !under_app_dir(segment))
+            .collect();
+        if kept.len() == segments.len() {
+            None
+        } else if kept.is_empty() {
+            Some((key, None))
+        } else {
+            Some((key, Some(kept.join(":"))))
+        }
+    })
+    .collect()
 }
 
 fn set_dock_icon() {
@@ -368,6 +471,8 @@ pub fn run() {
             cli_command::cli_command_install,
             cli_command::cli_command_uninstall,
             cli_command::cli_command_add_to_path,
+            account::client_config,
+            account::account_report_problem,
         ])
         .setup(|app| {
             updater::initialize(app)?;
@@ -420,6 +525,7 @@ pub fn run() {
             app.manage(LocalEnvironmentState::new(local));
             let relay_app = app.handle().clone();
             std::thread::spawn(move || account::sync_relay_credential(&relay_app));
+            account::run_heartbeat(app.handle().clone());
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
             #[cfg(target_os = "macos")]
             let window = window
@@ -473,7 +579,28 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_external_browser_url, pairing_url_from_line};
+    use super::{appimage_env_changes, is_external_browser_url, pairing_url_from_line};
+
+    #[test]
+    fn links_opened_from_an_appimage_drop_its_mount_paths() {
+        let app_dir = "/tmp/.mount_Gustaf1";
+        let vars = [
+            ("APPDIR", app_dir.to_owned()),
+            ("PATH", format!("{app_dir}/usr/bin:/usr/bin")),
+            ("LD_LIBRARY_PATH", format!("{app_dir}/usr/lib")),
+            ("HOME", "/home/user".to_owned()),
+            ("OTHER", "/tmp/.mount_Gustaf10/lib".to_owned()),
+        ]
+        .map(|(key, value)| (key.to_owned(), value));
+        assert_eq!(
+            appimage_env_changes(vars.into_iter(), &format!("{app_dir}/")),
+            vec![
+                ("APPDIR".to_owned(), None),
+                ("PATH".to_owned(), Some("/usr/bin".to_owned())),
+                ("LD_LIBRARY_PATH".to_owned(), None),
+            ]
+        );
+    }
 
     #[test]
     fn reads_the_pairing_url_from_the_server_log() {

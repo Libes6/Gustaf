@@ -76,3 +76,16 @@ List endpoints page newest first with `?limit=` (default 25, at most 100) and an
 and answer `{ items, nextCursor }`. The cursor carries the last row's `created_at` as Postgres text
 (microseconds) and id, because a millisecond JavaScript `Date` would skip or repeat rows that share a
 millisecond. The audit cursor is the identity id.
+
+## Ops pages
+
+`GET /v1/admin/relay`, `/system` and `/releases` ([`ops.service.ts`](../../apps/api/src/admin/ops.service.ts))
+are read-only.
+
+- Relay presence and the "since start" outcome counters live in the relay hub's memory, like
+  presence itself: one process, one relay. Daily totals go to `relay_daily` as aggregate counters
+  only (bytes and outcome counts per UTC day, no user, device or address), flushed once a minute;
+  the endpoint flushes first so today is current.
+- Coolify backups and GitHub releases are fetched server-side and cached in memory (10 minutes and
+  1 hour). A failed fetch is retried after a minute and the last good answer is served meanwhile,
+  so a slow or rate-limited upstream never fails the page.

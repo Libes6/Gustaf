@@ -15,7 +15,7 @@ const invalidLinkMessage = {
   context: "Authorization request",
   title: "This connect link is incomplete",
   description:
-    "The link is missing its authorization request. Re-run `t3 connect` in your terminal and open the freshly printed URL.",
+    "The link is missing its authorization request. Re-run `gustaf connect` in your terminal and open the freshly printed URL.",
 } as const;
 
 export function ConnectCliAuthorizeSurface() {
@@ -73,8 +73,8 @@ export function ConnectCliAuthorizeSurface() {
         title="Connecting your terminal"
         description={
           isSignedIn
-            ? "Redirecting to authorize T3 Connect for your CLI…"
-            : "Sign in to continue authorizing T3 Connect for your CLI."
+            ? "Redirecting to authorize Gustaf Connect for your CLI…"
+            : "Sign in to continue authorizing Gustaf Connect for your CLI."
         }
       />
       {isLoaded && !isSignedIn ? (

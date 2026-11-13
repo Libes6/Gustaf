@@ -62,7 +62,8 @@ OAuth app с `http://localhost:3100`. Переменные: `BETTER_AUTH_SECRET`
 
 Релей (`/v1/relay`, WebSocket) работает при включённых аккаунтах. `RELAY_MONTHLY_GB` (по
 умолчанию 100) — месячный объём трафика на пользователя, после него новые каналы
-отклоняются. Учёт — таблица `relay_usage`. Устройство протокола: `docs/internals/relay.md`.
+отклоняются. Учёт — таблица `relay_usage`; дневные суммы трафика и исходов подключений для
+админки — `relay_daily`. Устройство протокола: `docs/internals/relay.md`.
 
 ## Docker и GitHub Actions
 

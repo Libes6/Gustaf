@@ -457,7 +457,9 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
       yield* fs.makeDirectory(customBinDir);
       // Chained: the launcher reaches its runtime through a second link.
       yield* fs.symlink(path.join(versionsDir, "1.2.0", "t3"), path.join(baseDir, "alias-t3"));
-      yield* fs.symlink(path.join(baseDir, "alias-t3"), path.join(binDir, "t3"));
+      yield* fs.symlink(path.join(baseDir, "alias-t3"), path.join(binDir, "gustaf"));
+      // A T3 Code install sharing this home keeps the runtime its `t3` launcher runs.
+      yield* fs.symlink(path.join(versionsDir, "1.0.0", "t3"), path.join(binDir, "t3"));
       yield* fs.symlink(path.join(versionsDir, "1.2.5", "t3"), path.join(customBinDir, "t3"));
       yield* fs.writeFileString(
         path.join(baseDir, "runtime", "launchers"),
@@ -485,19 +487,20 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
         Effect.provideService(HostProcess.Environment, { T3CODE_INSTALL_BIN_DIR: binDir }),
       );
 
-      // 1.2.0 is the default launcher, 1.2.5 a recorded one, 1.3.0 running, 1.3.5 in the unit,
-      // 1.4.0 active, 1.5.0 the rolled-back target, 2.0.0 the caller's, 0.5.0 just installed.
-      // Being newer than the caller's version does not keep 2.1.0.
-      assert.deepEqual(removed.toSorted(), ["0.8.0", "1.0.0", "1.1.0", "2.1.0"]);
+      // 1.2.0 is the default launcher, 1.0.0 the shared `t3` one, 1.2.5 a recorded one, 1.3.0
+      // running, 1.3.5 in the unit, 1.4.0 active, 1.5.0 the rolled-back target, 2.0.0 the
+      // caller's, 0.5.0 just installed. Being newer than the caller's version does not keep 2.1.0.
+      assert.deepEqual(removed.toSorted(), ["0.8.0", "1.1.0", "2.1.0"]);
       // The launcher found on PATH is remembered for a service that cannot see it.
       assert.equal(
         yield* fs.readFileString(path.join(baseDir, "runtime", "launchers")),
-        `${path.join(customBinDir, "t3")}\n\n${path.join(binDir, "t3")}\n`,
+        `${path.join(customBinDir, "t3")}\n\n${path.join(binDir, "gustaf")}\n${path.join(binDir, "t3")}\n`,
       );
       assert.deepEqual((yield* fs.readDirectory(versionsDir)).toSorted(), [
         ".staging-abc",
         "0.5.0",
         "0.9.0",
+        "1.0.0",
         "1.0.1",
         "1.2.0",
         "1.2.5",
@@ -621,7 +624,7 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
         yield* fs.chmod(entry, 0o755);
         const link = path.join(baseDir, "t3");
         yield* fs.symlink(entry, link);
-        // Its argv names only the link, as with `t3 serve` run from PATH. Removing the link after
+        // Its argv names only the link, as with `gustaf serve` run from PATH. Removing the link after
         // spawning leaves the process's executable as the only reference.
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
         yield* spawner.spawn(ChildProcess.make(link, ["-e", "setTimeout(() => {}, 30_000)"]));

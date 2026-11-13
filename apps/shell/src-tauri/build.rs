@@ -36,6 +36,8 @@ fn main() {
             "cli_command_install",
             "cli_command_uninstall",
             "cli_command_add_to_path",
+            "client_config",
+            "account_report_problem",
         ]),
     ))
     .expect("failed to run tauri-build");

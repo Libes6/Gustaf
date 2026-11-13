@@ -43,11 +43,11 @@ const setup = Effect.gen(function* () {
         ...env,
       }),
     );
-  return { root, npmPackage, runtimeDir, executable, link: path.join(binDir, "t3"), provide };
+  return { root, npmPackage, runtimeDir, executable, link: path.join(binDir, "gustaf"), provide };
 });
 
 it.layer(NodeServices.layer)("t3 install", (it) => {
-  it.effect("links the running runtime, records it, and never replaces another t3", () =>
+  it.effect("links the running runtime, records it, and never replaces another one", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -68,33 +68,33 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
       yield* fs.symlink(path.join(alias, "runtime/versions", VERSION, "t3"), link);
       const onPath = yield* provide(installCli(), { PATH: `/usr/bin:${path.join(root, "bin")}/` });
       assert.isTrue(onPath.onPath);
-      // Another t3 earlier on PATH still runs first, so `t3` would not run this one.
+      // Another gustaf earlier on PATH still runs first, so `gustaf` would not run this one.
       const otherBin = path.join(root, "other-bin");
       yield* fs.makeDirectory(otherBin);
-      yield* fs.writeFileString(path.join(otherBin, "t3"), "");
+      yield* fs.writeFileString(path.join(otherBin, "gustaf"), "");
       const shadowed = yield* provide(installCli(), {
         PATH: `${otherBin}:${path.join(root, "bin")}`,
       });
       assert.isFalse(shadowed.onPath);
-      assert.equal(shadowed.shadowedBy, path.join(otherBin, "t3"));
+      assert.equal(shadowed.shadowedBy, path.join(otherBin, "gustaf"));
       assert.isUndefined(shadowed.pathCommand);
       const recorded = yield* fs.readFileString(path.join(runtimeDir, "launchers"));
-      assert.equal(recorded, `\n${yield* fs.realPath(path.join(root, "bin"))}/t3\n`);
+      assert.equal(recorded, `\n${yield* fs.realPath(path.join(root, "bin"))}/gustaf\n`);
 
       yield* fs.remove(link);
       yield* fs.writeFileString(link, "#!/bin/sh\n");
       const error = yield* provide(installCli()).pipe(Effect.flip);
-      assert.include(error.message, "Another t3 is already at");
+      assert.include(error.message, "Another gustaf is already at");
       assert.equal(yield* fs.readFileString(link), "#!/bin/sh\n");
 
       // Only `<version>/t3` is ours, not another program inside a version.
       yield* fs.remove(link);
       yield* fs.symlink(path.join(runtimeDir, "versions/0.0.1/node"), link);
       const sibling = yield* provide(installCli()).pipe(Effect.flip);
-      assert.include(sibling.message, "Another t3 is already at");
+      assert.include(sibling.message, "Another gustaf is already at");
       // This home's desktop launcher is replaced, as install.sh does.
       yield* fs.remove(link);
-      yield* fs.symlink(path.join(root, ".t3/bin/t3"), link);
+      yield* fs.symlink(path.join(root, ".t3/bin/gustaf"), link);
       yield* provide(installCli());
       assert.equal(yield* fs.readLink(link), executable);
 
@@ -123,15 +123,15 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
       assert.equal(yield* fs.readFileString(link), "#!/bin/sh\necho raced\n");
       yield* fs.remove(link);
 
-      // Windows writes a t3.cmd: only over its own, and only for paths cmd can run.
-      const shim = path.join(root, "bin", "t3.cmd");
+      // Windows writes a gustaf.cmd: only over its own, and only for paths cmd can run.
+      const shim = path.join(root, "bin", "gustaf.cmd");
       const windows = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         provide(effect.pipe(Effect.provideService(HostProcess.Platform, "win32")));
       const desktopShim =
         '@echo off\r\nrem Written by Gustaf\r\n"C:\\Gustaf\\Gustaf.exe" "x" %*\r\n';
       yield* fs.writeFileString(shim, desktopShim);
       const foreignShim = yield* windows(installCli()).pipe(Effect.flip);
-      assert.include(foreignShim.message, "Another t3 is already at");
+      assert.include(foreignShim.message, "Another gustaf is already at");
       assert.equal(yield* fs.readFileString(shim), desktopShim);
       // A user's wrapper that also runs a managed t3.exe is still theirs.
       const wrapper = `@echo off\r\nset FOO=1\r\n"${path.join(runtimeDir, "versions/0.0.1/t3.exe")}" %*`;
@@ -165,7 +165,7 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("asks npx users without a t3 command once per minor release and installs on yes", () =>
+  it.effect("asks npx users without the command once per minor release and installs on yes", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -208,24 +208,24 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
       yield* offer(false, { args: ["status", "--json=true"] });
       const globalBin = path.join(root, "global-bin");
       yield* fs.makeDirectory(globalBin);
-      yield* fs.writeFileString(path.join(globalBin, "t3"), "");
+      yield* fs.writeFileString(path.join(globalBin, "gustaf"), "");
       yield* offer(false, { env: { PATH: globalBin } });
       assert.equal(asked, 0);
       assert.isFalse(yield* fs.exists(link));
 
-      // A runner's own .bin on PATH is not an installed t3.
+      // A runner's own .bin on PATH is not an installed gustaf.
       const npxBin = path.join(npmPackage, "../.bin");
       const pnpmBin = path.join(root, ".cache/pnpm/dlx/abc/node_modules/.bin");
       for (const bin of [npxBin, pnpmBin]) {
         yield* fs.makeDirectory(bin, { recursive: true });
-        yield* fs.writeFileString(path.join(bin, "t3"), "");
+        yield* fs.writeFileString(path.join(bin, "gustaf"), "");
       }
       assert.isFalse(yield* offer(undefined, { env: { PATH: `${npxBin}:${pnpmBin}` } }));
       assert.equal(asked, 1);
       assert.isFalse(yield* fs.exists(path.join(runtimeDir, "install-prompt-declined")));
       asked = 0;
 
-      // `service install` is not `t3 install`; it still leaves the command unlinked.
+      // `service install` is not `gustaf install`; it still leaves the command unlinked.
       yield* offer(false, { args: ["service", "install"] });
       assert.equal(asked, 1);
       yield* offer(false);

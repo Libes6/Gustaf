@@ -9,11 +9,11 @@
 #                            (default: stable; preview is a maintainers' test train)
 #   T3CODE_VERSION           exact version to install (overrides T3CODE_CHANNEL)
 #   T3CODE_HOME              T3 home directory (default: ~/.t3)
-#   T3CODE_INSTALL_BIN_DIR   where the `t3` symlink goes (default: ~/.local/bin)
+#   T3CODE_INSTALL_BIN_DIR   where the `gustaf` symlink goes (default: ~/.local/bin)
 #   T3CODE_RELEASE_BASE_URL  mirror for releases/download (default: GitHub)
 #
 # The archive is unpacked into $T3CODE_HOME/runtime/versions/<version>, the
-# same layout `t3 service install` uses, so the service reuses this download
+# same layout `gustaf service install` uses, so the service reuses this download
 # instead of fetching the release again.
 set -eu
 
@@ -29,14 +29,14 @@ case "$t3_home" in
     ;;
 esac
 bin_dir="${T3CODE_INSTALL_BIN_DIR:-$HOME/.local/bin}"
-# Trailing slashes would put `//` in the paths the t3 command guard compares.
+# Trailing slashes would put `//` in the paths the gustaf command guard compares.
 while [ "${t3_home%/}" != "$t3_home" ] && [ "$t3_home" != / ]; do t3_home="${t3_home%/}"; done
 while [ "${bin_dir%/}" != "$bin_dir" ] && [ "$bin_dir" != / ]; do bin_dir="${bin_dir%/}"; done
 # Absolute, so the PATH hint never adds a folder that changes with the working directory.
 case "$bin_dir" in /*) ;; *) bin_dir="$PWD/$bin_dir" ;; esac
 
 fail() {
-  printf '\nt3 install: %s\n' "$1" >&2
+  printf '\ngustaf install: %s\n' "$1" >&2
   exit 1
 }
 
@@ -241,9 +241,9 @@ else
   trap - EXIT
 fi
 
-step "Setting up the t3 command..."
+step "Setting up the gustaf command..."
 mkdir -p "$bin_dir"
-# Replace only this home's own t3 links: into its versions, or the desktop app's launcher.
+# Replace only this home's own gustaf links: into its versions, or the desktop app's launcher.
 # Anything that is not a symlink (a script, a copied binary) belongs to someone else.
 # Exactly <versions>/<version>/t3 ($1 under $2), never another program inside a version.
 version_t3() {
@@ -251,11 +251,11 @@ version_t3() {
   case "${1#"$2"/}" in */*/*) return 1 ;; */t3) return 0 ;; *) return 1 ;; esac
 }
 slot_empty=true
-if [ -e "${bin_dir}/t3" ] || [ -L "${bin_dir}/t3" ]; then
+if [ -e "${bin_dir}/gustaf" ] || [ -L "${bin_dir}/gustaf" ]; then
   slot_empty=false
   owned=false
-  if [ -L "${bin_dir}/t3" ]; then
-    existing="$(readlink "${bin_dir}/t3" 2>/dev/null || true)"
+  if [ -L "${bin_dir}/gustaf" ]; then
+    existing="$(readlink "${bin_dir}/gustaf" 2>/dev/null || true)"
     case "$existing" in /*) ;; *) existing="${bin_dir}/${existing}" ;; esac
     real_versions_dir="$(CDPATH='' cd -P -- "$versions_dir" && pwd)"
     # Through a symlinked T3 home the link text names the alias; resolve its folder to compare.
@@ -265,24 +265,24 @@ if [ -e "${bin_dir}/t3" ] || [ -L "${bin_dir}/t3" ]; then
       */./* | */../* | */. | */..) ;;
       *)
         if version_t3 "$existing" "$versions_dir" || version_t3 "$existing" "$real_versions_dir" ||
-          [ "$existing" = "${t3_home}/bin/t3" ]; then owned=true; fi
+          [ "$existing" = "${t3_home}/bin/gustaf" ]; then owned=true; fi
         ;;
     esac
     if [ -n "$existing_dir" ] && version_t3 "${existing_dir}/${existing##*/}" "$real_versions_dir"; then
       owned=true
     fi
   fi
-  "$owned" || fail "another t3 is already at ${bin_dir}/t3. Remove it and run this again, or run ${target_dir}/t3 directly."
+  "$owned" || fail "another gustaf is already at ${bin_dir}/gustaf. Remove it and run this again, or run ${target_dir}/t3 directly."
 fi
 # An empty spot is linked without -f, so a file that appears after the check above is kept.
 if "$slot_empty"; then
-  ln -s "${target_dir}/t3" "${bin_dir}/t3" || fail "could not link ${bin_dir}/t3; something else was created there."
+  ln -s "${target_dir}/t3" "${bin_dir}/gustaf" || fail "could not link ${bin_dir}/gustaf; something else was created there."
 else
   # Known race, accepted: a file written here after the ownership check above is overwritten.
-  ln -sfn "${target_dir}/t3" "${bin_dir}/t3"
+  ln -sfn "${target_dir}/t3" "${bin_dir}/gustaf"
 fi
 # Pruning keeps what this launcher points at; a background service cannot see bin_dir otherwise.
-launcher="$(CDPATH='' cd -P -- "$bin_dir" && pwd)/t3"
+launcher="$(CDPATH='' cd -P -- "$bin_dir" && pwd)/gustaf"
 launchers="${t3_home}/runtime/launchers"
 grep -qxF "$launcher" "$launchers" 2>/dev/null || printf '%s\n' "$launcher" >> "$launchers"
 if "$interactive"; then printf '\r\033[2K' >&2; fi
@@ -295,7 +295,7 @@ read_from() {
     /*) case "$1" in *[!A-Za-z0-9_./-]*) ;; *) printf '%s' "$1" ;; esac ;;
   esac
 }
-# A command to paste for zsh, Linux bash, or fish, like `t3 install` prints. macOS bash reads only
+# A command to paste for zsh, Linux bash, or fish, like `gustaf install` prints. macOS bash reads only
 # one of several startup files, so no single file is safe to change there.
 path_command=
 path_rest="$bin_dir"
@@ -303,7 +303,7 @@ path_prefix=
 case "$bin_dir" in "$HOME"/*) path_rest="${bin_dir#"$HOME"}" path_prefix='$HOME' ;; esac
 case "$path_rest" in *[!A-Za-z0-9_./-]*) path_rest= ;; esac
 if [ -n "$path_rest" ]; then
-  # Last on PATH, so it never shadows another t3.
+  # Last on PATH, so it never shadows another gustaf.
   path_line="export PATH=\"\$PATH:${path_prefix}${path_rest}\""
   shell_name="${SHELL:-}"
   case "${shell_name##*/}" in
@@ -319,20 +319,20 @@ if [ -n "$path_rest" ]; then
       [ -z "$config_dir" ] || path_command="mkdir -p ${fish_dir} && printf '\\n%s\\n' 'fish_add_path --append --path ${path_prefix}${path_rest}' >> ${fish_dir}/config.fish" ;;
   esac
 fi
-# A t3 earlier on PATH runs instead; the PATH command adds this folder last.
-# A PATH entry with a trailing slash gives `dir//t3`.
-first_t3="$(command -v t3 2>/dev/null | tr -s / || true)"
-case "$first_t3" in "" | "${bin_dir}/t3") first_t3= ;; esac
+# A gustaf earlier on PATH runs instead; the PATH command adds this folder last.
+# A PATH entry with a trailing slash gives `dir//gustaf`.
+first_t3="$(command -v gustaf 2>/dev/null | tr -s / || true)"
+case "$first_t3" in "" | "${bin_dir}/gustaf") first_t3= ;; esac
 if [ -n "$first_t3" ]; then
-  printf '  Another t3 at %s runs first, so run %s%s/t3%s to use this one.\n\n' "$first_t3" "$bold" "$bin_dir" "$reset"
+  printf '  Another gustaf at %s runs first, so run %s%s/gustaf%s to use this one.\n\n' "$first_t3" "$bold" "$bin_dir" "$reset"
 else
   case ":${PATH}:" in
-    *":${bin_dir}:"* | *":${bin_dir}/:"*) printf '  Run %st3%s to use T3 Code here, or %st3 up%s to use it from your other devices.\n\n' "$bold" "$reset" "$bold" "$reset" ;;
+    *":${bin_dir}:"* | *":${bin_dir}/:"*) printf '  Run %sgustaf%s to use T3 Code here, or %sgustaf up%s to use it from your other devices.\n\n' "$bold" "$reset" "$bold" "$reset" ;;
     *)
       if [ -n "$path_command" ]; then
-        printf '  %s is not on your PATH yet. Add it with:\n\n    %s\n\n  Then open a new terminal and run %st3%s.\n\n' "$bin_dir" "$path_command" "$bold" "$reset"
+        printf '  %s is not on your PATH yet. Add it with:\n\n    %s\n\n  Then open a new terminal and run %sgustaf%s.\n\n' "$bin_dir" "$path_command" "$bold" "$reset"
       else
-        printf '  Add %s to your PATH, then run %st3%s.\n\n' "$bin_dir" "$bold" "$reset"
+        printf '  Add %s to your PATH, then run %sgustaf%s.\n\n' "$bin_dir" "$bold" "$reset"
       fi
       ;;
   esac

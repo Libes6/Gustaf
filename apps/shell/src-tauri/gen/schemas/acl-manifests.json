@@ -47,26 +47,6 @@
         "description": "Enables the app_branding command without any pre-configured scope.",
         "commands": { "allow": ["app_branding"], "deny": [] }
       },
-      "allow-cli-command-add-to-path": {
-        "identifier": "allow-cli-command-add-to-path",
-        "description": "Enables the cli_command_add_to_path command without any pre-configured scope.",
-        "commands": { "allow": ["cli_command_add_to_path"], "deny": [] }
-      },
-      "allow-cli-command-install": {
-        "identifier": "allow-cli-command-install",
-        "description": "Enables the cli_command_install command without any pre-configured scope.",
-        "commands": { "allow": ["cli_command_install"], "deny": [] }
-      },
-      "allow-cli-command-state": {
-        "identifier": "allow-cli-command-state",
-        "description": "Enables the cli_command_state command without any pre-configured scope.",
-        "commands": { "allow": ["cli_command_state"], "deny": [] }
-      },
-      "allow-cli-command-uninstall": {
-        "identifier": "allow-cli-command-uninstall",
-        "description": "Enables the cli_command_uninstall command without any pre-configured scope.",
-        "commands": { "allow": ["cli_command_uninstall"], "deny": [] }
-      },
       "allow-client-platform": {
         "identifier": "allow-client-platform",
         "description": "Enables the client_platform command without any pre-configured scope.",
@@ -216,26 +196,6 @@
         "identifier": "deny-app-branding",
         "description": "Denies the app_branding command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["app_branding"] }
-      },
-      "deny-cli-command-add-to-path": {
-        "identifier": "deny-cli-command-add-to-path",
-        "description": "Denies the cli_command_add_to_path command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["cli_command_add_to_path"] }
-      },
-      "deny-cli-command-install": {
-        "identifier": "deny-cli-command-install",
-        "description": "Denies the cli_command_install command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["cli_command_install"] }
-      },
-      "deny-cli-command-state": {
-        "identifier": "deny-cli-command-state",
-        "description": "Denies the cli_command_state command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["cli_command_state"] }
-      },
-      "deny-cli-command-uninstall": {
-        "identifier": "deny-cli-command-uninstall",
-        "description": "Denies the cli_command_uninstall command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["cli_command_uninstall"] }
       },
       "deny-client-platform": {
         "identifier": "deny-client-platform",

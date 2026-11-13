@@ -77,7 +77,7 @@ export class ServerSelfUpdate extends Context.Service<
 /**
  * A server starting from the runtime its launcher settled on means runtimes left by earlier
  * updates can go. The boot service says so through its IPC context. The SSH launcher and the
- * install script's `t3` start this home's pinned runtime directly, without one.
+ * install script's `gustaf` start this home's pinned runtime directly, without one.
  */
 export const pruneRuntimesOnStart = Effect.fn("cloud.server_self_update.prune_on_start")(
   function* (input: { readonly baseDir: string; readonly managed: boolean }) {
@@ -185,7 +185,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
     }
     if (capability === null) {
       return yield* failWith(
-        "Remote updates require the Gustaf background service. Run `t3 service install` on the server machine.",
+        "Remote updates require the Gustaf background service. Run `gustaf service install` on the server machine.",
       );
     }
 
