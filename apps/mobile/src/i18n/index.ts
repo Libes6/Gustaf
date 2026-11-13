@@ -12,15 +12,24 @@ export function t(text: string, locale = systemLocale): string {
 }
 
 const DURATION_UNITS = {
-  en: { h: "h", m: "m", s: "s", gap: "" },
-  ru: { h: "ч", m: "мин", s: "с", gap: " " },
+  en: { d: "d", h: "h", m: "m", s: "s", gap: "" },
+  ru: { d: "д", h: "ч", m: "мин", s: "с", gap: " " },
 } as const;
+
+/** One compact duration part: `5m` / `5 мин`. */
+export function formatDurationUnit(
+  value: number | string,
+  unit: "d" | "h" | "m" | "s",
+  locale = systemLocale,
+): string {
+  const units = DURATION_UNITS[isRussian(locale) ? "ru" : "en"];
+  return `${value}${units.gap}${units[unit]}`;
+}
 
 /** Elapsed time for live timers: `4s`, `1m 05s`, `1h 02m` (ru: `4 с`, `1 мин 05 с`, `1 ч 02 мин`). */
 export function formatElapsed(elapsedMs: number, locale = systemLocale): string {
-  const units = DURATION_UNITS[isRussian(locale) ? "ru" : "en"];
   const unit = (value: number | string, name: "h" | "m" | "s") =>
-    `${value}${units.gap}${units[name]}`;
+    formatDurationUnit(value, name, locale);
   const totalSeconds = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs / 1_000)) : 0;
   if (totalSeconds < 60) return unit(totalSeconds, "s");
   const totalMinutes = Math.floor(totalSeconds / 60);
