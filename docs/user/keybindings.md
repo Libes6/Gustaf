@@ -97,10 +97,10 @@ It is a JSON array of rules:
 ]
 ```
 
-T3 Code creates the file with its defaults and adds new defaults on later startups.
+Gustaf creates the file with its defaults and adds new defaults on later startups.
 New defaults do not replace commands you customized. If a new default overlaps one
 of your shortcuts, [rule order](#precedence) decides which runs.
-Invalid rules are ignored; if the file cannot be parsed, T3 Code uses defaults.
+Invalid rules are ignored; if the file cannot be parsed, Gustaf uses defaults.
 
 ## Rule shape
 

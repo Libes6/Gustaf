@@ -1,4 +1,8 @@
-# Updating T3 Code
+# Updating Gustaf
+
+The desktop app checks [GitHub Releases](https://github.com/Libes6/Gustaf/releases) and installs
+the update itself. On Android, install a newer APK from the same releases over the one you
+already have.
 
 The app you use and the server running your agents can be on different machines.
 When a server is behind your web or desktop app, the update button at the bottom
@@ -9,7 +13,7 @@ of the sidebar and **Settings → Environments** offer to update it.
 The update button at the bottom of the sidebar updates every connected machine
 in one step. It updates outdated providers, then servers that are behind, then
 the desktop app you are using. Servers move to the
-version your desktop app is installing, or to your web app's version. A
+version your desktop app is installing. A
 background service stays on its current release channel. A remote desktop app
 installs the latest release from its own channel. Hover the button to see what
 it will update.
@@ -28,7 +32,7 @@ running, and you can retry. The confirmation lists each machine it skips and
 why, such as a machine that is offline or needs a manual update. Use
 **Settings → Environments** for those.
 
-If a desktop app restarts on its old version, T3 Code tells you the update did
+If a desktop app restarts on its old version, Gustaf tells you the update did
 not apply. It does not install that version again on its own, even when another
 device asks. Use the update button on that machine to retry.
 
@@ -38,18 +42,18 @@ below.
 
 ## Switch between Stable and Nightly
 
-In the desktop app, change **Settings → About → Update track**. T3 Code shows each
+In the desktop app, change **Settings → About → Update track**. Gustaf shows each
 connected machine it will move and each one it skips, then moves them in one
 step. Remote servers install the latest release on the new track. Remote desktop
 apps reinstall on the new track. This app reinstalls last. Your threads,
 settings, and data stay.
 
 A background service cannot move to an older release remotely. When Stable is
-older than its Nightly, run `t3 update --channel stable --allow-downgrade` on
+older than its Nightly, run `gustaf update --channel stable --allow-downgrade` on
 that machine.
 
 A switch is blocked for a machine whose database already has changes the
-target release does not support, or when T3 Code cannot confirm that it does.
+target release does not support, or when Gustaf cannot confirm that it does.
 The dialog says why: update a machine on its current track first when its
 release is too old to check, or wait until the target track includes the
 changes. A Mac running the desktop app must switch on that Mac.
@@ -69,7 +73,7 @@ It resumes supported active threads after an update, crash, or machine
 restart. Changes are saved to connected environments that support this setting;
 update older servers first. If a supported environment was offline or has a
 different value, use **Apply to all** in Settings after it connects.
-T3 Code must start again on that machine;
+Gustaf must start again on that machine;
 the setting does not enable automatic startup. Terminal commands may still be
 interrupted, and threads without saved provider resume state need a new message.
 A thread that finished its turn to wait on a subagent, a background task, or a
@@ -81,7 +85,7 @@ while it is archived, snoozed, or settled. After three automatic resumes in a ro
 the thread waits for your next message.
 
 Updates from the previous orchestration system preserve conversation transcripts but cannot carry
-every kind of runtime history forward. Read [Threads from older T3 Code versions](./thread-migration.md)
+every kind of runtime history forward. Read [Threads from older Gustaf versions](./thread-migration.md)
 before continuing an important older thread.
 
 ## When versions don't match
@@ -90,7 +94,7 @@ A client and server must speak the same orchestration protocol. If they do not, 
 refused rather than running half-upgraded:
 
 - An app newer than the server is blocked before connecting, with a notice telling you to update
-  T3 Code on the machine named in the notice.
+  Gustaf on the machine named in the notice.
 - A server newer than your app refuses the connection with an update message.
 
 Update the side the notice names, then reconnect.
@@ -103,24 +107,20 @@ The offered action depends on how the server runs:
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Update server**          | Keep the client open while it installs and reconnects. Supported background services update remotely. For a desktop-hosted server, this also closes and relaunches the desktop app on the host. |
 | **Update the desktop app** | Update the desktop app on the machine running the server, then reopen it if needed.                                                                                                             |
-| **Copy update command**    | Run the command on the named host to update the detected global npm install, then restart the server with your usual options.                                                                   |
-| **Copy relaunch command**  | Stop the command-line server on its host and relaunch with the copied command, keeping your usual subcommand and options. This does not update an installed `t3` command.                       |
+| **Copy update command**    | Run the copied `gustaf update` command on the named host, then restart the server with your usual options. Gustaf is not installed from npm.                                                      |
+| **Copy relaunch command**  | Stop the command-line server on its host and relaunch with the copied command, keeping your usual subcommand and options. This does not update an installed `gustaf` command.                       |
 
 On the host, run:
 
 ```sh
-t3 update <client-version>
+gustaf update <client-version>
 ```
 
 Replace `<client-version>` with the version shown in the notice. The command
 asks before restarting the background service; if you decline, run
-`t3 service restart` when you are ready. For a server you started by hand,
+`gustaf service restart` when you are ready. For a server you started by hand,
 stop it and start it again afterwards with your usual options such as `--host`
 or `--tailscale-serve`.
-
-If you run the server with `npx` rather than an installed `t3`, there is
-nothing to update on the host: stop the server and relaunch it as
-`npx t3@<client-version>` with the same subcommand and options.
 
 ## If an update fails
 
@@ -135,22 +135,9 @@ Only one server can use a T3 home directory at a time. If startup reports that
 another server owns it, stop that server before retrying, or use a separate home
 directory and pair with the running server.
 
-### macOS app does not reopen after an Alpha update
-
-Updating an older **T3 Code (Alpha)** installation can replace it with
-**T3 Code (Beta)** without reopening the app. Open **T3 Code (Beta)** from
-Applications, or run:
-
-```sh
-open "/Applications/T3 Code (Beta).app"
-```
-
-If an old Dock shortcut no longer opens the app, remove it and add the Beta app
-from Applications again.
-
 ## If the desktop app does not start
 
-If the desktop app's server keeps failing at startup, T3 Code shows a "T3 Code
+If the desktop app's server keeps failing at startup, Gustaf shows a "Gustaf
 could not start" window instead of the app. If a newer version is available,
 choose **Update** to install it. If not, the window links to the last version
 that started on your computer. Download and install it to go back. Use **Copy
@@ -158,13 +145,11 @@ details** to include the error in a bug report.
 
 ## Registries and proxies
 
-Each server checks T3 Code releases, and providers installed with npm, through
-its own npm, so the checks use npm's configured registry, authentication, and
-proxy settings. Providers installed with Homebrew or pnpm check through those
-tools.
-Configure npm on the server's machine. If that registry cannot be reached, the
-release shows as unavailable; T3 Code does not try the public registry instead.
-Machines without npm check the public npm registry directly.
+The desktop app updates from GitHub Releases, not from npm. Providers installed
+with npm check through that npm, so those checks use npm's configured registry,
+authentication, and proxy settings. Providers installed with Homebrew or pnpm
+check through those tools. If a provider's registry cannot be reached, that
+provider's update shows as unavailable.
 
 ## Update providers
 
@@ -176,10 +161,10 @@ or when its instances use different update commands, such as two instances that
 run different CLI installs. Update those by hand, or point every instance of the
 provider at the same CLI.
 
-After a successful provider CLI update, T3 Code refreshes model discovery for
+After a successful provider CLI update, Gustaf refreshes model discovery for
 every enabled instance of that provider using its own configuration. Connected
 clients receive the refreshed catalogs automatically. Provider update checks
-must be enabled to download the latest T3 Code model catalog.
+must be enabled to download the latest Gustaf model catalog.
 
 Provider updates do not restart running chats. An existing session can keep
 using the previous CLI until it ends. If discovery fails, check the provider
@@ -198,11 +183,9 @@ These controls require a connected environment and permission to operate it.
 Provider update checks and restart continuation preferences are in
 **Settings → Maintenance**. If provider update checks are disabled, enable them
 there before refreshing to find newer versions. The same setting controls whether
-T3 Code downloads model catalog updates, so with it off new models may not appear
+Gustaf downloads model catalog updates, so with it off new models may not appear
 until you enable it and refresh provider status.
 
-Install App Store or Google Play releases as usual. The mobile app can also
-download updates in the background and apply them when you next leave the app.
-It saves drafts and queued messages before restarting. If you keep the app open
-for a long time, it may ask to install immediately; choosing **Later** leaves the
-update queued for the next suitable moment.
+Update the Android app by installing a newer APK from
+[GitHub Releases](https://github.com/Libes6/Gustaf/releases) over the one you
+already have. The app does not download that update by itself.
