@@ -465,6 +465,7 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            account::client_config,
             account::account_report_problem,
         ])
         .setup(|app| {

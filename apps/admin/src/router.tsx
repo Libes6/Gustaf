@@ -2,10 +2,12 @@ import { createRootRouteWithContext, createRoute, createRouter } from "@tanstack
 
 import type { Me } from "./api/types";
 import { EmptyState } from "./components/states";
+import { AnnouncementsPage } from "./pages/AnnouncementsPage";
 import { AiUsagePage } from "./pages/AiUsagePage";
 import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
+import { FeatureFlagsPage } from "./pages/FeatureFlagsPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { RelayPage } from "./pages/RelayPage";
 import { ReleasesPage } from "./pages/ReleasesPage";
@@ -14,6 +16,7 @@ import { ReportDetailPage } from "./pages/ReportDetailPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { UserDetailPage } from "./pages/UserDetailPage";
 import { UsersPage } from "./pages/UsersPage";
+import { VersionsPage } from "./pages/VersionsPage";
 import { strings } from "./strings";
 
 interface RouterContext {
@@ -61,6 +64,24 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const announcementsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/announcements",
+  component: AnnouncementsPage,
+});
+
+const versionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/versions",
+  component: VersionsPage,
+});
+
+const flagsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/flags",
+  component: FeatureFlagsPage,
+});
+
 const relayRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/relay",
@@ -99,6 +120,9 @@ export const router = createRouter({
     devicesRoute,
     aiUsageRoute,
     auditRoute,
+    announcementsRoute,
+    versionsRoute,
+    flagsRoute,
     relayRoute,
     systemRoute,
     releasesRoute,

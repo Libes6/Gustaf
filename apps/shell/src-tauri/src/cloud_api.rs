@@ -204,6 +204,23 @@ pub(crate) fn revoke_device(token: &str, device_id: &str) -> Result<(), ApiError
     .map(drop)
 }
 
+/// Announcements, the minimum version and feature flags for this app. The page decodes it;
+/// a credential, when there is one, only adds the user's own flags.
+pub(crate) fn client_config(
+    version: &str,
+    platform: &str,
+    token: Option<&str>,
+) -> Result<Value, ApiError> {
+    let response = send(
+        request("GET", "/v1/client-config", token)
+            .query("kind", "desktop")
+            .query("version", version)
+            .query("platform", platform),
+        None,
+    )?;
+    read_json(response)
+}
+
 /// "Report a problem". The device id is only a hint; the cloud keeps it when it is this user's.
 pub(crate) fn send_report(
     token: &str,

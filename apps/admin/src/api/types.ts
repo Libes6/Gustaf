@@ -125,6 +125,14 @@ export type AuditAction =
   | "user.role_change"
   | "user.delete"
   | "device.revoke"
+  | "announcement.create"
+  | "announcement.update"
+  | "announcement.delete"
+  | "minimum_version.set"
+  | "minimum_version.clear"
+  | "feature_flag.create"
+  | "feature_flag.update"
+  | "feature_flag.delete"
   | "report.update";
 
 export interface AuditEntry {
@@ -136,6 +144,50 @@ export interface AuditEntry {
   readonly targetType: string;
   readonly targetId: string;
   readonly meta: unknown;
+}
+
+export type ClientKind = "desktop" | "mobile";
+export type ClientTarget = "all" | ClientKind;
+export type AnnouncementLevel = "info" | "warning" | "critical";
+export type FlagMode = "off" | "everyone" | "listed";
+
+/** What the admin sends for an announcement; create and edit send the whole record. */
+export interface AnnouncementInput {
+  readonly textEn: string;
+  readonly textRu: string;
+  readonly level: AnnouncementLevel;
+  readonly link: string | null;
+  readonly target: ClientTarget;
+  readonly minVersion: string | null;
+  readonly maxVersion: string | null;
+  readonly startsAt: string | null;
+  readonly endsAt: string | null;
+  readonly active: boolean;
+}
+
+export interface Announcement extends AnnouncementInput {
+  readonly id: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface MinimumVersion {
+  readonly kind: ClientKind;
+  readonly version: string;
+  readonly message: string | null;
+  readonly updatedAt: string;
+}
+
+export interface FeatureFlagInput {
+  readonly description: string;
+  readonly mode: FlagMode;
+  readonly logins: ReadonlyArray<string>;
+}
+
+export interface FeatureFlag extends FeatureFlagInput {
+  readonly key: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 /** Relay outcome names, in the API's order; see apps/api/src/relay/relay.hub.ts. */

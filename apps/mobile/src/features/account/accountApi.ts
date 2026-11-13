@@ -181,3 +181,29 @@ export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
     },
   };
 }
+
+/** GET /v1/client-config. Public; a session or device token only adds the user's own flags. */
+export async function fetchClientConfig(
+  apiUrl: string,
+  fetchImpl: Fetch,
+  input: {
+    readonly version: string | null;
+    readonly platform: string;
+    readonly token: string | null;
+  },
+): Promise<unknown> {
+  const url = new URL(`${apiUrl}/v1/client-config`);
+  url.searchParams.set("kind", "mobile");
+  if (input.version) url.searchParams.set("version", input.version);
+  url.searchParams.set("platform", input.platform);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (input.token) headers.Authorization = `Bearer ${input.token}`;
+  const response = await fetchImpl(url.toString(), { headers });
+  if (!response.ok) {
+    throw new AccountApiError({
+      status: response.status,
+      detail: `client-config ${response.status}`,
+    });
+  }
+  return response.json();
+}

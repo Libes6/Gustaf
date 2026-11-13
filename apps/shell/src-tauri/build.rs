@@ -32,6 +32,7 @@ fn main() {
             "account_devices",
             "account_register_device",
             "account_revoke_device",
+            "client_config",
             "account_report_problem",
         ]),
     ))

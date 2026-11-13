@@ -26,6 +26,9 @@ export const queryKeys = {
   devices: (query: string, kind: DeviceKind | undefined) =>
     ["admin", "devices", { query, kind }] as const,
   audit: ["admin", "audit"] as const,
+  announcements: ["admin", "announcements"] as const,
+  minimumVersions: ["admin", "minimum-versions"] as const,
+  featureFlags: ["admin", "feature-flags"] as const,
   relay: ["admin", "relay"] as const,
   system: ["admin", "system"] as const,
   releases: ["admin", "releases"] as const,
@@ -131,6 +134,18 @@ export function useDevices(query: string, kind: DeviceKind | undefined) {
 
 export function useAudit() {
   return usePagedList(queryKeys.audit, (cursor) => api.listAudit({ cursor }));
+}
+
+export function useAnnouncements() {
+  return useQuery({ queryKey: queryKeys.announcements, queryFn: api.listAnnouncements });
+}
+
+export function useMinimumVersions() {
+  return useQuery({ queryKey: queryKeys.minimumVersions, queryFn: api.listMinimumVersions });
+}
+
+export function useFeatureFlags() {
+  return useQuery({ queryKey: queryKeys.featureFlags, queryFn: api.listFeatureFlags });
 }
 
 export function useReports(status: ReportStatus | undefined) {

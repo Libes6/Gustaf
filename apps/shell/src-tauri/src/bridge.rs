@@ -123,6 +123,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     account,
     pickFolder,
     droppedPaths,
+    // The cloud's announcements, minimum version and flags; the shell adds any credential.
+    clientConfig: () => invoke("client_config"),
   });
 
   // Same surface the web client expects from Electron's preload. Methods we have
