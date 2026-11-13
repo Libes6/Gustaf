@@ -37,6 +37,7 @@ import { autoConnectReport, devAutoConnectAttemptAtom } from "./devAutoConnect";
 import { splitEnvironmentSections } from "./environmentSections";
 import { leaveSettingsPage } from "../settings/settings-navigation";
 import { workspaceHasColumns } from "../layout/workspace/workspace-selection-store";
+import { connectRelayPairing } from "./relayRoute";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -205,11 +206,10 @@ function PairingForm({
     }
     setRelayStatus(null);
     setScannerLocked(false);
-    // Filled in so "add as a route" can resubmit the same code for a computer saved another way.
     const { host, code } = parsePairingUrl(pairingUrl);
     setHostInput(host);
     setCodeInput(code);
-    await submitPairingUrl(pairingUrl, routeFor);
+    await submitPairingUrl(pairingUrl, routeFor, true);
   };
 
   // The duplicate check runs before the code is redeemed, so the same code can add the route.
@@ -219,13 +219,16 @@ function PairingForm({
   const submitPairingUrl = async (
     pairingUrl: string,
     targetEnvironmentId: EnvironmentId | undefined,
+    relay = false,
   ) => {
     setOwnAttempt(true);
     setSubmitError(null);
     setAlreadySaved(undefined);
     setIsSubmitting(true);
     onChangeConnectionPairingUrl(pairingUrl);
-    const outcome = await onConnectPress(pairingUrl, targetEnvironmentId);
+    const outcome = relay
+      ? await connectRelayPairing(pairingUrl, targetEnvironmentId, onConnectPress)
+      : await onConnectPress(pairingUrl, targetEnvironmentId);
     setIsSubmitting(false);
     setSubmitError(outcome.error);
     setAlreadySaved(outcome.alreadySaved);
