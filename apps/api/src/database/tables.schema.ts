@@ -104,6 +104,10 @@ export const device = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     tokenRotatedAt: timestamp("token_rotated_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    // Reported by the app's heartbeat; null until the device first sends one.
+    appVersion: text("app_version"),
+    platform: text("platform"),
+    osVersion: text("os_version"),
     // Set by an admin; the row stays for the admin view, the token stops working.
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },

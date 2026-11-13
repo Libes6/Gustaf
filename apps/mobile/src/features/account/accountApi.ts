@@ -93,6 +93,13 @@ export class AccountApiError extends Schema.TaggedError<AccountApiError>()("Acco
   }
 }
 
+/** What the phone reports about itself: never names, paths or anything the user typed. */
+export interface AccountHeartbeat {
+  readonly appVersion: string;
+  readonly platform: "android" | "ios";
+  readonly osVersion: string | null;
+}
+
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface AccountApi {
@@ -109,6 +116,8 @@ export interface AccountApi {
     name: string,
   ) => Promise<{ readonly device: AccountDevice; readonly token: string }>;
   readonly revokeDevice: (token: string, deviceId: string) => Promise<void>;
+  /** Authenticated by the phone's device credential, not the session. */
+  readonly heartbeat: (deviceToken: string, report: AccountHeartbeat) => Promise<void>;
 }
 
 export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
@@ -154,6 +163,9 @@ export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
       ),
     revokeDevice: async (token, deviceId) => {
       await request("DELETE", `/v1/devices/${encodeURIComponent(deviceId)}`, { token });
+    },
+    heartbeat: async (deviceToken, report) => {
+      await request("POST", "/v1/devices/heartbeat", { token: deviceToken, body: report });
     },
   };
 }

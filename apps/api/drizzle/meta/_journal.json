@@ -36,6 +36,13 @@
       "when": 1794571816803,
       "tag": "0004_ai_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794578410574,
+      "tag": "0005_device_heartbeat",
+      "breakpoints": true
     }
   ]
 }
