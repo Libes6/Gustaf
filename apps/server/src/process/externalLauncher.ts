@@ -33,6 +33,7 @@ import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import { makeStaleWhileRevalidate } from "../environment/staleWhileRevalidate.ts";
+import { stripAppImageRuntimeEnv } from "./appImageEnv.ts";
 export {
   ExternalLauncherError,
   ExternalLauncherBrowserSpawnError,
@@ -722,7 +723,7 @@ const launchAndUnref = Effect.fn("externalLauncher.launchAndUnref")(function* (
   const { ELECTRON_RUN_AS_NODE: _runAsNode, ...env } = yield* HostProcess.Environment;
   const command = ChildProcess.make(launch.command, launch.args, {
     ...launch.options,
-    env: { ...env, ...launch.options.env },
+    env: stripAppImageRuntimeEnv({ ...env, ...launch.options.env }),
     extendEnv: false,
   });
 
