@@ -837,7 +837,7 @@ export const settingsDMessages = {
       "These permissions apply to this client’s current connection.",
     "settingsD.sessionPermissions.allowed": "Allowed",
     "settingsD.sessionPermissions.notGranted": "Not granted",
-    "settingsD.account.title": "Account",
+    "settingsD.account.title": "Gustaf Account",
     "settingsD.account.loading": "Loading…",
     "settingsD.account.notSignedIn": "Not signed in",
     "settingsD.account.signedOutDescription":
@@ -1757,7 +1757,7 @@ export const settingsDMessages = {
       "Эти разрешения действуют для текущего подключения этого клиента.",
     "settingsD.sessionPermissions.allowed": "Разрешено",
     "settingsD.sessionPermissions.notGranted": "Не предоставлено",
-    "settingsD.account.title": "Аккаунт",
+    "settingsD.account.title": "Аккаунт Gustaf",
     "settingsD.account.loading": "Загрузка…",
     "settingsD.account.notSignedIn": "Вход не выполнен",
     "settingsD.account.signedOutDescription":
