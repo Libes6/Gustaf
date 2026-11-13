@@ -51,7 +51,6 @@ type ConnectionsNewRouteParams = {
   readonly routeFor?: EnvironmentId;
 };
 
-// Module scope outlives remounts, so an opened link starts one pairing at a time.
 export function ConnectionsNewRouteScreen({
   route,
 }: StaticScreenProps<ConnectionsNewRouteParams | undefined>) {

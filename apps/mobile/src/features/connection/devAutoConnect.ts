@@ -150,6 +150,7 @@ export const relayLinkAttemptAtom = Atom.make<RelayLinkAttempt | null>(null).pip
   Atom.withLabel("mobile:relay-link-attempt"),
 );
 
+// Module scope outlives remounts, so an opened link starts one pairing at a time.
 const relayLinksStarted = new Set<string>();
 
 async function pairRelayLink(relayLink: string) {
