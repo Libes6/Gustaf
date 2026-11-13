@@ -36,6 +36,10 @@
     "allow-account-sign-out",
     "allow-account-devices",
     "allow-account-register-device",
-    "allow-account-revoke-device"
+    "allow-account-revoke-device",
+    "allow-cli-command-state",
+    "allow-cli-command-install",
+    "allow-cli-command-uninstall",
+    "allow-cli-command-add-to-path"
   ]
 }

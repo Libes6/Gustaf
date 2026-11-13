@@ -32,6 +32,10 @@ fn main() {
             "account_devices",
             "account_register_device",
             "account_revoke_device",
+            "cli_command_state",
+            "cli_command_install",
+            "cli_command_uninstall",
+            "cli_command_add_to_path",
         ]),
     ))
     .expect("failed to run tauri-build");

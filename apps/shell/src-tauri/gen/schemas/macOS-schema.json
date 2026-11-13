@@ -213,6 +213,30 @@
           "markdownDescription": "Enables the app_branding command without any pre-configured scope."
         },
         {
+          "description": "Enables the cli_command_add_to_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cli-command-add-to-path",
+          "markdownDescription": "Enables the cli_command_add_to_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cli_command_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cli-command-install",
+          "markdownDescription": "Enables the cli_command_install command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cli_command_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cli-command-state",
+          "markdownDescription": "Enables the cli_command_state command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cli_command_uninstall command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cli-command-uninstall",
+          "markdownDescription": "Enables the cli_command_uninstall command without any pre-configured scope."
+        },
+        {
           "description": "Enables the client_platform command without any pre-configured scope.",
           "type": "string",
           "const": "allow-client-platform",
@@ -391,6 +415,30 @@
           "type": "string",
           "const": "deny-app-branding",
           "markdownDescription": "Denies the app_branding command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cli_command_add_to_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cli-command-add-to-path",
+          "markdownDescription": "Denies the cli_command_add_to_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cli_command_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cli-command-install",
+          "markdownDescription": "Denies the cli_command_install command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cli_command_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cli-command-state",
+          "markdownDescription": "Denies the cli_command_state command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cli_command_uninstall command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cli-command-uninstall",
+          "markdownDescription": "Denies the cli_command_uninstall command without any pre-configured scope."
         },
         {
           "description": "Denies the client_platform command without any pre-configured scope.",

@@ -48,6 +48,11 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
   });
 
+  const invokeCli = (command) =>
+    invoke(command).catch((error) => {
+      throw error instanceof Error ? error : new Error(String(error));
+    });
+
   const pickFolder = async (options) => {
     const picked = await invoke("plugin:dialog|open", {
       options: {
@@ -236,22 +241,12 @@ const INIT_SCRIPT: &str = r#"(() => {
       displayName: "Gustaf",
     }),
     getRelayTelemetryEnabled: () => false,
+    // The shell answers with a plain string on failure; Settings shows an Error's message.
     cliCommand: {
-      getState: async () => ({
-        supported: false,
-        installedPath: null,
-        onPath: false,
-        launcherPath: null,
-      }),
-      install: async () => {
-        throw new Error("CLI install is not available in this Gustaf build yet.");
-      },
-      uninstall: async () => {
-        throw new Error("CLI uninstall is not available in this Gustaf build yet.");
-      },
-      addToPath: async () => {
-        throw new Error("Adding the CLI to PATH is not available in this Gustaf build yet.");
-      },
+      getState: () => invoke("cli_command_state"),
+      install: () => invokeCli("cli_command_install"),
+      uninstall: () => invokeCli("cli_command_uninstall"),
+      addToPath: () => invokeCli("cli_command_add_to_path"),
     },
     webLinks: {
       setReady: async () => {},

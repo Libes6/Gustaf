@@ -1,5 +1,6 @@
 mod account;
 mod bridge;
+mod cli_command;
 mod cloud_api;
 mod connection_storage;
 mod ipc_scope;
@@ -93,7 +94,7 @@ fn pairing_url_from_line(line: &str) -> Option<&str> {
     url.starts_with("http://").then_some(url)
 }
 
-fn login_shell_path() -> Option<String> {
+pub(crate) fn login_shell_path() -> Option<String> {
     // A Dock launch does not inherit the shell PATH, so codex, claude, and cursor disappear.
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
     let mut child = Command::new(shell)
@@ -363,6 +364,10 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            cli_command::cli_command_state,
+            cli_command::cli_command_install,
+            cli_command::cli_command_uninstall,
+            cli_command::cli_command_add_to_path,
         ])
         .setup(|app| {
             updater::initialize(app)?;
