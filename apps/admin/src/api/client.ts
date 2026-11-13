@@ -8,11 +8,14 @@ import type {
   Me,
   Overview,
   Page,
+  RelayHealth,
+  ReleaseStats,
   ReportCounts,
   ReportDetail,
   ReportStatus,
   ReportSummary,
   Role,
+  SystemStatus,
   UsagePeriod,
 } from "./types";
 
@@ -182,6 +185,9 @@ export function createApiClient({ baseUrl, fetch: fetchImpl }: ApiClientOptions)
     listAudit: (params: PageParams) =>
       request<Page<AuditEntry>>("GET", "/v1/admin/audit", { params: pageParams(params) }),
 
+    relay: () => request<RelayHealth>("GET", "/v1/admin/relay"),
+    system: () => request<SystemStatus>("GET", "/v1/admin/system"),
+    releases: () => request<ReleaseStats>("GET", "/v1/admin/releases"),
     listReports: (params: PageParams & { status?: ReportStatus | undefined }) =>
       request<Page<ReportSummary>>("GET", "/v1/admin/reports", {
         params: { status: params.status, ...pageParams(params) },

@@ -50,6 +50,13 @@
       "when": 1794578495557,
       "tag": "0006_bug_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794578618198,
+      "tag": "0007_relay_daily",
+      "breakpoints": true
     }
   ]
 }

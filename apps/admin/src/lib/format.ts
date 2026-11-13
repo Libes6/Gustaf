@@ -63,6 +63,26 @@ export function formatRelative(iso: string | null | undefined, now: number): str
   return relative.format(0, "minute");
 }
 
+/** Whole days, hours and minutes, largest two units: `3d 4h`, `5h 12m`, `7m`. */
+export function formatDuration(seconds: number): string {
+  const parts: string[] = [];
+  let rest = Math.max(0, Math.floor(seconds / 60));
+  for (const [unit, size] of [
+    ["d", 24 * 60],
+    ["h", 60],
+    ["m", 1],
+  ] as const) {
+    const value = Math.floor(rest / size);
+    rest -= value * size;
+    if (value > 0 || (unit === "m" && parts.length === 0)) parts.push(`${value}${unit}`);
+  }
+  return parts.slice(0, 2).join(" ");
+}
+
+export function formatPercent(value: number): string {
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)}%`;
+}
+
 export function shortCommit(commit: string): string {
   return /^[0-9a-f]{12,}$/i.test(commit) ? commit.slice(0, 7) : commit;
 }

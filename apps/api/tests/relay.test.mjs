@@ -11,6 +11,7 @@ async function withRelay(devices, run, limits = {}, trustedProxyHops = 0) {
   const revoked = new Set();
   const counted = [];
   const logs = [];
+  const recorded = [];
   let budgetLeft = true;
   const hub = new RelayHub(
     {
@@ -18,6 +19,7 @@ async function withRelay(devices, run, limits = {}, trustedProxyHops = 0) {
       stillUsable: async (ids) => new Set(ids.filter((id) => !revoked.has(id))),
       mayOpen: () => budgetLeft,
       countBytes: (userId, bytes) => counted.push([userId, bytes]),
+      record: (event) => recorded.push(event),
       log: (event) => logs.push(event),
     },
     { ...DEFAULT_RELAY_LIMITS, heartbeatMs: 60_000, ...limits },
@@ -46,6 +48,7 @@ async function withRelay(devices, run, limits = {}, trustedProxyHops = 0) {
       logs,
       hub,
       counted,
+      recorded,
       revoke: (id) => revoked.add(id),
       exhaustBudget: () => {
         budgetLeft = false;
@@ -96,7 +99,7 @@ const devices = {
 NodeTest.test(
   "pairs a client channel with its own user's host and copies frames both ways",
   async () => {
-    await withRelay(devices, async ({ connect, counted }) => {
+    await withRelay(devices, async ({ connect, counted, hub }) => {
       const host = await connect("laptop", "host");
       NodeAssert.deepEqual(host.first, { type: "ready", deviceId: "laptop" });
       const client = await connect("pixel", "client");
@@ -122,6 +125,11 @@ NodeTest.test(
       NodeAssert.deepEqual(
         counted.map(([user]) => user),
         ["alice", "alice"],
+      );
+      const live = hub.stats();
+      NodeAssert.deepEqual(
+        { hosts: live.hostsOnline, clients: live.clientsOnline, tunnels: live.openTunnels },
+        { hosts: 1, clients: 1, tunnels: 1 },
       );
 
       client.socket.send(JSON.stringify({ type: "close", channel: 5 }));
@@ -158,9 +166,10 @@ NodeTest.test("another user's computer looks offline, and phones cannot be hosts
 });
 
 NodeTest.test("rejects unknown tokens and frames on channels that were never opened", async () => {
-  await withRelay(devices, async ({ connect }) => {
+  await withRelay(devices, async ({ connect, hub }) => {
     const stranger = await connect("nobody", "client");
     NodeAssert.deepEqual(stranger.first, { type: "error", code: "unauthorized" });
+    NodeAssert.equal(hub.stats().counts.unauthorized, 1);
 
     await connect("laptop", "host");
     const client = await connect("pixel", "client");
@@ -199,7 +208,7 @@ NodeTest.test(
 NodeTest.test("budget, channel caps and revocation stop traffic", async () => {
   await withRelay(
     devices,
-    async ({ connect, exhaustBudget, revoke, sweep }) => {
+    async ({ connect, exhaustBudget, revoke, sweep, hub, recorded }) => {
       const host = await connect("laptop", "host");
       const client = await connect("pixel", "client");
       client.socket.send(JSON.stringify({ type: "open", channel: 1, hostDeviceId: "laptop" }));
@@ -224,6 +233,20 @@ NodeTest.test("budget, channel caps and revocation stop traffic", async () => {
       revoke("pixel");
       await sweep();
       NodeAssert.deepEqual(await client.inbox.next(), { closed: 4401 });
+
+      // Every outcome is counted in memory and handed on for the daily totals.
+      const { counts } = hub.stats();
+      NodeAssert.deepEqual([counts.attempt, counts.connected, counts.channel_opened], [2, 2, 1]);
+      NodeAssert.deepEqual(
+        [counts.channel_limit, counts.budget_exceeded, counts.revoked, counts.unauthorized],
+        [1, 1, 1, 0],
+      );
+      NodeAssert.deepEqual(
+        Object.entries(counts)
+          .flatMap(([event, n]) => Array(n).fill(event))
+          .sort(),
+        [...recorded].sort(),
+      );
     },
     { maxChannelsPerClient: 1 },
   );
@@ -234,7 +257,7 @@ NodeTest.test(
   async () => {
     await withRelay(
       devices,
-      async ({ connect, url, logs }) => {
+      async ({ connect, url, logs, hub }) => {
         const viaProxy = { "x-forwarded-for": "203.0.113.7" };
         await connect("laptop", "host", viaProxy);
         NodeAssert.equal(logs.find((event) => event.event === "relay.connect")?.ip, "203.0.113.7");
@@ -242,6 +265,7 @@ NodeTest.test(
         const refused = new WebSocket(url, { headers: viaProxy });
         const [, response] = await NodeEvents.once(refused, "unexpected-response");
         NodeAssert.equal(response.statusCode, 429);
+        NodeAssert.equal(hub.stats().counts.rate_limited, 1);
         // Another address has its own allowance.
         const other = await connect("pixel", "client", { "x-forwarded-for": "198.51.100.2" });
         NodeAssert.deepEqual(other.first, { type: "ready", deviceId: "pixel" });

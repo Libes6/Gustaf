@@ -172,6 +172,18 @@ export const relayUsage = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
 );
 
+// Relay totals per UTC day: bytes and connection outcomes by metric name (relay.daily.ts).
+// Aggregate only; no user, device or address is stored.
+export const relayDaily = pgTable(
+  "relay_daily",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    metric: text("metric").notNull(),
+    value: bigint("value", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.metric] })],
+);
+
 // "Report a problem" from the apps. Logs are only present when the user chose to attach them.
 export const bugReportClient = pgEnum("bug_report_client", ["desktop", "mobile"]);
 export const bugReportStatus = pgEnum("bug_report_status", ["new", "seen", "closed"]);

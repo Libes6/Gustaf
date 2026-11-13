@@ -7,6 +7,9 @@ import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { RelayPage } from "./pages/RelayPage";
+import { ReleasesPage } from "./pages/ReleasesPage";
+import { SystemPage } from "./pages/SystemPage";
 import { ReportDetailPage } from "./pages/ReportDetailPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { UserDetailPage } from "./pages/UserDetailPage";
@@ -58,6 +61,24 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const relayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/relay",
+  component: RelayPage,
+});
+
+const systemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/system",
+  component: SystemPage,
+});
+
+const releasesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/releases",
+  component: ReleasesPage,
+});
+
 const reportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reports",
@@ -78,6 +99,9 @@ export const router = createRouter({
     devicesRoute,
     aiUsageRoute,
     auditRoute,
+    relayRoute,
+    systemRoute,
+    releasesRoute,
     reportsRoute,
     reportRoute,
   ]),

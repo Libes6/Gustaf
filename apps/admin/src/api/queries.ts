@@ -26,6 +26,9 @@ export const queryKeys = {
   devices: (query: string, kind: DeviceKind | undefined) =>
     ["admin", "devices", { query, kind }] as const,
   audit: ["admin", "audit"] as const,
+  relay: ["admin", "relay"] as const,
+  system: ["admin", "system"] as const,
+  releases: ["admin", "releases"] as const,
   reports: (status: ReportStatus | undefined) => ["admin", "reports", { status }] as const,
   reportCounts: ["admin", "report-counts"] as const,
   report: (id: string) => ["admin", "report", id] as const,
@@ -64,6 +67,19 @@ export function useMe() {
 
 export function useOverview() {
   return useQuery({ queryKey: queryKeys.overview, queryFn: api.overview });
+}
+
+export function useRelayHealth() {
+  return useQuery({ queryKey: queryKeys.relay, queryFn: api.relay });
+}
+
+export function useSystemStatus() {
+  return useQuery({ queryKey: queryKeys.system, queryFn: api.system });
+}
+
+// The API caches GitHub for an hour; refetching sooner only re-reads that cache.
+export function useReleaseStats() {
+  return useQuery({ queryKey: queryKeys.releases, queryFn: api.releases, staleTime: 10 * 60_000 });
 }
 
 export function useAiUsage(days: UsagePeriod, userId?: string) {
