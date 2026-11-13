@@ -87,6 +87,12 @@ export const isTailnetHost = (host: string): boolean => {
   return ipv6 !== null && ipv6PrefixMatches(ipv6, [0xfd7a, 0x115c, 0xa1e0, 0, 0, 0, 0, 0], 48);
 };
 
+/** RFC 2544 198.18.0.0/15. Clash, Mihomo, and sing-box TUN fake-IP live here, never a LAN. */
+export const isBenchmarkingHost = (host: string): boolean => {
+  const parts = parseIpv4Address(host) ?? parseIpv4MappedIpv6Address(host);
+  return parts !== null && parts[0] === 198 && parts[1]! >= 18 && parts[1]! <= 19;
+};
+
 export const isSharedAddressSpaceHost = (host: string): boolean => {
   const parts = parseIpv4Address(host);
   return parts !== null && parts[0] === 100 && parts[1]! >= 64 && parts[1]! <= 127;
