@@ -18,7 +18,7 @@ import { useNewThreadHandler } from "./useHandleNewThread";
 
 /**
  * Opens a folder on this computer as a project in the primary environment: an
- * existing project opens (and unarchives), a new one is added. Used by `t3 <dir>`
+ * existing project opens (and unarchives), a new one is added. Used by `gustaf <dir>`
  * activations and folders dropped on the sidebar. `ready` is false until the
  * primary environment's projects have loaded, so a known folder is not added twice.
  */

@@ -1,4 +1,4 @@
-//! The `t3` command for terminals, run by the app's bundled CLI.
+//! The `gustaf` command for terminals, run by the app's bundled CLI.
 //!
 //! A launcher in the app's data folder runs the bundled `runtime/t3` against the same home the
 //! app's server uses. Settings links it into `~/.local/bin` or `~/bin` (macOS, Linux), or puts
@@ -11,9 +11,9 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::Manager;
 
-const MARKER: &str = "Written by Gustaf: runs the desktop app's bundled t3 CLI.";
+const MARKER: &str = "Written by Gustaf: runs the desktop app's bundled gustaf CLI.";
 const MOVED: &str = "Gustaf has moved or been removed. Open the app once to update this command.";
-/// The launcher is a few hundred bytes; never read a large binary another `t3` is.
+/// The launcher is a few hundred bytes; never read a large binary another `gustaf` is.
 const MAX_LAUNCHER_BYTES: u64 = 16_384;
 
 /// One change at a time, so two Settings windows cannot both append the PATH line.
@@ -74,7 +74,7 @@ impl Layout {
     fn launcher(&self) -> PathBuf {
         self.data_dir
             .join("bin")
-            .join(if cfg!(windows) { "t3.cmd" } else { "t3" })
+            .join(if cfg!(windows) { "gustaf.cmd" } else { "gustaf" })
     }
 }
 
@@ -99,7 +99,7 @@ fn write_launcher(layout: &Layout) -> Result<(), String> {
     }
     let failed = |_| {
         format!(
-            "Could not set up the t3 launcher at {}.",
+            "Could not set up the gustaf launcher at {}.",
             display(&launcher)
         )
     };
@@ -242,7 +242,7 @@ mod unix {
     fn first_on_path(layout: &Layout) -> Option<PathBuf> {
         path_entries(layout)
             .into_iter()
-            .map(|directory| directory.join("t3"))
+            .map(|directory| directory.join("gustaf"))
             .find(|candidate| is_executable_file(candidate))
     }
 
@@ -253,7 +253,7 @@ mod unix {
     fn installed_at(layout: &Layout) -> Option<PathBuf> {
         known_locations(layout)
             .into_iter()
-            .map(|directory| directory.join("t3"))
+            .map(|directory| directory.join("gustaf"))
             .find(|link| is_our_link(link))
     }
 
@@ -279,7 +279,7 @@ mod unix {
     }
 
     /// `pathSetup` in packages/shared/src/shell.ts: the file and line that put `directory` last on
-    /// PATH for new zsh, bash, or fish terminals, so it never shadows another `t3`.
+    /// PATH for new zsh, bash, or fish terminals, so it never shadows another `gustaf`.
     pub(super) fn startup_line(layout: &Layout, directory: &Path) -> Option<StartupLine> {
         let directory = display(directory);
         let home = display(&layout.home);
@@ -344,8 +344,8 @@ mod unix {
         let shadowed_by =
             foreign_first_on_path(layout).filter(|first| Some(first) != found.as_ref());
         let on_path = first_on_path(layout).is_some_and(|first| runs_our_launcher(layout, &first));
-        // Only a folder missing from PATH with no other t3 first: with one, the added folder (last
-        // on PATH) would still not run this t3.
+        // Only a folder missing from PATH with no other gustaf first: with one, the added folder (last
+        // on PATH) would still not run this gustaf.
         let setup = match &installed {
             Some(link) if !on_path && shadowed_by.is_none() && !folder_on_path(layout, link) => {
                 link.parent()
@@ -380,13 +380,13 @@ mod unix {
             // Our own link into another install runs first too; it is the one this updates.
             if Some(&shadow) != replaced.as_ref() {
                 return Err(format!(
-                    "Another t3 at {} runs first in a new terminal. Remove it, or run the launcher directly at {}.",
+                    "Another gustaf at {} runs first in a new terminal. Remove it, or run the launcher directly at {}.",
                     display(&shadow),
                     display(&launcher)
                 ));
             }
         }
-        // An old link of ours is updated where it is, so a t3 that works now keeps working.
+        // An old link of ours is updated where it is, so a gustaf that works now keeps working.
         let on_path = path_entries(layout);
         let candidates = user_candidates(layout);
         let mut folders: Vec<PathBuf> = Vec::new();
@@ -404,7 +404,7 @@ mod unix {
             if fs::create_dir_all(&folder).is_err() {
                 continue;
             }
-            let link = folder.join("t3");
+            let link = folder.join("gustaf");
             let linked = if Some(&link) == replaced.as_ref() {
                 // Swapped in place, so the command never goes missing.
                 let staging = link.with_extension(format!("{}.tmp", std::process::id()));
@@ -425,14 +425,14 @@ mod unix {
             return Ok(state(layout));
         }
         Err(format!(
-            "Another t3 command is already in ~/.local/bin and ~/bin, or neither is writable. Run the launcher directly at {}.",
+            "Another gustaf command is already in ~/.local/bin and ~/bin, or neither is writable. Run the launcher directly at {}.",
             display(&launcher)
         ))
     }
 
     pub(super) fn uninstall(layout: &Layout) -> Result<CliCommandState, String> {
         for folder in known_locations(layout) {
-            let link = folder.join("t3");
+            let link = folder.join("gustaf");
             if is_our_link(&link) {
                 fs::remove_file(&link)
                     .map_err(|_| format!("Could not remove {}.", display(&link)))?;
@@ -444,20 +444,20 @@ mod unix {
     pub(super) fn add_to_path(layout: &Layout) -> Result<CliCommandState, String> {
         let installed = installed_at(layout)
             .filter(|link| leads_here(layout, link))
-            .ok_or("Install the t3 command first.")?;
+            .ok_or("Install the gustaf command first.")?;
         let setup = installed
             .parent()
             .and_then(|folder| startup_line(layout, folder))
-            .ok_or("Gustaf cannot add t3 to this shell's PATH.")?;
+            .ok_or("Gustaf cannot add the gustaf command to this shell's PATH.")?;
         if let Some(shadow) = foreign_first_on_path(layout) {
             return Err(format!(
-                "Another t3 at {} runs first; Gustaf leaves it in place.",
+                "Another gustaf at {} runs first; Gustaf leaves it in place.",
                 display(&shadow)
             ));
         }
         if !folder_on_path(layout, &installed) && !has_line(&setup) {
             use std::io::Write;
-            let failed = |_| format!("Could not add t3 to {}.", setup.file);
+            let failed = |_| format!("Could not add gustaf to {}.", setup.file);
             if let Some(parent) = setup.path.parent() {
                 fs::create_dir_all(parent).map_err(failed)?;
             }
@@ -597,7 +597,7 @@ if ($env:T3_SET -eq '1') {
             entries.push(display(&folder));
             write_user_path(&entries)?;
             fs::write(owned_marker(layout), format!("{}\n", display(&folder)))
-                .map_err(|_| "Added t3 to your PATH but could not record it.".to_owned())?;
+                .map_err(|_| "Added gustaf to your PATH but could not record it.".to_owned())?;
         }
         Ok(state(layout))
     }
@@ -689,7 +689,7 @@ async fn run(
     change: fn(&Layout) -> Result<CliCommandState, String>,
 ) -> Result<CliCommandState, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let layout = layout(&app).ok_or("The t3 command needs an installed Gustaf app.")?;
+        let layout = layout(&app).ok_or("The gustaf command needs an installed Gustaf app.")?;
         let _held = CHANGES
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -771,7 +771,7 @@ mod tests {
             format!("/usr/bin:{}/.local/bin/", home.display())
         });
         let state = platform::install(&f.layout).unwrap();
-        let link = f.layout.home.join(".local/bin/t3");
+        let link = f.layout.home.join(".local/bin/gustaf");
         assert_eq!(state.installed_path, Some(display(&link)));
         assert!(state.on_path);
         assert_eq!(state.path_setup, None);
@@ -813,13 +813,13 @@ mod tests {
     }
 
     #[test]
-    fn leaves_a_t3_it_did_not_write_alone() {
+    fn leaves_a_gustaf_it_did_not_write_alone() {
         let f = fixture("foreign", "/bin/bash", |home| {
             format!("{}/.local/bin", home.display())
         });
         let local_bin = f.layout.home.join(".local/bin");
         fs::create_dir_all(&local_bin).unwrap();
-        let foreign = local_bin.join("t3");
+        let foreign = local_bin.join("gustaf");
         fs::write(&foreign, "#!/bin/sh\necho other\n").unwrap();
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&foreign, fs::Permissions::from_mode(0o755)).unwrap();
