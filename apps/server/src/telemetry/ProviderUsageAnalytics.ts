@@ -25,6 +25,7 @@ import {
   getModelSelectionStringOptionValue,
 } from "@t3tools/shared/model";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import * as AiUsageReporter from "./AiUsageReporter.ts";
 import * as AnalyticsService from "./AnalyticsService.ts";
 import { catalogModelLabel } from "./ProviderDimensions.ts";
 
@@ -398,6 +399,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const analytics = yield* AnalyticsService.AnalyticsService;
     const registry = yield* ProviderRegistry.ProviderRegistry;
+    const aiUsage = yield* AiUsageReporter.AiUsageReporter;
     const ledger = new RequestUsageLedger();
     const labeler = Effect.map(
       registry.getProviders,
@@ -411,10 +413,9 @@ export const layer = Layer.effect(
       ),
       turnCompleted: Effect.fn("ProviderTurnAnalytics.turnCompleted")(function* (report) {
         ledger.add(report);
-        yield* analytics.record(
-          "provider.turn.completed",
-          providerTurnProperties(report, yield* labeler),
-        );
+        const label = yield* labeler;
+        yield* analytics.record("provider.turn.completed", providerTurnProperties(report, label));
+        yield* aiUsage.record(report, label);
       }),
       runSettled: Effect.fn("ProviderTurnAnalytics.runSettled")(function* (report) {
         const properties = ledger.settle(report, yield* labeler);

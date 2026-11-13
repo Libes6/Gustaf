@@ -54,7 +54,7 @@ before an upload finishes requires you to attach that file again.
 You can drag or paste images into the web or desktop composer. HEIC and HEIF
 photos are converted to JPEG there and when selected from the mobile photo
 library; photos over the image limit are also resized to fit. On mobile, you can
-also send files to T3 Code through another app's system share sheet.
+also send files to Gustaf through another app's system share sheet.
 On Android, you can also drag images from another app into the message input
 in split screen.
 
@@ -92,7 +92,7 @@ keyboard. The button only offers Steer when the running agent supports it.
 
 Mobile keeps local copies of draft attachments, so you can preview them and queue
 messages while disconnected. Uploads resume when you reconnect. Drafts and queued
-messages survive app restarts. Signing out of T3 Connect keeps that work on your
+messages survive app restarts. Signing out keeps that work on your
 device until you sign back into the same account.
 
 ## Custom models
@@ -118,7 +118,7 @@ instance:
 
 ## Model defaults
 
-T3 Code remembers your provider, model, and model options for new threads. A
+Gustaf remembers your provider, model, and model options for new threads. A
 project's configured model takes precedence; resetting that project setting
 returns to the remembered selection.
 
@@ -162,7 +162,7 @@ Turn on **Suggest next prompt** in Settings > Labs. After a Claude or Codex turn
 empty composer shows a predicted next message. Press `Tab` to fill it in, then edit or send it, or
 press `Escape` to dismiss it. Each suggestion is one extra request that reuses the turn's prompt
 cache, so it uses a little of your plan's usage. Claude skips suggestions on the first turn of a
-thread and near usage limits. Codex needs version 0.165 or later; if T3 Code manages
+thread and near usage limits. Codex needs version 0.165 or later; if Gustaf manages
 Codex, update it in Settings > Providers. Codex follows a change to the setting at once; open Claude
 threads follow it after they restart. Suggestions show on web and desktop.
 
@@ -215,7 +215,7 @@ speech recognition. If the chosen environment disconnects, dictation stops; it n
 switches hosts. Choose **This device** to revoke access and discard pending audio.
 For [cloud dictation](./voice-input.md#choose-where-audio-goes), open **Cloud providers**
 under the environment in **Settings → Voice** and confirm which provider may receive recordings.
-On Android, keep T3 Code open while recording and transcribing.
+On Android, keep Gustaf open while recording and transcribing.
 
 On-device dictation may need a network connection to download a speech model the
 first time. After that it works offline for that language. iPhone dictates in the
@@ -238,7 +238,7 @@ microphone on iOS. Swipe a device left to forget it. Android may use another inp
 when the preferred microphone cannot be routed. Devices with the same name may share
 a saved preference, but simultaneous same-name inputs remain separately selectable.
 
-T3 Code deletes the temporary recording from your phone after transcription or
+Gustaf deletes the temporary recording from your phone after transcription or
 cancellation. The transcript stays in your draft until you send the message to the agent.
 
 ## Queued messages
@@ -281,7 +281,7 @@ After you add or change skills, plugins, or MCP servers, use **Restart agent
 session** in the command palette on web and desktop. The conversation continues,
 and your next message starts the agent again with the new setup.
 
-Provider commands must start the message to run. T3 Code commands such as
+Provider commands must start the message to run. Gustaf commands such as
 `/model` and skill mentions work on any line.
 
 Send `/compact` in an existing conversation to reduce context usage when the
@@ -353,6 +353,10 @@ saved text context at the time of the drop; later messages and the contents of a
 are not copied. The agent can read the saved transcript after the source disconnects. Normal
 file attachment limits apply.
 
+Type `@` and part of a model or provider name, such as `@opus`, to name that model for the
+agent, for example when delegating. It does not change the thread's model. Join words with
+`:`, `/` or `-`, as in `@opus:opencode`.
+
 Images keep their thumbnail shelf above the text and also get a chip at your cursor, so you can
 say exactly which image you mean. Deleting an image chip leaves the image on the shelf; removing
 the thumbnail asks first when the image is still mentioned in your text, then removes both. Files
@@ -361,7 +365,7 @@ exist only as chips: deleting a file's last chip removes the file from the messa
 Copy text that holds chips and paste it into another draft, in the same thread or another one,
 and the chips come along with what they point to. Images and files are fetched again from the
 environment they came from; while that happens the chip shows a dashed outline, and if it cannot
-complete T3 Code tells you and leaves the chip for you to remove or replace. A chip whose
+complete Gustaf tells you and leaves the chip for you to remove or replace. A chip whose
 context is no longer available shows the same dashed outline; hover it for what to do.
 
 Copying a message with the copy button, or copying text out of it, gives other apps readable
@@ -410,7 +414,7 @@ styles, or images from neighboring files.
 
 On web and desktop, HTML and PDF files open as rendered pages. Switch an HTML
 file to source view to read its markup; a link to a specific line opens source
-automatically. HTML previews cannot access your T3 Code session.
+automatically. HTML previews cannot access your Gustaf session.
 
 The file viewer recognizes images, HTML, and PDF files by their filename extension,
 including filenames or folders containing `#` or `?`.

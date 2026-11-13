@@ -23,6 +23,14 @@
       "types": "./src/composerThreadItems.ts",
       "default": "./src/composerThreadItems.ts"
     },
+    "./composer-model-mentions": {
+      "types": "./src/composerModelMentions.ts",
+      "default": "./src/composerModelMentions.ts"
+    },
+    "./model-search": {
+      "types": "./src/modelSearch.ts",
+      "default": "./src/modelSearch.ts"
+    },
     "./image-attachment-size": {
       "types": "./src/imageAttachmentSize.ts",
       "default": "./src/imageAttachmentSize.ts"
@@ -170,6 +178,10 @@
     "./queued-run-edit": {
       "types": "./src/queuedRunEdit.ts",
       "default": "./src/queuedRunEdit.ts"
+    },
+    "./client-config": {
+      "types": "./src/clientConfig.ts",
+      "default": "./src/clientConfig.ts"
     },
     "./clock": {
       "types": "./src/clock.ts",

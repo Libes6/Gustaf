@@ -39,6 +39,8 @@ declare global {
       readonly updater: import("./localUpdater").LocalUpdater;
       /** Absent in shells older than the cloud account. */
       readonly account?: import("./shellAccount").ShellAccount;
+      /** The cloud's announcements, minimum version and flags. Absent in older shells. */
+      readonly clientConfig?: () => Promise<unknown>;
     };
     /** Dev builds only, from DevReplayHost. Agents call these from the browser console. */
     t3dev?: {

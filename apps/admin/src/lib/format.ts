@@ -23,6 +23,11 @@ export function formatCount(value: number): string {
   return count.format(value);
 }
 
+/** Tokens of the measured turns; with no measured turn the count is unknown, not zero. */
+export function formatTokens(tokens: number, measuredTurns: number): string {
+  return measuredTurns === 0 ? strings.aiUsage.unknown : count.format(tokens);
+}
+
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
 
 export function formatBytes(bytes: number): string {
@@ -56,6 +61,26 @@ export function formatRelative(iso: string | null | undefined, now: number): str
     if (Math.abs(seconds) >= size) return relative.format(Math.trunc(seconds / size), unit);
   }
   return relative.format(0, "minute");
+}
+
+/** Whole days, hours and minutes, largest two units: `3d 4h`, `5h 12m`, `7m`. */
+export function formatDuration(seconds: number): string {
+  const parts: string[] = [];
+  let rest = Math.max(0, Math.floor(seconds / 60));
+  for (const [unit, size] of [
+    ["d", 24 * 60],
+    ["h", 60],
+    ["m", 1],
+  ] as const) {
+    const value = Math.floor(rest / size);
+    rest -= value * size;
+    if (value > 0 || (unit === "m" && parts.length === 0)) parts.push(`${value}${unit}`);
+  }
+  return parts.slice(0, 2).join(" ");
+}
+
+export function formatPercent(value: number): string {
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)}%`;
 }
 
 export function shortCommit(commit: string): string {

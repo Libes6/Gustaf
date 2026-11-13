@@ -32,6 +32,13 @@ const INIT_SCRIPT: &str = r#"(() => {
     for (const listener of updateListeners) listener(state);
   };
 
+  const snapShotListeners = new Set();
+  window.__gustafSnapShotEvent = (event) => {
+    for (const listener of snapShotListeners) listener(event);
+  };
+  const snapShot = (action, input = {}) => invoke("snap_shot_command", { action, input });
+  const configureSnapShot = (settings) => snapShot("configure", settings || {}).catch(console.error);
+
   const updater = Object.freeze({
     getUpdateState: () => invoke("update_state"),
     onUpdateState: (listener) => {
@@ -47,6 +54,11 @@ const INIT_SCRIPT: &str = r#"(() => {
       return true;
     },
   });
+
+  const invokeCli = (command) =>
+    invoke(command).catch((error) => {
+      throw error instanceof Error ? error : new Error(String(error));
+    });
 
   const pickFolder = async (options) => {
     const picked = await invoke("plugin:dialog|open", {
@@ -87,12 +99,16 @@ const INIT_SCRIPT: &str = r#"(() => {
   // Migrate the previous, port-specific browser settings only after saving succeeds.
   const getClientSettings = async () => {
     const saved = await invoke("read_client_settings");
-    if (saved !== null) return saved;
+    if (saved !== null) {
+      await configureSnapShot(saved);
+      return saved;
+    }
     const raw = window.localStorage.getItem("gustaf.clientSettings");
     if (!raw) return null;
     const settings = JSON.parse(raw);
     await invoke("write_client_settings", { settings });
     window.localStorage.removeItem("gustaf.clientSettings");
+    await configureSnapShot(settings);
     return settings;
   };
 
@@ -113,6 +129,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     listDevices: () => invoke("account_devices"),
     registerThisComputer: () => invoke("account_register_device"),
     revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
+    reportProblem: ({ message, attachLogs }) =>
+      invoke("account_report_problem", { message, attachLogs }),
   });
 
   window.gustafShell = Object.freeze({
@@ -121,11 +139,21 @@ const INIT_SCRIPT: &str = r#"(() => {
     account,
     pickFolder,
     droppedPaths,
+    // The cloud's announcements, minimum version and flags; the shell adds any credential.
+    clientConfig: () => invoke("client_config"),
   });
 
   // Same surface the web client expects from Electron's preload. Methods we have
   // not ported yet stay absent; callers use optional chaining. `preview` is omitted
   // on purpose (in-app browser is a separate project).
+  const sshPromptListeners = new Set();
+  window.__gustafSshPasswordPrompt = (request) => {
+    for (const listener of sshPromptListeners) listener(request);
+  };
+  const ssh = (method, input) => invoke("ssh_request", {
+    method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
+  });
+
   window.desktopBridge = {
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
@@ -140,9 +168,22 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
-    // SSH environments are not ported; the page subscribes while it starts.
-    onSshPasswordPrompt: () => () => {},
-    resolveSshPasswordPrompt: async () => {},
+    discoverSshHosts: () => ssh("discover"),
+    resolveSshHost: (alias) => ssh("resolve", alias),
+    ensureSshEnvironment: async (target, options) => {
+      const result = await ssh("ensure", { target, options });
+      if (result.type === "ssh-password-prompt-cancelled") throw new Error(result.message);
+      return result;
+    },
+    disconnectSshEnvironment: (target) => ssh("disconnect", target),
+    fetchSshEnvironmentDescriptor: (httpBaseUrl) => ssh("descriptor", { httpBaseUrl }),
+    bootstrapSshBearerSession: (httpBaseUrl, credential) => ssh("bootstrap", { httpBaseUrl, credential }),
+    fetchSshSessionState: (httpBaseUrl, bearerToken) => ssh("session", { httpBaseUrl, bearerToken }),
+    onSshPasswordPrompt: (listener) => {
+      sshPromptListeners.add(listener);
+      return () => sshPromptListeners.delete(listener);
+    },
+    resolveSshPasswordPrompt: (requestId, password) => ssh("resolve-password", { requestId, password }),
     getSystemLocale: () => navigator.language || "en-US",
     getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
     // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.
@@ -152,7 +193,24 @@ const INIT_SCRIPT: &str = r#"(() => {
     getLocalEnvironmentEnabled: () => true,
     getLocalEnvironmentBearerToken: () => invoke("local_environment_bearer_token"),
     getClientSettings,
-    setClientSettings: (settings) => invoke("write_client_settings", { settings }),
+    setClientSettings: async (settings) => {
+      await invoke("write_client_settings", { settings });
+      await configureSnapShot(settings);
+    },
+    getSnapShotState: () => snapShot("state"),
+    requestSnapShotPermissions: (includeAccessibility) => snapShot("permissions", { includeAccessibility }),
+    setupSnapShot: (action) => snapShot("setup", { action }),
+    checkSnapShotShortcut: (shortcut) => snapShot("check", { shortcut }),
+    setSnapShotShortcutSuppressed: (suppressed) => snapShot("suppress", { suppressed }),
+    listPendingSnapShots: () => snapShot("list"),
+    readSnapShot: (id) => snapShot("read", { id }),
+    acknowledgeSnapShot: (id) => snapShot("acknowledge", { id }),
+    setSnapShotAnimationDestination: () => snapShot("animation"),
+    dismissSnapShotAnimation: () => snapShot("animation"),
+    onSnapShotEvent: (listener) => {
+      snapShotListeners.add(listener);
+      return () => snapShotListeners.delete(listener);
+    },
     getConnectionCatalog: () => withCatalog(async () => {
       const saved = await invoke("read_connection_catalog");
       if (saved !== null) {
@@ -236,22 +294,12 @@ const INIT_SCRIPT: &str = r#"(() => {
       displayName: "Gustaf",
     }),
     getRelayTelemetryEnabled: () => false,
+    // The shell answers with a plain string on failure; Settings shows an Error's message.
     cliCommand: {
-      getState: async () => ({
-        supported: false,
-        installedPath: null,
-        onPath: false,
-        launcherPath: null,
-      }),
-      install: async () => {
-        throw new Error("CLI install is not available in this Gustaf build yet.");
-      },
-      uninstall: async () => {
-        throw new Error("CLI uninstall is not available in this Gustaf build yet.");
-      },
-      addToPath: async () => {
-        throw new Error("Adding the CLI to PATH is not available in this Gustaf build yet.");
-      },
+      getState: () => invoke("cli_command_state"),
+      install: () => invokeCli("cli_command_install"),
+      uninstall: () => invokeCli("cli_command_uninstall"),
+      addToPath: () => invokeCli("cli_command_add_to_path"),
     },
     webLinks: {
       setReady: async () => {},

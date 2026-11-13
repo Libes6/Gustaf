@@ -1,3 +1,4 @@
+import { WorktreeInventory } from "./WorktreeInventory";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 
 import { AdvancedSettings } from "./AdvancedSettings";
@@ -70,6 +71,7 @@ export function WorktreesSettingsPanel() {
       <SettingsSection id="worktree-branches" title={t("settingsE.worktreesSettings.branches")}>
         <BranchNamingSettings />
       </SettingsSection>
+      <WorktreeInventory />
       <WorktreeCleanupSection />
     </SettingsPageContainer>
   );

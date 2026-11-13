@@ -313,19 +313,19 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.serverLabel": "{label} server",
     "settingsD.savedEnvironmentRows.getMoreTunnels": "Get more tunnels",
     "settingsD.savedEnvironmentRows.noConnectPermission":
-      "Your session does not have permission to manage T3 Connect access.",
+      "Your session does not have permission to manage Gustaf Connect access.",
     "settingsD.savedEnvironmentRows.signIn": "Sign in",
     "settingsD.savedEnvironmentRows.fix": "Fix: {fix}",
     "settingsD.savedEnvironmentRows.moreInfo": "More info",
-    "settingsD.savedEnvironmentRows.t3ConnectLinked": "T3 Connect linked",
-    "settingsD.savedEnvironmentRows.t3ConnectTunnelDisabled": "T3 Connect tunnel disabled",
-    "settingsD.savedEnvironmentRows.t3ConnectUnlinked": "T3 Connect unlinked",
+    "settingsD.savedEnvironmentRows.t3ConnectLinked": "Gustaf Connect linked",
+    "settingsD.savedEnvironmentRows.t3ConnectTunnelDisabled": "Gustaf Connect tunnel disabled",
+    "settingsD.savedEnvironmentRows.t3ConnectUnlinked": "Gustaf Connect unlinked",
     "settingsD.savedEnvironmentRows.linkedDescription":
-      "This environment is available through T3 Connect.",
+      "This environment is available through Gustaf Connect.",
     "settingsD.savedEnvironmentRows.tunnelRemovedDescription":
       "The managed tunnel was removed. Agent activity publishing stays on.",
     "settingsD.savedEnvironmentRows.unlinkedDescription":
-      "This environment is no longer available through T3 Connect.",
+      "This environment is no longer available through Gustaf Connect.",
     "settingsD.savedEnvironmentRows.agentActivityEnabled": "Agent activity enabled",
     "settingsD.savedEnvironmentRows.agentActivityDisabled": "Agent activity disabled",
     "settingsD.savedEnvironmentRows.publishingDescription":
@@ -335,40 +335,40 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.webhooksHeld": "Webhooks held while offline",
     "settingsD.savedEnvironmentRows.webhooksNoLongerHeld": "Webhooks no longer held",
     "settingsD.savedEnvironmentRows.webhooksHeldDescription":
-      "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline.",
+      "Gustaf Connect keeps webhook requests for up to 24 hours while this environment is offline.",
     "settingsD.savedEnvironmentRows.webhooksNotHeldDescription":
       "Requests to an offline environment now fail. Anything already held is still delivered.",
     "settingsD.savedEnvironmentRows.signInToMakeAvailable":
-      "Sign in to make this environment available to your other devices through T3 Connect.",
+      "Sign in to make this environment available to your other devices through Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedFromConnect":
-      "This environment was removed from T3 Connect. Turn it on to link it again.",
+      "This environment was removed from Gustaf Connect. Turn it on to link it again.",
     "settingsD.savedEnvironmentRows.reachabilityUnreachable":
-      "T3 Connect is on, but other devices cannot reach this environment.",
+      "Gustaf Connect is on, but other devices cannot reach this environment.",
     "settingsD.savedEnvironmentRows.reachableDescription":
-      "This environment is available to your other devices through T3 Connect.",
+      "This environment is available to your other devices through Gustaf Connect.",
     "settingsD.savedEnvironmentRows.reachabilityNotChecked":
-      "T3 Connect is on. Reachability has not been checked yet.",
+      "Gustaf Connect is on. Reachability has not been checked yet.",
     "settingsD.savedEnvironmentRows.outOfSyncDescription":
-      "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it.",
+      "Gustaf Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn Gustaf Connect on to repair it.",
     "settingsD.savedEnvironmentRows.makeAvailableDescription":
-      "Make this environment available to your other devices through T3 Connect.",
+      "Make this environment available to your other devices through Gustaf Connect.",
     "settingsD.savedEnvironmentRows.publishSignInDescription":
       "Sign in to send activity to mobile notifications and Live Activities.",
     "settingsD.savedEnvironmentRows.publishDescription":
-      "Send activity to mobile notifications and Live Activities without T3 Connect.",
+      "Send activity to mobile notifications and Live Activities without Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedRunLinkCommand":
-      "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.",
+      "This environment was removed from Gustaf Connect. Run `gustaf connect link` on the host to link it again.",
     "settingsD.savedEnvironmentRows.publishAriaLabel": "Publish agent activity to mobile clients",
     "settingsD.savedEnvironmentRows.holdAriaLabel":
       "Hold webhook requests while this environment is offline",
     "settingsD.savedEnvironmentRows.holdDescription":
-      "Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing.",
+      "Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: Gustaf Connect only forwards requests and stores nothing.",
     "settingsD.savedEnvironmentRows.editPermissionsDescription":
       "To edit these settings, pair this connection with both View relay and Manage relay permissions.",
-    "settingsD.savedEnvironmentRows.enableT3Connect": "Enable T3 Connect",
+    "settingsD.savedEnvironmentRows.enableT3Connect": "Enable Gustaf Connect",
     "settingsD.savedEnvironmentRows.noRemoteEnvironments": "No saved remote environments",
     "settingsD.savedEnvironmentRows.addEnvironmentCloud":
-      "Click “Add environment” to pair another environment, or connect one from T3 Connect.",
+      "Click “Add environment” to pair another environment, or connect one from Gustaf Connect.",
     "settingsD.savedEnvironmentRows.addEnvironment":
       "Click “Add environment” to pair another environment.",
     "settingsD.snapShotSetupDialog.stepAccess": "Access",
@@ -837,7 +837,7 @@ export const settingsDMessages = {
       "These permissions apply to this client’s current connection.",
     "settingsD.sessionPermissions.allowed": "Allowed",
     "settingsD.sessionPermissions.notGranted": "Not granted",
-    "settingsD.account.title": "Account",
+    "settingsD.account.title": "Gustaf Account",
     "settingsD.account.loading": "Loading…",
     "settingsD.account.notSignedIn": "Not signed in",
     "settingsD.account.signedOutDescription":
@@ -849,7 +849,8 @@ export const settingsDMessages = {
     "settingsD.account.signOut": "Sign out",
     "settingsD.account.unnamed": "GitHub account",
     "settingsD.account.devices": "Devices",
-    "settingsD.account.devicesDescription": "Computers and phones linked to this account.",
+    "settingsD.account.devicesDescription":
+      "Computers and phones linked to this account. A registered computer reports its AI usage totals (provider, model, turns, token counts) to this account; set T3CODE_TELEMETRY_ENABLED=false to stop.",
     "settingsD.account.noDevices": "No devices are linked to this account yet.",
     "settingsD.account.thisComputer": "This computer",
     "settingsD.account.registerThisComputer": "Register this computer",
@@ -858,7 +859,21 @@ export const settingsDMessages = {
     "settingsD.account.signInFailed": "Could not sign in",
     "settingsD.account.actionFailed": "Account action failed",
     "settingsD.account.devicesFailed": "Could not load devices",
-    "settingsD.relay.title": "Remote access",
+    "settingsD.account.sidebarSignIn": "Sign in",
+    "settingsD.reportProblem.title": "Report a problem",
+    "settingsD.reportProblem.rowDescription": "Tell the Gustaf team what went wrong.",
+    "settingsD.reportProblem.open": "Report…",
+    "settingsD.reportProblem.description":
+      "Describe what happened and what you expected. The report is sent with your account, the app version and your platform.",
+    "settingsD.reportProblem.messageLabel": "What went wrong",
+    "settingsD.reportProblem.placeholder": "What did you do, and what happened?",
+    "settingsD.reportProblem.attachLogs": "Attach logs",
+    "settingsD.reportProblem.attachLogsHint":
+      "Recent app and server logs. Tokens and passwords are removed, but logs can include file names from this computer.",
+    "settingsD.reportProblem.cancel": "Cancel",
+    "settingsD.reportProblem.send": "Send report",
+    "settingsD.reportProblem.sent": "Report sent. Thank you!",
+    "settingsD.relay.title": "Any network (Gustaf relay)",
     "settingsD.relay.anyNetwork": "Reach this computer from any network",
     "settingsD.relay.description":
       "Your phone connects through the Gustaf relay with end-to-end encryption. The relay sees only that two of your devices are talking, not what they say.",
@@ -1199,18 +1214,19 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.serverLabel": "Сервер {label}",
     "settingsD.savedEnvironmentRows.getMoreTunnels": "Получить больше туннелей",
     "settingsD.savedEnvironmentRows.noConnectPermission":
-      "У вашей сессии нет разрешения управлять доступом к T3 Connect.",
+      "У вашей сессии нет разрешения управлять доступом к Gustaf Connect.",
     "settingsD.savedEnvironmentRows.signIn": "Войти",
     "settingsD.savedEnvironmentRows.fix": "Исправить: {fix}",
     "settingsD.savedEnvironmentRows.moreInfo": "Подробнее",
-    "settingsD.savedEnvironmentRows.t3ConnectLinked": "T3 Connect подключён",
-    "settingsD.savedEnvironmentRows.t3ConnectTunnelDisabled": "Туннель T3 Connect отключён",
-    "settingsD.savedEnvironmentRows.t3ConnectUnlinked": "T3 Connect отвязан",
-    "settingsD.savedEnvironmentRows.linkedDescription": "Это окружение доступно через T3 Connect.",
+    "settingsD.savedEnvironmentRows.t3ConnectLinked": "Gustaf Connect подключён",
+    "settingsD.savedEnvironmentRows.t3ConnectTunnelDisabled": "Туннель Gustaf Connect отключён",
+    "settingsD.savedEnvironmentRows.t3ConnectUnlinked": "Gustaf Connect отвязан",
+    "settingsD.savedEnvironmentRows.linkedDescription":
+      "Это окружение доступно через Gustaf Connect.",
     "settingsD.savedEnvironmentRows.tunnelRemovedDescription":
       "Управляемый туннель удалён. Публикация активности агента остаётся включённой.",
     "settingsD.savedEnvironmentRows.unlinkedDescription":
-      "Это окружение больше не доступно через T3 Connect.",
+      "Это окружение больше не доступно через Gustaf Connect.",
     "settingsD.savedEnvironmentRows.agentActivityEnabled": "Активность агента включена",
     "settingsD.savedEnvironmentRows.agentActivityDisabled": "Активность агента выключена",
     "settingsD.savedEnvironmentRows.publishingDescription":
@@ -1220,41 +1236,41 @@ export const settingsDMessages = {
     "settingsD.savedEnvironmentRows.webhooksHeld": "Webhook-запросы удерживаются, пока офлайн",
     "settingsD.savedEnvironmentRows.webhooksNoLongerHeld": "Webhook-запросы больше не удерживаются",
     "settingsD.savedEnvironmentRows.webhooksHeldDescription":
-      "T3 Connect хранит webhook-запросы до 24 часов, пока это окружение офлайн.",
+      "Gustaf Connect хранит webhook-запросы до 24 часов, пока это окружение офлайн.",
     "settingsD.savedEnvironmentRows.webhooksNotHeldDescription":
       "Запросы к офлайн-окружению теперь завершаются ошибкой. Всё, что уже удерживалось, всё равно доставляется.",
     "settingsD.savedEnvironmentRows.signInToMakeAvailable":
-      "Войдите, чтобы сделать это окружение доступным на других ваших устройствах через T3 Connect.",
+      "Войдите, чтобы сделать это окружение доступным на других ваших устройствах через Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedFromConnect":
-      "Это окружение удалено из T3 Connect. Включите, чтобы привязать его снова.",
+      "Это окружение удалено из Gustaf Connect. Включите, чтобы привязать его снова.",
     "settingsD.savedEnvironmentRows.reachabilityUnreachable":
-      "T3 Connect включён, но другие устройства не могут подключиться к этому окружению.",
+      "Gustaf Connect включён, но другие устройства не могут подключиться к этому окружению.",
     "settingsD.savedEnvironmentRows.reachableDescription":
-      "Это окружение доступно на других ваших устройствах через T3 Connect.",
+      "Это окружение доступно на других ваших устройствах через Gustaf Connect.",
     "settingsD.savedEnvironmentRows.reachabilityNotChecked":
-      "T3 Connect включён. Доступность ещё не проверялась.",
+      "Gustaf Connect включён. Доступность ещё не проверялась.",
     "settingsD.savedEnvironmentRows.outOfSyncDescription":
-      "T3 Connect не синхронизирован. Окружение привязано только для публикации активности агента, поэтому другие устройства не могут подключиться. Включите T3 Connect, чтобы исправить это.",
+      "Gustaf Connect не синхронизирован. Окружение привязано только для публикации активности агента, поэтому другие устройства не могут подключиться. Включите Gustaf Connect, чтобы исправить это.",
     "settingsD.savedEnvironmentRows.makeAvailableDescription":
-      "Сделайте это окружение доступным на других ваших устройствах через T3 Connect.",
+      "Сделайте это окружение доступным на других ваших устройствах через Gustaf Connect.",
     "settingsD.savedEnvironmentRows.publishSignInDescription":
       "Войдите, чтобы отправлять активность в мобильные уведомления и Live Activities.",
     "settingsD.savedEnvironmentRows.publishDescription":
-      "Отправляйте активность в мобильные уведомления и Live Activities без T3 Connect.",
+      "Отправляйте активность в мобильные уведомления и Live Activities без Gustaf Connect.",
     "settingsD.savedEnvironmentRows.removedRunLinkCommand":
-      "Это окружение удалено из T3 Connect. Выполните `t3 connect link` на хосте, чтобы привязать его снова.",
+      "Это окружение удалено из Gustaf Connect. Выполните `gustaf connect link` на хосте, чтобы привязать его снова.",
     "settingsD.savedEnvironmentRows.publishAriaLabel":
       "Публиковать активность агента в мобильных клиентах",
     "settingsD.savedEnvironmentRows.holdAriaLabel":
       "Удерживать webhook-запросы, пока это окружение офлайн",
     "settingsD.savedEnvironmentRows.holdDescription":
-      "Хранить webhook-запросы до 24 часов, пока окружение офлайн, а затем доставлять их. Выкл.: T3 Connect только пересылает запросы и ничего не сохраняет.",
+      "Хранить webhook-запросы до 24 часов, пока окружение офлайн, а затем доставлять их. Выкл.: Gustaf Connect только пересылает запросы и ничего не сохраняет.",
     "settingsD.savedEnvironmentRows.editPermissionsDescription":
       "Чтобы изменить эти настройки, свяжите подключение с разрешениями «Просмотр relay» и «Управление relay».",
-    "settingsD.savedEnvironmentRows.enableT3Connect": "Включить T3 Connect",
+    "settingsD.savedEnvironmentRows.enableT3Connect": "Включить Gustaf Connect",
     "settingsD.savedEnvironmentRows.noRemoteEnvironments": "Нет сохранённых удалённых окружений",
     "settingsD.savedEnvironmentRows.addEnvironmentCloud":
-      "Нажмите «Добавить окружение», чтобы связать другое окружение, или подключите одно из T3 Connect.",
+      "Нажмите «Добавить окружение», чтобы связать другое окружение, или подключите одно из Gustaf Connect.",
     "settingsD.savedEnvironmentRows.addEnvironment":
       "Нажмите «Добавить окружение», чтобы связать другое окружение.",
     "settingsD.snapShotSetupDialog.stepAccess": "Доступ",
@@ -1741,7 +1757,7 @@ export const settingsDMessages = {
       "Эти разрешения действуют для текущего подключения этого клиента.",
     "settingsD.sessionPermissions.allowed": "Разрешено",
     "settingsD.sessionPermissions.notGranted": "Не предоставлено",
-    "settingsD.account.title": "Аккаунт",
+    "settingsD.account.title": "Аккаунт Gustaf",
     "settingsD.account.loading": "Загрузка…",
     "settingsD.account.notSignedIn": "Вход не выполнен",
     "settingsD.account.signedOutDescription":
@@ -1753,7 +1769,8 @@ export const settingsDMessages = {
     "settingsD.account.signOut": "Выйти",
     "settingsD.account.unnamed": "Аккаунт GitHub",
     "settingsD.account.devices": "Устройства",
-    "settingsD.account.devicesDescription": "Компьютеры и телефоны, привязанные к этому аккаунту.",
+    "settingsD.account.devicesDescription":
+      "Компьютеры и телефоны, привязанные к этому аккаунту. Зарегистрированный компьютер отправляет в аккаунт сводку использования ИИ (провайдер, модель, число ходов, токены); чтобы отключить, задайте T3CODE_TELEMETRY_ENABLED=false.",
     "settingsD.account.noDevices": "К этому аккаунту пока не привязано ни одного устройства.",
     "settingsD.account.thisComputer": "Этот компьютер",
     "settingsD.account.registerThisComputer": "Зарегистрировать этот компьютер",
@@ -1763,7 +1780,21 @@ export const settingsDMessages = {
     "settingsD.account.signInFailed": "Не удалось войти",
     "settingsD.account.actionFailed": "Не удалось выполнить действие с аккаунтом",
     "settingsD.account.devicesFailed": "Не удалось загрузить устройства",
-    "settingsD.relay.title": "Удалённый доступ",
+    "settingsD.account.sidebarSignIn": "Войти",
+    "settingsD.reportProblem.title": "Сообщить о проблеме",
+    "settingsD.reportProblem.rowDescription": "Расскажите команде Gustaf, что пошло не так.",
+    "settingsD.reportProblem.open": "Сообщить…",
+    "settingsD.reportProblem.description":
+      "Опишите, что произошло и чего вы ожидали. Вместе с сообщением отправятся ваш аккаунт, версия приложения и платформа.",
+    "settingsD.reportProblem.messageLabel": "Что пошло не так",
+    "settingsD.reportProblem.placeholder": "Что вы делали и что произошло?",
+    "settingsD.reportProblem.attachLogs": "Приложить логи",
+    "settingsD.reportProblem.attachLogsHint":
+      "Свежие логи приложения и сервера. Токены и пароли вырезаются, но в логах могут остаться имена файлов с этого компьютера.",
+    "settingsD.reportProblem.cancel": "Отмена",
+    "settingsD.reportProblem.send": "Отправить",
+    "settingsD.reportProblem.sent": "Отчёт отправлен. Спасибо!",
+    "settingsD.relay.title": "Из любой сети (релей Gustaf)",
     "settingsD.relay.anyNetwork": "Доступ к компьютеру из любой сети",
     "settingsD.relay.description":
       "Телефон подключается через релей Gustaf со сквозным шифрованием. Релей видит только, что два ваших устройства общаются, но не что они передают.",

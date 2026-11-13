@@ -62,7 +62,7 @@ fn gather_snapshot() -> NetworkSnapshot {
 }
 
 /// IPv4 addresses on this machine that are usable from the LAN (not loopback,
-/// link-local, or Tailscale CGNAT — those are listed separately).
+/// link-local, Tailscale CGNAT, or VPN fake-IP — Tailscale is listed separately).
 fn lan_ipv4_addresses(interfaces: &[(String, Ipv4Addr)]) -> Vec<String> {
     let mut addresses: Vec<Ipv4Addr> = Vec::new();
     for (name, address) in interfaces {
@@ -71,6 +71,7 @@ fn lan_ipv4_addresses(interfaces: &[(String, Ipv4Addr)]) -> Vec<String> {
             || address.is_loopback()
             || address.is_link_local()
             || is_tailscale_cgnat(address)
+            || is_vpn_fake_ip(address)
             || addresses.contains(&address)
         {
             continue;
@@ -115,22 +116,26 @@ fn run_tailscale_status_json() -> Option<Value> {
     serde_json::from_slice(&stdout).ok()
 }
 
-/// A Dock launch on macOS has a minimal PATH, so also try the app bundle CLI.
+/// A Dock launch on macOS has a minimal PATH, so also try the login-shell PATH
+/// (Homebrew) and the app bundle CLI.
 fn tailscale_binary() -> Option<PathBuf> {
     let exe = if cfg!(windows) {
         "tailscale.exe"
     } else {
         "tailscale"
     };
-    let on_path = std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path)
+    let find_in = |path: &std::ffi::OsStr| {
+        std::env::split_paths(path)
             .map(|dir| dir.join(exe))
             .find(|candidate| candidate.is_file())
-    });
-    on_path.or_else(|| {
-        let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
-        (cfg!(target_os = "macos") && app.is_file()).then_some(app)
-    })
+    };
+    std::env::var_os("PATH")
+        .and_then(|path| find_in(&path))
+        .or_else(|| {
+            let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
+            (cfg!(target_os = "macos") && app.is_file()).then_some(app)
+        })
+        .or_else(|| crate::login_shell_path().and_then(|path| find_in(path.as_ref())))
 }
 
 /// Runs a helper without a console window and kills it after `HELPER_TIMEOUT`.
@@ -271,6 +276,12 @@ fn is_tailscale_cgnat(address: Ipv4Addr) -> bool {
     octets[0] == 100 && (64..=127).contains(&octets[1])
 }
 
+/// RFC 2544 198.18.0.0/15. Clash, Mihomo, and sing-box TUN fake-IP use it.
+fn is_vpn_fake_ip(address: Ipv4Addr) -> bool {
+    let octets = address.octets();
+    octets[0] == 198 && (18..=19).contains(&octets[1])
+}
+
 /// Matches whole words by prefix (`vEthernet (WSL)`, `bridge100`, `br-1a2b`) so
 /// a localized adapter name that merely contains `tap`/`tun`/`wg` is kept.
 fn is_host_only_interface(name: &str) -> bool {
@@ -339,24 +350,28 @@ pub(crate) fn advertised_endpoints_json(
         }
     }
 
-    // Serve proxies to loopback, so it is published in both exposure modes.
-    if tailscale_serve_enabled {
-        if let Some(dns) = &network.magic_dns_name {
-            let https = if tailscale_serve_port == 443 {
-                format!("https://{dns}")
-            } else {
-                format!("https://{dns}:{tailscale_serve_port}")
-            };
-            endpoints.push(endpoint(
-                &format!("tailscale-serve:{https}"),
-                "Tailscale Serve",
-                &https,
-                "private-network",
-                "desktop-addon",
-                false,
-                "HTTPS endpoint via Tailscale Serve.",
-            ));
+    // Serve proxies to loopback, so it is listed in both exposure modes. The web
+    // settings find it by the `tailscale-magicdns:` id and offer to turn Serve on
+    // while it is unavailable.
+    if let Some(dns) = &network.magic_dns_name {
+        let https = if tailscale_serve_port == 443 {
+            format!("https://{dns}")
+        } else {
+            format!("https://{dns}:{tailscale_serve_port}")
+        };
+        let mut serve = endpoint(
+            &format!("tailscale-magicdns:{https}"),
+            "Tailscale HTTPS",
+            &https,
+            "private-network",
+            "desktop-addon",
+            false,
+            "HTTPS endpoint via Tailscale Serve.",
+        );
+        if !tailscale_serve_enabled {
+            serve["status"] = json!("unavailable");
         }
+        endpoints.push(serve);
     }
 
     Value::Array(endpoints)
@@ -433,7 +448,8 @@ fn ensure_trailing_slash(url: &str) -> String {
 mod tests {
     use super::{
         advertised_endpoints_json, ensure_trailing_slash, is_host_only_interface,
-        is_tailscale_cgnat, lan_ipv4_addresses, parse_windows_ipconfig, NetworkSnapshot,
+        is_tailscale_cgnat, is_vpn_fake_ip, lan_ipv4_addresses, parse_windows_ipconfig,
+        NetworkSnapshot,
     };
     use std::net::Ipv4Addr;
 
@@ -445,6 +461,24 @@ mod tests {
     fn recognizes_tailscale_cgnat() {
         assert!(is_tailscale_cgnat(Ipv4Addr::new(100, 64, 0, 1)));
         assert!(!is_tailscale_cgnat(Ipv4Addr::new(192, 168, 1, 1)));
+        assert!(!is_tailscale_cgnat(Ipv4Addr::new(198, 18, 0, 1)));
+    }
+
+    #[test]
+    fn recognizes_vpn_fake_ip() {
+        for (address, fake) in [
+            ("198.18.0.0", true),
+            ("198.18.0.1", true),
+            ("198.18.255.255", true),
+            ("198.19.0.0", true),
+            ("198.19.255.255", true),
+            ("198.17.255.255", false),
+            ("198.20.0.0", false),
+            ("192.168.1.1", false),
+            ("100.64.0.1", false),
+        ] {
+            assert_eq!(is_vpn_fake_ip(ip(address)), fake, "{address}");
+        }
     }
 
     #[test]
@@ -480,6 +514,30 @@ mod tests {
             urls,
             ["http://127.0.0.1:3773/", "https://box.tail1234.ts.net/"]
         );
+        let serve = &endpoints[1];
+        assert_eq!(
+            serve["id"],
+            "tailscale-magicdns:https://box.tail1234.ts.net"
+        );
+        assert_eq!(serve["status"], "available");
+    }
+
+    #[test]
+    fn serve_endpoint_is_offered_as_unavailable_while_serve_is_off() {
+        let network = NetworkSnapshot {
+            magic_dns_name: Some("box.tail1234.ts.net".into()),
+            ..NetworkSnapshot::default()
+        };
+        let endpoints = advertised_endpoints_json(
+            "http://127.0.0.1:3773/",
+            "local-only",
+            false,
+            8443,
+            &network,
+        );
+        let serve = &endpoints.as_array().unwrap()[1];
+        assert_eq!(serve["httpBaseUrl"], "https://box.tail1234.ts.net:8443/");
+        assert_eq!(serve["status"], "unavailable");
     }
 
     #[test]
@@ -599,6 +657,8 @@ Drahtlos-LAN-Adapter WLAN:
             ("utun4".to_owned(), ip("100.101.1.2")),
             ("en1".to_owned(), ip("10.0.0.7")),
             ("en2".to_owned(), ip("169.254.3.4")),
+            ("en5".to_owned(), ip("198.18.0.1")),
+            ("Meta".to_owned(), ip("198.19.255.254")),
         ];
         assert_eq!(
             lan_ipv4_addresses(&interfaces),

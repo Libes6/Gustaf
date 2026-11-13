@@ -1,190 +1,111 @@
-# Install T3 Code
+# Install Gustaf
 
-T3 Code runs coding agents on your computer and lets you control them from its
-desktop, web, or mobile app. Set up the machine where the agents will work first.
+Gustaf runs coding agents on your computer. Use the desktop app on that computer, or the Android
+app as a remote. Set up the computer first.
 
-## Requirements
-
-You need an installed, authenticated provider before starting a thread. You can
-launch T3 Code and configure providers afterwards.
-
-## Command line
-
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
-```
-
-On Windows, in PowerShell:
-
-```powershell
-irm https://t3.codes/install.ps1 | iex
-```
-
-This installs the `t3` binary to `~/.local/bin`. If that folder is not on your
-`PATH` yet, the installer says so and, for zsh, bash on Linux, and fish, prints
-a command to add it. On Windows, `t3` works in the same PowerShell window right
-away; add the folder to your `PATH` for new windows. If a `t3` that the
-installer or the desktop app did not create is already there, it leaves that
-one alone and stops. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
-`T3CODE_VERSION` to pin an exact version.
-
-| Task                                             | Command                                                                 |
-| ------------------------------------------------ | ----------------------------------------------------------------------- |
-| Start the server and open the web app            | `t3`                                                                    |
-| Start the server without a browser               | `t3 serve`                                                              |
-| Use it from your other devices                   | `t3 up` ([details](./remote-access.md))                                 |
-| Keep it running in the background (macOS, Linux) | `t3 service install` ([details](./background-service.md))               |
-| Move to the newest release                       | `t3 update`                                                             |
-| Reclaim database space                           | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
-| Remove it again                                  | `t3 uninstall`                                                          |
-
-Run `t3 help` or `t3 --help` for the full reference. To start in a new working
-directory, use an explicit path such as `t3 ./my-project`. A bare directory name
-is accepted only if it already exists.
-
-If `t3` or `t3 start` reports an already running server, connect to that server
-instead. Stop it before starting a replacement, or use a different `--base-dir`
-for an independent server.
-
-To try T3 Code once without installing it, run `npx t3@latest` instead (needs
-Node.js for `npx`). It offers to install the `t3` command first. If you say no,
-it asks again at the next minor release, and `npx t3 install` installs it later.
-`npx t3` always runs the version npm picked, even when a `t3` is installed. On
-the nightly train, run your installed `t3` (for example `t3 up`), not
-`npx t3`, which runs the latest stable release.
-
-### Intel Macs
-
-There is no `t3` executable for Intel Macs (the desktop app is available). To
-run a server there, build it from source with `vp`, which provides the Node version it needs
-([Install vp](https://github.com/pingdotgg/t3code#install-vp)):
-
-```bash
-git clone https://github.com/pingdotgg/t3code
-cd t3code && vp i && vp run build:desktop
-node apps/server/dist/bin.mjs
-```
-
-`t3 update` and the background service do not apply to a server run this way;
-update it with `git pull` and a rebuild.
+Downloads are on [GitHub Releases](https://github.com/Libes6/Gustaf/releases). There is no install
+script and no npm package.
 
 ## Desktop app
 
-Download a release from [GitHub Releases](https://github.com/pingdotgg/t3code/releases),
-or use a package manager:
+| System              | File                                                             |
+| ------------------- | ---------------------------------------------------------------- |
+| macOS Apple Silicon | `Gustaf-<version>-macOS-arm64.dmg`                               |
+| Windows x64         | `Gustaf-<version>-Windows-x64-setup.exe` or the `.msi` beside it |
+| Linux x64           | `Gustaf-<version>-Linux-x64.AppImage`, `.deb`, or `.rpm`         |
 
-| Platform           | Install                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| Windows            | `winget install T3Tools.T3Code`                              |
-| macOS              | `brew install --cask t3-code`                                |
-| Debian, Ubuntu     | `sudo apt install ./T3-Code-*.deb`                           |
-| Arch Linux         | `yay -S t3code-bin`                                          |
-| Arch Linux nightly | `yay -S t3code-nightly-bin`                                  |
-| Nix                | `nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code` |
+Intel Macs are not published. Linux and Windows builds are x64 only.
 
-### Linux
-
-AppImage and `.deb` downloads are available for x86_64 and ARM64. Check your
-architecture with `uname -m`: for `x86_64`, choose a file ending in
-`x86_64.AppImage` or `amd64.deb`; for `aarch64`, choose `arm64.AppImage` or
-`arm64.deb`.
-
-To launch an AppImage, open a terminal in its download folder. Replace
-`T3-Code.AppImage` below with the exact filename you downloaded:
+To launch an AppImage, open a terminal in its download folder and replace the name below with the
+file you downloaded:
 
 ```bash
-chmod +x ./T3-Code.AppImage
-./T3-Code.AppImage
+chmod +x ./Gustaf-0.12.0-Linux-x64.AppImage
+./Gustaf-0.12.0-Linux-x64.AppImage
 ```
 
-The `.deb` updates itself like the other desktop builds. It asks for your
-password to install each update. If your desktop has no password prompt, the
-update fails. Download the new `.deb` and install it the same way.
+Install a `.deb` with `sudo apt install ./Gustaf-<version>-Linux-x64.deb`. Install a `.rpm` with
+your distribution's package tool.
 
-The AUR packages currently support x86_64 only; on ARM64, use the AppImage.
-Update AUR installs with your AUR helper, such as `yay -Syu`, instead of the
-in-app updater.
-
-### Nix (nixpkgs)
-
-T3 Code is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code).
-The command above installs from `nixos-unstable` and requires Nix 2.30 or later with
-`nix-command` and `flakes` enabled. Launch the desktop app with `t3code-desktop`;
-the package also includes the `t3` command.
-
-On NixOS, you can instead add the package to your system configuration, using
-a nixpkgs revision that includes `t3code`:
-
-```nix
-environment.systemPackages = [ pkgs.t3code ];
-```
-
-Apply the change with `sudo nixos-rebuild switch`. For Home Manager, add
-`pkgs.t3code` to `home.packages` and run `home-manager switch`.
-
-Update a profile installation with `nix profile upgrade t3code`. For NixOS or
-Home Manager, update your configuration's nixpkgs input or channel and rebuild.
-Nix manages both the desktop app and the bundled
-`t3` command; use Nix to update them instead of the in-app updater or `t3 update`.
-
-### The `t3` command
-
-The desktop app includes the `t3` command-line tool. A new install sets it up
-on first launch; after an update, or any time, choose **Install** next to
-**t3 command** in **Settings → About**. On macOS and Linux it adds a `t3` link
-in `~/.local/bin` (or `~/bin`); on Windows it adds the app's command folder to
-your `PATH`. Open a new terminal afterwards. If the folder is not on your
-`PATH`, **Add to PATH** in the welcome setup or **Settings → About** adds one
-line to your shell's startup file. **Remove** takes it off, and the app does not
-add it again. If you already have another `t3`, it stays as it is.
+The desktop app checks GitHub Releases and updates itself. See [Updating Gustaf](./updating.md).
 
 ### Windows Subsystem for Linux
 
-Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
-there. Install the provider CLIs inside that distro. T3 Code installs its own
-server runtime there automatically; the first launch after an app update can
-take longer.
+Choose a WSL distro in **Settings → Sharing & access** to run agents and projects there. Install
+the provider CLIs inside that distro. The first launch after an app update can take longer while
+the server runtime is prepared in that distro.
+
+## Command line
+
+<a id="command-line"></a>
+
+The desktop app runs the server. The same server is the `gustaf` command when that command is on
+your `PATH`.
+
+<a id="the-gustaf-command"></a>
+
+| Task                                             | Command                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| Start the server without a browser               | `gustaf serve`                                                |
+| Allow the local network                          | `gustaf serve --lan`                                          |
+| Pair another device                              | `gustaf pair`                                                 |
+| Keep it running in the background (macOS, Linux) | `gustaf service install` ([details](./background-service.md)) |
+| Move a command-line install to a newer release   | `gustaf update`                                               |
+
+Run `gustaf help` for the full reference. To start in a new working directory, use an explicit
+path such as `gustaf ./my-project`. A bare directory name is accepted only if it already exists.
+
+If `gustaf` reports an already running server, connect to that server instead. Stop it before
+starting a replacement, or use a different `--base-dir` for an independent server.
 
 ### Open a project from a terminal
 
 With the desktop app already running on the same machine:
 
 ```bash
-t3 app
+gustaf app
 ```
 
-This opens a new thread for the current directory, adding the project if needed.
-Pass a path, such as `t3 app ../my-project`, to open another directory. It requires
-the desktop app, so a standalone server or an SSH session is not enough. If the
+This opens a new thread for the current directory, adding the project if needed. Pass a path, such
+as `gustaf app ../my-project`, to open another directory. It requires the desktop app. If the
 command cannot reach the app, start or update the desktop app and try again.
 
-## Mobile app
+### Drop a folder on the sidebar
 
-Install T3 Code from the
-[App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or
-[Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code).
-The phone connects to a server on another machine. Follow
-[remote access](./remote-access.md) to link it through T3 Connect or a pairing URL.
+Drag one or more folders from Finder, Explorer, or your file manager onto the
+sidebar. Each one opens as a project on this computer, the same as `gustaf app`.
+Files dropped on a thread still attach to that thread. Browsers do not share
+folder paths, so in the web app use **Add project** instead. In the Gustaf
+desktop app this works on macOS.
 
-Store links and QR codes are also available in **Settings → About → Mobile app**
-on web and desktop. The store apps work with both stable and Nightly servers. Test builds are optional:
+## Android app
 
-- **iPhone and iPad:** TestFlight is invite-only.
-- **Android:** download an APK from the
-  [Android beta releases](https://github.com/pingdotgg/t3code/releases?q=android-beta-).
+<a id="mobile-app"></a>
 
-If the app crashes during launch, open Settings → Diagnostics on the next launch
-that succeeds. It lists startup crashes from the last 7 days with the error and
-component stack that store crash reports leave out. Copy the report and paste it
-into a GitHub issue. Error messages can quote values from the app, so read it over
-before sharing.
+Download `Gustaf-<version>-Android.apk` from the same
+[GitHub Releases](https://github.com/Libes6/Gustaf/releases) and install it. To update, install a
+newer APK over the one you already have. The phone connects to a server on a computer. Follow
+[remote access](./remote-access.md).
+
+If the app crashes during launch, open Settings → Diagnostics on the next launch that succeeds. It
+lists startup crashes from the last 7 days with the error and component stack. Copy the report and
+paste it into a [GitHub issue](https://github.com/Libes6/Gustaf/issues). Error messages can quote
+values from the app, so read it over before sharing.
+
+## Nix (nixpkgs)
+
+Gustaf is not published in nixpkgs. Use the desktop app or APK from GitHub Releases.
+
+## Requirements
+
+You need an installed, authenticated provider before starting a thread. You can open Gustaf and
+configure providers afterwards.
 
 ## Providers
 
-Open **Settings → Providers** in the web or desktop app, select the environment,
-and enable the provider you want. Installation, login, and configuration belong
-to that environment's machine, even when you connect from a phone or another
-computer.
+Open **Settings → Providers** in the desktop app, select the environment, and enable the provider
+you want. Installation, login, and configuration belong to that environment's machine, even when
+you connect from a phone or another computer.
 
 | Provider    | Install and authenticate                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -194,38 +115,35 @@ computer.
 | Grok Build  | Install [Grok Build CLI](https://x.ai/cli), then run `grok login`.                                                                                        |
 | Kiro        | Install [Kiro CLI](https://kiro.dev/docs/cli/), then run `kiro-cli login`.                                                                                |
 | OpenCode    | Install [OpenCode](https://opencode.ai), then run `opencode auth login`.                                                                                  |
-| Antigravity | Install and sign in with Google from T3 Code's provider settings.                                                                                         |
+| Antigravity | Install and sign in with Google from Gustaf's provider settings.                                                                                          |
 | Pi          | Install [Pi](./providers-pi.md#set-up-pi) with Node.js 22.19 or newer, then run `pi` and `/login`.                                                        |
 | Muse Code   | Install [Muse Code](https://dev.meta.ai/docs/muse-code) on the server, run `muse login`, then enable it in Settings → Providers.                          |
 | fx          | Install [fx](https://fx.sh) with `curl -fsSL https://fx.sh/setup.sh \| bash`, then run `fx login`.                                                        |
 
-Provider CLIs must be on the server's `PATH`. If T3 Code cannot find one, set its
-**Binary path** in provider settings, especially when using a version manager.
-Cursor's executable is `cursor-agent`, although its login command is
-`agent login`. Codex connected through ChatGPT and Antigravity can use their
-managed runtimes without a `PATH` entry.
+Provider CLIs must be on the server's `PATH`. If Gustaf cannot find one, set its **Binary path**
+in provider settings, especially when using a version manager. Cursor's executable is
+`cursor-agent`, although its login command is `agent login`. Codex connected through ChatGPT and
+Antigravity can use their managed runtimes without a `PATH` entry.
 
-T3 Code warns when a provider version has known compatibility problems with your
-release. Check **Settings → Providers** on that environment for the recommended
-version or range. When its package manager supports installing a specific version,
-you can install the recommendation there. Otherwise use the provider's installer
-on the environment's machine. An unlisted version is unverified.
+Gustaf warns when a provider version has known compatibility problems with your release. Check
+**Settings → Providers** on that environment for the recommended version or range. When its
+package manager supports installing a specific version, you can install the recommendation there.
+Otherwise use the provider's installer on the environment's machine. An unlisted version is
+unverified.
 
-When a provider CLI is behind its latest release, its provider card shows the
-available version. **Update now** runs the installer that owns the CLI
-(Homebrew, mise, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or
-the CLI's own update command when T3 Code cannot tell. T3 Code runs `mise upgrade`
-only for a tool your mise config requests as `latest` when the provider's binary
-path is a mise shim or under the tool's `installs/<tool>/latest` link; update a
-pinned version, or a path into one version's directory, through mise yourself.
-Cursor and Antigravity update with T3 Code. Homebrew and Chocolatey installs
-compare against the version their package manager offers, which can trail the
-npm release; update Claude installed with Chocolatey through Chocolatey.
+When a provider CLI is behind its latest release, its provider card shows the available version.
+**Update now** runs the installer that owns the CLI (Homebrew, mise, or a global npm, pnpm, Yarn,
+Bun, Volta, or Vite+ install), or the CLI's own update command when Gustaf cannot tell. Gustaf
+runs `mise upgrade` only for a tool your mise config requests as `latest` when the provider's
+binary path is a mise shim or under the tool's `installs/<tool>/latest` link; update a pinned
+version, or a path into one version's directory, through mise yourself. Cursor and Antigravity
+update with Gustaf. Homebrew and Chocolatey installs compare against the version their package
+manager offers, which can trail the npm release; update Claude installed with Chocolatey through
+Chocolatey.
 
-Add another provider instance for a separate account or configuration. Each
-instance can have its own environment variables, such as API keys or a custom
-base URL. Mark secret values as sensitive; after saving, T3 Code does not display
-their original values.
+Add another provider instance for a separate account or configuration. Each instance can have its
+own environment variables, such as API keys or a custom base URL. Mark secret values as
+sensitive; after saving, Gustaf does not display their original values.
 
 For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 [Claude](./providers-claude.md), [OpenCode](./providers-opencode.md),
@@ -238,5 +156,5 @@ For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 - [Permission modes](./permission-modes.md): choose when agents ask before acting.
 - [Remote access](./remote-access.md): connect from another device.
 - [Running in the background](./background-service.md): keep a Linux or macOS host available.
-- [Updating T3 Code](./updating.md): update the app and connected servers.
-- [Managed policy](./managed-policy.md): configure T3 Code for everyone on a machine.
+- [Updating Gustaf](./updating.md): update the app and the Android app.
+- [Managed policy](./managed-policy.md): configure Gustaf for everyone on a machine.

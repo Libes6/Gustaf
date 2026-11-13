@@ -16,7 +16,7 @@ import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import { isTailnetHost } from "@t3tools/shared/hostClassification";
+import { isBenchmarkingHost, isTailnetHost } from "@t3tools/shared/hostClassification";
 
 import * as ServerConfig from "../config.ts";
 import {
@@ -42,7 +42,10 @@ export class DirectEndpoints extends Context.Service<
 
 // Credentials travel over HTTP; public IPs leak them and hostnames can resolve differently per client.
 const isAdvertisableAddress = (address: string): boolean =>
-  NodeNet.isIPv4(address) && !address.startsWith("127.") && isPrivateNetworkAddress(address);
+  NodeNet.isIPv4(address) &&
+  !address.startsWith("127.") &&
+  !isBenchmarkingHost(address) &&
+  isPrivateNetworkAddress(address);
 
 // macOS utun names need Tailscale's IPv6 range to identify them; WARP shares its IPv4 range.
 const isTailscaleInterface = (

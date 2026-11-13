@@ -1296,10 +1296,14 @@ function OpenCommandPaletteDialog(props: {
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            New thread in <span className="font-semibold">{activeProjectTitle}</span>
+            {t("sidebar.SidebarProjectFolderHeader.newThreadIn").replace("{name}", "")}
+            <span className="font-semibold">{activeProjectTitle}</span>
           </>
         ),
-        searchTitle: `New thread in ${activeProjectTitle}`,
+        searchTitle: t("sidebar.SidebarProjectFolderHeader.newThreadIn").replace(
+          "{name}",
+          activeProjectTitle,
+        ),
         icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
         shortcutCommand: "chat.newLocal",
         run: async () => {

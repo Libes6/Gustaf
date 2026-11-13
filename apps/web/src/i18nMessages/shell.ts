@@ -3,6 +3,17 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "shell." and both languages list the same keys.
 export const shellMessages = {
   en: {
+    "shell.ssh.title": "SSH verification required",
+    "shell.ssh.description":
+      "Enter the password or verification code required by {target}. Gustaf keeps it in memory for this host and does not write it to disk.",
+    "shell.ssh.expired": "Expired",
+    "shell.ssh.expiredError": "This SSH verification prompt expired. Try connecting again.",
+    "shell.ssh.failed": "SSH verification prompt failed.",
+    "shell.ssh.hint":
+      "SSH keys may replace a password, but your server can still require a verification code.",
+    "shell.ssh.dismiss": "Dismiss",
+    "shell.ssh.cancel": "Cancel",
+    "shell.ssh.continue": "Continue",
     "shell.addToMachine.all": "All",
     "shell.addToMachine.chooseFolder": "Choose a folder on the other machine.",
     "shell.addToMachine.cloneDescription":
@@ -573,6 +584,17 @@ export const shellMessages = {
     "shell.commandPalette.current": "Current",
   },
   ru: {
+    "shell.ssh.title": "Подтверждение SSH",
+    "shell.ssh.description":
+      "Введите пароль или код подтверждения для {target}. Gustaf хранит его в памяти для этого хоста и не записывает на диск.",
+    "shell.ssh.expired": "Время истекло",
+    "shell.ssh.expiredError": "Время подтверждения SSH истекло. Попробуйте подключиться снова.",
+    "shell.ssh.failed": "Не удалось подтвердить вход по SSH.",
+    "shell.ssh.hint":
+      "Ключ SSH может заменить пароль, но сервер всё равно может запросить код подтверждения.",
+    "shell.ssh.dismiss": "Закрыть",
+    "shell.ssh.cancel": "Отмена",
+    "shell.ssh.continue": "Продолжить",
     "shell.addToMachine.all": "Все",
     "shell.addToMachine.chooseFolder": "Выберите папку на другой машине.",
     "shell.addToMachine.cloneDescription":

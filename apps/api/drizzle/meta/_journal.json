@@ -29,6 +29,41 @@
       "when": 1794506481603,
       "tag": "0003_relay_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794571816803,
+      "tag": "0004_ai_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794578410574,
+      "tag": "0005_device_heartbeat",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794578495557,
+      "tag": "0006_bug_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794578618198,
+      "tag": "0007_relay_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794578670049,
+      "tag": "0008_client_config",
+      "breakpoints": true
     }
   ]
 }

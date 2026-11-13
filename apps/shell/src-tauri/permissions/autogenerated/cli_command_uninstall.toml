@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cli-command-uninstall"
+description = "Enables the cli_command_uninstall command without any pre-configured scope."
+commands.allow = ["cli_command_uninstall"]
+
+[[permission]]
+identifier = "deny-cli-command-uninstall"
+description = "Denies the cli_command_uninstall command without any pre-configured scope."
+commands.deny = ["cli_command_uninstall"]

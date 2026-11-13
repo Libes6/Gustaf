@@ -1,3 +1,4 @@
+import * as WorktreeInventory from "./workspace/WorktreeInventory.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import * as EnvironmentKeys from "./cloud/environmentKeys.ts";
 import * as AssetSigner from "./assets/AssetSigner.ts";
@@ -54,6 +55,7 @@ import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewG
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as DelegatedTaskAnalytics from "./telemetry/DelegatedTaskAnalytics.ts";
+import * as AiUsageReporter from "./telemetry/AiUsageReporter.ts";
 import * as ProviderUsageAnalytics from "./telemetry/ProviderUsageAnalytics.ts";
 import * as ModelManifest from "./provider/ModelManifest.ts";
 import * as ResetCreditCoordinator from "./provider/resetCreditCoordinator.ts";
@@ -445,6 +447,14 @@ const layerReview = ReviewService.layer.pipe(
 );
 
 const layerVcs = Layer.empty.pipe(
+  Layer.provideMerge(
+    WorktreeInventory.layer.pipe(
+      Layer.provide(layerGitWorkflow),
+      Layer.provide(GitVcsDriver.layer),
+      Layer.provide(ProjectStore.layer),
+      Layer.provide(ProjectionStoreV2.layer),
+    ),
+  ),
   Layer.provideMerge(VcsProjectConfig.layer),
   Layer.provideMerge(layerVcsDriverRegistry),
   Layer.provideMerge(VcsProvisioningService.layer.pipe(Layer.provide(layerVcsDriverRegistry))),
@@ -550,7 +560,12 @@ const layerScheduledTaskWebhookOrigin = Layer.effect(
 
 const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
   Layer.provide(layerScheduledTaskWebhookOrigin),
-  Layer.provide(ProviderUsageAnalytics.layer),
+  Layer.provide(
+    ProviderUsageAnalytics.layer.pipe(
+      // Same opt-out as product events; the policy layer is memoized by reference.
+      Layer.provide(AiUsageReporter.layer.pipe(Layer.provide(ManagedPolicy.layer))),
+    ),
+  ),
   Layer.provide(layerCheckpointStore),
   Layer.provide(layerGitWorkflow),
   Layer.provide(

@@ -262,6 +262,7 @@ import {
 import { useThreadSelection } from "../../state/use-thread-selection";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
+import { useModelMentions } from "../../state/model-mentions";
 import { composerDocumentAttachmentRecord } from "../../lib/composerContext";
 import * as Option from "effect/Option";
 import { appAtomRegistry } from "../../state/atom-registry";
@@ -382,7 +383,7 @@ function UserMessageCopyButton(props: {
 }) {
   const button = (
     <CopyTextButton
-      accessibilityLabel="Copy message"
+      accessibilityLabel={t("Copy message")}
       text={props.text}
       onCopy={props.onCopy}
       tintColor={props.tintColor}
@@ -1155,7 +1156,7 @@ function ArtifactTemplateCard(props: {
       </View>
       {props.onUse ? (
         <Button
-          label="Use template"
+          label={t("Use template")}
           tone="secondary"
           accessibilityLabel={`Use ${props.template.displayName} template`}
           onPress={() => props.onUse?.(props.template)}
@@ -1174,6 +1175,7 @@ const AssistantMarkdownContent = memo(function AssistantMarkdownContent(props: {
   readonly renderImage: MarkdownImageRenderer;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill> | undefined;
 }) {
+  const models = useModelMentions(props.environmentId, props.markdown);
   const liveMarkdown = useLiveThreadLinkLabels(props.markdown, props.environmentId);
   const threadIcons = useThreadChipIcons(props.environmentId, liveMarkdown);
   const linkHandlers: MarkdownLinkHandlers = {
@@ -1190,6 +1192,7 @@ const AssistantMarkdownContent = memo(function AssistantMarkdownContent(props: {
       onUseArtifactTemplate={props.onUseArtifactTemplate}
       renderImage={props.renderImage}
       skills={props.skills}
+      models={models}
     />
   );
 });
@@ -1202,6 +1205,7 @@ function AssistantMarkdownBlocks(props: {
   readonly onUseArtifactTemplate?: ((template: CodexArtifactTemplate) => void) | undefined;
   readonly renderImage: MarkdownImageRenderer;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill> | undefined;
+  readonly models: ReturnType<typeof useModelMentions>;
 }) {
   const blocks = useMemo(
     () =>
@@ -1241,6 +1245,7 @@ function AssistantMarkdownBlocks(props: {
           key={`markdown:${offset}`}
           markdown={renderCodexInlineDirectivesAsMarkdown(segment.markdown)}
           skills={props.skills}
+          models={props.models}
           textStyle={props.markdownStyles.nativeTextStyle}
           {...props.linkHandlers}
           renderImage={props.renderImage}
@@ -2195,7 +2200,7 @@ function renderFeedEntry(
               entry.pendingMessage.messageId !== props.dispatchingMessageId ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit pending message"
+                  accessibilityLabel={t("Edit pending message")}
                   hitSlop={8}
                   className="size-7 items-center justify-center"
                   onPress={() => {
@@ -2272,7 +2277,7 @@ function renderFeedEntry(
         {showAssistantMeta ? (
           <View className="mt-1 flex-row items-center gap-1">
             <CopyTextButton
-              accessibilityLabel="Copy message"
+              accessibilityLabel={t("Copy message")}
               text={renderedText}
               tintColor={iconSubtleColor}
               buttonSize={props.replyActionSize.button}
@@ -2415,10 +2420,10 @@ function UserMessageContent(props: UserMessageContentProps) {
               (item) => item.contextId === reference.contextId,
             );
             return {
-              title: record?.label ?? "Context unavailable",
+              title: record?.label ?? t("Context unavailable"),
               actions: [
-                { id: "open-context", title: "Open context" },
-                { id: "copy-context", title: "Copy context", disabled: !record },
+                { id: "open-context", title: t("Open context") },
+                { id: "copy-context", title: t("Copy context"), disabled: !record },
               ],
             };
           },
@@ -2470,6 +2475,7 @@ function UserMessageContent(props: UserMessageContentProps) {
 
 function UserMessageMarkdownContent(props: UserMessageContentProps) {
   const text = props.text;
+  const models = useModelMentions(props.environmentId, text);
   const segments = parseReviewCommentMessageSegments(text);
   const hasReviewComment = segments.some((segment) => segment.kind === "review-comment");
   const contextClipboardFragment = props.context
@@ -2485,6 +2491,7 @@ function UserMessageMarkdownContent(props: UserMessageContentProps) {
         markdown={text}
         contextClipboardFragment={contextClipboardFragment}
         skills={props.skills}
+        models={models}
         textStyle={props.markdownStyles.nativeTextStyle}
         preserveSoftBreaks
         {...props.linkHandlers}
@@ -2517,6 +2524,7 @@ function UserMessageMarkdownContent(props: UserMessageContentProps) {
             markdown={text}
             contextClipboardFragment={contextClipboardFragment}
             skills={props.skills}
+            models={models}
             textStyle={props.markdownStyles.nativeTextStyle}
             preserveSoftBreaks
             {...props.linkHandlers}
@@ -3019,10 +3027,10 @@ export const ThreadFeed = memo(function ThreadFeed({
           actions: [
             {
               id: "open-skill",
-              title: "View instructions",
+              title: t("View instructions"),
               disabled: !enrichedSkillInstructionsPath(skill),
             },
-            { id: "copy-skill", title: "Copy skill" },
+            { id: "copy-skill", title: t("Copy skill") },
           ],
         };
       }
@@ -3965,8 +3973,10 @@ export const ThreadFeed = memo(function ThreadFeed({
             style={[StyleSheet.absoluteFill, { left: contentLeftInset, right: contentRightInset }]}
           >
             <ThreadFeedPlaceholder
-              title="No conversation yet"
-              detail="Ask the agent to inspect the repo, run a command, or continue the active thread."
+              title={t("No conversation yet")}
+              detail={t(
+                "Ask the agent to inspect the repo, run a command, or continue the active thread.",
+              )}
               topInset={topContentInset}
               bottomInset={bottomContentInset}
               horizontalPadding={horizontalPadding}
@@ -3991,9 +4001,9 @@ function ThreadFeedLoadEarlierControl(props: ThreadFeedHistoryControls) {
       {props.hasMoreHistory ? (
         <View className="self-center">
           <Button
-            label={props.loading ? "Loading earlier activity…" : "Load earlier activity"}
+            label={props.loading ? t("Loading earlier activity…") : t("Load earlier activity")}
             tone="secondary"
-            accessibilityLabel="Load earlier activity"
+            accessibilityLabel={t("Load earlier activity")}
             disabled={props.loading}
             onPress={props.onLoadEarlier}
             icon="chevron.up"

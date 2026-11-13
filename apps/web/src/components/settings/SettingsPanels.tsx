@@ -30,8 +30,6 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
 import { AboutVersionTitle } from "./AboutVersionTitle";
-import { AccountSettingsSection } from "./AccountSettings";
-import { RelayHostSettingsSection } from "./RelayHostSettings";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
 import {
@@ -2210,8 +2208,6 @@ export function AboutSettingsPanel() {
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
-      <AccountSettingsSection />
-      <RelayHostSettingsSection />
       <SettingsSection id="about" title={t("settingsD.settingsPanels.app")}>
         {primaryPolicy ? (
           <SettingsRow

@@ -1,8 +1,8 @@
 {
   "totals": {
     "web": {
-      "files": 261,
-      "strings": 941
+      "files": 259,
+      "strings": 932
     },
     "mobile": {
       "files": 235,
@@ -83,7 +83,7 @@
       "Try citing the selection after the connection or pending input is resolved.",
       "Unable to add to chat"
     ],
-    "apps/web/src/components/CommandPalette.tsx": ["Enter", "New thread in"],
+    "apps/web/src/components/CommandPalette.tsx": ["Enter"],
     "apps/web/src/components/CommandPaletteContent.tsx": ["Backspace", "Enter", "Esc"],
     "apps/web/src/components/CommandPaletteThreadItems.tsx": ["Remote"],
     "apps/web/src/components/ComposerContextPermissions.tsx": ["Permissions"],
@@ -1073,9 +1073,7 @@
       "Reset to inherited value"
     ],
     "apps/web/src/components/sidebar/SidebarChrome.tsx": ["Gustaf"],
-    "apps/web/src/components/sidebar/SidebarProjectFolderHeader.tsx": ["New thread in"],
     "apps/web/src/components/sidebar/SidebarThreadRow.tsx": [
-      "Custom…",
       "Handed off from",
       "Regenerating title",
       "Regenerating title",
@@ -1127,14 +1125,6 @@
       "Setting not saved"
     ],
     "apps/web/src/hooks/useStartTriage.ts": ["Could not start triage", "Starting triage…"],
-    "apps/web/src/hooks/useThreadActionMenu.ts": [
-      "Branch copied",
-      "Path copied",
-      "Path unavailable",
-      "Project created",
-      "This thread does not have a workspace path to copy.",
-      "Thread ID copied"
-    ],
     "apps/web/src/hooks/useThreadActions.ts": ["Thread deleted, but navigation failed"],
     "apps/web/src/lib/openPullRequestLink.ts": [
       "This commit is not in the thread's workspace",
@@ -1371,7 +1361,7 @@
       "Or use the managed relay",
       "Reach your machines from anywhere, no network setup.",
       "Scan QR code",
-      "Scan the code from t3 pair or desktop Connections settings",
+      "Scan the code from gustaf pair or desktop Connections settings",
       "Sign in to T3 Connect",
       "Tap to scan"
     ],

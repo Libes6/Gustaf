@@ -6,10 +6,12 @@
     "windows": ["main"],
     "permissions": [
       "core:default",
+      "allow-ssh-request",
       "dialog:allow-open",
       "notification:allow-notify",
       "allow-dropped-paths",
       "allow-drag-window",
+      "allow-snap-shot-command",
       "allow-read-connection-catalog",
       "allow-write-connection-catalog",
       "allow-reveal-window",
@@ -37,7 +39,13 @@
       "allow-account-sign-out",
       "allow-account-devices",
       "allow-account-register-device",
-      "allow-account-revoke-device"
+      "allow-account-revoke-device",
+      "allow-cli-command-state",
+      "allow-cli-command-install",
+      "allow-cli-command-uninstall",
+      "allow-cli-command-add-to-path",
+      "allow-client-config",
+      "allow-account-report-problem"
     ]
   }
 }

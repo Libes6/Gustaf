@@ -82,6 +82,7 @@ NodeTest.test("a failed migration keeps the original preferences for retry", asy
 NodeTest.test("native preferences take priority over old origin storage", async () => {
   const { bridge } = load(
     (name) => {
+      if (name === "snap_shot_command") return null;
       NodeAssert.equal(name, "read_client_settings");
       return { chatWidth: "comfortable" };
     },
@@ -192,8 +193,7 @@ NodeTest.test("every listener of the desktop bridge can be subscribed to", () =>
   const listeners = [...body.matchAll(/^ {2}(on[A-Z]\w*):/gm)].map((match) => match[1]);
   NodeAssert.ok(listeners.includes("onSshPasswordPrompt"));
   const { bridge } = load(() => null);
-  // SnapShots are detected by their absence (apps/web/src/lib/desktopSnapShot.ts).
-  for (const name of listeners.filter((name) => name !== "onSnapShotEvent")) {
+  for (const name of listeners) {
     NodeAssert.equal(typeof bridge[name], "function", name);
     NodeAssert.equal(typeof bridge[name](() => {}), "function", `${name} returns an unsubscribe`);
   }
@@ -209,3 +209,69 @@ NodeTest.test("calls the shell cannot honour are absent, not stubbed", () => {
   NodeAssert.equal(bridge.pickThemeFiles, undefined);
   NodeAssert.equal(bridge.setLocalEnvironmentEnabled, undefined);
 });
+
+NodeTest.test(
+  "SnapShots use native pending captures and unsubscribe without sending a turn",
+  async () => {
+    const calls = [];
+    const { window, bridge } = load((command, args) => {
+      calls.push([command, args]);
+      return args?.action === "list" ? [{ id: "abc" }] : null;
+    });
+    const received = [];
+    const unsubscribe = bridge.onSnapShotEvent((event) => received.push(event.type));
+    window.__gustafSnapShotEvent({ type: "ready", id: "abc" });
+    unsubscribe();
+    window.__gustafSnapShotEvent({ type: "ready", id: "abc" });
+    NodeAssert.deepEqual(received, ["ready"]);
+    NodeAssert.equal((await bridge.listPendingSnapShots())[0].id, "abc");
+    await bridge.readSnapShot("abc");
+    await bridge.acknowledgeSnapShot("abc");
+    await bridge.requestSnapShotPermissions(true);
+    NodeAssert.deepEqual(
+      calls.filter(([command]) => command === "snap_shot_command").map(([, args]) => args.action),
+      ["list", "read", "acknowledge", "permissions"],
+    );
+  },
+);
+
+NodeTest.test(
+  "SSH preparation, session bootstrap and password cancellation use the native owner",
+  async () => {
+    const calls = [];
+    const { bridge, window } = load((name, args) => {
+      calls.push([name, args]);
+      if (args.method === "ensure")
+        return { type: "ssh-password-prompt-cancelled", message: "cancelled" };
+      return { ok: true };
+    });
+    const received = [];
+    const unsubscribe = bridge.onSshPasswordPrompt((request) => received.push(request));
+    window.__gustafSshPasswordPrompt({ requestId: "one" });
+    unsubscribe();
+    window.__gustafSshPasswordPrompt({ requestId: "two" });
+    NodeAssert.equal(received.length, 1);
+    await bridge.discoverSshHosts();
+    await bridge.resolveSshHost("alias");
+    await NodeAssert.rejects(bridge.ensureSshEnvironment({ alias: "alias" }), /cancelled/);
+    await bridge.resolveSshPasswordPrompt("one", null);
+    await bridge.fetchSshEnvironmentDescriptor("http://127.0.0.1:2345/");
+    await bridge.bootstrapSshBearerSession("http://127.0.0.1:2345/", "credential");
+    await bridge.fetchSshSessionState("http://127.0.0.1:2345/", "bearer");
+    await bridge.disconnectSshEnvironment({ alias: "alias" });
+    NodeAssert.deepEqual(
+      calls.map(([, args]) => args.method),
+      [
+        "discover",
+        "resolve",
+        "ensure",
+        "resolve-password",
+        "descriptor",
+        "bootstrap",
+        "session",
+        "disconnect",
+      ],
+    );
+    NodeAssert.ok(calls.every(([name, args]) => name === "ssh_request" && args.locale === "ru"));
+  },
+);

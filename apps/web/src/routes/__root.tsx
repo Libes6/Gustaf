@@ -50,6 +50,7 @@ import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { GUEST_PAGE_PATH } from "../guestPage";
 import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
 import { useHostedPromptLinkLanding } from "../components/promptLinks/HostedPromptLinkLanding";
+import { ClientConfigBanners } from "../components/ClientConfigBanners";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { useAtomValue } from "@effect/atom-react";
 import { primaryServerConfigAtom, primaryServerWelcomeAtom } from "../state/server";
@@ -134,6 +135,7 @@ function RootRouteView() {
       <AnchoredToastProvider>
         <UiLanguageEffect />
         <RootRouteBranch />
+        <ClientConfigBanners />
       </AnchoredToastProvider>
     </ToastProvider>
   );

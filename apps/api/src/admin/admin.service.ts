@@ -1,6 +1,6 @@
 import * as NodeFS from "node:fs";
 import { NotFoundException } from "@nestjs/common";
-import { and, count, desc, eq, gt, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
 import { auditLog, device, relayUsage, session, user } from "../database/tables.schema.js";
 import { usageMonth } from "../relay/relay.usage.js";
@@ -71,6 +71,9 @@ const deviceColumns = {
   lastSeenAt: device.lastSeenAt,
   createdAt: device.createdAt,
   revokedAt: device.revokedAt,
+  appVersion: device.appVersion,
+  platform: device.platform,
+  osVersion: device.osVersion,
 };
 
 function withoutCursor<Row extends { cursorAt: string }>({ cursorAt: _cursorAt, ...row }: Row) {
@@ -92,52 +95,83 @@ export class AdminService {
   async overview() {
     const db = this.database.db;
     const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-    const [[users], [devices], [sessions], [relay], signups, migrations] = await Promise.all([
-      db
-        .select({
-          total: count(),
-          last7d: sql<number>`count(*) filter (where ${user.createdAt} > ${weekAgo})`.mapWith(
-            Number,
-          ),
-          banned: sql<number>`count(*) filter (where ${user.banned})`.mapWith(Number),
-        })
-        .from(user),
-      db
-        .select({
-          total: count(),
-          active7d: sql<number>`count(*) filter (where ${device.lastSeenAt} > ${weekAgo})`.mapWith(
-            Number,
-          ),
-          computer: sql<number>`count(*) filter (where ${device.kind} = 'computer')`.mapWith(
-            Number,
-          ),
-          phone: sql<number>`count(*) filter (where ${device.kind} = 'phone')`.mapWith(Number),
-        })
-        .from(device)
-        .where(isNull(device.revokedAt)),
-      db
-        .select({ active: count() })
-        .from(session)
-        .where(gt(session.expiresAt, sql`now()`)),
-      db
-        .select({
-          bytesThisMonth: sql<number>`coalesce(sum(${relayUsage.bytes}), 0)`.mapWith(Number),
-          users: count(),
-        })
-        .from(relayUsage)
-        .where(eq(relayUsage.month, usageMonth())),
-      // UTC calendar days, today included, zero-filled.
-      db.execute<{ date: string; count: number }>(sql`
+    const [[users], [devices], [sessions], [relay], signups, migrations, [active], versions] =
+      await Promise.all([
+        db
+          .select({
+            total: count(),
+            last7d: sql<number>`count(*) filter (where ${user.createdAt} > ${weekAgo})`.mapWith(
+              Number,
+            ),
+            banned: sql<number>`count(*) filter (where ${user.banned})`.mapWith(Number),
+          })
+          .from(user),
+        db
+          .select({
+            total: count(),
+            active7d:
+              sql<number>`count(*) filter (where ${device.lastSeenAt} > ${weekAgo})`.mapWith(
+                Number,
+              ),
+            computer: sql<number>`count(*) filter (where ${device.kind} = 'computer')`.mapWith(
+              Number,
+            ),
+            phone: sql<number>`count(*) filter (where ${device.kind} = 'phone')`.mapWith(Number),
+          })
+          .from(device)
+          .where(isNull(device.revokedAt)),
+        db
+          .select({ active: count() })
+          .from(session)
+          .where(gt(session.expiresAt, sql`now()`)),
+        db
+          .select({
+            bytesThisMonth: sql<number>`coalesce(sum(${relayUsage.bytes}), 0)`.mapWith(Number),
+            users: count(),
+          })
+          .from(relayUsage)
+          .where(eq(relayUsage.month, usageMonth())),
+        // UTC calendar days, today included, zero-filled.
+        db.execute<{ date: string; count: number }>(sql`
         select to_char(day, 'YYYY-MM-DD') as date, count(${user.id})::int as count
         from generate_series(
           (now() at time zone 'utc')::date - 29, (now() at time zone 'utc')::date, interval '1 day'
         ) as day
         left join ${user} on (${user.createdAt} at time zone 'utc')::date = day::date
         group by day order by day`),
-      db.execute<{ applied: number }>(
-        sql`select count(*)::int as applied from drizzle.__drizzle_migrations`,
-      ),
-    ]);
+        db.execute<{ applied: number }>(
+          sql`select count(*)::int as applied from drizzle.__drizzle_migrations`,
+        ),
+        // A user is active when a device of theirs authenticated or a session was refreshed.
+        db
+          .execute<{ today: number; last7d: number; last30d: number }>(sql`
+        with activity as (
+          select ${device.userId} as user_id, ${device.lastSeenAt} as at from ${device}
+          where ${device.lastSeenAt} > now() - interval '30 days'
+          union all
+          select ${session.userId}, ${session.updatedAt} from ${session}
+          where ${session.updatedAt} > now() - interval '30 days'
+        )
+        select
+          count(distinct user_id) filter (
+            where at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'
+          )::int as today,
+          count(distinct user_id) filter (where at > now() - interval '7 days')::int as last7d,
+          count(distinct user_id)::int as last30d
+        from activity`)
+          .then((result) => result.rows),
+        db
+          .select({
+            kind: device.kind,
+            platform: sql<string>`${device.platform}`,
+            version: sql<string>`${device.appVersion}`,
+            devices: count(),
+          })
+          .from(device)
+          .where(and(isNull(device.revokedAt), isNotNull(device.appVersion)))
+          .groupBy(device.kind, device.platform, device.appVersion)
+          .orderBy(device.kind, device.platform, device.appVersion),
+      ]);
     const applied = migrations.rows[0]?.applied ?? 0;
     return {
       users: users!,
@@ -149,6 +183,8 @@ export class AdminService {
       sessions: sessions!,
       relay: relay!,
       signupsByDay: signups.rows.map(({ date, count }) => ({ date, count })),
+      activeUsers: active!,
+      versions,
       build: { ...this.build, startedAt: this.startedAt },
       db: { ok: applied >= this.bundledMigrations, migrations: applied },
     };
