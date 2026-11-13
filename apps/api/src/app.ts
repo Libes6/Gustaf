@@ -23,6 +23,8 @@ import { HealthController } from "./health.controller.js";
 import { OwnershipService } from "./ownership.js";
 import { RelayController } from "./relay/relay.controller.js";
 import { RelayService } from "./relay/relay.service.js";
+import { AdminReportsController, ReportsController } from "./reports/reports.controller.js";
+import { ReportsService } from "./reports/reports.service.js";
 import { UsageController } from "./usage/usage.controller.js";
 import { UsageService } from "./usage/usage.service.js";
 
@@ -54,6 +56,8 @@ export async function createApp(
           AppSignInController,
           AdminController,
           RelayController,
+          ReportsController,
+          AdminReportsController,
           UsageController,
         ],
         providers: [
@@ -70,6 +74,7 @@ export async function createApp(
           UsageService,
           { provide: ADMIN_ORIGINS, useValue: config.auth.adminOrigins },
           AdminGuard,
+          ReportsService,
           {
             provide: AdminService,
             useFactory: (db: DatabaseService) => new AdminService(db, config.build),
@@ -146,6 +151,9 @@ export async function createApp(
             : authHandler(req, res),
       );
   }
+  // Registered after Better Auth, which reads its own body; replaces Nest's 100 KB default so a
+  // problem report can carry its log tail.
+  app.useBodyParser("json", { limit: "256kb" });
   if (config.auth) {
     const relay = app.get(RelayService);
     app.getHttpServer().on("upgrade", relay.upgrade);

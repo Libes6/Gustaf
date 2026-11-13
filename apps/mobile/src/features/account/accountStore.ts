@@ -6,6 +6,7 @@ import {
   type AccountDevice,
   type AccountUser,
   buildSignInUrl,
+  type ProblemReport,
   parseSignInRedirect,
 } from "./accountApi";
 import * as Storage from "./accountStorage";
@@ -201,6 +202,18 @@ export function createAccountStore(deps: AccountStoreDeps) {
         deps.onPhoneRegistered?.();
       } catch (cause) {
         await fail(cause);
+      }
+    },
+
+    /** Resolves when the cloud stored the report; rejects with the reason otherwise. */
+    async reportProblem(report: Omit<ProblemReport, "deviceId">) {
+      if (!token) throw new Error("session_expired");
+      try {
+        await deps.api.sendReport(token, { ...report, deviceId: state.phoneDeviceId });
+      } catch (cause) {
+        if (isAccountApiError(cause) && cause.status === 401)
+          await forgetLocally("session_expired");
+        throw cause;
       }
     },
 

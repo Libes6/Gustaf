@@ -7,6 +7,8 @@ import { AppLayout } from "./pages/AppLayout";
 import { AuditPage } from "./pages/AuditPage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { ReportDetailPage } from "./pages/ReportDetailPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { UserDetailPage } from "./pages/UserDetailPage";
 import { UsersPage } from "./pages/UsersPage";
 import { strings } from "./strings";
@@ -56,6 +58,18 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const reportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reports",
+  component: ReportsPage,
+});
+
+const reportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reports/$reportId",
+  component: ReportDetailPage,
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     overviewRoute,
@@ -64,6 +78,8 @@ export const router = createRouter({
     devicesRoute,
     aiUsageRoute,
     auditRoute,
+    reportsRoute,
+    reportRoute,
   ]),
   // The real value arrives through RouterProvider once /v1/me confirms an admin.
   context: { me: undefined! },

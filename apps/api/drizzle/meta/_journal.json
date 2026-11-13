@@ -43,6 +43,13 @@
       "when": 1794578410574,
       "tag": "0005_device_heartbeat",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794578495557,
+      "tag": "0006_bug_reports",
+      "breakpoints": true
     }
   ]
 }

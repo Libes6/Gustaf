@@ -172,6 +172,33 @@ export const relayUsage = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
 );
 
+// "Report a problem" from the apps. Logs are only present when the user chose to attach them.
+export const bugReportClient = pgEnum("bug_report_client", ["desktop", "mobile"]);
+export const bugReportStatus = pgEnum("bug_report_status", ["new", "seen", "closed"]);
+
+export const bugReport = pgTable(
+  "bug_report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    deviceId: uuid("device_id").references(() => device.id, { onDelete: "set null" }),
+    client: bugReportClient("client").notNull(),
+    appVersion: text("app_version").notNull(),
+    platform: text("platform").notNull(),
+    message: text("message").notNull(),
+    logs: text("logs"),
+    status: bugReportStatus("status").notNull().default("new"),
+    adminNote: text("admin_note"),
+    ...timestamps,
+  },
+  (table) => [
+    index("bug_report_status_created_at_idx").on(table.status, table.createdAt),
+    index("bug_report_user_id_created_at_idx").on(table.userId, table.createdAt),
+  ],
+);
+
 // AI usage counted by each user's computers (docs/internals/ai-usage.md). One row per user, UTC
 // day, provider and model; `model` is '' when the computer could not name a catalog model.
 // Token sums cover only the `measured_turns` whose provider reported both counts.

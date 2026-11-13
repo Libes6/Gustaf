@@ -89,13 +89,43 @@ export interface AdminDevice extends UserDevice {
   readonly userName: string;
 }
 
+export type ReportStatus = "new" | "seen" | "closed";
+export type ReportClient = "desktop" | "mobile";
+
+export interface ReportSummary {
+  readonly id: string;
+  readonly userId: string;
+  readonly userName: string;
+  readonly userEmail: string;
+  readonly client: ReportClient;
+  readonly appVersion: string;
+  readonly platform: string;
+  /** The first 200 characters of the message. */
+  readonly preview: string;
+  readonly hasLogs: boolean;
+  readonly status: ReportStatus;
+  readonly createdAt: string;
+}
+
+export interface ReportDetail extends Omit<ReportSummary, "preview"> {
+  readonly message: string;
+  readonly logs: string | null;
+  readonly adminNote: string | null;
+  readonly deviceId: string | null;
+  readonly deviceName: string | null;
+  readonly updatedAt: string;
+}
+
+export type ReportCounts = Readonly<Record<ReportStatus, number>>;
+
 export type AuditAction =
   | "user.ban"
   | "user.unban"
   | "user.revoke_sessions"
   | "user.role_change"
   | "user.delete"
-  | "device.revoke";
+  | "device.revoke"
+  | "report.update";
 
 export interface AuditEntry {
   readonly id: string;

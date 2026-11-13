@@ -1,5 +1,6 @@
+import Constants from "expo-constants";
 import { Image } from "expo-image";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
@@ -14,7 +15,12 @@ import { t } from "../../i18n";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import type { AccountUser } from "./accountApi";
-import { accountDeviceRows, accountErrorMessage, canRegisterPhone } from "./accountScreenState";
+import {
+  accountDeviceRows,
+  accountErrorMessage,
+  canRegisterPhone,
+  reportErrorMessage,
+} from "./accountScreenState";
 import { accountStore, useAccount } from "./useAccount";
 
 export function AccountSettingsRouteScreen() {
@@ -81,6 +87,33 @@ function SignedInAccount(props: { readonly user: AccountUser }) {
       onConfirm: () => void accountStore.revokeDevice(id),
     });
 
+  const reportProblem = () =>
+    Dialog.prompt({
+      title: t("Report a problem"),
+      message: t(
+        "Describe what happened. The report is sent with your account, the app version and your platform.",
+      ),
+      placeholder: t("What went wrong?"),
+      initialValue: "",
+      confirmText: t("Send"),
+      cancelText: t("Cancel"),
+      onConfirm: (value) => {
+        const message = value.trim().slice(0, 5000);
+        if (!message) return;
+        accountStore
+          .reportProblem({
+            message,
+            appVersion: Constants.expoConfig?.version ?? "0.0.0",
+            platform: `${Platform.OS} ${String(Platform.Version)}`,
+          })
+          .then(
+            () => Dialog.alert(t("Report sent"), t("Thank you!")),
+            (cause: unknown) =>
+              Dialog.alert(t("Could not send the report"), reportErrorMessage(cause)),
+          );
+      },
+    });
+
   const confirmSignOut = () =>
     Dialog.confirm({
       title: t("Sign out?"),
@@ -144,6 +177,10 @@ function SignedInAccount(props: { readonly user: AccountUser }) {
             onPress={() => void accountStore.registerPhone()}
           />
         ) : null}
+      </SettingsSection>
+
+      <SettingsSection>
+        <ListActionRow icon="text.bubble" label={t("Report a problem")} onPress={reportProblem} />
       </SettingsSection>
 
       <SettingsSection>
