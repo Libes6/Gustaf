@@ -19,6 +19,7 @@ const { StackRouter } = requireFromCore("@react-navigation/routers") as {
 
 const harness = vi.hoisted(() => ({
   pair: vi.fn(),
+  relay: vi.fn(),
   goBack: vi.fn(),
   dispatch: vi.fn(),
   columns: false,
@@ -35,6 +36,8 @@ const harness = vi.hoisted(() => ({
   // Navigation that is not ready yet holds callbacks here until the test flushes them.
   deferred: null as Array<() => void> | null,
 }));
+
+vi.mock("../relay/relayTunnels", () => ({ pairOverRelay: harness.relay }));
 
 vi.mock("@react-navigation/native", () => ({
   StackActions: { replace: vi.fn() },
@@ -72,6 +75,8 @@ import {
   relayPairingLinkFromPath,
   startDevAutoConnect,
   takeRelayPairingLink,
+  startRelayPairingLink,
+  relayLinkAttemptAtom,
 } from "./devAutoConnect";
 
 const PAIRING_URL = "http://192.168.1.10:3773/pair#token=abc";
@@ -287,4 +292,92 @@ it("a relay QR opened from the camera lands on the add-route form with the link"
     { name: "Home" },
     { name: "ConnectionsNew", params: { relayLink: RELAY_LINK } },
   ]);
+});
+
+function relayCompletion() {
+  const done = Promise.withResolvers<void>();
+  const unsubscribe = appAtomRegistry.subscribe(relayLinkAttemptAtom, (attempt) => {
+    if (attempt === null || attempt.status === "failed") done.resolve();
+  });
+  return { done: done.promise, [Symbol.dispose]: unsubscribe };
+}
+
+it.each(["gustaf://", "gustaf-dev://", "gustaf-preview://"])(
+  "%s starts relay pairing at link time, once per link, and closes the form on success",
+  async (scheme) => {
+    harness.columns = false;
+    harness.deferred = null;
+    harness.goBack.mockClear();
+    harness.relay.mockClear();
+    harness.pair.mockClear();
+    const link = formatRelayPairingLink({
+      relayUrl: "https://api.libes6.ru",
+      hostDeviceId: scheme.replace(/[^a-z]/g, ""),
+      hostKey: "A".repeat(43),
+      secret: "c".repeat(43),
+      hostName: "Desk",
+    });
+    const entered = Promise.withResolvers<void>();
+    const paired = Promise.withResolvers<string>();
+    harness.relay.mockImplementationOnce(() => {
+      entered.resolve();
+      return paired.promise;
+    });
+    harness.pair.mockResolvedValueOnce({ ok: true, error: null });
+    const state = takeRelayPairingLink(undefined, link.replace("gustaf://", scheme));
+    expect(startRelayPairingLink(state)).toBe(state);
+    await entered.promise;
+    expect(appAtomRegistry.get(relayLinkAttemptAtom)).toMatchObject({
+      relayLink: link,
+      status: "connecting",
+    });
+    startRelayPairingLink(state);
+    expect(harness.relay).toHaveBeenCalledTimes(1);
+    using completion = relayCompletion();
+    paired.resolve(PAIRING_URL);
+    await completion.done;
+    expect(harness.pair).toHaveBeenCalledExactlyOnceWith(PAIRING_URL, undefined);
+    expect(appAtomRegistry.get(relayLinkAttemptAtom)).toBeNull();
+    expect(harness.goBack).toHaveBeenCalledOnce();
+    startRelayPairingLink(state);
+    expect(harness.relay).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(["relay", "pairing"])(
+  "exposes an expired link error from %s and leaves the form open",
+  async (stage) => {
+    harness.goBack.mockClear();
+    const link = formatRelayPairingLink({
+      relayUrl: "https://api.libes6.ru",
+      hostDeviceId: `expired-${stage}`,
+      hostKey: "A".repeat(43),
+      secret: "d".repeat(43),
+      hostName: "MacBook",
+    });
+    const error = "Pairing code expired.";
+    if (stage === "relay") harness.relay.mockRejectedValueOnce(new Error(error));
+    else {
+      harness.relay.mockResolvedValueOnce(PAIRING_URL);
+      harness.pair.mockResolvedValueOnce({ ok: false, error });
+    }
+    const state = takeRelayPairingLink(undefined, link);
+    startRelayPairingLink(state);
+    using completion = relayCompletion();
+    await completion.done;
+    expect(appAtomRegistry.get(relayLinkAttemptAtom)).toEqual({
+      relayLink: link,
+      status: "failed",
+      error,
+    });
+    expect(harness.goBack).not.toHaveBeenCalled();
+  },
+);
+
+it("ignores a malformed relay link without starting a pairing", () => {
+  harness.relay.mockClear();
+  const state = settingsLink({ relayLink: "gustaf://relay-pair?v=0" });
+  expect(startRelayPairingLink(state)).toBe(state);
+  expect(takeRelayPairingLink(undefined, "gustaf://relay-pair?v=0")).toBeUndefined();
+  expect(harness.relay).not.toHaveBeenCalled();
 });
