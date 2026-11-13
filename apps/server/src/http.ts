@@ -55,6 +55,28 @@ import {
 } from "./httpCors.ts";
 import { requestUrl } from "./requestUrl.ts";
 
+// The shell loads this server over HTTP, outside Tauri's asset-protocol CSP.
+const SHELL_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  // Ghostty, Shiki/Oniguruma and PDF decoders compile bundled WebAssembly.
+  "script-src 'self' 'wasm-unsafe-eval'",
+  // React layout, theme palettes and highlighted code use inline styles.
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' https: http: data: blob:",
+  "font-src 'self' data: blob:",
+  // The Keychain catalog supports arbitrary remote environments; voice capture reads blobs.
+  "connect-src 'self' http: https: ws: wss: blob: ipc://localhost",
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  // Browser previews navigate to user-selected origins; attachments use blob URLs.
+  "frame-src 'self' http: https: blob: data:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join("; ");
+
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
@@ -664,6 +686,14 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     };
     const headers: Record<string, string> = {
       "Cache-Control": cacheControl,
+      ...(isHtml
+        ? {
+            Vary: "User-Agent",
+            ...(request.headers["user-agent"]?.includes("GustafShell/1")
+              ? { "Content-Security-Policy": SHELL_CONTENT_SECURITY_POLICY }
+              : {}),
+          }
+        : {}),
       ...validators(fileInfo),
     };
     const etag = headers.ETag;
@@ -699,7 +729,7 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
       const info = yield* fileSystem.stat(filePath);
       return HttpServerResponse.uint8Array(bytes, {
         headers: {
-          "Cache-Control": cacheControl,
+          ...headers,
           ...validators({ ...info, size: ByteSize.bytes(bytes.byteLength) }),
         },
         contentType,

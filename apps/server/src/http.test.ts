@@ -384,6 +384,22 @@ it.layer(
       yield* fs.utimes(indexPath, modifiedAt, modifiedAt);
       const request = yield* makeStaticRequest(staticDir);
       const initial = yield* request("/");
+      expect(initial.headers["content-security-policy"]).toBeUndefined();
+      const shellHeaders = { "user-agent": "GustafShell/1" };
+      for (const resource of ["/", "/settings/general"]) {
+        for (const method of ["GET", "HEAD"] as const) {
+          const shell = yield* request(resource, { method, headers: shellHeaders });
+          const policy = shell.headers["content-security-policy"];
+          expect(policy).toContain("script-src 'self' 'wasm-unsafe-eval'");
+          expect(policy).not.toContain("'unsafe-eval'");
+          expect(policy).toContain("frame-ancestors 'none'");
+          expect(policy).toContain(
+            "connect-src 'self' http: https: ws: wss: blob: ipc://localhost",
+          );
+          expect(shell.headers["vary"]).toContain("User-Agent");
+          yield* shell.text;
+        }
+      }
       expect(yield* initial.text).toBe("<html>old build</html>");
       const previousEtag = initial.headers["etag"] ?? '"previous-html"';
       const nextHtml = "<html>new build</html>";
