@@ -88,14 +88,15 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
   const [tunnelLimit, setTunnelLimit] = useState<number | null>(null);
 
   const reportUpdateFailure = (cause: unknown, reason?: string) => {
-    const message = cause instanceof Error ? cause.message : "Could not update T3 Connect access.";
+    const message =
+      cause instanceof Error ? cause.message : "Could not update Gustaf Connect access.";
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not update T3 Connect", { message, traceId, cause });
     setOperationError(traceId ? `${message} Trace ID: ${traceId}` : message);
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not update T3 Connect",
+        title: "Could not update Gustaf Connect",
         description: reason ?? relayFailureReason(cause) ?? message,
         ...(traceId
           ? {
@@ -135,7 +136,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
         !readEnvironmentScope(environmentId, AuthRelayWriteScope)
       ) {
         reportUpdateFailure(
-          new Error("This connection needs permission to view and manage T3 Connect settings."),
+          new Error("This connection needs permission to view and manage Gustaf Connect settings."),
         );
         return false;
       }
@@ -144,7 +145,9 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
     const readLinkState = () => {
       const state = readCachedCloudLinkState(target);
       if (state === null) {
-        reportUpdateFailure(new Error("Wait until the current T3 Connect settings can be read."));
+        reportUpdateFailure(
+          new Error("Wait until the current Gustaf Connect settings can be read."),
+        );
       }
       return state;
     };
@@ -171,7 +174,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
           reportUpdateFailure(
             cause,
             relayKeptLink
-              ? "Disconnected here, but T3 Connect still lists it. Remove it in Account."
+              ? "Disconnected here, but Gustaf Connect still lists it. Remove it in Account."
               : undefined,
           );
         }
@@ -188,7 +191,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
       }
       const clerkToken = tokenResult.value;
       if (!clerkToken) {
-        reportUpdateFailure(new Error("Sign in to T3 Connect before enabling this."));
+        reportUpdateFailure(new Error("Sign in to Gustaf Connect before enabling this."));
         return false;
       }
       const currentManagedTunnel = isManagedTunnelActive(currentLinkState, relayProviderKind);

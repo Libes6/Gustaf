@@ -116,9 +116,11 @@ function serverOsFromNodePlatform(platform: string): ClientOs {
   }
 }
 
-/** @public */
-/** @public */
-export const make = Effect.gen(function* () {
+/**
+ * Whether this server may send usage data right now: `T3CODE_TELEMETRY_ENABLED` and the managed
+ * policy. Product events and Gustaf AI usage reports share this one opt-out.
+ */
+export const telemetryConsent = Effect.gen(function* () {
   const telemetryConfig = yield* TelemetryEnvConfig;
   const hostEnvironment = yield* HostProcess.Environment;
   const awaitingShellConsent = hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1";
@@ -126,7 +128,7 @@ export const make = Effect.gen(function* () {
   const policyAllows =
     ManagedPolicy.deniedBy(yield* ManagedPolicy.ManagedPolicy, "telemetry") === undefined;
   // A cached PATH does not establish consent from the current login shell.
-  const telemetryEnabled = Effect.suspend(() => {
+  return Effect.suspend(() => {
     if (!telemetryConfig.enabled || !policyAllows) return Effect.succeed(false);
     if (!awaitingShellConsent) return Effect.succeed(true);
     if (hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1")
@@ -143,6 +145,12 @@ export const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
   });
+});
+
+/** @public */
+export const make = Effect.gen(function* () {
+  const telemetryConfig = yield* TelemetryEnvConfig;
+  const telemetryEnabled = yield* telemetryConsent;
   const httpClient = yield* HttpClient.HttpClient;
   const serverConfig = yield* ServerConfig.ServerConfig;
   const { distinctId, installId } = yield* getTelemetryIdentity;

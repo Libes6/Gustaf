@@ -91,6 +91,7 @@ import {
   type AcpAdapterV2RuntimeInput,
   type AcpAdapterV2SubagentUpdate,
 } from "@t3tools/provider-acp/server/adapter";
+import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 
 import { appendUserInputAttachmentPaths } from "../../provider/userInputAttachments.ts";
 
@@ -521,6 +522,7 @@ const isProviderAdapterProtocolError = Schema.is(ProviderAdapter.ProviderAdapter
 const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
   readonly environment: (runtimeOrdinal: number) => Readonly<Record<string, string>>;
   readonly runtimeMode?: "full-access" | "approval-required";
+  readonly makePromptGuard?: AcpAdapterV2Flavor["makePromptGuard"];
 }) {
   const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const path = yield* Path.Path;
@@ -532,6 +534,7 @@ const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
       driver: ACP_TEST_DRIVER,
       capabilities: AcpProviderCapabilitiesV2,
       promptInactivityTimeout: "15 minutes",
+      ...(input.makePromptGuard === undefined ? {} : { makePromptGuard: input.makePromptGuard }),
       makeRuntime: makeMockRuntime({
         childProcessSpawner,
         mockAgentPath: yield* path.fromFileUrl(
@@ -4134,6 +4137,44 @@ describe("AcpAdapterV2", () => {
       const [silent, next] = yield* harness.terminals(2);
       assert.equal(silent?.status, "failed");
       assert.include(silent?.failure?.message, "15 minutes");
+      assert.equal(next?.status, "completed");
+      assert.lengthOf(harness.natives, 2);
+    }).pipe(Effect.provide(layerTest), Effect.scoped),
+  );
+
+  it.effect("a prompt guard's failure stops a running turn and replaces the agent", () =>
+    Effect.gen(function* () {
+      const harness = yield* makePromptInactivityHarness({
+        environment: (runtimeOrdinal) =>
+          runtimeOrdinal === 1 ? { T3_ACP_HANG_PROMPT_FOREVER: "1" } : {},
+        makePromptGuard: () => (notification) =>
+          notification.update.sessionUpdate === "agent_message_chunk" &&
+          notification.update.content.type === "text" &&
+          notification.update.content.text === "stop"
+            ? makeProviderFailure({ class: "usage_limit", message: "Out of quota." })
+            : undefined,
+      });
+      const message = (sessionId: string, text: string) => ({
+        sessionId,
+        update: {
+          sessionUpdate: "agent_message_chunk" as const,
+          content: { type: "text" as const, text },
+        },
+      });
+      yield* harness.startTurn(1);
+      yield* harness.emitUpdate(message("mock-session-1", "Working."));
+      // Another session's text does not reach this prompt's guard.
+      yield* harness.emitUpdate(message("foreign-session", "stop"));
+      assert.isTrue(yield* harness.nextTurnRejected(2));
+
+      // The guard replaces the agent mid-request, so this request never gets its answer.
+      yield* harness.emitUpdate(message("mock-session-1", "stop")).pipe(Effect.forkScoped);
+      const [stopped] = yield* harness.terminals(1);
+      yield* harness.startTurn(2);
+      const [next] = yield* harness.terminals(1);
+      assert.equal(stopped?.status, "failed");
+      assert.equal(stopped?.failure?.class, "usage_limit");
+      assert.equal(stopped?.failure?.message, "Out of quota.");
       assert.equal(next?.status, "completed");
       assert.lengthOf(harness.natives, 2);
     }).pipe(Effect.provide(layerTest), Effect.scoped),

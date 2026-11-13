@@ -93,6 +93,13 @@ export class AccountApiError extends Schema.TaggedError<AccountApiError>()("Acco
   }
 }
 
+/** What the phone reports about itself: never names, paths or anything the user typed. */
+export interface AccountHeartbeat {
+  readonly appVersion: string;
+  readonly platform: "android" | "ios";
+  readonly osVersion: string | null;
+}
+
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface AccountApi {
@@ -109,6 +116,17 @@ export interface AccountApi {
     name: string,
   ) => Promise<{ readonly device: AccountDevice; readonly token: string }>;
   readonly revokeDevice: (token: string, deviceId: string) => Promise<void>;
+  readonly sendReport: (token: string, report: ProblemReport) => Promise<void>;
+  /** Authenticated by the phone's device credential, not the session. */
+  readonly heartbeat: (deviceToken: string, report: AccountHeartbeat) => Promise<void>;
+}
+
+/** "Report a problem" from the phone: the message only, the app keeps no log of its own. */
+export interface ProblemReport {
+  readonly message: string;
+  readonly appVersion: string;
+  readonly platform: string;
+  readonly deviceId: string | null;
 }
 
 export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
@@ -155,5 +173,37 @@ export function makeAccountApi(apiUrl: string, fetchImpl: Fetch): AccountApi {
     revokeDevice: async (token, deviceId) => {
       await request("DELETE", `/v1/devices/${encodeURIComponent(deviceId)}`, { token });
     },
+    sendReport: async (token, report) => {
+      await request("POST", "/v1/reports", { token, body: { client: "mobile", ...report } });
+    },
+    heartbeat: async (deviceToken, report) => {
+      await request("POST", "/v1/devices/heartbeat", { token: deviceToken, body: report });
+    },
   };
+}
+
+/** GET /v1/client-config. Public; a session or device token only adds the user's own flags. */
+export async function fetchClientConfig(
+  apiUrl: string,
+  fetchImpl: Fetch,
+  input: {
+    readonly version: string | null;
+    readonly platform: string;
+    readonly token: string | null;
+  },
+): Promise<unknown> {
+  const url = new URL(`${apiUrl}/v1/client-config`);
+  url.searchParams.set("kind", "mobile");
+  if (input.version) url.searchParams.set("version", input.version);
+  url.searchParams.set("platform", input.platform);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (input.token) headers.Authorization = `Bearer ${input.token}`;
+  const response = await fetchImpl(url.toString(), { headers });
+  if (!response.ok) {
+    throw new AccountApiError({
+      status: response.status,
+      detail: `client-config ${response.status}`,
+    });
+  }
+  return response.json();
 }

@@ -30,6 +30,7 @@ import {
   Settings2Icon,
   ShieldCheckIcon,
   SmartphoneIcon,
+  UserIcon,
   WrenchIcon,
   XIcon,
 } from "lucide-react";
@@ -60,6 +61,8 @@ import { useSettingsGroupLabel, useSettingsNavLabel, useT } from "../../useUiLan
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { useSettingsSectionNavigation } from "./useSettingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
+import { hasShellAccount } from "../../shellAccount";
+import { AccountSidebarEntry } from "./AccountSettings";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -108,6 +111,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/secrets": KeyRoundIcon,
   "/settings/maintenance": WrenchIcon,
   "/settings/labs": FlaskConicalIcon,
+  "/settings/account": UserIcon,
   "/settings/about": InfoIcon,
   "/settings/archived": ArchiveIcon,
 };
@@ -445,12 +449,21 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="max-md:hidden">
-        <Suspense fallback={null}>
-          <T3ConnectSidebarSignIn />
-        </Suspense>
-        <Suspense fallback={null}>
-          <T3ConnectSidebarAvatar />
-        </Suspense>
+        {hasShellAccount ? (
+          <AccountSidebarEntry
+            isActive={activePath === "/settings/account"}
+            onClick={() => handleSectionClick("/settings/account")}
+          />
+        ) : (
+          <>
+            <Suspense fallback={null}>
+              <T3ConnectSidebarSignIn />
+            </Suspense>
+            <Suspense fallback={null}>
+              <T3ConnectSidebarAvatar />
+            </Suspense>
+          </>
+        )}
       </SidebarFooter>
     </nav>
   );

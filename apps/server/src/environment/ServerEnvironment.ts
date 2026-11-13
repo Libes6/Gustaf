@@ -207,6 +207,8 @@ export const make = Effect.gen(function* () {
     serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
 
   const databaseMigration = databaseMigrationHead(serverConfig.dbPath);
+  // The Gustaf shell names its own release; the runtime's version stays T3's for CLI updates.
+  const appVersion = (yield* HostProcess.Environment).GUSTAF_APP_VERSION?.trim();
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
     label,
@@ -215,7 +217,7 @@ export const make = Effect.gen(function* () {
       arch: platformArch(hostArchitecture),
       ...(machine === null ? {} : { machine }),
     },
-    serverVersion: packageJson.version,
+    serverVersion: appVersion || packageJson.version,
     orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
     ...(databaseMigration === undefined ? {} : { databaseMigration }),
     capabilities: {

@@ -64,7 +64,7 @@ export function SecretRequestCard(props: {
     <View className="mb-3 min-h-9 flex-row items-center gap-2 px-1">
       <SymbolView name={icon} size={13} tintColor={props.iconColor} type="monochrome" />
       <Text className="flex-1 font-sans text-sm text-foreground-muted" numberOfLines={2}>
-        {item.label} · {display.label}
+        {item.label} · {t(display.label)}
       </Text>
     </View>
   );
@@ -109,14 +109,14 @@ function PendingSecretRequestForm(props: {
       return;
     }
     if (!isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), secretRequestFailureMessage, setError);
+      pipe(squashAtomCommandFailure(result), secretRequestFailureMessage, t, setError);
     }
   };
   const save = () => {
     if (source === null) {
       void send({ type: "save", secret });
     } else if (secretRequestReference(source, reference) === undefined) {
-      setError(source.invalidReferenceMessage);
+      setError(t(source.invalidReferenceMessage));
     } else {
       void send({ type: "reference", source, reference });
     }
@@ -137,7 +137,7 @@ function PendingSecretRequestForm(props: {
       {link !== null ? (
         <View className="gap-1.5">
           <Button
-            label={`Open ${link.host}`}
+            label={t("Open {host}").replace("{host}", link.host)}
             tone="secondary"
             fullWidth
             onPress={() => void tryOpenExternalUrl(link.href, "secret-request")}
@@ -153,7 +153,7 @@ function PendingSecretRequestForm(props: {
       {sources.length > 0 ? (
         <View className="flex-row flex-wrap gap-2">
           <Chip
-            label="Value"
+            label={t("Value")}
             size="small"
             selected={source === null}
             disabled={submitting}
@@ -180,7 +180,7 @@ function PendingSecretRequestForm(props: {
       {source === null ? (
         <SecretTextInput
           accessibilityLabel={item.label}
-          placeholder={item.placeholder ?? SECRET_REQUEST_DEFAULT_PLACEHOLDER}
+          placeholder={item.placeholder ?? t(SECRET_REQUEST_DEFAULT_PLACEHOLDER)}
           value={secret}
           onChangeText={setSecret}
           editable={!submitting}
@@ -189,7 +189,9 @@ function PendingSecretRequestForm(props: {
       ) : (
         <TextInput
           key={source.id}
-          accessibilityLabel={`${item.label} reference in ${source.label}`}
+          accessibilityLabel={t("{label} reference in {source}")
+            .replace("{label}", item.label)
+            .replace("{source}", source.label)}
           placeholder={source.referencePlaceholder}
           value={reference}
           onChangeText={(next) => {
@@ -217,7 +219,7 @@ function PendingSecretRequestForm(props: {
         </Text>
       ) : null}
       <Button
-        label="Save securely"
+        label={t("Save securely")}
         tone="primary"
         fullWidth
         disabled={submitting || draft.trim().length === 0}
@@ -232,7 +234,7 @@ function PendingSecretRequestForm(props: {
             type="monochrome"
           />
           <Text className="flex-1 font-sans text-xs text-foreground-muted">
-            {secretRequestPrivacyNote(item)}
+            {t(secretRequestPrivacyNote(item))}
           </Text>
         </View>
         <Button

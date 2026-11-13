@@ -822,7 +822,7 @@ export function CloudLinkRow({
   if (!canReadRelay) {
     return (
       <SettingsRow
-        title="T3 Connect"
+        title="Gustaf Connect"
         description={t("settingsD.savedEnvironmentRows.editPermissionsDescription")}
       />
     );

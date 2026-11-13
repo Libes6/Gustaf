@@ -43,16 +43,16 @@ import { statusCommand, upCommand } from "./cli/up.ts";
 const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer);
 
 export const makeCli = () =>
-  Command.make("t3", { ...sharedServerCommandFlags }).pipe(
+  Command.make("gustaf", { ...sharedServerCommandFlags }).pipe(
     Command.withDescription(
-      "Run Gustaf in this terminal and open it in your browser. To use it from your other devices, run `t3 up`.",
+      "Run Gustaf in this terminal and open it in your browser. To use it from your other devices, run `gustaf up`.",
     ),
     Command.withHandler(runDefaultServerCommand),
     Command.withSubcommands([
       Command.make("help").pipe(
         Command.withDescription("Show command help."),
         Command.withHandler(() =>
-          Effect.fail(new CliError.ShowHelp({ commandPath: ["t3"], errors: [] })),
+          Effect.fail(new CliError.ShowHelp({ commandPath: ["gustaf"], errors: [] })),
         ),
       ),
       acpMcpBridgeCommand,

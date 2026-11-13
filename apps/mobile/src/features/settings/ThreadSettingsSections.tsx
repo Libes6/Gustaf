@@ -36,7 +36,7 @@ export function SettingsLabsRouteScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <SettingsScreen title="Labs">
+    <SettingsScreen title={t("Labs")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -49,7 +49,9 @@ export function SettingsLabsRouteScreen() {
           icon="link"
           capability="peerLinks"
           setting="linkedEnvironmentsEnabled"
-          description="Let agents on a machine work on your other machines, and theirs on it. Turn it on for each machine. While off, nothing new starts over a link; running tasks finish."
+          description={t(
+            "Let agents on a machine work on your other machines, and theirs on it. Turn it on for each machine. While off, nothing new starts over a link; running tasks finish.",
+          )}
         />
         <MachineBetaSection
           title={t("Fast worktree checkout")}
@@ -172,7 +174,9 @@ export function AutoSettleSettingsRows(props: {
         {afterDays !== null ? (
           <View className="flex-row items-center gap-4 px-4 py-4 android:min-h-14 android:py-3">
             <View className="w-[22px] android:w-6" />
-            <Text className="flex-1 text-foreground text-lg android:text-base">Inactive days</Text>
+            <Text className="flex-1 text-foreground text-lg android:text-base">
+              {t("Inactive days")}
+            </Text>
             <AutoSettleDaysField
               value={afterDays}
               disabled={disabledFor("sidebarAutoSettleAfterDays")}
@@ -182,14 +186,14 @@ export function AutoSettleSettingsRows(props: {
         ) : null}
       </SettingsSection>
       {!props.pending && mismatches.length > 0 ? (
-        <SettingsSection title="Across environments">
+        <SettingsSection title={t("Across environments")}>
           <View className="gap-3 p-4">
-            <Text className="text-base text-foreground">Auto-settle defaults differ</Text>
+            <Text className="text-base text-foreground">{t("Auto-settle defaults differ")}</Text>
             <Text className="text-sm text-foreground-muted">
               {mismatches.map((mismatch) => mismatch.label).join(", ")}
             </Text>
             <Button
-              label="Apply auto-settle defaults"
+              label={t("Apply auto-settle defaults")}
               tone="secondary"
               disabled={disabledFor("sidebarAutoSettleOnMerge", "sidebarAutoSettleAfterDays")}
               onPress={() => writeToAll(autoSettlePatch)}
@@ -218,9 +222,9 @@ export function WorkingSectionSettings() {
         />
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        Fold working and monitoring threads into a Working section. They return to the top of the
-        list when they need you. While this is on, active threads are ordered by time and cannot be
-        moved.
+        {t(
+          "Fold working and monitoring threads into a Working section. They return to the top of the list when they need you. While this is on, active threads are ordered by time and cannot be moved.",
+        )}
       </Text>
     </View>
   );
@@ -236,8 +240,8 @@ export function NewThreadSettingsSection() {
     <SettingsSection title={t("New threads")}>
       <SettingsSwitchRow
         icon="square.and.pencil"
-        label="Use last project"
-        subtitle="Start new threads in the last project you used on this device."
+        label={t("Use last project")}
+        subtitle={t("Start new threads in the last project you used on this device.")}
         value={useLastProject}
         onValueChange={(value) => savePreferences({ useLastProjectForNewThreads: value })}
       />
@@ -275,7 +279,7 @@ function MachineBetaSection({
   if (supported.length === 0) return null;
   return (
     <View className="gap-3">
-      <SettingsSection title={`Beta: ${title}`}>
+      <SettingsSection title={t("Beta: {title}").replace("{title}", title)}>
         {supported.map((environment) => {
           const policy = environment.serverConfig?.managedPolicy;
           const managed = isManagedSettingPath(policy, setting);
@@ -284,7 +288,14 @@ function MachineBetaSection({
               key={environment.environmentId}
               icon={icon}
               label={environment.label}
-              {...(managed ? { subtitle: `Managed by ${policy?.organization}.` } : {})}
+              {...(managed
+                ? {
+                    subtitle: t("Managed by {organization}.").replace(
+                      "{organization}",
+                      policy?.organization ?? "",
+                    ),
+                  }
+                : {})}
               value={environment.serverConfig?.settings[setting] === true}
               disabled={managed || !writable.has(environment.environmentId)}
               onValueChange={(value) =>

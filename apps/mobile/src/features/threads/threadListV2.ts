@@ -1,4 +1,4 @@
-import { t } from "../../i18n";
+import { localizeWakeLabel, t } from "../../i18n";
 import {
   canSnooze,
   effectiveSnoozed,
@@ -161,7 +161,7 @@ export function layoutThreadListV2RowMenuActions(input: {
           ? [
               {
                 id: "arrange-menu",
-                title: "Arrange",
+                title: t("Arrange"),
                 image: "arrow.up.arrow.down",
                 subactions: [...input.reorder],
               },
@@ -541,7 +541,9 @@ export function buildThreadListV2ListItems(input: {
   const threadItems = input.items.map((item): ThreadListV2ListItem => {
     const snoozeWakeLabelText =
       item.snoozed && item.thread.snoozedUntil != null && input.snoozeLabelNow !== undefined
-        ? snoozeWakeLabel(item.thread.snoozedUntil, { now: input.snoozeLabelNow })
+        ? localizeWakeLabel(
+            snoozeWakeLabel(item.thread.snoozedUntil, { now: input.snoozeLabelNow }),
+          )
         : undefined;
     // Put the clock on items so recycler equality limits ticks to rows displaying snooze preset times.
     const snoozePresetMinute =
