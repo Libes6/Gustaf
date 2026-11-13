@@ -20,6 +20,7 @@ import {
 import type {
   KeybindingCommand,
   AssistantCitation,
+  ResponseContextRecord,
   ChatAttachment as ContractChatAttachment,
   ChatFileAttachment,
   EnvironmentId,
@@ -226,7 +227,10 @@ import { observeResize } from "~/lib/observeResize";
 
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
-import { BuildingIcon, PlayIcon } from "lucide-react";
+import { BuildingIcon, PlayIcon, ReplyIcon } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
+import { assistantCitationNavigation } from "../../lib/assistantCitationNavigation";
 import { Button } from "../ui/button";
 import { useManagedPolicy } from "../../state/managedPolicy";
 import { hasProviderSetup } from "./ProviderStatusBanner";
@@ -290,6 +294,7 @@ export interface ChatComposerHandle {
     citation: AssistantCitation,
     sourceAnchor: AssistantCitationSourceAnchor,
   ) => boolean;
+  replyToResponse: (response: ResponseContextRecord) => boolean;
   openModelPicker: () => void;
   stepReasoningEffort: (direction: 1 | -1) => void;
   toggleModelPicker: () => void;
@@ -790,6 +795,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (store) => store.syncPersistedAttachments,
   );
   const getComposerDraft = useComposerDraftStore((store) => store.getComposerDraft);
+  const setComposerDraftReplyTo = useComposerDraftStore((store) => store.setReplyTo);
+  const navigate = useNavigate();
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- starts or releases server attachment uploads as upload capability, limits and draft attachments change
   useEffect(() => {
@@ -2422,11 +2429,41 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // An open question owns the space above the composer. Only a machine problem,
   // which is why an answer could not go through, stays beside it.
+  const replyTo = composerDraft?.replyTo ?? null;
+  const replyBannerItems: readonly ComposerBannerStackItem[] = replyTo
+    ? [
+        {
+          id: "reply-to",
+          variant: "default",
+          icon: <ReplyIcon />,
+          title: replyTo.subagents
+            ? t("chatA.chatComposer.replyingToNamed").replace(
+                "{names}",
+                replyTo.subagents.map((subagent) => subagent.title).join(", "),
+              )
+            : t("chatA.chatComposer.replyingTo"),
+          description: (
+            <button
+              type="button"
+              className="cursor-pointer hover:text-foreground"
+              onClick={() => {
+                void navigate(assistantCitationNavigation(replyTo.citation));
+              }}
+            >
+              {assistantCitationLabel(replyTo.citation)}
+            </button>
+          ),
+          dismissLabel: t("chatA.chatComposer.cancelReply"),
+          onDismiss: () => setComposerDraftReplyTo(composerDraftTarget, null),
+        },
+      ]
+    : [];
   const bannerItems: readonly ComposerBannerStackItem[] =
     runtimeModeCeilingDenial === undefined || activePendingProgress
-      ? props.bannerItems
+      ? [...props.bannerItems, ...replyBannerItems]
       : [
           ...props.bannerItems,
+          ...replyBannerItems,
           {
             id: "managed-runtime-mode",
             variant: "warning",
@@ -2934,6 +2971,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           "cursor",
           { ensureLeadingBoundary: true, citationCommentAnchor: sourceAnchor },
         ),
+      replyToResponse: (response) => {
+        // An open question owns the composer, and its answer would not carry the reply.
+        if (pendingUserInputs.length > 0 || projectSelectionRequired) return false;
+        setComposerDraftReplyTo(composerDraftTarget, response);
+        focusComposer();
+        return true;
+      },
       openModelPicker: openModelPickerStable,
       stepReasoningEffort: (direction) => {
         if (noProviderAvailable || pendingUserInputs.length > 0 || isEditingQueuedMessage) {
@@ -3112,6 +3156,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       heldRequestIds,
       composerTerminalContexts,
       insertComposerDraftTerminalContext,
+      setComposerDraftReplyTo,
       insertComposerTextStable,
       insertComposerTextAtEndStable,
       promptRef,

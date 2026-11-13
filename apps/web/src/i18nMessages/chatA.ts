@@ -40,6 +40,10 @@ export const chatAMessages = {
     "chatA.chatComposer.sendAgainWhenChip": "Send again once its chip resolves.",
     "chatA.chatComposer.foldersOnlyLocal":
       "Folders can only be referenced on a server running on this computer",
+    "chatA.chatComposer.replyingTo": "Replying to",
+    "chatA.chatComposer.replyingToNamed": "Replying to {names}",
+    "chatA.chatComposer.cancelReply": "Cancel reply",
+    "chatA.responseReplyCard.goTo": "Go to the response this replies to: {label}",
     "chatA.chatComposer.typeFolderPathWithAt": "Type the folder path with @ instead.",
     "chatA.chatComposer.couldNotGetPath": 'Couldn\'t get the path of "{name}"',
     "chatA.chatComposer.unableToAddFolder": "Unable to add folder",
@@ -302,6 +306,10 @@ export const chatAMessages = {
     "chatA.chatComposer.sendAgainWhenChip": "Отправьте снова, когда его чип загрузится.",
     "chatA.chatComposer.foldersOnlyLocal":
       "Папки можно упомянуть только на сервере, запущенном на этом компьютере",
+    "chatA.chatComposer.replyingTo": "Ответ на сообщение",
+    "chatA.chatComposer.replyingToNamed": "Ответ: {names}",
+    "chatA.chatComposer.cancelReply": "Отменить ответ",
+    "chatA.responseReplyCard.goTo": "Перейти к ответу, на который это отвечает: {label}",
     "chatA.chatComposer.typeFolderPathWithAt": "Введите путь к папке с символом @.",
     "chatA.chatComposer.couldNotGetPath": "Не удалось получить путь к «{name}»",
     "chatA.chatComposer.unableToAddFolder": "Не удалось добавить папку",

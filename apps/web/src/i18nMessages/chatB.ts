@@ -515,6 +515,10 @@ export const chatBMessages = {
     "chatB.TriageDraftHero.orRun": "or run",
     "chatB.TriageDraftHero.copyCommandTip": "Copy command, for a terminal",
     "chatB.TimelineAssistantRows.forkFromResponse": "Fork from this response",
+    "chatB.TimelineAssistantRows.replyToResponse": "Reply to this response",
+    "chatB.ChatView.replyComposerNotReady": "The composer is not ready",
+    "chatB.ChatView.replyComposerNotReadyDescription":
+      "Try replying after the connection or pending input is resolved.",
     "chatB.TimelineMinimap.jumpToMessage": "Jump to message: {text}",
     "chatB.TimelineMinimap.userMessage": "User message",
     "chatB.TimelineMinimap.previousTurn": "Previous turn",
@@ -1266,6 +1270,10 @@ export const chatBMessages = {
     "chatB.TriageDraftHero.orRun": "или запустите",
     "chatB.TriageDraftHero.copyCommandTip": "Скопировать команду для терминала",
     "chatB.TimelineAssistantRows.forkFromResponse": "Форк от этого ответа",
+    "chatB.TimelineAssistantRows.replyToResponse": "Ответить на этот ответ",
+    "chatB.ChatView.replyComposerNotReady": "Поле ввода ещё не готово",
+    "chatB.ChatView.replyComposerNotReadyDescription":
+      "Ответьте после того, как восстановится соединение или будет обработан ожидающий запрос.",
     "chatB.TimelineMinimap.jumpToMessage": "Перейти к сообщению: {text}",
     "chatB.TimelineMinimap.userMessage": "Сообщение пользователя",
     "chatB.TimelineMinimap.previousTurn": "Предыдущий ход",
