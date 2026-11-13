@@ -37,6 +37,30 @@ export const DEFAULT_RELAY_LIMITS: RelayLimits = {
   maxSocketsPerUser: 20,
 };
 
+/**
+ * Counted connection and channel outcomes. `attempt` and `connected` are sockets, `channel_opened`
+ * is a tunnel; every other name is a refusal or a drop, by reason.
+ */
+export const RELAY_EVENTS = [
+  "attempt",
+  "connected",
+  "channel_opened",
+  "rate_limited",
+  "hello_timeout",
+  "bad_hello",
+  "unauthorized",
+  "unavailable",
+  "not_a_computer",
+  "socket_limit",
+  "host_offline",
+  "channel_limit",
+  "budget_exceeded",
+  "protocol_error",
+  "too_slow",
+  "revoked",
+] as const;
+export type RelayEvent = (typeof RELAY_EVENTS)[number];
+
 export interface RelayDependencies {
   authenticate(token: string): Promise<RelayDevice | undefined>;
   /** Of these device ids, the ones whose credential still works (not revoked, owner not banned). */
@@ -44,6 +68,7 @@ export interface RelayDependencies {
   /** Whether this user may open another channel (monthly byte budget). */
   mayOpen(userId: string): boolean;
   countBytes(userId: string, bytes: number): void;
+  record(event: RelayEvent): void;
   log(event: Record<string, unknown>): void;
 }
 
@@ -80,6 +105,8 @@ export class RelayHub {
   private checkingRevocations = false;
   private attempts = new Map<string, number>();
   private attemptsWindowStart = Date.now();
+  private readonly since = new Date();
+  private readonly counts = new Map<RelayEvent, number>();
 
   constructor(
     private readonly deps: RelayDependencies,
@@ -95,8 +122,10 @@ export class RelayHub {
   handleUpgrade(request: NodeHttp.IncomingMessage, socket: NodeStream.Duplex, head: Buffer) {
     const path = (request.url ?? "").split("?")[0];
     if (path !== RELAY_PATH) return false;
+    this.count("attempt");
     const ip = this.clientIp(request);
     if (!this.allowAttempt(ip)) {
+      this.count("rate_limited");
       socket.end(
         "HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
       );
@@ -112,6 +141,19 @@ export class RelayHub {
       .map((peer) => peer.device.id);
   }
 
+  /** Presence right now and outcome counts since this process started. */
+  stats() {
+    let openTunnels = 0;
+    for (const peer of this.peers) if (peer.role === "client") openTunnels += peer.channels.size;
+    return {
+      hostsOnline: this.hosts.size,
+      clientsOnline: this.peers.size - this.hosts.size,
+      openTunnels,
+      since: this.since,
+      counts: Object.fromEntries(RELAY_EVENTS.map((event) => [event, this.counts.get(event) ?? 0])),
+    };
+  }
+
   close() {
     clearInterval(this.heartbeat);
     for (const peer of this.peers) peer.socket.terminate();
@@ -119,26 +161,41 @@ export class RelayHub {
   }
 
   private accept(socket: WebSocket, ip: string | undefined) {
-    const timer = setTimeout(() => socket.close(4401, "hello timeout"), this.limits.helloTimeoutMs);
+    const timer = setTimeout(() => {
+      this.count("hello_timeout");
+      socket.close(4401, "hello timeout");
+    }, this.limits.helloTimeoutMs);
     socket.once("message", async (data, isBinary) => {
       clearTimeout(timer);
       const hello = isBinary ? null : this.parse(data);
       const token =
         typeof hello?.token === "string" && TOKEN.test(hello.token) ? hello.token : null;
       const role = hello?.role === "host" || hello?.role === "client" ? hello.role : null;
-      if (hello?.type !== "hello" || !token || !role) return this.fail(socket, "bad_hello");
+      if (hello?.type !== "hello" || !token || !role) {
+        this.count("bad_hello");
+        return this.fail(socket, "bad_hello");
+      }
       let device: RelayDevice | undefined;
       try {
         device = await this.deps.authenticate(token);
       } catch {
+        this.count("unavailable");
         return this.fail(socket, "unavailable", 1011);
       }
-      if (!device) return this.fail(socket, "unauthorized", 4401);
-      if (role === "host" && device.kind !== "computer")
+      if (!device) {
+        this.count("unauthorized");
+        return this.fail(socket, "unauthorized", 4401);
+      }
+      if (role === "host" && device.kind !== "computer") {
+        this.count("not_a_computer");
         return this.fail(socket, "not_a_computer", 4403);
+      }
       if (socket.readyState !== WebSocket.OPEN) return;
       const sockets = [...this.peers].filter((peer) => peer.device.userId === device.userId).length;
-      if (sockets >= this.limits.maxSocketsPerUser) return this.fail(socket, "limit", 4429);
+      if (sockets >= this.limits.maxSocketsPerUser) {
+        this.count("socket_limit");
+        return this.fail(socket, "limit", 4429);
+      }
       this.join(
         { socket, device, role, channels: new Map(), alive: true, bytes: 0, openedAt: Date.now() },
         ip,
@@ -154,6 +211,7 @@ export class RelayHub {
       this.hosts.set(peer.device.id, peer);
     }
     this.peers.add(peer);
+    this.count("connected");
     this.deps.log({
       event: "relay.connect",
       role: peer.role,
@@ -191,7 +249,7 @@ export class RelayHub {
   private control(peer: Peer, message: Record<string, unknown> | null) {
     // Clients cannot send WebSocket pings from a browser-style API; this is how they detect a dead socket.
     if (message?.type === "ping") return this.send(peer, { type: "pong" });
-    if (!message || !isChannel(message.channel)) return this.fail(peer.socket, "bad_message");
+    if (!message || !isChannel(message.channel)) return this.protocolError(peer);
     const channel = message.channel;
     if (message.type === "close") {
       const link = peer.channels.get(channel);
@@ -200,20 +258,25 @@ export class RelayHub {
       this.dropLink(link, "peer_closed");
       return;
     }
-    if (message.type !== "open" || peer.role !== "client")
-      return this.fail(peer.socket, "bad_message");
-    if (peer.channels.has(channel)) return this.fail(peer.socket, "bad_message");
+    if (message.type !== "open" || peer.role !== "client" || peer.channels.has(channel)) {
+      return this.protocolError(peer);
+    }
     const host =
       typeof message.hostDeviceId === "string" ? this.hosts.get(message.hostDeviceId) : undefined;
     // Another user's computer looks exactly like an offline one.
     if (!host || host.device.userId !== peer.device.userId) {
+      this.count("host_offline");
       return this.send(peer, { type: "close", channel, reason: "host_offline" });
     }
-    if (
+    const refusal =
       peer.channels.size >= this.limits.maxChannelsPerClient ||
-      host.channels.size >= this.limits.maxChannelsPerHost ||
-      !this.deps.mayOpen(peer.device.userId)
-    ) {
+      host.channels.size >= this.limits.maxChannelsPerHost
+        ? "channel_limit"
+        : this.deps.mayOpen(peer.device.userId)
+          ? null
+          : "budget_exceeded";
+    if (refusal) {
+      this.count(refusal);
       return this.send(peer, { type: "close", channel, reason: "limit" });
     }
     let hostChannel = 1 + Math.floor(Math.random() * 0xffff_fffe);
@@ -221,6 +284,7 @@ export class RelayHub {
     peer.channels.set(channel, { peer: host, peerChannel: hostChannel });
     host.channels.set(hostChannel, { peer, peerChannel: channel });
     this.send(host, { type: "open", channel: hostChannel, clientDeviceId: peer.device.id });
+    this.count("channel_opened");
   }
 
   private forward(peer: Peer, data: RawData) {
@@ -231,6 +295,7 @@ export class RelayHub {
     if (!link) return this.send(peer, { type: "close", channel, reason: "not_found" });
     const target = link.peer;
     if (target.socket.bufferedAmount > this.limits.maxBufferedBytes) {
+      this.count("too_slow");
       target.socket.close(4408, "too slow");
       return;
     }
@@ -290,7 +355,9 @@ export class RelayHub {
         ...new Set([...this.peers].map((peer) => peer.device.id)),
       ]);
       for (const peer of this.peers) {
-        if (!usable.has(peer.device.id)) peer.socket.close(4401, "revoked");
+        if (usable.has(peer.device.id)) continue;
+        this.count("revoked");
+        peer.socket.close(4401, "revoked");
       }
     } catch {
       // The database is away; keep the sockets and check again next time.
@@ -314,6 +381,16 @@ export class RelayHub {
 
   private send(peer: Peer, message: Record<string, unknown>) {
     if (peer.socket.readyState === WebSocket.OPEN) peer.socket.send(JSON.stringify(message));
+  }
+
+  private count(event: RelayEvent) {
+    this.counts.set(event, (this.counts.get(event) ?? 0) + 1);
+    this.deps.record(event);
+  }
+
+  private protocolError(peer: Peer) {
+    this.count("protocol_error");
+    this.fail(peer.socket, "bad_message");
   }
 
   private fail(socket: WebSocket, code: string, closeCode = 4400) {

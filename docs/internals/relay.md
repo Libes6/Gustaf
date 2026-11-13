@@ -93,6 +93,6 @@ Encryption does not help against a compromised device or a malicious app update.
 
 ## Open
 
-- A host without the desktop shell (the `t3` command) has no way to receive the device credential.
+- A host without the desktop shell (the `gustaf` command) has no way to receive the device credential.
 - Independent security review (a second model and a human) and a load test with realistic sessions.
 - Scale-out beyond one API process needs shared presence.

@@ -117,21 +117,6 @@
         "description": "Enables the set_window_theme command without any pre-configured scope.",
         "commands": { "allow": ["set_window_theme"], "deny": [] }
       },
-      "allow-set-wsl-backend-enabled": {
-        "identifier": "allow-set-wsl-backend-enabled",
-        "description": "Enables the set_wsl_backend_enabled command without any pre-configured scope.",
-        "commands": { "allow": ["set_wsl_backend_enabled"], "deny": [] }
-      },
-      "allow-set-wsl-distro": {
-        "identifier": "allow-set-wsl-distro",
-        "description": "Enables the set_wsl_distro command without any pre-configured scope.",
-        "commands": { "allow": ["set_wsl_distro"], "deny": [] }
-      },
-      "allow-set-wsl-only": {
-        "identifier": "allow-set-wsl-only",
-        "description": "Enables the set_wsl_only command without any pre-configured scope.",
-        "commands": { "allow": ["set_wsl_only"], "deny": [] }
-      },
       "allow-update-check": {
         "identifier": "allow-update-check",
         "description": "Enables the update_check command without any pre-configured scope.",
@@ -166,16 +151,6 @@
         "identifier": "allow-write-connection-catalog",
         "description": "Enables the write_connection_catalog command without any pre-configured scope.",
         "commands": { "allow": ["write_connection_catalog"], "deny": [] }
-      },
-      "allow-wsl-path": {
-        "identifier": "allow-wsl-path",
-        "description": "Enables the wsl_path command without any pre-configured scope.",
-        "commands": { "allow": ["wsl_path"], "deny": [] }
-      },
-      "allow-wsl-state": {
-        "identifier": "allow-wsl-state",
-        "description": "Enables the wsl_state command without any pre-configured scope.",
-        "commands": { "allow": ["wsl_state"], "deny": [] }
       },
       "deny-account-cancel-sign-in": {
         "identifier": "deny-account-cancel-sign-in",
@@ -292,21 +267,6 @@
         "description": "Denies the set_window_theme command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["set_window_theme"] }
       },
-      "deny-set-wsl-backend-enabled": {
-        "identifier": "deny-set-wsl-backend-enabled",
-        "description": "Denies the set_wsl_backend_enabled command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["set_wsl_backend_enabled"] }
-      },
-      "deny-set-wsl-distro": {
-        "identifier": "deny-set-wsl-distro",
-        "description": "Denies the set_wsl_distro command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["set_wsl_distro"] }
-      },
-      "deny-set-wsl-only": {
-        "identifier": "deny-set-wsl-only",
-        "description": "Denies the set_wsl_only command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["set_wsl_only"] }
-      },
       "deny-update-check": {
         "identifier": "deny-update-check",
         "description": "Denies the update_check command without any pre-configured scope.",
@@ -341,16 +301,6 @@
         "identifier": "deny-write-connection-catalog",
         "description": "Denies the write_connection_catalog command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["write_connection_catalog"] }
-      },
-      "deny-wsl-path": {
-        "identifier": "deny-wsl-path",
-        "description": "Denies the wsl_path command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["wsl_path"] }
-      },
-      "deny-wsl-state": {
-        "identifier": "deny-wsl-state",
-        "description": "Denies the wsl_state command without any pre-configured scope.",
-        "commands": { "allow": [], "deny": ["wsl_state"] }
       }
     },
     "permission_sets": {},

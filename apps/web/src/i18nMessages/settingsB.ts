@@ -90,7 +90,7 @@ export const settingsBMessages = {
       "Show folder threads on two lines: the title, then the branch, pull request, and agent.",
     "settingsB.LabsSettingsPanel.multilineAria": "Two-line folder rows",
     "settingsB.LabsSettingsPanel.guestSignInDescription":
-      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links.",
+      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to Gustaf Connect to use guest links.",
     "settingsB.LabsSettingsPanel.signIn": "Sign in",
     "settingsB.LabsSettingsPanel.guestLinksAria": "Guest links",
     "settingsB.LabsSettingsPanel.linkedEnvironmentsAria": "Linked environments",
@@ -129,7 +129,7 @@ export const settingsBMessages = {
       "This app has no address for {label} that another machine can reach. Enter its https or Tailscale address.",
     "settingsB.LinkedEnvironmentsSettings.pairingCode": "Pairing code",
     "settingsB.LinkedEnvironmentsSettings.codeFromEnvironment":
-      "From that environment's Connections, or t3 pair there",
+      "From that environment's Connections, or gustaf pair there",
     "settingsB.LinkedEnvironmentsSettings.pasteCode": "Paste the code",
     "settingsB.LinkedEnvironmentsSettings.createLinkOn":
       "Create a link on {label}: Settings → Connections → Create link, then paste its code here.",
@@ -618,7 +618,7 @@ export const settingsBMessages = {
       "Показывает треды в папках в две строки: заголовок, затем ветку, пул-реквест и агента.",
     "settingsB.LabsSettingsPanel.multilineAria": "Строки папок в две строки",
     "settingsB.LabsSettingsPanel.guestSignInDescription":
-      "Делитесь тредом с гостем, который смотрит его онлайн в браузере и отправляет сообщения, которые вы подтверждаете. Войдите в T3 Connect, чтобы пользоваться гостевыми ссылками.",
+      "Делитесь тредом с гостем, который смотрит его онлайн в браузере и отправляет сообщения, которые вы подтверждаете. Войдите в Gustaf Connect, чтобы пользоваться гостевыми ссылками.",
     "settingsB.LabsSettingsPanel.signIn": "Войти",
     "settingsB.LabsSettingsPanel.guestLinksAria": "Гостевые ссылки",
     "settingsB.LabsSettingsPanel.linkedEnvironmentsAria": "Связанные окружения",
@@ -657,7 +657,7 @@ export const settingsBMessages = {
       "В приложении нет адреса {label}, по которому до машины можно достучаться с другой машины. Введите её адрес https или Tailscale.",
     "settingsB.LinkedEnvironmentsSettings.pairingCode": "Код сопряжения",
     "settingsB.LinkedEnvironmentsSettings.codeFromEnvironment":
-      "Из раздела «Подключения» того окружения или командой t3 pair там",
+      "Из раздела «Подключения» того окружения или командой gustaf pair там",
     "settingsB.LinkedEnvironmentsSettings.pasteCode": "Вставьте код",
     "settingsB.LinkedEnvironmentsSettings.createLinkOn":
       "Создайте связь на {label}: Настройки → Подключения → Создать связь, затем вставьте её код сюда.",

@@ -114,16 +114,10 @@ function turnFailure(
   // The agent maps only the SDK's QUOTA_EXHAUSTED stop reason to `refusal`.
   if (errorText === undefined && stopReason !== "refusal") return undefined;
   const text = errorText ?? "";
+  if (stopReason === "refusal") return quotaFailure(text, now);
+  const limit = antigravityLimitFailure(text, now);
+  if (limit !== undefined) return limit;
   const apiError = API_ERROR.exec(text);
-  if (stopReason === "refusal" || QUOTA_EXHAUSTED.test(text)) {
-    return makeProviderFailure({
-      class: "usage_limit",
-      message: "You have reached your Antigravity quota for this period.",
-      code: apiError?.[3] ?? "QUOTA_EXHAUSTED",
-      retryable: true,
-      resetAt: resetAtFrom(text, now) ?? null,
-    });
-  }
   if (apiError === null) {
     return makeProviderFailure({
       class: "provider_error",
@@ -131,12 +125,39 @@ function turnFailure(
     });
   }
   const [, httpStatus, message, status] = apiError;
-  const rateLimited = httpStatus === "429" || status === "RESOURCE_EXHAUSTED";
   return makeProviderFailure({
-    class: rateLimited ? "usage_limit" : "provider_error",
+    class: "provider_error",
     message: message!.trim(),
     code: status ?? null,
-    retryable: rateLimited || Number(httpStatus) >= 500,
+    retryable: Number(httpStatus) >= 500,
+    resetAt: resetAtFrom(text, now) ?? null,
+  });
+}
+
+const quotaFailure = (text: string, now: DateTime.Utc) =>
+  makeProviderFailure({
+    class: "usage_limit",
+    message: "You have reached your Antigravity quota for this period.",
+    code: API_ERROR.exec(text)?.[3] ?? "QUOTA_EXHAUSTED",
+    retryable: true,
+    resetAt: resetAtFrom(text, now) ?? null,
+  });
+
+/** The quota or rate limit in a harness error, as its session log or its chat message carries it. */
+export function antigravityLimitFailure(
+  text: string,
+  now: DateTime.Utc,
+): OrchestrationV2ProviderFailure | undefined {
+  if (QUOTA_EXHAUSTED.test(text)) return quotaFailure(text, now);
+  const apiError = API_ERROR.exec(text);
+  if (apiError === null) return undefined;
+  const [, httpStatus, message, status] = apiError;
+  if (httpStatus !== "429" && status !== "RESOURCE_EXHAUSTED") return undefined;
+  return makeProviderFailure({
+    class: "usage_limit",
+    message: message!.trim(),
+    code: status ?? null,
+    retryable: true,
     resetAt: resetAtFrom(text, now) ?? null,
   });
 }

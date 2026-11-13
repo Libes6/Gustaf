@@ -18,7 +18,7 @@ const FAILURE_TITLES = {
   addToPath: "settingsA.cliCommand.couldNotAddToPath",
 } as const;
 
-/** The desktop `t3` command's state, and its actions with a toast on failure. */
+/** The desktop `gustaf` command's state, and its actions with a toast on failure. */
 export function useDesktopCliCommand() {
   const t = useT();
   const bridge = getDesktopCliCommandBridge();

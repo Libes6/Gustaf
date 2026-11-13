@@ -108,6 +108,9 @@ fn send(request: ureq::Request, body: Option<Value>) -> Result<ureq::Response, A
     match result {
         Ok(response) => Ok(response),
         Err(ureq::Error::Status(401, _)) => Err(ApiError::Unauthorized),
+        Err(ureq::Error::Status(429, _)) => Err(ApiError::Failed(
+            "Too many requests to the Gustaf cloud. Try again later.".to_owned(),
+        )),
         Err(ureq::Error::Status(status, _)) => Err(ApiError::Failed(format!(
             "The Gustaf cloud answered with HTTP {status}."
         ))),
@@ -172,10 +175,70 @@ pub(crate) fn register_computer(
     Ok((registered.device, registered.token))
 }
 
+/// `macos-arm64`, `windows-x64`, `linux-x64`; the cloud rejects anything else for a computer.
+pub(crate) fn platform_name(os: &str, arch: &str) -> Option<String> {
+    let arch = match arch {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        _ => return None,
+    };
+    matches!(os, "macos" | "windows" | "linux").then(|| format!("{os}-{arch}"))
+}
+
+/// Reports this computer's app version and platform with its own device credential.
+pub(crate) fn send_heartbeat(device_token: &str, app_version: &str) -> Result<(), ApiError> {
+    let platform = platform_name(std::env::consts::OS, std::env::consts::ARCH)
+        .ok_or_else(|| ApiError::Failed("This platform is not reported.".to_owned()))?;
+    send(
+        request("POST", "/v1/devices/heartbeat", Some(device_token)),
+        Some(json!({ "appVersion": app_version, "platform": platform })),
+    )
+    .map(drop)
+}
+
 pub(crate) fn revoke_device(token: &str, device_id: &str) -> Result<(), ApiError> {
     send(
         request("DELETE", &format!("/v1/devices/{device_id}"), Some(token)),
         None,
+    )
+    .map(drop)
+}
+
+/// Announcements, the minimum version and feature flags for this app. The page decodes it;
+/// a credential, when there is one, only adds the user's own flags.
+pub(crate) fn client_config(
+    version: &str,
+    platform: &str,
+    token: Option<&str>,
+) -> Result<Value, ApiError> {
+    let response = send(
+        request("GET", "/v1/client-config", token)
+            .query("kind", "desktop")
+            .query("version", version)
+            .query("platform", platform),
+        None,
+    )?;
+    read_json(response)
+}
+
+/// "Report a problem". The device id is only a hint; the cloud keeps it when it is this user's.
+pub(crate) fn send_report(
+    token: &str,
+    message: &str,
+    logs: Option<&str>,
+    app_version: &str,
+    device_id: Option<&str>,
+) -> Result<(), ApiError> {
+    send(
+        request("POST", "/v1/reports", Some(token)),
+        Some(json!({
+            "client": "desktop",
+            "message": message,
+            "logs": logs,
+            "appVersion": app_version,
+            "platform": format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+            "deviceId": device_id,
+        })),
     )
     .map(drop)
 }
@@ -207,6 +270,24 @@ mod tests {
             ]
             .map(|(key, value)| (key.to_owned(), value.to_owned()))
         );
+    }
+
+    #[test]
+    fn platform_names_match_what_the_cloud_accepts() {
+        assert_eq!(
+            platform_name("macos", "aarch64").as_deref(),
+            Some("macos-arm64")
+        );
+        assert_eq!(
+            platform_name("windows", "x86_64").as_deref(),
+            Some("windows-x64")
+        );
+        assert_eq!(
+            platform_name("linux", "x86_64").as_deref(),
+            Some("linux-x64")
+        );
+        assert_eq!(platform_name("linux", "riscv64"), None);
+        assert_eq!(platform_name("freebsd", "x86_64"), None);
     }
 
     #[test]

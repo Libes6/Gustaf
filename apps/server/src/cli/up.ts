@@ -81,7 +81,7 @@ const formatSetup = (setup: Setup) => {
       ? ["Anyone on your LAN or tailnet can reach the port. A pairing code is the only lock."]
       : []),
     ...(setup.lanFromOldDefault
-      ? ["Older installs keep LAN access on. Turn it off: `t3 up --no-lan`."]
+      ? ["Older installs keep LAN access on. Turn it off: `gustaf up --no-lan`."]
       : []),
   ];
   return [
@@ -95,7 +95,7 @@ const formatNextSteps = (lan: boolean, serviceInstalled: boolean, pairCommand: s
     ? `Run \`${pairCommand}\`. Use the code on your other device.`
     : serviceInstalled
       ? "Remote access is off. Gustaf still runs here in the background."
-      : "Remote access is off. Run `t3` to use Gustaf here.";
+      : "Remote access is off. Run `gustaf` to use Gustaf here.";
 
 const interactiveTerminal = () => Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
@@ -137,7 +137,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
     return yield* new CliError.UserError({
       cause: "routes",
       userMessage:
-        "No terminal. Choose access with --lan, or use --yes for the default. See `t3 up --help`.",
+        "No terminal. Choose access with --lan, or use --yes for the default. See `gustaf up --help`.",
     });
   }
   if (lan && !before.lan) {
@@ -180,7 +180,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
   }
 
   const previousLan = (yield* CliService.readServiceEnv(baseDir)).entries.T3CODE_LAN;
-  // Also with no service manager: the file records the choice that `t3 status` shows.
+  // Also with no service manager: the file records the choice that `gustaf status` shows.
   yield* CliService.writeServiceEnv(baseDir, { T3CODE_LAN: String(lan) });
   // When the service step fails, an installed service still runs with the old
   // value, so the file goes back to match it.
@@ -252,7 +252,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       }
       if (outcome === "skipped") {
         yield* Console.log(
-          "The installed service was not restarted. Run `t3 service status` to see why.",
+          "The installed service was not restarted. Run `gustaf service status` to see why.",
         );
       }
     }
@@ -289,11 +289,11 @@ export const upCommand = Command.make("up", {
     "Set up remote access and the Gustaf background service. --lan or --no-lan skips the question. Without a terminal, a needed restart runs without asking and stops running agent turns.",
   ),
   Command.withExamples([
-    { command: "t3 up", description: "Choose remote access." },
-    { command: "t3 up --lan", description: "Allow LAN access with pairing codes." },
-    { command: "t3 up --no-lan", description: "Stop LAN access." },
-    { command: "t3 up --yes", description: "Take the defaults with no questions." },
-    { command: "t3 status --json", description: "Read the settings from a script." },
+    { command: "gustaf up", description: "Choose remote access." },
+    { command: "gustaf up --lan", description: "Allow LAN access with pairing codes." },
+    { command: "gustaf up --no-lan", description: "Stop LAN access." },
+    { command: "gustaf up --yes", description: "Take the defaults with no questions." },
+    { command: "gustaf status --json", description: "Read the settings from a script." },
   ]),
   Command.withHandler(
     Effect.fn("cli.up.run")(function* (flags) {
@@ -312,7 +312,7 @@ export const upCommand = Command.make("up", {
   ),
 );
 
-/** `t3 status --json`, for scripts and agents. */
+/** `gustaf status --json`, for scripts and agents. */
 const setupJson = (setup: Setup) =>
   JSON.stringify(
     {
@@ -341,8 +341,8 @@ export const statusCommand = Command.make("status", {
 }).pipe(
   Command.withDescription("Show service setup and remote access settings."),
   Command.withExamples([
-    { command: "t3 status", description: "Show the settings." },
-    { command: "t3 status --json", description: "Print them for scripts and agents." },
+    { command: "gustaf status", description: "Show the settings." },
+    { command: "gustaf status --json", description: "Print them for scripts and agents." },
   ]),
   Command.withHandler(
     Effect.fn("cli.status")(function* (flags) {
@@ -360,7 +360,7 @@ export const statusCommand = Command.make("status", {
           ? setupJson(setup)
           : setup.service.otherBaseDir !== undefined
             ? `This machine\n${formatSetup(setup)}`
-            : `This machine\n${formatSetup(setup)}\n\nChange access: \`t3 up\`.`,
+            : `This machine\n${formatSetup(setup)}\n\nChange access: \`gustaf up\`.`,
       );
     }),
   ),

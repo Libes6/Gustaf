@@ -297,24 +297,6 @@
           "markdownDescription": "Enables the set_window_theme command without any pre-configured scope."
         },
         {
-          "description": "Enables the set_wsl_backend_enabled command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-set-wsl-backend-enabled",
-          "markdownDescription": "Enables the set_wsl_backend_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the set_wsl_distro command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-set-wsl-distro",
-          "markdownDescription": "Enables the set_wsl_distro command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the set_wsl_only command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-set-wsl-only",
-          "markdownDescription": "Enables the set_wsl_only command without any pre-configured scope."
-        },
-        {
           "description": "Enables the update_check command without any pre-configured scope.",
           "type": "string",
           "const": "allow-update-check",
@@ -355,18 +337,6 @@
           "type": "string",
           "const": "allow-write-connection-catalog",
           "markdownDescription": "Enables the write_connection_catalog command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the wsl_path command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-wsl-path",
-          "markdownDescription": "Enables the wsl_path command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the wsl_state command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-wsl-state",
-          "markdownDescription": "Enables the wsl_state command without any pre-configured scope."
         },
         {
           "description": "Denies the account_cancel_sign_in command without any pre-configured scope.",
@@ -507,24 +477,6 @@
           "markdownDescription": "Denies the set_window_theme command without any pre-configured scope."
         },
         {
-          "description": "Denies the set_wsl_backend_enabled command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-set-wsl-backend-enabled",
-          "markdownDescription": "Denies the set_wsl_backend_enabled command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the set_wsl_distro command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-set-wsl-distro",
-          "markdownDescription": "Denies the set_wsl_distro command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the set_wsl_only command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-set-wsl-only",
-          "markdownDescription": "Denies the set_wsl_only command without any pre-configured scope."
-        },
-        {
           "description": "Denies the update_check command without any pre-configured scope.",
           "type": "string",
           "const": "deny-update-check",
@@ -565,18 +517,6 @@
           "type": "string",
           "const": "deny-write-connection-catalog",
           "markdownDescription": "Denies the write_connection_catalog command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the wsl_path command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-wsl-path",
-          "markdownDescription": "Denies the wsl_path command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the wsl_state command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-wsl-state",
-          "markdownDescription": "Denies the wsl_state command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

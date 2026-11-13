@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { formatDateTime } from "../lib/format";
+import { formatDeviceBuild } from "../lib/versions";
 import { strings } from "../strings";
 import { PageTitle } from "./AppLayout";
 
@@ -81,6 +82,7 @@ export function DevicesPage() {
                   <TableHead>{columns.device}</TableHead>
                   <TableHead className="max-sm:hidden">{columns.kind}</TableHead>
                   <TableHead>{columns.owner}</TableHead>
+                  <TableHead className="max-md:hidden">{columns.version}</TableHead>
                   <TableHead className="max-md:hidden">{columns.lastSeen}</TableHead>
                   <TableHead className="max-lg:hidden">{columns.created}</TableHead>
                   <TableHead>{columns.status}</TableHead>
@@ -102,6 +104,12 @@ export function DevicesPage() {
                       >
                         {device.userName}
                       </Link>
+                    </TableCell>
+                    <TableCell
+                      className="whitespace-nowrap max-md:hidden"
+                      title={device.osVersion ?? undefined}
+                    >
+                      {formatDeviceBuild(device)}
                     </TableCell>
                     <TableCell className="text-muted-foreground max-md:hidden">
                       {formatDateTime(device.lastSeenAt)}

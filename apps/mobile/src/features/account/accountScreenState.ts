@@ -1,5 +1,7 @@
+import * as Schema from "effect/Schema";
+
 import { t } from "../../i18n";
-import type { AccountDevice } from "./accountApi";
+import { AccountApiError, type AccountDevice } from "./accountApi";
 import type { AccountState } from "./accountStore";
 
 const lastSeenFormatter = new Intl.DateTimeFormat(undefined, {
@@ -22,6 +24,16 @@ export function accountErrorMessage(error: string | null): string | null {
     default:
       return `${t("Request failed")}: ${error}`;
   }
+}
+
+const isAccountApiError = Schema.is(AccountApiError);
+
+export function reportErrorMessage(cause: unknown): string {
+  if (isAccountApiError(cause) && cause.status === 429) {
+    return t("Too many reports. Try again later.");
+  }
+  const reason = cause instanceof Error ? cause.message : String(cause);
+  return accountErrorMessage(reason) ?? reason;
 }
 
 export interface AccountDeviceRow {

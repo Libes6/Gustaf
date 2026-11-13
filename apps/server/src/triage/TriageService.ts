@@ -27,7 +27,7 @@ const GIT_ENV = {
   LANGUAGE: "C",
 } satisfies NodeJS.ProcessEnv;
 
-/** Starts in-app triage sessions: the same files `t3 triage` writes, plus a source clone. */
+/** Starts in-app triage sessions: the same files `gustaf triage` writes, plus a source clone. */
 export class TriageService extends Context.Service<
   TriageService,
   {

@@ -96,7 +96,7 @@ const layerTest = (input: {
 };
 
 it.effect.skipIf(windowsHost)(
-  "launched browsers and editors do not inherit ELECTRON_RUN_AS_NODE",
+  "launched browsers and editors inherit neither ELECTRON_RUN_AS_NODE nor the AppImage mount",
   () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -106,6 +106,7 @@ it.effect.skipIf(windowsHost)(
       yield* fileSystem.writeFileString(codePath, "#!/bin/sh\n");
       yield* fileSystem.chmod(codePath, 0o755);
 
+      const appDir = "/tmp/.mount_Gustafabc123";
       const spawned: ChildProcess.StandardCommand[] = [];
       yield* Effect.gen(function* () {
         const launcher = yield* ExternalLauncher.ExternalLauncher;
@@ -120,9 +121,13 @@ it.effect.skipIf(windowsHost)(
           }),
         ),
         Effect.provideService(HostProcess.Environment, {
-          PATH: binDir,
+          PATH: `${appDir}/usr/bin:${binDir}`,
           DISPLAY: ":0",
           ELECTRON_RUN_AS_NODE: "1",
+          APPIMAGE: "/home/user/Gustaf.AppImage",
+          APPDIR: appDir,
+          LD_LIBRARY_PATH: `${appDir}/usr/lib`,
+          GDK_PIXBUF_MODULE_FILE: `${appDir}/usr/lib/gdk-pixbuf-2.0/loaders.cache`,
         }),
       );
 

@@ -120,6 +120,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     listDevices: () => invoke("account_devices"),
     registerThisComputer: () => invoke("account_register_device"),
     revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
+    reportProblem: ({ message, attachLogs }) =>
+      invoke("account_report_problem", { message, attachLogs }),
   });
 
   window.gustafShell = Object.freeze({
@@ -128,6 +130,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     account,
     pickFolder,
     droppedPaths,
+    // The cloud's announcements, minimum version and flags; the shell adds any credential.
+    clientConfig: () => invoke("client_config"),
   });
 
   // Same surface the web client expects from Electron's preload. Methods we have
