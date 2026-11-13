@@ -532,7 +532,8 @@ pub fn run() {
             let relay_app = app.handle().clone();
             std::thread::spawn(move || account::sync_relay_credential(&relay_app));
             account::run_heartbeat(app.handle().clone());
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
+            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url))
+                .user_agent("GustafShell/1");
             #[cfg(target_os = "macos")]
             let window = window
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
