@@ -136,7 +136,9 @@ describe("AiUsageLedger", () => {
     const ledger = new AiUsageLedger();
     ledger.add("device-a", "turn-1", bucket());
     ledger.add("device-a", "turn-2", bucket({ day: "2026-10-01" }));
-    expect(ledger.nextBatch("device-b", () => "b", NOW)).toBe(undefined);
+    ledger.add("device-b", "turn-b", bucket());
+    expect(ledger.nextBatch("device-a", () => "stale", NOW)).toBe(undefined);
+    expect(ledger.nextBatch("device-b", () => "b", NOW)?.buckets).toEqual([bucket()]);
     ledger.add("device-a", "turn-3", bucket({ day: "2026-10-01" }));
     ledger.add("device-a", "turn-4", bucket());
     expect(ledger.nextBatch("device-a", () => "a", NOW)?.buckets).toEqual([bucket()]);

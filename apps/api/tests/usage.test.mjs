@@ -47,6 +47,7 @@ NodeTest.test(
       { batchId, buckets: [bucket({ inputTokens: -1 })] },
       { batchId, buckets: [bucket({ outputTokens: 1.5 })] },
       { batchId, buckets: [bucket({ day: "2026-02-30" })] },
+      { batchId, buckets: [bucket({ day: "2026-13-01" })] },
       { batchId, buckets: [bucket({ day: "2026-10-01" })] }, // older than 31 days
       { batchId, buckets: [bucket({ day: "2026-11-15" })] }, // past tomorrow
       { batchId, buckets: [bucket(), bucket({ turns: 1, measuredTurns: 1 })] }, // repeated key

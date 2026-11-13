@@ -4,8 +4,8 @@ import { DatabaseService } from "../database/database.service.js";
 import { aiUsageDaily, aiUsageReport, user } from "../database/tables.schema.js";
 import { periodStart, type readUsageReport, type UsagePeriod } from "./usage-rules.js";
 
-// Batch ids only need to outlive a host's retries, which stop when it quits.
-const REPORT_RETENTION = sql`interval '30 days'`;
+// Outlive the 31-day report window, including the allowed next UTC day.
+const REPORT_RETENTION = sql`interval '33 days'`;
 const SUMMARY_ROWS = 100;
 
 const sums = {

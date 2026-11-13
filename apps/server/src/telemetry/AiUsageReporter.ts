@@ -108,6 +108,7 @@ export class AiUsageLedger {
     }
     if (this.deviceId !== deviceId) {
       this.buckets.clear();
+      this.pending = null;
       this.deviceId = deviceId;
     }
     const key = bucketKey(turn);
@@ -128,8 +129,7 @@ export class AiUsageLedger {
 
   /** The batch to send for `deviceId`: the unsettled one, or a new one from waiting counts. */
   nextBatch(deviceId: string, newBatchId: () => string, nowMs: number): AiUsageBatch | undefined {
-    if (this.pending !== null && this.pending.deviceId !== deviceId) this.pending = null;
-    if (this.deviceId !== deviceId) this.clear();
+    if (this.deviceId !== deviceId) return undefined;
     if (this.pending !== null) return this.pending;
     const oldest = utcDay(nowMs - MAX_AGE_DAYS * DAY_MS);
     const buckets: AiUsageBucket[] = [];
@@ -201,12 +201,12 @@ export const make = Effect.gen(function* () {
   });
 
   const flush = Effect.gen(function* () {
-    if (!(yield* enabled)) return ledger.clear();
-    const current = yield* credential;
-    if (Option.isNone(current)) return ledger.clear();
-    const target = current.value;
-    const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     while (true) {
+      if (!(yield* enabled)) return ledger.clear();
+      const current = yield* credential;
+      if (Option.isNone(current)) return ledger.clear();
+      const target = current.value;
+      const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
       const batchId = yield* random.uuidV4().pipe(Effect.orElseSucceed(() => undefined));
       if (batchId === undefined) return;
       const batch = ledger.nextBatch(target.deviceId, () => batchId, nowMs);

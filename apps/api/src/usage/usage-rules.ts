@@ -38,7 +38,13 @@ function count(value: unknown, field: string, max: number) {
 function readBucket(value: unknown, oldest: string, newest: string): UsageBucket {
   const bucket = (value ?? {}) as Record<string, unknown>;
   const { day, provider, model } = bucket;
-  if (typeof day !== "string" || !DAY.test(day) || utcDay(Date.parse(`${day}T00:00:00Z`)) !== day) {
+  const parsedDay = typeof day === "string" ? Date.parse(`${day}T00:00:00Z`) : NaN;
+  if (
+    typeof day !== "string" ||
+    !DAY.test(day) ||
+    !Number.isFinite(parsedDay) ||
+    utcDay(parsedDay) !== day
+  ) {
     throw new BadRequestException("day must be a YYYY-MM-DD date");
   }
   if (day < oldest || day > newest) throw new BadRequestException("day is out of range");
