@@ -90,7 +90,7 @@ export const settingsBMessages = {
       "Show folder threads on two lines: the title, then the branch, pull request, and agent.",
     "settingsB.LabsSettingsPanel.multilineAria": "Two-line folder rows",
     "settingsB.LabsSettingsPanel.guestSignInDescription":
-      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links.",
+      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to Gustaf Connect to use guest links.",
     "settingsB.LabsSettingsPanel.signIn": "Sign in",
     "settingsB.LabsSettingsPanel.guestLinksAria": "Guest links",
     "settingsB.LabsSettingsPanel.linkedEnvironmentsAria": "Linked environments",
@@ -618,7 +618,7 @@ export const settingsBMessages = {
       "Показывает треды в папках в две строки: заголовок, затем ветку, пул-реквест и агента.",
     "settingsB.LabsSettingsPanel.multilineAria": "Строки папок в две строки",
     "settingsB.LabsSettingsPanel.guestSignInDescription":
-      "Делитесь тредом с гостем, который смотрит его онлайн в браузере и отправляет сообщения, которые вы подтверждаете. Войдите в T3 Connect, чтобы пользоваться гостевыми ссылками.",
+      "Делитесь тредом с гостем, который смотрит его онлайн в браузере и отправляет сообщения, которые вы подтверждаете. Войдите в Gustaf Connect, чтобы пользоваться гостевыми ссылками.",
     "settingsB.LabsSettingsPanel.signIn": "Войти",
     "settingsB.LabsSettingsPanel.guestLinksAria": "Гостевые ссылки",
     "settingsB.LabsSettingsPanel.linkedEnvironmentsAria": "Связанные окружения",

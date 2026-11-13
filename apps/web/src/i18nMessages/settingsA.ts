@@ -84,7 +84,7 @@ export const settingsAMessages = {
     "settingsA.connectionsSettings.enableNetworkAccessDescription":
       "Let your other devices connect to Gustaf over the network. Pair devices to give them access. Gustaf will restart.",
     "settingsA.connectionsSettings.disableNetworkAccessDescription":
-      "Devices connected over your local network will disconnect. Existing tunnels, such as T3 Connect or Tailscale HTTPS, keep working. Gustaf will restart.",
+      "Devices connected over your local network will disconnect. Existing tunnels, such as the Gustaf relay or Tailscale HTTPS, keep working. Gustaf will restart.",
     "settingsA.connectionsSettings.cancel": "Cancel",
     "settingsA.connectionsSettings.restarting": "Restarting…",
     "settingsA.connectionsSettings.restartAndEnable": "Restart and enable",
@@ -336,14 +336,14 @@ export const settingsAMessages = {
       "The environment is saved and will reconnect on app startup.",
     "settingsA.addEnvironment.couldNotAddRoute": "Could not add the route.",
     "settingsA.addEnvironment.fallbackRoute":
-      "{label} falls back to T3 Connect when its other routes are unreachable.",
+      "{label} falls back to Gustaf Connect when its other routes are unreachable.",
     "settingsA.addEnvironment.host": "Host",
     "settingsA.addEnvironment.pairingCode": "Pairing code",
     "settingsA.addEnvironment.pasteUrl":
       "Paste a full pairing URL here to fill both fields automatically.",
     "settingsA.addEnvironment.relayAccount":
-      "This machine is on your T3 Connect account. Use it as a fallback route.",
-    "settingsA.addEnvironment.addT3Connect": "Add T3 Connect",
+      "This machine is on your Gustaf Connect account. Use it as a fallback route.",
+    "settingsA.addEnvironment.addT3Connect": "Add Gustaf Connect",
     "settingsA.addEnvironment.adding": "Adding…",
     "settingsA.addEnvironment.addRoute": "Add route",
     "settingsA.addEnvironment.addEnvironment": "Add environment",
@@ -839,7 +839,7 @@ export const settingsAMessages = {
     "settingsA.connectionsSettings.enableNetworkAccessDescription":
       "Разрешить другим устройствам подключаться к Gustaf по сети. Сопрягайте устройства, чтобы выдать им доступ. Gustaf перезапустится.",
     "settingsA.connectionsSettings.disableNetworkAccessDescription":
-      "Устройства, подключённые по локальной сети, отключатся. Существующие туннели, например T3 Connect или HTTPS через Tailscale, продолжат работать. Gustaf перезапустится.",
+      "Устройства, подключённые по локальной сети, отключатся. Существующие туннели, например relay Gustaf или HTTPS через Tailscale, продолжат работать. Gustaf перезапустится.",
     "settingsA.connectionsSettings.cancel": "Отмена",
     "settingsA.connectionsSettings.restarting": "Перезапуск…",
     "settingsA.connectionsSettings.restartAndEnable": "Перезапустить и включить",
@@ -1098,14 +1098,14 @@ export const settingsAMessages = {
       "Окружение сохранено и будет переподключаться при запуске приложения.",
     "settingsA.addEnvironment.couldNotAddRoute": "Не удалось добавить маршрут.",
     "settingsA.addEnvironment.fallbackRoute":
-      "{label} переключается на T3 Connect, когда остальные маршруты недоступны.",
+      "{label} переключается на Gustaf Connect, когда остальные маршруты недоступны.",
     "settingsA.addEnvironment.host": "Хост",
     "settingsA.addEnvironment.pairingCode": "Код сопряжения",
     "settingsA.addEnvironment.pasteUrl":
       "Вставьте сюда полную ссылку сопряжения, чтобы автоматически заполнить оба поля.",
     "settingsA.addEnvironment.relayAccount":
-      "Этот компьютер есть в вашем аккаунте T3 Connect. Используйте его как резервный маршрут.",
-    "settingsA.addEnvironment.addT3Connect": "Добавить T3 Connect",
+      "Этот компьютер есть в вашем аккаунте Gustaf Connect. Используйте его как резервный маршрут.",
+    "settingsA.addEnvironment.addT3Connect": "Добавить Gustaf Connect",
     "settingsA.addEnvironment.adding": "Добавление…",
     "settingsA.addEnvironment.addRoute": "Добавить маршрут",
     "settingsA.addEnvironment.addEnvironment": "Добавить окружение",

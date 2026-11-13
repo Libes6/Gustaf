@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { LogInIcon, UserIcon } from "lucide-react";
 
 import { ensureLocalApi } from "../../localApi";
 import {
@@ -13,17 +14,61 @@ import { useT } from "../../useUiLanguage";
 import type { MessageKey } from "../../i18n";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { isThisComputerRegistered, orderDevices } from "./AccountSettings.logic";
-import { SettingsRow, SettingsSection } from "./settingsLayout";
+import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 type Pending = "signIn" | "signOut" | "register" | { readonly revoke: string } | null;
 
-/** The Gustaf cloud account; only the Tauri shell offers it. */
-export function AccountSettingsSection() {
+export function AccountSettingsPanel() {
   const account = shellAccount();
-  return account ? <AccountSettings account={account} /> : null;
+  return (
+    <SettingsPageContainer>
+      {account ? <AccountSettings account={account} /> : null}
+    </SettingsPageContainer>
+  );
+}
+
+/** The settings sidebar's footer entry into the Gustaf account; render it only when `hasShellAccount`. */
+export function AccountSidebarEntry({
+  isActive,
+  onClick,
+}: {
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const t = useT();
+  const view = useEnvironmentQuery(shellAccountAtom).data?.view ?? { kind: "loading" as const };
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          isActive={isActive}
+          aria-current={isActive ? "page" : undefined}
+          onClick={onClick}
+        >
+          {view.kind === "signedIn" ? (
+            <>
+              <AccountAvatar image={view.user.image} initials={view.initials} />
+              <span>{view.displayName ?? t("settingsD.account.unnamed")}</span>
+            </>
+          ) : view.kind === "signedOut" ? (
+            <>
+              <LogInIcon />
+              <span>{t("settingsD.account.sidebarSignIn")}</span>
+            </>
+          ) : (
+            <>
+              <UserIcon />
+              <span>{t("settingsD.account.title")}</span>
+            </>
+          )}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
 }
 
 function AccountSettings({ account }: { account: ShellAccount }) {

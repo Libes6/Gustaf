@@ -217,7 +217,7 @@ function providerEnvironmentDetail(
 ): string {
   if (environment.entry.target._tag === "PrimaryConnectionTarget")
     return t("settingsC.providerSettingsPanel.primaryDevice");
-  if (environment.relayManaged) return "T3 Connect";
+  if (environment.relayManaged) return "Gustaf Connect";
   if (environment.entry.target._tag === "SshConnectionTarget") return "SSH";
   if (isDesktopLocalConnectionTarget(environment.entry.target))
     return t("settingsC.providerSettingsPanel.localDevice");
