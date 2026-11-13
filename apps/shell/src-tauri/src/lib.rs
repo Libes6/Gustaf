@@ -1,5 +1,6 @@
 mod account;
 mod bridge;
+mod cli_command;
 mod cloud_api;
 mod connection_storage;
 mod diagnostics;
@@ -9,6 +10,7 @@ mod network;
 mod server_process;
 mod shell_settings;
 mod snap_shot;
+mod ssh;
 mod updater;
 
 use std::collections::VecDeque;
@@ -437,6 +439,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
+            ssh::ssh_request,
             bridge::dropped_paths,
             bridge::drag_window,
             snap_shot::snap_shot_command,
@@ -468,12 +471,17 @@ pub fn run() {
             account::account_devices,
             account::account_register_device,
             account::account_revoke_device,
+            cli_command::cli_command_state,
+            cli_command::cli_command_install,
+            cli_command::cli_command_uninstall,
+            cli_command::cli_command_add_to_path,
             account::client_config,
             account::account_report_problem,
         ])
         .setup(|app| {
             updater::initialize(app)?;
             snap_shot::initialize(app.handle());
+            app.manage(ssh::SshState::default());
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
@@ -570,6 +578,7 @@ pub fn run() {
         .expect("error while running Gustaf")
         .run(|app, event| {
             if matches!(event, RunEvent::Exit) {
+                ssh::stop(app);
                 stop_server(app);
             }
         });

@@ -1297,6 +1297,18 @@ const threadWorktreePathsIncludeArchivedOnRequest = Effect.gen(function* () {
       settledAt: null,
       lastVisitedAt: null,
       deletedAt: null,
+      pullRequests: [
+        {
+          host: "github.com",
+          repository: "acme/app",
+          number: 42,
+          url: "https://github.com/acme/app/pull/42",
+          source: "manual" as const,
+          linkedAt: DateTime.formatIso(now),
+          snapshot: null,
+          stack: null,
+        },
+      ],
     };
     return store
       .apply({
@@ -1319,6 +1331,28 @@ const threadWorktreePathsIncludeArchivedOnRequest = Effect.gen(function* () {
     occurredAt: now,
     payload: { ...deleted, deletedAt: now },
   });
+
+  const inventory = yield* store.getWorktreeInventoryThreads([
+    ProjectId.make("project:worktree-paths"),
+  ]);
+  assert.deepEqual(
+    inventory.map((thread) => [thread.id, thread.archived, thread.deleted]),
+    [
+      [ThreadId.make("thread:active"), false, false],
+      [ThreadId.make("thread:archived"), true, false],
+      [ThreadId.make("thread:deleted"), false, true],
+    ],
+  );
+  assert.deepEqual(inventory.find((thread) => thread.deleted)?.pullRequests, [
+    {
+      number: 42,
+      url: "https://github.com/acme/app/pull/42",
+      title: null,
+      state: null,
+    },
+  ]);
+  assert.deepEqual(yield* store.getWorktreeInventoryThreads([]), []);
+  assert.deepEqual(yield* store.getWorktreeInventoryThreads([ProjectId.make("other")]), []);
 
   assert.deepEqual(yield* store.getThreadWorktreePaths(), [
     { threadId: ThreadId.make("thread:active"), worktreePath: "/worktrees/active" },

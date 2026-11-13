@@ -24,8 +24,9 @@ it("resolves wildcard hosts to a concrete external interface when one is availab
   expect(connectionString).toBe("http://192.168.1.42:3773");
 });
 
-it("skips public and container addresses for a private-network listener", () => {
+it("skips VPN fake-IP, public, and container addresses for a private-network listener", () => {
   const interfaces = {
+    utun5: [ipv4("198.18.0.1")],
     eth0: [ipv4("203.0.113.7")],
     docker0: [ipv4("172.17.0.1")],
     bridge200: [ipv4("192.168.64.1")],
@@ -40,7 +41,7 @@ it("skips public and container addresses for a private-network listener", () => 
   ).toBe("http://10.0.0.5:3773");
   expect(
     resolveHeadlessConnectionString("0.0.0.0", 3773, {
-      interfaces: { eth0: [ipv4("203.0.113.7")] },
+      interfaces: { eth0: [ipv4("203.0.113.7")], Meta: [ipv4("198.19.0.1")] },
       privateNetworkOnly: true,
     }),
   ).toBe("http://localhost:3773");

@@ -39,6 +39,10 @@ vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
 }));
+vi.mock("../useUiLanguage", async () => {
+  const { translate } = await import("../i18n");
+  return { useT: () => (key: Parameters<typeof translate>[1]) => translate("en", key) };
+});
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ navigate: async () => recordEffect("project-settings") }),
 }));

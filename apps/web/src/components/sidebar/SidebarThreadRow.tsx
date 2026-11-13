@@ -427,7 +427,7 @@ function SnoozeMenuButton(props: {
             if (choice) onSnooze(choice);
           }}
         >
-          Custom…
+          {t("sidebar.Sidebar.customSnooze")}
         </MenuItem>
       </MenuPopup>
     </Menu>

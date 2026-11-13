@@ -29,7 +29,7 @@ on. [Install](./install.md#mobile-app) · [Remote access](./remote-access.md)
 ## Why does the relay fail?
 
 Sign in with GitHub on both devices and register each one under **Settings → Account**. On the
-computer, open **Settings → Remote access** and choose **Connect a phone**. On the phone, scan
+computer, open **Settings → Sharing & access** and choose **Connect a phone**. On the phone, scan
 that code from **Add route**. Allow the phone on the computer and compare the safety code. The
 code works once, for five minutes. [Relay troubleshooting](./remote-access.md#relay-troubleshooting)
 

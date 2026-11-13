@@ -2,7 +2,7 @@
 //! ignores a polite request to stop or the shell itself dies.
 
 use std::io;
-use std::process::{Child, ChildStdout, Command};
+use std::process::{Child, ChildStdin, ChildStdout, Command};
 use std::time::Duration;
 #[cfg(unix)]
 use std::time::Instant;
@@ -32,12 +32,26 @@ impl Server {
         })
     }
 
+    pub(crate) fn take_stdin(&mut self) -> Option<ChildStdin> {
+        self.child.stdin.take()
+    }
+
     pub(crate) fn take_stdout(&mut self) -> Option<ChildStdout> {
         self.child.stdout.take()
     }
 
     pub(crate) fn try_wait(&mut self) -> io::Result<Option<std::process::ExitStatus>> {
         self.child.try_wait()
+    }
+
+    pub(crate) fn wait_for_exit(&mut self, grace: Duration) {
+        let deadline = std::time::Instant::now() + grace;
+        while std::time::Instant::now() < deadline {
+            if !matches!(self.child.try_wait(), Ok(None)) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 
     /// Asks the server to stop, then kills what is left once `grace` has passed.

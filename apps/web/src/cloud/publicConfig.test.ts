@@ -16,6 +16,15 @@ describe("hasCloudPublicConfig", () => {
     expect(hasCloudPublicConfig()).toBe(false);
   });
 
+  it("stays off inside the Gustaf shell even with cloud config", () => {
+    vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "pk_test_example");
+    vi.stubEnv("VITE_CLERK_JWT_TEMPLATE", "t3-relay");
+    vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
+    vi.stubGlobal("window", { gustafShell: { account: {} } });
+
+    expect(hasCloudPublicConfig()).toBe(false);
+  });
+
   describe("browser origins", () => {
     beforeEach(() => {
       vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", `pk_live_${btoa("clerk.example.com$")}`);

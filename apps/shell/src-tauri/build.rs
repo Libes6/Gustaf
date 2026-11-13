@@ -26,6 +26,7 @@ fn main() {
     // Naming a command here gives it a permission the capability file can grant.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "ssh_request",
             "dropped_paths",
             "drag_window",
             "snap_shot_command",
@@ -57,6 +58,10 @@ fn main() {
             "account_devices",
             "account_register_device",
             "account_revoke_device",
+            "cli_command_state",
+            "cli_command_install",
+            "cli_command_uninstall",
+            "cli_command_add_to_path",
             "client_config",
             "account_report_problem",
         ]),

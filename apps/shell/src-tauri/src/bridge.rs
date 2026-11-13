@@ -55,6 +55,11 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
   });
 
+  const invokeCli = (command) =>
+    invoke(command).catch((error) => {
+      throw error instanceof Error ? error : new Error(String(error));
+    });
+
   const pickFolder = async (options) => {
     const picked = await invoke("plugin:dialog|open", {
       options: {
@@ -141,6 +146,14 @@ const INIT_SCRIPT: &str = r#"(() => {
   // Same surface the web client expects from Electron's preload. Methods we have
   // not ported yet stay absent; callers use optional chaining. `preview` is omitted
   // on purpose (in-app browser is a separate project).
+  const sshPromptListeners = new Set();
+  window.__gustafSshPasswordPrompt = (request) => {
+    for (const listener of sshPromptListeners) listener(request);
+  };
+  const ssh = (method, input) => invoke("ssh_request", {
+    method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
+  });
+
   window.desktopBridge = {
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
@@ -155,9 +168,22 @@ const INIT_SCRIPT: &str = r#"(() => {
     },
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
-    // SSH environments are not ported; the page subscribes while it starts.
-    onSshPasswordPrompt: () => () => {},
-    resolveSshPasswordPrompt: async () => {},
+    discoverSshHosts: () => ssh("discover"),
+    resolveSshHost: (alias) => ssh("resolve", alias),
+    ensureSshEnvironment: async (target, options) => {
+      const result = await ssh("ensure", { target, options });
+      if (result.type === "ssh-password-prompt-cancelled") throw new Error(result.message);
+      return result;
+    },
+    disconnectSshEnvironment: (target) => ssh("disconnect", target),
+    fetchSshEnvironmentDescriptor: (httpBaseUrl) => ssh("descriptor", { httpBaseUrl }),
+    bootstrapSshBearerSession: (httpBaseUrl, credential) => ssh("bootstrap", { httpBaseUrl, credential }),
+    fetchSshSessionState: (httpBaseUrl, bearerToken) => ssh("session", { httpBaseUrl, bearerToken }),
+    onSshPasswordPrompt: (listener) => {
+      sshPromptListeners.add(listener);
+      return () => sshPromptListeners.delete(listener);
+    },
+    resolveSshPasswordPrompt: (requestId, password) => ssh("resolve-password", { requestId, password }),
     getSystemLocale: () => navigator.language || "en-US",
     getPreferredSystemLanguages: () => Array.from(navigator.languages || []),
     // Sync, like Electron's preload: the shell bakes the launch bootstraps into this script.
@@ -268,22 +294,12 @@ const INIT_SCRIPT: &str = r#"(() => {
       displayName: "Gustaf",
     }),
     getRelayTelemetryEnabled: () => false,
+    // The shell answers with a plain string on failure; Settings shows an Error's message.
     cliCommand: {
-      getState: async () => ({
-        supported: false,
-        installedPath: null,
-        onPath: false,
-        launcherPath: null,
-      }),
-      install: async () => {
-        throw new Error("CLI install is not available in this Gustaf build yet.");
-      },
-      uninstall: async () => {
-        throw new Error("CLI uninstall is not available in this Gustaf build yet.");
-      },
-      addToPath: async () => {
-        throw new Error("Adding the CLI to PATH is not available in this Gustaf build yet.");
-      },
+      getState: () => invoke("cli_command_state"),
+      install: () => invokeCli("cli_command_install"),
+      uninstall: () => invokeCli("cli_command_uninstall"),
+      addToPath: () => invokeCli("cli_command_add_to_path"),
     },
     webLinks: {
       setReady: async () => {},

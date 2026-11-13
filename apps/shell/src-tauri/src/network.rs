@@ -62,7 +62,7 @@ fn gather_snapshot() -> NetworkSnapshot {
 }
 
 /// IPv4 addresses on this machine that are usable from the LAN (not loopback,
-/// link-local, or Tailscale CGNAT — those are listed separately).
+/// link-local, Tailscale CGNAT, or VPN fake-IP — Tailscale is listed separately).
 fn lan_ipv4_addresses(interfaces: &[(String, Ipv4Addr)]) -> Vec<String> {
     let mut addresses: Vec<Ipv4Addr> = Vec::new();
     for (name, address) in interfaces {
@@ -71,6 +71,7 @@ fn lan_ipv4_addresses(interfaces: &[(String, Ipv4Addr)]) -> Vec<String> {
             || address.is_loopback()
             || address.is_link_local()
             || is_tailscale_cgnat(address)
+            || is_vpn_fake_ip(address)
             || addresses.contains(&address)
         {
             continue;
@@ -275,6 +276,12 @@ fn is_tailscale_cgnat(address: Ipv4Addr) -> bool {
     octets[0] == 100 && (64..=127).contains(&octets[1])
 }
 
+/// RFC 2544 198.18.0.0/15. Clash, Mihomo, and sing-box TUN fake-IP use it.
+fn is_vpn_fake_ip(address: Ipv4Addr) -> bool {
+    let octets = address.octets();
+    octets[0] == 198 && (18..=19).contains(&octets[1])
+}
+
 /// Matches whole words by prefix (`vEthernet (WSL)`, `bridge100`, `br-1a2b`) so
 /// a localized adapter name that merely contains `tap`/`tun`/`wg` is kept.
 fn is_host_only_interface(name: &str) -> bool {
@@ -441,7 +448,8 @@ fn ensure_trailing_slash(url: &str) -> String {
 mod tests {
     use super::{
         advertised_endpoints_json, ensure_trailing_slash, is_host_only_interface,
-        is_tailscale_cgnat, lan_ipv4_addresses, parse_windows_ipconfig, NetworkSnapshot,
+        is_tailscale_cgnat, is_vpn_fake_ip, lan_ipv4_addresses, parse_windows_ipconfig,
+        NetworkSnapshot,
     };
     use std::net::Ipv4Addr;
 
@@ -453,6 +461,24 @@ mod tests {
     fn recognizes_tailscale_cgnat() {
         assert!(is_tailscale_cgnat(Ipv4Addr::new(100, 64, 0, 1)));
         assert!(!is_tailscale_cgnat(Ipv4Addr::new(192, 168, 1, 1)));
+        assert!(!is_tailscale_cgnat(Ipv4Addr::new(198, 18, 0, 1)));
+    }
+
+    #[test]
+    fn recognizes_vpn_fake_ip() {
+        for (address, fake) in [
+            ("198.18.0.0", true),
+            ("198.18.0.1", true),
+            ("198.18.255.255", true),
+            ("198.19.0.0", true),
+            ("198.19.255.255", true),
+            ("198.17.255.255", false),
+            ("198.20.0.0", false),
+            ("192.168.1.1", false),
+            ("100.64.0.1", false),
+        ] {
+            assert_eq!(is_vpn_fake_ip(ip(address)), fake, "{address}");
+        }
     }
 
     #[test]
@@ -631,6 +657,8 @@ Drahtlos-LAN-Adapter WLAN:
             ("utun4".to_owned(), ip("100.101.1.2")),
             ("en1".to_owned(), ip("10.0.0.7")),
             ("en2".to_owned(), ip("169.254.3.4")),
+            ("en5".to_owned(), ip("198.18.0.1")),
+            ("Meta".to_owned(), ip("198.19.255.254")),
         ];
         assert_eq!(
             lan_ipv4_addresses(&interfaces),

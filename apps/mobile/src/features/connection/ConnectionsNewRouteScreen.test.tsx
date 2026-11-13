@@ -76,6 +76,7 @@ vi.mock("./environmentSections", () => ({
 vi.mock("./devAutoConnect", () => ({
   autoConnectReport: () => ({ connecting: false, error: null }),
   devAutoConnectAttemptAtom: {},
+  relayLinkAttemptAtom: {},
 }));
 vi.mock("../../state/use-remote-environment-registry", () => ({
   setPendingConnectionError: (message: string | null) => {

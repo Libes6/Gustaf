@@ -837,7 +837,7 @@ export const settingsDMessages = {
       "These permissions apply to this client’s current connection.",
     "settingsD.sessionPermissions.allowed": "Allowed",
     "settingsD.sessionPermissions.notGranted": "Not granted",
-    "settingsD.account.title": "Account",
+    "settingsD.account.title": "Gustaf Account",
     "settingsD.account.loading": "Loading…",
     "settingsD.account.notSignedIn": "Not signed in",
     "settingsD.account.signedOutDescription":
@@ -873,7 +873,7 @@ export const settingsDMessages = {
     "settingsD.reportProblem.cancel": "Cancel",
     "settingsD.reportProblem.send": "Send report",
     "settingsD.reportProblem.sent": "Report sent. Thank you!",
-    "settingsD.relay.title": "Remote access",
+    "settingsD.relay.title": "Any network (Gustaf relay)",
     "settingsD.relay.anyNetwork": "Reach this computer from any network",
     "settingsD.relay.description":
       "Your phone connects through the Gustaf relay with end-to-end encryption. The relay sees only that two of your devices are talking, not what they say.",
@@ -1757,7 +1757,7 @@ export const settingsDMessages = {
       "Эти разрешения действуют для текущего подключения этого клиента.",
     "settingsD.sessionPermissions.allowed": "Разрешено",
     "settingsD.sessionPermissions.notGranted": "Не предоставлено",
-    "settingsD.account.title": "Аккаунт",
+    "settingsD.account.title": "Аккаунт Gustaf",
     "settingsD.account.loading": "Загрузка…",
     "settingsD.account.notSignedIn": "Вход не выполнен",
     "settingsD.account.signedOutDescription":
@@ -1794,7 +1794,7 @@ export const settingsDMessages = {
     "settingsD.reportProblem.cancel": "Отмена",
     "settingsD.reportProblem.send": "Отправить",
     "settingsD.reportProblem.sent": "Отчёт отправлен. Спасибо!",
-    "settingsD.relay.title": "Удалённый доступ",
+    "settingsD.relay.title": "Из любой сети (релей Gustaf)",
     "settingsD.relay.anyNetwork": "Доступ к компьютеру из любой сети",
     "settingsD.relay.description":
       "Телефон подключается через релей Gustaf со сквозным шифрованием. Релей видит только, что два ваших устройства общаются, но не что они передают.",

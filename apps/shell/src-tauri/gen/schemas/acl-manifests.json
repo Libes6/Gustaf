@@ -17,6 +17,11 @@
         "description": "Enables the account_register_device command without any pre-configured scope.",
         "commands": { "allow": ["account_register_device"], "deny": [] }
       },
+      "allow-account-report-problem": {
+        "identifier": "allow-account-report-problem",
+        "description": "Enables the account_report_problem command without any pre-configured scope.",
+        "commands": { "allow": ["account_report_problem"], "deny": [] }
+      },
       "allow-account-revoke-device": {
         "identifier": "allow-account-revoke-device",
         "description": "Enables the account_revoke_device command without any pre-configured scope.",
@@ -46,6 +51,31 @@
         "identifier": "allow-app-branding",
         "description": "Enables the app_branding command without any pre-configured scope.",
         "commands": { "allow": ["app_branding"], "deny": [] }
+      },
+      "allow-cli-command-add-to-path": {
+        "identifier": "allow-cli-command-add-to-path",
+        "description": "Enables the cli_command_add_to_path command without any pre-configured scope.",
+        "commands": { "allow": ["cli_command_add_to_path"], "deny": [] }
+      },
+      "allow-cli-command-install": {
+        "identifier": "allow-cli-command-install",
+        "description": "Enables the cli_command_install command without any pre-configured scope.",
+        "commands": { "allow": ["cli_command_install"], "deny": [] }
+      },
+      "allow-cli-command-state": {
+        "identifier": "allow-cli-command-state",
+        "description": "Enables the cli_command_state command without any pre-configured scope.",
+        "commands": { "allow": ["cli_command_state"], "deny": [] }
+      },
+      "allow-cli-command-uninstall": {
+        "identifier": "allow-cli-command-uninstall",
+        "description": "Enables the cli_command_uninstall command without any pre-configured scope.",
+        "commands": { "allow": ["cli_command_uninstall"], "deny": [] }
+      },
+      "allow-client-config": {
+        "identifier": "allow-client-config",
+        "description": "Enables the client_config command without any pre-configured scope.",
+        "commands": { "allow": ["client_config"], "deny": [] }
       },
       "allow-client-platform": {
         "identifier": "allow-client-platform",
@@ -122,6 +152,11 @@
         "description": "Enables the snap_shot_command command without any pre-configured scope.",
         "commands": { "allow": ["snap_shot_command"], "deny": [] }
       },
+      "allow-ssh-request": {
+        "identifier": "allow-ssh-request",
+        "description": "Enables the ssh_request command without any pre-configured scope.",
+        "commands": { "allow": ["ssh_request"], "deny": [] }
+      },
       "allow-update-check": {
         "identifier": "allow-update-check",
         "description": "Enables the update_check command without any pre-configured scope.",
@@ -172,6 +207,11 @@
         "description": "Denies the account_register_device command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["account_register_device"] }
       },
+      "deny-account-report-problem": {
+        "identifier": "deny-account-report-problem",
+        "description": "Denies the account_report_problem command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["account_report_problem"] }
+      },
       "deny-account-revoke-device": {
         "identifier": "deny-account-revoke-device",
         "description": "Denies the account_revoke_device command without any pre-configured scope.",
@@ -201,6 +241,31 @@
         "identifier": "deny-app-branding",
         "description": "Denies the app_branding command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["app_branding"] }
+      },
+      "deny-cli-command-add-to-path": {
+        "identifier": "deny-cli-command-add-to-path",
+        "description": "Denies the cli_command_add_to_path command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["cli_command_add_to_path"] }
+      },
+      "deny-cli-command-install": {
+        "identifier": "deny-cli-command-install",
+        "description": "Denies the cli_command_install command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["cli_command_install"] }
+      },
+      "deny-cli-command-state": {
+        "identifier": "deny-cli-command-state",
+        "description": "Denies the cli_command_state command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["cli_command_state"] }
+      },
+      "deny-cli-command-uninstall": {
+        "identifier": "deny-cli-command-uninstall",
+        "description": "Denies the cli_command_uninstall command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["cli_command_uninstall"] }
+      },
+      "deny-client-config": {
+        "identifier": "deny-client-config",
+        "description": "Denies the client_config command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["client_config"] }
       },
       "deny-client-platform": {
         "identifier": "deny-client-platform",
@@ -276,6 +341,11 @@
         "identifier": "deny-snap-shot-command",
         "description": "Denies the snap_shot_command command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["snap_shot_command"] }
+      },
+      "deny-ssh-request": {
+        "identifier": "deny-ssh-request",
+        "description": "Denies the ssh_request command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["ssh_request"] }
       },
       "deny-update-check": {
         "identifier": "deny-update-check",

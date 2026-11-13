@@ -62,6 +62,7 @@ const REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS = 900_000;
 const REMOTE_REUSE_READY_TIMEOUT_MS = 2_000;
 
 export interface RemoteT3RunnerOptions {
+  readonly installedCommand?: string | null;
   readonly nodeScriptPath?: string | null;
   readonly nodeEngineRange?: string | null;
   readonly archiveVersion?: string | null;
@@ -420,6 +421,10 @@ ensure_remote_node_path() {
 const REMOTE_RUNNER_SCRIPT = `#!/bin/sh
 set -eu
 @@T3_NODE_ENV_SCRIPT@@
+T3_INSTALLED_COMMAND=@@T3_INSTALLED_COMMAND@@
+if [ -n "$T3_INSTALLED_COMMAND" ] && command -v "$T3_INSTALLED_COMMAND" >/dev/null 2>&1; then
+  exec "$T3_INSTALLED_COMMAND" "$@"
+fi
 T3_NODE_SCRIPT_PATH=@@T3_NODE_SCRIPT_PATH@@
 if [ -n "$T3_NODE_SCRIPT_PATH" ]; then
   # Dev mode: a source checkout on the remote. This is the only path that
@@ -805,6 +810,7 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
   );
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
+      T3_INSTALLED_COMMAND: shellSingleQuote(input?.installedCommand?.trim() || ""),
       T3_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
       T3_ARCHIVE_VERSION: shellSingleQuote(archiveVersion),
       T3_RELEASE_BASE_URL: shellSingleQuote(releaseBaseUrl),
@@ -1702,6 +1708,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     return yield* withTargetLock(
       key,
       Effect.gen(function* () {
+        const previousEntry = tunnels.get(key);
         const entry = yield* ensureTunnelEntry(key, resolvedTarget, runner);
 
         const pairingResult = requestOptions?.issuePairingToken
@@ -1710,7 +1717,13 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
               target: entry.target,
               operation: (authOptions) =>
                 issueRemotePairingToken(entry.target, authOptions, runner),
-            })
+            }).pipe(
+              Effect.onExit((exit) =>
+                Exit.isSuccess(exit) || previousEntry === entry
+                  ? Effect.void
+                  : closeTunnelEntry(entry),
+              ),
+            )
           : null;
         const pairingToken = pairingResult?.credential ?? null;
 

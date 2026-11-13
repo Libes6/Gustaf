@@ -6,6 +6,7 @@ import { useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { useNowSecond } from "../../hooks/useNowSecond";
+import { useT } from "../../useUiLanguage";
 
 import { Button } from "../ui/button";
 import {
@@ -27,11 +28,9 @@ function formatRemainingSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function getPromptErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "SSH verification prompt failed.";
-  return message.includes("expired") || message.includes("no longer pending")
-    ? "This SSH verification prompt expired. Try connecting again."
-    : message;
+function getPromptErrorMessage(error: unknown, fallback: string, expired: string): string {
+  const message = error instanceof Error ? error.message : fallback;
+  return message.includes("expired") || message.includes("no longer pending") ? expired : message;
 }
 
 let promptQueue: readonly DesktopSshPasswordPromptRequest[] = [];
@@ -83,6 +82,7 @@ function ActiveSshPasswordPrompt({
 }: {
   readonly request: DesktopSshPasswordPromptRequest;
 }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [responseError, setResponseError] = useState<string | null>(null);
@@ -101,9 +101,7 @@ function ActiveSshPasswordPrompt({
   const remainingSeconds = remainingMs === null ? null : Math.ceil(remainingMs / 1_000);
   const remainingLabel =
     remainingSeconds === null ? null : formatRemainingSeconds(remainingSeconds);
-  const visibleResponseError = isExpired
-    ? "This SSH verification prompt expired. Try connecting again."
-    : responseError;
+  const visibleResponseError = isExpired ? t("shell.ssh.expiredError") : responseError;
 
   const respond = async (nextPassword: string | null) => {
     if (isRespondingRef.current) {
@@ -112,7 +110,7 @@ function ActiveSshPasswordPrompt({
 
     const requestId = request.requestId;
     if (nextPassword !== null && isExpired) {
-      setResponseError("This SSH verification prompt expired. Try connecting again.");
+      setResponseError(t("shell.ssh.expiredError"));
       return;
     }
 
@@ -125,7 +123,13 @@ function ActiveSshPasswordPrompt({
     if (AsyncResult.isSuccess(result) || nextPassword === null) {
       removeSshPasswordPrompt(requestId);
     } else {
-      setResponseError(getPromptErrorMessage(Cause.squash(result.cause)));
+      setResponseError(
+        getPromptErrorMessage(
+          Cause.squash(result.cause),
+          t("shell.ssh.failed"),
+          t("shell.ssh.expiredError"),
+        ),
+      );
     }
     isRespondingRef.current = false;
     setIsResponding(false);
@@ -156,11 +160,9 @@ function ActiveSshPasswordPrompt({
     >
       <DialogPopup className="max-w-md" initialFocus={inputRef} showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>SSH verification required</DialogTitle>
+          <DialogTitle>{t("shell.ssh.title")}</DialogTitle>
           <DialogDescription>
-            Enter the password or verification code required by <code>{target}</code>. Gustaf passes
-            your response to the local SSH process and keeps it in memory to reuse for this host.
-            Gustaf does not write it to disk.
+            {t("shell.ssh.description").replace("{target}", target)}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
@@ -183,7 +185,7 @@ function ActiveSshPasswordPrompt({
                         : "shrink-0 text-xs text-muted-foreground"
                     }
                   >
-                    {isExpired ? "Expired" : remainingLabel}
+                    {isExpired ? t("shell.ssh.expired") : remainingLabel}
                   </span>
                 ) : null}
               </div>
@@ -200,19 +202,16 @@ function ActiveSshPasswordPrompt({
             {visibleResponseError ? (
               <p className="text-sm text-destructive">{visibleResponseError}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                SSH keys may replace a password, but your server can still require a verification
-                code.
-              </p>
+              <p className="text-sm text-muted-foreground">{t("shell.ssh.hint")}</p>
             )}
           </form>
         </DialogPanel>
         <DialogFooter>
           <Button disabled={isResponding} type="button" variant="outline" onClick={cancelPrompt}>
-            {isExpired ? "Dismiss" : "Cancel"}
+            {isExpired ? t("shell.ssh.dismiss") : t("shell.ssh.cancel")}
           </Button>
           <Button disabled={isResponding || isExpired} form={formId} type="submit">
-            Continue
+            {t("shell.ssh.continue")}
           </Button>
         </DialogFooter>
       </DialogPopup>

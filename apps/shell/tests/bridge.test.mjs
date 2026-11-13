@@ -234,3 +234,44 @@ NodeTest.test(
     );
   },
 );
+
+NodeTest.test(
+  "SSH preparation, session bootstrap and password cancellation use the native owner",
+  async () => {
+    const calls = [];
+    const { bridge, window } = load((name, args) => {
+      calls.push([name, args]);
+      if (args.method === "ensure")
+        return { type: "ssh-password-prompt-cancelled", message: "cancelled" };
+      return { ok: true };
+    });
+    const received = [];
+    const unsubscribe = bridge.onSshPasswordPrompt((request) => received.push(request));
+    window.__gustafSshPasswordPrompt({ requestId: "one" });
+    unsubscribe();
+    window.__gustafSshPasswordPrompt({ requestId: "two" });
+    NodeAssert.equal(received.length, 1);
+    await bridge.discoverSshHosts();
+    await bridge.resolveSshHost("alias");
+    await NodeAssert.rejects(bridge.ensureSshEnvironment({ alias: "alias" }), /cancelled/);
+    await bridge.resolveSshPasswordPrompt("one", null);
+    await bridge.fetchSshEnvironmentDescriptor("http://127.0.0.1:2345/");
+    await bridge.bootstrapSshBearerSession("http://127.0.0.1:2345/", "credential");
+    await bridge.fetchSshSessionState("http://127.0.0.1:2345/", "bearer");
+    await bridge.disconnectSshEnvironment({ alias: "alias" });
+    NodeAssert.deepEqual(
+      calls.map(([, args]) => args.method),
+      [
+        "discover",
+        "resolve",
+        "ensure",
+        "resolve-password",
+        "descriptor",
+        "bootstrap",
+        "session",
+        "disconnect",
+      ],
+    );
+    NodeAssert.ok(calls.every(([name, args]) => name === "ssh_request" && args.locale === "ru"));
+  },
+);

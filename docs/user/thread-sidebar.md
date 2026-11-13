@@ -118,8 +118,10 @@ environment. Pinned and active reordering require server support. Threads from o
 their default order until the server is updated.
 
 To generate a fresh title from the conversation, open a thread's menu and choose
-**Regenerate title**. The action is unavailable while title generation is in progress
-or when the connected environment needs a server update.
+**Regenerate title**, or assign `thread.regenerateTitle` in
+[Keybindings](./keybindings.md#commands-with-special-behavior). The action is unavailable
+while title generation is in progress or when the connected environment needs a server
+update.
 
 To change how titles are written, add **Thread title instructions** in **Settings → Threads →
 Text generation**, under Advanced, such as a length limit or an identifier to put first. They apply to new and

@@ -45,7 +45,7 @@ of the first handshake.
 
 ## Pairing
 
-1. Settings → Remote access → Connect a phone shows `gustaf://relay-pair?…`: relay origin, host
+1. Settings → Sharing & access → Connect a phone shows `gustaf://relay-pair?…`: relay origin, host
    device id, host static key, a one-time secret (5 minutes, burned on first use) and the name.
 2. The phone handshakes through the relay and sends its name and the secret in the third message.
 3. The computer lists it under "Allow …?" with a safety code; nothing reaches the local server before

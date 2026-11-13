@@ -41,6 +41,7 @@ import { LocalEnvironmentSetting } from "./LocalEnvironmentSetting";
 import { searchableSetting } from "./settingsSearch";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
+import { RelayHostSettingsSection } from "./RelayHostSettings";
 import { LinkedEnvironmentsSettings } from "./LinkedEnvironmentsSettings";
 import { usePeerLinkHosts } from "~/state/peerLinks";
 import { LoadBalancingSettings } from "./LoadBalancingSettings";
@@ -1314,6 +1315,9 @@ function ConnectionsSettingsContent({
               </details>
             ) : null}
           </SettingsSection>
+
+          {/* The relay reaches this computer, so it shows only beside this computer's access. */}
+          {isPrimaryAccess ? <RelayHostSettingsSection /> : null}
 
           {canReadAccess || canWriteAccess ? (
             <FoldedSettingsSection
