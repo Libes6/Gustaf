@@ -231,10 +231,63 @@ pub(crate) fn open_external_url(url: &tauri::Url) {
         command.arg("url.dll,FileProtocolHandler");
         command
     } else {
-        Command::new("xdg-open")
+        let mut command = Command::new("xdg-open");
+        if let Ok(app_dir) = std::env::var("APPDIR") {
+            // `vars()` panics on a non-UTF-8 entry; those are left as they are.
+            let vars = std::env::vars_os().filter_map(|(key, value)| {
+                Some((key.into_string().ok()?, value.into_string().ok()?))
+            });
+            for (key, value) in appimage_env_changes(vars, &app_dir) {
+                match value {
+                    Some(value) => command.env(key, value),
+                    None => command.env_remove(key),
+                };
+            }
+        }
+        command
     };
     command.arg(url.as_str());
     let _ = command.spawn();
+}
+
+/// The AppImage's AppRun points PATH, libraries and GTK modules into its mount; the browser
+/// started from here must load the system's. Returns the variables to change: `None` removes.
+fn appimage_env_changes(
+    vars: impl Iterator<Item = (String, String)>,
+    app_dir: &str,
+) -> Vec<(String, Option<String>)> {
+    let app_dir = app_dir.trim_end_matches('/');
+    if app_dir.is_empty() {
+        return Vec::new();
+    }
+    let under_app_dir = |segment: &str| {
+        segment == app_dir
+            || segment
+                .strip_prefix(app_dir)
+                .is_some_and(|rest| rest.starts_with('/'))
+    };
+    vars.filter_map(|(key, value)| {
+        if matches!(key.as_str(), "APPIMAGE" | "APPDIR" | "ARGV0" | "OWD") {
+            return Some((key, None));
+        }
+        if !value.contains(app_dir) {
+            return None;
+        }
+        let segments: Vec<&str> = value.split(':').collect();
+        let kept: Vec<&str> = segments
+            .iter()
+            .copied()
+            .filter(|segment| !segment.is_empty() && !under_app_dir(segment))
+            .collect();
+        if kept.len() == segments.len() {
+            None
+        } else if kept.is_empty() {
+            Some((key, None))
+        } else {
+            Some((key, Some(kept.join(":"))))
+        }
+    })
+    .collect()
 }
 
 fn set_dock_icon() {
@@ -468,7 +521,28 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_external_browser_url, pairing_url_from_line};
+    use super::{appimage_env_changes, is_external_browser_url, pairing_url_from_line};
+
+    #[test]
+    fn links_opened_from_an_appimage_drop_its_mount_paths() {
+        let app_dir = "/tmp/.mount_Gustaf1";
+        let vars = [
+            ("APPDIR", app_dir.to_owned()),
+            ("PATH", format!("{app_dir}/usr/bin:/usr/bin")),
+            ("LD_LIBRARY_PATH", format!("{app_dir}/usr/lib")),
+            ("HOME", "/home/user".to_owned()),
+            ("OTHER", "/tmp/.mount_Gustaf10/lib".to_owned()),
+        ]
+        .map(|(key, value)| (key.to_owned(), value));
+        assert_eq!(
+            appimage_env_changes(vars.into_iter(), &format!("{app_dir}/")),
+            vec![
+                ("APPDIR".to_owned(), None),
+                ("PATH".to_owned(), Some("/usr/bin".to_owned())),
+                ("LD_LIBRARY_PATH".to_owned(), None),
+            ]
+        );
+    }
 
     #[test]
     fn reads_the_pairing_url_from_the_server_log() {
