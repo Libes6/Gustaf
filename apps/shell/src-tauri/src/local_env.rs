@@ -226,6 +226,22 @@ fn schedule_relaunch(app: tauri::AppHandle) {
     });
 }
 
+/// Declining leaves the setting as it was and answers with the unchanged state, which the
+/// page shows like any other result.
+fn apply_with_relaunch(
+    app: tauri::AppHandle,
+    settings: ShellSettings,
+    endpoint: &str,
+) -> Result<Value, String> {
+    if !crate::exit_guard::confirm(&app, crate::exit_guard::Exit::Restart) {
+        return Ok(exposure_state_value(&read_settings(&app), endpoint));
+    }
+    write_settings(&app, &settings)?;
+    let value = exposure_state_value(&settings, endpoint);
+    schedule_relaunch(app);
+    Ok(value)
+}
+
 fn read_settings(app: &tauri::AppHandle) -> ShellSettings {
     if let Some(managed) = app.try_state::<Mutex<ShellSettings>>() {
         if let Ok(guard) = managed.lock() {
@@ -300,10 +316,7 @@ pub(crate) async fn set_server_exposure_mode(
     off_main_thread(move || {
         let mut settings = read_settings(&app);
         settings.exposure_mode = parsed;
-        write_settings(&app, &settings)?;
-        let value = exposure_state_value(&settings, &endpoint);
-        schedule_relaunch(app);
-        Ok(value)
+        apply_with_relaunch(app, settings, &endpoint)
     })
     .await
 }
@@ -324,10 +337,7 @@ pub(crate) async fn set_tailscale_serve_enabled(
         } else if settings.tailscale_serve_port == 0 {
             settings.tailscale_serve_port = DEFAULT_TAILSCALE_SERVE_PORT;
         }
-        write_settings(&app, &settings)?;
-        let value = exposure_state_value(&settings, &endpoint);
-        schedule_relaunch(app);
-        Ok(value)
+        apply_with_relaunch(app, settings, &endpoint)
     })
     .await
 }

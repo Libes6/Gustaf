@@ -178,6 +178,19 @@ export const layer = HttpApiBuilder.group(
         }),
       )
       .handle(
+        "workingThreads",
+        Effect.fn("environment.orchestration.workingThreads")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          return yield* threadManagement.countWorkingThreads().pipe(
+            Effect.map((workingThreads) => ({ workingThreads })),
+            Effect.catch((cause) =>
+              failEnvironmentInternal("orchestration_snapshot_failed", cause),
+            ),
+          );
+        }),
+      )
+      .handle(
         "threadSnapshot",
         Effect.fn("environment.orchestration.threadSnapshot")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);
