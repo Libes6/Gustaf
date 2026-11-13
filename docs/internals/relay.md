@@ -85,8 +85,11 @@ Encryption does not help against a compromised device or a malicious app update.
 - Sockets that die silently (sleep, network change) are found by `ping`/`pong` control messages:
   the host pings every 25 s and reconnects after 60 s of silence; the phone pings when idle and
   before new work on a quiet tunnel.
-- Not carried: the device hub video stream. React Native `Image` loads URLs natively, so media at a
-  relay origin needs to go through `fetch` first.
+- Native views (image, video, PDF, sharing) load URLs themselves and cannot reach the made-up
+  relay origin. `apps/mobile/src/features/relay/relayAssetFiles.ts` downloads such a URL through
+  the tunnel into the cache first, so the whole file sits in memory once. WebViews that load an
+  environment page by URL (HTML file previews, rendered HTML) and the device hub video stream
+  are not carried.
 
 ## Open
 
