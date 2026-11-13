@@ -6,6 +6,7 @@ mod connection_storage;
 mod diagnostics;
 mod ipc_scope;
 mod local_env;
+mod navigation;
 mod network;
 mod server_process;
 mod shell_settings;
@@ -532,13 +533,14 @@ pub fn run() {
             let relay_app = app.handle().clone();
             std::thread::spawn(move || account::sync_relay_credential(&relay_app));
             account::run_heartbeat(app.handle().clone());
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
+            let window =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url.clone()));
             #[cfg(target_os = "macos")]
             let window = window
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
                 .hidden_title(true)
                 .traffic_light_position(tauri::LogicalPosition::new(16.0, 20.0));
-            window
+            let window = window
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
@@ -551,12 +553,22 @@ pub fn run() {
                     platform,
                 ))
                 // Editor and mail links have no page to load; their own app opens them.
-                .on_navigation(|url| {
+                .on_navigation(move |url| {
                     if bridge::is_handoff_url(url) {
                         open_external_url(url);
                         return false;
                     }
-                    true
+                    if navigation::deciding_main_frame() != Some(true) {
+                        return true;
+                    }
+                    match navigation::decide(&app_url, url) {
+                        navigation::MainFrameNavigation::Allow => true,
+                        navigation::MainFrameNavigation::OpenInBrowser => {
+                            open_external_url(url);
+                            false
+                        }
+                        navigation::MainFrameNavigation::Refuse => false,
+                    }
                 })
                 // Without a handler the web view cancels every download.
                 .on_download(|_webview, event| {
@@ -571,6 +583,7 @@ pub fn run() {
                     tauri::webview::NewWindowResponse::Deny
                 })
                 .build()?;
+            navigation::watch_frames(&window);
             app.manage(Mutex::new(Some(server)));
             Ok(())
         })
