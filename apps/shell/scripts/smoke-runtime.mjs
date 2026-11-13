@@ -66,6 +66,11 @@ function shellCommands(bearer) {
     server_exposure_state: () => exposure,
     advertised_endpoints: () => [],
     dropped_paths: () => [],
+    client_config: () => ({
+      announcements: [],
+      update: { required: false, minimumVersion: null, message: null },
+      flags: {},
+    }),
     update_state: () => ({
       enabled: false,
       status: "disabled",
