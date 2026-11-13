@@ -8,6 +8,7 @@ import { findEnvironmentUpdate } from "./environment-maintenance";
 
 export interface EnvironmentReleaseCheck {
   readonly fromVersion: string;
+  readonly desktopManaged: boolean;
   readonly targetVersion: string | null;
 }
 
@@ -32,11 +33,11 @@ const asError = (cause: unknown) =>
  * reports through a separate description request.
  */
 export const environmentReleaseCheckAtom = Atom.family((environmentId: EnvironmentId) =>
-  Atom.fn((readServerVersion: () => Promise<string>) =>
+  Atom.fn((readServerVersion: () => Promise<{ version: string; desktopManaged: boolean }>) =>
     Effect.gen(function* () {
-      const fromVersion = yield* Effect.tryPromise({ try: readServerVersion, catch: asError });
+      const host = yield* Effect.tryPromise({ try: readServerVersion, catch: asError });
       const targetVersion = yield* Effect.tryPromise({
-        try: (signal) => findEnvironmentUpdate(fromVersion, signal),
+        try: (signal) => findEnvironmentUpdate(host.version, signal, host.desktopManaged),
         catch: asError,
       }).pipe(
         Effect.timeoutOrElse({
@@ -49,7 +50,11 @@ export const environmentReleaseCheckAtom = Atom.family((environmentId: Environme
             ),
         }),
       );
-      return { fromVersion, targetVersion } satisfies EnvironmentReleaseCheck;
+      return {
+        fromVersion: host.version,
+        desktopManaged: host.desktopManaged,
+        targetVersion,
+      } satisfies EnvironmentReleaseCheck;
     }),
   ).pipe(Atom.withLabel(`mobile:environment-release-check:${environmentId}`)),
 );

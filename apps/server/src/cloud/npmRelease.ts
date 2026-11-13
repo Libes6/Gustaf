@@ -3,7 +3,11 @@ import {
   ServerNpmReleaseInput,
   type ServerNpmRelease,
 } from "@t3tools/contracts";
-import { npmReleaseDatabaseMigration } from "@t3tools/shared/cliRelease";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import {
+  GUSTAF_UPDATE_MANIFEST_URL,
+  npmReleaseDatabaseMigration,
+} from "@t3tools/shared/cliRelease";
 import { resolveCommandPath } from "@t3tools/shared/shell";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
@@ -58,6 +62,27 @@ function toRelease(spec: string, json: string) {
 export const make = Effect.fn("NpmRelease.make")(function* () {
   const runner = yield* ProcessRunner.ProcessRunner;
   const http = yield* HttpClient.HttpClient;
+  const gustafDesktop = (yield* HostProcess.Environment).GUSTAF_APP_VERSION?.trim();
+  const desktopRelease = yield* Cache.make({
+    capacity: 1,
+    timeToLive: Duration.minutes(1),
+    lookup: Effect.fn("NpmRelease.gustafDesktop")(function* (_key: string) {
+      const response = yield* http.get(GUSTAF_UPDATE_MANIFEST_URL).pipe(
+        Effect.timeout(Duration.seconds(15)),
+        Effect.mapError(
+          () => new ServerNpmReleaseError({ reason: "Could not check Gustaf releases." }),
+        ),
+      );
+      if (response.status !== 200)
+        return yield* new ServerNpmReleaseError({ reason: "Could not check Gustaf releases." });
+      const json = yield* response.text.pipe(
+        Effect.mapError(
+          () => new ServerNpmReleaseError({ reason: "Invalid Gustaf release manifest." }),
+        ),
+      );
+      return yield* toRelease("latest", json);
+    }),
+  });
   const lookupPublic = Effect.fn("NpmRelease.lookupPublic")(function* (spec: string) {
     const unreachable = new ServerNpmReleaseError({
       reason: "npm is not installed and the public npm registry could not be reached.",
@@ -122,6 +147,7 @@ export const make = Effect.fn("NpmRelease.make")(function* () {
           () => new ServerNpmReleaseError({ reason: "Invalid release version or track." }),
         ),
       );
+      if (gustafDesktop) return yield* Cache.get(desktopRelease, "latest");
       return yield* Cache.get(cache, spec);
     }),
   });

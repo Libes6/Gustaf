@@ -166,3 +166,42 @@ it("only displays the safe release error, not arbitrary transport diagnostics", 
     npmReleaseFailureMessage(Cause.fail(new Error("sensitive transport details"))),
   ).not.toContain("sensitive");
 });
+
+it.effect("checks the Gustaf desktop manifest without querying the upstream runtime registry", () =>
+  Effect.gen(function* () {
+    const query = setup();
+    vi.mocked(serverEnvironment.configValueAtom).mockImplementation((id) => {
+      const config = configFor(id);
+      return Atom.make({
+        ...config,
+        environment: {
+          ...config.environment,
+          capabilities: {
+            ...config.environment.capabilities,
+            serverSelfUpdate: "desktop-managed" as const,
+          },
+        },
+      });
+    });
+    const fetch = vi.fn().mockResolvedValue(Response.json({ version: "0.14.0" }));
+    vi.stubGlobal("fetch", fetch);
+    const registry = AtomRegistry.make();
+    const release = npmReleaseAtom("latest");
+    const unmount = registry.mount(release);
+    try {
+      expect(yield* AtomRegistry.getResult(registry, release, { suspendOnWaiting: true })).toEqual({
+        version: "0.14.0",
+        databaseMigration: undefined,
+      });
+      expect(fetch).toHaveBeenCalledWith(
+        "https://github.com/Libes6/Gustaf/releases/latest/download/latest.json",
+        expect.any(Object),
+      );
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      unmount();
+      registry.dispose();
+      vi.unstubAllGlobals();
+    }
+  }),
+);
