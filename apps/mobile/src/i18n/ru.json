@@ -1729,5 +1729,7 @@
   "Search failed": "Поиск не удался",
   "Couldn't search messages": "Не удалось выполнить поиск по сообщениям",
   "Couldn't search thread messages": "Не удалось выполнить поиск по сообщениям тредов",
-  "Couldn't search messages for \"{query}\". Change the search to try again.": "Не удалось выполнить поиск сообщений по запросу «{query}». Измените запрос и попробуйте снова."
+  "Couldn't search messages for \"{query}\". Change the search to try again.": "Не удалось выполнить поиск сообщений по запросу «{query}». Измените запрос и попробуйте снова.",
+  "Waiting on a subagent": "Ожидание субагента",
+  "Waiting on {count} subagents": "Ожидание субагентов: {count}"
 }
