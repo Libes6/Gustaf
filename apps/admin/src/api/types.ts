@@ -25,6 +25,7 @@ export interface Overview {
   readonly signupsByDay: ReadonlyArray<{ readonly date: string; readonly count: number }>;
   readonly build: { readonly version: string; readonly commit: string; readonly startedAt: string };
   readonly db: { readonly ok: boolean; readonly migrations: number };
+  readonly relay: { readonly bytesThisMonth: number; readonly users: number };
 }
 
 export interface AdminUser {
@@ -62,6 +63,8 @@ export interface UserSession {
 export interface AdminUserDetail extends AdminUser {
   readonly devices: ReadonlyArray<UserDevice>;
   readonly sessions: ReadonlyArray<UserSession>;
+  /** Bytes through the relay per UTC month (`YYYY-MM`), newest first. */
+  readonly relay: ReadonlyArray<{ readonly month: string; readonly bytes: number }>;
 }
 
 export interface AdminDevice extends UserDevice {

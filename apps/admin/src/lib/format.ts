@@ -23,6 +23,18 @@ export function formatCount(value: number): string {
   return count.format(value);
 }
 
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
+
+export function formatBytes(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : value.toFixed(1)} ${BYTE_UNITS[unit]}`;
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return strings.common.never;
   const date = new Date(iso);

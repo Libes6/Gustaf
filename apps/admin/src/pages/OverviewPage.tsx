@@ -5,7 +5,7 @@ import type { Overview } from "../api/types";
 import { ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
 import { Card, CardTitle } from "../components/ui/card";
-import { formatCount, formatDateTime, formatDay, shortCommit } from "../lib/format";
+import { formatBytes, formatCount, formatDateTime, formatDay, shortCommit } from "../lib/format";
 import { strings } from "../strings";
 import { PageTitle } from "./AppLayout";
 
@@ -15,13 +15,13 @@ function Stat({
   hint,
 }: {
   readonly title: string;
-  readonly value: number;
+  readonly value: string;
   readonly hint?: string;
 }) {
   return (
     <Card>
       <CardTitle>{title}</CardTitle>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(value)}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </Card>
   );
@@ -103,22 +103,27 @@ export function OverviewPage() {
 function OverviewContent({ data }: { readonly data: Overview }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           title={strings.overview.users}
-          value={data.users.total}
+          value={formatCount(data.users.total)}
           hint={strings.overview.usersHint(data.users.last7d, data.users.banned)}
         />
         <Stat
           title={strings.overview.devices}
-          value={data.devices.total}
+          value={formatCount(data.devices.total)}
           hint={strings.overview.devicesHint(
             data.devices.active7d,
             data.devices.byKind.computer,
             data.devices.byKind.phone,
           )}
         />
-        <Stat title={strings.overview.sessions} value={data.sessions.active} />
+        <Stat title={strings.overview.sessions} value={formatCount(data.sessions.active)} />
+        <Stat
+          title={strings.overview.relay}
+          value={formatBytes(data.relay.bytesThisMonth)}
+          hint={strings.overview.relayHint(data.relay.users)}
+        />
       </div>
       <Card>
         <CardTitle>{strings.overview.signups}</CardTitle>

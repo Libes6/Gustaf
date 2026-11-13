@@ -5,6 +5,7 @@ import { strings } from "../strings";
 import {
   auditActionLabel,
   errorMessage,
+  formatBytes,
   formatDay,
   formatMeta,
   formatRelative,
@@ -25,6 +26,13 @@ describe("formatting", () => {
   it("reads API days as UTC calendar days", () => {
     expect(formatDay("2026-11-01")).toBe("1 Nov");
     expect(formatDay("garbage")).toBe("garbage");
+  });
+
+  it("formats byte counts in binary units", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(1023)).toBe("1023 B");
+    expect(formatBytes(1536)).toBe("1.5 KB");
+    expect(formatBytes(100 * 1024 ** 3)).toBe("100.0 GB");
   });
 
   it("shortens full commit hashes only", () => {
