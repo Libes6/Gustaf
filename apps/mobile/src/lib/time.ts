@@ -1,20 +1,23 @@
-export function relativeTime(input: string, nowMs: number = Date.now()): string {
+import { formatDurationUnit } from "../i18n";
+
+export function relativeTime(input: string, nowMs: number = Date.now(), locale?: string): string {
+  const lessThanMinute = `<${formatDurationUnit(1, "m", locale)}`;
   const timestamp = Date.parse(input);
   if (Number.isNaN(timestamp)) {
-    return "<1m";
+    return lessThanMinute;
   }
 
   const deltaSeconds = Math.max(0, Math.floor((nowMs - timestamp) / 1000));
-  if (deltaSeconds < 60) return "<1m";
+  if (deltaSeconds < 60) return lessThanMinute;
 
   const deltaMinutes = Math.floor(deltaSeconds / 60);
-  if (deltaMinutes < 60) return `${deltaMinutes}m`;
+  if (deltaMinutes < 60) return formatDurationUnit(deltaMinutes, "m", locale);
 
   const deltaHours = Math.floor(deltaMinutes / 60);
-  if (deltaHours < 24) return `${deltaHours}h`;
+  if (deltaHours < 24) return formatDurationUnit(deltaHours, "h", locale);
 
   const deltaDays = Math.floor(deltaHours / 24);
-  return `${deltaDays}d`;
+  return formatDurationUnit(deltaDays, "d", locale);
 }
 
 /** Milliseconds until the relative-time label next changes. */

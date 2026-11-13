@@ -161,7 +161,7 @@ export function layoutThreadListV2RowMenuActions(input: {
           ? [
               {
                 id: "arrange-menu",
-                title: "Arrange",
+                title: t("Arrange"),
                 image: "arrow.up.arrow.down",
                 subactions: [...input.reorder],
               },
