@@ -49,7 +49,7 @@ export class DeviceGuard implements CanActivate {
   }
 }
 
-const CurrentDevice = createParamDecorator(
+export const CurrentDevice = createParamDecorator(
   (_data: unknown, context: ExecutionContext) =>
     context.switchToHttp().getRequest<DeviceRequest>().device!,
 );

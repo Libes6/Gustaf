@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
+  date,
   index,
   jsonb,
   pgEnum,
@@ -167,4 +170,48 @@ export const relayUsage = pgTable(
     bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.userId, table.month] })],
+);
+
+// AI usage counted by each user's computers (docs/internals/ai-usage.md). One row per user, UTC
+// day, provider and model; `model` is '' when the computer could not name a catalog model.
+// Token sums cover only the `measured_turns` whose provider reported both counts.
+export const aiUsageDaily = pgTable(
+  "ai_usage_daily",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    turns: bigint("turns", { mode: "number" }).notNull(),
+    measuredTurns: bigint("measured_turns", { mode: "number" }).notNull(),
+    inputTokens: bigint("input_tokens", { mode: "number" }).notNull(),
+    outputTokens: bigint("output_tokens", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.day, table.provider, table.model] }),
+    // Global summaries filter on the day range alone.
+    index("ai_usage_daily_day_idx").on(table.day),
+    check(
+      "ai_usage_daily_counts_check",
+      sql`${table.turns} >= 0 and ${table.measuredTurns} between 0 and ${table.turns} and ${table.inputTokens} >= 0 and ${table.outputTokens} >= 0`,
+    ),
+  ],
+);
+
+// Report batches already added to ai_usage_daily, so a retried upload counts once.
+export const aiUsageReport = pgTable(
+  "ai_usage_report",
+  {
+    deviceId: uuid("device_id")
+      .notNull()
+      .references(() => device.id, { onDelete: "cascade" }),
+    batchId: uuid("batch_id").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.deviceId, table.batchId] }),
+    index("ai_usage_report_received_at_idx").on(table.receivedAt),
+  ],
 );

@@ -9,6 +9,7 @@ import {
   formatDay,
   formatMeta,
   formatRelative,
+  formatTokens,
   hasMeta,
   shortCommit,
 } from "./format";
@@ -33,6 +34,12 @@ describe("formatting", () => {
     expect(formatBytes(1023)).toBe("1023 B");
     expect(formatBytes(1536)).toBe("1.5 KB");
     expect(formatBytes(100 * 1024 ** 3)).toBe("100.0 GB");
+  });
+
+  it("shows unmeasured tokens as unknown, not zero", () => {
+    expect(formatTokens(0, 0)).toBe(strings.aiUsage.unknown);
+    expect(formatTokens(0, 2)).toBe("0");
+    expect(formatTokens(12345, 1)).toBe("12,345");
   });
 
   it("shortens full commit hashes only", () => {
