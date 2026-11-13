@@ -353,6 +353,7 @@ it.each(["relay", "pairing"])(
       hostDeviceId: `expired-${stage}`,
       hostKey: "A".repeat(43),
       secret: "d".repeat(43),
+      hostName: "MacBook",
     });
     const error = "Pairing code expired.";
     if (stage === "relay") harness.relay.mockRejectedValueOnce(new Error(error));
