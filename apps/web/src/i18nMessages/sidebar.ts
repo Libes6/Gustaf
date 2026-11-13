@@ -157,6 +157,16 @@ export const sidebarMessages = {
     "sidebar.UpdateEverythingDialog.skippedCount": "{count} skipped",
     "sidebar.UpdateEverythingDialog.cancel": "Cancel",
     "sidebar.UpdateEverythingDialog.runningCount": "{count} running",
+    "sidebar.SidebarFolderDrop.needsDesktopApp": "Dropping folders needs the desktop app",
+    "sidebar.SidebarFolderDrop.needsDesktopAppDescription":
+      "Browsers do not share folder paths. Use Add project to choose a folder.",
+    "sidebar.SidebarFolderDrop.notConnected": "This computer's server is not connected yet",
+    "sidebar.SidebarFolderDrop.notConnectedDescription": "Try again when it connects.",
+    "sidebar.SidebarFolderDrop.couldNotAdd": 'Could not add "{name}"',
+    "sidebar.SidebarFolderDrop.couldNotReadPath": "Gustaf could not read the folder's path.",
+    "sidebar.SidebarFolderDrop.onlyFolders": "Only folders can be added as projects",
+    "sidebar.SidebarFolderDrop.onlyFoldersDescription": "Drop files on a thread to attach them.",
+    "sidebar.SidebarFolderDrop.dropToAdd": "Drop folders to add projects",
   },
   ru: {
     "sidebar.SidebarThreadTooltip.usageLimitReached": "Достигнут лимит использования",
@@ -316,5 +326,17 @@ export const sidebarMessages = {
     "sidebar.UpdateEverythingDialog.skippedCount": "Пропущено: {count}",
     "sidebar.UpdateEverythingDialog.cancel": "Отмена",
     "sidebar.UpdateEverythingDialog.runningCount": "Запущено: {count}",
+    "sidebar.SidebarFolderDrop.needsDesktopApp":
+      "Перетаскивание папок работает только в приложении",
+    "sidebar.SidebarFolderDrop.needsDesktopAppDescription":
+      "Браузер не сообщает путь к папке. Выберите папку через «Добавить проект».",
+    "sidebar.SidebarFolderDrop.notConnected": "Сервер этого компьютера ещё не подключён",
+    "sidebar.SidebarFolderDrop.notConnectedDescription": "Попробуйте снова после подключения.",
+    "sidebar.SidebarFolderDrop.couldNotAdd": "Не удалось добавить «{name}»",
+    "sidebar.SidebarFolderDrop.couldNotReadPath": "Gustaf не смог прочитать путь к папке.",
+    "sidebar.SidebarFolderDrop.onlyFolders": "Проектом можно сделать только папку",
+    "sidebar.SidebarFolderDrop.onlyFoldersDescription":
+      "Перетащите файлы на тред, чтобы прикрепить их.",
+    "sidebar.SidebarFolderDrop.dropToAdd": "Отпустите папки, чтобы добавить проекты",
   },
 } as const satisfies Record<UiLanguage, Record<string, string>>;
