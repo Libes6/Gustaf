@@ -32,6 +32,13 @@ const INIT_SCRIPT: &str = r#"(() => {
     for (const listener of updateListeners) listener(state);
   };
 
+  const snapShotListeners = new Set();
+  window.__gustafSnapShotEvent = (event) => {
+    for (const listener of snapShotListeners) listener(event);
+  };
+  const snapShot = (action, input = {}) => invoke("snap_shot_command", { action, input });
+  const configureSnapShot = (settings) => snapShot("configure", settings || {}).catch(console.error);
+
   const updater = Object.freeze({
     getUpdateState: () => invoke("update_state"),
     onUpdateState: (listener) => {
@@ -92,12 +99,16 @@ const INIT_SCRIPT: &str = r#"(() => {
   // Migrate the previous, port-specific browser settings only after saving succeeds.
   const getClientSettings = async () => {
     const saved = await invoke("read_client_settings");
-    if (saved !== null) return saved;
+    if (saved !== null) {
+      await configureSnapShot(saved);
+      return saved;
+    }
     const raw = window.localStorage.getItem("gustaf.clientSettings");
     if (!raw) return null;
     const settings = JSON.parse(raw);
     await invoke("write_client_settings", { settings });
     window.localStorage.removeItem("gustaf.clientSettings");
+    await configureSnapShot(settings);
     return settings;
   };
 
@@ -182,7 +193,24 @@ const INIT_SCRIPT: &str = r#"(() => {
     getLocalEnvironmentEnabled: () => true,
     getLocalEnvironmentBearerToken: () => invoke("local_environment_bearer_token"),
     getClientSettings,
-    setClientSettings: (settings) => invoke("write_client_settings", { settings }),
+    setClientSettings: async (settings) => {
+      await invoke("write_client_settings", { settings });
+      await configureSnapShot(settings);
+    },
+    getSnapShotState: () => snapShot("state"),
+    requestSnapShotPermissions: (includeAccessibility) => snapShot("permissions", { includeAccessibility }),
+    setupSnapShot: (action) => snapShot("setup", { action }),
+    checkSnapShotShortcut: (shortcut) => snapShot("check", { shortcut }),
+    setSnapShotShortcutSuppressed: (suppressed) => snapShot("suppress", { suppressed }),
+    listPendingSnapShots: () => snapShot("list"),
+    readSnapShot: (id) => snapShot("read", { id }),
+    acknowledgeSnapShot: (id) => snapShot("acknowledge", { id }),
+    setSnapShotAnimationDestination: () => snapShot("animation"),
+    dismissSnapShotAnimation: () => snapShot("animation"),
+    onSnapShotEvent: (listener) => {
+      snapShotListeners.add(listener);
+      return () => snapShotListeners.delete(listener);
+    },
     getConnectionCatalog: () => withCatalog(async () => {
       const saved = await invoke("read_connection_catalog");
       if (saved !== null) {

@@ -1,5 +1,12 @@
 # SnapShots
 
+Gustaf’s Tauri app currently supports SnapShots on macOS 12 or later. Switch to an external app and use
+the shortcut to capture its active visible window. Screen Recording permits capture; Accessibility
+is required for the global shortcut and also permits optional app text. Review or remove the
+attachment in your draft before sending. Pending captures remain in memory until saved to the
+draft, so keep Gustaf open until the attachment appears. The cross-platform details below describe
+the upstream Electron app.
+
 A SnapShot captures the window you are working in and attaches it to your current draft. The
 attachment carries the app name and window title, and when available the app icon and the window's
 accessibility data (its controls, text, and their positions in the image). Agents can use that data
