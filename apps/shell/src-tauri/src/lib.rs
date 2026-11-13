@@ -500,7 +500,8 @@ pub fn run() {
             app.manage(account::AccountStore::default());
             set_dock_icon();
             let mut settings = shell_settings::load(app.handle());
-            let mut wsl = wsl::WslRuntime::start(&settings);
+            let mut wsl =
+                wsl::WslRuntime::start(&settings, &app.package_info().version.to_string());
             if cfg!(windows) && settings.wsl_backend_enabled && settings.wsl_only && !wsl.ready() {
                 let reason = wsl.error().unwrap_or_else(|| "WSL is unavailable".into());
                 let russian = app

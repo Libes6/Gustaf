@@ -81,7 +81,7 @@ fn distros() -> Result<Vec<Distro>, String> {
 }
 
 impl WslRuntime {
-    pub(crate) fn start(settings: &ShellSettings) -> Self {
+    pub(crate) fn start(settings: &ShellSettings, app_version: &str) -> Self {
         let mut state = Self {
             server: Mutex::new(None),
             local: None,
@@ -115,6 +115,7 @@ impl WslRuntime {
             let (server, url) = crate::spawn_server(
                 cmd,
                 Some(&wsl_support::server_script(
+                    app_version,
                     port,
                     settings.wsl_only
                         && settings.exposure_mode
@@ -217,7 +218,7 @@ async fn change(
             *guard = next.clone();
         }
         drop(guard);
-        let error = app.state::<WslRuntime>().error();
+        let error = app.try_state::<WslRuntime>().and_then(|wsl| wsl.error());
         let value = state_value(&next, distros(), error);
         if changed {
             crate::local_env::schedule_relaunch(app);
@@ -303,9 +304,8 @@ pub(crate) async fn wsl_path(
             return Ok(path);
         }
         let distro = app
-            .state::<WslRuntime>()
-            .running_distro
-            .clone()
+            .try_state::<WslRuntime>()
+            .and_then(|wsl| wsl.running_distro.clone())
             .or(settings.wsl_distro)
             .or_else(|| {
                 distros()
@@ -362,8 +362,10 @@ mod tests {
 
     #[test]
     fn unavailable_state_keeps_saved_selection_and_only_mode_hides_preflight_error() {
-        let mut settings = ShellSettings::default();
-        settings.wsl_distro = Some("Ubuntu Dev".into());
+        let mut settings = ShellSettings {
+            wsl_distro: Some("Ubuntu Dev".into()),
+            ..ShellSettings::default()
+        };
         let value = state_value(&settings, Err("not installed".into()), None);
         assert_eq!(value["available"], false);
         assert_eq!(value["distro"], "Ubuntu Dev");

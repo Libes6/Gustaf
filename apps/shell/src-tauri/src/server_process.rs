@@ -2,7 +2,7 @@
 //! ignores a polite request to stop or the shell itself dies.
 
 use std::io;
-use std::process::{Child, ChildStdin, ChildStdout, Command};
+use std::process::{Child, ChildStdout, Command};
 use std::time::Duration;
 #[cfg(unix)]
 use std::time::Instant;
@@ -12,7 +12,6 @@ pub(crate) const STOP_GRACE: Duration = Duration::from_secs(8);
 
 pub(crate) struct Server {
     child: Child,
-    stdin: Option<ChildStdin>,
     #[cfg(windows)]
     job: windows_job::Job,
 }
@@ -21,15 +20,13 @@ impl Server {
     pub(crate) fn spawn(command: &mut Command) -> io::Result<Self> {
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(command, 0);
-        let mut child = command.spawn()?;
-        let stdin = child.stdin.take();
+        let child = command.spawn()?;
         // Windows has no process group to signal. A job with kill-on-close takes the
         // server's children down with it, also when the shell is killed.
         #[cfg(windows)]
         let job = windows_job::Job::containing(&child)?;
         Ok(Self {
             child,
-            stdin,
             #[cfg(windows)]
             job,
         })
@@ -37,7 +34,8 @@ impl Server {
 
     pub(crate) fn write_stdin(&mut self, script: &str) -> Result<(), String> {
         use std::io::Write;
-        self.stdin
+        self.child
+            .stdin
             .as_mut()
             .ok_or("server stdin is missing")?
             .write_all(script.as_bytes())
@@ -57,7 +55,8 @@ impl Server {
         if !matches!(self.child.try_wait(), Ok(None)) {
             return;
         }
-        let wsl = self.stdin.take().is_some();
+        // Closing a piped stdin is the WSL server's stop signal; give it the grace to exit.
+        let wsl = self.child.stdin.take().is_some();
         #[cfg(windows)]
         if wsl {
             let deadline = std::time::Instant::now() + grace;

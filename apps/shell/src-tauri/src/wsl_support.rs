@@ -20,8 +20,10 @@ pub(crate) fn parse_distros(bytes: &[u8]) -> Vec<Distro> {
     let text = if utf16 {
         String::from_utf16_lossy(
             &bytes
-                .chunks_exact(2)
-                .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|b| u16::from_le_bytes(*b))
                 .collect::<Vec<_>>(),
         )
     } else {
@@ -93,6 +95,7 @@ pub(crate) fn uses_wsl_path(
 }
 
 pub(crate) fn server_script(
+    app_version: &str,
     port: u16,
     network_accessible: bool,
     tailscale_port: Option<u16>,
@@ -105,9 +108,13 @@ pub(crate) fn server_script(
     if let Some(port) = tailscale_port {
         exposure.push_str(&format!(" --tailscale-serve --tailscale-serve-port {port}"));
     }
+    let app_version: String = app_version
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+        .collect();
     // One parsed line leaves stdin to the watchdog; EOF also cleans up after a host crash.
     format!(
-        r#"set -eu; cli="$HOME/.gustaf/runtime/t3"; test -x "$cli" || {{ echo 'Install the Linux Gustaf runtime at ~/.gustaf/runtime (including t3 and its dependencies) in this WSL distro'; exit 127; }}; command -v setsid >/dev/null; setsid "$cli" --mode web --no-browser --no-auto-bootstrap-project-from-cwd {exposure} --port {port} --base-dir "$HOME/.gustaf" & server=$!; (IFS= read -r _ || true; kill -TERM -- -"$server" 2>/dev/null || true; sleep 2; kill -KILL -- -"$server" 2>/dev/null || true) <&0 >/dev/null 2>&1 & guard=$!; trap 'kill -KILL -- -"$server" 2>/dev/null || true; kill "$guard" 2>/dev/null || true' EXIT HUP INT TERM; wait "$server"
+        r#"set -eu; cli="$HOME/.gustaf/runtime/t3"; test -x "$cli" || {{ echo 'Install the Linux Gustaf runtime at ~/.gustaf/runtime (including t3 and its dependencies) in this WSL distro'; exit 127; }}; command -v setsid >/dev/null; GUSTAF_APP_VERSION='{app_version}' setsid "$cli" --mode web --no-browser --no-auto-bootstrap-project-from-cwd {exposure} --port {port} --base-dir "$HOME/.gustaf" & server=$!; (IFS= read -r _ || true; kill -TERM -- -"$server" 2>/dev/null || true; sleep 2; kill -KILL -- -"$server" 2>/dev/null || true) <&0 >/dev/null 2>&1 & guard=$!; trap 'kill -KILL -- -"$server" 2>/dev/null || true; kill "$guard" 2>/dev/null || true' EXIT HUP INT TERM; wait "$server"
 "#
     )
 }
@@ -135,13 +142,14 @@ mod tests {
         );
         assert_eq!(unc_path(r"C:\Users\Max"), None);
         assert_eq!(unc_path(r"\\server\share"), None);
-        let script = server_script(43321, false, None);
+        let script = server_script("0.12.0'; rm -rf ~", 43321, false, None);
+        assert!(script.contains("GUSTAF_APP_VERSION='0.12.0rm-rf' setsid"));
         assert!(script.contains("--port 43321"));
         assert!(script.contains("--base-dir \"$HOME/.gustaf\""));
         assert!(script.contains("kill -KILL"));
         assert_eq!(script.lines().count(), 1);
         assert!(script.contains("--host 127.0.0.1"));
-        let exposed = server_script(43321, true, Some(443));
+        let exposed = server_script("0.12.0", 43321, true, Some(443));
         assert!(
             exposed.contains("--host 0.0.0.0 --lan --tailscale-serve --tailscale-serve-port 443")
         );
