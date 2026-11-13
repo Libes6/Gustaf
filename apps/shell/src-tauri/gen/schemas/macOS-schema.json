@@ -297,6 +297,12 @@
           "markdownDescription": "Enables the set_window_theme command without any pre-configured scope."
         },
         {
+          "description": "Enables the snap_shot_command command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-snap-shot-command",
+          "markdownDescription": "Enables the snap_shot_command command without any pre-configured scope."
+        },
+        {
           "description": "Enables the update_check command without any pre-configured scope.",
           "type": "string",
           "const": "allow-update-check",
@@ -475,6 +481,12 @@
           "type": "string",
           "const": "deny-set-window-theme",
           "markdownDescription": "Denies the set_window_theme command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the snap_shot_command command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-snap-shot-command",
+          "markdownDescription": "Denies the snap_shot_command command without any pre-configured scope."
         },
         {
           "description": "Denies the update_check command without any pre-configured scope.",

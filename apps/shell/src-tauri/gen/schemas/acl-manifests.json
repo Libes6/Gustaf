@@ -117,6 +117,11 @@
         "description": "Enables the set_window_theme command without any pre-configured scope.",
         "commands": { "allow": ["set_window_theme"], "deny": [] }
       },
+      "allow-snap-shot-command": {
+        "identifier": "allow-snap-shot-command",
+        "description": "Enables the snap_shot_command command without any pre-configured scope.",
+        "commands": { "allow": ["snap_shot_command"], "deny": [] }
+      },
       "allow-update-check": {
         "identifier": "allow-update-check",
         "description": "Enables the update_check command without any pre-configured scope.",
@@ -266,6 +271,11 @@
         "identifier": "deny-set-window-theme",
         "description": "Denies the set_window_theme command without any pre-configured scope.",
         "commands": { "allow": [], "deny": ["set_window_theme"] }
+      },
+      "deny-snap-shot-command": {
+        "identifier": "deny-snap-shot-command",
+        "description": "Denies the snap_shot_command command without any pre-configured scope.",
+        "commands": { "allow": [], "deny": ["snap_shot_command"] }
       },
       "deny-update-check": {
         "identifier": "deny-update-check",

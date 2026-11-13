@@ -8,6 +8,7 @@ mod local_env;
 mod network;
 mod server_process;
 mod shell_settings;
+mod snap_shot;
 mod updater;
 
 use std::collections::VecDeque;
@@ -438,6 +439,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             bridge::dropped_paths,
             bridge::drag_window,
+            snap_shot::snap_shot_command,
             connection_storage::read_connection_catalog,
             connection_storage::write_connection_catalog,
             bridge::reveal_window,
@@ -471,6 +473,7 @@ pub fn run() {
         ])
         .setup(|app| {
             updater::initialize(app)?;
+            snap_shot::initialize(app.handle());
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
