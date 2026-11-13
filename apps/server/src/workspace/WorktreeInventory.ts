@@ -51,7 +51,7 @@ const make = Effect.gen(function* () {
           Effect.catch(() => {
             errors.push({
               projectId: project.projectId,
-              message: "Не удалось прочитать Git worktrees проекта.",
+              message: "Could not read the project's Git worktrees.",
             });
             return Effect.succeed([]);
           }),
@@ -107,11 +107,11 @@ const make = Effect.gen(function* () {
           const status = yield* workflow.localStatus({ cwd: entry.path }).pipe(
             Effect.map((status) => ({
               hasWorkingTreeChanges: status.isRepo ? status.hasWorkingTreeChanges : null,
-              error: status.isRepo ? null : "Папка больше не является Git-репозиторием.",
+              error: status.isRepo ? null : "The folder is no longer a Git repository.",
             })),
             Effect.orElseSucceed(() => ({
               hasWorkingTreeChanges: null,
-              error: "Не удалось проверить изменения файлов.",
+              error: "Could not check for file changes.",
             })),
           );
           entries.set(key, { ...entry, ...status });
