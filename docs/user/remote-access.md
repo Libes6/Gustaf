@@ -15,7 +15,8 @@ connected and how much they send, not prompts, files, or tool output.
 1. On the computer, open **Settings → Account**, choose **Sign in with GitHub**, and register this
    computer.
 2. On the phone, sign in under **Settings → Account** and register the phone.
-3. On the computer, open **Settings → Remote access** and choose **Connect a phone**.
+3. On the computer, open **Settings → Sharing & access** and, under **Any network (Gustaf relay)**,
+   choose **Connect a phone**.
 4. On the phone, open **Add route** and scan the code.
 5. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
 
