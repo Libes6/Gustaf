@@ -37,6 +37,7 @@
     "allow-account-devices",
     "allow-account-register-device",
     "allow-account-revoke-device",
-    "allow-client-config"
+    "allow-client-config",
+    "allow-account-report-problem"
   ]
 }

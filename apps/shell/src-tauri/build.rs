@@ -33,6 +33,7 @@ fn main() {
             "account_register_device",
             "account_revoke_device",
             "client_config",
+            "account_report_problem",
         ]),
     ))
     .expect("failed to run tauri-build");

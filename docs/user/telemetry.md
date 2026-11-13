@@ -12,6 +12,18 @@ are sent only when they appear in a provider's public model list.
 Product events do not include prompts, responses, file contents, authentication tokens, conversation IDs,
 raw provider events, or child-agent output.
 
+## Gustaf AI usage
+
+When this computer is registered to your Gustaf account (**Settings → Account**), it reports how
+you use AI providers to that account: per day, the provider, the model when it appears in a
+provider's public model list, the number of turns, and input and output token counts when the
+provider reports them. Gustaf administrators can see these totals per account. Reports never include
+prompts, responses, code, tool calls, file paths, keys, or error messages.
+
+Only turns that finish while the computer is registered are counted; earlier history is never
+uploaded. `T3CODE_TELEMETRY_ENABLED=false` and the managed policy's telemetry switch also stop
+these reports.
+
 ## Relay connection diagnostics
 
 T3 Code sends relay connection traces to Axiom to diagnose T3 Connect connectivity. These are

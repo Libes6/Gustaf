@@ -97,6 +97,7 @@ import { pruneNewTaskBranchCheckouts } from "./features/threads/NewTaskDraftRout
 import { installAppUpdateChecks } from "./features/updates/app-updates";
 import { ClientConfigBanners } from "./features/client-config/ClientConfigBanners";
 import { installClientConfig } from "./features/client-config/clientConfig";
+import { installAccountHeartbeat } from "./features/account/useAccount";
 
 import "../global.css";
 
@@ -203,6 +204,7 @@ const appServiceDisposers = [
   installAppShortcuts(linkToAppPath),
   installAppUpdateChecks(),
   installClientConfig(),
+  installAccountHeartbeat(),
   installShowcaseCapture(rootPathnameFromState),
 ];
 disposeOnFoundationReplace(typeof module === "undefined" ? undefined : module.hot, () => {

@@ -104,6 +104,13 @@ const parseJson = (text: string): unknown => {
 const decodeStoredCredential = Schema.decodeUnknownOption(StoredCredential);
 const decodeStoredDevices = Schema.decodeUnknownOption(StoredDevices);
 const decodeCredential = (text: string) => decodeStoredCredential(parseJson(text));
+
+/** This computer's Gustaf cloud device credential, which the desktop shell hands over. */
+export const readCloudCredential = (secrets: ServerSecretStore.ServerSecretStore["Service"]) =>
+  secrets.get(CREDENTIAL_SECRET).pipe(
+    Effect.map(Option.flatMap((bytes) => decodeCredential(new TextDecoder().decode(bytes)))),
+    Effect.orElseSucceed(() => Option.none<StoredCredential>()),
+  );
 const decodeDevices = (text: string) => decodeStoredDevices(parseJson(text));
 const encodeJson = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 

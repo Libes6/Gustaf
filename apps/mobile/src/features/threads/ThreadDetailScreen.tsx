@@ -9,7 +9,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult, Atom } from "effect/reactivity";
 import * as Dialog from "../../components/ui/Dialog";
-import { t } from "../../i18n";
+import { localizeWakeLabel, t } from "../../i18n";
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import { mobilePreferencesAtom } from "../../state/preferences";
 import { parseThreadKey, threadKey } from "@t3tools/client-runtime/state/entities";
@@ -842,11 +842,18 @@ function ThreadDetailBody(
       const state = lifecycleSnoozed ? "snoozed" : settled ? "settled" : "woke";
       const label =
         lifecycleSnoozed && snoozedUntil !== null
-          ? `Snoozed, wakes in ${snoozeWakeLabel(snoozedUntil, { now: lifecycleNow })}`
+          ? t("Snoozed, wakes in {time}").replace(
+              "{time}",
+              localizeWakeLabel(snoozeWakeLabel(snoozedUntil, { now: lifecycleNow })),
+            )
           : settled
-            ? "Settled"
-            : "Woke from snooze";
-      const actionLabel = lifecycleSnoozed ? "Wake now" : settled ? "Un-settle" : "Dismiss";
+            ? t("Settled")
+            : t("Woke from snooze");
+      const actionLabel = lifecycleSnoozed
+        ? t("Wake now")
+        : settled
+          ? t("Un-settle")
+          : t("Dismiss");
       return {
         kind: "lifecycle",
         state,
@@ -854,10 +861,10 @@ function ThreadDetailBody(
         action: {
           label: statusPending
             ? lifecycleSnoozed
-              ? "Waking..."
+              ? t("Waking...")
               : settled
-                ? "Un-settling..."
-                : "Dismissing..."
+                ? t("Un-settling...")
+                : t("Dismissing...")
             : actionLabel,
           accessibilityLabel: actionLabel,
           disabled: !props.canOperateThread || statusPending,

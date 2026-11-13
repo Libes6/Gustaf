@@ -219,6 +219,9 @@ NodeTest.test(
         if (corsEnabled) NodeAssert.equal(preflight.status, 204);
         const anonymous = await fetch(`${url}/v1/admin/overview`, { headers: { origin: ADMIN } });
         NodeAssert.equal(anonymous.status, 401);
+        for (const path of ["relay", "system", "releases"]) {
+          NodeAssert.equal((await fetch(`${url}/v1/admin/${path}`)).status, 401, path);
+        }
         NodeAssert.equal(
           anonymous.headers.get("access-control-allow-credentials"),
           corsEnabled ? "true" : null,

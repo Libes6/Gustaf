@@ -113,6 +113,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     listDevices: () => invoke("account_devices"),
     registerThisComputer: () => invoke("account_register_device"),
     revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
+    reportProblem: ({ message, attachLogs }) =>
+      invoke("account_report_problem", { message, attachLogs }),
   });
 
   window.gustafShell = Object.freeze({

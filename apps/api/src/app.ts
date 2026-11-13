@@ -9,6 +9,8 @@ import { AccountController } from "./account.controller.js";
 import { AdminController } from "./admin/admin.controller.js";
 import { ADMIN_ORIGINS, AdminGuard } from "./admin/admin.guard.js";
 import { AdminService } from "./admin/admin.service.js";
+import { OpsController } from "./admin/ops.controller.js";
+import { OpsService } from "./admin/ops.service.js";
 import { APP_SIGN_IN_PATH } from "./auth/app-sign-in.js";
 import { AppSignInController } from "./auth/app-sign-in.controller.js";
 import { AppSignInService } from "./auth/app-sign-in.service.js";
@@ -28,6 +30,10 @@ import { HealthController } from "./health.controller.js";
 import { OwnershipService } from "./ownership.js";
 import { RelayController } from "./relay/relay.controller.js";
 import { RelayService } from "./relay/relay.service.js";
+import { AdminReportsController, ReportsController } from "./reports/reports.controller.js";
+import { ReportsService } from "./reports/reports.service.js";
+import { UsageController } from "./usage/usage.controller.js";
+import { UsageService } from "./usage/usage.service.js";
 
 @Module({})
 // oxlint-disable-next-line typescript/no-extraneous-class -- Nest requires a decorated module class.
@@ -42,7 +48,7 @@ export function resolveRequestId(incoming: string | string[] | undefined) {
 }
 
 export async function createApp(
-  config: Pick<AppConfig, "databaseUrl" | "trustProxy" | "auth" | "build">,
+  config: Pick<AppConfig, "databaseUrl" | "trustProxy" | "auth" | "build" | "ops">,
 ) {
   const logger = new ConsoleLogger("GustafCloud", { json: true });
   const database = {
@@ -56,8 +62,12 @@ export async function createApp(
           DevicesController,
           AppSignInController,
           AdminController,
+          OpsController,
           RelayController,
           AdminClientConfigController,
+          ReportsController,
+          AdminReportsController,
+          UsageController,
         ],
         providers: [
           {
@@ -70,8 +80,10 @@ export async function createApp(
           DeviceGuard,
           DevicesService,
           OwnershipService,
+          UsageService,
           { provide: ADMIN_ORIGINS, useValue: config.auth.adminOrigins },
           AdminGuard,
+          ReportsService,
           {
             provide: AdminService,
             useFactory: (db: DatabaseService) => new AdminService(db, config.build),
@@ -82,6 +94,12 @@ export async function createApp(
             useFactory: (db: DatabaseService, devices: DevicesService) =>
               new RelayService(db, devices, config.auth!.relayMonthlyBytes, config.trustProxy),
             inject: [DatabaseService, DevicesService],
+          },
+          {
+            provide: OpsService,
+            useFactory: (db: DatabaseService, relay: RelayService) =>
+              new OpsService(db, relay, config.build, config.ops),
+            inject: [DatabaseService, RelayService],
           },
         ],
       }
@@ -148,6 +166,9 @@ export async function createApp(
             : authHandler(req, res),
       );
   }
+  // Registered after Better Auth, which reads its own body; replaces Nest's 100 KB default so a
+  // problem report can carry its log tail.
+  app.useBodyParser("json", { limit: "256kb" });
   if (config.auth) {
     const relay = app.get(RelayService);
     app.getHttpServer().on("upgrade", relay.upgrade);
