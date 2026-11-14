@@ -42,6 +42,9 @@ pub(crate) struct ShellSettings {
     pub exposure_mode: ExposureMode,
     pub tailscale_serve_enabled: bool,
     pub tailscale_serve_port: u16,
+    /// Lets agents control this Mac. Off until the user agrees in a native dialog.
+    #[serde(default)]
+    pub computer_use_enabled: bool,
 }
 
 impl Default for ShellSettings {
@@ -50,6 +53,7 @@ impl Default for ShellSettings {
             exposure_mode: ExposureMode::LocalOnly,
             tailscale_serve_enabled: false,
             tailscale_serve_port: DEFAULT_TAILSCALE_SERVE_PORT,
+            computer_use_enabled: false,
         }
     }
 }
@@ -98,5 +102,15 @@ mod tests {
         assert_eq!(parsed.exposure_mode, ExposureMode::LocalOnly);
         assert!(!parsed.tailscale_serve_enabled);
         assert_eq!(parsed.tailscale_serve_port, 443);
+        assert!(!parsed.computer_use_enabled);
+    }
+
+    #[test]
+    fn settings_saved_before_computer_use_leave_it_off() {
+        let parsed: ShellSettings = serde_json::from_str(
+            r#"{"exposureMode":"local-only","tailscaleServeEnabled":false,"tailscaleServePort":443}"#,
+        )
+        .unwrap();
+        assert!(!parsed.computer_use_enabled);
     }
 }

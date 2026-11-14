@@ -1,5 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=native/SnapShot.swift");
+    println!("cargo:rerun-if-changed=native/ComputerUse.swift");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         let output =
             std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("gustaf-snapshot");
@@ -22,6 +23,21 @@ fn main() {
             .status()
             .expect("Swift compiler is required for macOS SnapShots");
         assert!(status.success(), "failed to compile SnapShot helper");
+        let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap())
+            .join("gustaf-computer-use");
+        let status = std::process::Command::new("xcrun")
+            .args([
+                "swiftc",
+                "-O",
+                "-target",
+                &format!("{arch}-apple-macosx12.0"),
+                "native/ComputerUse.swift",
+                "-o",
+            ])
+            .arg(output)
+            .status()
+            .expect("Swift compiler is required for macOS computer use");
+        assert!(status.success(), "failed to compile computer-use helper");
     }
     // Naming a command here gives it a permission the capability file can grant.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(

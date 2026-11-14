@@ -17,7 +17,7 @@ pub(crate) enum Exit {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Language {
+pub(crate) enum Language {
     En,
     Ru,
 }
@@ -126,7 +126,7 @@ fn language_from_settings(settings: &serde_json::Value) -> Language {
     }
 }
 
-fn saved_language(app: &tauri::AppHandle) -> Language {
+pub(crate) fn saved_language(app: &tauri::AppHandle) -> Language {
     crate::bridge::client_settings_path(app)
         .ok()
         .and_then(|path| std::fs::read(path).ok())
