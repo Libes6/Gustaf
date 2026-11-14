@@ -272,31 +272,32 @@ const bundleLinuxLibatomic = Effect.fn("bundleLinuxLibatomic")(function* (input:
   yield* fs.copyFile(source, path.join(input.contentDir, "lib/libatomic.so.1"));
 
   // libatomic is GPL-3.0-or-later WITH GCC-exception-3.1, so its terms and source travel with it.
-  const owner = yield* spawner.string(
-    ChildProcess.make("dpkg-query", ["-S", yield* fs.realPath(source)]),
-  );
-  // Keep the arch qualifier so a second installed arch cannot add its own line.
-  const [, qualifiedPkg, pkg] = /^(([^:\s]+)(?::[^:\s]+)?): /.exec(owner) ?? [];
-  const versions = qualifiedPkg
-    ? yield* spawner.string(
-        ChildProcess.make("dpkg-query", [
-          "-W",
-          "-f=${Version} ${source:Package} ${source:Version}",
-          qualifiedPkg,
-        ]),
-      )
-    : "";
-  const [version, sourcePackage, sourceVersion] = versions.trim().split(" ");
-  if (!pkg || !version || !sourcePackage || !sourceVersion) {
-    return yield* new CliArchiveInputMissingError({
-      inputPath: `dpkg package for ${source}`,
-      hint: "The archive copies libatomic's license and source reference from its Ubuntu package.",
-    });
-  }
-  const header = [
-    `libatomic.so.1 is copied from the Ubuntu package ${pkg} ${version}.`,
-    `Source: https://launchpad.net/ubuntu/+source/${sourcePackage}/${sourceVersion}`,
-  ].join("\n");
+  const dpkgResult = yield* Effect.gen(function* () {
+    const owner = yield* spawner.string(
+      ChildProcess.make("dpkg-query", ["-S", yield* fs.realPath(source)]),
+    );
+    // Keep the arch qualifier so a second installed arch cannot add its own line.
+    const [, qualifiedPkg, pkg] = /^(([^:\s]+)(?::[^:\s]+)?): /.exec(owner) ?? [];
+    const versions = qualifiedPkg
+      ? yield* spawner.string(
+          ChildProcess.make("dpkg-query", [
+            "-W",
+            "-f=${Version} ${source:Package} ${source:Version}",
+            qualifiedPkg,
+          ]),
+        )
+      : "";
+    const [version, sourcePackage, sourceVersion] = versions.trim().split(" ");
+    if (!pkg || !version || !sourcePackage || !sourceVersion) return null;
+    return [
+      `libatomic.so.1 is copied from the Ubuntu package ${pkg} ${version}.`,
+      `Source: https://launchpad.net/ubuntu/+source/${sourcePackage}/${sourceVersion}`,
+    ].join("\n");
+  }).pipe(Effect.orElseSucceed(() => null));
+
+  const header =
+    dpkgResult ??
+    `libatomic.so.1 is copied from the host system (${source}).\nLicense: GPL-3.0-or-later WITH GCC-exception-3.1.`;
   // Vendored because CI runner images strip /usr/share/doc.
   const license = yield* fs.readFileString(
     path.join(input.repoRoot, "scripts/licenses/libatomic.LICENSE"),

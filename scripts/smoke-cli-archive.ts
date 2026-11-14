@@ -114,7 +114,11 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
 
   // The runner has libatomic installed; fresh Ubuntu servers do not.
   if (platform === "linux") {
-    const ldd = yield* spawner.string(ChildProcess.make("ldd", [executable]));
+    const lddEnv = { ...process.env };
+    delete lddEnv.LD_LIBRARY_PATH;
+    const ldd = yield* spawner.string(
+      ChildProcess.make("ldd", [executable], { env: lddEnv }),
+    );
     // Older glibc prints the path as given, newer prints it resolved; compare both resolved.
     const loaded = /libatomic\.so\.1 => (\/.*) \(0x[0-9a-f]+\)/.exec(ldd)?.[1];
     if (
