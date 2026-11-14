@@ -313,6 +313,13 @@ import {
   DeviceShutdownInput,
 } from "./device.ts";
 import {
+  ComputerUseAllowThreadInput,
+  ComputerUseError,
+  ComputerUseOpenPermissionSettingsInput,
+  ComputerUseSetEnabledInput,
+  ComputerUseStatus,
+} from "./computerUse.ts";
+import {
   ServerConfigStreamEvent,
   DesktopUpdateCommitInput,
   OtlpEndpointCheckInput,
@@ -505,6 +512,12 @@ export const WS_METHODS = {
   deviceDetail: "device.detail",
   deviceAction: "device.action",
 
+  computerUseStatus: "computerUse.status",
+  computerUseSetEnabled: "computerUse.setEnabled",
+  computerUseOpenPermissionSettings: "computerUse.openPermissionSettings",
+  computerUseAllowThread: "computerUse.allowThread",
+  computerUseStop: "computerUse.stop",
+
   serverProbe: "server.probe",
   serverGetConfig: "server.getConfig",
   serverGetNpmRelease: "server.getNpmRelease",
@@ -622,6 +635,7 @@ export const WS_METHODS = {
   subscribePreviewEvents: "subscribePreviewEvents",
   subscribeDiscoveredLocalServers: "subscribeDiscoveredLocalServers",
   subscribeDeviceState: "subscribeDeviceState",
+  subscribeComputerUseStatus: "subscribeComputerUseStatus",
   subscribeServerConfig: "subscribeServerConfig",
   subscribeServerLifecycle: "subscribeServerLifecycle",
   subscribeAuthAccess: "subscribeAuthAccess",
@@ -1772,6 +1786,47 @@ const WsSubscribeDeviceStateRpc = Rpc.make(WS_METHODS.subscribeDeviceState, {
   stream: true,
 });
 
+const WsComputerUseStatusRpc = Rpc.make(WS_METHODS.computerUseStatus, {
+  payload: Schema.Struct({}),
+  success: ComputerUseStatus,
+  error: EnvironmentAuthorizationError,
+});
+
+/** Turning it on shows a dialog on the Mac; only a person there can agree. */
+const WsComputerUseSetEnabledRpc = Rpc.make(WS_METHODS.computerUseSetEnabled, {
+  payload: ComputerUseSetEnabledInput,
+  success: ComputerUseStatus,
+  error: Schema.Union([ComputerUseError, EnvironmentAuthorizationError]),
+});
+
+const WsComputerUseOpenPermissionSettingsRpc = Rpc.make(
+  WS_METHODS.computerUseOpenPermissionSettings,
+  {
+    payload: ComputerUseOpenPermissionSettingsInput,
+    error: Schema.Union([ComputerUseError, EnvironmentAuthorizationError]),
+  },
+);
+
+const WsComputerUseAllowThreadRpc = Rpc.make(WS_METHODS.computerUseAllowThread, {
+  payload: ComputerUseAllowThreadInput,
+  success: ComputerUseStatus,
+  error: Schema.Union([ComputerUseError, EnvironmentAuthorizationError]),
+});
+
+/** Stops whichever thread controls the Mac. */
+const WsComputerUseStopRpc = Rpc.make(WS_METHODS.computerUseStop, {
+  payload: Schema.Struct({}),
+  success: ComputerUseStatus,
+  error: Schema.Union([ComputerUseError, EnvironmentAuthorizationError]),
+});
+
+const WsSubscribeComputerUseStatusRpc = Rpc.make(WS_METHODS.subscribeComputerUseStatus, {
+  payload: Schema.Struct({}),
+  success: ComputerUseStatus,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
 const WsOrchestrationV2DispatchCommandRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
   payload: OrchestrationV2RpcSchemas.dispatchCommand.input,
   success: OrchestrationV2RpcSchemas.dispatchCommand.output,
@@ -2260,6 +2315,12 @@ export const WsRpcGroup = RpcGroup.make(
   WsDeviceDetailRpc,
   WsDeviceActionRpc,
   WsSubscribeDeviceStateRpc,
+  WsComputerUseStatusRpc,
+  WsComputerUseSetEnabledRpc,
+  WsComputerUseOpenPermissionSettingsRpc,
+  WsComputerUseAllowThreadRpc,
+  WsComputerUseStopRpc,
+  WsSubscribeComputerUseStatusRpc,
   WsSubscribeServerConfigRpc,
   WsSubscribeServerLifecycleRpc,
   WsSubscribeAuthAccessRpc,

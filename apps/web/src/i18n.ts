@@ -10,6 +10,7 @@ import { settingsCMessages } from "./i18nMessages/settingsC";
 import { settingsDMessages } from "./i18nMessages/settingsD";
 import { settingsEMessages } from "./i18nMessages/settingsE";
 import { miscMessages } from "./i18nMessages/misc";
+import { computerUseMessages } from "./i18nMessages/computerUse";
 
 const baseMessages = {
   en: {
@@ -442,6 +443,7 @@ const messages = {
     ...settingsDMessages.en,
     ...settingsEMessages.en,
     ...miscMessages.en,
+    ...computerUseMessages.en,
   },
   ru: {
     ...baseMessages.ru,
@@ -455,6 +457,7 @@ const messages = {
     ...settingsDMessages.ru,
     ...settingsEMessages.ru,
     ...miscMessages.ru,
+    ...computerUseMessages.ru,
   },
 } satisfies Record<UiLanguage, Record<string, string>>;
 

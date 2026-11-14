@@ -23,6 +23,24 @@ Gustaf shell (`apps/shell/src-tauri/src/computer_use/`); the wire types are in
   spawns any provider. Every agent subprocess inherits the server's environment, and an agent
   holding the token could skip the server's per-thread checks.
 
+## The server's side
+
+- **A thread's permission is the shell session.** Allowing a thread starts the session at once,
+  so "the Mac is busy" shows when the user allows a thread, not mid-task, and the menu-bar
+  indicator is on whenever an agent may act. Any end of the session, from wherever, revokes the
+  permission; nothing is stored, so a restart needs a new Allow.
+- **Every agent action is checked in `ComputerUseService`**: the calling thread must hold the
+  session and its provider must show tool images to its model. The provider list
+  (`computerUseSupportsDriver` in contracts) comes from reading each adapter: Claude and Codex pass
+  MCP images natively, OpenCode attaches them as files, Pi copies them into model content. Driving
+  a screen without seeing it is refused rather than attempted.
+- **Two kinds of connection.** Session requests share one long-lived connection, because the
+  session belongs to it. Stop, status and turning the feature on or off each open their own, so a
+  step in flight or the confirm dialog waiting for the person at the Mac never delays a Stop.
+  Permission changes are serialized: once a Stop starts, no later action is sent.
+- **The MCP tools are listed only where the shell gave the server its executor**, and never to a
+  delegated child; elsewhere they cost no agent context.
+
 ## Ownership and lifecycle
 
 - One owner per Mac user, across threads, environments and Gustaf builds: an `flock` on

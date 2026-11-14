@@ -14,6 +14,7 @@ import type * as Types from "effect/Types";
 import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
+  ComputerUseError,
   DeviceToolError,
   OrchestratorMcpFailure,
   PreviewAutomationError,
@@ -77,6 +78,13 @@ import {
   DeviceStandardToolkit,
 } from "./toolkits/device/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
+import * as ComputerUseHandlers from "./toolkits/computerUse/handlers.ts";
+import {
+  ComputerScreenshotTool,
+  ComputerScreenshotToolkit,
+  ComputerStandardToolkit,
+} from "./toolkits/computerUse/tools.ts";
+import * as ComputerUseService from "../computerUse/ComputerUseService.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
 import { requestUrl } from "../requestUrl.ts";
 
@@ -803,6 +811,33 @@ const registerDeviceScreenshot = Effect.fn("McpHttpServer.registerDeviceScreensh
 
 const isOrchestratorMcpFailure = Schema.is(OrchestratorMcpFailure);
 const isDeviceToolError = Schema.is(DeviceToolError);
+const isComputerUseError = Schema.is(ComputerUseError);
+
+const registerComputerScreenshot = Effect.fn("McpHttpServer.registerComputerScreenshot")(
+  function* () {
+    const computerUse = yield* ComputerUseService.ComputerUseService;
+    const threads = yield* ThreadManagementService.ThreadManagementService;
+    const built = yield* decodeAsAdvertised(ComputerScreenshotToolkit);
+    yield* registerImageTool(
+      ComputerScreenshotTool,
+      (payload) =>
+        built
+          .handle("computer_screenshot", payload)
+          .pipe(Stream.unwrap, Stream.run(Sink.last()), Effect.flatMap(Effect.fromOption)),
+      (effect) =>
+        effect.pipe(
+          Effect.provideService(ComputerUseService.ComputerUseService, computerUse),
+          Effect.provideService(ThreadManagementService.ThreadManagementService, threads),
+        ),
+      "screenshot",
+      // Both are written by the server or the shell for the agent; neither carries screen content.
+      (error) =>
+        isComputerUseError(error) || isOrchestratorMcpFailure(error)
+          ? error.message
+          : "Mac screenshot failed.",
+    );
+  },
+);
 
 const registerHtmlPreview = Effect.fn("McpHttpServer.registerHtmlPreview")(function* () {
   const htmlRender = yield* HtmlRender.HtmlRender;
@@ -1207,6 +1242,11 @@ export const layerDeviceToolkit = Layer.mergeAll(
   layerDeviceScreenshotRegistration,
 );
 
+export const layerComputerUseToolkit = Layer.mergeAll(
+  toolkitRegistration(ComputerStandardToolkit, ComputerUseHandlers.layerStandard),
+  imageToolRegistration(registerComputerScreenshot(), ComputerUseHandlers.layerScreenshot),
+);
+
 /**
  * `McpServer` for in-process calls, which provide `McpInvocationContext`
  * around `callTool` as the auth middleware does for each /mcp request.
@@ -1248,6 +1288,7 @@ export const layerTools = Layer.mergeAll(
   layerWorktreeToolkitRegistration,
   layerPullRequestsToolkit,
   layerDeviceToolkit,
+  layerComputerUseToolkit,
   layerHtmlToolkit,
 );
 

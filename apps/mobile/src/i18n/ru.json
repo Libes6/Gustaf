@@ -595,5 +595,8 @@
   "Try copying this thread again.": "Попробуйте скопировать тред ещё раз.",
   "Woke": "Разбужен",
   "Failed to copy thread": "Не удалось скопировать тред",
-  "Failed to copy PR link": "Не удалось скопировать ссылку на PR"
+  "Failed to copy PR link": "Не удалось скопировать ссылку на PR",
+  "Could not stop control": "Не удалось остановить управление",
+  "This thread's agent controls the Mac": "Агент этого треда управляет Mac",
+  "The Mac is controlled by": "Mac управляет"
 }
