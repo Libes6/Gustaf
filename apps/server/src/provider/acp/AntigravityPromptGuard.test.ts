@@ -24,7 +24,8 @@ it("stops on the third broken stream in a row, counting notices split across chu
   assert.isUndefined(guard(message("Still writing.")));
   assert.isUndefined(guard(message(`⚠ ${NOTICE}`)));
   const failure = guard(message(`Again. ⚠ ${NOTICE}`));
-  assert.equal(failure?.class, "provider_error");
+  assert.equal(failure?.class, "network_transient");
+  assert.equal(failure?.code, "STREAM_INTERRUPTED");
   assert.include(failure?.message, "5 minutes");
 });
 

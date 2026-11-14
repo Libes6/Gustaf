@@ -7659,7 +7659,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 prompt: subagent.task.prompt,
                 title: subagent.task.title,
                 model: subagent.task.model,
-                status: settledStatus === "completed" ? "idle" : settledStatus,
+                status:
+                  settledStatus === "completed" ||
+                  (settledStatus === "failed" && failure?.class === "network_transient")
+                    ? "idle"
+                    : settledStatus,
                 childSessionId: subagent.childSessionId,
                 result: null,
               });
@@ -7900,7 +7904,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               openAgentRequests.clear();
               yield* quarantineNativeTransportAtGeneration(generation);
               yield* advanceRuntimeCallbackGeneration;
-              yield* Ref.set(runtimeRestartRequired, true);
+              if (reason._tag !== "guard" || reason.failure.class !== "network_transient") {
+                yield* Ref.set(runtimeRestartRequired, true);
+              }
               yield* cancelPendingRuntimeRequests();
               yield* terminalizeOpenForegroundTools(context, "failed");
               yield* finalizeTurn(
@@ -8495,7 +8501,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                       result.stopReason === "cancelled"
                         ? undefined
                         : yield* checkPromptOutcome(result);
-                    if (hiddenFailure !== undefined) {
+                    if (hiddenFailure !== undefined && hiddenFailure.class !== "network_transient") {
                       yield* Ref.set(runtimeRestartRequired, true);
                     }
                     const failure =

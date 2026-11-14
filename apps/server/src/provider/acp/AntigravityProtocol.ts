@@ -1,8 +1,10 @@
 import type {
+  OrchestrationV2ProviderFailure,
   ProviderApprovalOption,
   ProviderUserInputAnswers,
   UserInputQuestion,
 } from "@t3tools/contracts";
+import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -507,3 +509,97 @@ export function antigravitySubagentOutput(toolCall: AcpToolCallState): string | 
   const output = toolCall.data.rawOutput;
   return typeof output === "string" && output.trim() ? boundText(output.trim()) : undefined;
 }
+
+export const ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE =
+  "The stream was interrupted. Please continue the task you were working on.";
+
+export function isAntigravityStreamInterrupted(text: string): boolean {
+  return text.includes("The stream was interrupted");
+}
+
+export function antigravityStreamInterruptedFailure(
+  text?: string,
+): OrchestrationV2ProviderFailure {
+  const message =
+    text && isAntigravityStreamInterrupted(text)
+      ? "The stream was interrupted. Please continue the task you were working on."
+      : (text?.trim() || ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE);
+  return makeProviderFailure({
+    class: "network_transient",
+    code: "STREAM_INTERRUPTED",
+    message,
+    retryable: true,
+  });
+}
+
+const ANTIGRAVITY_TASK_ID_REGEX = /(?:Task id|taskId|TaskId|task id)["':\s]+([a-zA-Z0-9_\-/]+)/i;
+
+export function extractAntigravityBackgroundTaskId(
+  toolCall: AcpToolCallState,
+): string | undefined {
+  const rawInput = Predicate.isObject(toolCall.data.rawInput)
+    ? (toolCall.data.rawInput as Record<string, unknown>)
+    : undefined;
+  if (rawInput && typeof rawInput.TaskId === "string" && rawInput.TaskId.trim()) {
+    return rawInput.TaskId.trim();
+  }
+  if (rawInput && typeof rawInput.taskId === "string" && rawInput.taskId.trim()) {
+    return rawInput.taskId.trim();
+  }
+
+  const rawOutput = toolCall.data.rawOutput;
+  if (typeof rawOutput === "string") {
+    const match = ANTIGRAVITY_TASK_ID_REGEX.exec(rawOutput);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  } else if (Predicate.isObject(rawOutput)) {
+    const obj = rawOutput as Record<string, unknown>;
+    if (typeof obj.taskId === "string" && obj.taskId.trim()) return obj.taskId.trim();
+    if (typeof obj.TaskId === "string" && obj.TaskId.trim()) return obj.TaskId.trim();
+  }
+
+  const title = (toolCall.title ?? "").toLowerCase();
+  if (
+    title.includes("schedule") ||
+    title.includes("manage_task") ||
+    (rawInput && (rawInput.CronExpression !== undefined || rawInput.DurationSeconds !== undefined))
+  ) {
+    return toolCall.toolCallId;
+  }
+
+  if (isAntigravityBackgroundCommandTool(toolCall)) {
+    return toolCall.toolCallId;
+  }
+
+  return undefined;
+}
+
+export function isAntigravityBackgroundCommandTool(toolCall: AcpToolCallState): boolean {
+  const rawInput = Predicate.isObject(toolCall.data.rawInput)
+    ? (toolCall.data.rawInput as Record<string, unknown>)
+    : undefined;
+  if (rawInput && (rawInput.IsDaemon === true || rawInput.isDaemon === true)) {
+    return true;
+  }
+  const title = (toolCall.title ?? "").toLowerCase();
+  return (
+    title.includes("run_command") &&
+    rawInput !== undefined &&
+    (rawInput.IsDaemon === true || rawInput.isDaemon === true)
+  );
+}
+
+export function isAntigravityPersistentBackgroundTool(toolCall: AcpToolCallState): boolean {
+  const title = (toolCall.title ?? "").toLowerCase();
+  if (title.includes("schedule")) return true;
+  const rawInput = Predicate.isObject(toolCall.data.rawInput)
+    ? (toolCall.data.rawInput as Record<string, unknown>)
+    : undefined;
+  if (rawInput) {
+    if (rawInput.IsDaemon === true || rawInput.isDaemon === true) return true;
+    if (rawInput.CronExpression !== undefined || rawInput.DurationSeconds !== undefined) return true;
+  }
+  return false;
+}
+

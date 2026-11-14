@@ -18,7 +18,8 @@ const HARNESS_ERROR = /(?:^|⚠\uFE0F?\s*)(Error \d{3}, Message: [\s\S]*)$/;
 const FLAGGED_HARNESS_ERROR = /⚠\uFE0F?\s*(Error \d{3}, Message: [\s\S]*)$/;
 
 const STREAM_LOOP_FAILURE = makeProviderFailure({
-  class: "provider_error",
+  class: "network_transient",
+  code: "STREAM_INTERRUPTED",
   message:
     "The model's answer broke off 3 times in a row, so Gustaf stopped the turn. Antigravity cuts a model off after 5 minutes without output, which long thinking on a big task hits. Ask for the work in smaller parts, or pick another model or provider.",
   retryable: true,

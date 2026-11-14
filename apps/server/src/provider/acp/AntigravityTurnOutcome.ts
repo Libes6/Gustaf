@@ -12,6 +12,12 @@ import * as Schema from "effect/Schema";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
 import { antigravityManagedPath, antigravityProfileRoot } from "./AntigravityProfilePaths.ts";
+import {
+  antigravityStreamInterruptedFailure,
+  isAntigravityStreamInterrupted,
+} from "./AntigravityProtocol.ts";
+
+export { antigravityStreamInterruptedFailure, isAntigravityStreamInterrupted };
 
 // CORTEX_STEP_TYPE_ERROR_MESSAGE in the native trajectory.
 const ERROR_STEP_TYPE = 17;
@@ -115,6 +121,9 @@ function turnFailure(
   if (errorText === undefined && stopReason !== "refusal") return undefined;
   const text = errorText ?? "";
   if (stopReason === "refusal") return quotaFailure(text, now);
+  if (isAntigravityStreamInterrupted(text)) {
+    return antigravityStreamInterruptedFailure(text);
+  }
   const limit = antigravityLimitFailure(text, now);
   if (limit !== undefined) return limit;
   const apiError = API_ERROR.exec(text);

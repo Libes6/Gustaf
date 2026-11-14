@@ -7,18 +7,23 @@ import {
 } from "@t3tools/contracts";
 import type { SelfInvocation } from "@t3tools/shared/nodeRuntime";
 import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Exit from "effect/Exit";
+import * as Predicate from "effect/Predicate";
+import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
+import type * as EffectAcpSchema from "effect-acp/compat";
 import * as EffectAcpErrors from "effect-acp/errors";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
 import type { AntigravityAuth } from "../../provider/AntigravityAuth.ts";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
+import { withAcpKeepAlive } from "../../provider/acp/AcpJsonRpcConnection.ts";
 import {
   antigravityAppendsSystemPrompt,
   antigravityPermissionMode,
@@ -36,10 +41,16 @@ import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityCli
 import { makeAntigravityPromptGuard } from "../../provider/acp/AntigravityPromptGuard.ts";
 import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
+  ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
   antigravityApprovalOptions,
+  antigravityStreamInterruptedFailure,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
+  extractAntigravityBackgroundTaskId,
   extractAntigravityUserInputQuestion,
+  isAntigravityBackgroundCommandTool,
+  isAntigravityPersistentBackgroundTool,
+  isAntigravityStreamInterrupted,
   makeAntigravityReadRepair,
   makeAntigravityUserInputResponse,
   normalizeAntigravityToolCall,
@@ -180,7 +191,64 @@ export function makeAntigravityAcpAdapterFlavor(
             ),
           ),
         prompt: (payload, promptOptions) =>
-          Effect.sync(reads.reset).pipe(Effect.andThen(runtime.prompt(payload, promptOptions))),
+          withAcpKeepAlive(
+            runtime,
+            Effect.gen(function* () {
+              yield* Effect.sync(reads.reset);
+              const runPrompt = runtime.prompt(payload, promptOptions).pipe(
+                Effect.flatMap((response) => {
+                  if (response.stopReason === "error") {
+                    const errText =
+                      typeof response.error === "string"
+                        ? response.error
+                        : Predicate.isObject(response.error) &&
+                            "message" in response.error &&
+                            typeof response.error.message === "string"
+                          ? response.error.message
+                          : "";
+                    if (isAntigravityStreamInterrupted(errText)) {
+                      return Effect.fail(
+                        new EffectAcpErrors.AcpTransportError({ detail: errText }),
+                      );
+                    }
+                  }
+                  return Effect.succeed(response);
+                }),
+              );
+
+              const isInterruptedError = (error: unknown): boolean =>
+                Predicate.isObject(error) &&
+                (("detail" in error &&
+                  typeof error.detail === "string" &&
+                  isAntigravityStreamInterrupted(error.detail)) ||
+                  ("message" in error &&
+                    typeof error.message === "string" &&
+                    isAntigravityStreamInterrupted(error.message)));
+
+              const retrySchedule = Schedule.exponential("500 millis", 2).pipe(
+                Schedule.jittered,
+              );
+
+              return yield* runPrompt.pipe(
+                Effect.retry({
+                  times: 3,
+                  schedule: retrySchedule,
+                  while: isInterruptedError,
+                }),
+                Effect.catchIf(
+                  isInterruptedError,
+                  (error) =>
+                    Effect.succeed<EffectAcpSchema.PromptResponse>({
+                      stopReason: "error",
+                      error:
+                        ("detail" in error && typeof error.detail === "string"
+                          ? error.detail
+                          : undefined) ?? ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
+                    }),
+                ),
+              );
+            }),
+          ),
         handleSessionUpdate: (handler) => {
           projectUpdate = handler;
           return runtime.handleSessionUpdate((notification) =>
@@ -232,6 +300,11 @@ export function makeAntigravityAcpAdapterFlavor(
         Effect.provideService(FileSystem.FileSystem, options.fileSystem),
         Effect.provideService(Path.Path, options.path),
       ),
+    preserveRuntimeOnSettledInterrupt: true,
+    deferFinalizeForBackgroundWork: true,
+    isPersistentBackgroundTool: isAntigravityPersistentBackgroundTool,
+    extractBackgroundTaskId: extractAntigravityBackgroundTaskId,
+    isBackgroundCommandTool: isAntigravityBackgroundCommandTool,
     // Loading history replays tool calls; resume avoids replay.
     subagentsIdleOnTurnCompletion: true,
     ...(options.onSessionEvent === undefined ? {} : { onSessionEvent: options.onSessionEvent }),
@@ -240,13 +313,26 @@ export function makeAntigravityAcpAdapterFlavor(
       modelSelection,
     }) {
       const defaultModel = yield* options.defaultModel;
+      const targetModel =
+        modelSelection.model === ANTIGRAVITY_DEFAULT_MODEL ? undefined : modelSelection.model;
       return yield* applyAntigravityAcpModelSelection({
         runtime,
-        model:
-          modelSelection.model === ANTIGRAVITY_DEFAULT_MODEL ? undefined : modelSelection.model,
+        model: targetModel,
         defaultModel,
         mapError: (cause) => cause,
-      });
+      }).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning(
+            "Failed to switch Antigravity model immediately; deferring selection for next turn",
+          ).pipe(
+            Effect.annotateLogs({
+              targetModel: targetModel ?? defaultModel,
+              error: String(cause),
+            }),
+            Effect.as(targetModel ?? defaultModel),
+          ),
+        ),
+      );
     }),
     sessionModeForPolicy: (policy) => antigravityPermissionMode(policy.runtimeMode),
     runtimeModeForSessionMode: antigravityRuntimeModeForSessionMode,

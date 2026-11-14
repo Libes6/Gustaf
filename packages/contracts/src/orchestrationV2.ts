@@ -1473,6 +1473,7 @@ export const OrchestrationV2ProviderFailureClass = Schema.Literals([
   "transport_error",
   "permission_error",
   "validation_error",
+  "network_transient",
   "unknown",
 ]);
 export type OrchestrationV2ProviderFailureClass = typeof OrchestrationV2ProviderFailureClass.Type;

@@ -477,8 +477,14 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
       }
     });
 
-  const dispatchNotification = (notification: AcpIncomingNotification, lineLength: number) =>
-    bufferRawNotification(notification, lineLength).pipe(
+  const dispatchNotification = (notification: AcpIncomingNotification, lineLength: number) => {
+    if (
+      notification._tag === "ExtNotification" &&
+      (notification.method === "$/ping" || notification.method === "ping")
+    ) {
+      return Effect.void;
+    }
+    return bufferRawNotification(notification, lineLength).pipe(
       Effect.andThen(
         // A failing or dying handler must not stop the reader, or every later
         // message on the connection goes unanswered.
@@ -488,6 +494,7 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
       ),
       Effect.asVoid,
     );
+  };
 
   const emitClientProtocolError = (error: AcpError.AcpError) =>
     Queue.offer(clientQueue, {
@@ -547,6 +554,9 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
     });
 
   const handleExtRequest = (message: RpcMessage.RequestEncoded) => {
+    if (message.tag === "$/ping" || message.tag === "ping") {
+      return respondWithSuccess(message.id, {});
+    }
     if (!options.onExtRequest) {
       return respondWithError(message.id, AcpError.AcpRequestError.methodNotFound(message.tag));
     }

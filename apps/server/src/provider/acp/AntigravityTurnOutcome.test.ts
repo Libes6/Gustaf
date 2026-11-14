@@ -7,7 +7,11 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { watchAntigravityPromptOutcome } from "./AntigravityTurnOutcome.ts";
+import {
+  antigravityStreamInterruptedFailure,
+  isAntigravityStreamInterrupted,
+  watchAntigravityPromptOutcome,
+} from "./AntigravityTurnOutcome.ts";
 
 const USER_INPUT = 14;
 const PLANNER_RESPONSE = 15;
@@ -31,6 +35,9 @@ const RATE_LIMIT_ERROR = errorPayload(
 );
 const INVALID_ARGUMENT_ERROR = errorPayload(
   "Error 400, Message: Request contains an invalid argument., Status: INVALID_ARGUMENT, Details: []",
+);
+const STREAM_INTERRUPTED_ERROR = errorPayload(
+  "The stream was interrupted. Please continue the task you were working on.",
 );
 // The model's reply quoting the agent's quota notice is an ordinary planner response.
 const QUOTED_NOTICE = Buffer.from(
@@ -129,6 +136,18 @@ describe("watchAntigravityPromptOutcome", () => {
           retryable: false,
         },
       );
+      assert.deepEqual(
+        yield* turn([
+          [USER_INPUT, input],
+          [ERROR_MESSAGE, STREAM_INTERRUPTED_ERROR],
+        ]),
+        {
+          class: "network_transient",
+          message: "The stream was interrupted. Please continue the task you were working on.",
+          code: "STREAM_INTERRUPTED",
+          retryable: true,
+        },
+      );
       // A completed tool keeps its usage, and the turn still fails.
       assert.equal(
         (yield* turn(
@@ -208,4 +227,23 @@ describe("watchAntigravityPromptOutcome", () => {
       });
     }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
+});
+
+describe("antigravityStreamInterruptedFailure", () => {
+  it("classifies stream interrupted as retryable network_transient failure", () => {
+    assert.isTrue(
+      isAntigravityStreamInterrupted(
+        "The stream was interrupted. Please continue the task you were working on.",
+      ),
+    );
+    const failure = antigravityStreamInterruptedFailure(
+      "Error: The stream was interrupted. Please continue the task you were working on.",
+    );
+    assert.deepEqual(failure, {
+      class: "network_transient",
+      code: "STREAM_INTERRUPTED",
+      message: "The stream was interrupted. Please continue the task you were working on.",
+      retryable: true,
+    });
+  });
 });

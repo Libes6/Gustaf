@@ -133,6 +133,72 @@ describe("AntigravityAdapterV2 flavor", () => {
       outcome: { outcome: "selected", optionId: "opt-dev" },
     });
   });
+
+  it("configures background task preservation and graceful background work deferral", () => {
+    assert.isTrue(flavor.preserveRuntimeOnSettledInterrupt);
+    assert.isTrue(flavor.deferFinalizeForBackgroundWork);
+    assert.isTrue(flavor.subagentsIdleOnTurnCompletion);
+
+    const scheduleTool = {
+      toolCallId: "tool-sched-1",
+      title: "Running schedule",
+      kind: "other" as const,
+      status: "running" as const,
+      data: { rawInput: { Prompt: "check status", DurationSeconds: 60 } },
+    };
+    assert.isTrue(flavor.isPersistentBackgroundTool?.(scheduleTool));
+    assert.equal(flavor.extractBackgroundTaskId?.(scheduleTool), "tool-sched-1");
+
+    const daemonTool = {
+      toolCallId: "tool-daemon-1",
+      title: "Running run_command",
+      kind: "execute" as const,
+      status: "running" as const,
+      data: {
+        rawInput: { CommandLine: "npm run dev", IsDaemon: true },
+        rawOutput: 'Task id "3207fcfa-2b89-49c2-8af6-6663185043c7/task-347" finished',
+      },
+    };
+    assert.isTrue(flavor.isBackgroundCommandTool?.(daemonTool));
+    assert.isTrue(flavor.isPersistentBackgroundTool?.(daemonTool));
+    assert.equal(
+      flavor.extractBackgroundTaskId?.(daemonTool),
+      "3207fcfa-2b89-49c2-8af6-6663185043c7/task-347",
+    );
+
+    const manageTool = {
+      toolCallId: "tool-manage-1",
+      title: "Running manage_task",
+      kind: "other" as const,
+      status: "completed" as const,
+      data: { rawInput: { Action: "status", TaskId: "task-bg-99" } },
+    };
+    assert.equal(flavor.extractBackgroundTaskId?.(manageTool), "task-bg-99");
+  });
+
+  it.effect("gracefully handles model selection failure by deferring without throwing", () =>
+    Effect.gen(function* () {
+      const failingRuntime = {
+        getConfigOptions: Effect.fail(
+          new EffectAcpErrors.AcpTransportError({
+            detail: "Config unavailable",
+            cause: new Error("Config unavailable"),
+          }),
+        ),
+        setModel: () => Effect.void,
+        setConfigOption: () => Effect.void,
+      } as unknown as AcpSessionRuntime.AcpSessionRuntime["Service"];
+
+      const result = yield* flavor.applyModelSelection({
+        runtime: failingRuntime,
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("antigravity-test"),
+          model: "gemini-2.5-flash",
+        },
+      });
+      assert.equal(result, "gemini-2.5-flash");
+    }),
+  );
 });
 
 const layerSession = Layer.mergeAll(
