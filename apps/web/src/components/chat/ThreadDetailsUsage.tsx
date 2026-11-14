@@ -212,7 +212,7 @@ function UsageRow({
           />
         }
       >
-        <span className="max-w-28 truncate text-muted-foreground">{label}</span>
+        <span title={label} className="max-w-40 truncate text-muted-foreground">{label}</span>
         {fill !== null ? (
           <span className="relative h-[3px] rounded-full bg-muted-foreground/30 dark:bg-muted-foreground/20">
             {fill > 0 ? (

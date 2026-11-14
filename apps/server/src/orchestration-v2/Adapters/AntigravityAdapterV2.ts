@@ -47,6 +47,7 @@ import {
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
   extractAntigravityBackgroundTaskId,
+  extractAntigravityBackgroundToolMutation,
   extractAntigravityUserInputQuestion,
   isAntigravityBackgroundCommandTool,
   isAntigravityPersistentBackgroundTool,
@@ -306,6 +307,7 @@ export function makeAntigravityAcpAdapterFlavor(
       classifyAntigravitySubagentToolCall(toolCall) === "subagent",
     isPersistentBackgroundTool: isAntigravityPersistentBackgroundTool,
     extractBackgroundTaskId: extractAntigravityBackgroundTaskId,
+    extractBackgroundToolMutation: extractAntigravityBackgroundToolMutation,
     isBackgroundCommandTool: isAntigravityBackgroundCommandTool,
     // Loading history replays tool calls; resume avoids replay.
     subagentsIdleOnTurnCompletion: true,
