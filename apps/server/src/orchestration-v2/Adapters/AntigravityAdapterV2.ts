@@ -104,6 +104,24 @@ const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractS
   if (classifyAntigravitySubagentToolCall(toolCall) !== "subagent") {
     return undefined;
   }
+  if (toolCall.title === "Running manage_subagents" || toolCall.title === "Run manage_subagents?") {
+    return {
+      nativeTaskId: toolCall.toolCallId,
+      prompt: "Antigravity native subagents",
+      title: "Antigravity subagent status",
+      model: null,
+      status:
+        toolCall.status === "completed"
+          ? "idle"
+          : toolCall.status === "failed"
+            ? "failed"
+            : toolCall.status === "pending"
+              ? "pending"
+              : "running",
+      childSessionId: null,
+      result: antigravitySubagentOutput(toolCall) ?? null,
+    };
+  }
   const status =
     toolCall.status === "failed" ? "failed" : toolCall.status === "pending" ? "pending" : "running";
   const launches = antigravitySubagentLaunches(toolCall.data.rawInput);
