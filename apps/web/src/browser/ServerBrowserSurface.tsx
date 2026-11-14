@@ -50,6 +50,47 @@ export interface ServerBrowserHandle {
   readonly canvas: () => HTMLCanvasElement | null;
 }
 
+const STATS_WINDOW_MS = 5_000;
+
+/** Dev-only stream numbers, logged per window while frames flow; idle streams stay silent. */
+function measurePaints(
+  paint: (jpeg: ArrayBuffer, done?: () => void) => void,
+  canvas: HTMLCanvasElement,
+): (jpeg: ArrayBuffer, done: () => void) => void {
+  let since = 0;
+  let last = 0;
+  let frames = 0;
+  let bytes = 0;
+  let paintMs = 0;
+  let maxPaintMs = 0;
+  return (jpeg, done) => {
+    const started = performance.now();
+    // A pause restarts the window so idle time does not read as a low frame rate.
+    if (started - last > 1_000) {
+      since = started;
+      frames = bytes = paintMs = maxPaintMs = 0;
+    }
+    last = started;
+    paint(jpeg, () => {
+      const now = performance.now();
+      frames += 1;
+      bytes += jpeg.byteLength;
+      paintMs += now - started;
+      maxPaintMs = Math.max(maxPaintMs, now - started);
+      done();
+      if (now - since < STATS_WINDOW_MS) return;
+      console.debug(
+        `[preview-stream] ${((frames * 1000) / (now - since)).toFixed(1)} fps, ` +
+          `${(bytes / frames / 1024).toFixed(0)} KB/frame, ` +
+          `decode+draw ${(paintMs / frames).toFixed(1)} ms avg / ${maxPaintMs.toFixed(0)} ms max, ` +
+          `${canvas.width}x${canvas.height}`,
+      );
+      since = now;
+      frames = bytes = paintMs = maxPaintMs = 0;
+    });
+  };
+}
+
 const RESIZE_THROTTLE_MS = 150;
 // Reuse nearby probes when a slow link would return the tap's answer after it ends.
 const PROBE_REUSE_PX = 24;
@@ -373,12 +414,22 @@ export function ServerBrowserSurface(props: {
       hasFrameRef.current = true;
       firstFrame();
     });
+    const paint = import.meta.env.DEV ? measurePaints(painter.paint, canvas) : painter.paint;
+    // Holding the ack while hidden stops the server encoding frames nobody sees.
+    let held: { readonly jpeg: ArrayBuffer; readonly done: () => void } | null = null;
+    const onVisibility = () => {
+      if (document.hidden || !held) return;
+      paint(held.jpeg, held.done);
+      held = null;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     const client = createPreviewStreamClient(
       { access, threadId, tabId, maxWidth: cap.width, maxHeight: cap.height },
       {
-        onFrame: (jpeg) => {
+        onFrame: (jpeg, done) => {
           unauthorizedRef.current = 0;
-          painter.paint(jpeg);
+          if (document.hidden) held = { jpeg, done };
+          else paint(jpeg, done);
         },
         onProbe: (result) => {
           if (controlRef.current?.controller !== "you") return;
@@ -446,6 +497,7 @@ export function ServerBrowserSurface(props: {
     );
     clientRef.current = client;
     return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
       painter.stop();
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       client.stop();

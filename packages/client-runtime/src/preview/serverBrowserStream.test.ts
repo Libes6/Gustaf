@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { createPreviewStreamClient, type PreviewStreamControl } from "./serverBrowserStream.ts";
+import {
+  createPreviewFramePainter,
+  createPreviewStreamClient,
+  type PreviewStreamControl,
+} from "./serverBrowserStream.ts";
 
 class FakeSocket extends EventTarget {
   static readonly OPEN = 1;
@@ -83,10 +87,15 @@ describe("preview stream control", () => {
     socket.control({ ...agent, canOperate: false });
     const frame = new ArrayBuffer(3);
     socket.message(frame);
-    expect(onFrame).toHaveBeenCalledWith(frame);
+    expect(onFrame).toHaveBeenCalledWith(frame, expect.any(Function));
     expect(client.send({ type: "takeControl" })).toBe(false);
     expect(client.send({ type: "resize", width: 390, height: 844 })).toBe(false);
     expect(client.send({ type: "reload" })).toBe(false);
+    // The server holds newer frames until this one is painted, and acks once per frame.
+    expect(socket.sent).toEqual([]);
+    const done = onFrame.mock.calls[0]![1] as () => void;
+    done();
+    done();
     expect(socket.sent).toEqual(['{"type":"ack"}']);
     client.stop();
   });
@@ -131,6 +140,43 @@ describe("preview stream control", () => {
     );
     restarted.stop();
     expect(onFileChooser).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe("preview frame painter", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("releases every frame it skips or draws, so the server never waits on a lost ack", async () => {
+    const decodes: Array<PromiseWithResolvers<ImageBitmap>> = [];
+    vi.stubGlobal("createImageBitmap", () => {
+      const decode = Promise.withResolvers<ImageBitmap>();
+      decodes.push(decode);
+      return decode.promise;
+    });
+    const drawImage = vi.fn();
+    const canvas = { width: 0, height: 0, getContext: () => ({ drawImage }) };
+    const painter = createPreviewFramePainter(canvas as unknown as HTMLCanvasElement);
+    const bitmap = { width: 2, height: 1, close: vi.fn() } as unknown as ImageBitmap;
+    const first = Promise.withResolvers<void>();
+    const latest = Promise.withResolvers<void>();
+    const done = { first: vi.fn(first.resolve), skipped: vi.fn(), latest: vi.fn(latest.resolve) };
+
+    painter.paint(new ArrayBuffer(1), done.first);
+    painter.paint(new ArrayBuffer(1), done.skipped);
+    painter.paint(new ArrayBuffer(1), done.latest);
+    expect(done.skipped).toHaveBeenCalledOnce();
+    expect(decodes).toHaveLength(1);
+
+    decodes[0]!.resolve(bitmap);
+    await first.promise;
+    expect(decodes).toHaveLength(2);
+    expect(done.latest).not.toHaveBeenCalled();
+
+    decodes[1]!.reject(new Error("corrupt"));
+    await latest.promise;
+    expect(drawImage).toHaveBeenCalledOnce();
+    expect(canvas).toMatchObject({ width: 2, height: 1 });
+    painter.stop();
   });
 });
 

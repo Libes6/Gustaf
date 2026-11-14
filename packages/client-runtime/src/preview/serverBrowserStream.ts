@@ -183,7 +183,8 @@ export interface PreviewStreamTarget {
 }
 
 export interface PreviewStreamEvents {
-  readonly onFrame: (jpeg: ArrayBuffer) => void;
+  /** Call `done` once the frame is painted or dropped; the server sends nothing newer until then. */
+  readonly onFrame: (jpeg: ArrayBuffer, done: () => void) => void;
   readonly onViewport: (viewport: PreviewStreamViewport) => void;
   readonly onProbe?: (probe: PreviewStreamProbe) => void;
   readonly onPointer?: (pointer: PreviewStreamPointer) => void;
@@ -246,8 +247,12 @@ export function createPreviewStreamClient(
       if (socket !== ws) return;
       if (event.data instanceof ArrayBuffer) {
         failures = 0;
-        ws.send(ACK_MESSAGE);
-        events.onFrame(event.data);
+        let acked = false;
+        events.onFrame(event.data, () => {
+          if (acked || socket !== ws || ws.readyState !== WebSocket.OPEN) return;
+          acked = true;
+          ws.send(ACK_MESSAGE);
+        });
         return;
       }
       if (typeof event.data !== "string") return;
@@ -400,8 +405,14 @@ export function createPreviewStreamClient(
 }
 
 export interface PreviewFramePainter {
-  readonly paint: (jpeg: ArrayBuffer) => void;
+  /** `done` runs once the frame is drawn, fails to decode, or is superseded. */
+  readonly paint: (jpeg: ArrayBuffer, done?: () => void) => void;
   readonly stop: () => void;
+}
+
+interface PendingFrame {
+  readonly jpeg: ArrayBuffer;
+  readonly done: (() => void) | undefined;
 }
 
 /** One decode at a time, keeping only the latest waiting frame for slow viewers. */
@@ -412,10 +423,10 @@ export function createPreviewFramePainter(
   const context = canvas.getContext("2d");
   let stopped = false;
   let decoding = false;
-  let waiting: ArrayBuffer | null = null;
-  const draw = (jpeg: ArrayBuffer) => {
+  let waiting: PendingFrame | null = null;
+  const draw = (frame: PendingFrame) => {
     decoding = true;
-    void createImageBitmap(new Blob([jpeg], { type: "image/jpeg" }))
+    void createImageBitmap(new Blob([frame.jpeg], { type: "image/jpeg" }))
       .then((bitmap) => {
         if (stopped || !context) {
           bitmap.close();
@@ -432,16 +443,18 @@ export function createPreviewFramePainter(
       .catch(() => undefined)
       .finally(() => {
         decoding = false;
+        frame.done?.();
         const next = waiting;
         waiting = null;
         if (next && !stopped) draw(next);
       });
   };
   return {
-    paint: (jpeg) => {
+    paint: (jpeg, done) => {
       if (stopped) return;
-      if (decoding) waiting = jpeg;
-      else draw(jpeg);
+      if (!decoding) return draw({ jpeg, done });
+      waiting?.done?.();
+      waiting = { jpeg, done };
     },
     stop: () => {
       stopped = true;

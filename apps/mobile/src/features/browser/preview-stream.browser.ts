@@ -170,7 +170,7 @@ export function start(configuration: PreviewStreamConfiguration) {
         interactive,
       },
       {
-        onFrame: (jpeg) => painter.paint(jpeg),
+        onFrame: (jpeg, done) => painter.paint(jpeg, done),
         onPointer: showAgentCursor,
         onClipboard: (text) => post({ type: "clipboard", text }),
         onDownload: (download) => post({ type: "download", ...download }),
