@@ -235,6 +235,10 @@
       "types": "./src/state/presentation.ts",
       "default": "./src/state/presentation.ts"
     },
+    "./state/computerUse": {
+      "types": "./src/state/computerUse.ts",
+      "default": "./src/state/computerUse.ts"
+    },
     "./state/device": {
       "types": "./src/state/device.ts",
       "default": "./src/state/device.ts"
