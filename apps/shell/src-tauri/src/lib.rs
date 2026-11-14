@@ -2,10 +2,13 @@ mod account;
 mod bridge;
 mod cli_command;
 mod cloud_api;
+mod computer_use;
 mod connection_storage;
 mod diagnostics;
+mod exit_guard;
 mod ipc_scope;
 mod local_env;
+mod navigation;
 mod network;
 mod server_process;
 mod shell_settings;
@@ -143,11 +146,13 @@ const LOG_TAIL_LINES: usize = 20;
 fn start_server(
     app: &tauri::App,
     settings: &ShellSettings,
+    extra_env: &[(String, String)],
 ) -> Result<(Server, tauri::Url), String> {
     let mut command = server_command(app, settings).map_err(|error| error.to_string())?;
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
+    command.envs(extra_env.iter().map(|(key, value)| (key, value)));
     command.stdin(Stdio::null()).stdout(Stdio::piped());
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
@@ -371,13 +376,24 @@ pub(crate) fn stop_server(app: &tauri::AppHandle) {
     }
 }
 
+#[cfg(target_os = "macos")]
+const QUIT_MENU_ID: &str = "quit";
+
 /// The default menu binds Cmd+W to "Close Window", which ends the app and every running agent.
 /// The web app uses that shortcut to close a panel, so this menu leaves it out.
+/// Quit is not the predefined item: that one ends the app at once, with no chance to ask.
 #[cfg(target_os = "macos")]
 fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, PredefinedMenuItem as Item, Submenu};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem as Item, Submenu};
 
     let name = app.package_info().name.clone();
+    let quit = MenuItem::with_id(
+        app,
+        QUIT_MENU_ID,
+        format!("Quit {name}"),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
     Menu::with_items(
         app,
         &[
@@ -394,7 +410,7 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
                     &Item::hide_others(app, None)?,
                     &Item::show_all(app, None)?,
                     &Item::separator(app)?,
-                    &Item::quit(app, None)?,
+                    &quit,
                 ],
             )?,
             &Submenu::with_items(
@@ -426,8 +442,12 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.menu(app_menu);
-    builder
+    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_MENU_ID {
+            exit_guard::request_quit(app);
+        }
+    });
+    let builder = builder
         // Must be the first plugin. A second launch would start a second server on the same data.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
@@ -437,7 +457,11 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_notification::init());
+    // The emergency stop for computer use, which only macOS has.
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    builder
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_request,
             bridge::dropped_paths,
@@ -488,7 +512,8 @@ pub fn run() {
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
-            let (server, pairing_url) = match start_server(app, &settings) {
+            let computer_use_env = computer_use::initialize(app.handle(), &settings);
+            let (server, pairing_url) = match start_server(app, &settings, &computer_use_env) {
                 Ok(started) => started,
                 Err(reason) => {
                     report_start_failure(app.handle(), &reason);
@@ -532,13 +557,15 @@ pub fn run() {
             let relay_app = app.handle().clone();
             std::thread::spawn(move || account::sync_relay_credential(&relay_app));
             account::run_heartbeat(app.handle().clone());
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url));
+            let window =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url.clone()))
+                    .user_agent("GustafShell/1");
             #[cfg(target_os = "macos")]
             let window = window
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
                 .hidden_title(true)
                 .traffic_light_position(tauri::LogicalPosition::new(16.0, 20.0));
-            window
+            let window = window
                 .title("Gustaf")
                 .inner_size(1280.0, 800.0)
                 .resizable(true)
@@ -551,12 +578,22 @@ pub fn run() {
                     platform,
                 ))
                 // Editor and mail links have no page to load; their own app opens them.
-                .on_navigation(|url| {
+                .on_navigation(move |url| {
                     if bridge::is_handoff_url(url) {
                         open_external_url(url);
                         return false;
                     }
-                    true
+                    if navigation::deciding_main_frame() != Some(true) {
+                        return true;
+                    }
+                    match navigation::decide(&app_url, url) {
+                        navigation::MainFrameNavigation::Allow => true,
+                        navigation::MainFrameNavigation::OpenInBrowser => {
+                            open_external_url(url);
+                            false
+                        }
+                        navigation::MainFrameNavigation::Refuse => false,
+                    }
                 })
                 // Without a handler the web view cancels every download.
                 .on_download(|_webview, event| {
@@ -571,16 +608,28 @@ pub fn run() {
                     tauri::webview::NewWindowResponse::Deny
                 })
                 .build()?;
+            navigation::watch_frames(&window);
             app.manage(Mutex::new(Some(server)));
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while running Gustaf")
-        .run(|app, event| {
-            if matches!(event, RunEvent::Exit) {
+        .run(|app, event| match event {
+            // Closing the only window ends the app (on macOS too), so it asks like Quit does.
+            RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "main" => {
+                api.prevent_close();
+                exit_guard::request_quit(app);
+            }
+            RunEvent::Exit => {
+                computer_use::shutdown(app);
                 ssh::stop(app);
                 stop_server(app);
             }
+            _ => {}
         });
 }
 

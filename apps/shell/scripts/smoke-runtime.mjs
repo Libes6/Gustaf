@@ -98,7 +98,21 @@ async function startAsShell(browser, pairingUrl) {
   const bearer = await exchangeForBearer(url.origin, token);
   const commands = shellCommands(bearer);
   const unknownCommands = new Set();
-  const page = await browser.newPage();
+  const page = await browser.newPage({ userAgent: "GustafShell/1" });
+  const cspViolations = [];
+  page.on("console", (message) => {
+    if (/content.security.policy|violates.*directive|refused to/i.test(message.text())) {
+      cspViolations.push(message.text());
+    }
+  });
+  await page.exposeFunction("__gustafSmokeCspViolation", (violation) => {
+    cspViolations.push(violation);
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      window.__gustafSmokeCspViolation(`${event.effectiveDirective}: ${event.blockedURI}`);
+    });
+  });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.stack ?? error.message));
   await page.exposeFunction("__gustafSmokeInvoke", (command) => {
@@ -124,8 +138,15 @@ async function startAsShell(browser, pairingUrl) {
       .replaceAll("__GUSTAF_BOOTSTRAPS__", JSON.stringify(bootstraps))
       .replaceAll("__GUSTAF_PLATFORM__", '"darwin"'),
   );
-  await page.goto(`${url.origin}/`);
+  const response = await page.goto(`${url.origin}/`);
+  if (!response.headers()["content-security-policy"]?.includes("script-src 'self'")) {
+    throw new Error("The shell HTML response has no enforced CSP.");
+  }
   await page.waitForTimeout(SETTLE_MS);
+  for (const route of ["/settings/appearance", "/settings/keybindings", "/"]) {
+    await page.goto(`${url.origin}${route}`);
+    await page.waitForTimeout(SETTLE_MS);
+  }
   const text = await page.evaluate(() => document.body.innerText);
   const bridged = await page.evaluate(() => window.desktopBridge !== undefined);
   if (NodeProcess.env.GUSTAF_SMOKE_SCREENSHOT) {
@@ -137,6 +158,7 @@ async function startAsShell(browser, pairingUrl) {
     text.toLowerCase().includes(BOOT_FAILURE) && "the page reports a start failure",
     PAIRING_FORM.test(text) && "the page asks to pair instead of signing in",
     pageErrors.length > 0 && "the page threw",
+    cspViolations.length > 0 && `CSP violations: ${cspViolations.join("; ")}`,
     unknownCommands.size > 0 && `unanswered commands: ${[...unknownCommands].join(", ")}`,
   ].filter(Boolean);
   if (problems.length > 0) {

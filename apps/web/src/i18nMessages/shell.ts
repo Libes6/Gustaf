@@ -545,6 +545,8 @@ export const shellMessages = {
     "shell.installT3.macOsLinux": "macOS, Linux",
     "shell.installT3.then": "Then",
     "shell.installT3.windowsPowerShell": "Windows (PowerShell)",
+    "shell.installT3.skipHint":
+      "Skip the install if you already have gustaf. If gustaf is not found after installing, add the folder the installer names to your PATH.",
     "shell.sidebar.dragToResize": "Drag to resize sidebar",
     "shell.sidebar.resize": "Resize Sidebar",
     "shell.sidebar.title": "Sidebar",
@@ -1139,6 +1141,8 @@ export const shellMessages = {
     "shell.installT3.macOsLinux": "macOS, Linux",
     "shell.installT3.then": "Затем",
     "shell.installT3.windowsPowerShell": "Windows (PowerShell)",
+    "shell.installT3.skipHint":
+      "Если gustaf уже установлен, этот шаг можно пропустить. Если после установки команда gustaf не находится, добавьте в PATH папку, которую назвал установщик.",
     "shell.sidebar.dragToResize": "Перетащите, чтобы изменить ширину боковой панели",
     "shell.sidebar.resize": "Изменить ширину боковой панели",
     "shell.sidebar.title": "Боковая панель",

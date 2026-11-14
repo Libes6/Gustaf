@@ -115,9 +115,9 @@ export async function openServerPictureInPicture(input: {
         interactive: false,
       },
       {
-        onFrame: (jpeg) => {
+        onFrame: (jpeg, done) => {
           refusals = 0;
-          painter.paint(jpeg);
+          painter.paint(jpeg, done);
         },
         onViewport: () => undefined,
         onConnectedChange: () => undefined,

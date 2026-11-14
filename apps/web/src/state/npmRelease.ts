@@ -1,3 +1,4 @@
+import { latestGustafRelease } from "@t3tools/shared/cliRelease";
 import { type ServerConfig, ServerNpmReleaseError } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -46,6 +47,18 @@ export const npmReleaseAtom = Atom.family((spec: string) =>
     }
     const unsupported = unsupportedLookup(get(serverEnvironment.configValueAtom(environmentId)));
     if (unsupported !== null) return Effect.fail(unsupported);
+    if (
+      get(serverEnvironment.configValueAtom(environmentId))?.environment.capabilities
+        .serverSelfUpdate === "desktop-managed"
+    ) {
+      return Effect.tryPromise({
+        try: async (signal) => ({
+          version: await latestGustafRelease(signal),
+          databaseMigration: undefined,
+        }),
+        catch: () => new ServerNpmReleaseError({ reason: "Could not check Gustaf releases." }),
+      });
+    }
     return get
       .result(serverEnvironment.npmRelease({ environmentId, input: { spec } }))
       .pipe(

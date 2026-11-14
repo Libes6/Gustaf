@@ -78,6 +78,11 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
+  // Lets an agent see and drive the Mac this environment runs on.
+  [WS_METHODS.computerUseSetEnabled]: AuthSettingsWriteScope,
+  [WS_METHODS.computerUseAllowThread]: AuthOrchestrationOperateScope,
+  [WS_METHODS.computerUseOpenPermissionSettings]: AuthOrchestrationOperateScope,
+  [WS_METHODS.computerUseStop]: AuthOrchestrationOperateScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

@@ -17,6 +17,7 @@
 - [Visual replies](./user/html-renders.md)
 - [Import browser sessions](./user/browser-import.md)
 - [Devices](./user/devices.md)
+- [Control your Mac](./user/computer-use.md)
 - [Usage and limits](./user/usage.md)
 - [Secrets](./user/secrets.md)
 - [Product usage data](./user/telemetry.md)

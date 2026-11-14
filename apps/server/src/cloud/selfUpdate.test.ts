@@ -24,6 +24,7 @@ import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 import * as ServerSelfUpdate from "./selfUpdate.ts";
 
 interface HarnessOptions {
+  readonly appVersion?: string;
   readonly mode?: "web" | "desktop";
   readonly managed?: boolean;
   readonly preflight?: "ready" | "blocked";
@@ -40,14 +41,14 @@ const releaseHttpClient = (order: string[], urls: string[], beforeDownload?: Eff
   HttpClient.make((request) =>
     Effect.gen(function* () {
       urls.push(request.url);
-      if (request.url.endsWith("/SHA256SUMS")) {
+      if (request.url.endsWith("/SHA256SUMS.txt")) {
         const digest = yield* Effect.promise(() => crypto.subtle.digest("SHA-256", archiveBytes));
         const hex = Array.from(new Uint8Array(digest), (byte) =>
           byte.toString(16).padStart(2, "0"),
         ).join("");
         return HttpClientResponse.fromWeb(
           request,
-          new Response(`${hex}  t3-1.1.0-linux-x64.tar.gz\n`),
+          new Response(`${hex}  gustaf-1.1.0-linux-x64.tar.gz\n`),
         );
       }
       if (beforeDownload) yield* beforeDownload;
@@ -147,6 +148,7 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
       HttpClient.HttpClient,
       releaseHttpClient(order, urls, options.beforeDownload),
     ),
+    Effect.provideService(HostProcess.Environment, { GUSTAF_APP_VERSION: options.appVersion }),
     Effect.provideService(HostProcess.Platform, "linux"),
     Effect.provideService(HostProcess.Architecture, "x64"),
     Effect.provide(
@@ -370,7 +372,7 @@ it.layer(NodeServices.layer)("pruning runtimes on start", (it) => {
     for (const version of [staleVersion, packageJson.version]) {
       const directory = path.join(realHome, "runtime", "versions", version);
       yield* fs.makeDirectory(directory, { recursive: true });
-      yield* fs.writeFileString(path.join(directory, "t3"), "");
+      yield* fs.writeFileString(path.join(directory, "gustaf"), "");
       const sentinel = path.join(directory, ".install-complete");
       yield* fs.writeFileString(sentinel, `${version}\n`);
       yield* fs.utimes(sentinel, 0, 0);
@@ -379,7 +381,7 @@ it.layer(NodeServices.layer)("pruning runtimes on start", (it) => {
     // Like `process.execPath`, the running runtime is reported by its real path.
     const executablePath =
       input.executable === "own runtime"
-        ? yield* fs.realPath(path.join(versionsDir, packageJson.version, "t3"))
+        ? yield* fs.realPath(path.join(versionsDir, packageJson.version, "gustaf"))
         : "/usr/local/bin/node";
     const removed = yield* ServerSelfUpdate.pruneRuntimesOnStart({
       baseDir,
@@ -457,3 +459,18 @@ it("a host crosses tracks only to a release that knows its whole database", () =
     }),
   ).toContain("Cannot confirm");
 });
+
+it.effect("Gustaf desktop updates stay on the desktop even with an update bridge", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness({
+      mode: "desktop",
+      appVersion: "0.13.0",
+      desktopAppUpdate: { available: true, run: () => Effect.die("must not install remotely") },
+    });
+    expect(
+      (yield* harness.selfUpdate.update({ targetVersion: "0.14.0" }).pipe(Effect.flip)).reason,
+    ).toBe("Update the Gustaf desktop app on this machine.");
+    expect(harness.urls).toEqual([]);
+    expect(harness.order).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);

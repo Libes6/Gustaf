@@ -1,3 +1,5 @@
+import { cliInstallCommand } from "@t3tools/shared/cliRelease";
+
 import packageJson from "../../package.json" with { type: "json" };
 import { BUILD_MIGRATION_HEAD, recordedMigrations } from "../persistence/databaseMigrationHead.ts";
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
@@ -28,7 +30,7 @@ export function runServicePreflight(input: {
       // reinstall itself and report success, so name the exact install and the path check.
       reason: [
         `The installed service launcher speaks protocol ${input.launcherProtocol}, but t3@${version} requires protocol ${SERVICE_LAUNCHER_PROTOCOL}.`,
-        `On the server machine, install this exact CLI: \`curl -fsSL https://t3.codes/install.sh | T3CODE_VERSION=${version} sh\`.`,
+        `On the server machine, install this exact CLI: \`${cliInstallCommand("linux", version)}\`.`,
         `Check that \`gustaf --version\` prints ${version} and that \`which -a gustaf\` lists no older gustaf (such as an npm or nvm install) first, then run \`~/.local/bin/gustaf service install\` (the installer's default path).`,
         "Updating the desktop app does not update this CLI, and `gustaf service update` only repairs the service with whichever CLI runs it.",
       ].join(" "),

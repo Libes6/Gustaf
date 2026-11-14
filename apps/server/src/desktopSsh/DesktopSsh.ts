@@ -52,13 +52,13 @@ export const Request = Schema.Union([
   }),
 ]);
 
-/** Remote hosts run upstream t3 archives, so they follow the runtime's version, not the Gustaf app's. */
+/** Remote hosts download the Gustaf release archive of the app that connects to them. */
 export const cliRunner = (
   runtimeVersion: string,
   env: Readonly<Record<string, string | undefined>>,
 ): SshTunnel.RemoteT3RunnerOptions => ({
   installedCommand: "gustaf",
-  archiveVersion: runtimeVersion,
+  archiveVersion: env.GUSTAF_APP_VERSION?.trim() || runtimeVersion,
   releaseBaseUrl: env[CLI_RELEASE_BASE_URL_ENV]?.trim() || null,
 });
 

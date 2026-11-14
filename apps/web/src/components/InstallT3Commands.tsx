@@ -1,3 +1,5 @@
+import { cliInstallCommand } from "@t3tools/shared/cliRelease";
+
 import { cn } from "~/lib/utils";
 
 import { useT } from "../useUiLanguage";
@@ -18,16 +20,12 @@ export function InstallT3Commands({
   return (
     <div className={cn("space-y-2", className)}>
       <p className="text-xs text-muted-foreground">{t("shell.installT3.macOsLinux")}</p>
-      <CommandBlock command="curl -fsSL https://t3.codes/install.sh | sh" />
+      <CommandBlock command={cliInstallCommand("linux")} />
       <p className="text-xs text-muted-foreground">{t("shell.installT3.windowsPowerShell")}</p>
-      <CommandBlock command="irm https://t3.codes/install.ps1 | iex" />
+      <CommandBlock command={cliInstallCommand("win32")} />
       <p className="text-xs text-muted-foreground">{t("shell.installT3.then")}</p>
       <CommandBlock command={command} />
-      <p className="text-xs text-muted-foreground">
-        Skip the install if you already have <code className="font-mono">gustaf</code>. If{" "}
-        <code className="font-mono">gustaf</code> is not found after installing, add the folder the
-        installer names to your PATH.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("shell.installT3.skipHint")}</p>
     </div>
   );
 }

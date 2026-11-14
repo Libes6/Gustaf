@@ -1,0 +1,37 @@
+{
+  "request": {
+    "id": 3,
+    "token": "launch-secret",
+    "op": "act",
+    "sessionToken": "SESSION",
+    "action": { "type": "key", "keys": ["command", "s"] }
+  },
+  "status": {
+    "event": "status",
+    "status": {
+      "availability": "active",
+      "permissions": { "screenRecording": true, "accessibility": true },
+      "owner": { "environmentId": "env-1", "threadId": "thread-A", "label": "A" },
+      "emergencyShortcut": "⌃⌥⌘⎋"
+    }
+  },
+  "screenshot": {
+    "id": 7,
+    "ok": true,
+    "result": {
+      "captureId": "c1",
+      "displayId": 2,
+      "bounds": { "x": -1920.0, "y": -200.0, "width": 1920.0, "height": 1080.0 },
+      "scale": 1.0,
+      "width": 1280,
+      "height": 720,
+      "mimeType": "image/png",
+      "data": "iVBORw0KGgo="
+    }
+  },
+  "failure": {
+    "id": 7,
+    "ok": false,
+    "error": { "code": "unauthorized", "message": "This caller may not control the Mac." }
+  }
+}

@@ -292,7 +292,10 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                         if (disabled) return;
                         const fromVersion = config.environment.serverVersion;
                         void run("check", async () => {
-                          const exit = await checkRelease(async () => fromVersion);
+                          const exit = await checkRelease(async () => ({
+                            version: fromVersion,
+                            desktopManaged: capabilities?.serverSelfUpdate === "desktop-managed",
+                          }));
                           // `run` owns the error message, so a failed lookup rethrows to it.
                           if (Exit.isFailure(exit)) throw Cause.squash(exit.cause);
                         });

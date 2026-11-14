@@ -93,7 +93,7 @@ impl StoredAccount {
 
 // --- PKCE (RFC 7636) ---
 
-fn random_token() -> String {
+pub(crate) fn random_token() -> String {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)

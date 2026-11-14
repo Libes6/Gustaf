@@ -51,6 +51,9 @@ mod tests {
     fn the_static_file_grants_no_remote_origin_of_its_own() {
         let file: serde_json::Value = serde_json::from_str(PERMISSIONS_FILE).unwrap();
         assert!(file.get("remote").is_none());
+        // Computer use is reachable only from the server the shell started (computer_use/channel.rs).
+        let permissions = file["permissions"].to_string();
+        assert!(!permissions.contains("computer") && !permissions.contains("global-shortcut"));
     }
 
     #[test]

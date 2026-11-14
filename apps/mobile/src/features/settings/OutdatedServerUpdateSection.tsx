@@ -46,7 +46,10 @@ export function OutdatedServerUpdateSection({
     startCheck(async () => {
       const description = await describe(environmentId);
       if (AsyncResult.isFailure(description)) throw squashAtomCommandFailure(description);
-      return description.value.serverVersion;
+      return {
+        version: description.value.serverVersion,
+        desktopManaged: description.value.capabilities.serverSelfUpdate === "desktop-managed",
+      };
     });
   }
 
@@ -105,7 +108,11 @@ export function OutdatedServerUpdateSection({
         loading={checking}
         onPress={check}
       />
-      {release?.targetVersion ? (
+      {release?.desktopManaged ? (
+        <Text className="p-4 text-sm text-foreground-muted">
+          {t("Update the desktop app on this machine.")}
+        </Text>
+      ) : release?.targetVersion ? (
         <SettingsActionRow
           icon="arrow.up.circle"
           label={state.status === "failed" ? "Retry update" : `Update to ${release.targetVersion}`}

@@ -11,8 +11,13 @@ import {
   OrchestrationV2AppThread,
   OrchestrationV2TurnItem,
   OrchestrationV2ThreadTranscript,
+  MessageId,
+  NodeId,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+  RunAttemptId,
+  RunId,
   ThreadId,
+  type OrchestrationV2RunStatus,
 } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
 import { threadTranscriptHeader } from "@t3tools/shared/threadTranscript";
@@ -292,5 +297,77 @@ it.effect("leaves older settled threads out of the HTTP shell only when asked", 
       [thread.id, ...Array.from({ length: 25 }, (_, index) => `settled-${index + 1}`)].toSorted(),
     );
     expect(cut.olderSettled?.counts).toEqual([{ projectId: thread.projectId, count: 1 }]);
+  }),
+);
+
+it.effect("counts the threads whose run quitting would end", () =>
+  Effect.gen(function* () {
+    let allowed = true;
+    const { eventSink, handler } = yield* serveOrchestrationHttp(() => allowed);
+    const working = Effect.promise(async () => {
+      const response = await handler(
+        new Request("http://localhost/api/orchestration/working-threads"),
+      );
+      return { status: response.status, body: (await response.json()) as unknown };
+    });
+    expect(yield* working).toEqual({ status: 200, body: { workingThreads: 0 } });
+
+    const runs: ReadonlyArray<readonly [string, number, OrchestrationV2RunStatus]> = [
+      ["busy", 1, "running"],
+      ["busy", 2, "starting"],
+      ["approval", 1, "waiting"],
+      ["queued", 1, "queued"],
+      ["done", 1, "completed"],
+    ];
+    yield* eventSink.write({
+      events: runs.flatMap(([name, ordinal, status]) => {
+        const threadId = ThreadId.make(`thread-${name}`);
+        const runId = RunId.make(`run-${name}-${ordinal}`);
+        return [
+          ...(ordinal === 1
+            ? [
+                {
+                  id: EventId.make(`create-${threadId}`),
+                  type: "thread.created" as const,
+                  threadId,
+                  occurredAt: now,
+                  payload: {
+                    ...thread,
+                    id: threadId,
+                    lineage: { ...thread.lineage, rootThreadId: threadId },
+                  },
+                },
+              ]
+            : []),
+          {
+            id: EventId.make(`create-${runId}`),
+            type: "run.created" as const,
+            threadId,
+            occurredAt: now,
+            payload: {
+              id: runId,
+              threadId,
+              ordinal,
+              providerInstanceId: thread.providerInstanceId,
+              modelSelection: thread.modelSelection,
+              providerThreadId: null,
+              userMessageId: MessageId.make(`message-${runId}`),
+              rootNodeId: NodeId.make(`node-${runId}`),
+              activeAttemptId: RunAttemptId.make(`attempt-${runId}`),
+              status,
+              requestedAt: now,
+              startedAt: now,
+              completedAt: null,
+              checkpointId: null,
+              contextHandoffId: null,
+            },
+          },
+        ];
+      }),
+    });
+    expect(yield* working).toEqual({ status: 200, body: { workingThreads: 2 } });
+
+    allowed = false;
+    expect((yield* working).status).toBe(403);
   }),
 );
