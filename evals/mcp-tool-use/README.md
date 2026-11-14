@@ -32,6 +32,13 @@ Cases are JSON lines in `cases/`, one file per area. The case schema in `run.ts`
 
 Check that the case builds with `--dry-run --case <id>`. Then run it on the text before your fix, where it must fail, and on the text after, where it must pass.
 
+## Computer use cases
+
+`cases/computer-use.ndjson` guards the `computer_*` tools from the owner's Computer Use spec: in an
+allowed thread a GUI task goes through them, screenshot first, never shell automation such as
+`osascript` or `screencapture`; a refused thread makes the agent ask for Control Mac instead of
+working around it; a code question leaves the Mac alone.
+
 ## Device manager cases
 
 `cases/device-manager.ndjson` ports nine mechanisms from the [device-routing investigation described in #25661](https://github.com/pingdotgg/t3code/pull/25661) and adds seven cases from t3dotgg’s 2026-10-26 fleet device investigation. All prompts, files, hosts and prior turns are authored Acme data; the fleet cases cite finding ids without carrying source transcripts or identifiers.
