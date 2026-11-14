@@ -3,6 +3,7 @@
 //! and killing it is a hard stop. Requests and replies are never logged.
 
 use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -31,25 +32,30 @@ impl Drop for Process {
     }
 }
 
-impl Process {
-    fn start(app: &tauri::AppHandle) -> Result<Self, String> {
-        use std::os::unix::fs::PermissionsExt;
-        let directory = app
-            .path()
-            .app_cache_dir()
-            .map_err(|error| error.to_string())?
-            .join("native");
-        std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-        let path = directory.join("gustaf-computer-use");
-        let temporary = directory.join(format!("computer-use-{}.tmp", std::process::id()));
-        std::fs::write(
-            &temporary,
-            include_bytes!(concat!(env!("OUT_DIR"), "/gustaf-computer-use")),
-        )
+/// Once per launch: the helper itself restarts after every check that finds Screen Recording off.
+fn install(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = app
+        .path()
+        .app_cache_dir()
+        .map_err(|error| error.to_string())?
+        .join("native");
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let path = directory.join("gustaf-computer-use");
+    let temporary = directory.join(format!("computer-use-{}.tmp", std::process::id()));
+    std::fs::write(
+        &temporary,
+        include_bytes!(concat!(env!("OUT_DIR"), "/gustaf-computer-use")),
+    )
+    .map_err(|error| error.to_string())?;
+    std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o700))
         .map_err(|error| error.to_string())?;
-        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o700))
-            .map_err(|error| error.to_string())?;
-        std::fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
+    std::fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
+    Ok(path)
+}
+
+impl Process {
+    fn start(path: &Path) -> Result<Self, String> {
         let mut child = Command::new(path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -77,17 +83,26 @@ impl Process {
 
 pub(crate) struct HelperBackend {
     app: tauri::AppHandle,
+    path: Option<PathBuf>,
     process: Option<Process>,
 }
 
 impl HelperBackend {
     pub(crate) fn new(app: tauri::AppHandle) -> Self {
-        Self { app, process: None }
+        Self {
+            app,
+            path: None,
+            process: None,
+        }
     }
 
     fn call(&mut self, mut request: Value, timeout: Duration) -> Result<Value, String> {
         if self.process.is_none() {
-            self.process = Some(Process::start(&self.app)?);
+            if self.path.is_none() {
+                self.path = Some(install(&self.app)?);
+            }
+            let path = self.path.as_deref().ok_or("helper-missing")?;
+            self.process = Some(Process::start(path)?);
         }
         let process = self.process.as_mut().ok_or("helper-missing")?;
         process.next += 1;
@@ -142,11 +157,22 @@ fn parse_display(value: &Value) -> Option<Display> {
 
 impl Backend for HelperBackend {
     fn permissions(&mut self) -> Result<Permissions, String> {
-        let value = self.call(json!({ "op": "permissions" }), QUICK)?;
-        Ok(Permissions {
+        let request = json!({ "op": "permissions" });
+        // A helper that failed to start or answer says nothing about permissions: ask a fresh one.
+        let value = match self.call(request.clone(), QUICK) {
+            Ok(value) => value,
+            Err(_) => self.call(request, QUICK)?,
+        };
+        let permissions = Permissions {
             screen_recording: value["screenRecording"].as_bool() == Some(true),
             accessibility: value["accessibility"].as_bool() == Some(true),
-        })
+        };
+        // A process keeps the Screen Recording answer it first got, so a grant made in System
+        // Settings shows only in a new helper. The shell itself never asks, so it needs no restart.
+        if !permissions.screen_recording {
+            self.process = None;
+        }
+        Ok(permissions)
     }
 
     fn open_settings(&mut self, permission: Permission) -> Result<(), String> {

@@ -34,7 +34,7 @@ fn text(language: Language) -> Text {
     match language {
         Language::En => Text {
             title: "Allow agents to control this Mac?",
-            confirm: format!("Agents in the threads you allow will see your screen and use the mouse and keyboard. You can stop them at any time from the menu bar or with {EMERGENCY_SHORTCUT}."),
+            confirm: format!("The agent in the thread you allow will see this Mac's screen and use its mouse and keyboard. You are asked once; later threads are allowed from the app. While an agent is in control, the menu bar says so. To stop: Stop in the thread, Stop control in the menu bar, or {EMERGENCY_SHORTCUT}."),
             allow: "Allow",
             deny: "Don't Allow",
             indicator: "Agent controls Mac",
@@ -43,7 +43,7 @@ fn text(language: Language) -> Text {
         },
         Language::Ru => Text {
             title: "Разрешить агентам управлять этим Mac?",
-            confirm: format!("Агенты в разрешённых вами тредах будут видеть экран и пользоваться мышью и клавиатурой. Остановить их можно в любой момент из строки меню или сочетанием {EMERGENCY_SHORTCUT}."),
+            confirm: format!("Агент в треде, которому вы разрешите, будет видеть экран этого Mac и пользоваться мышью и клавиатурой. Это спрашивается один раз; следующие треды разрешаются из приложения. Пока агент управляет, об этом говорит строка меню. Остановить: «Стоп» в треде, «Остановить управление» в строке меню или {EMERGENCY_SHORTCUT}."),
             allow: "Разрешить",
             deny: "Не разрешать",
             indicator: "Агент управляет Mac",

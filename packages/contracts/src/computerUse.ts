@@ -67,7 +67,10 @@ export type ComputerUseEndReason = typeof ComputerUseEndReason.Type;
 
 export const ComputerUseStatus = Schema.Struct({
   availability: ComputerUseAvailability,
-  /** Present only while the feature is on; the shell does not probe macOS before that. */
+  /**
+   * Present only while the feature is on; the shell does not probe macOS before that. Absent
+   * while on means the check itself failed, not that permissions are missing.
+   */
   permissions: Schema.optional(ComputerUsePermissions),
   owner: Schema.optional(ComputerUseOwner),
   lastEndReason: Schema.optional(ComputerUseEndReason),

@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { computerUseErrorCode } from "@t3tools/client-runtime/state/computerUse";
+import { computerUseErrorCode, computerUseStep } from "@t3tools/client-runtime/state/computerUse";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -12,7 +12,7 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { MonitorIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { computerUseEnvironment, useComputerUseStatus } from "~/state/computerUse";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -30,18 +30,10 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   unsupported: "computerUse.error.unsupported",
 };
 
-const PERMISSIONS: ReadonlyArray<{
-  readonly permission: ComputerUsePermission;
-  readonly field: "screenRecording" | "accessibility";
-  readonly label: MessageKey;
-}> = [
-  {
-    permission: "screen-recording",
-    field: "screenRecording",
-    label: "computerUse.screenRecording",
-  },
-  { permission: "accessibility", field: "accessibility", label: "computerUse.accessibility" },
-];
+const PERMISSION_LABELS: Record<ComputerUsePermission, MessageKey> = {
+  "screen-recording": "computerUse.screenRecording",
+  accessibility: "computerUse.accessibility",
+};
 
 /** The thread header's view of computer use on the Mac this environment runs on. */
 export function ComputerUseControl({
@@ -103,6 +95,9 @@ export function ComputerUseControl({
   );
 }
 
+/** While the grant step shows: macOS sends no event when a permission is switched on. */
+const PERMISSION_RECHECK_MS = 2_000;
+
 function ComputerUsePanel({
   environmentId,
   threadId,
@@ -122,6 +117,25 @@ function ComputerUsePanel({
   const allowThread = useAtomCommand(computerUseEnvironment.allowThread, options);
   const [pending, setPending] = useState<MessageKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const step = computerUseStep(status, environmentId, threadId);
+  const granting = step.kind === "grant";
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- polls the Mac while the grant step shows, because macOS reports no permission changes
+  useEffect(() => {
+    if (!granting) return;
+    const timer = setInterval(
+      () => void refresh({ environmentId, input: {} }),
+      PERMISSION_RECHECK_MS,
+    );
+    return () => clearInterval(timer);
+  }, [granting, environmentId, refresh]);
+
+  const fail = (result: AtomCommandResult<unknown, unknown>) => {
+    if (result._tag === "Success" || isAtomCommandInterrupted(result)) return false;
+    const code = computerUseErrorCode(squashAtomCommandFailure(result));
+    setError(t((code && ERROR_KEYS[code]) || "computerUse.error.failed"));
+    return true;
+  };
 
   const run = async (
     label: MessageKey | null,
@@ -129,17 +143,35 @@ function ComputerUsePanel({
   ) => {
     setPending(label);
     setError(null);
-    const result = await task();
+    fail(await task());
     setPending(null);
-    if (result._tag === "Success" || isAtomCommandInterrupted(result)) return;
-    const code = computerUseErrorCode(squashAtomCommandFailure(result));
-    setError(t((code && ERROR_KEYS[code]) || "computerUse.error.failed"));
   };
 
-  const owner = status.owner;
-  const text = (key: MessageKey) => <p className="text-muted-foreground text-sm">{t(key)}</p>;
+  /** One click: turning the feature on first when it is off, then allowing this thread. */
+  const allow = async (confirmOnMac: boolean) => {
+    setError(null);
+    if (confirmOnMac) {
+      setPending("computerUse.confirmOnMac");
+      const enabled = await setEnabled({ environmentId, input: { enabled: true } });
+      // Missing permissions become the next step instead; the status subscription shows it.
+      if (fail(enabled) || enabled._tag !== "Success" || enabled.value.availability !== "ready") {
+        setPending(null);
+        return;
+      }
+    }
+    setPending("computerUse.starting");
+    fail(await allowThread({ environmentId, input: { threadId } }));
+    setPending(null);
+  };
+
+  const muted = (content: string) => <p className="text-muted-foreground text-sm">{content}</p>;
+  const stopHint = (
+    <p className="text-muted-foreground text-xs">
+      {t("computerUse.howToStop").replace("{shortcut}", status.emergencyShortcut)}
+    </p>
+  );
   const lastEnd =
-    owner === undefined && status.lastEndReason !== undefined ? (
+    status.owner === undefined && status.lastEndReason !== undefined ? (
       <p className="text-muted-foreground text-xs">
         {t("computerUse.lastEnd").replace(
           "{reason}",
@@ -149,47 +181,58 @@ function ComputerUsePanel({
     ) : null;
 
   const body = (() => {
-    switch (status.availability) {
+    switch (step.kind) {
       case "unsupported":
-        return text("computerUse.unsupported");
-      case "disabled":
+        return muted(t("computerUse.unsupported"));
+      case "allow":
         return (
           <>
-            {text("computerUse.disabled")}
+            {muted(t("computerUse.whatItDoes"))}
+            {stopHint}
+            {step.confirmOnMac ? muted(t("computerUse.firstTime")) : null}
             <Button
               size="sm"
               disabled={!canOperate || pending !== null}
-              onClick={() =>
-                void run("computerUse.confirmOnMac", () =>
-                  setEnabled({ environmentId, input: { enabled: true } }),
-                )
-              }
+              onClick={() => void allow(step.confirmOnMac)}
             >
-              {t("computerUse.enable")}
+              {t("computerUse.allow")}
             </Button>
           </>
         );
-      case "permissions-required":
+      case "grant":
         return (
           <>
-            {text("computerUse.permissionsNeeded")}
-            {PERMISSIONS.filter(({ field }) => status.permissions?.[field] !== true).map(
-              ({ permission, label }) => (
-                <div key={permission} className="flex items-center justify-between gap-2">
-                  <span className="text-sm">{t(label)}</span>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    disabled={!canOperate}
-                    onClick={() =>
-                      void run(null, () => openSettings({ environmentId, input: { permission } }))
-                    }
-                  >
-                    {t("computerUse.openSettings")}
-                  </Button>
-                </div>
-              ),
+            {muted(
+              step.missing.length === 1
+                ? t("computerUse.grantOne").replace(
+                    "{permission}",
+                    t(PERMISSION_LABELS[step.missing[0]!]),
+                  )
+                : t("computerUse.grantBoth"),
             )}
+            {step.missing.map((permission) => (
+              <div key={permission} className="flex items-center justify-between gap-2">
+                <span className="text-sm">{t(PERMISSION_LABELS[permission])}</span>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={!canOperate}
+                  onClick={() =>
+                    void run(null, () => openSettings({ environmentId, input: { permission } }))
+                  }
+                >
+                  {t("computerUse.openSettings")}
+                </Button>
+              </div>
+            ))}
+            <p className="text-muted-foreground text-xs">{t("computerUse.grantAutoCheck")}</p>
+            <p className="text-muted-foreground text-xs">{t("computerUse.grantOldEntry")}</p>
+          </>
+        );
+      case "check-failed":
+        return (
+          <>
+            {muted(t("computerUse.checkFailed"))}
             <Button
               size="sm"
               variant="outline"
@@ -200,32 +243,15 @@ function ComputerUsePanel({
             </Button>
           </>
         );
-      case "ready":
-        return (
-          <>
-            {text("computerUse.ready")}
-            <Button
-              size="sm"
-              disabled={!canOperate || pending !== null}
-              onClick={() =>
-                void run(null, () => allowThread({ environmentId, input: { threadId } }))
-              }
-            >
-              {t("computerUse.allow")}
-            </Button>
-          </>
-        );
       case "active":
         return (
           <>
             <p className="text-sm">
-              {owner?.environmentId === environmentId && owner.threadId === threadId
+              {step.here
                 ? t("computerUse.ownedHere")
-                : t("computerUse.ownedElsewhere").replace("{owner}", owner?.label ?? "")}
+                : t("computerUse.ownedElsewhere").replace("{owner}", step.label)}
             </p>
-            <p className="text-muted-foreground text-xs">
-              {t("computerUse.emergency").replace("{shortcut}", status.emergencyShortcut)}
-            </p>
+            {stopHint}
           </>
         );
     }
