@@ -8699,7 +8699,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     : flavor.getModelContextWindow?.(selection, session);
                 },
               }),
-          ...(postSettleContinuationEnabled || followsAgentWorkState
+          ...(postSettleContinuationEnabled ||
+          followsAgentWorkState ||
+          flavor.supportsSubagents === true ||
+          flavor.subagentsIdleOnTurnCompletion === true ||
+          flavor.extractBackgroundTaskId !== undefined
             ? {
                 hasPendingBackgroundWork: Effect.gen(function* () {
                   const rootSessionId = yield* Ref.get(activeSessionId);
@@ -8735,6 +8739,33 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                   }
                   return false;
                 }),
+                hasPendingBackgroundWorkForThread: (providerThread) =>
+                  Effect.gen(function* () {
+                    const nativeId = providerThread.nativeThreadRef?.nativeId;
+                    const active = yield* Ref.get(activeTurn);
+                    if (
+                      active !== null &&
+                      (nativeId === undefined || active.nativeThreadId === nativeId)
+                    ) {
+                      if (
+                        [...active.subagents.values()].some(
+                          acpSubagentHasPendingBackgroundWork,
+                        )
+                      )
+                        return true;
+                      if (hasDeferredBackgroundWork(active)) return true;
+                    }
+                    const carryover = yield* Ref.get(carryoverSubagents);
+                    if (
+                      carryover !== null &&
+                      (nativeId === undefined || carryover.sessionId === nativeId) &&
+                      carryover.subagents.some(acpSubagentHasPendingBackgroundWork)
+                    ) {
+                      return true;
+                    }
+                    if ((yield* Ref.get(runningBackgroundTaskIds)).size > 0) return true;
+                    return false;
+                  }),
               }
             : {}),
           ensureThread: Effect.fn("AcpAdapterV2.ensureThread")(

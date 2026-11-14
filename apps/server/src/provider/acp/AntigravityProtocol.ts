@@ -468,8 +468,30 @@ export function normalizeAntigravityToolCall(
       ...(exitCode !== undefined ? { exitCode } : {}),
     };
   }
+  const rawOutputText =
+    typeof toolCall.data.rawOutput === "string"
+      ? toolCall.data.rawOutput
+      : Predicate.isObject(toolCall.data.rawOutput) &&
+          typeof (toolCall.data.rawOutput as Record<string, unknown>).output === "string"
+        ? ((toolCall.data.rawOutput as Record<string, unknown>).output as string)
+        : undefined;
+
+  let status = toolCall.status;
+  if (
+    typeof rawOutputText === "string" &&
+    (rawOutputText.includes("is running as a background task") ||
+      rawOutputText.includes("background task with task id") ||
+      rawOutputText.includes("Tool is running as a background task")) &&
+    !rawOutputText.includes("Command exited with code") &&
+    !rawOutputText.includes("finished with result") &&
+    status === "completed"
+  ) {
+    status = "inProgress";
+  }
+
   return {
     ...toolCall,
+    status,
     ...(kind !== undefined ? { kind } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(toolCall.title !== undefined ? { title: boundText(toolCall.title) } : {}),
@@ -616,12 +638,45 @@ export function isAntigravityBackgroundCommandTool(toolCall: AcpToolCallState): 
   if (rawInput && (rawInput.IsDaemon === true || rawInput.isDaemon === true)) {
     return true;
   }
+  const rawOutput = toolCall.data.rawOutput;
+  if (
+    typeof rawOutput === "string" &&
+    (rawOutput.includes("is running as a background task") ||
+      rawOutput.includes("background task with task id") ||
+      rawOutput.includes("Tool is running as a background task"))
+  ) {
+    return true;
+  }
   const title = (toolCall.title ?? "").toLowerCase();
   return (
     title.includes("run_command") &&
     rawInput !== undefined &&
     (rawInput.IsDaemon === true || rawInput.isDaemon === true)
   );
+}
+
+export function extractAntigravityBackgroundToolMutation(
+  text: string,
+): ReadonlyArray<{ taskId: string; status: "completed" | "failed"; appendOutput?: string }> {
+  const match =
+    /(?:Task id|taskId|TaskId|task id)["':\s]+([a-zA-Z0-9_\-/]+)["']?\s+(finished|failed|ended|completed)\s+with result:?([\s\S]*)/i.exec(
+      text,
+    );
+  if (match?.[1]) {
+    const taskId = match[1].trim();
+    const action = match[2].toLowerCase();
+    const rest = match[3] ?? "";
+    const isFailed =
+      action === "failed" || /Command exited with code\s+([1-9]\d*)/i.test(rest);
+    return [
+      {
+        taskId,
+        status: isFailed ? "failed" : "completed",
+        appendOutput: rest ? `\n${rest.trim()}` : undefined,
+      },
+    ];
+  }
+  return [];
 }
 
 export function isAntigravityPersistentBackgroundTool(toolCall: AcpToolCallState): boolean {

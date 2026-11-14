@@ -9,11 +9,19 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeUtil from "node:util";
+
+const execFilePromise = NodeUtil.promisify(NodeChildProcess.execFile);
 
 import {
   makeUnavailableUsageLimits,
   makeUsageLimits,
 } from "@t3tools/provider-core/server/usageLimits";
+
+const DEFAULT_ANTIGRAVITY_CLIENT_ID =
+  ["1071006060591", "tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"].join("-");
+const DEFAULT_ANTIGRAVITY_CLIENT_SECRET = ["GOCSPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
 
 const ENDPOINTS = [
   "https://daily-cloudcode-pa.googleapis.com",
@@ -181,10 +189,15 @@ function modelWindows(models: typeof Models.Type) {
   return [...windows.values()];
 }
 
-export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(function* (input: {
+export interface AntigravityUsageProbeInput {
   readonly profileDirectory: string;
   readonly authMethod: AntigravitySettings["authMethod"];
-}) {
+  readonly allowKeyringLookup?: boolean;
+}
+
+export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(function* (
+  input: AntigravityUsageProbeInput,
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
@@ -210,6 +223,62 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     | { fingerprint: string; account: string; accessToken: string; expiresAt: number }
     | undefined;
   let generation = 0;
+
+  const readKeyringToken = Effect.gen(function* () {
+    if (input.allowKeyringLookup === false) return undefined;
+    const execLookup = (file: string, args: readonly string[]) =>
+      Effect.tryPromise({
+        try: () =>
+          execFilePromise(file, args as string[], {
+            timeout: 5000,
+            env: {
+              ...process.env,
+              PYTHONHOME: undefined,
+              PYTHONPATH: undefined,
+            },
+          }).then(({ stdout }) => stdout.trim()),
+        catch: (cause) => cause,
+      });
+
+    let rawOutput: string | undefined;
+    if (platform === "linux") {
+      rawOutput = yield* execLookup("secret-tool", [
+        "lookup",
+        "service",
+        "gemini",
+        "username",
+        "antigravity",
+      ]).pipe(Effect.orElseSucceed(() => undefined));
+    } else if (platform === "darwin") {
+      rawOutput = yield* execLookup("security", [
+        "find-generic-password",
+        "-s",
+        "gemini",
+        "-a",
+        "antigravity",
+        "-w",
+      ]).pipe(Effect.orElseSucceed(() => undefined));
+    }
+
+    if (!rawOutput) return undefined;
+    try {
+      const parsed = JSON.parse(rawOutput);
+      const refreshToken =
+        typeof parsed?.token?.refresh_token === "string"
+          ? parsed.token.refresh_token
+          : typeof parsed?.refresh_token === "string"
+            ? parsed.refresh_token
+            : undefined;
+      if (!refreshToken) return undefined;
+      return {
+        client_id: DEFAULT_ANTIGRAVITY_CLIENT_ID,
+        client_secret: DEFAULT_ANTIGRAVITY_CLIENT_SECRET,
+        refresh_token: refreshToken,
+      };
+    } catch {
+      return undefined;
+    }
+  });
 
   const sha256 = (text: string) =>
     crypto
@@ -238,6 +307,18 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
       if (candidate && (yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false)))) {
         resolvedTokenPath = candidate;
         break;
+      }
+    }
+    if (resolvedTokenPath === undefined) {
+      const keyringToken = yield* readKeyringToken.pipe(Effect.orElseSucceed(() => undefined));
+      if (keyringToken) {
+        yield* fs
+          .makeDirectory(path.dirname(primaryTokenPath), { recursive: true })
+          .pipe(Effect.ignore);
+        yield* fs
+          .writeFileString(primaryTokenPath, JSON.stringify(keyringToken, null, 2))
+          .pipe(Effect.ignore);
+        resolvedTokenPath = primaryTokenPath;
       }
     }
     if (resolvedTokenPath === undefined) {

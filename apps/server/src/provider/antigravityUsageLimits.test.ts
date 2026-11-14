@@ -111,7 +111,7 @@ const fixture = Effect.fn("AntigravityUsageTest.fixture")(function* (
             : Response.json({}, { status: 403 }),
         );
       }
-      expect(JSON.parse(body)).toEqual({ project: "project-id" });
+      expect(JSON.parse(body)).toEqual(options.missingToken ? {} : { project: "project-id" });
       expect(request.headers["user-agent"]).toMatch(/^antigravity\/hub\/2\.24\.0 /);
       return HttpClientResponse.fromWeb(
         request,
@@ -132,6 +132,7 @@ const fixture = Effect.fn("AntigravityUsageTest.fixture")(function* (
   const usage = yield* makeAntigravityUsageProbe({
     profileDirectory,
     authMethod: options.authMethod ?? "oauth-personal",
+    allowKeyringLookup: options.allowKeyringLookup ?? false,
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
   return { ...usage, requests, writeToken, tokenPath };
 });
@@ -612,6 +613,19 @@ describe("Antigravity subscription limits", () => {
         const { probe, requests } = yield* fixture(options);
         expect((yield* probe).unavailable?.reason).toBe("unsupported");
         expect(requests).toEqual([]);
+      }
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+
+  it.effect("reads token from keyring fallback when token file is absent", () =>
+    Effect.gen(function* () {
+      const { probe, tokenPath } = yield* fixture({ missingToken: true, allowKeyringLookup: true });
+      const limits = yield* probe;
+      if (limits.unavailable === undefined) {
+        expect(limits.windows.length).toBeGreaterThan(0);
+        expect(yield* (yield* FileSystem.FileSystem).exists(tokenPath)).toBe(true);
+      } else {
+        expect(limits.unavailable.reason).toBe("unsupported");
       }
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
