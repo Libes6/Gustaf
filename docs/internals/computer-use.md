@@ -69,6 +69,16 @@ prompts look and is not done yet.
 
 Gustaf is ad hoc signed, so macOS may forget both permissions after each update.
 
+## Whose permissions are checked
+
+The helper asks macOS (`CGPreflightScreenCaptureAccess`, `AXIsProcessTrusted`) from the same
+process that captures and posts events, so the check and the action always agree. macOS
+attributes that unbundled child to the app responsible for it: the installed Gustaf bundle, or,
+for a dev shell started from a terminal, that terminal app (or whatever app ran the command).
+A process keeps the first Screen Recording answer it got, so the shell drops the helper after
+any check that finds it off and the next check runs in a fresh one. A helper that cannot be asked reports no permissions,
+which clients show as a failed check rather than as permissions to grant.
+
 ## The OS calls
 
 `native/ComputerUse.swift` is a helper process, like SnapShots: one request per line, one OS

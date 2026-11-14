@@ -10,19 +10,26 @@ Only one thread controls the Mac at a time, across every environment and Gustaf 
 ## Turning it on
 
 1. Open the thread and click **Control Mac** (the monitor icon) in its header.
-2. Click **Turn on for this Mac**. A dialog appears on the Mac; only someone sitting at it can
-   allow it.
-3. If Gustaf lacks a permission, click **Open on the Mac** next to it. Allow Gustaf under
-   **System Settings › Privacy & Security › Screen Recording** and **Accessibility**, then click
-   **Check again**. macOS may ask you to reopen Gustaf after granting Screen Recording.
-4. Click **Allow this thread**. Then ask the agent to do the task, for example "Open TextEdit,
-   type a short note and save it to Desktop/test".
+2. Click **Allow this thread**. The first time, a Gustaf dialog appears on the Mac; only someone
+   sitting at it can allow it. Later threads skip that dialog.
+3. If Gustaf lacks a macOS permission, the panel names the missing one. Click **Open settings**
+   next to it and switch Gustaf on under **System Settings › Privacy & Security** (**Screen
+   Recording** or **Accessibility**). macOS may show its own prompt for the same permission; it
+   leads to the same switch. The panel notices the change within a few seconds; then click
+   **Allow this thread** again.
+4. Ask the agent to do the task, for example "Open TextEdit, type a short note and save it to
+   Desktop/test".
+
+When Gustaf already has both permissions, step 3 never appears.
 
 Control works with Claude, Codex, OpenCode and Pi. Other providers do not show screenshots to
 their model, so the tools refuse there.
 
-Gustaf is not signed by Apple, so macOS may forget both permissions after an update. Grant them
-again the same way.
+Gustaf is not signed by Apple, so macOS treats each update as a new app: the list can show
+several **Gustaf** entries, and one switched on for an older version does not count. If the
+panel still asks for a permission that looks granted, remove the Gustaf entries with **−** and
+click **Open settings** again. If macOS offers to quit and reopen Gustaf after you grant Screen
+Recording, you only need to when the panel still asks for it.
 
 ## Stopping
 

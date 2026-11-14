@@ -10,6 +10,8 @@ use super::*;
 
 struct World {
     permissions: Permissions,
+    /// The helper could not be asked, such as when it failed to start.
+    permissions_fail: bool,
     displays: Vec<Display>,
     probe: Probe,
     inputs: Vec<Input>,
@@ -41,6 +43,7 @@ fn display(id: u32, x: f64, y: f64, width: f64, height: f64, scale: f64) -> Disp
 fn world() -> Arc<Mutex<World>> {
     Arc::new(Mutex::new(World {
         permissions: GRANTED,
+        permissions_fail: false,
         displays: vec![
             display(1, 0.0, 0.0, 1440.0, 900.0, 2.0),
             display(2, -1920.0, -200.0, 1920.0, 1080.0, 1.0),
@@ -58,6 +61,9 @@ impl Backend for Fake {
     fn permissions(&mut self) -> Result<Permissions, String> {
         let mut world = self.0.lock().unwrap();
         world.calls += 1;
+        if world.permissions_fail {
+            return Err("helper-timed-out".into());
+        }
         Ok(world.permissions)
     }
     fn open_settings(&mut self, _permission: Permission) -> Result<(), String> {
@@ -259,6 +265,11 @@ fn status_follows_platform_switch_permissions_and_session() {
     rig.world.lock().unwrap().permissions = screen_only;
     let refused = rig.executor.start(1, owner("A")).unwrap_err();
     assert!(refused.message.contains("needs Accessibility permission"));
+    // A helper that cannot be asked names no permission as missing; clients say the check failed.
+    rig.world.lock().unwrap().permissions_fail = true;
+    let unknown = rig.executor.status();
+    assert_eq!(unknown.availability, Availability::PermissionsRequired);
+    assert_eq!(unknown.permissions, None);
     // A disabled feature never starts the helper to ask.
     let rig = rig_with(false, lock::tempdir().join("owner.lock"));
     assert_eq!(rig.executor.status().permissions, None);

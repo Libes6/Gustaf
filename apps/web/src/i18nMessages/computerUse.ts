@@ -9,23 +9,30 @@ export const computerUseMessages = {
     "computerUse.title": "Control this Mac",
     "computerUse.unsupported":
       "Not available here. Agents can control a Mac only through the Gustaf app on that Mac, in its own environment.",
-    "computerUse.disabled":
-      "Turned off on this Mac. Turning it on asks the person at the Mac to confirm.",
-    "computerUse.enable": "Turn on for this Mac",
-    "computerUse.confirmOnMac": "Confirm on the Mac.",
+    "computerUse.confirmOnMac": "Waiting for the person at the Mac to confirm…",
     "computerUse.disable": "Turn off on this Mac",
-    "computerUse.permissionsNeeded":
-      "Gustaf needs these permissions in System Settings › Privacy & Security on the Mac:",
+    "computerUse.whatItDoes":
+      "This thread's agent will see the Mac's screen and use its mouse and keyboard until control stops. Works with Claude, Codex, OpenCode and Pi.",
+    "computerUse.howToStop":
+      "To stop: Stop in the thread header, Stop control in the Mac's menu bar, or {shortcut} on the Mac.",
+    "computerUse.firstTime":
+      "The first time, Gustaf asks the person at the Mac to confirm in a dialog there.",
+    "computerUse.starting": "Starting control…",
+    "computerUse.grantOne": "Gustaf on the Mac still needs the {permission} permission.",
+    "computerUse.grantBoth": "Gustaf on the Mac still needs two permissions.",
+    "computerUse.grantAutoCheck":
+      "Switch Gustaf on in the list that opens. This panel notices on its own; then click Allow this thread.",
+    "computerUse.grantOldEntry":
+      "Gustaf already looks switched on? The list can hold an older Gustaf build under the same name. Remove the Gustaf entries with −, then click Open settings again.",
+    "computerUse.checkFailed":
+      "Gustaf could not ask macOS about its permissions. Check again; if it keeps failing, reopen Gustaf on the Mac.",
     "computerUse.screenRecording": "Screen Recording",
     "computerUse.accessibility": "Accessibility",
-    "computerUse.openSettings": "Open on the Mac",
+    "computerUse.openSettings": "Open settings",
     "computerUse.checkAgain": "Check again",
-    "computerUse.ready":
-      "Let this thread's agent see the screen and use the mouse and keyboard. Works with Claude, Codex, OpenCode and Pi; other providers are not supported.",
     "computerUse.allow": "Allow this thread",
     "computerUse.ownedHere": "This thread's agent controls the Mac.",
     "computerUse.ownedElsewhere": "The Mac is controlled by “{owner}”.",
-    "computerUse.emergency": "Emergency stop on the Mac: {shortcut}.",
     "computerUse.lastEnd": "Last stopped: {reason}.",
     "computerUse.end.stopped-by-user": "by the user",
     "computerUse.end.emergency-shortcut": "with the emergency shortcut",
@@ -36,8 +43,8 @@ export const computerUseMessages = {
     "computerUse.end.app-quit": "Gustaf quit",
     "computerUse.error.busy": "The Mac is already controlled by another thread. Stop it first.",
     "computerUse.error.declined": "The person at the Mac did not allow it.",
-    "computerUse.error.permission-required": "Grant the permissions on the Mac first.",
-    "computerUse.error.disabled": "Turn it on for this Mac first.",
+    "computerUse.error.permission-required": "Gustaf lacks a macOS permission on the Mac.",
+    "computerUse.error.disabled": "Control is turned off on the Mac. Try again.",
     "computerUse.error.emergency-stop-unavailable":
       "The emergency stop shortcut could not be set up, so control did not start.",
     "computerUse.error.unsupported": "Not available in this environment.",
@@ -50,23 +57,30 @@ export const computerUseMessages = {
     "computerUse.title": "Управление этим Mac",
     "computerUse.unsupported":
       "Здесь недоступно. Агенты управляют Mac только через приложение Gustaf на этом Mac, в его собственном окружении.",
-    "computerUse.disabled":
-      "Выключено на этом Mac. При включении человек у Mac должен подтвердить.",
-    "computerUse.enable": "Включить на этом Mac",
-    "computerUse.confirmOnMac": "Подтвердите на Mac.",
+    "computerUse.confirmOnMac": "Ждём подтверждения на Mac…",
     "computerUse.disable": "Выключить на этом Mac",
-    "computerUse.permissionsNeeded":
-      "Gustaf нужны разрешения в Системных настройках › Конфиденциальность и безопасность на Mac:",
+    "computerUse.whatItDoes":
+      "Агент этого треда будет видеть экран Mac и пользоваться мышью и клавиатурой, пока управление не остановят. Работает с Claude, Codex, OpenCode и Pi.",
+    "computerUse.howToStop":
+      "Остановить: «Стоп» в шапке треда, «Остановить управление» в строке меню Mac или {shortcut} на Mac.",
+    "computerUse.firstTime":
+      "В первый раз Gustaf попросит человека у Mac подтвердить в окне на самом Mac.",
+    "computerUse.starting": "Запускаю управление…",
+    "computerUse.grantOne": "Gustaf на Mac не хватает разрешения «{permission}».",
+    "computerUse.grantBoth": "Gustaf на Mac не хватает двух разрешений.",
+    "computerUse.grantAutoCheck":
+      "Включите Gustaf в открывшемся списке. Панель заметит это сама; затем нажмите «Разрешить этому треду».",
+    "computerUse.grantOldEntry":
+      "Gustaf там уже включён? В списке может остаться старая сборка Gustaf с тем же именем. Удалите записи Gustaf кнопкой −, затем снова нажмите «Открыть настройки».",
+    "computerUse.checkFailed":
+      "Gustaf не смог узнать у macOS свои разрешения. Проверьте снова; если не помогает, перезапустите Gustaf на Mac.",
     "computerUse.screenRecording": "Запись экрана",
     "computerUse.accessibility": "Универсальный доступ",
-    "computerUse.openSettings": "Открыть на Mac",
+    "computerUse.openSettings": "Открыть настройки",
     "computerUse.checkAgain": "Проверить снова",
-    "computerUse.ready":
-      "Агент этого треда будет видеть экран и пользоваться мышью и клавиатурой. Работает с Claude, Codex, OpenCode и Pi; другие провайдеры не поддерживаются.",
     "computerUse.allow": "Разрешить этому треду",
     "computerUse.ownedHere": "Агент этого треда управляет Mac.",
     "computerUse.ownedElsewhere": "Mac управляет «{owner}».",
-    "computerUse.emergency": "Аварийная остановка на Mac: {shortcut}.",
     "computerUse.lastEnd": "Последняя остановка: {reason}.",
     "computerUse.end.stopped-by-user": "пользователем",
     "computerUse.end.emergency-shortcut": "аварийным сочетанием",
@@ -77,8 +91,8 @@ export const computerUseMessages = {
     "computerUse.end.app-quit": "Gustaf закрыт",
     "computerUse.error.busy": "Mac уже управляет другой тред. Сначала остановите его.",
     "computerUse.error.declined": "Человек у Mac не разрешил.",
-    "computerUse.error.permission-required": "Сначала выдайте разрешения на Mac.",
-    "computerUse.error.disabled": "Сначала включите для этого Mac.",
+    "computerUse.error.permission-required": "Gustaf не хватает разрешения macOS на Mac.",
+    "computerUse.error.disabled": "Управление на Mac выключено. Попробуйте снова.",
     "computerUse.error.emergency-stop-unavailable":
       "Не удалось назначить аварийное сочетание, поэтому управление не началось.",
     "computerUse.error.unsupported": "Недоступно в этом окружении.",

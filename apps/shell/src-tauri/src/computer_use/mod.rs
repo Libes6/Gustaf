@@ -550,7 +550,7 @@ impl Executor {
         if !guard(&self.state).enabled {
             return Err(Error::new(
                 ErrorCode::Disabled,
-                "Computer use is turned off on this Mac. The user can turn it on in Settings.",
+                "Computer use is turned off on this Mac. The user can turn it on from the thread's Control Mac button.",
             ));
         }
         let permissions = guard(&self.backend).permissions().map_err(Error::backend)?;
