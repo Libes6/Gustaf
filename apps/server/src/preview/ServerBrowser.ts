@@ -90,9 +90,10 @@ import { installPdfDocumentNavigation, isPdfAssetUrl } from "./PdfDocumentNaviga
 
 const SERVER_HOST_CLIENT_ID = SERVER_BROWSER_AUTOMATION_CLIENT_ID;
 const RENDER_SCALE = 2;
-// Chromium allows three unacked frames, so 100 ms pacing caps viewers near 30 fps.
-const SCREENCAST_ACK_PACE_MS = 100;
+// Chromium keeps a few frames unacked; 50 ms pacing measured ~36 fps (100 ms gave ~24).
+const SCREENCAST_ACK_PACE_MS = 50;
 const SCREENCAST_SETTLE_MS = 200;
+// A caret blink or typing stays below this rate, so they keep sharp full-size frames.
 const SCREENCAST_MOTION_FRAMES = 4;
 const SCREENCAST_MOTION_WINDOW_MS = 300;
 const SCREENCAST_MOTION_QUALITY = 50;
@@ -268,8 +269,6 @@ interface ViewerState {
   readonly push: (output: ServerBrowserViewerOutput) => void;
   readonly pause: () => Promise<void>;
   readonly resume: () => Promise<void>;
-  scrolledAt: number;
-
   requestedSize: { width: number; height: number; order: number } | null;
 }
 
@@ -2418,7 +2417,6 @@ const make = Effect.gen(function* () {
         return;
       }
       case "wheel":
-        viewer.scrolledAt = Date.now();
         await session.send("Input.dispatchMouseEvent", {
           type: "mouseWheel",
           x: num(message.x),
@@ -2549,18 +2547,28 @@ const make = Effect.gen(function* () {
     let motion = false;
     const recentFrames: Array<number> = [];
     let screencastParams = Promise.resolve();
-    let screencastScale = 1;
-    const startScreencast = (scale: number) => {
-      screencastScale = scale;
+    // Moving frames carry one pixel per CSS pixel: a Retina viewer decodes a quarter of the
+    // pixels while anything animates, and the settle still restores full sharpness.
+    let screencastMoving = false;
+    let cssSize: { readonly width: number; readonly height: number } | null = null;
+    const startScreencast = (moving: boolean) => {
+      screencastMoving = moving;
       screencastParams = screencastParams.then(async () => {
         if (tab.capturing > 0) return;
+        const size =
+          screencastMoving && cssSize
+            ? {
+                maxWidth: Math.min(input.maxWidth, cssSize.width),
+                maxHeight: Math.min(input.maxHeight, cssSize.height),
+              }
+            : { maxWidth: input.maxWidth, maxHeight: input.maxHeight };
         await session.send("Page.stopScreencast").catch(constVoid);
         await session
           .send("Page.startScreencast", {
             format: "jpeg",
-            quality: screencastScale < 1 ? Math.min(quality, SCREENCAST_MOTION_QUALITY) : quality,
-            maxWidth: Math.max(1, Math.round(input.maxWidth * screencastScale)),
-            maxHeight: Math.max(1, Math.round(input.maxHeight * screencastScale)),
+            quality: screencastMoving ? Math.min(quality, SCREENCAST_MOTION_QUALITY) : quality,
+            maxWidth: Math.max(1, Math.round(size.maxWidth)),
+            maxHeight: Math.max(1, Math.round(size.maxHeight)),
           })
           .catch(constVoid);
       });
@@ -2600,8 +2608,7 @@ const make = Effect.gen(function* () {
         );
         return screencastParams;
       },
-      resume: () => startScreencast(screencastScale),
-      scrolledAt: 0,
+      resume: () => startScreencast(screencastMoving),
       requestedSize: null,
     };
     yield* Effect.acquireRelease(
@@ -2640,19 +2647,13 @@ const make = Effect.gen(function* () {
       if (framesInFlight > 0) mayHaveDropped = true;
       framesInFlight += 1;
       const arrivedAt = Date.now();
+      cssSize = { width: frame.metadata.deviceWidth, height: frame.metadata.deviceHeight };
       recentFrames.push(arrivedAt);
       while (recentFrames[0]! < arrivedAt - SCREENCAST_MOTION_WINDOW_MS) recentFrames.shift();
-      if (
-        !motion &&
-        recentFrames.length >= SCREENCAST_MOTION_FRAMES &&
-        arrivedAt - viewer.scrolledAt < SCREENCAST_MOTION_WINDOW_MS
-      ) {
+      // Any sustained repaint counts: scrolling, page loads, animations, and the agent's actions.
+      if (!motion && recentFrames.length >= SCREENCAST_MOTION_FRAMES) {
         motion = true;
-        void startScreencast(0.5);
-      } else if (motion && arrivedAt - viewer.scrolledAt > SCREENCAST_SETTLE_MS) {
-        motion = false;
-        recentFrames.length = 0;
-        void startScreencast(1);
+        void startScreencast(true);
       }
       if (settleTimer !== null) clearTimeout(settleTimer);
       settleTimer = setTimeout(() => {
@@ -2662,7 +2663,7 @@ const make = Effect.gen(function* () {
         if (motion) {
           motion = false;
           recentFrames.length = 0;
-          void startScreencast(1);
+          void startScreencast(false);
         }
         void pushStill();
       }, SCREENCAST_SETTLE_MS);
@@ -2680,7 +2681,7 @@ const make = Effect.gen(function* () {
       });
     });
     void broadcastViewport(tab).catch(constVoid);
-    yield* Effect.promise(() => startScreencast(1));
+    yield* Effect.promise(() => startScreencast(false));
     // An idle page does not repaint for a new screencast, so the viewer
     // starts from a still unless a live frame beat it.
     if (!screencastStarted) yield* Effect.promise(pushStill);
