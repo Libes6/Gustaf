@@ -302,15 +302,14 @@ export function makeAntigravityAcpAdapterFlavor(
         Effect.provideService(Path.Path, options.path),
       ),
     preserveRuntimeOnSettledInterrupt: true,
-    deferFinalizeForBackgroundWork: false,
-    enablePostSettleContinuation: true,
+    deferFinalizeForBackgroundWork: true,
     isProvisionalSubagentTool: (toolCall) =>
       classifyAntigravitySubagentToolCall(toolCall) === "subagent",
     isPersistentBackgroundTool: isAntigravityPersistentBackgroundTool,
     extractBackgroundTaskId: extractAntigravityBackgroundTaskId,
     extractBackgroundToolMutation: extractAntigravityBackgroundToolMutation,
     isBackgroundCommandTool: isAntigravityBackgroundCommandTool,
-    subagentsIdleOnTurnCompletion: false,
+    subagentsIdleOnTurnCompletion: true,
     ...(options.onSessionEvent === undefined ? {} : { onSessionEvent: options.onSessionEvent }),
     applyModelSelection: Effect.fn("AntigravityAdapterV2.applyModelSelection")(function* ({
       runtime,

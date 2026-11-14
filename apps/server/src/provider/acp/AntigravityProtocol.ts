@@ -477,20 +477,13 @@ export function normalizeAntigravityToolCall(
         : undefined;
 
   let status = toolCall.status;
-  const isScheduleTool =
-    (toolCall.title ?? "").toLowerCase().includes("schedule") ||
-    (Predicate.isObject(toolCall.data.rawInput) &&
-      ((toolCall.data.rawInput as Record<string, unknown>).CronExpression !== undefined ||
-        (toolCall.data.rawInput as Record<string, unknown>).DurationSeconds !== undefined));
-
   if (
-    (isScheduleTool ||
-      (typeof rawOutputText === "string" &&
-        (rawOutputText.includes("is running as a background task") ||
-          rawOutputText.includes("background task with task id") ||
-          rawOutputText.includes("Tool is running as a background task")) &&
-        !rawOutputText.includes("Command exited with code") &&
-        !rawOutputText.includes("finished with result"))) &&
+    typeof rawOutputText === "string" &&
+    (rawOutputText.includes("is running as a background task") ||
+      rawOutputText.includes("background task with task id") ||
+      rawOutputText.includes("Tool is running as a background task")) &&
+    !rawOutputText.includes("Command exited with code") &&
+    !rawOutputText.includes("finished with result") &&
     (status === "completed" || status === "pending")
   ) {
     status = "inProgress";
@@ -622,15 +615,6 @@ export function extractAntigravityBackgroundTaskId(
     return rawInput.taskId.trim();
   }
 
-  const title = (toolCall.title ?? "").toLowerCase();
-  if (
-    title.includes("schedule") ||
-    title.includes("manage_task") ||
-    (rawInput && (rawInput.CronExpression !== undefined || rawInput.DurationSeconds !== undefined))
-  ) {
-    return toolCall.toolCallId;
-  }
-
   if (isAntigravityBackgroundCommandTool(toolCall)) {
     return toolCall.toolCallId;
   }
@@ -698,14 +682,11 @@ export function extractAntigravityBackgroundToolMutation(
 }
 
 export function isAntigravityPersistentBackgroundTool(toolCall: AcpToolCallState): boolean {
-  const title = (toolCall.title ?? "").toLowerCase();
-  if (title.includes("schedule")) return true;
   const rawInput = Predicate.isObject(toolCall.data.rawInput)
     ? (toolCall.data.rawInput as Record<string, unknown>)
     : undefined;
-  if (rawInput) {
-    if (rawInput.IsDaemon === true || rawInput.isDaemon === true) return true;
-    if (rawInput.CronExpression !== undefined || rawInput.DurationSeconds !== undefined) return true;
+  if (rawInput && (rawInput.IsDaemon === true || rawInput.isDaemon === true)) {
+    return true;
   }
   return false;
 }
