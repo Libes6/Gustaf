@@ -59,6 +59,7 @@ import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.t
 import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as CodexInstallation from "./provider/CodexInstallation.ts";
 import * as DeviceService from "./device/DeviceService.ts";
+import * as ComputerUseService from "./computerUse/ComputerUseService.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as DirectEndpoints from "./environment/DirectEndpoints.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
@@ -786,6 +787,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(CommandOutputHub.CommandOutputHub)({}),
   Layer.mock(CodexInstallation.CodexInstallation)({ managedDirectory: "/unused" }),
   Layer.mock(DeviceService.DeviceService)({}),
+  Layer.mock(ComputerUseService.ComputerUseService)({}),
   Layer.mock(EnvironmentTheme.EnvironmentThemeService)({}),
   Layer.mock(GitWorkflowService.GitWorkflowService)({}),
   Layer.mock(WorktreeInventory.WorktreeInventory)({}),

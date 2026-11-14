@@ -6,7 +6,7 @@
  */
 import * as Schema from "effect/Schema";
 
-import { NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, PositiveInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 export const ComputerUseRect = Schema.Struct({
   x: Schema.Finite,
@@ -185,6 +185,10 @@ export const ComputerUseErrorCode = Schema.Literals([
   "invalid-action",
   "emergency-stop-unavailable",
   "failed",
+  /** Server only: the user has not allowed computer use in the calling thread. */
+  "not-allowed",
+  /** Server only: the calling provider does not show tool images to its model. */
+  "provider-unsupported",
 ]);
 export type ComputerUseErrorCode = typeof ComputerUseErrorCode.Type;
 
@@ -239,3 +243,29 @@ export const ComputerUseExecutorEvent = Schema.Struct({
   status: ComputerUseStatus,
 });
 export type ComputerUseExecutorEvent = typeof ComputerUseExecutorEvent.Type;
+
+/**
+ * Drivers whose runtime hands an MCP tool's image content to the model: Claude Agent SDK and
+ * Codex app-server pass it natively, OpenCode attaches it as files, Pi copies it into model
+ * content (provider-pi rpc.ts). The others are refused: driving a screen blind is unsafe.
+ */
+const COMPUTER_USE_IMAGE_DRIVERS: ReadonlySet<string> = new Set([
+  "claudeAgent",
+  "codex",
+  "opencode",
+  "pi",
+]);
+export const computerUseSupportsDriver = (driver: string): boolean =>
+  COMPUTER_USE_IMAGE_DRIVERS.has(driver);
+
+/** An environment without the shell's executor, such as one on a VPS. */
+export const COMPUTER_USE_UNSUPPORTED_STATUS: ComputerUseStatus = {
+  availability: "unsupported",
+  emergencyShortcut: "",
+};
+
+export const ComputerUseSetEnabledInput = Schema.Struct({ enabled: Schema.Boolean });
+export const ComputerUseOpenPermissionSettingsInput = Schema.Struct({
+  permission: ComputerUsePermission,
+});
+export const ComputerUseAllowThreadInput = Schema.Struct({ threadId: ThreadId });
