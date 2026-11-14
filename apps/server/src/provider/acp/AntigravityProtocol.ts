@@ -487,19 +487,53 @@ const ANTIGRAVITY_SUBAGENT_TITLES = new Set([
   "Run start_subagent?",
   "Running invoke_subagent",
   "Run invoke_subagent?",
+  "start_subagent",
+  "invoke_subagent",
+  "subagent",
 ]);
+
+export function isAntigravitySubagentToolCall(
+  toolCall: AcpToolCallState,
+  rawPayload?: unknown,
+): boolean {
+  if (toolCall.kind === "subagent") return true;
+  if (toolCall.kind !== undefined && toolCall.kind !== "other") return false;
+
+  const title = toolCall.title?.trim().toLowerCase();
+  if (title) {
+    if (
+      (toolCall.title !== undefined && ANTIGRAVITY_SUBAGENT_TITLES.has(toolCall.title)) ||
+      title === "invoke_subagent" ||
+      title === "start_subagent" ||
+      title.includes("invoke_subagent") ||
+      title.includes("start_subagent")
+    ) {
+      return true;
+    }
+  }
+
+  const rawInput = toolCall.data?.rawInput;
+  if (Predicate.isObject(rawInput)) {
+    if ("Subagents" in rawInput || "subagents" in rawInput) return true;
+    if (
+      ("Role" in rawInput || "role" in rawInput || "TypeName" in rawInput || "typeName" in rawInput) &&
+      ("Prompt" in rawInput || "prompt" in rawInput)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /** The ACP agent reports subagent calls as ordinary tools without child IDs or models. */
 export function classifyAntigravitySubagentToolCall(
   toolCall: AcpToolCallState,
   rawPayload?: unknown,
 ): "subagent" | "mcp" | undefined {
-  if (
-    (toolCall.kind !== undefined && toolCall.kind !== "other") ||
-    toolCall.title === undefined ||
-    !ANTIGRAVITY_SUBAGENT_TITLES.has(toolCall.title)
-  )
+  if (!isAntigravitySubagentToolCall(toolCall, rawPayload)) {
     return undefined;
+  }
   const update = Predicate.isObject(rawPayload) ? rawPayload.update : undefined;
   const meta = Predicate.isObject(update) ? update._meta : toolCall.data.meta;
   return Predicate.isObject(meta) && meta.is_mcp_tool_call === true ? "mcp" : "subagent";

@@ -341,4 +341,37 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
       expect(JSON.stringify(children).length).toBeLessThan(600 * 1024);
     }),
   );
+
+  it("decodes single subagent, flat object, and lowercase tool inputs", () => {
+    expect(
+      antigravitySubagentLaunches({
+        Role: "Codebase Researcher",
+        Prompt: "Find all usages",
+        TypeName: "research",
+      }),
+    ).toEqual([{ role: "Codebase Researcher", prompt: "Find all usages" }]);
+
+    expect(
+      antigravitySubagentLaunches({
+        role: "Debugger",
+        prompt: "Fix crash",
+      }),
+    ).toEqual([{ role: "Debugger", prompt: "Fix crash" }]);
+
+    expect(
+      antigravitySubagentLaunches({
+        TypeName: "general",
+        Prompt: "Run build",
+      }),
+    ).toEqual([{ role: "general", prompt: "Run build" }]);
+
+    expect(
+      antigravitySubagentLaunches(
+        JSON.stringify({
+          role: "Tester",
+          prompt: "Verify tests",
+        }),
+      ),
+    ).toEqual([{ role: "Tester", prompt: "Verify tests" }]);
+  });
 });

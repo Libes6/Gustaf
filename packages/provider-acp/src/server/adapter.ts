@@ -8476,15 +8476,35 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               // Stop sees the native return. Capture usage only before finalize: a late
               // response must not flip a settled turn.
               Effect.tap((result) =>
-                Effect.sync(() => {
+                Effect.gen(function* () {
                   if (flavor.reportsPerTurnPromptUsage === true && !context.finalized) {
                     context.promptUsage = result.usage ?? undefined;
+                    if (result.usage) {
+                      const totalTokens =
+                        result.usage.totalTokens ??
+                        ((result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0));
+                      if (totalTokens > 0) {
+                        const usageSnapshot: ThreadTokenUsageSnapshot = {
+                          usedTokens: totalTokens,
+                          ...(result.usage.inputTokens !== undefined
+                            ? { inputTokens: result.usage.inputTokens }
+                            : {}),
+                          ...(result.usage.outputTokens !== undefined
+                            ? { outputTokens: result.usage.outputTokens }
+                            : {}),
+                          ...(result.usage.cachedReadTokens !== undefined
+                            ? { cachedInputTokens: result.usage.cachedReadTokens }
+                            : {}),
+                        };
+                        context.contextUsage = usageSnapshot;
+                        yield* Ref.update(contextUsageBySessionId, (current) =>
+                          new Map(current).set(requestedSessionId, usageSnapshot),
+                        );
+                      }
+                    }
                   }
-                }).pipe(
-                  Effect.andThen(
-                    Deferred.succeed(context.promptWireSettled, undefined).pipe(Effect.asVoid),
-                  ),
-                ),
+                  yield* Deferred.succeed(context.promptWireSettled, undefined);
+                }),
               ),
               Effect.tap(() => options.testHooks?.afterPromptWireSettled?.() ?? Effect.void),
               Effect.flatMap((result) =>

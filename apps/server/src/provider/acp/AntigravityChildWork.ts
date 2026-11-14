@@ -44,7 +44,7 @@ interface AntigravityChildLaunch {
   readonly prompt: string;
 }
 
-const decodeLaunchInput = Schema.decodeUnknownOption(
+const decodeLegacyBatch = Schema.decodeUnknownOption(
   Schema.Struct({
     Subagents: Schema.NonEmptyArray(Schema.Struct({ Role: Schema.String, Prompt: Schema.String })),
   }),
@@ -54,11 +54,63 @@ const decodeLaunchInput = Schema.decodeUnknownOption(
 export function antigravitySubagentLaunches(
   input: unknown,
 ): ReadonlyArray<AntigravityChildLaunch> | undefined {
-  return Option.getOrUndefined(
-    Option.map(decodeLaunchInput(input), (decoded) =>
+  const legacy = Option.getOrUndefined(
+    Option.map(decodeLegacyBatch(input), (decoded) =>
       decoded.Subagents.map((entry) => ({ role: entry.Role, prompt: entry.Prompt })),
     ),
   );
+  if (legacy !== undefined) {
+    return legacy;
+  }
+
+  let parsed: unknown = input;
+  if (typeof input === "string") {
+    try {
+      parsed = JSON.parse(input);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Predicate.isObject(parsed)) {
+    return undefined;
+  }
+
+  const parseItem = (item: unknown): AntigravityChildLaunch | undefined => {
+    if (!Predicate.isObject(item)) return undefined;
+    const rec = item as Record<string, unknown>;
+    const prompt = rec.Prompt ?? rec.prompt;
+    const role = rec.Role ?? rec.role ?? rec.TypeName ?? rec.typeName;
+    if (typeof prompt === "string" && prompt.trim()) {
+      const roleStr = typeof role === "string" && role.trim() ? role.trim() : "Subagent";
+      return { role: roleStr, prompt: prompt.trim() };
+    }
+    return undefined;
+  };
+
+  if (Array.isArray(parsed)) {
+    const items = parsed.flatMap((it) => {
+      const p = parseItem(it);
+      return p ? [p] : [];
+    });
+    return items.length > 0 ? items : undefined;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const rawSubagents = record.Subagents ?? record.subagents;
+  if (Array.isArray(rawSubagents)) {
+    const items = rawSubagents.flatMap((it) => {
+      const p = parseItem(it);
+      return p ? [p] : [];
+    });
+    if (items.length > 0) return items;
+  }
+
+  const single = parseItem(record);
+  if (single !== undefined) {
+    return [single];
+  }
+
+  return undefined;
 }
 
 /** Batch title and prompt; reads match permission-prompt tool call ids against this exact text. */

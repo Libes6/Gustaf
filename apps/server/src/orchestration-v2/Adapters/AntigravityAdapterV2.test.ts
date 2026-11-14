@@ -92,6 +92,31 @@ describe("AntigravityAdapterV2 flavor", () => {
     });
     assert.equal(launch?.title, "Readme Reader");
     assert.equal(launch?.prompt, "Read README.md");
+
+    const singleLaunch = flavor.extractSubagentUpdate?.({
+      toolCallId: "single-1",
+      title: "invoke_subagent",
+      kind: "other",
+      status: "pending",
+      data: {
+        rawInput: {
+          TypeName: "general",
+          Role: "Code Specialist",
+          Prompt: "Implement feature X",
+        },
+      },
+    });
+    assert.equal(singleLaunch?.title, "Code Specialist");
+    assert.equal(singleLaunch?.prompt, "Implement feature X");
+    assert.isTrue(
+      flavor.isProvisionalSubagentTool?.({
+        toolCallId: "single-1",
+        title: "invoke_subagent",
+        kind: "other",
+        status: "pending",
+        data: {},
+      }),
+    );
   });
 
   it("routes interaction_* permission requests to the question card", () => {

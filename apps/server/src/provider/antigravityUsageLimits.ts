@@ -191,7 +191,21 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
   const crypto = yield* Digest.Digest;
   const platform = yield* HostProcess.Platform;
   const architecture = yield* HostProcess.Architecture;
-  const tokenPath = path.join(input.profileDirectory, "antigravity-acp", "acp_token.json");
+  const home = yield* HostProcess.HomeDirectory.pipe(Effect.orElseSucceed(() => ""));
+  const primaryTokenPath = path.join(input.profileDirectory, "antigravity-acp", "acp_token.json");
+  const candidateTokenPaths = [
+    primaryTokenPath,
+    path.join(input.profileDirectory, "acp_token.json"),
+    ...(home
+      ? [
+          path.join(home, ".gemini", "antigravity-acp", "acp_token.json"),
+          path.join(home, ".gemini", "acp_token.json"),
+          path.join(home, ".gemini", "antigravity", "acp_token.json"),
+          path.join(home, ".gemini", "antigravity-cli", "acp_token.json"),
+          path.join(home, ".config", "antigravity", "acp_token.json"),
+        ]
+      : []),
+  ];
   let cached:
     | { fingerprint: string; account: string; accessToken: string; expiresAt: number }
     | undefined;
@@ -219,7 +233,14 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     if (input.authMethod !== "oauth-personal" && input.authMethod !== "oauth-business") {
       return makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" });
     }
-    if (!(yield* fs.exists(tokenPath))) {
+    let resolvedTokenPath: string | undefined;
+    for (const candidate of candidateTokenPaths) {
+      if (candidate && (yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false)))) {
+        resolvedTokenPath = candidate;
+        break;
+      }
+    }
+    if (resolvedTokenPath === undefined) {
       cached = undefined;
       return makeUnavailableUsageLimits({
         checkedAt,
@@ -227,7 +248,7 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
         message: "Sign in with Google to see Antigravity limits.",
       });
     }
-    const token = yield* fs.readFileString(tokenPath).pipe(Effect.flatMap(decodeTokenFile));
+    const token = yield* fs.readFileString(resolvedTokenPath).pipe(Effect.flatMap(decodeTokenFile));
     const fingerprint = yield* sha256(
       `${token.client_id}\0${token.refresh_token}\0${token.project_id ?? ""}`,
     );

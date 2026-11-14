@@ -31,6 +31,8 @@ describe("native Antigravity subagent tools", () => {
       "Run start_subagent?",
       "Running invoke_subagent",
       "Run invoke_subagent?",
+      "start_subagent",
+      "invoke_subagent",
     ]) {
       expect(classifyAntigravitySubagentToolCall({ ...toolCall, title }, {})).toBe("subagent");
       expect(
@@ -41,13 +43,17 @@ describe("native Antigravity subagent tools", () => {
       ).toBe("mcp");
     }
     for (const title of [
-      "Running subagent",
-      "start_subagent",
       "Run command",
       "Running manage_task",
     ]) {
       expect(classifyAntigravitySubagentToolCall({ ...toolCall, title }, {})).toBeUndefined();
     }
+    expect(
+      classifyAntigravitySubagentToolCall(
+        { ...toolCall, title: "other_tool", data: { rawInput: { Role: "Coder", Prompt: "write code" } } },
+        {},
+      ),
+    ).toBe("subagent");
     expect(
       classifyAntigravitySubagentToolCall(
         { ...toolCall, title: "Running start_subagent", kind: "execute" },

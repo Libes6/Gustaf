@@ -42,11 +42,14 @@ const make = Effect.gen(function* () {
       ?.split(",")
       .map((value) => value.trim())
       .filter(Boolean);
+    const geminiHomeEnv = environment["GEMINI_HOME"]?.trim();
     const defaults = [
       ...["antigravity", "antigravity-cli", "antigravity-ide", "antigravity-backup"].map((name) =>
         path.join(home, ".gemini", name),
       ),
+      path.join(home, ".gemini"),
       path.join(home, ".config", "antigravity"),
+      ...(geminiHomeEnv ? [geminiHomeEnv] : []),
     ];
     const canonical = new Set<string>();
     for (const root of configured?.length ? configured : defaults) {
@@ -80,6 +83,7 @@ const make = Effect.gen(function* () {
             }),
         ),
       );
+      roots.push(directories.profile);
       roots.push(path.join(directories.profile, "antigravity-acp"));
     }
     const conversationDirs = new Set<string>();
