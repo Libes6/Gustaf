@@ -672,3 +672,42 @@ fn closing_the_owning_connection_ends_control() {
     assert_eq!(rig.ended.recv().unwrap(), EndReason::ConnectionLost);
     assert_eq!(rig.executor.status().owner, None);
 }
+
+/// The server decodes these with packages/contracts/src/computerUse.ts; the same file is its test.
+#[test]
+fn the_wire_matches_the_shared_contract_samples() {
+    let samples: Value = serde_json::from_str(include_str!(
+        "../../../../../packages/contracts/src/computerUse.wire.json"
+    ))
+    .unwrap();
+    let rig = rig();
+    let channel = Channel::new(Arc::clone(&rig.executor), "launch-secret".into());
+    let started = channel.handle(
+        1,
+        &request(
+            "launch-secret",
+            json!({ "op": "start", "owner": owner("A") }),
+        ),
+    );
+    let session = started["result"]["sessionToken"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    assert_eq!(
+        json!({ "event": "status", "status": rig.executor.status() }),
+        samples["status"]
+    );
+    let screenshot = json!({ "op": "screenshot", "sessionToken": session, "displayId": 2 });
+    assert_eq!(
+        channel.handle(1, &request("launch-secret", screenshot)),
+        samples["screenshot"]
+    );
+    assert_eq!(
+        channel.handle(1, &request("wrong", json!({ "op": "status" }))),
+        samples["failure"]
+    );
+    let line = samples["request"].to_string().replace("SESSION", &session);
+    assert_eq!(channel.handle(1, &line)["ok"], true);
+    assert_eq!(rig.world.lock().unwrap().inputs.len(), 4);
+}
