@@ -35,7 +35,11 @@ const PERMISSIONS: ReadonlyArray<{
   readonly field: "screenRecording" | "accessibility";
   readonly label: MessageKey;
 }> = [
-  { permission: "screen-recording", field: "screenRecording", label: "computerUse.screenRecording" },
+  {
+    permission: "screen-recording",
+    field: "screenRecording",
+    label: "computerUse.screenRecording",
+  },
   { permission: "accessibility", field: "accessibility", label: "computerUse.accessibility" },
 ];
 
@@ -119,7 +123,10 @@ function ComputerUsePanel({
   const [pending, setPending] = useState<MessageKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const run = async (label: MessageKey | null, task: () => Promise<AtomCommandResult<unknown, unknown>>) => {
+  const run = async (
+    label: MessageKey | null,
+    task: () => Promise<AtomCommandResult<unknown, unknown>>,
+  ) => {
     setPending(label);
     setError(null);
     const result = await task();
@@ -239,7 +246,9 @@ function ComputerUsePanel({
           size="xs"
           variant="ghost-muted"
           disabled={!canOperate || pending !== null}
-          onClick={() => void run(null, () => setEnabled({ environmentId, input: { enabled: false } }))}
+          onClick={() =>
+            void run(null, () => setEnabled({ environmentId, input: { enabled: false } }))
+          }
         >
           {t("computerUse.disable")}
         </Button>
