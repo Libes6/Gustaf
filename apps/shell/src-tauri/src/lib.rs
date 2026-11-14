@@ -2,6 +2,7 @@ mod account;
 mod bridge;
 mod cli_command;
 mod cloud_api;
+mod computer_use;
 mod connection_storage;
 mod diagnostics;
 mod exit_guard;
@@ -145,11 +146,13 @@ const LOG_TAIL_LINES: usize = 20;
 fn start_server(
     app: &tauri::App,
     settings: &ShellSettings,
+    extra_env: &[(String, String)],
 ) -> Result<(Server, tauri::Url), String> {
     let mut command = server_command(app, settings).map_err(|error| error.to_string())?;
     if let Some(path) = login_shell_path() {
         command.env("PATH", path);
     }
+    command.envs(extra_env.iter().map(|(key, value)| (key, value)));
     command.stdin(Stdio::null()).stdout(Stdio::piped());
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut command, 0x08000000);
@@ -444,7 +447,7 @@ pub fn run() {
             exit_guard::request_quit(app);
         }
     });
-    builder
+    let builder = builder
         // Must be the first plugin. A second launch would start a second server on the same data.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
@@ -454,7 +457,11 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_notification::init());
+    // The emergency stop for computer use, which only macOS has.
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    builder
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_request,
             bridge::dropped_paths,
@@ -505,7 +512,8 @@ pub fn run() {
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
-            let (server, pairing_url) = match start_server(app, &settings) {
+            let computer_use_env = computer_use::initialize(app.handle(), &settings);
+            let (server, pairing_url) = match start_server(app, &settings, &computer_use_env) {
                 Ok(started) => started,
                 Err(reason) => {
                     report_start_failure(app.handle(), &reason);
@@ -617,6 +625,7 @@ pub fn run() {
                 exit_guard::request_quit(app);
             }
             RunEvent::Exit => {
+                computer_use::shutdown(app);
                 ssh::stop(app);
                 stop_server(app);
             }
