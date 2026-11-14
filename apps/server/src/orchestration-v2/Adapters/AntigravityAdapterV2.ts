@@ -303,6 +303,7 @@ export function makeAntigravityAcpAdapterFlavor(
       ),
     preserveRuntimeOnSettledInterrupt: true,
     deferFinalizeForBackgroundWork: true,
+    enablePostSettleContinuation: true,
     isProvisionalSubagentTool: (toolCall) =>
       classifyAntigravitySubagentToolCall(toolCall) === "subagent",
     isPersistentBackgroundTool: isAntigravityPersistentBackgroundTool,

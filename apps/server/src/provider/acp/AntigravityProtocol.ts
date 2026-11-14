@@ -593,16 +593,6 @@ const ANTIGRAVITY_TASK_ID_REGEX = /(?:Task id|taskId|TaskId|task id)["':\s]+([a-
 export function extractAntigravityBackgroundTaskId(
   toolCall: AcpToolCallState,
 ): string | undefined {
-  const rawInput = Predicate.isObject(toolCall.data.rawInput)
-    ? (toolCall.data.rawInput as Record<string, unknown>)
-    : undefined;
-  if (rawInput && typeof rawInput.TaskId === "string" && rawInput.TaskId.trim()) {
-    return rawInput.TaskId.trim();
-  }
-  if (rawInput && typeof rawInput.taskId === "string" && rawInput.taskId.trim()) {
-    return rawInput.taskId.trim();
-  }
-
   const rawOutput = toolCall.data.rawOutput;
   if (typeof rawOutput === "string") {
     const match = ANTIGRAVITY_TASK_ID_REGEX.exec(rawOutput);
@@ -613,6 +603,16 @@ export function extractAntigravityBackgroundTaskId(
     const obj = rawOutput as Record<string, unknown>;
     if (typeof obj.taskId === "string" && obj.taskId.trim()) return obj.taskId.trim();
     if (typeof obj.TaskId === "string" && obj.TaskId.trim()) return obj.TaskId.trim();
+  }
+
+  const rawInput = Predicate.isObject(toolCall.data.rawInput)
+    ? (toolCall.data.rawInput as Record<string, unknown>)
+    : undefined;
+  if (rawInput && typeof rawInput.TaskId === "string" && rawInput.TaskId.trim()) {
+    return rawInput.TaskId.trim();
+  }
+  if (rawInput && typeof rawInput.taskId === "string" && rawInput.taskId.trim()) {
+    return rawInput.taskId.trim();
   }
 
   const title = (toolCall.title ?? "").toLowerCase();
@@ -663,7 +663,8 @@ export function extractAntigravityBackgroundToolMutation(
       text,
     );
   if (match?.[1]) {
-    const taskId = match[1].trim();
+    const rawTaskId = match[1].trim();
+    const taskId = rawTaskId.includes("/") ? rawTaskId.split("/").pop()! : rawTaskId;
     const action = match[2].toLowerCase();
     const rest = match[3] ?? "";
     const isFailed =
@@ -674,6 +675,16 @@ export function extractAntigravityBackgroundToolMutation(
         status: isFailed ? "failed" : "completed",
         appendOutput: rest ? `\n${rest.trim()}` : undefined,
       },
+      // Also return the rawTaskId in case adapter matched on the full compound ID
+      ...(rawTaskId !== taskId
+        ? [
+            {
+              taskId: rawTaskId,
+              status: (isFailed ? "failed" : "completed") as "failed" | "completed",
+              appendOutput: rest ? `\n${rest.trim()}` : undefined,
+            },
+          ]
+        : []),
     ];
   }
   return [];
