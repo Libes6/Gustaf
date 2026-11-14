@@ -3,6 +3,7 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "chatB." and both languages list the same keys.
 export const chatBMessages = {
   en: {
+    "chatB.provider.startFailed": "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
     "chatB.provider.claudeUnanswered":
       "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.",
     "chatB.provider.claudeBootTimeout":
@@ -758,6 +759,7 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.appAccessRequest": "App access request",
   },
   ru: {
+    "chatB.provider.startFailed": "Не удалось запустить ход. Отправьте сообщение ещё раз; если ошибка повторяется, проверьте логи сервера.",
     "chatB.provider.claudeUnanswered":
       "Claude не прислал ответ за 10 минут. API или промежуточный шлюз не отвечает.",
     "chatB.provider.claudeBootTimeout":

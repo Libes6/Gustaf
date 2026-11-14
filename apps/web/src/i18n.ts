@@ -556,6 +556,7 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
 
 export function translateProviderMessage(language: UiLanguage, message: string): string {
   const knownMessages = {
+    "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.": "chatB.provider.startFailed",
     "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.":
       "chatB.provider.claudeUnanswered",
     "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.":
