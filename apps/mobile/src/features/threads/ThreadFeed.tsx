@@ -3952,7 +3952,7 @@ export const ThreadFeed = memo(function ThreadFeed({
                   endpoints={props.pendingHandoff}
                   iconColor={iconSubtleColor}
                   surfaceColor={screenColor}
-                  label={t("Context handoff pending")}
+                  label={t("Context transfers on next message")}
                 />
               ) : null
             }
