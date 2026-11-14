@@ -331,7 +331,7 @@
   "Open automation": "Открыть автоматизацию",
   "Sent by Gustaf": "Отправлено из Gustaf",
   "New session": "Новая сессия",
-  "Context handoff pending": "Передача контекста ожидает",
+  "Context transfers on next message": "Контекст будет передан со следующим сообщением",
   "More": "Ещё",
   "Stop sharing": "Прекратить доступ",
   "Send": "Отправить",
