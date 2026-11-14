@@ -4486,6 +4486,7 @@ interface ClaudeSubagentProjectionTarget {
   readonly childRootNodeId: OrchestrationV2ExecutionNode["id"];
   readonly nextOrdinal: () => number;
   readonly toolCalls: Map<string, ActiveClaudeToolCall>;
+  readonly stopRequestedAt?: number | undefined;
 }
 
 /** Claude writes blocks separately with stop_reason null until the last.
@@ -5275,6 +5276,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           string,
           Deferred.Deferred<ProviderAdapter.ProviderAdapterV2SubagentOutcome>
         >();
+        // Claude reports a stopped workflow's members as failed; this is the only evidence it was Stop.
+        const workflowStopRequestedAt = new Map<string, number>();
         // Buffered idle outcomes must not settle a resumed child again.
         const appliedSubagentOutcomes = new WeakSet<SDKMessage>();
         // Subagent frames can precede the task_started that registers their owner.
@@ -6406,13 +6409,19 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               return;
             const memberKey = `${input.coordinator.childThreadId}:agent:${member.index}`;
             const previous = seen.get(memberKey);
+            const stopRequestedAt = workflowStopRequestedAt.get(taskId);
             const status =
               (member.state === "queued" || member.state === "running") &&
               input.coordinator.task.status !== "running"
                 ? input.coordinator.task.status
                 : member.state === "queued"
                   ? "pending"
-                  : member.state;
+                  : member.state === "failed" &&
+                      stopRequestedAt !== undefined &&
+                      // lastProgressAt (completedAt) is the last tick, often before Stop for a blocked tool.
+                      previous?.status !== "failed"
+                    ? "cancelled"
+                    : member.state;
             const settled = status !== "pending" && status !== "running";
             const prompt = member.prompt ?? member.label;
             const model = member.model ?? parentThread.modelSelection.model;
@@ -6570,6 +6579,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               childRootNodeId,
               nextOrdinal: () => ++nextItemOrdinal,
               toolCalls,
+              stopRequestedAt,
             };
             const endOpenToolCalls = Effect.fnUntraced(function* () {
               if (toolCalls.size === 0) return;
@@ -7583,12 +7593,20 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly toolResult: ClaudeToolResultContentBlock;
           readonly output: ClaudeNativeToolOutput;
           readonly completedAt: DateTime.Utc;
+          readonly stopped?: boolean;
         }) {
           const { toolCall } = input;
           const toolNonExecutionKind = claudeToolNonExecutionKind(
             input.message,
             input.toolResult.tool_use_id,
           );
+          // Stop denial metadata distinguishes cancelled work from a real error
+          // that happens to arrive after the turn was interrupted.
+          const stopped =
+            input.stopped === true ||
+            (toolNonExecutionKind === "user-rejected" &&
+              input.context !== null &&
+              (yield* Ref.get(interruptedTurns)).has(input.context.providerTurnId));
           yield* stopTaskOutputTail(toolCall.nativeItemId);
           yield* emitToolCallArtifacts(
             buildToolCallArtifacts({
@@ -7607,7 +7625,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 toolNonExecutionKind === "cancelled"
                   ? "cancelled"
                   : isClaudeToolResultError(input.toolResult)
-                    ? "failed"
+                    ? stopped
+                      ? "interrupted"
+                      : "failed"
                     : "completed",
               ...(toolNonExecutionKind === undefined ? {} : { toolNonExecutionKind }),
               startedAt: toolCall.startedAt,
@@ -7702,6 +7722,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               toolResult,
               output,
               completedAt: at,
+              // A denial written before Stop (a declined approval) is not the Stop's.
+              stopped:
+                target.stopRequestedAt !== undefined &&
+                field(line, "toolDenialKind") !== undefined &&
+                DateTime.toEpochMillis(at) >= target.stopRequestedAt,
             });
           }
           if (line.type !== "assistant") return false;
@@ -12093,6 +12118,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 detail: "No running workflow task belongs to this provider thread",
               });
             }
+            workflowStopRequestedAt.set(taskId, DateTime.toEpochMillis(yield* DateTime.now));
             yield* liveQuery.query.stopTask(taskId).pipe(
               Effect.mapError(
                 (cause) =>
@@ -12102,6 +12128,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     cause,
                   }),
               ),
+              Effect.onError(() => Effect.sync(() => workflowStopRequestedAt.delete(taskId))),
             );
           }),
           awaitBackgroundTasks: Effect.fn("ClaudeAdapterV2.awaitBackgroundTasks")(
