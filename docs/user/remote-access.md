@@ -192,10 +192,11 @@ In the desktop app, open **Settings → Environments → Add environment**, choo
 or reuses a server there and opens the port forward for you. Projects, provider
 credentials, and agent work stay on the remote machine.
 
-The remote host must be Linux or an Apple Silicon Mac with `curl` or `wget`,
+The remote host must be Linux x64 or an Apple Silicon Mac with `curl` or `wget`,
 `tar`, `sha256sum` or `shasum`, and [provider setup](./install.md#providers).
-The first launch downloads Gustaf's server to `~/.t3/runtime` on the host, so
-it takes longer than later ones.
+The first launch downloads the Gustaf server of the same release as your desktop
+app to `~/.t3/runtime` on the host, so it takes longer than later ones. A
+`gustaf` command already on the host's `PATH` is used instead.
 Provider CLIs must be on the `PATH` of a non-interactive login shell there;
 check with:
 

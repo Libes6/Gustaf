@@ -26,9 +26,13 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
     try {
       await NodeFSP.mkdir(target, { recursive: true });
       await NodeFSP.writeFile(NodePath.join(target, ".install-complete"), `${version}\n`);
-      await NodeFSP.writeFile(NodePath.join(target, "t3"), "#!/bin/sh\necho 't3 v1.2.3'\n", {
-        mode: 0o755,
-      });
+      await NodeFSP.writeFile(
+        NodePath.join(target, "gustaf"),
+        "#!/bin/sh\necho 'gustaf v1.2.3'\n",
+        {
+          mode: 0o755,
+        },
+      );
       const { status, stdout, stderr } = NodeChildProcess.spawnSync(
         "sh",
         [NodePath.resolve(import.meta.dirname, "install.sh")],
@@ -46,14 +50,14 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
         },
       );
       expect(status, stdout + stderr).toBe(0);
-      expect(stderr).toContain(`Installed T3 Code ${version}`);
-      expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "t3"));
+      expect(stderr).toContain(`Installed Gustaf ${version}`);
+      expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "gustaf"));
       expect(
         NodeChildProcess.execFileSync(launcher, ["--version"], {
           cwd: NodeOS.tmpdir(),
           encoding: "utf8",
         }).trim(),
-      ).toBe("t3 v1.2.3");
+      ).toBe("gustaf v1.2.3");
     } finally {
       await NodeFSP.rm(temporaryRoot, { recursive: true, force: true });
     }
@@ -71,10 +75,10 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chan
     const server = NodeHttp.createServer((request, response) => {
       const url = new URL(request.url ?? "/", "http://fixture");
       const body =
-        url.pathname === "/pingdotgg/t3code/releases/latest" &&
+        url.pathname === "/Libes6/Gustaf/releases/latest" &&
         request.headers.accept === "application/json"
           ? { tag_name: "v1.2.3" }
-          : url.pathname === "/repos/pingdotgg/t3code/releases"
+          : url.pathname === "/repos/Libes6/Gustaf/releases"
             ? { "1": nightlies, "2": [{ tag_name: `v${version}` }, { tag_name: "v1.2.3" }] }[
                 url.searchParams.get("page") ?? ""
               ]
@@ -119,7 +123,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chan
         },
       );
       expect(code, output).toBe(0);
-      expect(output).toContain(`Installed T3 Code ${version}`);
+      expect(output).toContain(`Installed Gustaf ${version}`);
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -193,7 +197,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh com
       expect(climbing.code).not.toBe(0);
       expect(await NodeFSP.readlink(link)).toBe(`${home}/runtime/versions/../../other/t3`);
 
-      // Only `<version>/t3` counts, not another program inside a version.
+      // Only `<version>/gustaf` (or a T3 Code `t3`) counts, not another program inside a version.
       await NodeFSP.rm(link);
       await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/helper"), link);
       const sibling = await installOver({ script: "install.sh", home, binDir });
@@ -202,7 +206,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh com
         NodePath.join(home, "runtime/versions/1.0.0/helper"),
       );
 
-      // An upgrade over an older version's link, written through a symlinked T3 home.
+      // An upgrade over a T3 Code version's link, written through a symlinked T3 home.
       await NodeFSP.rm(link);
       await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/t3"), link);
       await NodeFSP.symlink(home, NodePath.join(root, "alias"));
@@ -214,7 +218,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh com
       });
       expect(upgrade.code, upgrade.output).toBe(0);
       expect(await NodeFSP.readlink(link)).toBe(
-        NodePath.join(root, "alias/runtime/versions/1.2.3/t3"),
+        NodePath.join(root, "alias/runtime/versions/1.2.3/gustaf"),
       );
       expect(upgrade.output).toContain(
         `printf '\\n%s\\n' 'export PATH="$PATH:$HOME/bin"' >> ~/.zshrc`,
@@ -238,7 +242,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh com
         env: { HOME: root, PATH: `${binDir}/:/usr/bin:/bin` },
       });
       expect(slashed.code, slashed.output).toBe(0);
-      expect(slashed.output).toContain("Run gustaf to use T3 Code here");
+      expect(slashed.output).toContain("Run gustaf to use Gustaf here");
 
       // A relative folder is made absolute, so the PATH command never follows the working directory.
       const relative = await installOver({
@@ -259,7 +263,9 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh com
         binDir: `${binDir}/`,
       });
       expect(overDesktop.code, overDesktop.output).toBe(0);
-      expect(await NodeFSP.readlink(link)).toBe(NodePath.join(home, "runtime/versions/1.2.3/t3"));
+      expect(await NodeFSP.readlink(link)).toBe(
+        NodePath.join(home, "runtime/versions/1.2.3/gustaf"),
+      );
     } finally {
       await NodeFSP.rm(root, { recursive: true, force: true });
     }
@@ -301,7 +307,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "win32")("install.ps1 co
       const upgrade = await installOver({ script: "install.ps1", home, binDir });
       expect(upgrade.code, upgrade.output).toBe(0);
       expect(await NodeFSP.readFile(shim, "utf8")).toContain(
-        NodePath.join(upgrade.target, "t3.exe"),
+        NodePath.join(upgrade.target, "gustaf.exe"),
       );
 
       const again = await installOver({ script: "install.ps1", home, binDir });
@@ -333,7 +339,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "win32")("install.ps1 co
         env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
       });
       expect(slashed.code, slashed.output).toBe(0);
-      expect(slashed.output).toContain("to use T3 Code here");
+      expect(slashed.output).toContain("to use Gustaf here");
       // The same when the install folder itself is given with a trailing separator.
       const bothSlashed = await installOver({
         script: "install.ps1",
@@ -342,7 +348,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "win32")("install.ps1 co
         env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
       });
       expect(bothSlashed.code, bothSlashed.output).toBe(0);
-      expect(bothSlashed.output).toContain("to use T3 Code here");
+      expect(bothSlashed.output).toContain("to use Gustaf here");
     } finally {
       await NodeFSP.rm(root, { recursive: true, force: true });
     }
@@ -366,7 +372,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
         const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-checksum-"));
         const home = NodePath.join(root, homeName);
         const version = "1.2.3";
-        const stem = `t3-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
+        const stem = `gustaf-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
         const archiveName = `${stem}.tar.gz`;
         const server = NodeHttp.createServer();
         try {
@@ -396,8 +402,8 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
           }
           await NodeFSP.mkdir(NodePath.join(root, stem));
           await NodeFSP.writeFile(
-            NodePath.join(root, stem, "t3"),
-            "#!/bin/sh\necho 't3 v1.2.3'\n",
+            NodePath.join(root, stem, "gustaf"),
+            "#!/bin/sh\necho 'gustaf v1.2.3'\n",
             { mode: 0o755 },
           );
           const archivePath = NodePath.join(root, archiveName);
@@ -406,7 +412,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
           const digest = NodeCrypto.createHash("sha256").update(archive).digest("hex");
           server.on("request", (request, response) => {
             response.end(
-              request.url?.endsWith("/SHA256SUMS")
+              request.url?.endsWith("/SHA256SUMS.txt")
                 ? `${validChecksum ? digest : "0".repeat(64)}  ${archiveName}\n`
                 : archive,
             );
@@ -448,11 +454,11 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
               NodeChildProcess.execFileSync(NodePath.join(root, "bin/gustaf"), ["--version"], {
                 encoding: "utf8",
               }).trim(),
-            ).toBe("t3 v1.2.3");
+            ).toBe("gustaf v1.2.3");
           } else {
             expect(code).not.toBe(0);
             expect(output).toContain("checksum mismatch");
-            expect(output).not.toContain("Installed T3 Code");
+            expect(output).not.toContain("Installed Gustaf");
             expect(await NodeFSP.readdir(versions)).toEqual([]);
           }
         } finally {

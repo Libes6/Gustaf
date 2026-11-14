@@ -332,12 +332,14 @@ describe("Tauri SSH session", () => {
     }),
   );
 
-  it("downloads remote runtimes from upstream t3 releases at the runtime version", () => {
-    assert.deepStrictEqual(DesktopSsh.cliRunner("0.1.7", { GUSTAF_APP_VERSION: "0.12.0" }), {
+  it("downloads remote runtimes from the Gustaf release of the connecting app", () => {
+    assert.deepStrictEqual(DesktopSsh.cliRunner("0.1.7", { GUSTAF_APP_VERSION: "0.14.0" }), {
       installedCommand: "gustaf",
-      archiveVersion: "0.1.7",
+      archiveVersion: "0.14.0",
       releaseBaseUrl: null,
     });
+    // A server started without the desktop shell (dev, tests) names its own version.
+    assert.strictEqual(DesktopSsh.cliRunner("0.14.0", {}).archiveVersion, "0.14.0");
     assert.strictEqual(
       DesktopSsh.cliRunner("0.1.7", { T3CODE_RELEASE_BASE_URL: " https://mirror.example/dl " })
         .releaseBaseUrl,

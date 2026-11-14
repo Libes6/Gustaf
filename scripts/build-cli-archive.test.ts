@@ -9,7 +9,29 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { awaitCliNotarization, signMacArchiveContents } from "./build-cli-archive.ts";
+import { cliArchiveFileName as publishedArchiveFileName } from "@t3tools/shared/cliRelease";
+
+import {
+  awaitCliNotarization,
+  cliArchiveFileName,
+  signMacArchiveContents,
+} from "./build-cli-archive.ts";
+
+// Install, update, SSH and the npm launcher download what the release builds.
+it("builds each desktop platform's archive under the name clients download", () => {
+  assert.deepStrictEqual(
+    [
+      cliArchiveFileName("1.2.3", "mac", "arm64"),
+      cliArchiveFileName("1.2.3", "linux", "x64"),
+      cliArchiveFileName("1.2.3", "win", "x64"),
+    ],
+    [
+      publishedArchiveFileName("1.2.3", "darwin-arm64"),
+      publishedArchiveFileName("1.2.3", "linux-x64"),
+      publishedArchiveFileName("1.2.3", "win32-x64"),
+    ],
+  );
+});
 
 const signedEnv = {
   T3CODE_CLI_MAC_SIGN_IDENTITY: "Developer ID Application: Test (TEAM)",

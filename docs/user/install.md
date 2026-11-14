@@ -3,8 +3,9 @@
 Gustaf runs coding agents on your computer. Use the desktop app on that computer, or the Android
 app as a remote. Set up the computer first.
 
-Downloads are on [GitHub Releases](https://github.com/Libes6/Gustaf/releases). There is no install
-script and no npm package.
+Downloads are on [GitHub Releases](https://github.com/Libes6/Gustaf/releases). A computer without
+the desktop app can [install the `gustaf` command](#install-the-command-line-only) instead. There is
+no npm package.
 
 ## Desktop app
 
@@ -51,6 +52,27 @@ your `PATH`.
 | Pair another device                              | `gustaf pair`                                                 |
 | Keep it running in the background (macOS, Linux) | `gustaf service install` ([details](./background-service.md)) |
 | Move a command-line install to a newer release   | `gustaf update`                                               |
+
+### Install the command line only
+
+<a id="install-the-command-line-only"></a>
+
+On a server or another computer without the desktop app, install the `gustaf` command:
+
+```bash
+# macOS (Apple Silicon), Linux (x64)
+curl -fsSL https://raw.githubusercontent.com/Libes6/Gustaf/main/scripts/install.sh | sh
+```
+
+```powershell
+# Windows (x64)
+irm https://raw.githubusercontent.com/Libes6/Gustaf/main/scripts/install.ps1 | iex
+```
+
+The installer downloads `gustaf-<version>-<platform>.tar.gz` (`.zip` on Windows) from the newest
+release, checks it against `SHA256SUMS.txt`, and links `~/.local/bin/gustaf`. It needs no Node or
+npm. Set `T3CODE_VERSION` to install an exact release, for example to match a desktop app. Intel
+Macs, Linux on ARM and Windows on ARM have no command-line build.
 
 Run `gustaf help` for the full reference. To start in a new working directory, use an explicit
 path such as `gustaf ./my-project`. A bare directory name is accepted only if it already exists.

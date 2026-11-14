@@ -97,6 +97,10 @@ jobs:
       - run: node --test apps/shell/tests/*.test.mjs
       # --release: shares every compiled dependency with the bundle below instead of building them twice.
       - run: cargo test --locked --release --manifest-path apps/shell/src-tauri/Cargo.toml
+      # The server and web report their package version, which `gustaf update`, SSH hosts and the
+      # CLI archive names use, so it must be the app's. The repository keeps T3's 0.1.7 there.
+      - name: Stamp the app version into the server and web packages
+        run: node apps/shell/scripts/stamp-version.mjs
       - name: Build T3 and bundle Gustaf
         shell: bash
         env:
@@ -142,6 +146,21 @@ jobs:
           name: installers-${{ matrix.platform }}
           path: release-assets/*
           if-no-files-found: error
+      # build:runtime leaves the `gustaf` CLI archive it bundled in release/gustaf-cli.
+      - name: Check the CLI archive unpacks and runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p 'require("./apps/shell/src-tauri/tauri.conf.json").version')
+          shopt -s nullglob
+          archives=(release/gustaf-cli/gustaf-"$version"-*)
+          test "${#archives[@]}" -eq 1
+          node scripts/smoke-cli-archive.ts --archive "${archives[0]}" --expect-version "$version"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.platform }}
+          path: release/gustaf-cli/*
+          if-no-files-found: error
 
   release:
     name: Publish Gustaf
@@ -172,11 +191,17 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$version"
           mapfile -t installers < <(find release-assets -type f -print | sort)
           test "${#installers[@]}" -eq 13
+          # The `gustaf` CLI for each desktop platform; cliArchiveFileName in packages/shared/src/cliRelease.ts.
+          mapfile -t archives < <(find downloaded -path 'downloaded/cli-*' -type f -print | sort)
+          test "${#archives[@]}" -eq 3
+          for archive in "${archives[@]}"; do
+            [[ "${archive##*/}" =~ ^gustaf-$version-(darwin-arm64\.tar\.gz|linux-x64\.tar\.gz|win32-x64\.zip)$ ]]
+          done
           previous=$(git describe --tags --abbrev=0 --match 'v*.*.*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
           node apps/shell/scripts/release-notes.mjs "$version" "$previous" "$RUNNER_TEMP/release-notes.md"
           node apps/shell/scripts/release-manifest.mjs release-assets "$version" "$RUNNER_TEMP/release-notes.md"
           mkdir publish
-          cp "${installers[@]}" release-assets/latest.json publish/
+          cp "${installers[@]}" "${archives[@]}" release-assets/latest.json publish/
           (cd publish && sha256sum -- * > SHA256SUMS.txt)
           if state=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
             test "$state" = true

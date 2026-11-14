@@ -5,18 +5,25 @@ import { compareSemverVersions, parseSemver } from "./semver.ts";
 
 const CLI_RELEASE_REPOSITORY = "Libes6/Gustaf";
 export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
-export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
+/** The release job's checksum file, which lists every asset of a release. */
+export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS.txt";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
+/** The install scripts as of the newest release; `main` only gets released code. */
+export const CLI_INSTALL_SCRIPT_URL = `https://raw.githubusercontent.com/${CLI_RELEASE_REPOSITORY}/main/scripts/install.sh`;
+export const CLI_INSTALL_POWERSHELL_URL = `https://raw.githubusercontent.com/${CLI_RELEASE_REPOSITORY}/main/scripts/install.ps1`;
 
-// Keep archive keys aligned with the Linux matrix, Windows ARM64 build, and cli_archive rows in release.yml.
-// Node single-executables do not support darwin-x64 and segfault at startup.
-const CLI_ARCHIVE_PLATFORM_KEYS = [
-  "darwin-arm64",
-  "linux-arm64",
-  "linux-x64",
-  "win32-arm64",
-  "win32-x64",
-] as const;
+/** The shell command that installs the `gustaf` CLI, optionally pinned to `version`. */
+export function cliInstallCommand(platform: NodeJS.Platform, version?: string): string {
+  if (platform === "win32") {
+    return version === undefined
+      ? `irm ${CLI_INSTALL_POWERSHELL_URL} | iex`
+      : `$env:T3CODE_VERSION='${version}'; irm ${CLI_INSTALL_POWERSHELL_URL} | iex`;
+  }
+  return `curl -fsSL ${CLI_INSTALL_SCRIPT_URL} | ${version === undefined ? "" : `T3CODE_VERSION=${version} `}sh`;
+}
+
+// Keep archive keys aligned with the desktop platforms in ci.yml's bundle matrix.
+const CLI_ARCHIVE_PLATFORM_KEYS = ["darwin-arm64", "linux-x64", "win32-x64"] as const;
 export type CliArchivePlatformKey = (typeof CLI_ARCHIVE_PLATFORM_KEYS)[number];
 
 export function cliArchivePlatformKey(
@@ -25,6 +32,11 @@ export function cliArchivePlatformKey(
 ): CliArchivePlatformKey | undefined {
   const key = `${platform}-${arch}`;
   return CLI_ARCHIVE_PLATFORM_KEYS.find((candidate) => candidate === key);
+}
+
+/** The program inside a release archive and inside `runtime/versions/<version>/`. */
+export function cliExecutableName(platform: NodeJS.Platform): string {
+  return platform === "win32" ? "gustaf.exe" : "gustaf";
 }
 
 /** Use System32 bsdtar on Windows; Git-for-Windows GNU tar cannot open zip archives. */
@@ -38,7 +50,7 @@ export function cliArchiveTarCommand(
 }
 
 export function cliArchiveFileName(version: string, platformKey: CliArchivePlatformKey): string {
-  return `t3-${version}-${platformKey}.${platformKey.startsWith("win32") ? "zip" : "tar.gz"}`;
+  return `gustaf-${version}-${platformKey}.${platformKey.startsWith("win32") ? "zip" : "tar.gz"}`;
 }
 
 const CLI_RELEASE_DEFAULT_BASE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases/download`;

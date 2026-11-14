@@ -41,8 +41,10 @@ Get the latest version from [GitHub Releases](https://github.com/Libes6/Gustaf/r
 | Windows (x64)         | `Gustaf-<version>-Windows-x64-setup.exe` or `.msi`       |
 | Linux (x64)           | `Gustaf-<version>-Linux-x64.AppImage`, `.deb`, or `.rpm` |
 | Android               | `Gustaf-<version>-Android.apk`                           |
+| Command line only     | `gustaf-<version>-<platform>.tar.gz` (`.zip` on Windows) |
 
-`SHA256SUMS.txt` in each release lists the checksums of every file.
+`SHA256SUMS.txt` in each release lists the checksums of every file. To install only the `gustaf`
+command, see [Install the command line only](docs/user/install.md#install-the-command-line-only).
 
 ### macOS
 
