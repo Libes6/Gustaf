@@ -94,6 +94,31 @@ describe("AntigravityAdapterV2 flavor", () => {
     assert.equal(launch?.prompt, "Read README.md");
   });
 
+  it.each(["pending", "inProgress", "completed", "failed"] as const)(
+    "shows manage_subagents %s as native activity with its observed result",
+    (status) => {
+      const update = flavor.extractSubagentUpdate?.({
+        toolCallId: "trajectory:8",
+        title: "Running manage_subagents",
+        kind: "other",
+        status,
+        data: { rawInput: { Action: "list" }, rawOutput: "Reviewer: running" },
+      });
+      assert.equal(update?.title, "Antigravity subagent status");
+      assert.equal(
+        update?.status,
+        status === "completed"
+          ? "idle"
+          : status === "failed"
+            ? "failed"
+            : status === "pending"
+              ? "pending"
+              : "running",
+      );
+      assert.equal(update?.result, "Reviewer: running");
+    },
+  );
+
   it("routes interaction_* permission requests to the question card", () => {
     const question = flavor.extractPermissionQuestion?.(
       permissionRequest("interaction_1", [
@@ -630,7 +655,7 @@ describe("AntigravityAdapterV2 html_render pages", () => {
                       toolCallId,
                       title: "Running html_render",
                       kind: "other",
-                      status: "in_progress",
+                      status: "inProgress",
                       rawInput,
                     });
                   }
@@ -666,7 +691,7 @@ describe("AntigravityAdapterV2 html_render pages", () => {
                       toolCallId,
                       title: "Running html_render",
                       kind: "other",
-                      status: "in_progress",
+                      status: "inProgress",
                       rawInput,
                     });
                     yield* mcpSessions.recordHtmlRender(threadId, rawInput, page(toolCallId));
@@ -920,7 +945,7 @@ describe("AntigravityAdapterV2 subagent reads", () => {
                       toolCallId,
                       title,
                       kind: "read",
-                      status: "in_progress",
+                      status: "inProgress",
                       rawInput: { absolute_path: target },
                       locations: [{ path: target }],
                     });
