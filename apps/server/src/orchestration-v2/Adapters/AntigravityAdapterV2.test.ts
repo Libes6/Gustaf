@@ -76,7 +76,7 @@ describe("AntigravityAdapterV2 flavor", () => {
     assert.equal(batch?.status, "running");
     assert.equal(batch?.prompt, "Started two agents.");
     assert.isNull(batch?.result);
-    assert.isTrue(flavor.subagentsIdleOnTurnCompletion);
+    assert.isFalse(flavor.subagentsIdleOnTurnCompletion);
 
     // Permission prompts carry the launch; later updates for the same call do not.
     const launch = flavor.extractSubagentUpdate?.({
@@ -161,8 +161,8 @@ describe("AntigravityAdapterV2 flavor", () => {
 
   it("configures background task preservation and graceful background work deferral", () => {
     assert.isTrue(flavor.preserveRuntimeOnSettledInterrupt);
-    assert.isTrue(flavor.deferFinalizeForBackgroundWork);
-    assert.isTrue(flavor.subagentsIdleOnTurnCompletion);
+    assert.isFalse(flavor.deferFinalizeForBackgroundWork);
+    assert.isFalse(flavor.subagentsIdleOnTurnCompletion);
 
     const scheduleTool = {
       toolCallId: "tool-sched-1",

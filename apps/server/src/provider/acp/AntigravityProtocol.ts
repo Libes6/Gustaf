@@ -477,14 +477,21 @@ export function normalizeAntigravityToolCall(
         : undefined;
 
   let status = toolCall.status;
+  const isScheduleTool =
+    (toolCall.title ?? "").toLowerCase().includes("schedule") ||
+    (Predicate.isObject(toolCall.data.rawInput) &&
+      ((toolCall.data.rawInput as Record<string, unknown>).CronExpression !== undefined ||
+        (toolCall.data.rawInput as Record<string, unknown>).DurationSeconds !== undefined));
+
   if (
-    typeof rawOutputText === "string" &&
-    (rawOutputText.includes("is running as a background task") ||
-      rawOutputText.includes("background task with task id") ||
-      rawOutputText.includes("Tool is running as a background task")) &&
-    !rawOutputText.includes("Command exited with code") &&
-    !rawOutputText.includes("finished with result") &&
-    status === "completed"
+    (isScheduleTool ||
+      (typeof rawOutputText === "string" &&
+        (rawOutputText.includes("is running as a background task") ||
+          rawOutputText.includes("background task with task id") ||
+          rawOutputText.includes("Tool is running as a background task")) &&
+        !rawOutputText.includes("Command exited with code") &&
+        !rawOutputText.includes("finished with result"))) &&
+    (status === "completed" || status === "pending")
   ) {
     status = "inProgress";
   }
