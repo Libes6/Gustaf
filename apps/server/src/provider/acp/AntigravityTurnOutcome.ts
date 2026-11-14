@@ -11,6 +11,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
+import type { AcpToolCallState } from "@t3tools/provider-acp/server/runtimeModel";
+import { classifyAntigravitySubagentToolCall } from "./AntigravityProtocol.ts";
+
 import { antigravityManagedPath, antigravityProfileRoot } from "./AntigravityProfilePaths.ts";
 
 // CORTEX_STEP_TYPE_ERROR_MESSAGE in the native trajectory.
@@ -162,6 +165,29 @@ export function antigravityLimitFailure(
   });
 }
 
+function unfinishedToolsFailure(
+  result: EffectAcpSchema.PromptResponse,
+  tools: ReadonlyArray<AcpToolCallState>,
+): OrchestrationV2ProviderFailure | undefined {
+  if (result.stopReason !== "end_turn") return undefined;
+  const unfinished = tools.some(
+    (tool) =>
+      (tool.status === "pending" ||
+        tool.status === "inProgress" ||
+        tool.status === "requiresAction") &&
+      classifyAntigravitySubagentToolCall(tool) !== "subagent",
+  );
+  return unfinished
+    ? makeProviderFailure({
+        class: "provider_error",
+        code: "ANTIGRAVITY_UNFINISHED_TOOLS",
+        message:
+          "Antigravity ended the turn without completing a tool call. Background work is unconfirmed. Ask the agent to check the command or subagent status explicitly.",
+        retryable: false,
+      })
+    : undefined;
+}
+
 const conversationSegments = ["antigravity-acp", "conversations"];
 
 /**
@@ -174,8 +200,16 @@ export const watchAntigravityPromptOutcome = Effect.fn("AntigravityTurnOutcome.w
   profileDirectory: string,
   sessionId: string,
 ) {
-  const typedOnly = (result: EffectAcpSchema.PromptResponse) =>
-    DateTime.now.pipe(Effect.map((now) => turnFailure(result.stopReason, undefined, now)));
+  const typedOnly = (
+    result: EffectAcpSchema.PromptResponse,
+    tools: ReadonlyArray<AcpToolCallState> = [],
+  ) =>
+    DateTime.now.pipe(
+      Effect.map(
+        (now) =>
+          turnFailure(result.stopReason, undefined, now) ?? unfinishedToolsFailure(result, tools),
+      ),
+    );
   if (!NATIVE_SESSION_ID.test(sessionId)) return typedOnly;
   const segments = [...conversationSegments, `${sessionId}.db`];
   const before = yield* Effect.tryPromise({
@@ -214,6 +248,7 @@ export const watchAntigravityPromptOutcome = Effect.fn("AntigravityTurnOutcome.w
   }
   return Effect.fn("AntigravityTurnOutcome.check")(function* (
     result: EffectAcpSchema.PromptResponse,
+    tools: ReadonlyArray<AcpToolCallState> = [],
   ) {
     // The same file as before the prompt, or one this prompt created, still unlinked.
     const after = yield* Effect.tryPromise({
@@ -232,6 +267,9 @@ export const watchAntigravityPromptOutcome = Effect.fn("AntigravityTurnOutcome.w
           Effect.orElseSucceed(() => undefined),
         )
       : undefined;
-    return turnFailure(result.stopReason, step, yield* DateTime.now);
+    return (
+      turnFailure(result.stopReason, step, yield* DateTime.now) ??
+      unfinishedToolsFailure(result, tools)
+    );
   });
 });

@@ -38,6 +38,48 @@ const QUOTED_NOTICE = Buffer.from(
 );
 
 describe("watchAntigravityPromptOutcome", () => {
+  it.effect(
+    "reports unfinished tools without treating prose or settled calls as background work",
+    () =>
+      Effect.gen(function* () {
+        const check = yield* watchAntigravityPromptOutcome("/unused", "../invalid");
+        for (const status of [
+          "pending",
+          "inProgress",
+          "requiresAction",
+          "completed",
+          "failed",
+        ] as const) {
+          const failure = yield* check({ stopReason: "end_turn" }, [
+            { toolCallId: "command", title: "Running run_command", status, data: {} },
+          ]);
+          assert.equal(
+            failure?.code,
+            status === "pending" || status === "inProgress" || status === "requiresAction"
+              ? "ANTIGRAVITY_UNFINISHED_TOOLS"
+              : undefined,
+          );
+        }
+        assert.isUndefined(yield* check({ stopReason: "end_turn" }, []));
+        assert.isUndefined(
+          yield* check({ stopReason: "end_turn" }, [
+            {
+              toolCallId: "child",
+              title: "Running invoke_subagent",
+              kind: "other",
+              status: "inProgress",
+              data: {},
+            },
+          ]),
+        );
+        assert.isUndefined(
+          yield* check({ stopReason: "cancelled" }, [
+            { toolCallId: "command", status: "inProgress", data: {} },
+          ]),
+        );
+      }),
+  );
+
   it.effect("fails only turns whose own steps end in an upstream error", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
