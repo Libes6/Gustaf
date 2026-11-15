@@ -8,6 +8,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   ProviderSessionId,
+  type ProviderTurnId,
   RunAttemptId,
   RunId,
   ThreadId,
@@ -1241,5 +1242,249 @@ describe("AntigravityAdapterV2 session system prompt", () => {
           assert.include(sent, "<pull_request_linking>");
         }
       }).pipe(Effect.provide(layerSession), Effect.scoped),
+  );
+});
+
+describe("AntigravityAdapterV2 background work", () => {
+  type RuntimeService = AcpSessionRuntime.AcpSessionRuntime["Service"];
+  type Send = (update: EffectAcpSchema.SessionUpdate) => Effect.Effect<void>;
+  type ScriptedPrompt = (send: Send) => Effect.Effect<EffectAcpSchema.PromptResponse>;
+
+  const runCommand = (input: {
+    readonly status: "in_progress" | "completed";
+    readonly isDaemon: boolean;
+  }): EffectAcpSchema.SessionUpdate =>
+    input.status === "in_progress"
+      ? {
+          sessionUpdate: "tool_call",
+          toolCallId: "call_command",
+          title: "Running run_command",
+          kind: "execute",
+          status: "in_progress",
+          rawInput: {
+            CommandLine: "sleep 40 && echo done",
+            IsDaemon: input.isDaemon,
+            WaitMsBeforeAsync: 10000,
+          },
+        }
+      : {
+          sessionUpdate: "tool_call_update",
+          toolCallId: "call_command",
+          status: "completed",
+          rawOutput: { combinedOutput: "done\n", exitCode: 0 },
+        };
+
+  // agy answers `end_turn` once the command passes WaitMsBeforeAsync, and reports it only
+  // to an open prompt; each scripted prompt plays one `session/prompt`.
+  const startBackgroundTurn = Effect.fn("startBackgroundTurn")(function* (
+    name: string,
+    script: ReadonlyArray<ScriptedPrompt>,
+  ) {
+    const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const path = yield* Path.Path;
+    const crypto = yield* SecureRandom.SecureRandom;
+    const mockAgentPath = yield* path.fromFileUrl(
+      new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
+    );
+    const prompts: Array<string> = [];
+    let sessionUpdate: Parameters<RuntimeService["handleSessionUpdate"]>[0] | undefined;
+    const instanceId = ProviderInstanceId.make(`antigravity-${name}-test`);
+    const adapter = yield* makeAntigravityAdapterV2({
+      instanceId,
+      selfInvocation: yield* resolveSelfInvocation(),
+      makeRuntime: (input) =>
+        makeAntigravityAcpRuntime({
+          ...input,
+          childProcessSpawner,
+          spawn: {
+            command: process.execPath,
+            args: [mockAgentPath],
+            cwd: input.cwd,
+            env: { T3_ACP_ANTIGRAVITY: "1" },
+          },
+        }).pipe(
+          Effect.provideService(SecureRandom.SecureRandom, crypto),
+          Effect.map((runtime): RuntimeService => ({
+            ...runtime,
+            handleSessionUpdate: (handler) =>
+              Effect.sync(() => {
+                sessionUpdate = handler;
+              }).pipe(Effect.andThen(runtime.handleSessionUpdate(handler))),
+            prompt: (request, options) =>
+              Effect.gen(function* () {
+                const play = script[prompts.length];
+                prompts.push(JSON.stringify(request.prompt));
+                if (options?.dispatched) yield* Deferred.succeed(options.dispatched, undefined);
+                if (play === undefined || sessionUpdate === undefined) {
+                  return yield* Effect.die("agy received an unexpected prompt");
+                }
+                const send = sessionUpdate;
+                return yield* play((update) =>
+                  send(normalizeAntigravitySessionUpdate({ sessionId: "mock-session-1", update })),
+                );
+              }),
+            cancel: Effect.void,
+          })),
+        ),
+      withProcess: (_stop, task) => task,
+      defaultModel: Effect.undefined,
+    });
+    const threadId = ThreadId.make(`thread-antigravity-${name}`);
+    const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      cwd: process.cwd(),
+    });
+    const modelSelection = { instanceId, model: "gemini-test-low" } as const;
+    const session = yield* adapter.openSession({
+      threadId,
+      providerSessionId: ProviderSessionId.make(`provider-session-antigravity-${name}`),
+      modelSelection,
+      runtimePolicy,
+    });
+    const providerThread = yield* session.ensureThread({ threadId, modelSelection, runtimePolicy });
+    const now = yield* DateTime.now;
+    yield* session.startTurn({
+      appThread: {
+        createdBy: "user",
+        creationSource: "web",
+        id: threadId,
+        projectId: ProjectId.make(`project-antigravity-${name}`),
+        title: "Antigravity background work",
+        providerInstanceId: instanceId,
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        activeProviderThreadId: providerThread.id,
+        lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+        forkedFrom: null,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        settledOverride: null,
+        settledAt: null,
+        lastVisitedAt: null,
+        deletedAt: null,
+      },
+      threadId,
+      runId: RunId.make(`run-antigravity-${name}`),
+      runOrdinal: 1,
+      providerTurnOrdinal: 1,
+      attemptId: RunAttemptId.make(`attempt-antigravity-${name}`),
+      rootNodeId: NodeId.make(`node-antigravity-${name}`),
+      providerThread,
+      message: {
+        createdBy: "user",
+        creationSource: "web",
+        messageId: MessageId.make(`message-antigravity-${name}`),
+        text: "run the slow check",
+        attachments: [],
+      },
+      modelSelection,
+      runtimePolicy,
+    });
+    const events: Array<ProviderAdapter.ProviderAdapterV2Event> = [];
+    const terminal = yield* Deferred.make<void>();
+    const providerTurn = yield* Deferred.make<ProviderTurnId>();
+    yield* session.events.pipe(
+      Stream.runForEach((event) =>
+        Effect.sync(() => events.push(event)).pipe(
+          Effect.andThen(
+            event.type === "turn.terminal"
+              ? Deferred.succeed(terminal, undefined)
+              : event.type === "provider_turn.updated"
+                ? Deferred.succeed(providerTurn, event.providerTurn.id)
+                : Effect.void,
+          ),
+        ),
+      ),
+      Effect.forkScoped,
+    );
+    const untilTerminal = Deferred.await(terminal).pipe(Effect.as(events));
+    return { session, providerThread, providerTurn, prompts, untilTerminal };
+  });
+
+  const commandStatuses = (events: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event>) =>
+    events.flatMap((event) =>
+      event.type === "turn_item.updated" &&
+      event.turnItem.nativeItemRef?.nativeId === "call_command"
+        ? [event.turnItem.status]
+        : [],
+    );
+  const terminalStatus = (events: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event>) =>
+    events.flatMap((event) => (event.type === "turn.terminal" ? [event.status] : []));
+
+  it.effect("re-attaches while a command runs and completes the turn when it reports", () =>
+    Effect.gen(function* () {
+      const turn = yield* startBackgroundTurn("background-command", [
+        (send) =>
+          send(runCommand({ status: "in_progress", isDaemon: false })).pipe(
+            Effect.as({ stopReason: "end_turn" as const }),
+          ),
+        (send) =>
+          send(runCommand({ status: "completed", isDaemon: false })).pipe(
+            Effect.andThen(
+              send({
+                sessionUpdate: "agent_message_chunk",
+                content: { type: "text", text: "The check printed done." },
+              }),
+            ),
+            Effect.as({ stopReason: "end_turn" as const }),
+          ),
+      ]);
+      const events = yield* turn.untilTerminal;
+
+      assert.lengthOf(turn.prompts, 2);
+      assert.include(turn.prompts[1], "sleep 40 && echo done");
+      assert.equal(commandStatuses(events).at(-1), "completed");
+      assert.notInclude(commandStatuses(events).slice(0, -1), "completed");
+      assert.deepEqual(terminalStatus(events), ["completed"]);
+    }).pipe(Effect.provide(layerSession), Effect.scoped),
+  );
+
+  it.effect("ends the turn over a running daemon and leaves the daemon running", () =>
+    Effect.gen(function* () {
+      const turn = yield* startBackgroundTurn("background-daemon", [
+        (send) =>
+          send(runCommand({ status: "in_progress", isDaemon: true })).pipe(
+            Effect.as({ stopReason: "end_turn" as const }),
+          ),
+      ]);
+      const events = yield* turn.untilTerminal;
+
+      assert.lengthOf(turn.prompts, 1);
+      assert.equal(commandStatuses(events).at(-1), "running");
+      assert.deepEqual(terminalStatus(events), ["completed"]);
+    }).pipe(Effect.provide(layerSession), Effect.scoped),
+  );
+
+  it.effect("Stop while it waits for the command ends the wait and the command", () =>
+    Effect.gen(function* () {
+      const reattached = yield* Deferred.make<void>();
+      const turn = yield* startBackgroundTurn("background-stop", [
+        (send) =>
+          send(runCommand({ status: "in_progress", isDaemon: false })).pipe(
+            Effect.as({ stopReason: "end_turn" as const }),
+          ),
+        // The agent ends again at once while the command still runs, so the turn waits.
+        () =>
+          Deferred.succeed(reattached, undefined).pipe(
+            Effect.as({ stopReason: "end_turn" as const }),
+          ),
+      ]);
+      yield* Deferred.await(reattached);
+      yield* turn.session.interruptTurn({
+        providerThread: turn.providerThread,
+        providerTurnId: yield* Deferred.await(turn.providerTurn),
+        requestRuntimeRestart: true,
+      });
+      const events = yield* turn.untilTerminal;
+
+      assert.lengthOf(turn.prompts, 2);
+      assert.equal(commandStatuses(events).at(-1), "interrupted");
+      assert.deepEqual(terminalStatus(events), ["interrupted"]);
+    }).pipe(Effect.provide(layerSession), Effect.scoped),
   );
 });
