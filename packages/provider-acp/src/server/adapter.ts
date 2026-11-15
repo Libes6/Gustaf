@@ -518,6 +518,7 @@ export interface AcpAdapterV2Flavor {
     notification: EffectAcpSchema.SessionNotification,
   ) => boolean;
   readonly deferFinalizeForBackgroundWork?: boolean;
+  readonly awaitsBackgroundHydration?: boolean;
   readonly assertComplete?: Effect.Effect<void, EffectAcpErrors.AcpError>;
   /** Interrupt the local prompt fiber before `session/cancel` (Grok wedged prompts). */
   readonly interruptPromptOnCancel?: boolean;
@@ -1408,6 +1409,7 @@ interface ActiveAcpTurn {
   interrupted: boolean;
   finalized: boolean;
   finalizedStatus: "completed" | "interrupted" | "failed" | "cancelled" | null;
+  childTurnsContinue?: boolean;
   promptSettled: boolean;
   promptSettledStatus: "completed" | "interrupted" | "failed" | "cancelled" | null;
   workAccepted: boolean;
@@ -1637,6 +1639,31 @@ type AcpCarryoverSubagents = {
   /** The root's subscriber keeps ingesting, so late child terminals can still project. */
   readonly projectsLateTerminals: boolean;
   readonly subagents: ReadonlyArray<ActiveAcpSubagent>;
+};
+
+interface AcpCarryoverBackgroundTool {
+  readonly taskId: string;
+  readonly toolCallId: string;
+  readonly threadId: ThreadId;
+  readonly runId: OrchestrationV2ExecutionNode["runId"];
+  readonly nodeId: OrchestrationV2ExecutionNode["id"];
+  readonly rootNodeId: OrchestrationV2ExecutionNode["id"];
+  readonly providerThreadId: ProviderThreadId;
+  readonly providerTurnId: OrchestrationV2ProviderTurn["id"];
+  readonly turnItemId: OrchestrationV2TurnItem["id"];
+  readonly turnItemOrdinal: number;
+  readonly nativeItemRef: OrchestrationV2ExecutionNode["nativeItemRef"];
+  readonly startedAt: DateTime.Utc;
+  readonly title: string | null;
+  readonly input: string;
+  readonly initialOutput: string;
+  terminalStatusProjected: boolean;
+}
+
+type AcpCarryoverBackgroundTools = {
+  readonly sessionId: string;
+  readonly projectsLateTerminals: boolean;
+  readonly tools: Map<string, AcpCarryoverBackgroundTool>;
 };
 
 type PendingRuntimeRequest = {
@@ -2228,6 +2255,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         const stoppedRunQuarantine = yield* Ref.make(false);
         // Native subagents can outlive interrupts; carry lineage forward to finish their original turn items.
         const carryoverSubagents = yield* Ref.make<AcpCarryoverSubagents | null>(null);
+        const carryoverBackgroundTools = yield* Ref.make<AcpCarryoverBackgroundTools | null>(null);
         const handledBackgroundTaskIdsInActiveTurn = yield* Ref.make<ReadonlySet<string>>(
           new Set(),
         );
@@ -4654,11 +4682,70 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           return true;
         });
 
+        const projectCarryoverBackgroundToolStatus = Effect.fnUntraced(function* (
+          tool: AcpCarryoverBackgroundTool,
+          status: "completed" | "failed",
+          appendOutput?: string,
+        ) {
+          const now = yield* DateTime.now;
+          const completedAt = now;
+          yield* emitProviderEvent({
+            type: "node.updated",
+            driver,
+            node: {
+              id: tool.nodeId,
+              threadId: tool.threadId,
+              runId: tool.runId,
+              parentNodeId: tool.rootNodeId,
+              rootNodeId: tool.rootNodeId,
+              kind: "tool_call",
+              status: nodeStatus(status),
+              countsForRun: true,
+              providerThreadId: tool.providerThreadId,
+              providerTurnId: tool.providerTurnId,
+              nativeItemRef: tool.nativeItemRef,
+              runtimeRequestId: null,
+              checkpointScopeId: null,
+              startedAt: tool.startedAt,
+              completedAt,
+            },
+          });
+          const output = appendOutput
+            ? `${tool.initialOutput}\n${appendOutput.trim()}`
+            : tool.initialOutput;
+          yield* emitProviderEvent({
+            type: "turn_item.updated",
+            driver,
+            turnItem: {
+              id: tool.turnItemId,
+              threadId: tool.threadId,
+              runId: tool.runId,
+              nodeId: tool.nodeId,
+              providerThreadId: tool.providerThreadId,
+              providerTurnId: tool.providerTurnId,
+              nativeItemRef: tool.nativeItemRef,
+              parentItemId: null,
+              ordinal: tool.turnItemOrdinal,
+              status,
+              title: tool.title,
+              startedAt: tool.startedAt,
+              completedAt,
+              updatedAt: now,
+              type: "command_execution",
+              input: tool.input,
+              output,
+              exitCode: status === "completed" ? 0 : 1,
+            },
+          });
+          tool.terminalStatusProjected = true;
+        });
+
         const applyLateBackgroundMutation = Effect.fnUntraced(function* (
           sessionId: string,
           mutation: {
             readonly taskId: string;
             readonly status: "running" | "completed" | "failed";
+            readonly appendOutput?: string;
           },
         ) {
           const taskAlreadyEnded = (yield* Ref.get(endedBackgroundTaskIds)).has(mutation.taskId);
@@ -4687,6 +4774,22 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             }
             return;
           }
+          const carryover = yield* Ref.get(carryoverBackgroundTools);
+          if (
+            carryover !== null &&
+            carryover.sessionId === sessionId &&
+            carryover.projectsLateTerminals
+          ) {
+            const carryoverTool = carryover.tools.get(mutation.taskId);
+            if (carryoverTool !== undefined && !carryoverTool.terminalStatusProjected) {
+              const status = mutation.status === "failed" ? "failed" : "completed";
+              yield* projectCarryoverBackgroundToolStatus(
+                carryoverTool,
+                status,
+                mutation.appendOutput,
+              );
+            }
+          }
           if (
             postSettleContinuationEnabled &&
             (yield* Ref.get(activeSessionId)) === sessionId &&
@@ -4706,7 +4809,20 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           readonly output?: string;
         }) {
           const context = yield* Ref.get(activeTurn);
-          if (context === null || context.finalized || !context.promptSettled) return;
+          if (context === null || context.finalized || !context.promptSettled) {
+            const carryover = yield* Ref.get(carryoverBackgroundTools);
+            if (carryover !== null && carryover.projectsLateTerminals) {
+              const carryoverTool = carryover.tools.get(mutation.taskId);
+              if (carryoverTool !== undefined && !carryoverTool.terminalStatusProjected) {
+                yield* projectCarryoverBackgroundToolStatus(
+                  carryoverTool,
+                  mutation.status,
+                  mutation.output,
+                );
+              }
+            }
+            return;
+          }
           const toolCallId = context.toolCallIdsByBackgroundTaskId.get(mutation.taskId);
           const tool = toolCallId === undefined ? undefined : context.tools.get(toolCallId);
           if (tool === undefined) return;
@@ -5530,7 +5646,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                         : mutation.status === "failed"
                           ? ("failed" as const)
                           : ("completed" as const);
-                    if (nextStatus !== "inProgress") {
+                    if (nextStatus !== "inProgress" && flavor.awaitsBackgroundHydration === true) {
                       yield* markAwaitingBackgroundHydration(context, mutation.taskId);
                       nextStatus = "inProgress";
                     }
@@ -5538,7 +5654,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                       context,
                       appendToolOutputText(
                         { ...previous, status: nextStatus },
-                        mutation.appendOutput,
+                        mutation.appendOutput ?? "",
                       ),
                     );
                   }
@@ -6189,11 +6305,14 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           ) {
             if (!acpSubagentStatusIsTerminal(update.status)) return false;
             if (acpSubagentStatusIsTerminal(subagent.task.status)) {
-              if (subagent.terminalStatusProjected || context.finalizedStatus !== "completed") {
+              if (
+                subagent.terminalStatusProjected ||
+                (context.finalizedStatus !== "completed" && !context.childTurnsContinue)
+              ) {
                 return true;
               }
             }
-            if (context.finalizedStatus === "completed") {
+            if (context.finalizedStatus === "completed" || context.childTurnsContinue) {
               yield* emitSubagent(context, update);
             } else {
               yield* mutateCarryoverSubagentStatus(subagent, update.status, update.result);
@@ -7156,6 +7275,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 yield* Ref.set(midTurnUnreportedCompletedTaskIds, new Set());
                 yield* Ref.set(handledBackgroundTaskIdsInActiveTurn, new Set());
                 yield* Ref.set(carryoverSubagents, null);
+                yield* Ref.set(carryoverBackgroundTools, null);
                 yield* Ref.set(suppressPostSettleMonitorPrompt, false);
                 yield* Ref.set(lastTurnRoute, null);
               }),
@@ -7630,6 +7750,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               yield* Ref.set(runningBackgroundTaskIds, new Set());
               yield* Ref.set(midTurnUnreportedCompletedTaskIds, new Set());
               yield* Ref.set(carryoverSubagents, null);
+              yield* Ref.set(carryoverBackgroundTools, null);
               yield* Ref.set(lastTurnRoute, null);
             }),
           );
@@ -7755,6 +7876,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               (followsAgentWorkState &&
                 rootSessionId !== null &&
                 hasWorkingDescendant(rootSessionId)));
+          context.childTurnsContinue = childTurnsContinue;
           yield* emitProviderEvent(
             settledStatus === "failed"
               ? {
@@ -7799,6 +7921,49 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 sessionId,
                 projectsLateTerminals: settledStatus === "completed" || childTurnsContinue,
                 subagents: subagentsRequiringCarryover,
+              });
+            }
+          }
+          const backgroundToolsRequiringCarryover: Array<AcpCarryoverBackgroundTool> = [];
+          for (const [taskId, toolCallId] of context.toolCallIdsByBackgroundTaskId) {
+            const tool = context.tools.get(toolCallId);
+            if (tool === undefined) continue;
+            const status = toolStatus(tool.status);
+            if (status !== "pending" && status !== "running") continue;
+            const nativeItemId = `${context.nativeThreadId}:tool:${toolCallId}`;
+            const turnItemOrdinal = yield* resolveItemOrdinal(context, nativeItemId);
+            backgroundToolsRequiringCarryover.push({
+              taskId,
+              toolCallId,
+              threadId: context.input.threadId,
+              runId: context.input.runId,
+              nodeId: providerNodeId(nativeItemId),
+              rootNodeId: context.input.rootNodeId,
+              providerThreadId: context.input.providerThread.id,
+              providerTurnId: context.providerTurnId,
+              turnItemId: providerTurnItemId(nativeItemId),
+              turnItemOrdinal,
+              nativeItemRef: {
+                driver,
+                nativeId: toolCallId,
+                strength: "strong" as const,
+              },
+              startedAt: context.toolStartedAt.get(toolCallId) ?? context.startedAt,
+              title: tool.title ?? null,
+              input: tool.command ?? tool.title ?? "Command",
+              initialOutput: toolOutputText(tool),
+              terminalStatusProjected: false,
+            });
+          }
+          if (backgroundToolsRequiringCarryover.length > 0 && !directStopQuarantine) {
+            const sessionId = yield* Ref.get(activeSessionId);
+            if (sessionId !== null) {
+              yield* Ref.set(carryoverBackgroundTools, {
+                sessionId,
+                projectsLateTerminals: settledStatus === "completed" || childTurnsContinue,
+                tools: new Map(
+                  backgroundToolsRequiringCarryover.map((item) => [item.taskId, item]),
+                ),
               });
             }
           }
@@ -8298,6 +8463,14 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 }
               }
             }
+            const carryoverBgTools = yield* Ref.getAndSet(carryoverBackgroundTools, null);
+            if (carryoverBgTools !== null && carryoverBgTools.sessionId === requestedSessionId) {
+              for (const [taskId, tool] of carryoverBgTools.tools) {
+                if (!tool.terminalStatusProjected) {
+                  context.toolCallIdsByBackgroundTaskId.set(taskId, tool.toolCallId);
+                }
+              }
+            }
             yield* Ref.set(activeTurn, context);
             yield* Ref.set(stoppedRunQuarantine, false);
             const runningTurn = providerTurnPayload(context, "running", null);
@@ -8492,7 +8665,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                           ...(result.usage.outputTokens !== undefined
                             ? { outputTokens: result.usage.outputTokens }
                             : {}),
-                          ...(result.usage.cachedReadTokens !== undefined
+                          ...(result.usage.cachedReadTokens != null
                             ? { cachedInputTokens: result.usage.cachedReadTokens }
                             : {}),
                         };
@@ -8704,7 +8877,6 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               }),
           ...(postSettleContinuationEnabled ||
           followsAgentWorkState ||
-          flavor.supportsSubagents === true ||
           flavor.subagentsIdleOnTurnCompletion === true ||
           flavor.extractBackgroundTaskId !== undefined
             ? {
@@ -9022,6 +9194,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                             // Callbacks can settle the turn while close is awaiting confirmation.
                             const context = yield* Ref.get(activeTurn);
                             const carryover = yield* Ref.get(carryoverSubagents);
+                            yield* Ref.set(carryoverBackgroundTools, null);
                             yield* Ref.set(stoppedRunQuarantine, true);
                             yield* Ref.set(runtimeRestartRequired, true);
                             agentWork = null;
@@ -9118,6 +9291,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                             }),
                           );
                           const orphanCarryover = yield* Ref.getAndSet(carryoverSubagents, null);
+                          yield* Ref.set(carryoverBackgroundTools, null);
                           yield* quarantineStoppedRun();
                           yield* cancelPendingRuntimeRequests();
                           yield* terminalizeCarryoverSubagents(orphanCarryover);

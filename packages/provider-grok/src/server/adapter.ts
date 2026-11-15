@@ -336,6 +336,7 @@ export function makeGrokAcpAdapterFlavor(
     isPersistentBackgroundTool: isXAiPersistentMonitor,
     isProviderWakeNotification: isXAiTaskCompletedWakeNotification,
     deferFinalizeForBackgroundWork: true,
+    awaitsBackgroundHydration: true,
     enablePostSettleContinuation: true,
     ...(options.assertComplete === undefined ? {} : { assertComplete: options.assertComplete }),
   };

@@ -8,6 +8,8 @@ import {
   antigravityApprovalOptions,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
+  extractAntigravityBackgroundLogPath,
+  extractAntigravityBackgroundTaskCompletion,
   isAntigravityUserInputRequest,
   makeAntigravityUserInputResponse,
   normalizeAntigravitySessionUpdate,
@@ -628,5 +630,95 @@ describe("Antigravity served reads", () => {
       toolCallId: "call_current",
       status: "completed",
     });
+  });
+});
+
+describe("Antigravity background task completions and logs", () => {
+  it("extracts log path and task id from background task launch output", () => {
+    const toolCall = {
+      toolCallId: "tool-1",
+      data: {
+        rawOutput:
+          "Tool is running as a background task with task id: 014770f4-0b92-4ee3-8647-a62869fe8b23/task-46\nTask logs are available at: file:///home/konstantin/.gemini/antigravity-cli/brain/session/tasks/task-46.log",
+      },
+    };
+    expect(extractAntigravityBackgroundLogPath(toolCall)).toEqual({
+      taskId: "014770f4-0b92-4ee3-8647-a62869fe8b23/task-46",
+      logPath: "/home/konstantin/.gemini/antigravity-cli/brain/session/tasks/task-46.log",
+    });
+  });
+
+  it("extracts running progress output from manage_task status check", () => {
+    const toolCall = {
+      toolCallId: "tool-manage",
+      title: "Running manage_task",
+      data: {
+        rawInput: { Action: "status", TaskId: "task-46" },
+        rawOutput:
+          "Task: 014770f4-0b92-4ee3-8647-a62869fe8b23/task-46\nStatus: RUNNING\nLog output:\nWorker progress: 10/30\nWorker progress: 11/30\nLast progress: 0s ago",
+      },
+    };
+    const completions = extractAntigravityBackgroundTaskCompletion(toolCall);
+    expect(completions).toEqual([
+      {
+        taskId: "task-46",
+        status: "running",
+        appendOutput: "Worker progress: 10/30\nWorker progress: 11/30",
+      },
+      {
+        taskId: "014770f4-0b92-4ee3-8647-a62869fe8b23/task-46",
+        status: "running",
+        appendOutput: "Worker progress: 10/30\nWorker progress: 11/30",
+      },
+    ]);
+  });
+
+  it("extracts completed status and final output from manage_task", () => {
+    const toolCall = {
+      toolCallId: "tool-manage",
+      title: "Running manage_task",
+      data: {
+        rawInput: { Action: "status", TaskId: "task-46" },
+        rawOutput:
+          "Task: 014770f4-0b92-4ee3-8647-a62869fe8b23/task-46\nStatus: DONE\nLog output:\nWorker completed successfully",
+      },
+    };
+    const completions = extractAntigravityBackgroundTaskCompletion(toolCall);
+    expect(completions).toEqual([
+      {
+        taskId: "task-46",
+        status: "completed",
+        appendOutput: "Worker completed successfully",
+      },
+      {
+        taskId: "014770f4-0b92-4ee3-8647-a62869fe8b23/task-46",
+        status: "completed",
+        appendOutput: "Worker completed successfully",
+      },
+    ]);
+  });
+
+  it("extracts cancelled status from manage_task kill", () => {
+    const toolCall = {
+      toolCallId: "tool-manage",
+      title: "Running manage_task",
+      data: {
+        rawInput: { Action: "kill", TaskId: "task-46" },
+        rawOutput: 'Task "014770f4-0b92-4ee3-8647-a62869fe8b23/task-46" cancelled.',
+      },
+    };
+    const completions = extractAntigravityBackgroundTaskCompletion(toolCall);
+    expect(completions).toEqual([
+      {
+        taskId: "task-46",
+        status: "failed",
+        appendOutput: "\nTask was cancelled",
+      },
+      {
+        taskId: "014770f4-0b92-4ee3-8647-a62869fe8b23/task-46",
+        status: "failed",
+        appendOutput: "\nTask was cancelled",
+      },
+    ]);
   });
 });

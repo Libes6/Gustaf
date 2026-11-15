@@ -22,6 +22,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
 import type { AntigravityAuth } from "../../provider/AntigravityAuth.ts";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
+import { parseSessionUpdateEvent } from "@t3tools/provider-acp/server/runtimeModel";
 import { withAcpKeepAlive } from "../../provider/acp/AcpJsonRpcConnection.ts";
 import {
   antigravityAppendsSystemPrompt,
@@ -44,6 +45,8 @@ import {
   antigravityApprovalOptions,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
+  extractAntigravityBackgroundLogPath,
+  extractAntigravityBackgroundTaskCompletion,
   extractAntigravityBackgroundTaskId,
   extractAntigravityBackgroundToolMutation,
   extractAntigravityUserInputQuestion,
@@ -165,6 +168,7 @@ export function makeAntigravityAcpAdapterFlavor(
       const reads = makeAntigravityReadRepair();
       // Served reads are reported from the read handler, so they take turns with agent updates.
       const updates = yield* Semaphore.make(1);
+      const watchedTasks = new Set<string>();
       let projectUpdate: Parameters<typeof runtime.handleSessionUpdate>[0] | undefined;
       return {
         ...runtime,
@@ -207,7 +211,7 @@ export function makeAntigravityAcpAdapterFlavor(
                           : "";
                     if (isAntigravityStreamInterrupted(errText)) {
                       return Effect.fail(
-                        new EffectAcpErrors.AcpTransportError({ detail: errText }),
+                        new EffectAcpErrors.AcpTransportError({ detail: errText, cause: errText }),
                       );
                     }
                   }
@@ -235,10 +239,13 @@ export function makeAntigravityAcpAdapterFlavor(
                 Effect.catchIf(isInterruptedError, (error) =>
                   Effect.succeed<EffectAcpSchema.PromptResponse>({
                     stopReason: "error",
-                    error:
-                      ("detail" in error && typeof error.detail === "string"
-                        ? error.detail
-                        : undefined) ?? ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
+                    error: {
+                      code: -32603,
+                      message:
+                        ("detail" in error && typeof error.detail === "string"
+                          ? error.detail
+                          : undefined) ?? ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
+                    },
                   }),
                 ),
               );
@@ -247,7 +254,64 @@ export function makeAntigravityAcpAdapterFlavor(
         handleSessionUpdate: (handler) => {
           projectUpdate = handler;
           return runtime.handleSessionUpdate((notification) =>
-            updates.withPermit(handler(reads.repair(notification))),
+            Effect.gen(function* () {
+              const repaired = reads.repair(notification);
+              const update = repaired.update;
+              if (
+                update.sessionUpdate === "tool_call" ||
+                update.sessionUpdate === "tool_call_update"
+              ) {
+                for (const event of parseSessionUpdateEvent(repaired).events) {
+                  if (event._tag !== "ToolCallUpdated") continue;
+                  const toolCall = normalizeAntigravityToolCall(event.toolCall);
+                  const bgLog = extractAntigravityBackgroundLogPath(toolCall);
+                  if (bgLog !== undefined && !watchedTasks.has(bgLog.taskId)) {
+                    watchedTasks.add(bgLog.taskId);
+                    const logPath = bgLog.logPath;
+                    const targetToolCallId = toolCall.toolCallId;
+                    const sessionId = notification.sessionId;
+
+                    yield* Effect.gen(function* () {
+                      let lastSize = 0;
+                      while (true) {
+                        yield* Effect.sleep("1500 millis");
+                        const exists = yield* options.fileSystem
+                          .exists(logPath)
+                          .pipe(Effect.orElseSucceed(() => false));
+                        if (!exists) continue;
+                        const content = yield* options.fileSystem
+                          .readFileString(logPath)
+                          .pipe(Effect.orElseSucceed(() => ""));
+                        if (content.length > lastSize) {
+                          lastSize = content.length;
+                          const isDone =
+                            content.includes("Command exited with code") ||
+                            content.includes("finished with result");
+                          const isFailed = /Command exited with code\s+([1-9]\d*)/i.test(content);
+                          if (projectUpdate !== undefined) {
+                            yield* projectUpdate({
+                              sessionId,
+                              update: {
+                                sessionUpdate: "tool_call_update",
+                                toolCallId: targetToolCallId,
+                                status: isDone
+                                  ? isFailed
+                                    ? "failed"
+                                    : "completed"
+                                  : "in_progress",
+                                rawOutput: { type: "Text", text: content },
+                              },
+                            }).pipe(Effect.ignore);
+                          }
+                          if (isDone) break;
+                        }
+                      }
+                    }).pipe(Effect.forkIn(scope));
+                  }
+                }
+              }
+              return yield* updates.withPermit(handler(repaired));
+            }),
           );
         },
         start: () =>
@@ -302,6 +366,7 @@ export function makeAntigravityAcpAdapterFlavor(
     isPersistentBackgroundTool: isAntigravityPersistentBackgroundTool,
     extractBackgroundTaskId: extractAntigravityBackgroundTaskId,
     extractBackgroundToolMutation: extractAntigravityBackgroundToolMutation,
+    extractBackgroundTaskCompletion: extractAntigravityBackgroundTaskCompletion,
     isBackgroundCommandTool: isAntigravityBackgroundCommandTool,
     subagentsIdleOnTurnCompletion: true,
     ...(options.onSessionEvent === undefined ? {} : { onSessionEvent: options.onSessionEvent }),

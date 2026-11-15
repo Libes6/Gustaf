@@ -491,7 +491,7 @@ export function normalizeAntigravityToolCall(
 
   return {
     ...toolCall,
-    status,
+    ...(status !== undefined ? { status } : {}),
     ...(kind !== undefined ? { kind } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(toolCall.title !== undefined ? { title: boundText(toolCall.title) } : {}),
@@ -600,8 +600,15 @@ export function extractAntigravityBackgroundTaskId(toolCall: AcpToolCallState): 
     }
   } else if (Predicate.isObject(rawOutput)) {
     const obj = rawOutput as Record<string, unknown>;
-    if (typeof obj.taskId === "string" && obj.taskId.trim()) return obj.taskId.trim();
-    if (typeof obj.TaskId === "string" && obj.TaskId.trim()) return obj.TaskId.trim();
+    const raw =
+      typeof obj.taskId === "string"
+        ? obj.taskId
+        : typeof obj.TaskId === "string"
+          ? obj.TaskId
+          : undefined;
+    if (raw && raw.trim()) {
+      return raw.trim();
+    }
   }
 
   const rawInput = Predicate.isObject(toolCall.data.rawInput)
@@ -645,9 +652,11 @@ export function isAntigravityBackgroundCommandTool(toolCall: AcpToolCallState): 
   );
 }
 
-export function extractAntigravityBackgroundToolMutation(
-  text: string,
-): ReadonlyArray<{ taskId: string; status: "completed" | "failed"; appendOutput?: string }> {
+export function extractAntigravityBackgroundToolMutation(text: string): ReadonlyArray<{
+  readonly taskId: string;
+  readonly status: "completed" | "failed" | "running";
+  readonly appendOutput: string;
+}> {
   const match =
     /(?:Task id|taskId|TaskId|task id)["':\s]+([a-zA-Z0-9_\-/]+)["']?\s+(finished|failed|ended|completed)\s+with result:?([\s\S]*)/i.exec(
       text,
@@ -655,14 +664,15 @@ export function extractAntigravityBackgroundToolMutation(
   if (match?.[1]) {
     const rawTaskId = match[1].trim();
     const taskId = rawTaskId.includes("/") ? rawTaskId.split("/").pop()! : rawTaskId;
-    const action = match[2].toLowerCase();
+    const action = (match[2] ?? "").toLowerCase();
     const rest = match[3] ?? "";
     const isFailed = action === "failed" || /Command exited with code\s+([1-9]\d*)/i.test(rest);
+    const appendOutput = rest ? `\n${rest.trim()}` : "";
     return [
       {
         taskId,
         status: isFailed ? "failed" : "completed",
-        appendOutput: rest ? `\n${rest.trim()}` : undefined,
+        appendOutput,
       },
       // Also return the rawTaskId in case adapter matched on the full compound ID
       ...(rawTaskId !== taskId
@@ -670,7 +680,7 @@ export function extractAntigravityBackgroundToolMutation(
             {
               taskId: rawTaskId,
               status: (isFailed ? "failed" : "completed") as "failed" | "completed",
-              appendOutput: rest ? `\n${rest.trim()}` : undefined,
+              appendOutput,
             },
           ]
         : []),
@@ -687,4 +697,99 @@ export function isAntigravityPersistentBackgroundTool(toolCall: AcpToolCallState
     return true;
   }
   return false;
+}
+
+export function extractAntigravityBackgroundTaskCompletion(
+  toolCall: AcpToolCallState,
+): ReadonlyArray<{
+  readonly taskId: string;
+  readonly status: "running" | "completed" | "failed";
+  readonly appendOutput: string;
+}> {
+  const title = (toolCall.title ?? "").toLowerCase();
+  const rawInput = Predicate.isObject(toolCall.data.rawInput)
+    ? (toolCall.data.rawInput as Record<string, unknown>)
+    : undefined;
+  const isManage =
+    title.includes("manage_task") ||
+    (rawInput !== undefined && ("Action" in rawInput || "action" in rawInput));
+  if (!isManage) return [];
+
+  const rawOutput = toolCall.data.rawOutput;
+  const text =
+    typeof rawOutput === "string"
+      ? rawOutput
+      : Predicate.isObject(rawOutput) &&
+          typeof (rawOutput as Record<string, unknown>).output === "string"
+        ? ((rawOutput as Record<string, unknown>).output as string)
+        : "";
+
+  const results: Array<{
+    taskId: string;
+    status: "running" | "completed" | "failed";
+    appendOutput: string;
+  }> = [];
+
+  const inputTaskId =
+    typeof rawInput?.TaskId === "string"
+      ? rawInput.TaskId.trim()
+      : typeof rawInput?.taskId === "string"
+        ? rawInput.taskId.trim()
+        : undefined;
+
+  const taskHeaderMatch = /Task:\s*([a-zA-Z0-9_\-/]+)/i.exec(text);
+  const statusMatch = /Status:\s*([a-zA-Z_]+)/i.exec(text);
+  const logOutputMatch = /Log output:\s*([\s\S]*?)(?:\n\s*Last progress:|$)/i.exec(text);
+
+  const matchedTaskId = taskHeaderMatch?.[1]?.trim() ?? inputTaskId;
+  if (matchedTaskId && statusMatch?.[1]) {
+    const rawStatus = statusMatch[1].toUpperCase();
+    const status: "running" | "completed" | "failed" =
+      rawStatus === "RUNNING"
+        ? "running"
+        : rawStatus === "FAILED" || rawStatus === "ERROR"
+          ? "failed"
+          : "completed";
+    const appendOutput = logOutputMatch?.[1]?.trim() ?? "";
+    const shortTaskId = matchedTaskId.includes("/")
+      ? matchedTaskId.split("/").pop()!
+      : matchedTaskId;
+    results.push({ taskId: shortTaskId, status, appendOutput });
+    if (shortTaskId !== matchedTaskId) {
+      results.push({ taskId: matchedTaskId, status, appendOutput });
+    }
+    return results;
+  }
+
+  const cancelMatch = /Task\s+["']?([a-zA-Z0-9_\-/]+)["']?\s+(?:cancelled|canceled)/i.exec(text);
+  if (cancelMatch?.[1] || inputTaskId) {
+    const targetId = cancelMatch?.[1]?.trim() ?? inputTaskId!;
+    const shortTaskId = targetId.includes("/") ? targetId.split("/").pop()! : targetId;
+    results.push({ taskId: shortTaskId, status: "failed", appendOutput: "\nTask was cancelled" });
+    if (shortTaskId !== targetId) {
+      results.push({ taskId: targetId, status: "failed", appendOutput: "\nTask was cancelled" });
+    }
+    return results;
+  }
+
+  return results;
+}
+
+export function extractAntigravityBackgroundLogPath(
+  toolCall: AcpToolCallState,
+): { readonly taskId: string; readonly logPath: string } | undefined {
+  const rawOutput = toolCall.data?.rawOutput;
+  const text =
+    typeof rawOutput === "string"
+      ? rawOutput
+      : Predicate.isObject(rawOutput) &&
+          typeof (rawOutput as Record<string, unknown>).output === "string"
+        ? ((rawOutput as Record<string, unknown>).output as string)
+        : undefined;
+  if (!text) return undefined;
+  const matchLog = /Task logs are available at:\s*file:\/\/([^\s\n\r]+)/i.exec(text);
+  if (!matchLog?.[1]) return undefined;
+  const taskId = extractAntigravityBackgroundTaskId(toolCall);
+  if (!taskId) return undefined;
+  return { taskId, logPath: matchLog[1].trim() };
 }

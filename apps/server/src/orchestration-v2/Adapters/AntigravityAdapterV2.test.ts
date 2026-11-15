@@ -170,7 +170,7 @@ describe("AntigravityAdapterV2 flavor", () => {
       kind: "other" as const,
       status: "running" as const,
       data: { rawInput: { Prompt: "check status", DurationSeconds: 60 } },
-    };
+    } as any;
     assert.isFalse(flavor.isPersistentBackgroundTool?.(scheduleTool));
     assert.isUndefined(flavor.extractBackgroundTaskId?.(scheduleTool));
 
@@ -183,7 +183,7 @@ describe("AntigravityAdapterV2 flavor", () => {
         rawInput: { CommandLine: "npm run dev", IsDaemon: true },
         rawOutput: 'Task id "3207fcfa-2b89-49c2-8af6-6663185043c7/task-347" finished',
       },
-    };
+    } as any;
     assert.isTrue(flavor.isBackgroundCommandTool?.(daemonTool));
     assert.isTrue(flavor.isPersistentBackgroundTool?.(daemonTool));
     assert.equal(
@@ -197,7 +197,7 @@ describe("AntigravityAdapterV2 flavor", () => {
       kind: "other" as const,
       status: "completed" as const,
       data: { rawInput: { Action: "status", TaskId: "task-bg-99" } },
-    };
+    } as any;
     assert.equal(flavor.extractBackgroundTaskId?.(manageTool), "task-bg-99");
   });
 
@@ -214,8 +214,9 @@ describe("AntigravityAdapterV2 flavor", () => {
         setConfigOption: () => Effect.void,
       } as unknown as AcpSessionRuntime.AcpSessionRuntime["Service"];
 
-      const result = yield* flavor.applyModelSelection({
+      const result = yield* flavor.applyModelSelection!({
         runtime: failingRuntime,
+        startResult: {} as any,
         modelSelection: {
           instanceId: ProviderInstanceId.make("antigravity-test"),
           model: "gemini-2.5-flash",
