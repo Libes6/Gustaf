@@ -42,15 +42,16 @@ describe("native Antigravity subagent tools", () => {
         ),
       ).toBe("mcp");
     }
-    for (const title of [
-      "Run command",
-      "Running manage_task",
-    ]) {
+    for (const title of ["Run command", "Running manage_task"]) {
       expect(classifyAntigravitySubagentToolCall({ ...toolCall, title }, {})).toBeUndefined();
     }
     expect(
       classifyAntigravitySubagentToolCall(
-        { ...toolCall, title: "other_tool", data: { rawInput: { Role: "Coder", Prompt: "write code" } } },
+        {
+          ...toolCall,
+          title: "other_tool",
+          data: { rawInput: { Role: "Coder", Prompt: "write code" } },
+        },
         {},
       ),
     ).toBe("subagent");

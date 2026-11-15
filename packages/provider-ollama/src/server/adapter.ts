@@ -198,7 +198,10 @@ const chat = Effect.fn("Ollama.chat")(function* (
   input: {
     readonly baseUrl: string;
     readonly model: string;
-    readonly messages: ReadonlyArray<{ readonly role: "user" | "assistant"; readonly content: string }>;
+    readonly messages: ReadonlyArray<{
+      readonly role: "user" | "assistant";
+      readonly content: string;
+    }>;
   },
 ) {
   const body = yield* executeJson(
@@ -259,10 +262,7 @@ function makeAdapter(input: {
       const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
       const scope = yield* Scope.Scope;
       yield* Effect.addFinalizer(() => Queue.shutdown(events));
-      const history = new Map<
-        string,
-        Array<{ role: "user" | "assistant"; content: string }>
-      >();
+      const history = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>();
       const turns = new Map<string, Fiber.Fiber<void, never>>();
       const now = yield* DateTime.now;
       const providerSession = {
@@ -325,66 +325,66 @@ function makeAdapter(input: {
             model,
             messages,
           });
-              const eventTime = yield* DateTime.now;
-              const providerTurn = {
-                id: providerTurnId,
-                providerThreadId: turnInput.providerThread.id,
-                nodeId: turnInput.rootNodeId,
-                runAttemptId: turnInput.attemptId,
-                nativeTurnRef: null,
-                ordinal: decodePositive(turnInput.runOrdinal),
-                status: "completed" as const,
-                startedAt: eventTime,
-                completedAt: eventTime,
-              } satisfies OrchestrationV2ProviderTurn;
-              history.set(turnInput.providerThread.id, [
-                ...messages,
-                { role: "assistant" as const, content: text },
-              ]);
-              yield* offer({
-                type: "provider_turn.updated",
-                driver: OLLAMA_DRIVER_KIND,
-                providerTurn,
-              });
-              yield* offer({
-                type: "turn_item.updated",
-                driver: OLLAMA_DRIVER_KIND,
-                turnItem: {
-                  id: TurnItemId.make(
-                    `turn-item:ollama:${turnInput.threadId}:${turnInput.runOrdinal}:assistant`,
-                  ),
-                  threadId: turnInput.threadId,
-                  runId: turnInput.runId,
-                  nodeId: turnInput.rootNodeId,
-                  providerThreadId: turnInput.providerThread.id,
-                  providerTurnId,
-                  nativeItemRef: null,
-                  parentItemId: null,
-                  ordinal: decodeNonNegative(turnInput.runOrdinal),
-                  status: "completed",
-                  title: null,
-                  startedAt: eventTime,
-                  completedAt: eventTime,
-                  updatedAt: eventTime,
-                  type: "assistant_message",
-                  messageId: MessageId.make(
-                    `message:ollama:${turnInput.threadId}:${turnInput.runOrdinal}:assistant`,
-                  ),
-                  text,
-                  streaming: false,
-                },
-              });
-              yield* offer({
-                type: "turn.terminal",
-                driver: OLLAMA_DRIVER_KIND,
-                providerThreadId: turnInput.providerThread.id,
-                providerTurnId,
-                runOrdinal: decodePositive(turnInput.runOrdinal),
-                status: "completed",
-                failure: null,
-                threadDisposition: "reusable",
-              });
-          }).pipe(
+          const eventTime = yield* DateTime.now;
+          const providerTurn = {
+            id: providerTurnId,
+            providerThreadId: turnInput.providerThread.id,
+            nodeId: turnInput.rootNodeId,
+            runAttemptId: turnInput.attemptId,
+            nativeTurnRef: null,
+            ordinal: decodePositive(turnInput.runOrdinal),
+            status: "completed" as const,
+            startedAt: eventTime,
+            completedAt: eventTime,
+          } satisfies OrchestrationV2ProviderTurn;
+          history.set(turnInput.providerThread.id, [
+            ...messages,
+            { role: "assistant" as const, content: text },
+          ]);
+          yield* offer({
+            type: "provider_turn.updated",
+            driver: OLLAMA_DRIVER_KIND,
+            providerTurn,
+          });
+          yield* offer({
+            type: "turn_item.updated",
+            driver: OLLAMA_DRIVER_KIND,
+            turnItem: {
+              id: TurnItemId.make(
+                `turn-item:ollama:${turnInput.threadId}:${turnInput.runOrdinal}:assistant`,
+              ),
+              threadId: turnInput.threadId,
+              runId: turnInput.runId,
+              nodeId: turnInput.rootNodeId,
+              providerThreadId: turnInput.providerThread.id,
+              providerTurnId,
+              nativeItemRef: null,
+              parentItemId: null,
+              ordinal: decodeNonNegative(turnInput.runOrdinal),
+              status: "completed",
+              title: null,
+              startedAt: eventTime,
+              completedAt: eventTime,
+              updatedAt: eventTime,
+              type: "assistant_message",
+              messageId: MessageId.make(
+                `message:ollama:${turnInput.threadId}:${turnInput.runOrdinal}:assistant`,
+              ),
+              text,
+              streaming: false,
+            },
+          });
+          yield* offer({
+            type: "turn.terminal",
+            driver: OLLAMA_DRIVER_KIND,
+            providerThreadId: turnInput.providerThread.id,
+            providerTurnId,
+            runOrdinal: decodePositive(turnInput.runOrdinal),
+            status: "completed",
+            failure: null,
+            threadDisposition: "reusable",
+          });
+        }).pipe(
           Effect.catch((error) =>
             offer({
               type: "turn.terminal",
@@ -435,7 +435,10 @@ function makeAdapter(input: {
         resumeThread: ({ providerThread }) => Effect.succeed(providerThread),
         injectHistory: (historyInput) =>
           Effect.sync(() => {
-            const grouped = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>();
+            const grouped = new Map<
+              string,
+              Array<{ role: "user" | "assistant"; content: string }>
+            >();
             for (const message of historyInput.messages) {
               const key = message.providerThreadId ?? sessionInput.providerSessionId;
               const current = grouped.get(key) ?? [];
@@ -515,7 +518,13 @@ export const OllamaAdapterV2Driver: ProviderAdapterDriver<OllamaSettings, HttpCl
   ),
 };
 
-function ask(http: Http, baseUrl: string, modelSelection: ModelSelection, prompt: string, operation: string) {
+function ask(
+  http: Http,
+  baseUrl: string,
+  modelSelection: ModelSelection,
+  prompt: string,
+  operation: string,
+) {
   return completeOllama(http, { baseUrl, model: modelSelection.model, prompt }).pipe(
     Effect.mapError(
       (cause) =>
@@ -531,9 +540,13 @@ function ask(http: Http, baseUrl: string, modelSelection: ModelSelection, prompt
 export function makeOllamaTextGeneration(http: Http, baseUrl: string): ProviderTextGeneration {
   return {
     generateTranscriptionPostProcessing: (input) =>
-      ask(http, baseUrl, input.modelSelection, input.prompt, "generateTranscriptionPostProcessing").pipe(
-        Effect.map((transcription) => ({ transcription })),
-      ),
+      ask(
+        http,
+        baseUrl,
+        input.modelSelection,
+        input.prompt,
+        "generateTranscriptionPostProcessing",
+      ).pipe(Effect.map((transcription) => ({ transcription }))),
     generateCommitMessage: (input) =>
       ask(
         http,

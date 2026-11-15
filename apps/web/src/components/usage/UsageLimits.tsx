@@ -229,7 +229,14 @@ export function LimitWindows({
         return (
           <Fragment key={window.id}>
             <span className="flex min-w-0 items-center gap-2 text-xs">
-              <span title={window.label} className="truncate text-muted-foreground">{window.label}</span>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="min-w-0 truncate text-muted-foreground" />}
+                >
+                  {window.label}
+                </TooltipTrigger>
+                <TooltipPopup>{window.label}</TooltipPopup>
+              </Tooltip>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
                 {t("misc.usageLimits.percentUsedShort").replace(
                   "{used}",

@@ -14,7 +14,8 @@ export const OllamaSettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed(OLLAMA_DEFAULT_BASE_URL)),
       Schema.annotateKey({
         title: "Server URL",
-        description: "Ollama server. Gustaf reads models from /api/tags and chats through /api/chat.",
+        description:
+          "Ollama server. Gustaf reads models from /api/tags and chats through /api/chat.",
         providerSettingsForm: {
           placeholder: OLLAMA_DEFAULT_BASE_URL,
           clearWhenEmpty: "omit",

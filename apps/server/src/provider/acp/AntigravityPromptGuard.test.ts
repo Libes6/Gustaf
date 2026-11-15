@@ -14,19 +14,15 @@ const toolCall: EffectAcpSchema.SessionNotification = {
   update: { sessionUpdate: "tool_call", toolCallId: "tool-1", title: "Read file" },
 };
 
-it("stops on the third broken stream in a row, counting notices split across chunks", () => {
+it("leaves repeated broken streams to the harness's own retry loop", () => {
   const guard = makeAntigravityPromptGuard();
   assert.isUndefined(guard(message(`Writing the analysis. ⚠ ${NOTICE}`)));
-  // A tool call between breaks is progress, so the count starts over.
   assert.isUndefined(guard(toolCall));
   assert.isUndefined(guard(message(`Continuing. ⚠ ${NOTICE.slice(0, 30)}`)));
   assert.isUndefined(guard(message(NOTICE.slice(30))));
   assert.isUndefined(guard(message("Still writing.")));
   assert.isUndefined(guard(message(`⚠ ${NOTICE}`)));
-  const failure = guard(message(`Again. ⚠ ${NOTICE}`));
-  assert.equal(failure?.class, "network_transient");
-  assert.equal(failure?.code, "STREAM_INTERRUPTED");
-  assert.include(failure?.message, "5 minutes");
+  assert.isUndefined(guard(message(`Again. ⚠ ${NOTICE}`)));
 });
 
 it("stops at once on a spent quota the harness reports in the chat, not on a quoted one", () => {

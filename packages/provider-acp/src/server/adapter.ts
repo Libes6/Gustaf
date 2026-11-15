@@ -8482,7 +8482,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     if (result.usage) {
                       const totalTokens =
                         result.usage.totalTokens ??
-                        ((result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0));
+                        (result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0);
                       if (totalTokens > 0) {
                         const usageSnapshot: ThreadTokenUsageSnapshot = {
                           usedTokens: totalTokens,
@@ -8521,7 +8521,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                       result.stopReason === "cancelled"
                         ? undefined
                         : yield* checkPromptOutcome(result);
-                    if (hiddenFailure !== undefined && hiddenFailure.class !== "network_transient") {
+                    if (
+                      hiddenFailure !== undefined &&
+                      hiddenFailure.class !== "network_transient"
+                    ) {
                       yield* Ref.set(runtimeRestartRequired, true);
                     }
                     const failure =
@@ -8739,33 +8742,33 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                   }
                   return false;
                 }),
-                hasPendingBackgroundWorkForThread: (providerThread) =>
-                  Effect.gen(function* () {
-                    const nativeId = providerThread.nativeThreadRef?.nativeId;
-                    const active = yield* Ref.get(activeTurn);
-                    if (
-                      active !== null &&
-                      (nativeId === undefined || active.nativeThreadId === nativeId)
-                    ) {
-                      if (
-                        [...active.subagents.values()].some(
-                          acpSubagentHasPendingBackgroundWork,
-                        )
-                      )
-                        return true;
-                      if (hasDeferredBackgroundWork(active)) return true;
-                    }
-                    const carryover = yield* Ref.get(carryoverSubagents);
-                    if (
-                      carryover !== null &&
-                      (nativeId === undefined || carryover.sessionId === nativeId) &&
-                      carryover.subagents.some(acpSubagentHasPendingBackgroundWork)
-                    ) {
+                hasPendingBackgroundWorkForThread: Effect.fn(
+                  "AcpAdapterV2.hasPendingBackgroundWorkForThread",
+                )(function* (
+                  providerThread: OrchestrationV2ProviderThread,
+                  _options?: { readonly includeSubagents?: boolean },
+                ) {
+                  const nativeId = providerThread.nativeThreadRef?.nativeId;
+                  const active = yield* Ref.get(activeTurn);
+                  if (
+                    active !== null &&
+                    (nativeId === undefined || active.nativeThreadId === nativeId)
+                  ) {
+                    if ([...active.subagents.values()].some(acpSubagentHasPendingBackgroundWork))
                       return true;
-                    }
-                    if ((yield* Ref.get(runningBackgroundTaskIds)).size > 0) return true;
-                    return false;
-                  }),
+                    if (hasDeferredBackgroundWork(active)) return true;
+                  }
+                  const carryover = yield* Ref.get(carryoverSubagents);
+                  if (
+                    carryover !== null &&
+                    (nativeId === undefined || carryover.sessionId === nativeId) &&
+                    carryover.subagents.some(acpSubagentHasPendingBackgroundWork)
+                  ) {
+                    return true;
+                  }
+                  if ((yield* Ref.get(runningBackgroundTaskIds)).size > 0) return true;
+                  return false;
+                }),
               }
             : {}),
           ensureThread: Effect.fn("AcpAdapterV2.ensureThread")(

@@ -7,7 +7,6 @@ import {
 } from "@t3tools/contracts";
 import type { SelfInvocation } from "@t3tools/shared/nodeRuntime";
 import * as SecureRandom from "effect/crypto/SecureRandom";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -43,7 +42,6 @@ import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTur
 import {
   ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
   antigravityApprovalOptions,
-  antigravityStreamInterruptedFailure,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
   extractAntigravityBackgroundTaskId,
@@ -226,9 +224,7 @@ export function makeAntigravityAcpAdapterFlavor(
                     typeof error.message === "string" &&
                     isAntigravityStreamInterrupted(error.message)));
 
-              const retrySchedule = Schedule.exponential("500 millis", 2).pipe(
-                Schedule.jittered,
-              );
+              const retrySchedule = Schedule.exponential("500 millis", 2).pipe(Schedule.jittered);
 
               return yield* runPrompt.pipe(
                 Effect.retry({
@@ -236,16 +232,14 @@ export function makeAntigravityAcpAdapterFlavor(
                   schedule: retrySchedule,
                   while: isInterruptedError,
                 }),
-                Effect.catchIf(
-                  isInterruptedError,
-                  (error) =>
-                    Effect.succeed<EffectAcpSchema.PromptResponse>({
-                      stopReason: "error",
-                      error:
-                        ("detail" in error && typeof error.detail === "string"
-                          ? error.detail
-                          : undefined) ?? ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
-                    }),
+                Effect.catchIf(isInterruptedError, (error) =>
+                  Effect.succeed<EffectAcpSchema.PromptResponse>({
+                    stopReason: "error",
+                    error:
+                      ("detail" in error && typeof error.detail === "string"
+                        ? error.detail
+                        : undefined) ?? ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE,
+                  }),
                 ),
               );
             }),

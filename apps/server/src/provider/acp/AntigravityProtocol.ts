@@ -516,7 +516,7 @@ const ANTIGRAVITY_SUBAGENT_TITLES = new Set([
 
 export function isAntigravitySubagentToolCall(
   toolCall: AcpToolCallState,
-  rawPayload?: unknown,
+  _rawPayload?: unknown,
 ): boolean {
   if (toolCall.kind === "subagent") return true;
   if (toolCall.kind !== undefined && toolCall.kind !== "other") return false;
@@ -538,7 +538,10 @@ export function isAntigravitySubagentToolCall(
   if (Predicate.isObject(rawInput)) {
     if ("Subagents" in rawInput || "subagents" in rawInput) return true;
     if (
-      ("Role" in rawInput || "role" in rawInput || "TypeName" in rawInput || "typeName" in rawInput) &&
+      ("Role" in rawInput ||
+        "role" in rawInput ||
+        "TypeName" in rawInput ||
+        "typeName" in rawInput) &&
       ("Prompt" in rawInput || "prompt" in rawInput)
     ) {
       return true;
@@ -573,13 +576,11 @@ export function isAntigravityStreamInterrupted(text: string): boolean {
   return text.includes("The stream was interrupted");
 }
 
-export function antigravityStreamInterruptedFailure(
-  text?: string,
-): OrchestrationV2ProviderFailure {
+export function antigravityStreamInterruptedFailure(text?: string): OrchestrationV2ProviderFailure {
   const message =
     text && isAntigravityStreamInterrupted(text)
       ? "The stream was interrupted. Please continue the task you were working on."
-      : (text?.trim() || ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE);
+      : text?.trim() || ANTIGRAVITY_STREAM_INTERRUPTED_MESSAGE;
   return makeProviderFailure({
     class: "network_transient",
     code: "STREAM_INTERRUPTED",
@@ -590,9 +591,7 @@ export function antigravityStreamInterruptedFailure(
 
 const ANTIGRAVITY_TASK_ID_REGEX = /(?:Task id|taskId|TaskId|task id)["':\s]+([a-zA-Z0-9_\-/]+)/i;
 
-export function extractAntigravityBackgroundTaskId(
-  toolCall: AcpToolCallState,
-): string | undefined {
+export function extractAntigravityBackgroundTaskId(toolCall: AcpToolCallState): string | undefined {
   const rawOutput = toolCall.data.rawOutput;
   if (typeof rawOutput === "string") {
     const match = ANTIGRAVITY_TASK_ID_REGEX.exec(rawOutput);
@@ -658,8 +657,7 @@ export function extractAntigravityBackgroundToolMutation(
     const taskId = rawTaskId.includes("/") ? rawTaskId.split("/").pop()! : rawTaskId;
     const action = match[2].toLowerCase();
     const rest = match[3] ?? "";
-    const isFailed =
-      action === "failed" || /Command exited with code\s+([1-9]\d*)/i.test(rest);
+    const isFailed = action === "failed" || /Command exited with code\s+([1-9]\d*)/i.test(rest);
     return [
       {
         taskId,
@@ -690,4 +688,3 @@ export function isAntigravityPersistentBackgroundTool(toolCall: AcpToolCallState
   }
   return false;
 }
-
