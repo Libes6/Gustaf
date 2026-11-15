@@ -38,6 +38,8 @@ const NativeToolFields = Schema.Struct({
   exitCode: Schema.optional(Schema.Int),
   exit_code: Schema.optional(Schema.Int),
   imagePath: Schema.optional(Schema.String),
+  // Unknown, so a string flag cannot fail the whole decode and lose the command.
+  IsDaemon: Schema.optional(Schema.Unknown),
 });
 const decodeNativeToolFields = Schema.decodeUnknownOption(NativeToolFields);
 const decodeSingleAnswer = Schema.decodeUnknownOption(
@@ -446,6 +448,7 @@ export function normalizeAntigravityToolCall(
   if (command !== undefined) data.command = command;
   if (cwd !== undefined) data.cwd = cwd;
   if (imagePath !== undefined) data.imagePath = imagePath;
+  if (input?.IsDaemon === true || input?.IsDaemon === "true") data.isDaemon = true;
   if (kind === "edit") {
     const content = Array.isArray(data.content) ? data.content : [];
     // Full-access edits report only a path; without a hunk the checkpoint diff is the review.
@@ -501,6 +504,16 @@ export function classifyAntigravitySubagentToolCall(
   const update = Predicate.isObject(rawPayload) ? rawPayload.update : undefined;
   const meta = Predicate.isObject(update) ? update._meta : toolCall.data.meta;
   return Predicate.isObject(meta) && meta.is_mcp_tool_call === true ? "mcp" : "subagent";
+}
+
+/**
+ * Work agy keeps running after it answers `end_turn`, and reports only to an open prompt.
+ * Daemons (dev servers, watchers) run on their own and never hold the turn.
+ */
+export function antigravityBackgroundWorkHoldsTurn(toolCall: AcpToolCallState): boolean {
+  if (toolCall.status !== "inProgress") return false;
+  if (toolCall.kind === "execute") return toolCall.data.isDaemon !== true;
+  return classifyAntigravitySubagentToolCall(toolCall) === "subagent";
 }
 
 export function antigravitySubagentOutput(toolCall: AcpToolCallState): string | undefined {
