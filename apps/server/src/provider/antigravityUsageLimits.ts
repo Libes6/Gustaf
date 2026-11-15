@@ -19,9 +19,14 @@ import {
   makeUsageLimits,
 } from "@t3tools/provider-core/server/usageLimits";
 
-const DEFAULT_ANTIGRAVITY_CLIENT_ID =
-  ["1071006060591", "tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"].join("-");
-const DEFAULT_ANTIGRAVITY_CLIENT_SECRET = ["GOCSPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
+const DEFAULT_ANTIGRAVITY_CLIENT_ID = [
+  "1071006060591",
+  "tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
+].join("-");
+const DEFAULT_ANTIGRAVITY_CLIENT_SECRET = [
+  "GOCSPX",
+  "K58FWR486LdLJ1mLB8sXC4z6qDAf",
+].join("-");
 
 const ENDPOINTS = [
   "https://daily-cloudcode-pa.googleapis.com",
