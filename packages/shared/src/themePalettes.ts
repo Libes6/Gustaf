@@ -101,6 +101,7 @@ export type ThemeDefinition = Readonly<{
   colors: ThemeColors;
   variants?: ThemeVariants;
   collection?: Readonly<{ id: string; label: string }>;
+  css?: string;
   sidebarArtwork?: boolean;
   managed?: boolean;
 }>;

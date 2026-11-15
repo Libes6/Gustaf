@@ -21,6 +21,18 @@ Android uses **Material You Layout** by default unless you have turned it off in
 It changes shapes, spacing, and controls independently
 of the selected theme.
 
+## Chat wallpapers
+
+On web and desktop, choose a scene in **Settings → Appearance → Chat wallpaper** or use
+**Change chat wallpaper** in the command palette. The selection is saved on this device or browser.
+Choose **Off** to remove the background. Animation pauses while the window is unfocused and
+respects the system reduced-motion preference.
+
+Import additional scenes in the Claude Desktop Themes `SCENES` format from a `.js` file or
+an HTTPS link to the file (including GitHub file links). An optional theme `.json` supplies its
+name and background; interface colors stay unchanged. Import scene files individually, and
+remove installed scenes in the same settings section. Other Claude mod formats are not supported.
+
 ## Composer context
 
 Git-backed projects show branch and worktree controls below the composer while you create a thread.
@@ -53,6 +65,19 @@ without replaying its transitions.
 On web and desktop, choose **Create theme** to adjust a palette, or import a Gustaf or VS Code
 theme. The theme editor's color picker lets you select an area of the app to find the color to
 change. Export your theme as JSON to share it.
+
+### Custom CSS
+
+Open **Custom CSS** in the theme editor to change layouts, backgrounds, and other styles.
+The CSS previews while you edit, is saved with the theme, and travels with its JSON export.
+It applies on web and desktop. Use `.dark` or `:root:not(.dark)` to target one appearance.
+
+External file loads are removed, including `@import` and `image-set()`. Images can be embedded
+with `url(data:...)`; `url(#id)` is also supported. Theme CSS is limited to 50,000 characters.
+Prefer `data-slot` and other `data-` attributes over classes that may change between releases.
+
+Clear the CSS in the editor to remove it, or choose a built-in theme from the command palette
+if custom rules make the interface hard to use.
 
 ## Environment themes
 

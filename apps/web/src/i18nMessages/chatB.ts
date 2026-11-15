@@ -237,7 +237,7 @@ export const chatBMessages = {
     "chatB.V2LifecycleRow.outcomeUpdated": "Updated",
     "chatB.V2LifecycleRow.onLabel": "on {label}",
     "chatB.V2LifecycleRow.newSession": "New session",
-    "chatB.V2LifecycleRow.handoffPending": "Context handoff pending",
+    "chatB.V2LifecycleRow.handoffPending": "Context transfers on next message",
     "chatB.V2LifecycleRow.handoff": "Context handoff",
     "chatB.UsageLimitRecoveryBanner.couldNotSnoozeTitle": "Could not snooze thread",
     "chatB.UsageLimitRecoveryBanner.resetPassedDescription":
@@ -989,7 +989,7 @@ export const chatBMessages = {
     "chatB.V2LifecycleRow.outcomeUpdated": "Обновлён",
     "chatB.V2LifecycleRow.onLabel": "на {label}",
     "chatB.V2LifecycleRow.newSession": "Новая сессия",
-    "chatB.V2LifecycleRow.handoffPending": "Передача контекста ожидает",
+    "chatB.V2LifecycleRow.handoffPending": "Контекст будет передан со следующим сообщением",
     "chatB.V2LifecycleRow.handoff": "Передача контекста",
     "chatB.UsageLimitRecoveryBanner.couldNotSnoozeTitle": "Не удалось отложить тред",
     "chatB.UsageLimitRecoveryBanner.resetPassedDescription":

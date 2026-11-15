@@ -36,6 +36,7 @@ import type { MessageKey } from "../../i18n";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
+import { WallpaperSettings } from "../../wallpaper/WallpaperSettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, MessageKey> = {
@@ -158,6 +159,8 @@ export function AppearanceSettingsPanel() {
           />
         </div>
       </SettingsSection>
+
+      <WallpaperSettings />
 
       <SettingsSection id="appearance-interface" title={t("settings.section.interface")}>
         <SettingsRow

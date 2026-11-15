@@ -38,6 +38,58 @@ const QUOTED_NOTICE = Buffer.from(
 );
 
 describe("watchAntigravityPromptOutcome", () => {
+  it.effect(
+    "reports unfinished tools without treating prose or settled calls as background work",
+    () =>
+      Effect.gen(function* () {
+        const check = yield* watchAntigravityPromptOutcome("/unused", "../invalid");
+        for (const status of [
+          "pending",
+          "inProgress",
+          "requiresAction",
+          "completed",
+          "failed",
+        ] as const) {
+          const failure = yield* check({ stopReason: "end_turn" }, [
+            { toolCallId: "command", title: "Running run_command", status, data: {} },
+          ]);
+          assert.equal(
+            failure?.code,
+            status === "pending" || status === "inProgress" || status === "requiresAction"
+              ? "ANTIGRAVITY_UNFINISHED_TOOLS"
+              : undefined,
+          );
+        }
+        assert.isUndefined(yield* check({ stopReason: "end_turn" }, []));
+        assert.isUndefined(
+          yield* check({ stopReason: "end_turn" }, [
+            {
+              toolCallId: "dev-server",
+              kind: "execute",
+              status: "inProgress",
+              data: { isDaemon: true },
+            },
+          ]),
+        );
+        assert.isUndefined(
+          yield* check({ stopReason: "end_turn" }, [
+            {
+              toolCallId: "child",
+              title: "Running invoke_subagent",
+              kind: "other",
+              status: "inProgress",
+              data: {},
+            },
+          ]),
+        );
+        assert.isUndefined(
+          yield* check({ stopReason: "cancelled" }, [
+            { toolCallId: "command", status: "inProgress", data: {} },
+          ]),
+        );
+      }),
+  );
+
   it.effect("fails only turns whose own steps end in an upstream error", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -89,6 +141,23 @@ describe("watchAntigravityPromptOutcome", () => {
           code: "RESOURCE_EXHAUSTED",
           retryable: true,
           resetAt: "1970-01-01T01:00:00.000Z",
+        },
+      );
+      assert.deepEqual(
+        yield* turn([
+          [USER_INPUT, input],
+          [
+            ERROR_MESSAGE,
+            errorPayload(
+              "The stream was interrupted. Please continue the task you were working on.",
+            ),
+          ],
+        ]),
+        {
+          class: "transport_error",
+          message: "The stream was interrupted. Please continue the task you were working on.",
+          code: "STREAM_INTERRUPTED",
+          retryable: true,
         },
       );
       // The earlier error step is outside this turn.

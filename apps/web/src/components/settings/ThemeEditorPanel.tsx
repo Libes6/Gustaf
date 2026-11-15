@@ -32,6 +32,7 @@ import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ThemeCssEditor } from "./ThemeCssEditor";
 import { getThemeRoleLabel, ThemeColorField } from "./ThemeColorPicker";
 import {
   clearThemeInspectorHover,
@@ -357,6 +358,8 @@ export function ThemeEditorPanel({
   };
   const isEditing = editingTheme !== null;
   const [name, setName] = useState("");
+  const [css, setCss] = useState("");
+  const [cssOpen, setCssOpen] = useState(false);
   const [activeAppearance, setActiveAppearance] = useState<ThemeAppearance>(initialAppearance);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [colorsByAppearance, setColorsByAppearance] = useState<ThemeEditorColorsByAppearance>(() =>
@@ -412,6 +415,8 @@ export function ThemeEditorPanel({
       }
 
       setName(editingTheme?.label ?? seedName ?? "");
+      setCss(sourceTheme?.css ?? "");
+      setCssOpen(Boolean(sourceTheme?.css));
       setActiveAppearance(nextAppearance);
       // Open unmanaged themes in advanced mode to preserve imported or hand-tuned colors.
       setIsAdvanced(sourceTheme !== null && sourceTheme.managed !== true);
@@ -466,11 +471,13 @@ export function ThemeEditorPanel({
     }
   }
 
+  const cssForSave = css.trim() ? css : (mergeTarget?.css ?? "");
+
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies the edited colors to the document as a live theme preview while the editor is open
   useEffect(() => {
     if (!open) return;
-    applyThemeColorPreview(colorsByAppearance[activeAppearance], activeAppearance);
-  }, [activeAppearance, colorsByAppearance, open]);
+    applyThemeColorPreview(colorsByAppearance[activeAppearance], activeAppearance, cssForSave);
+  }, [activeAppearance, colorsByAppearance, cssForSave, open]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- restores the document theme when the editor closes or unmounts
   useEffect(() => {
@@ -767,6 +774,10 @@ export function ThemeEditorPanel({
   };
 
   const handleSubmit = () => {
+    if (mergeTarget?.css && css.trim() && mergeTarget.css !== css) {
+      setError(t("themeCss.mergeConflict"));
+      return;
+    }
     if (!name.trim()) {
       setError(t("settingsE.themeEditorPanel.nameRequired"));
       return;
@@ -802,6 +813,7 @@ export function ThemeEditorPanel({
         savedTheme = updateCustomTheme({
           ...parseThemeFile({
             version: THEME_FILE_VERSION,
+            ...(cssForSave ? { css: cssForSave } : {}),
             id: mergeTarget.id,
             name: mergeTarget.label,
             appearance: mergeTarget.appearance,
@@ -822,6 +834,7 @@ export function ThemeEditorPanel({
         savedTheme = updateCustomTheme({
           ...parseThemeFile({
             version: THEME_FILE_VERSION,
+            ...(cssForSave ? { css: cssForSave } : {}),
             id: editingTheme.id,
             name,
             appearance: baseAppearance,
@@ -844,6 +857,7 @@ export function ThemeEditorPanel({
         savedTheme = updateCustomTheme({
           ...parseThemeFile({
             version: THEME_FILE_VERSION,
+            ...(cssForSave ? { css: cssForSave } : {}),
             id: mergeTarget.id,
             name: mergeTarget.label,
             appearance: mergeTarget.appearance,
@@ -860,6 +874,7 @@ export function ThemeEditorPanel({
         savedTheme = installCustomTheme(
           parseThemeFile({
             version: THEME_FILE_VERSION,
+            ...(cssForSave ? { css: cssForSave } : {}),
             name,
             appearance: activeAppearance,
             colors: colorsForSave[activeAppearance],
@@ -1255,6 +1270,22 @@ export function ThemeEditorPanel({
             <div className="space-y-3">
               {renderColorsHeader()}
               {renderColorFields()}
+            </div>
+            <div className="space-y-2">
+              <Button
+                aria-expanded={cssOpen}
+                size="xs"
+                variant="ghost"
+                onClick={() => setCssOpen(!cssOpen)}
+              >
+                {t("themeCss.title")}
+              </Button>
+              {cssOpen ? (
+                <>
+                  <p className="text-xs text-muted-foreground">{t("themeCss.description")}</p>
+                  <ThemeCssEditor value={css} onChange={setCss} />
+                </>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">

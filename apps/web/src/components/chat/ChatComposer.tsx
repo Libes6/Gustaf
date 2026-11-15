@@ -2509,6 +2509,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       )
     : bannerItems;
 
+  const usageLimitsItems = shelfItems.filter((item) => item.id.startsWith("usage-limits:"));
+  const attachedShelfItems = shelfItems.filter((item) => !item.id.startsWith("usage-limits:"));
+
   const insertComposerText = (
     text: string,
     position: "cursor" | "end",
@@ -3316,9 +3319,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {usageLimitsItems.length > 0 ? (
+        <div className="mb-2 flex max-h-[min(40vh,20rem)] flex-col gap-1 overflow-y-auto">
+          <ComposerBannerStack items={usageLimitsItems} detached />
+        </div>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
-          <ComposerBannerStack items={shelfItems} />
+          <ComposerBannerStack items={attachedShelfItems} />
           {showComposerTopDrawer ? (
             <ComposerBanner.Attachment>
               <ComposerBanner.Root data-chat-composer-top-drawer="true" variant="info">

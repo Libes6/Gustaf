@@ -77,6 +77,9 @@ const SHELL_CONTENT_SECURITY_POLICY = [
   "form-action 'self'",
 ].join("; ");
 
+const WALLPAPER_CONTENT_SECURITY_POLICY =
+  "default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts";
+
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
@@ -689,9 +692,11 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
       ...(isHtml
         ? {
             Vary: "User-Agent",
-            ...(request.headers["user-agent"]?.includes("GustafShell/1")
-              ? { "Content-Security-Policy": SHELL_CONTENT_SECURITY_POLICY }
-              : {}),
+            ...(relativePath === "wallpaper-frame.html"
+              ? { "Content-Security-Policy": WALLPAPER_CONTENT_SECURITY_POLICY }
+              : request.headers["user-agent"]?.includes("GustafShell/1")
+                ? { "Content-Security-Policy": SHELL_CONTENT_SECURITY_POLICY }
+                : {}),
           }
         : {}),
       ...validators(fileInfo),

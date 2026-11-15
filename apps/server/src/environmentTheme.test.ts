@@ -18,6 +18,7 @@ const encodeThemeFile = Schema.encodeSync(Schema.fromJsonString(EnvironmentTheme
 
 const NIGHTFALL_THEME: EnvironmentThemeFile = {
   name: "Nightfall",
+  css: "[data-chat-header] { border-radius: 12px; }",
   appearance: "dark",
   canvas: "#1a1b26",
   accent: "#7aa2f7",

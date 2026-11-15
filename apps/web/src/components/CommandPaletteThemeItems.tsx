@@ -1,6 +1,7 @@
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
+import { useWallpaperLibrary } from "../wallpaper/wallpaperLibrary";
 import { getClientSettings } from "../hooks/useSettings";
 import { type MessageKey, translate } from "../i18n";
 import { useCustomThemes } from "../hooks/useCustomThemes";
@@ -76,6 +77,31 @@ export function useCommandPaletteThemeItems() {
     setThemeHalf,
   } = useTheme();
   const themeCards = useThemeCards();
+  const wallpapers = useWallpaperLibrary();
+  const changeWallpaperItem: CommandPaletteSubmenuItem = {
+    kind: "submenu",
+    value: "action:change-wallpaper",
+    title: t("wallpaper.change"),
+    addonIcon: <PaletteIcon className={ADDON_ICON_CLASS} />,
+    searchTerms: ["wallpaper", "scene", "обои", "сцена"],
+    icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
+    groups: [
+      {
+        value: "wallpapers",
+        label: t("wallpaper.title"),
+        items: [{ id: null, name: t("wallpaper.off") }, ...wallpapers.options].map((scene) => ({
+          kind: "action",
+          value: `wallpaper:${scene.id ?? "off"}`,
+          title: scene.name,
+          searchTerms: [scene.name, "wallpaper", "обои"],
+          icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
+          run: async () => {
+            wallpapers.select(scene.id);
+          },
+        })),
+      },
+    ],
+  };
 
   const changeThemeItem: CommandPaletteSubmenuItem = {
     kind: "submenu",
@@ -178,5 +204,5 @@ export function useCommandPaletteThemeItems() {
     },
   };
 
-  return { changeThemeItem, changeAppearanceItem, themeEditorItem };
+  return { changeThemeItem, changeAppearanceItem, changeWallpaperItem, themeEditorItem };
 }

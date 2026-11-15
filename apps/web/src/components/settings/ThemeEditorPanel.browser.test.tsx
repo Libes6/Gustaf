@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../../test/render";
+import {
+  applyThemePalette,
+  CUSTOM_THEMES_STORAGE_KEY,
+  getCustomThemes,
+  invalidateCustomThemes,
+  serializeThemeFile,
+} from "../../themePalette";
 import { ThemeEditorPanel } from "./ThemeEditorPanel";
 
 function dragHeader(panel: HTMLElement, toX: number, toY: number) {
@@ -148,4 +155,62 @@ describe("ThemeEditorPanel", () => {
     });
     expect((hex.element() as HTMLInputElement).value).toBe(original);
   });
+});
+
+it("previews, saves and clears custom CSS without losing it on export", async () => {
+  const previous = localStorage.getItem(CUSTOM_THEMES_STORAGE_KEY);
+  using _library = {
+    [Symbol.dispose]() {
+      if (previous === null) localStorage.removeItem(CUSTOM_THEMES_STORAGE_KEY);
+      else localStorage.setItem(CUSTOM_THEMES_STORAGE_KEY, previous);
+      invalidateCustomThemes();
+      applyThemePalette("dark");
+    },
+  };
+  const css = "[data-css-editor-probe] { color: rgb(11, 22, 33); }";
+  const props = {
+    open: true,
+    onOpenChange: () => {},
+    onSaved: () => true,
+    editingTheme: null,
+    initialAppearance: "dark" as const,
+    seedName: "CSS editor test",
+    restoreTheme: () => applyThemePalette("dark"),
+  };
+  await using screen = await render(
+    <>
+      <div data-css-editor-probe="">Probe</div>
+      <ThemeEditorPanel {...props} />
+    </>,
+  );
+  const probe = screen.getByText("Probe").element();
+  await screen.getByRole("button", { name: "Custom CSS", exact: true }).click();
+  await screen.getByRole("textbox", { name: "Custom CSS", exact: true }).fill(css);
+  await vi.waitFor(() => expect(getComputedStyle(probe).color).toBe("rgb(11, 22, 33)"));
+  await screen.getByRole("button", { name: "Create theme", exact: true }).click();
+  const saved = getCustomThemes().find((theme) => theme.label === "CSS editor test")!;
+  expect(saved.css).toBe(css);
+  expect(JSON.parse(serializeThemeFile(saved)).css).toBe(css);
+  await screen.rerender(
+    <>
+      <div data-css-editor-probe="">Probe</div>
+      <ThemeEditorPanel {...props} open={false} />
+    </>,
+  );
+  await screen.rerender(
+    <>
+      <div data-css-editor-probe="">Probe</div>
+      <ThemeEditorPanel {...props} editingTheme={saved} />
+    </>,
+  );
+  await screen.getByRole("button", { name: "Clear CSS", exact: true }).click();
+  await vi.waitFor(() => expect(getComputedStyle(probe).color).not.toBe("rgb(11, 22, 33)"));
+  await screen.getByRole("button", { name: "Save changes", exact: true }).click();
+  expect(getCustomThemes().find((theme) => theme.id === saved.id)?.css).toBeUndefined();
+  await screen.rerender(
+    <>
+      <div data-css-editor-probe="">Probe</div>
+      <ThemeEditorPanel {...props} open={false} />
+    </>,
+  );
 });

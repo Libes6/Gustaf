@@ -114,6 +114,7 @@ describe("theme files", () => {
     const theme = parseThemeFile({
       version: THEME_FILE_VERSION,
       name: "Search",
+      css: "[data-chat-header] { border-radius: 12px; }",
       appearance: "dark",
       colors: {
         searchMatchBackground: "#224466",
@@ -126,6 +127,19 @@ describe("theme files", () => {
     const restored = parseThemeFile(JSON.parse(serializeThemeFile(theme)));
     expect(restored.colors).toEqual(theme.colors);
     expect(restored.variants).toEqual(theme.variants);
+    expect(restored.css).toBe("[data-chat-header] { border-radius: 12px; }");
+  });
+
+  it.each([42, "x".repeat(50_001)])("rejects invalid theme CSS", (css) => {
+    expect(() =>
+      parseThemeFile({
+        version: THEME_FILE_VERSION,
+        name: "Invalid CSS",
+        appearance: "dark",
+        colors: { canvas: "#101010" },
+        css,
+      }),
+    ).toThrow("Theme CSS must be text");
   });
 
   it.each(["searchMatchBackground", "searchMatchActiveBackground"] as const)(
@@ -441,6 +455,7 @@ describe("theme files", () => {
       parseThemeFile({
         version: THEME_FILE_VERSION,
         id: "aurora",
+        css: "[data-chat-header] { border-radius: 12px; }",
         name: "Aurora",
         appearance: "light",
         colors: { canvas: "#f8fbff", accent: "#5b6cff" },
@@ -470,6 +485,7 @@ describe("theme files", () => {
     invalidateCustomThemes();
     expect(getCustomThemes().find((theme) => theme.id === "aurora")).toMatchObject({
       id: "aurora",
+      css: "[data-chat-header] { border-radius: 12px; }",
       colors: { accent: canonical("hsl(263 70% 58%)") },
     });
     removeCustomTheme("aurora");

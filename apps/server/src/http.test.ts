@@ -400,6 +400,17 @@ it.layer(
           yield* shell.text;
         }
       }
+      yield* fs.writeFileString(path.join(staticDir, "wallpaper-frame.html"), "<html>scene</html>");
+      for (const headers of [{}, shellHeaders]) {
+        const frame = yield* request("/wallpaper-frame.html", { headers });
+        expect(frame.headers["content-security-policy"]).toContain("sandbox allow-scripts");
+        expect(frame.headers["content-security-policy"]).toContain(
+          "script-src 'self' 'unsafe-eval'",
+        );
+        expect(frame.headers["content-security-policy"]).toContain("connect-src 'none'");
+        expect(frame.headers["content-security-policy"]).toContain("frame-ancestors 'self'");
+        yield* frame.text;
+      }
       expect(yield* initial.text).toBe("<html>old build</html>");
       const previousEtag = initial.headers["etag"] ?? '"previous-html"';
       const nextHtml = "<html>new build</html>";

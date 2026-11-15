@@ -3,6 +3,36 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "misc." and both languages list the same keys.
 export const miscMessages = {
   en: {
+    "themeCss.language": "CSS",
+    "themeCss.position": "Ln {line}, Col {column}",
+    "themeCss.externalIgnored": "Rules that load external files will be ignored.",
+    "themeCss.title": "Custom CSS",
+    "themeCss.description":
+      "Saved and exported with this theme. Web and desktop only. Rules that load external files are ignored.",
+    "themeCss.clear": "Clear CSS",
+    "themeCss.indentHint": "Tab indents. Shift+Tab unindents. Press Escape, then Tab to leave.",
+    "themeCss.focusHint": "Tab moves to the next control.",
+    "themeCss.mergeConflict":
+      "These themes have different CSS. Use the same CSS before merging their palettes.",
+    "wallpaper.title": "Chat wallpaper",
+    "wallpaper.scene": "Scene",
+    "wallpaper.description":
+      "On this client. Animation pauses when the window loses focus and respects reduced motion.",
+    "wallpaper.off": "Off",
+    "wallpaper.importDescription":
+      "Import a Claude Desktop Themes scene (.js), optionally with its theme .json. Or paste a direct link to a scene file, including a GitHub file link.",
+    "wallpaper.importFile": "Import scene files",
+    "wallpaper.url": "Scene file URL",
+    "wallpaper.install": "Install",
+    "wallpaper.importing": "Importing…",
+    "wallpaper.remove": "Remove",
+    "wallpaper.tooLarge": "Scene files must be smaller than 200 KB.",
+    "wallpaper.invalidScene": "Select a JavaScript scene that registers SCENES['name'].",
+    "wallpaper.invalidUrl": "Enter an HTTPS link to a scene file.",
+    "wallpaper.importFailed":
+      "Could not import the scene. Check the file or download it and import it locally.",
+    "wallpaper.sceneFailed": "Wallpaper could not run",
+    "wallpaper.change": "Change chat wallpaper",
     "misc.attachmentFilePreview.attachment": "Attachment",
     "misc.attachmentFilePreview.close": "Close",
     "misc.attachmentFilePreview.copied": "Copied",
@@ -1175,6 +1205,36 @@ export const miscMessages = {
     "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
+    "themeCss.language": "CSS",
+    "themeCss.position": "Стр. {line}, столб. {column}",
+    "themeCss.externalIgnored": "Правила загрузки внешних файлов будут проигнорированы.",
+    "themeCss.title": "Свой CSS",
+    "themeCss.description":
+      "Сохраняется и экспортируется вместе с темой. Для веба и десктопа. Правила загрузки внешних файлов игнорируются.",
+    "themeCss.clear": "Очистить CSS",
+    "themeCss.indentHint":
+      "Tab добавляет отступ, Shift+Tab убирает. Нажмите Escape, затем Tab, чтобы выйти из редактора.",
+    "themeCss.focusHint": "Tab переводит фокус к следующему элементу.",
+    "themeCss.mergeConflict": "У тем разный CSS. Перед объединением палитр задайте одинаковый CSS.",
+    "wallpaper.title": "Обои чата",
+    "wallpaper.scene": "Сцена",
+    "wallpaper.description":
+      "Для этого клиента. Анимация останавливается без фокуса окна и учитывает уменьшение движения.",
+    "wallpaper.off": "Выключены",
+    "wallpaper.importDescription":
+      "Импортируйте сцену Claude Desktop Themes (.js), при желании вместе с её .json. Или вставьте прямую ссылку на файл сцены, в том числе из GitHub.",
+    "wallpaper.importFile": "Импорт файлов сцены",
+    "wallpaper.url": "Ссылка на файл сцены",
+    "wallpaper.install": "Установить",
+    "wallpaper.importing": "Импорт…",
+    "wallpaper.remove": "Удалить",
+    "wallpaper.tooLarge": "Файлы сцены должны быть меньше 200 КБ.",
+    "wallpaper.invalidScene": "Выберите JavaScript-сцену с регистрацией SCENES['name'].",
+    "wallpaper.invalidUrl": "Введите HTTPS-ссылку на файл сцены.",
+    "wallpaper.importFailed":
+      "Не удалось импортировать сцену. Проверьте файл или скачайте его и импортируйте с диска.",
+    "wallpaper.sceneFailed": "Не удалось запустить обои",
+    "wallpaper.change": "Сменить обои чата",
     "misc.attachmentFilePreview.attachment": "Вложение",
     "misc.attachmentFilePreview.close": "Закрыть",
     "misc.attachmentFilePreview.copied": "Скопировано",
