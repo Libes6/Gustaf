@@ -8,5 +8,10 @@
   <true/>
   <key>com.apple.security.automation.apple-events</key>
   <true/>
+  <!-- Chromium: the bundled framework has no team signature to validate, and V8 compiles code. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
 </dict>
 </plist>

@@ -80,6 +80,8 @@ NodeFS.writeFileSync(
 </plist>
 `,
 );
-// The bundler signs the framework; the helper is a plain file to it, so it is signed here.
+// To the bundler these are plain files (`frameworks` would be copied while the shell still
+// compiles, before CEF is downloaded), so they are signed here, inside out.
+run("codesign", ["--force", "--sign", "-", NodePath.join(out, framework)]);
 run("codesign", ["--force", "--sign", "-", NodePath.join(out, `${helperName}.app`)]);
 console.log(`Staged Chromium ${version} in ${out}`);

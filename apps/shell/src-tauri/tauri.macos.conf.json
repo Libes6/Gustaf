@@ -5,8 +5,8 @@
   },
   "bundle": {
     "macOS": {
-      "frameworks": ["target/browser/Chromium Embedded Framework.framework"],
       "files": {
+        "Frameworks/Chromium Embedded Framework.framework": "target/browser/Chromium Embedded Framework.framework",
         "Frameworks/Gustaf Browser Helper.app": "target/browser/Gustaf Browser Helper.app"
       }
     }
