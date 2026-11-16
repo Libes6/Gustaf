@@ -8,7 +8,7 @@ import { Card, CardTitle } from "../components/ui/card";
 import { formatBytes, formatCount, formatDateTime, formatDay, shortCommit } from "../lib/format";
 import { formatPlatform, groupVersions } from "../lib/versions";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 export function Stat({
   title,
@@ -21,9 +21,9 @@ export function Stat({
 }) {
   return (
     <Card>
-      <CardTitle>{title}</CardTitle>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      <h2 className="text-sm text-muted-foreground">{title}</h2>
+      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      {hint ? <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p> : null}
     </Card>
   );
 }
@@ -146,7 +146,7 @@ export function OverviewPage() {
   const overview = useOverview();
   return (
     <>
-      <PageTitle>{strings.overview.title}</PageTitle>
+      <PageHeader title={strings.overview.title} />
       {overview.isPending ? (
         <LoadingState />
       ) : overview.isError ? (

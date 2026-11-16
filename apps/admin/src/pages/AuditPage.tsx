@@ -8,7 +8,7 @@ import { Badge } from "../components/ui/badge";
 import { Card } from "../components/ui/card";
 import { auditActionLabel, formatDateTime, formatMeta, hasMeta } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 function actionVariant(action: string) {
   if (action === "user.ban" || action === "user.delete" || action === "device.revoke") {
@@ -20,7 +20,7 @@ function actionVariant(action: string) {
 
 function AuditItem({ entry }: { readonly entry: AuditEntry }) {
   return (
-    <li className="flex flex-col gap-1.5 px-4 py-3">
+    <li className="flex flex-col gap-1.5 px-5 py-3.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <Badge variant={actionVariant(entry.action)}>{auditActionLabel(entry.action)}</Badge>
         <span className="font-mono text-xs text-muted-foreground wrap-anywhere">
@@ -54,7 +54,7 @@ export function AuditPage() {
   const { query: result } = list;
   return (
     <>
-      <PageTitle>{strings.audit.title}</PageTitle>
+      <PageHeader title={strings.audit.title} />
       <Card className="p-0">
         {result.isPending ? (
           <LoadingState />

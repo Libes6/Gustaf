@@ -10,7 +10,7 @@ import { RoleBadge, StatusBadge } from "../components/role-badges";
 import { EmptyState, ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card, CardTitle } from "../components/ui/card";
+import { Card, CardHeader, CardTitle } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Label, Textarea } from "../components/ui/input";
 import {
@@ -75,7 +75,7 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="mb-2 flex flex-wrap items-center gap-4">
         <UserAvatar name={user.name} image={user.image} size="lg" />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-semibold tracking-tight">{user.name}</h1>
@@ -108,40 +108,42 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
         ) : null}
       </Card>
 
-      <Card>
-        <CardTitle>{strings.users.profile}</CardTitle>
-        <dl className="mt-2 divide-y">
-          <Field label={strings.users.email}>{user.email}</Field>
-          <Field label={strings.users.github}>
-            {user.githubLogin ? `@${user.githubLogin}` : strings.common.none}
-          </Field>
-          <Field label={strings.users.columns.created}>{formatDateTime(user.createdAt)}</Field>
-          <Field label={strings.users.columns.lastSeen}>{formatDateTime(user.lastSeenAt)}</Field>
-          {user.banned ? (
-            <Field label={strings.users.banReason}>{user.banReason ?? strings.common.none}</Field>
-          ) : null}
-        </dl>
-      </Card>
-
-      <Card>
-        <CardTitle>{strings.users.relay}</CardTitle>
-        {user.relay.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">{strings.users.relayEmpty}</p>
-        ) : (
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardTitle>{strings.users.profile}</CardTitle>
           <dl className="mt-2 divide-y">
-            {user.relay.map((usage) => (
-              <Field key={usage.month} label={usage.month}>
-                {formatBytes(usage.bytes)}
-              </Field>
-            ))}
+            <Field label={strings.users.email}>{user.email}</Field>
+            <Field label={strings.users.github}>
+              {user.githubLogin ? `@${user.githubLogin}` : strings.common.none}
+            </Field>
+            <Field label={strings.users.columns.created}>{formatDateTime(user.createdAt)}</Field>
+            <Field label={strings.users.columns.lastSeen}>{formatDateTime(user.lastSeenAt)}</Field>
+            {user.banned ? (
+              <Field label={strings.users.banReason}>{user.banReason ?? strings.common.none}</Field>
+            ) : null}
           </dl>
-        )}
-      </Card>
+        </Card>
+
+        <Card>
+          <CardTitle>{strings.users.relay}</CardTitle>
+          {user.relay.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">{strings.users.relayEmpty}</p>
+          ) : (
+            <dl className="mt-2 divide-y">
+              {user.relay.map((usage) => (
+                <Field key={usage.month} label={usage.month}>
+                  {formatBytes(usage.bytes)}
+                </Field>
+              ))}
+            </dl>
+          )}
+        </Card>
+      </div>
 
       <UserAiUsage userId={user.id} />
 
       <Card className="p-0">
-        <CardTitle className="px-4 pt-4">{strings.users.devices}</CardTitle>
+        <CardHeader title={strings.users.devices} />
         {user.devices.length === 0 ? (
           <EmptyState message={strings.users.devicesEmpty} />
         ) : (
@@ -185,7 +187,7 @@ function UserDetail({ user }: { readonly user: AdminUserDetail }) {
       </Card>
 
       <Card className="p-0">
-        <CardTitle className="px-4 pt-4">{strings.users.sessions}</CardTitle>
+        <CardHeader title={strings.users.sessions} />
         {user.sessions.length === 0 ? (
           <EmptyState message={strings.users.sessionsEmpty} />
         ) : (

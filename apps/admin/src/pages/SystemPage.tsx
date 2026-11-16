@@ -3,7 +3,7 @@ import type { BackupStatus, SystemStatus } from "../api/types";
 import { Meter } from "../components/charts";
 import { ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
-import { Card, CardTitle } from "../components/ui/card";
+import { Card, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -21,14 +21,14 @@ import {
   shortCommit,
 } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 import { Row } from "./OverviewPage";
 
 export function SystemPage() {
   const system = useSystemStatus();
   return (
     <>
-      <PageTitle>{strings.system.title}</PageTitle>
+      <PageHeader title={strings.system.title} />
       {system.isPending ? (
         <LoadingState />
       ) : system.isError ? (
@@ -96,14 +96,13 @@ function SystemContent({ data, now }: { readonly data: SystemStatus; readonly no
         </Card>
       </div>
       <Card className="p-0">
-        <div className="flex items-baseline justify-between gap-4 p-4 pb-2">
-          <CardTitle>{strings.system.database}</CardTitle>
-          <span className="text-sm tabular-nums">
+        <CardHeader title={strings.system.database}>
+          <span className="text-sm text-muted-foreground tabular-nums">
             {database
               ? `${strings.system.dbSize}: ${formatBytes(database.sizeBytes)}`
               : strings.system.unavailable}
           </span>
-        </div>
+        </CardHeader>
         {database ? (
           <Table>
             <TableHeader>

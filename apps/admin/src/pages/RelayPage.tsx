@@ -4,7 +4,7 @@ import { useRelayHealth } from "../api/queries";
 import { RELAY_FAILURES, type RelayHealth } from "../api/types";
 import { DailyBars, Meter } from "../components/charts";
 import { ErrorState, LoadingState } from "../components/states";
-import { Card, CardTitle } from "../components/ui/card";
+import { Card, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -15,14 +15,14 @@ import {
 } from "../components/ui/table";
 import { formatBytes, formatCount, formatDateTime, formatPercent } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 import { Stat } from "./OverviewPage";
 
 export function RelayPage() {
   const relay = useRelayHealth();
   return (
     <>
-      <PageTitle>{strings.relay.title}</PageTitle>
+      <PageHeader title={strings.relay.title} />
       {relay.isPending ? (
         <LoadingState />
       ) : relay.isError ? (
@@ -78,12 +78,9 @@ function RelayContent({ data }: { readonly data: RelayHealth }) {
         </Card>
       </div>
       <Card className="p-0">
-        <div className="p-4 pb-2">
-          <CardTitle>{strings.relay.failures}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">{strings.relay.failuresHint}</p>
-        </div>
+        <CardHeader title={strings.relay.failures} description={strings.relay.failuresHint} />
         {failures.length === 0 ? (
-          <p className="px-4 pb-4 text-sm text-muted-foreground">{strings.relay.noFailures}</p>
+          <p className="px-5 py-4 text-sm text-muted-foreground">{strings.relay.noFailures}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -114,14 +111,12 @@ function RelayContent({ data }: { readonly data: RelayHealth }) {
         )}
       </Card>
       <Card className="p-0">
-        <div className="p-4 pb-2">
-          <CardTitle>{strings.relay.topUsers}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {strings.relay.topUsersHint(formatBytes(data.monthlyLimitBytes))}
-          </p>
-        </div>
+        <CardHeader
+          title={strings.relay.topUsers}
+          description={strings.relay.topUsersHint(formatBytes(data.monthlyLimitBytes))}
+        />
         {data.topUsers.length === 0 ? (
-          <p className="px-4 pb-4 text-sm text-muted-foreground">{strings.relay.topUsersEmpty}</p>
+          <p className="px-5 py-4 text-sm text-muted-foreground">{strings.relay.topUsersEmpty}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -138,7 +133,7 @@ function RelayContent({ data }: { readonly data: RelayHealth }) {
                     <Link
                       to="/users/$userId"
                       params={{ userId: row.userId }}
-                      className="font-medium hover:underline"
+                      className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {row.name}
                     </Link>
