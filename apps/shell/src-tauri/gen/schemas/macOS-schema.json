@@ -303,6 +303,72 @@
           "markdownDescription": "Enables the local_environment_enabled command without any pre-configured scope."
         },
         {
+          "description": "Enables the native_browser_clear_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-clear-data",
+          "markdownDescription": "Enables the native_browser_clear_data command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-close",
+          "markdownDescription": "Enables the native_browser_close command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_close_all command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-close-all",
+          "markdownDescription": "Enables the native_browser_close_all command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_create command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-create",
+          "markdownDescription": "Enables the native_browser_create command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_history command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-history",
+          "markdownDescription": "Enables the native_browser_history command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_navigate command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-navigate",
+          "markdownDescription": "Enables the native_browser_navigate command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_open_devtools command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-open-devtools",
+          "markdownDescription": "Enables the native_browser_open_devtools command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_present command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-present",
+          "markdownDescription": "Enables the native_browser_present command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_reload command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-reload",
+          "markdownDescription": "Enables the native_browser_reload command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_set_color_scheme command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-set-color-scheme",
+          "markdownDescription": "Enables the native_browser_set_color_scheme command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the native_browser_set_zoom command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-native-browser-set-zoom",
+          "markdownDescription": "Enables the native_browser_set_zoom command without any pre-configured scope."
+        },
+        {
           "description": "Enables the read_client_settings command without any pre-configured scope.",
           "type": "string",
           "const": "allow-read-client-settings",
@@ -529,6 +595,72 @@
           "type": "string",
           "const": "deny-local-environment-enabled",
           "markdownDescription": "Denies the local_environment_enabled command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_clear_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-clear-data",
+          "markdownDescription": "Denies the native_browser_clear_data command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-close",
+          "markdownDescription": "Denies the native_browser_close command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_close_all command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-close-all",
+          "markdownDescription": "Denies the native_browser_close_all command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_create command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-create",
+          "markdownDescription": "Denies the native_browser_create command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_history command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-history",
+          "markdownDescription": "Denies the native_browser_history command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_navigate command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-navigate",
+          "markdownDescription": "Denies the native_browser_navigate command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_open_devtools command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-open-devtools",
+          "markdownDescription": "Denies the native_browser_open_devtools command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_present command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-present",
+          "markdownDescription": "Denies the native_browser_present command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_reload command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-reload",
+          "markdownDescription": "Denies the native_browser_reload command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_set_color_scheme command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-set-color-scheme",
+          "markdownDescription": "Denies the native_browser_set_color_scheme command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the native_browser_set_zoom command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-native-browser-set-zoom",
+          "markdownDescription": "Denies the native_browser_set_zoom command without any pre-configured scope."
         },
         {
           "description": "Denies the read_client_settings command without any pre-configured scope.",

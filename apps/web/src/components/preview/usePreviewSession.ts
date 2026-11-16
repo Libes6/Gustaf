@@ -8,6 +8,7 @@ import { type EnvironmentId, type ScopedThreadRef, ThreadId } from "@t3tools/con
 import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
 
+import { nativeBrowserTabs } from "~/browser/nativeBrowser";
 import {
   applyPreviewServerEvent,
   isPreviewSupportedInRuntime,
@@ -141,7 +142,7 @@ const desktopHostedPreviewSyncAtom = Atom.family((environmentId: EnvironmentId) 
 
 export function useDesktopHostedPreviewSessions(environmentId: EnvironmentId | null): void {
   useAtomValue(
-    isPreviewSupportedInRuntime() && environmentId !== null
+    (isPreviewSupportedInRuntime() || nativeBrowserTabs !== null) && environmentId !== null
       ? desktopHostedPreviewSyncAtom(environmentId)
       : inactiveAtom,
   );

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-native-browser-set-zoom"
+description = "Enables the native_browser_set_zoom command without any pre-configured scope."
+commands.allow = ["native_browser_set_zoom"]
+
+[[permission]]
+identifier = "deny-native-browser-set-zoom"
+description = "Denies the native_browser_set_zoom command without any pre-configured scope."
+commands.deny = ["native_browser_set_zoom"]

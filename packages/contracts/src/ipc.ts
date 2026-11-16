@@ -1156,6 +1156,8 @@ export interface DesktopBridge {
     onRequest: (listener: (request: DesktopAppActivationRequest) => void) => () => void;
   };
   preview: DesktopPreviewBridge;
+  /** Gustaf's shell on macOS: the user's tabs as native web views laid over the page. */
+  nativeBrowser?: DesktopNativeBrowserBridge;
 }
 
 /** Renderer callback invoked by Electron with a fresh user gesture before display-media capture. */
@@ -1302,6 +1304,56 @@ export interface DesktopPreviewBridge {
   onStateChange: (listener: (tabId: string, state: DesktopPreviewTabState) => void) => () => void;
   onPointerEvent: (listener: (event: DesktopPreviewPointerEvent) => void) => () => void;
   onOpenLink: (listener: (event: DesktopPreviewOpenLinkEvent) => void) => () => void;
+}
+
+export interface DesktopNativeBrowserTabState {
+  tabId: string;
+  /** Stable per tab while the shell runs. */
+  number: number;
+  url: string;
+  title: string;
+  loading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  zoomFactor: number;
+}
+
+export interface DesktopNativeBrowserRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DesktopNativeBrowserBridge {
+  createTab: (
+    tabId: string,
+    input: {
+      readonly url: string | null;
+      readonly profileId?: string | undefined;
+      readonly zoomFactor?: number | undefined;
+      readonly colorScheme?: DesktopPreviewColorScheme | undefined;
+    },
+  ) => Promise<void>;
+  closeTab: (tabId: string) => Promise<void>;
+  /** The view sits above the whole page, so null hides it whenever the page must draw over it. */
+  present: (
+    tabId: string,
+    presentation: { readonly rect: DesktopNativeBrowserRect; readonly cornerRadius: number } | null,
+  ) => Promise<void>;
+  navigate: (tabId: string, url: string) => Promise<void>;
+  goBack: (tabId: string) => Promise<void>;
+  goForward: (tabId: string) => Promise<void>;
+  refresh: (tabId: string) => Promise<void>;
+  hardReload: (tabId: string) => Promise<void>;
+  setZoomFactor: (tabId: string, zoomFactor: number) => Promise<void>;
+  setColorScheme: (tabId: string, colorScheme: DesktopPreviewColorScheme) => Promise<void>;
+  openDevTools: (tabId: string) => Promise<void>;
+  /** Omit the profile to clear every profile. */
+  clearCookies: (profileId?: string) => Promise<void>;
+  clearCache: (profileId?: string) => Promise<void>;
+  onStateChange: (listener: (state: DesktopNativeBrowserTabState) => void) => () => void;
+  onOpenLink: (listener: (event: { tabId: string; url: string }) => void) => () => void;
 }
 
 export type ConfirmDialogVariant = "default" | "destructive";

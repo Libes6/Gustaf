@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Commands and plugins the Gustaf page may use. It is granted to the page of the server the shell started, at its exact origin, by ipc_scope.rs at startup; this file names no origin.",
-  "windows": ["main"],
+  "description": "Commands and plugins the Gustaf page may use. It is granted to the page of the server the shell started, at its exact origin, by ipc_scope.rs at startup; this file names no origin. It names the main web view, not the window: the browser tabs are web views in that window and must not get these commands.",
+  "webviews": ["main"],
   "permissions": [
     "core:default",
     "allow-ssh-request",
@@ -44,6 +44,17 @@
     "allow-cli-command-uninstall",
     "allow-cli-command-add-to-path",
     "allow-client-config",
-    "allow-account-report-problem"
+    "allow-account-report-problem",
+    "allow-native-browser-create",
+    "allow-native-browser-close",
+    "allow-native-browser-close-all",
+    "allow-native-browser-present",
+    "allow-native-browser-navigate",
+    "allow-native-browser-history",
+    "allow-native-browser-reload",
+    "allow-native-browser-set-zoom",
+    "allow-native-browser-set-color-scheme",
+    "allow-native-browser-open-devtools",
+    "allow-native-browser-clear-data"
   ]
 }

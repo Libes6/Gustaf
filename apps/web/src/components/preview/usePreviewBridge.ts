@@ -7,6 +7,7 @@ import type {
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import { recordFaviconForThread } from "~/browserFaviconStore";
+import type { DesktopPreviewTabControls } from "~/browser/nativeBrowser";
 import { useBrowserPointerStore } from "~/browser/browserPointerStore";
 import { acquireBrowserSurfaceActivity } from "~/browser/browserSurfaceStore";
 import { applyPreviewDesktopState, type DesktopPreviewOverlay } from "~/previewStateStore";
@@ -39,14 +40,16 @@ export function createCaptureActivity(tabId: string) {
   return { update, release: () => update(false) };
 }
 
-/** ElectronBrowserHost owns webview lifetime. */
+/** ElectronBrowserHost and NativeBrowserHost own the page's lifetime. */
 export function usePreviewBridge(input: {
   threadRef: ScopedThreadRef;
   tabId: string;
   runtimeTabId: string;
   serverDriven?: boolean;
+  /** Defaults to Electron's preview bridge. */
+  bridge?: Pick<DesktopPreviewTabControls, "onStateChange"> | null;
 }): void {
-  const { threadRef, tabId, runtimeTabId, serverDriven = false } = input;
+  const { threadRef, tabId, runtimeTabId, serverDriven = false, bridge = previewBridge } = input;
   const clearBrowserPointer = useBrowserPointerStore((state) => state.clear);
   const reportStatus = useAtomCommand(previewEnvironment.reportStatus, "preview status report");
   const { environmentId, threadId } = threadRef;
@@ -86,19 +89,20 @@ export function usePreviewBridge(input: {
   );
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to preview bridge state changes and capture activity for the current tab
   useEffect(() => {
-    if (!previewBridge || typeof window === "undefined") return;
+    if (!bridge || typeof window === "undefined") return;
     lastReportedUrl.current = null;
     lastReportedKind.current = null;
     lastDesktopNavStatus.current = null;
     const activity = createCaptureActivity(runtimeTabId);
     captureActivity.current = activity;
-    const unsubscribe = previewBridge.onStateChange(handleStateChange);
+    const unsubscribe = bridge.onStateChange(handleStateChange);
     return () => {
       unsubscribe();
       activity.release();
       if (captureActivity.current === activity) captureActivity.current = null;
     };
   }, [
+    bridge,
     runtimeTabId,
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A different tab or thread starts its status reports and pointer tracking from scratch.
     environmentId,

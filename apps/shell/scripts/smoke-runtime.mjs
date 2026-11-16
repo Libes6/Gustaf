@@ -61,6 +61,7 @@ function shellCommands(bearer) {
     read_connection_catalog: () => null,
     write_connection_catalog: () => null,
     window_fullscreen_state: () => false,
+    native_browser_close_all: () => null,
     set_window_theme: () => null,
     reveal_window: () => null,
     server_exposure_state: () => exposure,

@@ -80,6 +80,17 @@ fn main() {
             "cli_command_add_to_path",
             "client_config",
             "account_report_problem",
+            "native_browser_create",
+            "native_browser_close",
+            "native_browser_close_all",
+            "native_browser_present",
+            "native_browser_navigate",
+            "native_browser_history",
+            "native_browser_reload",
+            "native_browser_set_zoom",
+            "native_browser_set_color_scheme",
+            "native_browser_open_devtools",
+            "native_browser_clear_data",
         ]),
     ))
     .expect("failed to run tauri-build");

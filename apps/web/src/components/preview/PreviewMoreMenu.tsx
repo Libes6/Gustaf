@@ -49,7 +49,8 @@ interface Props {
   zoomFactor: number;
   colorScheme: DesktopPreviewColorScheme;
   deviceToolbarVisible: boolean;
-  onToggleDeviceToolbar: () => void;
+  /** Omitted where the page always fills the panel. */
+  onToggleDeviceToolbar?: (() => void) | undefined;
   nativePictureInPicture: boolean;
   profileName: string | undefined;
   move?: { readonly label: string; readonly onMove: () => void };
@@ -113,11 +114,13 @@ export function PreviewMoreMenu({
           </MenuItem>
         ) : null}
         {move ? <MenuItem onClick={move.onMove}>{move.label}</MenuItem> : null}
-        <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
-          {deviceToolbarVisible
-            ? t("misc.previewMoreMenu.hideDeviceToolbar")
-            : t("misc.previewMoreMenu.showDeviceToolbar")}
-        </MenuItem>
+        {onToggleDeviceToolbar ? (
+          <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
+            {deviceToolbarVisible
+              ? t("misc.previewMoreMenu.hideDeviceToolbar")
+              : t("misc.previewMoreMenu.showDeviceToolbar")}
+          </MenuItem>
+        ) : null}
         <MenuSub>
           <MenuSubTrigger disabled={disabled}>
             {t("misc.previewMoreMenu.appearance")}
