@@ -40,7 +40,6 @@ import * as SshTunnel from "./tunnel.ts";
 
 const isSshCommandError = Schema.is(SshCommandError);
 
-
 const makeSuccessfulProcess = (stdout: string) => {
   const stdoutStream = Stream.make(new TextEncoder().encode(stdout));
   return ChildProcessSpawner.makeHandle({
@@ -288,7 +287,7 @@ describe("ssh tunnel scripts", () => {
       );
       const child = yield* spawner.spawn(
         ChildProcess.make("sh", ["-s", "--", "--version"], {
-          env: { HOME: root, PATH: `${bin}:${process.env.PATH ?? ""}` },
+          env: { HOME: root, PATH: `${bin}:/usr/bin:/bin` },
           extendEnv: false,
           stdin: {
             stream: Stream.make(
@@ -432,7 +431,7 @@ describe("ssh tunnel scripts", () => {
   });
 
   // GNU tar runs gzip to unpack; macOS tar decompresses by itself, so only Linux shows it.
-  it.skipIf(process.platform !== "linux")(
+  it.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
     "names gzip when a host with tar but no gzip cannot unpack the release archive",
     () => {
       const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-ssh-runner-"));
