@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-native-browser-present"
+description = "Enables the native_browser_present command without any pre-configured scope."
+commands.allow = ["native_browser_present"]
+
+[[permission]]
+identifier = "deny-native-browser-present"
+description = "Denies the native_browser_present command without any pre-configured scope."
+commands.deny = ["native_browser_present"]

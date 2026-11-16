@@ -1099,6 +1099,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "browser-native-tabs",
+    title: "Native browser tabs",
+    to: "/settings/browser",
+    macOnly: true,
+    shellAccountOnly: true,
+    searchTerms: ["webkit safari stream screencast performance cpu render tabs"],
+  },
+  {
     id: "browser-auto-show-floating-preview",
     title: "Auto-show floating preview",
     to: "/settings/browser",

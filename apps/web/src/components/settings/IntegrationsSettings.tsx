@@ -48,6 +48,7 @@ import { useRef, useState } from "react";
 
 import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
 import { resolveEnvironmentOptionLabel } from "~/components/BranchToolbar.logic";
+import { nativeBrowserTabs } from "~/browser/nativeBrowser";
 import { previewBridge } from "~/components/preview/previewBridge";
 import { cn, randomUUID } from "~/lib/utils";
 import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
@@ -817,6 +818,34 @@ function BrowserSearchEngineSetting() {
         />
       ) : null}
     </>
+  );
+}
+
+function BrowserNativeTabsSetting() {
+  const row = useLocalizedSettingLookup();
+  const t = useT();
+  const nativeTabs = useClientSettings((settings) => settings.browserNativeTabs);
+  const updateSettings = useUpdatePrimarySettings();
+
+  return (
+    <SettingsRow
+      {...row("browser-native-tabs")}
+      resetAction={
+        nativeTabs ? null : (
+          <SettingResetButton
+            label={t("settingsB.IntegrationsSettings.resetNativeTabs")}
+            onClick={() => updateSettings({ browserNativeTabs: true })}
+          />
+        )
+      }
+      control={
+        <Switch
+          checked={nativeTabs}
+          onCheckedChange={(checked) => updateSettings({ browserNativeTabs: Boolean(checked) })}
+          aria-label={row("browser-native-tabs").title}
+        />
+      }
+    />
   );
 }
 
@@ -1676,6 +1705,7 @@ export function BrowserSettingsPanel() {
         <AgentBrowserAccessSetting />
       </SettingsSection>
       <SettingsSection id="browser" title={t("settingsB.IntegrationsSettings.sectionBrowsing")}>
+        {nativeBrowserTabs ? <BrowserNativeTabsSetting /> : null}
         {hasNativeBrowser || desktopOnlyMessage ? (
           <SettingsUnavailableGroup message={desktopOnlyMessage}>
             <BrowserProfilesSetting disabled={desktopOnly} />

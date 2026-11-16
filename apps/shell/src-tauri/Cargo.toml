@@ -25,7 +25,8 @@ libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-tauri = { version = "2", features = [] }
+# `unstable` places the user's browser tabs as child web views; `devtools` opens their inspector.
+tauri = { version = "2", features = ["unstable", "devtools"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-process = "2"
@@ -46,6 +47,17 @@ windows-sys = { version = "0.61", features = [
 objc2 = "0.6.5"
 objc2-app-kit = "0.3.2"
 objc2-foundation = "0.3.2"
+block2 = "0.6"
+objc2-web-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "block2",
+  "objc2-app-kit",
+  "objc2-core-foundation",
+  "WKNavigation",
+  "WKWebView",
+  "WKWebsiteDataRecord",
+  "WKWebsiteDataStore",
+] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 

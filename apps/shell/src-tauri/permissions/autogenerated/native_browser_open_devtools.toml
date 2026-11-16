@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-native-browser-open-devtools"
+description = "Enables the native_browser_open_devtools command without any pre-configured scope."
+commands.allow = ["native_browser_open_devtools"]
+
+[[permission]]
+identifier = "deny-native-browser-open-devtools"
+description = "Denies the native_browser_open_devtools command without any pre-configured scope."
+commands.deny = ["native_browser_open_devtools"]

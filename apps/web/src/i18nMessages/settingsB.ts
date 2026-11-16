@@ -447,6 +447,7 @@ export const settingsBMessages = {
     "settingsB.IntegrationsSettings.autoShowDescription":
       "Show the floating preview when an agent opens a browser or device unless the agent says otherwise.",
     "settingsB.IntegrationsSettings.resetAutoShow": "auto-show floating preview",
+    "settingsB.IntegrationsSettings.resetNativeTabs": "native browser tabs",
     "settingsB.IntegrationsSettings.autoShowAria": "Auto-show floating preview",
     "settingsB.IntegrationsSettings.couldNotClear": "Could not clear {name}'s data",
     "settingsB.IntegrationsSettings.notConnectedYet": "You're not connected to a server yet.",
@@ -979,6 +980,7 @@ export const settingsBMessages = {
     "settingsB.IntegrationsSettings.autoShowDescription":
       "Показывать плавающий предпросмотр, когда агент открывает браузер или устройство, если агент не указал иное.",
     "settingsB.IntegrationsSettings.resetAutoShow": "автопоказ плавающего предпросмотра",
+    "settingsB.IntegrationsSettings.resetNativeTabs": "нативные вкладки браузера",
     "settingsB.IntegrationsSettings.autoShowAria": "Автопоказ плавающего предпросмотра",
     "settingsB.IntegrationsSettings.couldNotClear": "Не удалось очистить данные «{name}»",
     "settingsB.IntegrationsSettings.notConnectedYet": "Вы ещё не подключены к серверу.",

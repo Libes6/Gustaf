@@ -8,6 +8,7 @@ mod diagnostics;
 mod exit_guard;
 mod ipc_scope;
 mod local_env;
+mod native_browser;
 mod navigation;
 mod network;
 mod server_process;
@@ -450,7 +451,7 @@ pub fn run() {
     let builder = builder
         // Must be the first plugin. A second launch would start a second server on the same data.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
@@ -501,6 +502,17 @@ pub fn run() {
             cli_command::cli_command_add_to_path,
             account::client_config,
             account::account_report_problem,
+            native_browser::native_browser_create,
+            native_browser::native_browser_close,
+            native_browser::native_browser_close_all,
+            native_browser::native_browser_present,
+            native_browser::native_browser_navigate,
+            native_browser::native_browser_history,
+            native_browser::native_browser_reload,
+            native_browser::native_browser_set_zoom,
+            native_browser::native_browser_set_color_scheme,
+            native_browser::native_browser_open_devtools,
+            native_browser::native_browser_clear_data,
         ])
         .setup(|app| {
             updater::initialize(app)?;
@@ -509,6 +521,7 @@ pub fn run() {
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
+            app.manage(native_browser::NativeBrowser::default());
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
@@ -559,7 +572,9 @@ pub fn run() {
             account::run_heartbeat(app.handle().clone());
             let window =
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(app_url.clone()))
-                    .user_agent("GustafShell/1");
+                    .user_agent("GustafShell/1")
+                    // The `devtools` feature is for the browser tabs; the app's own page stays closed.
+                    .devtools(cfg!(debug_assertions));
             #[cfg(target_os = "macos")]
             let window = window
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
