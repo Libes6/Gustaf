@@ -1,0 +1,17 @@
+[package]
+name = "gustaf-browser-helper"
+version = "0.0.0"
+description = "Chromium's child processes for the Gustaf shell's browser tabs (macOS)"
+edition = "2021"
+publish = false
+
+# Built on its own by scripts/stage-browser.mjs: the Tauri bundler would ship any binary of the
+# shell's own package on every platform.
+[workspace]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Must match the shell's `cef`: the helper and the browser process load one framework.
+cef = { version = "=156.6.0", default-features = false, features = ["sandbox"] }
+
+[profile.release]
+strip = true
