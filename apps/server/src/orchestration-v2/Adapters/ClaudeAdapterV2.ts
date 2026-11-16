@@ -361,6 +361,8 @@ const CLAUDE_DESCENDANT_POLL = "1 second";
 // Claude Code's refusal of bypassPermissions as root, which it explains only on stderr.
 const CLAUDE_ROOT_REFUSAL =
   "--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons";
+// Claude Code's answer to a --resume whose session store is gone, as a result error and on stderr.
+const CLAUDE_CONVERSATION_NOT_FOUND = "No conversation found with session ID:";
 
 const CLAUDE_GROUP_WATCH_SCRIPT = [
   "{ trap '' TERM; read -r _ <&3; kill -TERM 0; sleep 5; kill -KILL 0; } </dev/null >/dev/null 2>&1 &",
@@ -669,6 +671,17 @@ export class ClaudeCodeRootRefusalError extends Schema.TaggedError<ClaudeCodeRoo
   }
 }
 
+export class ClaudeConversationNotFoundError extends Schema.TaggedError<ClaudeConversationNotFoundError>()(
+  "ClaudeConversationNotFoundError",
+  {
+    cause: Schema.Defect(),
+  },
+) {
+  override get message(): string {
+    return "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.";
+  }
+}
+
 class ClaudeMcpRegistrationTimeoutError extends Schema.TaggedError<ClaudeMcpRegistrationTimeoutError>()(
   "ClaudeMcpRegistrationTimeoutError",
   { phase: Schema.Literals(["initialize", "setMcpServers"]) },
@@ -761,6 +774,14 @@ export interface ClaudeAgentSdkSubagentLookupInput {
 }
 
 const isClaudeAgentSdkQueryRunnerError = Schema.is(ClaudeAgentSdkQueryRunnerError);
+
+const isClaudeConversationNotFound = (cause: Cause.Cause<ClaudeAgentSdkQueryRunnerError>) => {
+  const error = Cause.squash(cause);
+  return (
+    isClaudeAgentSdkQueryRunnerError(error) &&
+    Predicate.isTagged(error.cause, "ClaudeConversationNotFoundError")
+  );
+};
 const isClaudeMcpRegistrationTimeoutError = Schema.is(ClaudeMcpRegistrationTimeoutError);
 const isProviderAdapterRuntimeRequestResponseError = Schema.is(
   ProviderAdapter.ProviderAdapterRuntimeRequestResponseError,
@@ -1341,6 +1362,7 @@ export const layerQueryRunner: Layer.Layer<
           let stderrTail = "";
           let stderrClosed: Promise<void> = Promise.resolve();
           let answered = false;
+          let conversationMissing = false;
           const appendStderr = (text: string) => {
             if (answered) return;
             stderrTail = (stderrTail + text).slice(-CLAUDE_STDERR_TAIL_LENGTH);
@@ -1517,15 +1539,27 @@ export const layerQueryRunner: Layer.Layer<
                     }
                     const refusedRoot = !answered && stderrTail.includes(CLAUDE_ROOT_REFUSAL);
                     return yield* queryRunnerError(
-                      refusedRoot ? new ClaudeCodeRootRefusalError({ cause }) : cause,
+                      refusedRoot
+                        ? new ClaudeCodeRootRefusalError({ cause })
+                        : conversationMissing ||
+                            (!answered && stderrTail.includes(CLAUDE_CONVERSATION_NOT_FOUND))
+                          ? new ClaudeConversationNotFoundError({ cause })
+                          : cause,
                       "fromAsyncIterable",
                     );
                   }),
                 ),
               ),
-              Stream.tap(() =>
+              Stream.tap((message) =>
                 Effect.sync(() => {
                   answered = true;
+                  if (
+                    message.type === "result" &&
+                    message.subtype !== "success" &&
+                    message.errors.some((error) => error.startsWith(CLAUDE_CONVERSATION_NOT_FOUND))
+                  ) {
+                    conversationMissing = true;
+                  }
                 }),
               ),
               Stream.tap((message) =>
@@ -4647,6 +4681,7 @@ interface ActiveClaudeSubagent {
 }
 
 interface ClaudeLiveQueryContext {
+  exitCause?: Cause.Cause<ClaudeAgentSdkQueryRunnerError>;
   readonly queryPolicy: ClaudeRuntimeQueryPolicy;
   readonly nativeThreadId: string;
   readonly settingsCwd: string | null;
@@ -5428,6 +5463,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           );
         });
         const openedNativeThreads = yield* Ref.make(new Set<string>());
+        // Sessions Claude Code reported gone on resume; resumeThread fails them into a fresh session.
+        const missingNativeThreads = new Set<string>();
         const pdfBudgets = new Map<string, ReturnType<typeof makeClaudeAttachmentBudget>>();
         const latestPlanByKind = yield* Ref.make(new Map<string, OrchestrationV2PlanArtifact>());
         // Claude 5 task tools edit one list per native session, across turns.
@@ -11689,6 +11726,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             Effect.exit,
             Effect.flatMap(
               Effect.fnUntraced(function* (exit: ClaudeQueryStreamExit) {
+                if (exit._tag === "Failure") {
+                  context.exitCause = exit.cause;
+                  if (isClaudeConversationNotFound(exit.cause)) {
+                    missingNativeThreads.add(context.nativeThreadId);
+                  }
+                }
                 const heldContext = yield* Ref.get(activeTurn);
                 if (
                   (yield* Ref.get(queryContext))?.query === querySession &&
@@ -11864,6 +11907,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 return yield* new ProviderAdapter.ProviderAdapterProtocolError({
                   driver: CLAUDE_PROVIDER,
                   detail: "Claude provider query ended before the turn could start.",
+                  ...(querySession.exitCause === undefined ? {} : { cause: Cause.squash(querySession.exitCause) }),
                 });
               }
               if (
@@ -12496,6 +12540,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 // A live process holds the conversation even before saving it.
                 (yield* Ref.get(queryContext))?.nativeThreadId !== nativeThreadId
               ) {
+                if (missingNativeThreads.has(nativeThreadId)) {
+                  return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: CLAUDE_PROVIDER,
+                    detail: `Claude Code has no conversation ${nativeThreadId} to resume.`,
+                  });
+                }
                 // An unreadable transcript leaves the resume to the CLI.
                 const transcript = yield* claudeTranscriptState(nativeThreadId).pipe(
                   Effect.orElseSucceed(() => "missing" as const),

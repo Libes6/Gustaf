@@ -11222,6 +11222,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
 
   const openAdapterWhoseFirstQueryEndsBeforeItsFirstFrame = Effect.fnUntraced(function* (
     name: string,
+    firstMessages = Stream.empty as Stream.Stream<SDKMessage, ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError>,
   ) {
     const fileSystem = yield* FileSystem.FileSystem;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
@@ -11260,7 +11261,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               // The first CLI exits without writing a frame.
               messages:
                 opened === 1
-                  ? Stream.empty.pipe(Stream.ensuring(Deferred.succeed(deadStreamEnded, undefined)))
+                  ? firstMessages.pipe(Stream.ensuring(Deferred.succeed(deadStreamEnded, undefined)))
                   : Stream.fromQueue(sdkMessages),
               offer: () => Effect.void,
               setModel: () => Effect.void,
@@ -11343,6 +11344,87 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             NodeServices.layer,
             NodeCrypto.layer,
           ),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("resumes in a fresh session after Claude Code reports its conversation gone", () =>
+    Effect.gen(function* () {
+      const harness = yield* openAdapterWhoseFirstQueryEndsBeforeItsFirstFrame(
+        "claude-query-conversation-missing",
+        Stream.fail(
+          new ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError({
+            method: "fromAsyncIterable",
+            cause: new ClaudeAdapterV2.ClaudeConversationNotFoundError({
+              cause: new Error("Claude Code process exited with code 1"),
+            }),
+          }),
+        ),
+      );
+      const turnInput = harness.turnInput("a", 1);
+      const started = yield* harness.runtime.startTurn(turnInput).pipe(Effect.exit);
+      assert.isTrue(Exit.isFailure(started));
+      if (Exit.isFailure(started)) {
+        assert.include(
+          makeProviderFailure({ cause: started.cause, class: "transport_error" }).message,
+          "could not find this conversation",
+        );
+      }
+      // A failed resume is what sends the next turn to a fresh native session.
+      const resumed = yield* harness.runtime
+        .resumeThread({
+          providerThread: turnInput.providerThread,
+          threadId: turnInput.threadId,
+          modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+          runtimePolicy: CLAUDE_TEST_RUNTIME_POLICY,
+        })
+        .pipe(Effect.exit);
+      assert.isTrue(Exit.isFailure(resumed));
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
+        ),
+      ),
+    ),
+  );
+
+  it.effect("fails a turn whose Claude query ends before its first frame", () =>
+    Effect.gen(function* () {
+      const harness = yield* openAdapterWhoseFirstQueryEndsBeforeItsFirstFrame(
+        "claude-query-dies-before-frame",
+      );
+      const started = yield* harness.runtime.startTurn(harness.turnInput("a", 1)).pipe(Effect.exit);
+      assert.isTrue(
+        Exit.isFailure(started),
+        "a turn whose Claude query ended before its first frame started running on the dead query",
+      );
+      if (Exit.isFailure(started)) {
+        assert.include(
+          Cause.pretty(started.cause),
+          "Claude provider query ended before the turn could start.",
+        );
+      }
+      const followUp = yield* harness.runtime
+        .startTurn(harness.turnInput("b", 2))
+        .pipe(Effect.exit);
+      assert.isTrue(
+        Exit.isSuccess(followUp),
+        `the turn whose query ended before its first frame is still active: ${
+          Exit.isFailure(followUp) ? Cause.pretty(followUp.cause) : ""
+        }`,
+      );
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
         ),
       ),
     ),
