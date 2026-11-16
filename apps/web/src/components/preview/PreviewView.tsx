@@ -1030,7 +1030,7 @@ export function PreviewView({
                 onControl={(control) =>
                   setServerControlledTabId(control?.controller === "you" ? runtimeTabId : null)
                 }
-                onPopup={(popupTabId) => showPreviewPopup(threadRef, popupTabId, "panel")}
+                onPopup={(popupTabId) => showPreviewPopup(threadRef, popupTabId)}
                 // Stays connected under the empty state so a URL picked there reaches the page.
                 className={cn(
                   "absolute inset-0 h-full w-full",
