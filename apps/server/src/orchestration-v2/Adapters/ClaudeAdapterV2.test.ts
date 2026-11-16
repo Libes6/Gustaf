@@ -7692,6 +7692,20 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           : [],
       );
       assert.deepEqual(reportedContext, [2]);
+      yield* harness.offerAndWait(
+        claudeSdkFrame({
+          type: "user",
+          message: {
+            role: "user",
+            content: "<local-command-stdout>Set model to `claude-opus-5-5`</local-command-stdout>",
+          },
+          session_id: WAKE_NATIVE_SESSION,
+          parent_tool_use_id: null,
+          uuid: "00000000-0000-4000-8000-000000000663",
+          isReplay: true,
+        }),
+      );
+      assert.isFalse(yield* harness.hasPendingBackgroundWork);
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

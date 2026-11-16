@@ -1993,6 +1993,7 @@ export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
   "mcp__t3-code__list_scheduled_tasks",
   "mcp__t3-code__t3_thread_list",
   "mcp__t3-code__t3_thread_wait",
+  "mcp__t3-code__t3_worktree_inventory",
   "mcp__t3-code__t3_worktree_status",
   "mcp__t3-code__t3_worktree_list",
   "mcp__t3-code__t3_project_list",
@@ -8474,6 +8475,16 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly message: SDKMessage;
         }) {
           const message = wakeInput.message;
+          // Live model changes replay local command output while the root is idle.
+          if (
+            message.type === "user" &&
+            "isReplay" in message &&
+            message.isReplay === true &&
+            typeof message.message.content === "string" &&
+            message.message.content.startsWith("<local-command-stdout>")
+          ) {
+            return;
+          }
           const isNotification =
             message.type === "system" && message.subtype === "task_notification";
           const isPendingTaskNotification =
