@@ -16,6 +16,7 @@ const loadPlaywright = () =>
 
 interface Options {
   readonly profilesDir: string;
+  readonly platform: NodeJS.Platform;
   readonly executable: () => Promise<string>;
   /**
    * A path that starts `executable`, such as one that moves Chrome out of the server's cgroup.
@@ -30,6 +31,13 @@ interface Options {
   readonly idleBrowserMs?: number;
   readonly onContextClose?: (context: BrowserContext) => void;
 }
+
+/**
+ * Without a GPU, WebGL falls back to SwiftShader on the CPU: an animated page such as
+ * github.com kept ~5 cores busy on an M4. Every Mac has Metal; a Linux server may have no GPU.
+ */
+const renderingArgs = (platform: NodeJS.Platform) =>
+  platform === "darwin" ? ["--use-angle=metal"] : ["--disable-gpu"];
 
 const UA_PLATFORMS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "macOS",
@@ -96,7 +104,7 @@ export class ServerBrowserContexts {
       executable,
       env,
       args: [
-        "--disable-gpu",
+        ...renderingArgs(this.options.platform),
         "--force-device-scale-factor=2",
         "--disable-blink-features=AutomationControlled",
       ],

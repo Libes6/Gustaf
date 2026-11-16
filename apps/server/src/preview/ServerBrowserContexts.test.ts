@@ -54,6 +54,7 @@ const makeBrowser = () => {
 
 const options = () => ({
   profilesDir: "/test/profiles",
+  platform: "linux" as NodeJS.Platform,
   executable: vi.fn(async () => "/test/chromium"),
   env: {},
 });
@@ -283,6 +284,20 @@ describe("ServerBrowserContexts", () => {
       await pool.close();
     },
   );
+
+  it.each([
+    ["darwin", "--use-angle=metal"],
+    ["linux", "--disable-gpu"],
+    ["win32", "--disable-gpu"],
+  ] as const)("renders on %s with %s", async (platform, flag) => {
+    launches.launch.mockResolvedValue(makeBrowser() as unknown as Browser);
+    const pool = new ServerBrowserContexts({ ...options(), platform });
+    await pool.contextFor(INCOGNITO_BROWSER_PROFILE_ID);
+    const args = launches.launch.mock.calls[0]?.[0]?.args;
+    expect(args).toContain(flag);
+    expect(args).not.toContain(flag === "--disable-gpu" ? "--use-angle=metal" : "--disable-gpu");
+    await pool.close();
+  });
 
   it("allows only an explicit sandbox opt-out", async () => {
     const browser = makeBrowser();
