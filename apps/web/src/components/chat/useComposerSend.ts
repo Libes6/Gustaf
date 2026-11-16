@@ -628,6 +628,7 @@ export function useComposerSend(input: ComposerSendInput) {
           replyTo,
         },
         setThreadError,
+        { dispatchMode, submissionIntent },
       );
       return;
     }
