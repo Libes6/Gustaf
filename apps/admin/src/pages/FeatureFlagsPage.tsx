@@ -20,7 +20,7 @@ import {
 } from "../components/ui/table";
 import { parseLogins } from "../lib/client-config";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 const t = strings.flags;
 const MODES: ReadonlyArray<FlagMode> = ["off", "everyone", "listed"];
@@ -53,11 +53,7 @@ export function FeatureFlagsPage() {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <PageTitle>{t.title}</PageTitle>
-          <p className="-mt-3 text-sm text-muted-foreground">{t.description}</p>
-        </div>
+      <PageHeader title={t.title} description={t.description}>
         <Button
           onClick={() =>
             setEditing({ key: null, input: { description: "", mode: "off", logins: [] } })
@@ -66,7 +62,7 @@ export function FeatureFlagsPage() {
           <PlusIcon aria-hidden />
           {t.new}
         </Button>
-      </div>
+      </PageHeader>
       <Card className="p-0">
         {result.isPending ? (
           <LoadingState />
@@ -94,7 +90,7 @@ export function FeatureFlagsPage() {
                     {flag.description}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-52 items-center gap-2">
                       <label htmlFor={`${id}-${flag.key}`} className="sr-only">
                         {t.columns.mode}
                       </label>

@@ -3,6 +3,13 @@ export const strings = {
   appName: "Gustaf Admin",
   nav: {
     label: "Main",
+    sectionLabel: (group: string) => `${group} pages`,
+    groups: {
+      accounts: "Accounts",
+      product: "Product",
+      infrastructure: "Infrastructure",
+      control: "Control",
+    },
     overview: "Overview",
     users: "Users",
     devices: "Devices",

@@ -21,7 +21,7 @@ export function SearchForm({
   return (
     <form
       role="search"
-      className="flex min-w-0 flex-1 gap-2"
+      className="flex min-w-0 flex-1 gap-2 sm:max-w-sm"
       onSubmit={(event) => {
         event.preventDefault();
         const value = new FormData(event.currentTarget).get("query");

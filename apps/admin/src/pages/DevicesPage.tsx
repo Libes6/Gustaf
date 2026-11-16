@@ -9,7 +9,7 @@ import { SearchForm } from "../components/search-form";
 import { EmptyState, ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
+import { Card, CardHeader } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Label, NativeSelect } from "../components/ui/input";
 import {
@@ -23,7 +23,7 @@ import {
 import { formatDateTime } from "../lib/format";
 import { formatDeviceBuild } from "../lib/versions";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 function parseKind(value: string): DeviceKind | undefined {
   return value === "computer" || value === "phone" ? value : undefined;
@@ -44,30 +44,30 @@ export function DevicesPage() {
 
   return (
     <>
-      <PageTitle>{strings.devices.title}</PageTitle>
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <SearchForm
-          label={strings.devices.searchLabel}
-          placeholder={strings.devices.searchPlaceholder}
-          defaultValue={query}
-          onSearch={setQuery}
-        />
-        <div className="flex items-center gap-2">
-          <Label htmlFor={kindId} className="sr-only">
-            {strings.devices.kindLabel}
-          </Label>
-          <NativeSelect
-            id={kindId}
-            value={kind ?? ""}
-            onChange={(event) => setKind(parseKind(event.target.value))}
-          >
-            <option value="">{strings.devices.allKinds}</option>
-            <option value="computer">{strings.kinds.computer}</option>
-            <option value="phone">{strings.kinds.phone}</option>
-          </NativeSelect>
-        </div>
-      </div>
+      <PageHeader title={strings.devices.title} />
       <Card className="p-0">
+        <CardHeader>
+          <SearchForm
+            label={strings.devices.searchLabel}
+            placeholder={strings.devices.searchPlaceholder}
+            defaultValue={query}
+            onSearch={setQuery}
+          />
+          <div className="w-full sm:ms-auto sm:w-44">
+            <Label htmlFor={kindId} className="sr-only">
+              {strings.devices.kindLabel}
+            </Label>
+            <NativeSelect
+              id={kindId}
+              value={kind ?? ""}
+              onChange={(event) => setKind(parseKind(event.target.value))}
+            >
+              <option value="">{strings.devices.allKinds}</option>
+              <option value="computer">{strings.kinds.computer}</option>
+              <option value="phone">{strings.kinds.phone}</option>
+            </NativeSelect>
+          </div>
+        </CardHeader>
         {result.isPending ? (
           <LoadingState />
         ) : result.isError ? (

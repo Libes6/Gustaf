@@ -22,9 +22,9 @@ export function Pager({
   return (
     <nav
       aria-label={strings.common.pagination}
-      className="flex items-center justify-end gap-2 border-t px-3 py-2"
+      className="flex items-center justify-end gap-2 border-t px-5 py-3"
     >
-      <span className="me-auto text-xs text-muted-foreground" aria-live="polite">
+      <span className="me-auto text-sm text-muted-foreground tabular-nums" aria-live="polite">
         {strings.common.page(page)}
       </span>
       <Button variant="outline" size="sm" disabled={!hasPrevious || busy} onClick={onPrevious}>

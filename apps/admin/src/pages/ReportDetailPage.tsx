@@ -77,7 +77,7 @@ function ReportView({ report }: { readonly report: ReportDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <h1 className="me-auto text-xl font-semibold tracking-tight">{strings.reports.title}</h1>
         <ReportStatusBadge status={report.status} />
         {STATUS_ACTIONS[report.status].map((action) => (
@@ -146,7 +146,7 @@ function ReportView({ report }: { readonly report: ReportDetail }) {
       <Card>
         <CardTitle>{strings.reports.logs}</CardTitle>
         {report.logs ? (
-          <pre className="mt-2 max-h-[32rem] overflow-auto rounded-md border bg-muted p-2 font-mono text-xs">
+          <pre className="mt-2 max-h-[32rem] overflow-auto rounded-md border bg-muted p-3 font-mono text-xs">
             {report.logs}
           </pre>
         ) : (

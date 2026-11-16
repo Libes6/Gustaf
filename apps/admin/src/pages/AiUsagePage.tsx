@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useAiUsage } from "../api/queries";
 import type { AiUsageCounts, AiUsageSummary, UsagePeriod } from "../api/types";
 import { EmptyState, ErrorState, LoadingState } from "../components/states";
-import { Card, CardTitle } from "../components/ui/card";
+import { Card, CardHeader } from "../components/ui/card";
 import { Label, NativeSelect } from "../components/ui/input";
 import {
   Table,
@@ -16,7 +16,8 @@ import {
 } from "../components/ui/table";
 import { formatCount, formatTokens } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
+import { Stat } from "./OverviewPage";
 
 const PERIODS: ReadonlyArray<UsagePeriod> = [1, 7, 30, 90];
 
@@ -111,12 +112,9 @@ function Totals({ totals }: { readonly totals: AiUsageSummary["totals"] }) {
     [strings.aiUsage.users, formatCount(totals.users)],
   ] as const;
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {items.map(([title, value]) => (
-        <Card key={title}>
-          <CardTitle>{title}</CardTitle>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-        </Card>
+        <Stat key={title} title={title} value={value} />
       ))}
       {totals.turns > 0 ? (
         <p className="col-span-full text-xs text-muted-foreground">
@@ -132,11 +130,9 @@ export function AiUsagePage() {
   const result = useAiUsage(days);
   return (
     <>
-      <PageTitle>{strings.aiUsage.title}</PageTitle>
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">{strings.aiUsage.description}</p>
+      <PageHeader title={strings.aiUsage.title} description={strings.aiUsage.description}>
         <PeriodSelect value={days} onChange={setDays} />
-      </div>
+      </PageHeader>
       {result.isPending ? (
         <LoadingState />
       ) : result.isError ? (
@@ -149,11 +145,11 @@ export function AiUsagePage() {
         <div aria-busy={result.isFetching} className="flex flex-col gap-4">
           <Totals totals={result.data.totals} />
           <Card className="p-0">
-            <CardTitle className="px-4 pt-4">{strings.aiUsage.byModel}</CardTitle>
+            <CardHeader title={strings.aiUsage.byModel} />
             <ModelTable rows={result.data.byModel} />
           </Card>
           <Card className="p-0">
-            <CardTitle className="px-4 pt-4">{strings.aiUsage.byUser}</CardTitle>
+            <CardHeader title={strings.aiUsage.byUser} />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -194,10 +190,9 @@ export function UserAiUsage({ userId }: { readonly userId: string }) {
   const result = useAiUsage(days, userId);
   return (
     <Card className="p-0">
-      <div className="flex items-center justify-between gap-2 px-4 pt-4">
-        <CardTitle>{strings.aiUsage.title}</CardTitle>
+      <CardHeader title={strings.aiUsage.title}>
         <PeriodSelect value={days} onChange={setDays} />
-      </div>
+      </CardHeader>
       {result.isPending ? (
         <LoadingState />
       ) : result.isError ? (
