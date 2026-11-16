@@ -330,6 +330,15 @@ export function summarizeT3ToolCalls(
     case "project-list":
       label = phrase("Listed", "list", `projects ${times}`);
       break;
+    case "subscription-list":
+      label = phrase("Listed", "list", `subscriptions ${times}`);
+      break;
+    case "subscription-update":
+      label = phrase("Saved", "save", quantity(selected.length, "subscription"));
+      break;
+    case "subscription-delete":
+      label = phrase("Deleted", "delete", quantity(selected.length, "subscription"));
+      break;
     case "project-read":
       label = phrase("Read", "read", quantity(countEntities(projectIds), "project"));
       break;

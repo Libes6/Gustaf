@@ -355,6 +355,10 @@
       "types": "./src/chatList.ts",
       "import": "./src/chatList.ts"
     },
+    "./subscriptions": {
+      "types": "./src/subscriptions.ts",
+      "import": "./src/subscriptions.ts"
+    },
     "./nodeRuntime": {
       "types": "./src/nodeRuntime.ts",
       "import": "./src/nodeRuntime.ts"
