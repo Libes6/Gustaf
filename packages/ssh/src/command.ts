@@ -113,6 +113,10 @@ export function baseSshArgs(
     `BatchMode=${input?.batchMode ?? "no"}`,
     "-o",
     "ConnectTimeout=10",
+    // ssh asks about an unknown host key through SSH_ASKPASS, which only answers with the
+    // password, so a first connection failed. A changed key is still refused.
+    "-o",
+    "StrictHostKeyChecking=accept-new",
     ...(target.port !== null ? ["-p", String(target.port)] : []),
   ];
 }
