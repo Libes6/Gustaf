@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off - Runs the generated runner in a real shell.
+import * as NodePath from "node:path";
+
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -26,10 +29,14 @@ import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as SshAuth from "./auth.ts";
+import { remoteStateKey } from "./command.ts";
 import { SshCommandError, SshPasswordPromptError, SshReadinessError } from "./errors.ts";
 import * as SshTunnel from "./tunnel.ts";
 
 const isSshCommandError = Schema.is(SshCommandError);
+
+const launchStateKey = (command: ChildProcess.Command) =>
+  /exec sh -s -- ([^"]+)"/u.exec(commandArgs(command).join(" "))?.[1];
 
 const makeSuccessfulProcess = (stdout: string) => {
   const stdoutStream = Stream.make(new TextEncoder().encode(stdout));
