@@ -28,6 +28,7 @@ import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -72,6 +73,9 @@ export class DesktopSsh extends Context.Service<
   }
 >()("t3/desktopSsh/DesktopSsh") {}
 
+/** Long enough to fetch a code from another device; a prompt nobody answers must still end. */
+const PROMPT_LIFETIME = Duration.minutes(10);
+
 const cancelled = (locale: string) => ({
   type: "ssh-password-prompt-cancelled" as const,
   message: locale.startsWith("ru")
@@ -93,6 +97,7 @@ export const layer = (present: (request: DesktopSshPasswordPromptRequest) => voi
         | NetService.NetService
       >();
       const prompts = new Map<string, Deferred.Deferred<string | null>>();
+      const promptsByHost = new Map<string, Deferred.Deferred<string | null>>();
       const origins = new Map<string, string>();
       const random = yield* SecureRandom.SecureRandom;
 
@@ -102,7 +107,11 @@ export const layer = (present: (request: DesktopSshPasswordPromptRequest) => voi
           const passwordPrompt = SshAuth.SshPasswordPrompt.of({
             isAvailable: true,
             request: Effect.fn("DesktopSsh.password")(function* (input) {
-              const response = yield* Deferred.make<string | null>();
+              // Connections to one host share its open prompt: a second dialog would wait
+              // unseen behind the first while its deadline ran out.
+              const hostKey = `${input.username ?? ""}@${input.destination}`;
+              const open = promptsByHost.get(hostKey);
+              if (open) return yield* Deferred.await(open);
               const requestId = yield* random.uuidV4().pipe(
                 Effect.mapError(
                   (cause) =>
@@ -112,7 +121,9 @@ export const layer = (present: (request: DesktopSshPasswordPromptRequest) => voi
                     }),
                 ),
               );
+              const response = yield* Deferred.make<string | null>();
               prompts.set(requestId, response);
+              promptsByHost.set(hostKey, response);
               yield* Effect.sync(() =>
                 present({
                   requestId,
@@ -121,12 +132,27 @@ export const layer = (present: (request: DesktopSshPasswordPromptRequest) => voi
                   prompt: russian
                     ? `Введите пароль SSH или код подтверждения для ${input.destination}.`
                     : input.prompt,
-                  expiresAt: new Date(Date.now() + 120_000).toISOString(),
+                  expiresAt: new Date(
+                    Date.now() + Duration.toMillis(PROMPT_LIFETIME),
+                  ).toISOString(),
                 }),
               );
               return yield* Deferred.await(response).pipe(
-                Effect.timeoutOrElse({ duration: "2 minutes", orElse: () => Effect.succeed(null) }),
-                Effect.ensuring(Effect.sync(() => prompts.delete(requestId))),
+                Effect.timeoutOrElse({
+                  duration: PROMPT_LIFETIME,
+                  orElse: () => Effect.succeed(null),
+                }),
+                // Whatever ends the prompt also ends it for the connections sharing it.
+                Effect.ensuring(
+                  Deferred.succeed(response, null).pipe(
+                    Effect.andThen(
+                      Effect.sync(() => {
+                        prompts.delete(requestId);
+                        if (promptsByHost.get(hostKey) === response) promptsByHost.delete(hostKey);
+                      }),
+                    ),
+                  ),
+                ),
               );
             }),
           });

@@ -252,7 +252,7 @@ describe("Tauri SSH session", () => {
           locale,
         );
         if (action === "timeout") {
-          yield* TestClock.adjust("2 minutes");
+          yield* TestClock.adjust("10 minutes");
         } else {
           yield* session.execute(
             {
@@ -279,6 +279,49 @@ describe("Tauri SSH session", () => {
         });
         assert.equal(test.tunnels(), 0);
         assert.equal(test.killed(), 0);
+      }).pipe(Effect.provide(test.layer), Effect.scoped);
+    }),
+  );
+
+  it.effect("asks once for a host that two connections wait on", () =>
+    Effect.gen(function* () {
+      const shown: Array<DesktopSshPasswordPromptRequest> = [];
+      const first = yield* Deferred.make<void>();
+      const test = fixture({
+        requirePassword: true,
+        present: (request) => {
+          shown.push(request);
+          Deferred.doneUnsafe(first, Effect.void);
+        },
+      });
+      yield* Effect.gen(function* () {
+        const session = yield* DesktopSsh.DesktopSsh;
+        const ensure = (port: number) =>
+          session
+            .execute(
+              {
+                method: "ensure",
+                input: { target: { ...target, port }, options: { issuePairingToken: true } },
+              },
+              "en",
+            )
+            .pipe(Effect.forkChild);
+        const pending = [yield* ensure(2222), yield* ensure(2223)];
+        yield* Deferred.await(first);
+        yield* Effect.yieldNow;
+        const prompt = shown[0]!;
+        yield* session.execute(
+          {
+            method: "resolve-password",
+            input: { requestId: prompt.requestId, password: "test-password" },
+          },
+          "en",
+        );
+        for (const fiber of pending) {
+          const result = (yield* Fiber.join(fiber)) as DesktopSshEnvironmentBootstrap;
+          assert.equal(result.pairingToken, "pairing");
+        }
+        assert.equal(shown.length, 1);
       }).pipe(Effect.provide(test.layer), Effect.scoped);
     }),
   );
