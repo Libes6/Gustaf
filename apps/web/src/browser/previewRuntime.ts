@@ -10,9 +10,17 @@ import {
   useEnvironmentSupportsServerBrowser,
 } from "~/state/entities";
 
-import { nativeBrowserTabs, usesNativeBrowserTabs } from "./nativeBrowser";
+import { nativeBrowserTabs, nativeRendersServerTabs, usesNativeBrowserTabs } from "./nativeBrowser";
 
 export function previewRuntimeFor(environmentId: EnvironmentId): PreviewRuntime | undefined {
+  // The shell's Chromium draws a server tab, so it is both the user's view and the agent's page.
+  if (
+    nativeRendersServerTabs &&
+    environmentId === appAtomRegistry.get(primaryEnvironmentIdAtom) &&
+    readEnvironmentSupportsServerBrowser(environmentId)
+  ) {
+    return "server";
+  }
   if (
     usesNativeBrowserTabs({
       available: nativeBrowserTabs !== null,
@@ -53,14 +61,14 @@ export function usePreviewAvailable(environmentId: EnvironmentId | null): boolea
   return isPreviewSupportedInRuntime() || serverBrowser;
 }
 
-// Gustaf's shell sets `desktopBridge` without `preview`; only a host with the preview bridge can draw a server tab itself.
+// Electron's preview bridge, or Gustaf's shell with Chromium, can draw a server tab itself.
 export function rendersServerTabNatively(
   environmentId: EnvironmentId,
   primaryEnvironmentId: EnvironmentId | null,
   snapshot: Pick<PreviewSessionSnapshot, "runtime" | "headless"> | null | undefined,
 ): boolean {
   return (
-    isPreviewSupportedInRuntime() &&
+    (isPreviewSupportedInRuntime() || nativeRendersServerTabs) &&
     snapshot?.runtime === "server" &&
     !snapshot.headless &&
     primaryEnvironmentId !== null &&

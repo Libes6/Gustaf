@@ -60,7 +60,10 @@ objc2-web-kit = { version = "0.3.2", default-features = false, features = [
 ] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
+# Development: Chromium draws the server's browser tabs (`--features cef-browser`).
+cef = { version = "=156.6.0", default-features = false, features = ["sandbox"], optional = true }
 
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+cef-browser = ["dep:cef"]

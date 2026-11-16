@@ -1333,6 +1333,8 @@ export interface DesktopNativeBrowserBridge {
       readonly profileId?: string | undefined;
       readonly zoomFactor?: number | undefined;
       readonly colorScheme?: DesktopPreviewColorScheme | undefined;
+      /** A server browser tab: the shell draws it and the server drives the same page. */
+      readonly serverTab?: { readonly threadId: string; readonly tabId: string } | undefined;
     },
   ) => Promise<void>;
   closeTab: (tabId: string) => Promise<void>;
@@ -1354,6 +1356,8 @@ export interface DesktopNativeBrowserBridge {
   clearCache: (profileId?: string) => Promise<void>;
   onStateChange: (listener: (state: DesktopNativeBrowserTabState) => void) => () => void;
   onOpenLink: (listener: (event: { tabId: string; url: string }) => void) => () => void;
+  /** The shell draws this server's browser tabs itself (Chromium), so agents drive what it shows. */
+  readonly rendersServerTabs?: boolean;
 }
 
 export type ConfirmDialogVariant = "default" | "destructive";

@@ -53,9 +53,28 @@ pub(crate) enum DataKind {
 pub(crate) struct CreateInput {
     tab_id: String,
     url: Option<String>,
+    /// A tab of the server's browser: Chromium draws it and the server drives the same page.
+    #[cfg_attr(not(feature = "cef-browser"), allow(dead_code))]
+    server_tab: Option<ServerTabKey>,
     profile_id: Option<String>,
     zoom_factor: Option<f64>,
     color_scheme: Option<ColorScheme>,
+}
+
+#[cfg(feature = "cef-browser")]
+type ServerTabKey = crate::cef::ServerTab;
+#[cfg(not(feature = "cef-browser"))]
+type ServerTabKey = serde::de::IgnoredAny;
+
+/// Whether Chromium draws this tab rather than WebKit.
+async fn chromium_owns(app: &AppHandle, tab_id: &str) -> bool {
+    #[cfg(feature = "cef-browser")]
+    return crate::cef::owns(app, tab_id).await;
+    #[cfg(not(feature = "cef-browser"))]
+    {
+        let _ = (app, tab_id);
+        false
+    }
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -136,6 +155,15 @@ pub(crate) async fn native_browser_create(
     app: AppHandle,
     input: CreateInput,
 ) -> Result<(), String> {
+    #[cfg(feature = "cef-browser")]
+    if let (Some(server), true) = (input.server_tab.clone(), crate::cef::running()) {
+        let url = input
+            .url
+            .as_deref()
+            .and_then(|raw| parse_page_url(raw).ok())
+            .map_or_else(|| "about:blank".to_owned(), |url| url.to_string());
+        return crate::cef::create(&app, input.tab_id, url, Some(server)).await;
+    }
     let state = app.state::<NativeBrowser>();
     let reserved = {
         let mut tabs = state.tabs.lock().map_err(|error| error.to_string())?;
@@ -236,6 +264,10 @@ fn build(app: &AppHandle, input: &CreateInput, tab: &Tab) -> Result<(), String> 
 
 #[tauri::command]
 pub(crate) async fn native_browser_close(app: AppHandle, tab_id: String) -> Result<(), String> {
+    #[cfg(feature = "cef-browser")]
+    if chromium_owns(&app, &tab_id).await {
+        return crate::cef::close(&app, tab_id).await;
+    }
     let removed = app
         .state::<NativeBrowser>()
         .tabs
@@ -251,6 +283,10 @@ pub(crate) async fn native_browser_close(app: AppHandle, tab_id: String) -> Resu
 /// A page load starts from no tabs; the web app creates the ones its threads still have.
 #[tauri::command]
 pub(crate) async fn native_browser_close_all(app: AppHandle) -> Result<(), String> {
+    #[cfg(feature = "cef-browser")]
+    if crate::cef::running() {
+        crate::cef::close_all(&app).await?;
+    }
     let removed: Vec<Tab> = app
         .state::<NativeBrowser>()
         .tabs
@@ -279,6 +315,14 @@ pub(crate) async fn native_browser_present(
     rect: Option<Rect>,
     corner_radius: Option<f64>,
 ) -> Result<(), String> {
+    #[cfg(feature = "cef-browser")]
+    if chromium_owns(&app, &tab_id).await {
+        let rect = rect
+            .filter(|rect| rect.width >= 1.0 && rect.height >= 1.0)
+            .map(|rect| (rect.x, rect.y, rect.width, rect.height));
+        let radius = corner_radius.unwrap_or(0.0).max(0.0);
+        return crate::cef::present(&app, tab_id, rect, radius).await;
+    }
     let webview = tab(&app, &tab_id)?;
     let Some(rect) = rect.filter(|rect| rect.width >= 1.0 && rect.height >= 1.0) else {
         return webview.hide().map_err(|error| error.to_string());
@@ -299,6 +343,10 @@ pub(crate) async fn native_browser_navigate(
     tab_id: String,
     url: String,
 ) -> Result<(), String> {
+    if chromium_owns(&app, &tab_id).await {
+        #[cfg(feature = "cef-browser")]
+        return crate::cef::with_tab(&app, tab_id, move |tab| crate::cef::navigate(tab, &url)).await;
+    }
     let webview = tab(&app, &tab_id)?;
     webview
         .navigate(parse_page_url(&url)?)
@@ -311,6 +359,10 @@ pub(crate) async fn native_browser_history(
     tab_id: String,
     delta: i32,
 ) -> Result<(), String> {
+    if chromium_owns(&app, &tab_id).await {
+        #[cfg(feature = "cef-browser")]
+        return crate::cef::with_tab(&app, tab_id, move |tab| crate::cef::history(tab, delta)).await;
+    }
     let webview = tab(&app, &tab_id)?;
     platform::history(&webview, delta);
     Ok(())
@@ -322,6 +374,10 @@ pub(crate) async fn native_browser_reload(
     tab_id: String,
     hard: bool,
 ) -> Result<(), String> {
+    if chromium_owns(&app, &tab_id).await {
+        #[cfg(feature = "cef-browser")]
+        return crate::cef::with_tab(&app, tab_id, move |tab| crate::cef::reload(tab, hard)).await;
+    }
     let webview = tab(&app, &tab_id)?;
     platform::reload(&webview, hard);
     Ok(())
@@ -335,6 +391,11 @@ pub(crate) async fn native_browser_set_zoom(
 ) -> Result<(), String> {
     if !(zoom_factor > 0.0 && zoom_factor <= 5.0) {
         return Err("Zoom must be between 0 and 5".to_owned());
+    }
+    if chromium_owns(&app, &tab_id).await {
+        #[cfg(feature = "cef-browser")]
+        return crate::cef::with_tab(&app, tab_id, move |tab| crate::cef::set_zoom(tab, zoom_factor))
+            .await;
     }
     let webview = tab(&app, &tab_id)?;
     webview
@@ -351,6 +412,10 @@ pub(crate) async fn native_browser_set_color_scheme(
     tab_id: String,
     color_scheme: ColorScheme,
 ) -> Result<(), String> {
+    // Chromium tabs follow the system appearance for now.
+    if chromium_owns(&app, &tab_id).await {
+        return Ok(());
+    }
     let webview = tab(&app, &tab_id)?;
     platform::set_color_scheme(&webview, color_scheme);
     // The page keeps the scheme it asked for and shows it with the next state.
@@ -363,6 +428,10 @@ pub(crate) async fn native_browser_open_devtools(
     app: AppHandle,
     tab_id: String,
 ) -> Result<(), String> {
+    if chromium_owns(&app, &tab_id).await {
+        #[cfg(feature = "cef-browser")]
+        return crate::cef::with_tab(&app, tab_id, crate::cef::open_devtools).await;
+    }
     let webview = tab(&app, &tab_id)?;
     webview.open_devtools();
     Ok(())

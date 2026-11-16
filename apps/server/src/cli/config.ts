@@ -155,6 +155,11 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  // Gustaf's shell draws server tabs itself and serves their debugger on this socket.
+  desktopBrowserSocket: Config.String("T3CODE_DESKTOP_BROWSER_SOCKET").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   autoBootstrapProjectFromCwd: Config.Boolean("T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -518,6 +523,9 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     desktopTelemetryControlFd,
     desktopBrowserFd,
     desktopBrowserControlFd,
+    ...(env.desktopBrowserSocket === undefined
+      ? {}
+      : { desktopBrowserSocket: env.desktopBrowserSocket }),
     resourceMonitorPath,
     autoBootstrapProjectFromCwd,
     logWebSocketEvents,

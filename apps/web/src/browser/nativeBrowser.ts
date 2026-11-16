@@ -160,3 +160,6 @@ const nativeBrowserBridge =
 export const nativeBrowserTabs: NativeBrowserTabs | null = nativeBrowserBridge
   ? createNativeBrowserTabs(nativeBrowserBridge)
   : null;
+
+/** Gustaf's shell with Chromium draws the server's own tabs, so the user and agents share them. */
+export const nativeRendersServerTabs = nativeBrowserBridge?.rendersServerTabs === true;

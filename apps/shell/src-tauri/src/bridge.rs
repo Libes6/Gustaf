@@ -196,6 +196,8 @@ const INIT_SCRIPT: &str = r#"(() => {
         call("native_browser_clear_data", { profileId: profileId ?? null, kind: "cache" }),
       onStateChange: listen(stateListeners),
       onOpenLink: listen(linkListeners),
+      // Chromium (cef/) draws the server's tabs here, so the agent drives the page the user sees.
+      rendersServerTabs: __GUSTAF_RENDERS_SERVER_TABS__,
     });
   })();
 
@@ -395,6 +397,7 @@ pub(crate) fn init_script(
     version: &str,
     bootstraps_json: &serde_json::Value,
     platform: &str,
+    renders_server_tabs: bool,
 ) -> String {
     let version = serde_json::to_string(version).unwrap_or_else(|_| "null".to_owned());
     let bootstraps = serde_json::to_string(bootstraps_json).unwrap_or_else(|_| "[]".to_owned());
@@ -403,6 +406,7 @@ pub(crate) fn init_script(
         .replace("__GUSTAF_VERSION__", &version)
         .replace("__GUSTAF_BOOTSTRAPS__", &bootstraps)
         .replace("__GUSTAF_PLATFORM__", &platform)
+        .replace("__GUSTAF_RENDERS_SERVER_TABS__", &renders_server_tabs.to_string())
 }
 
 #[tauri::command]
@@ -584,7 +588,7 @@ mod tests {
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {
-        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin");
+        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin", false);
         assert!(script.contains(r#"version: "0.8.3\"; alert(1); \"","#));
         assert!(!script.contains("__GUSTAF_VERSION__"));
     }
@@ -601,8 +605,10 @@ mod tests {
                 "bootstrapToken": "tok",
             }]),
             "darwin",
+            false,
         );
         assert!(script.contains("window.desktopBridge = {"));
+        assert!(!script.contains("__GUSTAF_RENDERS_SERVER_TABS__"));
         assert!(!script.contains("preview:"));
         assert!(script.contains("getLocalEnvironmentBootstraps"));
         assert!(script.contains("http://127.0.0.1:3773"));
