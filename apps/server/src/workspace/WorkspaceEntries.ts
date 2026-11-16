@@ -117,6 +117,8 @@ export class WorkspaceEntries extends Context.Service<
 
 /** Ignored files offered for copying; more than this is a build folder, not config. */
 const IGNORED_FILES_LIMIT = 200;
+// Folder metadata the OS writes; binary, so reads refuse it, and useless on another machine.
+const OS_METADATA_FILE = /(?:^|\/)(?:\.DS_Store|\._[^/]*|Thumbs\.db|desktop\.ini)$/i;
 
 /** Paths sent to one `git check-ignore` call when labelling a folder's children. */
 const IGNORE_CHECK_CHUNK_SIZE = 1000;
@@ -504,7 +506,7 @@ export const make = Effect.gen(function* () {
     if (!result || result.exitCode !== 0) return { files: [], truncated: false };
     const paths = result.stdout
       .split("\0")
-      .filter((entry) => entry.length > 0 && !entry.endsWith("/"))
+      .filter((entry) => entry.length > 0 && !entry.endsWith("/") && !OS_METADATA_FILE.test(entry))
       .toSorted();
     const files = yield* Effect.promise(() =>
       Promise.all(
