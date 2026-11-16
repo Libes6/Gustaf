@@ -17,6 +17,8 @@ function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
     __TAURI_INTERNALS__: {
       invoke: async (name, args) => {
         if (name === "window_fullscreen_state") return false;
+        // The macOS init script clears stale native tabs on every load; it is not part of any test.
+        if (name === "native_browser_close_all") return undefined;
         return invoke(name, args);
       },
     },
