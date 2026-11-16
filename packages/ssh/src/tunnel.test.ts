@@ -1,4 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off - Runs the generated runner in a real shell.
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
@@ -374,6 +377,69 @@ describe("ssh tunnel scripts", () => {
       "T3_ARCHIVE_VERSION='1.2.3-preview.20260911.4'",
     );
   });
+
+  // GNU tar runs gzip to unpack; macOS tar decompresses by itself, so only Linux shows it.
+  it.skipIf(process.platform !== "linux")(
+    "names gzip when a host with tar but no gzip cannot unpack the release archive",
+    () => {
+      const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-ssh-runner-"));
+      try {
+        const bin = NodePath.join(root, "bin");
+        const release = NodePath.join(root, "release");
+        const archive = `gustaf-${ARCHIVE.archiveVersion}-linux-x64.tar.gz`;
+        NodeFS.mkdirSync(bin);
+        NodeFS.mkdirSync(NodePath.join(root, "home"));
+        NodeFS.mkdirSync(NodePath.join(release, "gustaf"), { recursive: true });
+        NodeFS.writeFileSync(NodePath.join(release, "gustaf", "gustaf"), "#!/bin/sh\necho ok\n", {
+          mode: 0o755,
+        });
+        NodeChildProcess.execFileSync("tar", ["-czf", archive, "gustaf"], { cwd: release });
+        NodeChildProcess.execFileSync("sh", ["-c", `sha256sum ${archive} > SHA256SUMS.txt`], {
+          cwd: release,
+        });
+        for (const tool of [
+          "sh",
+          "mkdir",
+          "mktemp",
+          "cat",
+          "rm",
+          "grep",
+          "cut",
+          "sha256sum",
+          "tar",
+          "mv",
+        ]) {
+          NodeFS.symlinkSync(
+            NodeChildProcess.execFileSync("sh", ["-c", `command -v ${tool}`], {
+              encoding: "utf8",
+            }).trim(),
+            NodePath.join(bin, tool),
+          );
+        }
+        NodeFS.writeFileSync(
+          NodePath.join(bin, "uname"),
+          '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n',
+          { mode: 0o755 },
+        );
+        NodeFS.writeFileSync(
+          NodePath.join(bin, "curl"),
+          `#!/bin/sh\nfor last; do :; done\nfor a; do case "$a" in http*) src="${release}/\${a##*/}" ;; esac; done\nexec cat "$src" > "$last"\n`,
+          { mode: 0o755 },
+        );
+        const runner = NodePath.join(root, "run-t3.sh");
+        NodeFS.writeFileSync(runner, SshTunnel.buildRemoteT3RunnerScript(ARCHIVE));
+        const result = NodeChildProcess.spawnSync(NodePath.join(bin, "sh"), [runner, "--version"], {
+          encoding: "utf8",
+          env: { HOME: NodePath.join(root, "home"), PATH: bin },
+        });
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, /(missing|needs) gzip/);
+        assert.notInclude(result.stderr, "Cannot exec");
+      } finally {
+        NodeFS.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it.effect("accepts launch JSON after remote shell startup noise", () => {
     const target = {
