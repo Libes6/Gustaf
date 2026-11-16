@@ -136,8 +136,8 @@ function NativeBrowserTab({
       };
     }),
   );
-  // A server tab's state comes from the server, which drives the page.
-  usePreviewBridge({ threadRef, tabId, runtimeTabId, bridge: serverTab ? null : tabs });
+  // The server reports a server tab's navigation; the shell only says it has a page.
+  usePreviewBridge({ threadRef, tabId, runtimeTabId, bridge: tabs, serverDriven: serverTab });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the native view lives in the shell for as long as this tab is mounted
   useEffect(() => {

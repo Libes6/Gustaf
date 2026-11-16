@@ -50,7 +50,7 @@ pub enum HostEvent {
     /// The page's DevTools agent answered: the tab can be driven.
     Attached { tab_id: String },
     Detached { tab_id: String },
-    Loaded { tab_id: String, url: String },
+    Loaded { tab_id: String },
     /// A relayed CDP message for the client.
     Cdp { tab_id: String, message: String },
 }
@@ -312,11 +312,8 @@ wrap_load_handler! {
             let Some(frame) = frame.filter(|frame| frame.is_main() != 0) else {
                 return;
             };
-            let _ = http_status_code;
-            emit(HostEvent::Loaded {
-                tab_id: self.tab_id.clone(),
-                url: CefString::from(&frame.url()).to_string(),
-            });
+            let _ = (http_status_code, frame);
+            emit(HostEvent::Loaded { tab_id: self.tab_id.clone() });
         }
     }
 }
@@ -607,6 +604,21 @@ pub fn from_client(tab_id: &str, raw: &str) {
     for message in output.to_page {
         to_page(tab_id, &message);
     }
+}
+
+/// The page's address and history, as the window's toolbar shows them.
+pub fn page_state(tab_id: &str) -> Option<(String, bool, bool, bool)> {
+    let browser = browser_of(tab_id)?;
+    let url = browser
+        .main_frame()
+        .map(|frame| CefString::from(&frame.url()).to_string())
+        .unwrap_or_default();
+    Some((
+        url,
+        browser.is_loading() != 0,
+        browser.can_go_back() != 0,
+        browser.can_go_forward() != 0,
+    ))
 }
 
 pub fn is_open(tab_id: &str) -> bool {

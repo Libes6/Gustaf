@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use serde::Deserialize;
@@ -24,6 +24,7 @@ use tauri::{AppHandle, Manager};
 use host::{HostEvent, Rect};
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
+static NEXT_NUMBER: AtomicU64 = AtomicU64::new(1);
 static SERVER: OnceLock<Mutex<Option<UnixStream>>> = OnceLock::new();
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
@@ -36,6 +37,8 @@ pub(crate) struct ServerTab {
 #[derive(Default)]
 struct Tab {
     server: Option<ServerTab>,
+    /// Stands in for WebKit's web contents id, which the page treats as "has a page".
+    number: u64,
     attached: bool,
     shown: bool,
 }
@@ -182,6 +185,7 @@ fn on_host_event(app: &AppHandle, event_in: HostEvent) {
             if let Some(server) = server_of(&tab_id) {
                 send(&event("attached", &server));
             }
+            publish(app, &tab_id);
         }
         HostEvent::Detached { tab_id } => {
             let removed = TABS.with(|tabs| tabs.borrow_mut().remove(&tab_id));
@@ -189,16 +193,7 @@ fn on_host_event(app: &AppHandle, event_in: HostEvent) {
                 send(&event("detached", &server));
             }
         }
-        HostEvent::Loaded { tab_id, url } => {
-            // A tab the server does not drive reports its page to the window like WebKit ones.
-            if server_of(&tab_id).is_none() {
-                let state = json!({ "tabId": tab_id, "url": url, "title": "", "loading": false,
-                    "canGoBack": false, "canGoForward": false, "zoomFactor": 1.0, "number": 0 });
-                if let Some(page) = app.get_webview("main") {
-                    let _ = page.eval(format!("window.__gustafNativeBrowserState?.({state})"));
-                }
-            }
-        }
+        HostEvent::Loaded { tab_id, .. } => publish(app, &tab_id),
         HostEvent::Cdp { tab_id, message } => {
             if let Some(server) = server_of(&tab_id) {
                 let mut cdp = event("cdp", &server);
@@ -206,6 +201,27 @@ fn on_host_event(app: &AppHandle, event_in: HostEvent) {
                 send(&cdp);
             }
         }
+    }
+}
+
+/// Tells the page the tab has a page, as WebKit tabs do; the server reports the rest of its state.
+fn publish(app: &AppHandle, tab_id: &str) {
+    let Some((url, loading, can_go_back, can_go_forward)) = host::page_state(tab_id) else {
+        return;
+    };
+    let number = TABS.with(|tabs| tabs.borrow().get(tab_id).map(|tab| tab.number)).unwrap_or(0);
+    let state = json!({
+        "tabId": tab_id,
+        "number": number,
+        "url": url,
+        "title": "",
+        "loading": loading,
+        "canGoBack": can_go_back,
+        "canGoForward": can_go_forward,
+        "zoomFactor": 1.0,
+    });
+    if let Some(page) = app.get_webview("main") {
+        let _ = page.eval(format!("window.__gustafNativeBrowserState?.({state})"));
     }
 }
 
@@ -265,7 +281,11 @@ pub(crate) async fn create(
         TABS.with(|tabs| {
             tabs.borrow_mut().insert(
                 tab_id.clone(),
-                Tab { server, ..Tab::default() },
+                Tab {
+                    server,
+                    number: NEXT_NUMBER.fetch_add(1, Ordering::Relaxed),
+                    ..Tab::default()
+                },
             )
         });
         // Hidden until the page places it.
