@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Native Browser Spike",
+  "version": "0.0.0",
+  "identifier": "io.github.libes6.gustaf.spike.nativebrowser",
+  "build": { "frontendDist": "ui" },
+  "app": { "windows": [], "security": { "csp": null } },
+  "bundle": { "active": false, "icon": ["icons/icon.png"] }
+}

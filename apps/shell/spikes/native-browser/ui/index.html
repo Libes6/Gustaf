@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Native browser spike</title>
+    <style>
+      :root { color-scheme: dark; font: 13px system-ui; }
+      body { margin: 0; height: 100vh; display: grid; grid-template-columns: 240px 1fr 1fr; background: #16161a; color: #ddd; }
+      aside { background: #1d1d22; padding: 12px; }
+      main { padding: 16px; overflow: auto; }
+      section { display: flex; flex-direction: column; border-left: 1px solid #333; min-width: 0; }
+      header { display: flex; gap: 6px; padding: 6px; align-items: center; position: relative; }
+      header input { flex: 1; min-width: 0; background: #222; color: #ddd; border: 1px solid #444; border-radius: 6px; padding: 4px 8px; }
+      button { background: #2a2a31; color: #ddd; border: 1px solid #444; border-radius: 6px; padding: 4px 8px; }
+      #slot { flex: 1; margin: 0 6px 6px; border-radius: 10px; background: #0d0d10; }
+      #menu { position: absolute; top: 34px; right: 6px; width: 260px; background: #2a2a31; border: 1px solid #555;
+        border-radius: 8px; padding: 8px; display: none; z-index: 10; box-shadow: 0 8px 30px #000a; }
+      #menu.open { display: block; }
+      label { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <aside>Sidebar</aside>
+    <main>
+      <p>Chat column. The panel on the right is a native child webview placed over <code>#slot</code>.</p>
+      <label><input id="hideOnOverlay" type="checkbox" checked /> Hide the native view while the menu is open</label>
+      <label><input id="wide" type="checkbox" /> Wide panel (moves the slot)</label>
+    </main>
+    <section>
+      <header>
+        <input id="address" value="https://github.com" />
+        <button id="go">Go</button>
+        <button id="menuButton">Menu</button>
+        <div id="menu">An HTML menu that overlaps the page.<br />Without hiding, the native view covers it.</div>
+      </header>
+      <div id="slot"></div>
+    </section>
+    <script>
+      const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+      const slot = document.getElementById("slot");
+      const menu = document.getElementById("menu");
+      const hideOnOverlay = document.getElementById("hideOnOverlay");
+      let opened = false;
+      const bounds = () => {
+        const r = slot.getBoundingClientRect();
+        const covered = menu.classList.contains("open") && hideOnOverlay.checked;
+        return { x: r.x, y: r.y, width: Math.max(1, r.width), height: Math.max(1, r.height), visible: !covered };
+      };
+      const sync = () => opened && invoke("browser_bounds", { bounds: bounds() });
+      const open = async (url) => {
+        if (!opened) {
+          opened = true;
+          await invoke("browser_open", { url, bounds: bounds() });
+        } else {
+          await invoke("browser_navigate", { url });
+        }
+      };
+      new ResizeObserver(sync).observe(slot);
+      addEventListener("resize", sync);
+      document.getElementById("go").onclick = () => open(document.getElementById("address").value);
+      document.getElementById("menuButton").onclick = () => { menu.classList.toggle("open"); sync(); };
+      document.getElementById("wide").onchange = (e) => {
+        document.body.style.gridTemplateColumns = e.target.checked ? "240px 1fr 2fr" : "240px 1fr 1fr";
+      };
+      invoke("spike_url").then((url) => {
+        if (url) { document.getElementById("address").value = url; open(url); }
+      });
+    </script>
+  </body>
+</html>

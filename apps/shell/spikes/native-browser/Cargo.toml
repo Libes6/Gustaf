@@ -1,0 +1,17 @@
+# Throwaway spike, not part of the app: a native child webview beside an HTML UI, for the
+# hybrid browser decision (TASKS.md, "Гибридный браузер, этап 0").
+[package]
+name = "native-browser-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = { version = "=2.12.5", features = ["unstable", "devtools"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
