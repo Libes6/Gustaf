@@ -117,6 +117,12 @@ export function baseSshArgs(
     // password, so a first connection failed. A changed key is still refused.
     "-o",
     "StrictHostKeyChecking=accept-new",
+    // T3 always supplies its own remote command or only forwards ports, so a host
+    // alias's RemoteCommand or RequestTTY must not hijack the session.
+    "-o",
+    "RemoteCommand=none",
+    "-o",
+    "RequestTTY=no",
     ...(target.port !== null ? ["-p", String(target.port)] : []),
   ];
 }
