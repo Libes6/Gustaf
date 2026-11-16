@@ -5,6 +5,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
+  CLI_INSTALL_SCRIPT_URL,
   CLI_RELEASE_CHECKSUMS_FILE,
   cliArchiveFileName,
   cliArchivePlatformKey,
@@ -259,6 +260,43 @@ describe("ssh tunnel scripts", () => {
           `${version}\n`,
         );
       }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+
+  it.live("a failed archive download says what it tried and how to install by hand", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "gustaf-ssh-download-" });
+      const bin = path.join(root, "bin");
+      yield* fs.makeDirectory(bin);
+      yield* fs.writeFileString(
+        path.join(bin, "uname"),
+        '#!/bin/sh\ncase "$1" in -s) echo Darwin ;; -m) echo arm64 ;; esac\n',
+        { mode: 0o755 },
+      );
+      yield* fs.writeFileString(
+        path.join(bin, "curl"),
+        "#!/bin/sh\necho 'curl: (6) Could not resolve host: github.com' >&2\nexit 6\n",
+        { mode: 0o755 },
+      );
+      const child = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-s", "--", "--version"], {
+          env: { HOME: root, PATH: `${bin}:${process.env.PATH ?? ""}` },
+          extendEnv: false,
+          stdin: {
+            stream: Stream.make(
+              new TextEncoder().encode(SshTunnel.buildRemoteT3RunnerScript(ARCHIVE)),
+            ),
+            endOnDone: true,
+          },
+        }),
+      );
+      const errors = yield* child.stderr.pipe(Stream.decodeText(), Stream.mkString);
+      assert.notEqual(yield* child.exitCode, 0);
+      assert.include(errors, `Could not download Gustaf ${ARCHIVE.archiveVersion}`);
+      assert.include(errors, CLI_INSTALL_SCRIPT_URL);
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
 
   it.live("reports only the failed launch's own output, not an earlier launch's log", () =>
