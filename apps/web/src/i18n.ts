@@ -11,6 +11,7 @@ import { settingsDMessages } from "./i18nMessages/settingsD";
 import { settingsEMessages } from "./i18nMessages/settingsE";
 import { miscMessages } from "./i18nMessages/misc";
 import { computerUseMessages } from "./i18nMessages/computerUse";
+import { subscriptionsMessages } from "./i18nMessages/subscriptions";
 
 const baseMessages = {
   en: {
@@ -35,6 +36,7 @@ const baseMessages = {
     "settings.nav.connections": "Environments",
     "settings.nav.access": "Sharing & access",
     "settings.nav.secrets": "Secrets",
+    "settings.nav.subscriptions": "Subscriptions",
     "settings.nav.maintenance": "Maintenance",
     "settings.nav.labs": "Labs",
     "settings.nav.account": "Account",
@@ -242,6 +244,7 @@ const baseMessages = {
     "settings.nav.connections": "Окружения",
     "settings.nav.access": "Общий доступ",
     "settings.nav.secrets": "Секреты",
+    "settings.nav.subscriptions": "Подписки",
     "settings.nav.maintenance": "Обслуживание",
     "settings.nav.labs": "Labs",
     "settings.nav.account": "Аккаунт",
@@ -444,6 +447,7 @@ const messages = {
     ...settingsEMessages.en,
     ...miscMessages.en,
     ...computerUseMessages.en,
+    ...subscriptionsMessages.en,
   },
   ru: {
     ...baseMessages.ru,
@@ -458,6 +462,7 @@ const messages = {
     ...settingsEMessages.ru,
     ...miscMessages.ru,
     ...computerUseMessages.ru,
+    ...subscriptionsMessages.ru,
   },
 } satisfies Record<UiLanguage, Record<string, string>>;
 
@@ -486,6 +491,7 @@ const settingsNavKeys = {
   "/settings/connections": "settings.nav.connections",
   "/settings/access": "settings.nav.access",
   "/settings/secrets": "settings.nav.secrets",
+  "/settings/subscriptions": "settings.nav.subscriptions",
   "/settings/maintenance": "settings.nav.maintenance",
   "/settings/labs": "settings.nav.labs",
   "/settings/account": "settings.nav.account",
