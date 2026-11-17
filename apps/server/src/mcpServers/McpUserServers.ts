@@ -6,6 +6,7 @@ import {
   type SecretReference,
   type SettingsSecretValue,
 } from "@t3tools/contracts";
+import type { McpUserServer } from "@t3tools/provider-core/server/mcpSession";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
@@ -24,22 +25,7 @@ import {
 import * as ServerSettings from "../serverSettings.ts";
 
 /** A user MCP server ready to hand a provider; the provider starts it. */
-export type ResolvedMcpServer =
-  | {
-      readonly type: "stdio";
-      readonly id: McpServerId;
-      readonly command: string;
-      readonly args: ReadonlyArray<string>;
-      /** The server's own variables over the host PATH; providers add their own environment. */
-      readonly env: Readonly<Record<string, string>>;
-      readonly cwd: string;
-    }
-  | {
-      readonly type: "http";
-      readonly id: McpServerId;
-      readonly url: string;
-      readonly headers: Readonly<Record<string, string>>;
-    };
+export type ResolvedMcpServer = McpUserServer & { readonly id: McpServerId };
 
 export interface NativeMcpSessionSources {
   readonly provider: NativeMcpProvider;
