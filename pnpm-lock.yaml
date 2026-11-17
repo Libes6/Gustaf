@@ -203,9 +203,6 @@ catalogs:
     '@pierre/highlights':
       specifier: 0.2.0
       version: 0.2.0
-    '@types/plist':
-      specifier: 3.0.5
-      version: 3.0.5
     '@types/react':
       specifier: ~19.3.0
       version: 19.3.0
@@ -233,9 +230,6 @@ catalogs:
     pele:
       specifier: ^1.8.0
       version: 1.8.0
-    plist:
-      specifier: 3.1.1
-      version: 3.1.1
     react:
       specifier: 19.3.0
       version: 19.3.0
@@ -2453,12 +2447,6 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.2)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@electron/asar':
-        specifier: ^4.3.0
-        version: 4.3.0
-      '@electron/osx-sign':
-        specifier: 2.7.0
-        version: 2.7.0
       '@t3tools/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
@@ -2474,12 +2462,6 @@ importers:
       effect:
         specifier: 4.1.2
         version: 4.1.2
-      playwright-core:
-        specifier: 1.60.0
-        version: 1.60.0
-      plist:
-        specifier: 'catalog:'
-        version: 3.1.1
       pngjs:
         specifier: 7.0.0
         version: 7.0.0
@@ -2490,9 +2472,6 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.60.0)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@types/plist':
-        specifier: 'catalog:'
-        version: 3.0.5
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -3749,19 +3728,9 @@ packages:
     resolution: {integrity: sha512-+bqFCP98pLI0Tt0XQo1TmlXtwjWchISndDOxCkEcIuUgXWpBnLyRI+2DU+mesvnMMX6L1XDqYNA0lXNDHd/yiA==}
     engines: {node: '>=22.12.0'}
 
-  '@electron/asar@4.3.0':
-    resolution: {integrity: sha512-k/FFC/NQoTykGBi/Ga4L4KorsAKDdkK0LfNVG90eUG6vPVpJaL3iR9V1ZLbzBAF3QpojK5DcaGOdQOheKZv4JQ==}
-    engines: {node: '>=22.12.0'}
-    hasBin: true
-
   '@electron/get@5.1.0':
     resolution: {integrity: sha512-3kSBtG8ObcTVfXanm5vVJ6UnBLEVmVsRk1M+vGqCuMBV+XLCbJYuWQful+yIy0GQDsSlK0kHEriEHn7SPk4EnA==}
     engines: {node: '>=22.12.0'}
-
-  '@electron/osx-sign@2.7.0':
-    resolution: {integrity: sha512-9DGhNqKMl6ibkhUoXbN7OHX2gZznfY10L3ZwG0u6r667Kfb6kec4JEfFTXftoqzmOfZ+OzwDbr4p/nKBMHnz0g==}
-    engines: {node: '>=22.12.0'}
-    hasBin: true
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -7254,9 +7223,6 @@ packages:
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
 
-  '@types/plist@3.0.5':
-    resolution: {integrity: sha512-E6OCaRmAe4WDmWNsL/9RMqdkkzDCY1etutkflWk4c+AcjDU07Pcz1fQwTX0TQz+Pxqn9i4L1TU3UFpjnrcDgxA==}
-
   '@types/pngjs@6.0.5':
     resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
 
@@ -9490,10 +9456,6 @@ packages:
 
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
-
-  isbinaryfile@4.0.10:
-    resolution: {integrity: sha512-iHrqe5shvBUcFbmZq9zOQHBoeOhZJu6RQGrDpBgenUm/Am+F3JM2MgQj+rK3Z601fzrL5gLZWtAPH2OBaSVcyw==}
-    engines: {node: '>= 8.0.0'}
 
   isbot@5.1.40:
     resolution: {integrity: sha512-yNeeynhhtIVRBk12tBV4eHNxwB42HzR4Q3Ea7vCOiJhImGaAIdIMrbJtacQlBizGLjUPw+akkFI5Dn9T70XoVQ==}
@@ -13023,11 +12985,6 @@ snapshots:
 
   '@electron-internal/extract-zip@1.0.5': {}
 
-  '@electron/asar@4.3.0':
-    dependencies:
-      glob: 13.0.6
-      minimatch: 10.2.5
-
   '@electron/get@5.1.0(supports-color@8.1.1)':
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
@@ -13038,15 +12995,6 @@ snapshots:
       sumchecker: 3.0.1(supports-color@8.1.1)
     optionalDependencies:
       undici: 7.29.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@electron/osx-sign@2.7.0':
-    dependencies:
-      debug: 4.4.3(supports-color@8.1.1)
-      isbinaryfile: 4.0.10
-      plist: 3.1.1
-      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 
@@ -15863,11 +15811,6 @@ snapshots:
       pg-protocol: 1.16.0
       pg-types: 2.2.0
 
-  '@types/plist@3.0.5':
-    dependencies:
-      '@types/node': 24.12.4
-      xmlbuilder: 15.1.1
-
   '@types/pngjs@6.0.5':
     dependencies:
       '@types/node': 24.12.4
@@ -18028,8 +17971,6 @@ snapshots:
       is-docker: 2.2.1
 
   isarray@1.0.0: {}
-
-  isbinaryfile@4.0.10: {}
 
   isbot@5.1.40: {}
 
