@@ -4,6 +4,19 @@ Gustaf uses Claude Code's login and configuration. Start with the default provid
 for one account; [provider setup](./install.md#providers) covers installation and
 shared provider settings.
 
+## Install Claude from Gustaf
+
+On an environment without Claude Code, such as a fresh server you connect to remotely, open the
+Claude instance in **Settings > Providers** and choose **Use managed Claude**, then **Install
+Claude**. Gustaf downloads the latest native Claude Code release on that environment, checks its
+checksum, and runs it from its own data folder; it does not change your shell setup. If `claude`
+is already on the environment's `PATH`, Gustaf uses that instead of downloading. Choose **Install**
+again to update, or **Use existing Claude** to go back to the `claude` command.
+
+Sign-in still happens outside Gustaf. Either run `claude setup-token` on any computer and add the
+token to the instance's environment variables as `CLAUDE_CODE_OAUTH_TOKEN` (mark it sensitive), or
+run `~/.t3/tools/claude/bin/claude auth login` on the environment's machine.
+
 ## Separate accounts or configurations
 
 Use a separate Claude config directory for each account. This also works for named

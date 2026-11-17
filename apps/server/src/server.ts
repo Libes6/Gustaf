@@ -111,6 +111,7 @@ import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts
 import * as NativeAppIconResolver from "./assets/NativeAppIconResolver.ts";
 import * as AntigravityInstallation from "./provider/AntigravityInstallation.ts";
 import * as ProviderInstallation from "./provider/providerInstallation.ts";
+import * as ClaudeInstallation from "./provider/ClaudeInstallation.ts";
 import * as CodexInstallation from "./provider/CodexInstallation.ts";
 import * as ProviderInstanceRegistry from "./provider/ProviderInstanceRegistry.ts";
 import * as ProviderAdapterRegistry from "./orchestration-v2/ProviderAdapterRegistry.ts";
@@ -602,17 +603,17 @@ const layerProviderInstallationRefresh = Layer.effectDiscard(
   Effect.gen(function* () {
     const antigravity = yield* AntigravityInstallation.AntigravityInstallation;
     const codex = yield* CodexInstallation.CodexInstallation;
+    const claude = yield* ClaudeInstallation.ClaudeInstallation;
     const instances = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
     const providers = yield* ProviderRegistry.ProviderRegistry;
-    yield* Stream.merge(
-      antigravity.changes.pipe(
-        Stream.changesWith((a, b) => a.installedVersion === b.installedVersion),
-        Stream.drop(1),
+    yield* Stream.mergeAll(
+      [antigravity.changes, codex.changes, claude.changes].map((changes) =>
+        changes.pipe(
+          Stream.changesWith((a, b) => a.installedVersion === b.installedVersion),
+          Stream.drop(1),
+        ),
       ),
-      codex.changes.pipe(
-        Stream.changesWith((a, b) => a.installedVersion === b.installedVersion),
-        Stream.drop(1),
-      ),
+      { concurrency: "unbounded" },
     ).pipe(
       Stream.runForEach((state) =>
         instances.listInstances.pipe(
@@ -711,6 +712,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(
     Layer.mergeAll(
       AntigravityInstallation.AntigravityInstallation.layer,
+      ClaudeInstallation.ClaudeInstallation.layer,
       CodexInstallation.CodexInstallation.layer,
     ),
   ),

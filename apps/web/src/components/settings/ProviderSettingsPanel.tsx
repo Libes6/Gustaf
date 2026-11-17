@@ -102,6 +102,7 @@ import { TextGeneratorsSettings } from "./TextGeneratorsSettings";
 import { UsageProviderSettings } from "./UsageProviderSettings";
 import { ProviderSetupSection, readAntigravityAuthMethod } from "./ProviderSetupSection";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
+import { ClaudeSetupSection } from "./ClaudeSetupSection";
 import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSection";
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
 import { providerClients } from "./providerDriverMeta";
@@ -1382,6 +1383,7 @@ function ProviderInstanceRow({
             environmentLabel={environmentLabel}
             instanceId={instanceId}
             provider={liveProvider}
+            providerName="Antigravity"
             binaryPath={configuredBinaryPath(instance.config)}
             authMethod={readAntigravityAuthMethod(instance.config)}
             enabled={resolveProviderInstanceEnabled(instance)}
@@ -1405,6 +1407,29 @@ function ProviderInstanceRow({
                     ? instance.config
                     : {}),
                   enabled: true,
+                  setupMode,
+                },
+              })
+            }
+          />
+        ) : mode === "editor" && driver === "claudeAgent" ? (
+          <ClaudeSetupSection
+            environmentId={environmentId}
+            environmentLabel={environmentLabel}
+            instanceId={instanceId}
+            provider={liveProvider}
+            config={instance.config}
+            binaryPath={configuredBinaryPath(instance.config)}
+            enabled={resolveProviderInstanceEnabled(instance)}
+            readOnly={readOnly}
+            onEnable={() => actions.enableInstance(instanceId, { ...instance, enabled: true })}
+            onModeChange={(setupMode) =>
+              actions.updateInstance(instanceId, instance, {
+                ...instance,
+                config: {
+                  ...(instance.config !== null && typeof instance.config === "object"
+                    ? instance.config
+                    : {}),
                   setupMode,
                 },
               })

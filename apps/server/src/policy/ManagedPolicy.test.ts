@@ -393,7 +393,11 @@ it.layer(NodeServices.layer)("ManagedPolicy.load", (it) => {
         providers: {
           allowedDrivers: ["claudeAgent", "codex"],
           lockedInstanceFields: {
-            claudeAgent: ["config.binaryPath", "environment.CLAUDE_CODE_USE_BEDROCK"],
+            claudeAgent: [
+              "config.binaryPath",
+              "config.setupMode",
+              "environment.CLAUDE_CODE_USE_BEDROCK",
+            ],
           },
         },
       });
