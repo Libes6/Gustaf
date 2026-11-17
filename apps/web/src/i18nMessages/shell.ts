@@ -359,6 +359,7 @@ export const shellMessages = {
     "shell.projectScripts.editScript": "Edit {name}",
     "shell.projectScripts.failedToImport": "Failed to import action.",
     "shell.projectScripts.fromT3Json": "From t3.json",
+    "shell.projectScripts.fromPackageJson": "From package.json",
     "shell.projectScripts.pairAgainToRun":
       "Pair this client again with permission to run terminal commands.",
     "shell.projectScripts.projectActions": "Project actions",
@@ -956,6 +957,7 @@ export const shellMessages = {
     "shell.projectScripts.editScript": "Изменить {name}",
     "shell.projectScripts.failedToImport": "Не удалось импортировать действие.",
     "shell.projectScripts.fromT3Json": "Из t3.json",
+    "shell.projectScripts.fromPackageJson": "Из package.json",
     "shell.projectScripts.pairAgainToRun":
       "Выполните сопряжение клиента заново с разрешением на запуск команд терминала.",
     "shell.projectScripts.projectActions": "Действия проекта",

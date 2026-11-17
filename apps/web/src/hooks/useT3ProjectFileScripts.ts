@@ -43,3 +43,44 @@ export function useT3ProjectFileScripts(
 ): ReadonlyArray<T3ProjectFileScript> {
   return useT3ProjectFileState(environmentId, cwd).scripts;
 }
+
+const PACKAGE_JSON_NAME = "package.json";
+const MAX_PACKAGE_SCRIPTS = 50;
+const NO_PACKAGE_SCRIPTS: ReadonlyArray<T3ProjectFileScript> = [];
+
+function runnerForPackageManager(packageManager: unknown): string {
+  const name = typeof packageManager === "string" ? packageManager.split("@")[0] : "";
+  return name === "pnpm" || name === "yarn" || name === "bun" ? name : "npm";
+}
+
+export function parsePackageJsonScripts(contents: string): ReadonlyArray<T3ProjectFileScript> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(contents);
+  } catch {
+    return NO_PACKAGE_SCRIPTS;
+  }
+  if (typeof parsed !== "object" || parsed === null) return NO_PACKAGE_SCRIPTS;
+  const { scripts, packageManager } = parsed as { scripts?: unknown; packageManager?: unknown };
+  if (typeof scripts !== "object" || scripts === null) return NO_PACKAGE_SCRIPTS;
+  const runner = runnerForPackageManager(packageManager);
+  const names = Object.entries(scripts).flatMap(([name, body]) =>
+    typeof body === "string" && body.trim() !== "" && name.trim() !== "" ? [name] : [],
+  );
+  // npm runs pre/post hooks implicitly, so listing them next to their base script is noise.
+  return names
+    .filter(
+      (name) => !/^(pre|post)(.+)$/.test(name) || !names.includes(name.replace(/^(pre|post)/, "")),
+    )
+    .slice(0, MAX_PACKAGE_SCRIPTS)
+    .map((name) => ({ name, command: `${runner} run ${name}` }));
+}
+
+export function usePackageJsonScripts(
+  environmentId: EnvironmentId,
+  cwd: string | null,
+): ReadonlyArray<T3ProjectFileScript> {
+  const query = useProjectFileQuery(environmentId, cwd ?? "", PACKAGE_JSON_NAME, cwd !== null);
+  const contents = query.data && !query.data.truncated ? query.data.contents : null;
+  return contents === null ? NO_PACKAGE_SCRIPTS : parsePackageJsonScripts(contents);
+}

@@ -66,6 +66,7 @@ interface ProjectScriptsControlProps {
   environmentId: EnvironmentId;
   scripts: ReadonlyArray<ProjectScript>;
   fileScripts?: ReadonlyArray<T3ProjectFileScript>;
+  packageScripts?: ReadonlyArray<T3ProjectFileScript>;
   preferredScriptId?: string | null;
   onRunScript?: ((script: ProjectScript) => void) | undefined;
   onAddScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
@@ -83,6 +84,7 @@ export default function ProjectScriptsControl({
   environmentId,
   scripts,
   fileScripts = NO_FILE_SCRIPTS,
+  packageScripts = NO_FILE_SCRIPTS,
   preferredScriptId = null,
   onRunScript,
   onAddScript,
@@ -109,14 +111,23 @@ export default function ProjectScriptsControl({
   const primaryScript =
     (preferredScriptId ? scripts.find((script) => script.id === preferredScriptId) : undefined) ??
     primaryProjectScript(scripts);
-  const importableScripts = fileScripts.filter(
-    (fileScript) =>
-      !scripts.some(
-        (script) =>
-          script.command === fileScript.command ||
-          script.name.toLowerCase() === fileScript.name.toLowerCase(),
+  const notAdded = (candidates: ReadonlyArray<T3ProjectFileScript>) =>
+    candidates.filter(
+      (candidate) =>
+        !scripts.some(
+          (script) =>
+            script.command === candidate.command ||
+            script.name.toLowerCase() === candidate.name.toLowerCase(),
+        ),
+    );
+  const importableFileScripts = notAdded(fileScripts);
+  const importablePackageScripts = notAdded(packageScripts).filter(
+    (candidate) =>
+      !importableFileScripts.some(
+        (fileScript) => fileScript.name.toLowerCase() === candidate.name.toLowerCase(),
       ),
   );
+  const importableScripts = [...importableFileScripts, ...importablePackageScripts];
 
   const openAddDialog = () => {
     setEditorRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT });
@@ -155,25 +166,41 @@ export default function ProjectScriptsControl({
     }
   };
 
-  const importMenuItems = importableScripts.length > 0 && (
+  const importGroup = (
+    label: string,
+    group: ReadonlyArray<T3ProjectFileScript>,
+    separator: boolean,
+  ) =>
+    group.length > 0 && (
+      <>
+        {separator && <MenuSeparator />}
+        <MenuGroup>
+          <MenuGroupLabel>{label}</MenuGroupLabel>
+          {group.map((fileScript) => (
+            <MenuItem
+              density={presentation === "menu" ? "touch" : "default"}
+              key={`${fileScript.name} ${fileScript.command}`}
+              onClick={() => void importFileScript(fileScript)}
+            >
+              <ScriptIcon icon={fileScript.icon ?? "play"} className="size-4" />
+              <MenuItemLabel>{fileScript.name}</MenuItemLabel>
+              <MenuShortcut>
+                <DownloadIcon className="size-3.5" aria-label={t("shell.projectScripts.import")} />
+              </MenuShortcut>
+            </MenuItem>
+          ))}
+        </MenuGroup>
+      </>
+    );
+
+  const importMenuItems = (
     <>
-      {scripts.length > 0 && <MenuSeparator />}
-      <MenuGroup>
-        <MenuGroupLabel>{t("shell.projectScripts.fromT3Json")}</MenuGroupLabel>
-        {importableScripts.map((fileScript) => (
-          <MenuItem
-            density={presentation === "menu" ? "touch" : "default"}
-            key={`${fileScript.name} ${fileScript.command}`}
-            onClick={() => void importFileScript(fileScript)}
-          >
-            <ScriptIcon icon={fileScript.icon ?? "play"} className="size-4" />
-            <MenuItemLabel>{fileScript.name}</MenuItemLabel>
-            <MenuShortcut>
-              <DownloadIcon className="size-3.5" aria-label={t("shell.projectScripts.import")} />
-            </MenuShortcut>
-          </MenuItem>
-        ))}
-      </MenuGroup>
+      {importGroup(t("shell.projectScripts.fromT3Json"), importableFileScripts, scripts.length > 0)}
+      {importGroup(
+        t("shell.projectScripts.fromPackageJson"),
+        importablePackageScripts,
+        scripts.length > 0 || importableFileScripts.length > 0,
+      )}
     </>
   );
 
