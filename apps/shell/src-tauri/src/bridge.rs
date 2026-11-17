@@ -752,7 +752,7 @@ new Function("window", "document", "navigator", script)(window, document, { lang
             .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("node runs the init script");
-        let script = init_script("0.8.4", &serde_json::json!([]), "darwin");
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
         node.stdin
             .take()
             .unwrap()
@@ -770,7 +770,7 @@ new Function("window", "document", "navigator", script)(window, document, { lang
 
     #[test]
     fn the_page_no_longer_asks_on_every_resize() {
-        let script = init_script("0.8.4", &serde_json::json!([]), "darwin");
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
         assert!(!script.contains(r#"addEventListener("resize""#));
     }
 

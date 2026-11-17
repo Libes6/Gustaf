@@ -541,6 +541,7 @@ function McpEditor({
                 id="mcp-name"
                 value={name}
                 autoFocus
+                // i18n-ignore -- Figma is a product name.
                 placeholder="Figma"
                 disabled={busy}
                 onChange={(e) => setName(e.target.value)}
@@ -603,6 +604,7 @@ function McpEditor({
                   <div className="min-w-0 flex-1">
                     <Input
                       aria-label={t("settingsE.mcp.s34")}
+                      // i18n-ignore -- These are literal environment variable and HTTP header names.
                       placeholder={type === "stdio" ? "API_KEY" : "Authorization"}
                       disabled={busy}
                       value={row.key}
