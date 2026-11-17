@@ -278,9 +278,10 @@ fn is_external_browser_url(url: &tauri::Url) -> bool {
     url.scheme() == "http" || url.scheme() == "https"
 }
 
-pub(crate) fn open_external_url(url: &tauri::Url) {
+/// True when the system was asked to open the link; false when it was refused or could not start.
+pub(crate) fn open_external_url(url: &tauri::Url) -> bool {
     if !is_external_browser_url(url) && !bridge::is_handoff_url(url) {
-        return;
+        return false;
     }
     let mut command = if cfg!(target_os = "macos") {
         Command::new("open")
@@ -306,7 +307,7 @@ pub(crate) fn open_external_url(url: &tauri::Url) {
         command
     };
     command.arg(url.as_str());
-    let _ = command.spawn();
+    command.spawn().is_ok()
 }
 
 /// The AppImage's AppRun points PATH, libraries and GTK modules into its mount; the browser
@@ -472,6 +473,9 @@ pub fn run() {
             connection_storage::write_connection_catalog,
             bridge::reveal_window,
             bridge::window_fullscreen_state,
+            bridge::open_external,
+            bridge::open_system_settings,
+            bridge::check_system_permission,
             bridge::set_window_theme,
             bridge::read_client_settings,
             bridge::write_client_settings,

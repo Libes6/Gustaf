@@ -50,10 +50,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     downloadUpdate: () => invoke("update_download"),
     installUpdate: (expectedVersion) =>
       invoke("update_install", { expectedVersion: expectedVersion ?? null }),
-    openExternal: async (url) => {
-      window.open(url, "_blank");
-      return true;
-    },
+    openExternal: (url) => invoke("open_external", { url: String(url) }),
   });
 
   const invokeCli = (command) =>
@@ -213,6 +210,7 @@ const INIT_SCRIPT: &str = r#"(() => {
       fullscreenListeners.add(listener);
       return () => fullscreenListeners.delete(listener);
     },
+    // The shell has no app zoom, so the page is always at 1.
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
     discoverSshHosts: () => ssh("discover"),
@@ -294,8 +292,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     pasteAsText: async () => false,
     setTheme: (theme) => invoke("set_window_theme", { theme }),
     openExternal: updater.openExternal,
-    openSystemSettings: async () => false,
-    checkSystemPermission: async () => false,
+    openSystemSettings: (pane) => invoke("open_system_settings", { pane }),
+    checkSystemPermission: (pane) => invoke("check_system_permission", { pane }),
     getWslState: async () => ({
       enabled: false,
       distro: null,
@@ -416,6 +414,66 @@ pub(crate) fn reveal_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub(crate) fn window_fullscreen_state(window: tauri::Window) -> Result<bool, String> {
     window.is_fullscreen().map_err(|error| error.to_string())
+}
+
+/// `SystemSettingsPane` in `packages/contracts/src/ipc.ts`.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SystemSettingsPane {
+    FullDiskAccess,
+}
+
+/// The page asks whether the system took the link, so the answer is the real one.
+#[tauri::command]
+pub(crate) fn open_external(url: String) -> bool {
+    url.parse::<tauri::Url>()
+        .is_ok_and(|url| crate::open_external_url(&url))
+}
+
+#[tauri::command]
+pub(crate) fn open_system_settings(pane: SystemSettingsPane) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let SystemSettingsPane::FullDiskAccess = pane;
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+            .spawn()
+            .is_ok()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let SystemSettingsPane::FullDiskAccess = pane;
+        false
+    }
+}
+
+/// Files only a process with Full Disk Access can open; the first that opens settles it.
+#[cfg(target_os = "macos")]
+fn full_disk_access_probes() -> Vec<std::io::Result<()>> {
+    let mut probes =
+        vec![std::fs::File::open("/Library/Application Support/com.apple.TCC/TCC.db").map(drop)];
+    if let Some(home) = std::env::var_os("HOME") {
+        probes.push(std::fs::read_dir(Path::new(&home).join("Library/Safari")).map(drop));
+    }
+    probes
+}
+
+fn any_probe_opened(probes: &[std::io::Result<()>]) -> bool {
+    probes.iter().any(Result::is_ok)
+}
+
+/// Only macOS gates files behind a permission; elsewhere there is nothing to grant.
+#[tauri::command]
+pub(crate) fn check_system_permission(pane: SystemSettingsPane) -> bool {
+    let SystemSettingsPane::FullDiskAccess = pane;
+    #[cfg(target_os = "macos")]
+    {
+        any_probe_opened(&full_disk_access_probes())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
 }
 
 /// True when `now` differs from what was last pushed; remembers `now`.
@@ -600,7 +658,30 @@ pub(crate) fn dropped_paths(app: tauri::AppHandle) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{free_destination, fullscreen_changed, init_script, is_handoff_url};
+    use super::{
+        any_probe_opened, free_destination, fullscreen_changed, init_script, is_handoff_url,
+        SystemSettingsPane,
+    };
+    use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn the_permission_is_granted_once_a_protected_file_opens() {
+        let denied = || Err(Error::from(ErrorKind::PermissionDenied));
+        assert!(!any_probe_opened(&[]));
+        assert!(!any_probe_opened(&[
+            denied(),
+            Err(Error::from(ErrorKind::NotFound))
+        ]));
+        assert!(any_probe_opened(&[denied(), Ok(())]));
+    }
+
+    #[test]
+    fn the_page_names_the_pane_the_way_the_contract_does() {
+        let pane: SystemSettingsPane = serde_json::from_str(r#""full-disk-access""#).unwrap();
+        assert!(matches!(pane, SystemSettingsPane::FullDiskAccess));
+        assert!(serde_json::from_str::<SystemSettingsPane>(r#""camera""#).is_err());
+    }
+
     use std::sync::atomic::AtomicBool;
 
     #[test]
