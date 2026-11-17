@@ -1,7 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, PreviewRuntime, PreviewSessionSnapshot } from "@t3tools/contracts";
 
-import { getClientSettings } from "~/hooks/useSettings";
 import { isPreviewSupportedInRuntime } from "~/previewStateStore";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
@@ -10,7 +9,7 @@ import {
   useEnvironmentSupportsServerBrowser,
 } from "~/state/entities";
 
-import { nativeBrowserTabs, nativeRendersServerTabs, usesNativeBrowserTabs } from "./nativeBrowser";
+import { nativeRendersServerTabs } from "./nativeBrowser";
 
 export function previewRuntimeFor(environmentId: EnvironmentId): PreviewRuntime | undefined {
   // The shell's Chromium draws a server tab, so it is both the user's view and the agent's page.
@@ -20,16 +19,6 @@ export function previewRuntimeFor(environmentId: EnvironmentId): PreviewRuntime 
     readEnvironmentSupportsServerBrowser(environmentId)
   ) {
     return "server";
-  }
-  if (
-    usesNativeBrowserTabs({
-      available: nativeBrowserTabs !== null,
-      enabled: getClientSettings().browserNativeTabs,
-      environmentId,
-      primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
-    })
-  ) {
-    return "desktop";
   }
   if (!readEnvironmentSupportsServerBrowser(environmentId)) return undefined;
   if (

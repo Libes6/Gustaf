@@ -531,7 +531,6 @@ pub fn run() {
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
-            app.manage(native_browser::NativeBrowser::default());
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));

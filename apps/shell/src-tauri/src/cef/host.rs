@@ -67,6 +67,7 @@ type Reply = Box<dyn FnOnce(Result<Value, Value>)>;
 
 #[derive(Default)]
 struct Tab {
+    profile: String,
     browser: Option<Browser>,
     registration: Option<Registration>,
     relay: Option<Relay>,
@@ -82,6 +83,111 @@ thread_local! {
 }
 
 static ON_EVENT: OnceLock<Box<dyn Fn(HostEvent) + Send + Sync>> = OnceLock::new();
+static PROFILE_ROOT: OnceLock<PathBuf> = OnceLock::new();
+
+/// Browser profile ids of `packages/contracts/src/browserProfile.ts`.
+pub const INCOGNITO_PROFILE_ID: &str = "incognito";
+
+thread_local! {
+    /// One persistent store per browser profile; incognito tabs each get their own in memory.
+    static CONTEXTS: RefCell<HashMap<String, RequestContext>> = RefCell::default();
+}
+
+/// A profile's folder under Chromium's root, named so any profile id is a safe file name.
+fn profile_dir(profile: &str) -> Option<PathBuf> {
+    use std::fmt::Write;
+    let mut name = String::new();
+    for byte in profile.bytes() {
+        if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
+            name.push(byte as char);
+        } else {
+            let _ = write!(name, "%{byte:02X}");
+        }
+    }
+    Some(PROFILE_ROOT.get()?.join("profiles").join(name))
+}
+
+fn new_context(cache_path: Option<&std::path::Path>) -> Option<RequestContext> {
+    let settings = RequestContextSettings {
+        cache_path: cache_path
+            .map(|path| CefString::from(path.to_string_lossy().as_ref()))
+            .unwrap_or_default(),
+        persist_session_cookies: cache_path.is_some().into(),
+        ..Default::default()
+    };
+    request_context_create_context(Some(&settings), None)
+}
+
+fn context_for(profile: &str) -> Option<RequestContext> {
+    if profile == INCOGNITO_PROFILE_ID {
+        return new_context(None);
+    }
+    if let Some(context) = CONTEXTS.with(|contexts| contexts.borrow().get(profile).cloned()) {
+        return Some(context);
+    }
+    let context = new_context(Some(&profile_dir(profile)?))?;
+    CONTEXTS.with(|contexts| contexts.borrow_mut().insert(profile.to_owned(), context.clone()));
+    Some(context)
+}
+
+/// Deletes a profile's cookies, or every persistent profile's with `None`.
+pub fn clear_cookies(profile: Option<&str>) {
+    let profiles: Vec<String> = match profile {
+        Some(profile) => vec![profile.to_owned()],
+        None => {
+            let root = PROFILE_ROOT.get().map(|root| root.join("profiles"));
+            let mut names: Vec<String> =
+                CONTEXTS.with(|contexts| contexts.borrow().keys().cloned().collect());
+            // Profiles without an open tab this run still keep cookies on disk.
+            if let Some(entries) = root.and_then(|root| std::fs::read_dir(root).ok()) {
+                for entry in entries.flatten() {
+                    names.push(decode_profile_name(&entry.file_name().to_string_lossy()));
+                }
+            }
+            names.sort();
+            names.dedup();
+            names
+        }
+    };
+    for profile in profiles {
+        if profile == INCOGNITO_PROFILE_ID {
+            continue;
+        }
+        if let Some(manager) = context_for(&profile).and_then(|context| context.cookie_manager(None)) {
+            manager.delete_cookies(None, None, None);
+            manager.flush_store(None);
+        }
+    }
+}
+
+fn decode_profile_name(name: &str) -> String {
+    let bytes = name.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(&name[index + 1..index + 3], 16) {
+                out.push(byte);
+                index += 3;
+                continue;
+            }
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The open tabs of a profile, so a cache clear can ask a live page to do it.
+pub fn tabs_of(profile: Option<&str>) -> Vec<String> {
+    TABS.with(|tabs| {
+        tabs.borrow()
+            .iter()
+            .filter(|(_, tab)| profile.is_none_or(|profile| tab.profile == profile))
+            .map(|(id, _)| id.clone())
+            .collect()
+    })
+}
 static MOCK_KEYCHAIN: AtomicBool = AtomicBool::new(false);
 
 fn emit(event: HostEvent) {
@@ -350,6 +456,7 @@ pub fn start(
 ) -> Result<String, String> {
     let mtm = MainThreadMarker::new().ok_or("CEF starts on the main thread")?;
     let _ = ON_EVENT.set(Box::new(on_event));
+    let _ = PROFILE_ROOT.set(config.profile_root.clone());
     MOCK_KEYCHAIN.store(config.mock_keychain, Ordering::Relaxed);
 
     let framework_dir = config.module_root.join(FRAMEWORK);
@@ -403,11 +510,23 @@ pub fn start(
 }
 
 /// Places a browser view as a subview of `parent_view` (an `NSView*`), `rect` from its top left.
-pub fn open_tab(tab_id: &str, url: &str, parent_view: *mut c_void, rect: Rect) -> Result<(), String> {
+pub fn open_tab(
+    tab_id: &str,
+    url: &str,
+    profile: &str,
+    parent_view: *mut c_void,
+    rect: Rect,
+) -> Result<(), String> {
     if TABS.with(|tabs| tabs.borrow().contains_key(tab_id)) {
         return Err(format!("Tab {tab_id} is already open"));
     }
-    TABS.with(|tabs| tabs.borrow_mut().insert(tab_id.to_owned(), Tab::default()));
+    let mut context = context_for(profile).ok_or("Chromium could not open the profile")?;
+    TABS.with(|tabs| {
+        tabs.borrow_mut().insert(
+            tab_id.to_owned(),
+            Tab { profile: profile.to_owned(), ..Tab::default() },
+        )
+    });
     let frame = frame_in(parent_view, rect);
     let window_info = WindowInfo {
         runtime_style: RuntimeStyle::ALLOY,
@@ -429,7 +548,7 @@ pub fn open_tab(tab_id: &str, url: &str, parent_view: *mut c_void, rect: Rect) -
         Some(&CefString::from(url)),
         Some(&BrowserSettings::default()),
         None,
-        None,
+        Some(&mut context),
     );
     if created != 1 {
         TABS.with(|tabs| tabs.borrow_mut().remove(tab_id));

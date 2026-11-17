@@ -154,9 +154,9 @@ const INIT_SCRIPT: &str = r#"(() => {
     method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
   });
 
-  // The user's browser tabs as native web views over the page (native_browser.rs), macOS only.
+  // Browser tabs drawn by Chromium over the page (native_browser.rs), when the app has it.
   const nativeBrowser = (() => {
-    if (__GUSTAF_PLATFORM__ !== "darwin") return undefined;
+    if (!__GUSTAF_RENDERS_SERVER_TABS__) return undefined;
     const stateListeners = new Set();
     const linkListeners = new Set();
     window.__gustafNativeBrowserState = (state) => {
@@ -196,8 +196,6 @@ const INIT_SCRIPT: &str = r#"(() => {
         call("native_browser_clear_data", { profileId: profileId ?? null, kind: "cache" }),
       onStateChange: listen(stateListeners),
       onOpenLink: listen(linkListeners),
-      // Chromium (cef/) draws the server's tabs here, so the agent drives the page the user sees.
-      rendersServerTabs: __GUSTAF_RENDERS_SERVER_TABS__,
     });
   })();
 

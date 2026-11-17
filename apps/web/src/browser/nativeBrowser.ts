@@ -5,7 +5,6 @@ import {
   type DesktopPreviewBridge,
   type DesktopPreviewColorScheme,
   type DesktopPreviewTabState,
-  type EnvironmentId,
   PREVIEW_ZOOM_LEVELS,
 } from "@t3tools/contracts";
 
@@ -26,24 +25,6 @@ export type DesktopPreviewTabControls = Pick<
   | "clearCache"
   | "onStateChange"
 >;
-
-/**
- * The user's own tabs on the shell's own server render natively. Agent tabs are opened by the
- * server and stream; another environment's pages could not reach its localhost from here.
- */
-export function usesNativeBrowserTabs(input: {
-  readonly available: boolean;
-  readonly enabled: boolean;
-  readonly environmentId: EnvironmentId;
-  readonly primaryEnvironmentId: EnvironmentId | null;
-}): boolean {
-  return (
-    input.available &&
-    input.enabled &&
-    input.primaryEnvironmentId !== null &&
-    input.environmentId === input.primaryEnvironmentId
-  );
-}
 
 export function nativeBrowserTabState(
   state: DesktopNativeBrowserTabState,
@@ -161,5 +142,5 @@ export const nativeBrowserTabs: NativeBrowserTabs | null = nativeBrowserBridge
   ? createNativeBrowserTabs(nativeBrowserBridge)
   : null;
 
-/** Gustaf's shell with Chromium draws the server's own tabs, so the user and agents share them. */
-export const nativeRendersServerTabs = nativeBrowserBridge?.rendersServerTabs === true;
+/** Gustaf's shell draws its own server's tabs with Chromium, so the user and agents share them. */
+export const nativeRendersServerTabs = nativeBrowserTabs !== null;

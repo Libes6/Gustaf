@@ -246,7 +246,7 @@ fn on_command(command: Value) {
 fn content_view(app: &AppHandle) -> Result<*mut std::ffi::c_void, String> {
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
-    let window = app.get_window("main").ok_or("The app window is not open")?;
+    let window = app.get_webview_window("main").ok_or("The app window is not open")?;
     let ns_window = window.ns_window().map_err(|error| error.to_string())?;
     // SAFETY: the main window's NSWindow, used on the main thread.
     let view: *mut AnyObject = unsafe { msg_send![ns_window.cast::<AnyObject>(), contentView] };
@@ -272,10 +272,13 @@ pub(crate) async fn create(
     app: &AppHandle,
     tab_id: String,
     url: String,
+    profile: String,
     server: Option<ServerTab>,
 ) -> Result<(), String> {
     on_main(app, move |app| {
+        // Asked again by a remount: the tab keeps its page and reports its state once more.
         if host::is_open(&tab_id) {
+            publish(app, &tab_id);
             return Ok(());
         }
         TABS.with(|tabs| {
@@ -292,6 +295,7 @@ pub(crate) async fn create(
         let created = host::open_tab(
             &tab_id,
             &url,
+            &profile,
             content_view(app)?,
             Rect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 },
         );
@@ -303,18 +307,24 @@ pub(crate) async fn create(
     .await
 }
 
-pub(crate) fn is_tab(tab_id: &str) -> bool {
-    // Only called from the main thread through `owns`.
-    host::is_open(tab_id)
-}
-
-/// Whether CEF draws this tab; asks on the main thread.
-pub(crate) async fn owns(app: &AppHandle, tab_id: &str) -> bool {
-    if !running() {
-        return false;
-    }
-    let tab_id = tab_id.to_owned();
-    on_main(app, move |_| Ok(is_tab(&tab_id))).await.unwrap_or(false)
+/// Cookies go through each profile's cookie store; a cache clear needs a live page of the
+/// profile, as Chromium offers no other way to drop a profile's HTTP cache.
+pub(crate) async fn clear_data(
+    app: &AppHandle,
+    profile: Option<String>,
+    cookies: bool,
+) -> Result<(), String> {
+    on_main(app, move |_| {
+        if cookies {
+            host::clear_cookies(profile.as_deref());
+        } else {
+            for tab in host::tabs_of(profile.as_deref()) {
+                host::call(&tab, "Network.clearBrowserCache", json!({}), |_| {});
+            }
+        }
+        Ok(())
+    })
+    .await
 }
 
 pub(crate) async fn present(
