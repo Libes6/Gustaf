@@ -337,7 +337,7 @@ export function branchMismatchBannerItem(input: {
         {input.restoring ? "Restoring..." : translate(getUiLanguage(), "webCopy.restoreBranch")}
       </Button>
     ),
-    dismissLabel: "Dismiss branch change notice",
+    dismissLabel: t("settingsStatus.dismissBranchNotice"),
     onDismiss: input.onDismiss,
   };
 }

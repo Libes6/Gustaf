@@ -156,7 +156,10 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
               <ComposerBanner.Content className="text-muted-foreground">
                 {t("webCopy.nothingStashedYet")}
                 {stashShortcutLabel
-                  ? ` Press ${stashShortcutLabel} with a prompt in the composer to stash it.`
+                  ? t("settingsStatus.composerStashShortcut").replace(
+                      "{shortcut}",
+                      stashShortcutLabel,
+                    )
                   : null}
               </ComposerBanner.Content>
             </ComposerBanner.Row>

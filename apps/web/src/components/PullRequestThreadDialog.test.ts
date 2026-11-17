@@ -9,6 +9,11 @@ import { AsyncResult } from "effect/reactivity";
 import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+vi.mock("../useUiLanguage", async () => {
+  const { translate } = await import("../i18n");
+  return { useT: () => (key: Parameters<typeof translate>[1]) => translate("en", key) };
+});
+
 const state = vi.hoisted(() => ({
   canOperate: false,
   canWriteSourceControl: true,

@@ -358,7 +358,18 @@ function CleanupSection() {
             )}${report.counts.failed > 0 ? t("settingsD.storageSettings.countsFailed").replace("{failed}", String(report.counts.failed)) : ""}`
         : "",
       description: report
-        ? `Last run ${formatRelativeTimeLabel(report.finishedAt, nowMs)}. ${formatBytes(report.bytesFreed)} recovered.${report.counts.failed > 0 ? ` ${report.counts.failed} ${report.counts.failed === 1 ? "item" : "items"} couldn't be removed.` : ""}`
+        ? t("settingsStatus.cleanupReport")
+            .replace("{time}", formatRelativeTimeLabel(report.finishedAt, nowMs))
+            .replace("{bytes}", formatBytes(report.bytesFreed))
+            .replace(
+              "{failures}",
+              report.counts.failed > 0
+                ? t("settingsStatus.cleanupFailures").replace(
+                    "{count}",
+                    String(report.counts.failed),
+                  )
+                : "",
+            )
         : query?.failed
           ? t("settingsD.storageSettings.couldNotLoadLastRun")
           : query?.loading

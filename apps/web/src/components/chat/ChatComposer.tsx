@@ -760,8 +760,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (supportsAttachmentUploads
       ? needsReattachFileCount > 0
         ? needsReattachFileCount === 1
-          ? "Attach the interrupted file again or remove it"
-          : "Attach the interrupted files again or remove them"
+          ? t("settingsStatus.attachInterruptedFile")
+          : t("settingsStatus.attachInterruptedFiles")
         : // A plain send waits for its uploads. Answers and approval redirects need them first.
           questionAttachmentTarget ||
             pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId))
