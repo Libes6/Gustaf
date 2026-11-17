@@ -3,6 +3,44 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "misc." and both languages list the same keys.
 export const miscMessages = {
   en: {
+    "misc.welcomeWizard.skippedComputers":
+      "Not connected, so setup skips {computers}. You can set them up later from Settings.",
+    "misc.welcomeWizard.telemetryNotice":
+      "Gustaf collects anonymous usage data to help us improve it.",
+    "misc.welcomeWizard.privacyWithOptOut":
+      "To learn how your data is used and how to opt out, see our",
+    "misc.welcomeWizard.privacyDetails": "To learn how your data is used, see our",
+    "misc.welcomeWizard.selectedCount": "{selected} of {total} selected",
+    "misc.welcomeWizard.folderCount": "Folders: {count}",
+    "misc.welcomeWizard.pathAdded": "Added to {file}. Open a new terminal to use",
+    "misc.welcomeWizard.useCli": "Use",
+    "misc.welcomeWizard.cliFromTerminal": "from any terminal. Adds one line to",
+    "misc.welcomeWizard.importCount": "Import projects: {count}",
+    "misc.welcomeWizard.connectYourComputers": "Connect your computers",
+    "misc.welcomeWizard.chooseOneOrMoreComputersWellSetUpAgentsAndProjectsOnEach":
+      "Choose one or more computers. We’ll set up agents and projects on each.",
+    "misc.welcomeWizard.privacyPolicy": "privacy policy",
+    "misc.welcomeWizard.runThisOnEachComputerYouWantToConnect":
+      "Run this on each computer you want to connect.",
+    "misc.welcomeWizard.keepGustafRunningSelectTheComputersYouWantToSetUpAbove":
+      "Keep Gustaf running. Select the computers you want to set up above.",
+    "misc.welcomeWizard.needAPairingLink": "Need a pairing link?",
+    "misc.welcomeWizard.startGustafOrRun": "Start Gustaf or run",
+    "misc.welcomeWizard.thereBefore": "there before",
+    "misc.welcomeWizard.onATailnetRun": ". On a tailnet, run",
+    "misc.welcomeWizard.instead": "instead.",
+    "misc.welcomeWizard.connectAnotherChatgptAccount": "Connect another ChatGPT account",
+    "misc.welcomeWizard.run": "Run",
+    "misc.welcomeWizard.inThisTerminal": "in this terminal.",
+    "misc.welcomeWizard.lookingForProjectsFromClaudeCodeAndCodex":
+      "Looking for projects from Claude Code and Codex…",
+    "misc.welcomeWizard.doNotImportProjects": "Do not import projects",
+    "misc.welcomeWizard.selectNone": "Select none",
+    "misc.welcomeWizard.lookingForProjects": "Looking for projects…",
+    "misc.welcomeWizard.couldNotCheckProjects": "Could not check projects.",
+    "misc.welcomeWizard.noExistingClaudeCodeOrCodexProjectsFound":
+      "No existing Claude Code or Codex projects found.",
+    "misc.welcomeWizard.someHistoryWasNotImported": "Some history was not imported",
     "themeCss.language": "CSS",
     "themeCss.position": "Ln {line}, Col {column}",
     "themeCss.externalIgnored": "Rules that load external files will be ignored.",
@@ -1205,6 +1243,44 @@ export const miscMessages = {
     "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
+    "misc.welcomeWizard.skippedComputers":
+      "Нет подключения к {computers}, настройка пропущена. Настройте их позже в настройках.",
+    "misc.welcomeWizard.telemetryNotice":
+      "Gustaf собирает анонимные данные об использовании для улучшения приложения.",
+    "misc.welcomeWizard.privacyWithOptOut":
+      "Подробнее об использовании данных и отказе от сбора читайте в",
+    "misc.welcomeWizard.privacyDetails": "Подробнее об использовании данных читайте в",
+    "misc.welcomeWizard.selectedCount": "Выбрано: {selected} из {total}",
+    "misc.welcomeWizard.folderCount": "Папок: {count}",
+    "misc.welcomeWizard.pathAdded": "Добавлено в {file}. Откройте новый терминал для запуска",
+    "misc.welcomeWizard.useCli": "Запускайте",
+    "misc.welcomeWizard.cliFromTerminal": "из любого терминала. Добавит одну строку в",
+    "misc.welcomeWizard.importCount": "Импортировать проекты: {count}",
+    "misc.welcomeWizard.connectYourComputers": "Подключите компьютеры",
+    "misc.welcomeWizard.chooseOneOrMoreComputersWellSetUpAgentsAndProjectsOnEach":
+      "Выберите компьютеры. Мы настроим агенты и проекты на каждом.",
+    "misc.welcomeWizard.privacyPolicy": "политике конфиденциальности",
+    "misc.welcomeWizard.runThisOnEachComputerYouWantToConnect":
+      "Выполните команду на каждом компьютере, который хотите подключить.",
+    "misc.welcomeWizard.keepGustafRunningSelectTheComputersYouWantToSetUpAbove":
+      "Оставьте Gustaf запущенным. Выберите компьютеры для настройки выше.",
+    "misc.welcomeWizard.needAPairingLink": "Нужна ссылка для подключения?",
+    "misc.welcomeWizard.startGustafOrRun": "Запустите Gustaf или выполните",
+    "misc.welcomeWizard.thereBefore": "на том компьютере перед",
+    "misc.welcomeWizard.onATailnetRun": ". В сети Tailscale выполните",
+    "misc.welcomeWizard.instead": "вместо этого.",
+    "misc.welcomeWizard.connectAnotherChatgptAccount": "Подключить ещё один аккаунт ChatGPT",
+    "misc.welcomeWizard.run": "Выполните",
+    "misc.welcomeWizard.inThisTerminal": "в этом терминале.",
+    "misc.welcomeWizard.lookingForProjectsFromClaudeCodeAndCodex":
+      "Ищем проекты Claude Code и Codex…",
+    "misc.welcomeWizard.doNotImportProjects": "Не импортировать проекты",
+    "misc.welcomeWizard.selectNone": "Снять выбор",
+    "misc.welcomeWizard.lookingForProjects": "Ищем проекты…",
+    "misc.welcomeWizard.couldNotCheckProjects": "Не удалось проверить проекты.",
+    "misc.welcomeWizard.noExistingClaudeCodeOrCodexProjectsFound":
+      "Проекты Claude Code и Codex не найдены.",
+    "misc.welcomeWizard.someHistoryWasNotImported": "Часть истории не импортирована",
     "themeCss.language": "CSS",
     "themeCss.position": "Стр. {line}, столб. {column}",
     "themeCss.externalIgnored": "Правила загрузки внешних файлов будут проигнорированы.",
