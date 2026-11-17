@@ -1,0 +1,37 @@
+[package]
+name = "gustaf-cef-spike"
+version = "0.0.0"
+description = "Stage 0 spike: Chromium (CEF) as a downloadable module inside a Tauri window"
+edition = "2021"
+publish = false
+
+# Stands alone: the spike must not change how the shell itself builds.
+[workspace]
+
+[[bin]]
+name = "gustaf-cef-spike"
+path = "src/main.rs"
+
+[[bin]]
+name = "gustaf-cef-helper"
+path = "src/bin/helper.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+cef = { version = "=156.6.0", default-features = false, features = ["sandbox"] }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+# `unstable` only for the WKWebView comparison tab (`CEF_SPIKE_ENGINE=wk`).
+tauri = { version = "2", features = ["unstable"] }
+ureq = "2"
+objc2 = "0.6.5"
+objc2-app-kit = "0.3.2"
+objc2-foundation = "0.3.2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

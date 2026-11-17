@@ -336,7 +336,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
                   true,
                 )
               }
-              onPopup={(popupTabId) => showPreviewPopup(threadRef, popupTabId, "floating")}
+              onPopup={(popupTabId) => showPreviewPopup(threadRef, popupTabId)}
               className="size-full"
             />
           </div>

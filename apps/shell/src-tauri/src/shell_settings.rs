@@ -45,6 +45,9 @@ pub(crate) struct ShellSettings {
     /// Lets agents control this Mac. Off until the user agrees in a native dialog.
     #[serde(default)]
     pub computer_use_enabled: bool,
+    /// The user removed the built-in browser; an update that brings it back removes it again.
+    #[serde(default)]
+    pub browser_removed: bool,
 }
 
 impl Default for ShellSettings {
@@ -54,6 +57,7 @@ impl Default for ShellSettings {
             tailscale_serve_enabled: false,
             tailscale_serve_port: DEFAULT_TAILSCALE_SERVE_PORT,
             computer_use_enabled: false,
+            browser_removed: false,
         }
     }
 }

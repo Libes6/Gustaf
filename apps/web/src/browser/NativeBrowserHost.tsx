@@ -27,6 +27,7 @@ import { useTabProfileId } from "./ElectronBrowserHost";
 import { type NativeBrowserTabs, nativeBrowserTabs } from "./nativeBrowser";
 import { usePageCoversNativeBrowser } from "./nativeBrowserOcclusion";
 import { openUrlInPreview } from "./openFileInPreview";
+import { rendersServerTabNatively } from "./previewRuntime";
 import { previewRuntimeTabId } from "./previewRuntimeTabId";
 
 /** The desktop-runtime tabs of the shell's own server, which this window draws natively. */
@@ -38,7 +39,11 @@ function nativeBrowserSessions(
     const threadRef = parseScopedThreadKey(threadKey);
     if (!threadRef || threadRef.environmentId !== primaryEnvironmentId) return [];
     return Object.values(previewState.sessions)
-      .filter((snapshot) => snapshot.runtime !== "server")
+      .filter(
+        (snapshot) =>
+          snapshot.runtime !== "server" ||
+          rendersServerTabNatively(threadRef.environmentId, primaryEnvironmentId, snapshot),
+      )
       .map((snapshot) => ({
         threadRef,
         snapshot,
@@ -82,6 +87,7 @@ export function NativeBrowserHost() {
         runtimeTabId={runtimeTabId}
         initialUrl={snapshot.navStatus._tag === "Idle" ? null : snapshot.navStatus.url}
         profileId={snapshot.profileId}
+        serverTab={snapshot.runtime === "server"}
       />
     ),
   );
@@ -94,6 +100,8 @@ interface NativeBrowserTabProps {
   readonly runtimeTabId: string;
   readonly initialUrl: string | null;
   readonly profileId: string | undefined;
+  /** The server owns the page; the shell only draws it. */
+  readonly serverTab: boolean;
 }
 
 function AuthorizedNativeBrowserTab(props: NativeBrowserTabProps) {
@@ -112,6 +120,7 @@ function NativeBrowserTab({
   runtimeTabId,
   initialUrl,
   profileId,
+  serverTab,
 }: NativeBrowserTabProps) {
   const hydrated = useClientSettingsHydrated();
   const [initialSrc] = useState(initialUrl);
@@ -127,7 +136,8 @@ function NativeBrowserTab({
       };
     }),
   );
-  usePreviewBridge({ threadRef, tabId, runtimeTabId, bridge: tabs });
+  // The server reports a server tab's navigation; the shell only says it has a page.
+  usePreviewBridge({ threadRef, tabId, runtimeTabId, bridge: tabs, serverDriven: serverTab });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the native view lives in the shell for as long as this tab is mounted
   useEffect(() => {
@@ -140,6 +150,7 @@ function NativeBrowserTab({
         profileId,
         zoomFactor: defaults.zoomFactor,
         colorScheme: defaults.appearance,
+        ...(serverTab ? { serverTab: { threadId: threadRef.threadId, tabId } } : {}),
       });
       if (!cancelled) setCreated(true);
     })().catch(() => undefined);
@@ -148,7 +159,7 @@ function NativeBrowserTab({
       setCreated(false);
       void tabs.closeTab(runtimeTabId).catch(() => undefined);
     };
-  }, [hydrated, initialSrc, profileId, runtimeTabId, tabs]);
+  }, [hydrated, initialSrc, profileId, runtimeTabId, serverTab, tabId, tabs, threadRef.threadId]);
 
   const shown = created && visible && rect !== null && !covered;
   const x = rect?.x ?? 0;

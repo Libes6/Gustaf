@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Gustaf CEF spike</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font:
+          13px/1.4 -apple-system,
+          sans-serif;
+        background: #1c1d22;
+        color: #e8e8ea;
+      }
+      header {
+        box-sizing: border-box;
+        height: 72px;
+        padding: 8px 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-bottom: 1px solid #33353d;
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+      }
+      #slot {
+        position: absolute;
+        inset: 72px 0 0 0;
+        overflow: auto;
+        padding: 12px;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        color: #9aa0ad;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>WKWebView page</strong>
+      <span id="state">…</span>
+      <button id="install">Install module</button>
+      <button id="remove">Remove</button>
+      <input id="url" value="https://example.com/" />
+      <button id="open">Open Chromium tab</button>
+      <button id="cover">Cover 2s</button>
+    </header>
+    <div id="slot"><pre id="log"></pre></div>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+      const slot = document.getElementById("slot");
+      let open = false;
+
+      const rect = () => {
+        const box = slot.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      };
+      const refresh = async () => {
+        const state = await invoke("spike_state");
+        document.getElementById("state").textContent =
+          `module ${state.manifest.id} ${state.manifest.version}: ` +
+          (state.installed
+            ? state.external
+              ? "installed outside the app"
+              : "in the app bundle"
+            : "not installed") +
+          (state.started ? ", CEF running" : "");
+      };
+
+      document.getElementById("install").onclick = () => invoke("module_install").then(refresh);
+      document.getElementById("remove").onclick = () =>
+        invoke("module_remove").then(refresh, (error) => alert(error));
+      document.getElementById("open").onclick = () =>
+        invoke("browser_open", { url: document.getElementById("url").value, rect: rect() });
+      // What the page does while one of its own menus has to draw over the tab.
+      document.getElementById("cover").onclick = async () => {
+        await invoke("browser_present", { rect: null });
+        setTimeout(() => invoke("browser_present", { rect: rect() }), 2000);
+      };
+      new ResizeObserver(() => open && invoke("browser_present", { rect: rect() })).observe(slot);
+      listen("spike-tab", () => {
+        open = true;
+        refresh();
+      });
+      listen("spike-log", (event) => {
+        document.getElementById("log").textContent += event.payload + "\n";
+        refresh();
+      });
+      refresh();
+    </script>
+  </body>
+</html>

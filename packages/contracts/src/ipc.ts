@@ -1156,8 +1156,23 @@ export interface DesktopBridge {
     onRequest: (listener: (request: DesktopAppActivationRequest) => void) => () => void;
   };
   preview: DesktopPreviewBridge;
-  /** Gustaf's shell on macOS: the user's tabs as native web views laid over the page. */
+  /** Gustaf's shell with its built-in browser: tabs Chromium draws over the page. */
   nativeBrowser?: DesktopNativeBrowserBridge;
+  /** Gustaf's shell on macOS: removes or reinstalls the built-in browser, then restarts. */
+  builtInBrowser?: DesktopBuiltInBrowserBridge;
+}
+
+export interface DesktopBuiltInBrowserState {
+  readonly supported: boolean;
+  readonly installed: boolean;
+  readonly running: boolean;
+  readonly sizeBytes: number;
+}
+
+export interface DesktopBuiltInBrowserBridge {
+  state: () => Promise<DesktopBuiltInBrowserState>;
+  remove: () => Promise<void>;
+  install: () => Promise<void>;
 }
 
 /** Renderer callback invoked by Electron with a fresh user gesture before display-media capture. */
@@ -1333,6 +1348,8 @@ export interface DesktopNativeBrowserBridge {
       readonly profileId?: string | undefined;
       readonly zoomFactor?: number | undefined;
       readonly colorScheme?: DesktopPreviewColorScheme | undefined;
+      /** A server browser tab: the shell draws it and the server drives the same page. */
+      readonly serverTab?: { readonly threadId: string; readonly tabId: string } | undefined;
     },
   ) => Promise<void>;
   closeTab: (tabId: string) => Promise<void>;

@@ -9,7 +9,8 @@ const script = source
   .split('"#;')[0]
   .replaceAll("__GUSTAF_VERSION__", '"test"')
   .replaceAll("__GUSTAF_BOOTSTRAPS__", "[]")
-  .replaceAll("__GUSTAF_PLATFORM__", '"darwin"');
+  .replaceAll("__GUSTAF_PLATFORM__", '"darwin"')
+  .replaceAll("__GUSTAF_RENDERS_SERVER_TABS__", "true");
 
 function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
   const events = new Map();
@@ -17,7 +18,7 @@ function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
     __TAURI_INTERNALS__: {
       invoke: async (name, args) => {
         if (name === "window_fullscreen_state") return false;
-        // The macOS init script clears stale native tabs on every load; it is not part of any test.
+        // With Chromium the init script clears stale tabs on every load; it is not part of any test.
         if (name === "native_browser_close_all") return undefined;
         return invoke(name, args);
       },

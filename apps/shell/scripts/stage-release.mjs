@@ -1,3 +1,4 @@
+import * as NodeChildProcess from "node:child_process";
 import * as NodeProcess from "node:process";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -29,4 +30,16 @@ for (const directory of directories) {
       NodeFS.constants.COPYFILE_EXCL,
     );
   }
+}
+
+// The built-in browser on its own, which the app downloads to reinstall it after a removal
+// (browser_module.rs). The same signed files the bundle carries, staged by stage-browser.mjs.
+if (platform.startsWith("darwin")) {
+  const browser = "apps/shell/src-tauri/target/browser";
+  const archive = NodePath.join("release-assets", `gustaf-browser-${version}-darwin-arm64.tar.xz`);
+  const result = NodeChildProcess.spawnSync("tar", ["-cJf", archive, "-C", browser, "."], {
+    stdio: "inherit",
+    env: { ...NodeProcess.env, COPYFILE_DISABLE: "1" },
+  });
+  if (result.status !== 0) throw Error("Could not pack the built-in browser");
 }

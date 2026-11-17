@@ -58,9 +58,18 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: apps/shell/scripts/install-linux-deps.sh
+      # The macOS app embeds Chromium (CEF), whose Rust wrapper builds with CMake and Ninja.
+      - name: Install Chromium build tools
+        if: runner.os == 'macOS'
+        run: |
+          command -v cmake >/dev/null || brew install cmake
+          command -v ninja >/dev/null || brew install ninja
       # The same profile and features the bundle job compiles with.
       - run: cargo test --locked --release --no-run --manifest-path apps/shell/src-tauri/Cargo.toml
       - run: cargo build --locked --release --bins --features tauri/custom-protocol --manifest-path apps/shell/src-tauri/Cargo.toml
+      # tauri.macos.conf.json turns Chromium on for the macOS bundle.
+      - if: runner.os == 'macOS'
+        run: cargo build --locked --release --bins --features tauri/custom-protocol,cef-browser --manifest-path apps/shell/src-tauri/Cargo.toml
       - run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml
 
   bundle:
@@ -92,6 +101,12 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: apps/shell/scripts/install-linux-deps.sh
+      # The macOS app embeds Chromium (CEF), whose Rust wrapper builds with CMake and Ninja.
+      - name: Install Chromium build tools
+        if: runner.os == 'macOS'
+        run: |
+          command -v cmake >/dev/null || brew install cmake
+          command -v ninja >/dev/null || brew install ninja
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/provider-ollama/src/http.test.ts
       - run: node --test apps/shell/tests/*.test.mjs
@@ -190,7 +205,8 @@ jobs:
           version=$(jq -er .version apps/shell/src-tauri/tauri.conf.json)
           test "$GITHUB_REF_NAME" = "v$version"
           mapfile -t installers < <(find release-assets -type f -print | sort)
-          test "${#installers[@]}" -eq 13
+          # 13 installers and the macOS built-in browser archive (stage-release.mjs).
+          test "${#installers[@]}" -eq 14
           # The `gustaf` CLI for each desktop platform; cliArchiveFileName in packages/shared/src/cliRelease.ts.
           mapfile -t archives < <(find downloaded -path 'downloaded/cli-*' -type f -print | sort)
           test "${#archives[@]}" -eq 3
