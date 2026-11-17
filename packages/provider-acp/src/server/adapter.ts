@@ -316,6 +316,7 @@ export interface AcpAdapterV2Flavor {
   ) => Effect.Effect<
     (
       result: EffectAcpSchema.PromptResponse,
+      tools: ReadonlyArray<AcpToolCallState>,
     ) => Effect.Effect<OrchestrationV2ProviderFailure | undefined>
   >;
   readonly requiresSignIn?: (cause: unknown) => boolean;
@@ -518,6 +519,19 @@ export interface AcpAdapterV2Flavor {
     notification: EffectAcpSchema.SessionNotification,
   ) => boolean;
   readonly deferFinalizeForBackgroundWork?: boolean;
+  /**
+   * For an agent that answers `end_turn` while work it started still runs, and then reports
+   * that work, its wake-up reply and permission requests only to an open `session/prompt`.
+   * While `holdsTurn` matches an open tool the turn stays open and re-sends `prompt`, first
+   * at once and then with backoff; the inner effect of `watchWake` cuts a backoff short.
+   */
+  readonly backgroundReattach?: {
+    readonly holdsTurn: (toolCall: AcpToolCallState) => boolean;
+    readonly prompt: (
+      held: ReadonlyArray<AcpToolCallState>,
+    ) => ReadonlyArray<EffectAcpSchema.ContentBlock>;
+    readonly watchWake?: (sessionId: string) => Effect.Effect<Effect.Effect<void>>;
+  };
   readonly assertComplete?: Effect.Effect<void, EffectAcpErrors.AcpError>;
   /** Interrupt the local prompt fiber before `session/cancel` (Grok wedged prompts). */
   readonly interruptPromptOnCancel?: boolean;
@@ -1669,6 +1683,42 @@ interface SnapshotMessageState {
 /** How long a Stop waits for the agent to confirm before the user is offered Force stop. */
 const ACP_STOP_CONFIRM_TIMEOUT_MS = 10_000;
 const TOOL_UPDATE_PERSIST_EVERY = 10;
+// `backgroundReattach`: a wait before each re-sent prompt. Each re-send is one model call,
+// so the waits grow; after the last one the turn completes and the work shows as running.
+const ACP_BACKGROUND_REATTACH_WAITS: ReadonlyArray<Duration.Input> = [
+  0,
+  "15 seconds",
+  "30 seconds",
+  "1 minute",
+  "2 minutes",
+  "5 minutes",
+  "5 minutes",
+  "5 minutes",
+  "5 minutes",
+  "5 minutes",
+];
+
+/** Usage of a turn sent as several prompts, for agents whose usage counts one prompt. */
+function sumAcpPromptUsage(
+  left: EffectAcpSchema.Usage | null | undefined,
+  right: EffectAcpSchema.Usage | null | undefined,
+): EffectAcpSchema.Usage | null | undefined {
+  if (left == null) return right;
+  if (right == null) return left;
+  const add = (a: number | null | undefined, b: number | null | undefined) =>
+    a == null && b == null ? undefined : (a ?? 0) + (b ?? 0);
+  const cachedReadTokens = add(left.cachedReadTokens, right.cachedReadTokens);
+  const cachedWriteTokens = add(left.cachedWriteTokens, right.cachedWriteTokens);
+  const thoughtTokens = add(left.thoughtTokens, right.thoughtTokens);
+  return {
+    inputTokens: left.inputTokens + right.inputTokens,
+    outputTokens: left.outputTokens + right.outputTokens,
+    totalTokens: left.totalTokens + right.totalTokens,
+    ...(cachedReadTokens === undefined ? {} : { cachedReadTokens }),
+    ...(cachedWriteTokens === undefined ? {} : { cachedWriteTokens }),
+    ...(thoughtTokens === undefined ? {} : { thoughtTokens }),
+  };
+}
 
 // CommandOutputHub reads the last 256 KiB; retain more so its display cut stays unchanged.
 const MAX_AGENT_TERMINAL_OUTPUT_CHARS = 320 * 1024;
@@ -8411,7 +8461,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               }
               return;
             }
-            const checkPromptOutcome =
+            // `backgroundReattach` re-sends the prompt; each send gets its own outcome watch.
+            let checkPromptOutcome =
               flavor.watchPromptOutcome === undefined
                 ? undefined
                 : yield* flavor.watchPromptOutcome(requestedSessionId);
@@ -8434,9 +8485,79 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             const compactSession = isCompactionMessage(turnInput.message)
               ? flavor.compactSession
               : undefined;
+            const reattach = flavor.backgroundReattach;
+            const promptHoldingBackgroundWork = Effect.fn(
+              "AcpAdapterV2.promptHoldingBackgroundWork",
+            )(function* (
+              backgroundReattach: NonNullable<AcpAdapterV2Flavor["backgroundReattach"]>,
+            ) {
+              let result = yield* runtime.prompt({ prompt: promptParts!.prompt }, promptOptions);
+              for (const wait of ACP_BACKGROUND_REATTACH_WAITS) {
+                // Until the next send no prompt is open, so Stop finalizes the turn itself.
+                context.promptSettled = true;
+                if (result.stopReason !== "end_turn" || context.interrupted || context.finalized) {
+                  return result;
+                }
+                const held = yield* runtimeCallbackPermit.withPermit(
+                  Effect.sync(() =>
+                    [...context.tools.values()].filter(backgroundReattach.holdsTurn),
+                  ),
+                );
+                if (held.length === 0) return result;
+                if (
+                  checkPromptOutcome !== undefined &&
+                  (yield* checkPromptOutcome(result, [])) !== undefined
+                ) {
+                  return result;
+                }
+                if (Duration.toMillis(wait) > 0) {
+                  const wake =
+                    backgroundReattach.watchWake === undefined
+                      ? Effect.never
+                      : yield* backgroundReattach.watchWake(requestedSessionId);
+                  yield* Effect.raceAll([
+                    Effect.sleep(wait),
+                    wake,
+                    Deferred.await(context.completed),
+                  ]);
+                }
+                context.promptSettled = false;
+                if (context.interrupted || context.finalized) {
+                  return { stopReason: "cancelled" } satisfies EffectAcpSchema.PromptResponse;
+                }
+                yield* Effect.logInfo("orchestration-v2.acp-background-reattach", {
+                  driver,
+                  providerTurnId,
+                  heldToolCallIds: held.map((tool) => tool.toolCallId),
+                });
+                if (flavor.watchPromptOutcome !== undefined) {
+                  checkPromptOutcome = yield* flavor.watchPromptOutcome(requestedSessionId);
+                }
+                yield* runtimeCallbackPermit.withPermit(closeTextStreams(context));
+                // A Stop that cancelled before this prompt reached the agent cancels it again.
+                const dispatched = yield* Deferred.make<void>();
+                const lateStop = yield* Deferred.await(dispatched).pipe(
+                  Effect.andThen(
+                    Effect.suspend(() =>
+                      context.interrupted ? runtime.cancel.pipe(Effect.ignore) : Effect.void,
+                    ),
+                  ),
+                  Effect.forkIn(sessionScope),
+                );
+                const earlierUsage = result.usage;
+                result = yield* runtime
+                  .prompt({ prompt: [...backgroundReattach.prompt(held)] }, { dispatched })
+                  .pipe(Effect.ensuring(Fiber.interrupt(lateStop)));
+                const usage = sumAcpPromptUsage(earlierUsage, result.usage);
+                if (usage != null) result = { ...result, usage };
+              }
+              return result;
+            });
             yield* (
               compactSession === undefined
-                ? runtime.prompt({ prompt: promptParts!.prompt }, promptOptions)
+                ? reattach === undefined
+                  ? runtime.prompt({ prompt: promptParts!.prompt }, promptOptions)
+                  : promptHoldingBackgroundWork(reattach)
                 : Deferred.succeed(context.promptDispatched, undefined).pipe(
                     Effect.andThen(compactSession(runtime, requestedSessionId)),
                     Effect.as({ stopReason: "end_turn" } satisfies EffectAcpSchema.PromptResponse),
@@ -8494,7 +8615,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                       result.stopReason === "error" ||
                       result.stopReason === "cancelled"
                         ? undefined
-                        : yield* checkPromptOutcome(result);
+                        : yield* checkPromptOutcome(result, [...context.tools.values()]);
                     if (hiddenFailure !== undefined) {
                       yield* Ref.set(runtimeRestartRequired, true);
                     }

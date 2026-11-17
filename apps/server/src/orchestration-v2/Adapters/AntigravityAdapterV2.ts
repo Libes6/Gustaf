@@ -19,6 +19,8 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
 import type { AntigravityAuth } from "../../provider/AntigravityAuth.ts";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
+import type { AcpToolCallState } from "@t3tools/provider-acp/server/runtimeModel";
+import type * as EffectAcpSchema from "effect-acp/compat";
 import {
   antigravityAppendsSystemPrompt,
   antigravityPermissionMode,
@@ -32,11 +34,13 @@ import {
   antigravitySubagentLaunches,
   describeAntigravitySubagentLaunches,
 } from "../../provider/acp/AntigravityChildWork.ts";
+import { watchAntigravityBackgroundWake } from "../../provider/acp/AntigravityBackgroundWake.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
 import { makeAntigravityPromptGuard } from "../../provider/acp/AntigravityPromptGuard.ts";
 import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
   antigravityApprovalOptions,
+  antigravityBackgroundWorkHoldsTurn,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
   extractAntigravityUserInputQuestion,
@@ -104,6 +108,24 @@ const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractS
   if (classifyAntigravitySubagentToolCall(toolCall) !== "subagent") {
     return undefined;
   }
+  if (toolCall.title === "Running manage_subagents" || toolCall.title === "Run manage_subagents?") {
+    return {
+      nativeTaskId: toolCall.toolCallId,
+      prompt: "Antigravity native subagents",
+      title: "Antigravity subagent status",
+      model: null,
+      status:
+        toolCall.status === "completed"
+          ? "idle"
+          : toolCall.status === "failed"
+            ? "failed"
+            : toolCall.status === "pending"
+              ? "pending"
+              : "running",
+      childSessionId: null,
+      result: antigravitySubagentOutput(toolCall) ?? null,
+    };
+  }
   const status =
     toolCall.status === "failed" ? "failed" : toolCall.status === "pending" ? "pending" : "running";
   const launches = antigravitySubagentLaunches(toolCall.data.rawInput);
@@ -123,6 +145,27 @@ const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractS
     result: status === "failed" ? (antigravitySubagentOutput(toolCall) ?? null) : null,
   };
 };
+
+/** Sent when agy ended its turn while work it started still runs, so it can report it. */
+function antigravityBackgroundContinuationPrompt(
+  held: ReadonlyArray<AcpToolCallState>,
+): ReadonlyArray<EffectAcpSchema.ContentBlock> {
+  const work = held
+    .slice(0, 3)
+    .map((tool) => tool.command ?? tool.title ?? "background task")
+    .map((label) => `- ${label.length > 200 ? `${label.slice(0, 200)}…` : label}`)
+    .join("\n");
+  return [
+    {
+      type: "text",
+      text: `<background_work_continuation>
+Your turn ended while work you started was still running:
+${work}
+If it is still running, wait for it in this turn instead of ending it. Do not start it again. Once it finishes, read its result and continue the user's request.
+</background_work_continuation>`,
+    },
+  ];
+}
 
 interface AntigravityFlavorServices {
   readonly random: SecureRandom.SecureRandom["Service"];
@@ -180,7 +223,11 @@ export function makeAntigravityAcpAdapterFlavor(
             ),
           ),
         prompt: (payload, promptOptions) =>
-          Effect.sync(reads.reset).pipe(Effect.andThen(runtime.prompt(payload, promptOptions))),
+          Effect.sync(reads.reset).pipe(
+            Effect.andThen(runtime.prompt(payload, promptOptions)),
+            // Updates sent before the response are projected before the turn reads its tools.
+            Effect.tap(() => updates.withPermit(Effect.void)),
+          ),
         handleSessionUpdate: (handler) => {
           projectUpdate = handler;
           return runtime.handleSessionUpdate((notification) =>
@@ -234,6 +281,19 @@ export function makeAntigravityAcpAdapterFlavor(
       ),
     // Loading history replays tool calls; resume avoids replay.
     subagentsIdleOnTurnCompletion: true,
+    // A still-running command is not painted completed when the turn ends.
+    extractBackgroundTaskId: (toolCall) =>
+      toolCall.kind === "execute" ? toolCall.toolCallId : undefined,
+    backgroundReattach: {
+      holdsTurn: antigravityBackgroundWorkHoldsTurn,
+      prompt: antigravityBackgroundContinuationPrompt,
+      ...(profileDirectory === undefined
+        ? {}
+        : {
+            watchWake: (sessionId: string) =>
+              watchAntigravityBackgroundWake(profileDirectory, sessionId),
+          }),
+    },
     ...(options.onSessionEvent === undefined ? {} : { onSessionEvent: options.onSessionEvent }),
     applyModelSelection: Effect.fn("AntigravityAdapterV2.applyModelSelection")(function* ({
       runtime,

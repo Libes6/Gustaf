@@ -27,10 +27,15 @@ describe("native Antigravity subagent tools", () => {
   it("recognizes only native invocation titles and excludes MCP tools", () => {
     const toolCall = { toolCallId: "trajectory:4", kind: "other", data: {} };
     for (const title of [
+      "start_subagent",
+      "invoke_subagent",
+      "manage_subagents",
       "Running start_subagent",
       "Run start_subagent?",
       "Running invoke_subagent",
       "Run invoke_subagent?",
+      "Running manage_subagents",
+      "Run manage_subagents?",
     ]) {
       expect(classifyAntigravitySubagentToolCall({ ...toolCall, title }, {})).toBe("subagent");
       expect(
@@ -42,7 +47,7 @@ describe("native Antigravity subagent tools", () => {
     }
     for (const title of [
       "Running subagent",
-      "start_subagent",
+      "mcp_start_subagent",
       "Run command",
       "Running manage_task",
     ]) {
@@ -288,6 +293,24 @@ describe("Antigravity tool results", () => {
         },
       },
     });
+    for (const rawOutput of [
+      "Tool is running as a background task with task id task-42",
+      { output: "Tool is running as a background task with task id task-42" },
+    ]) {
+      const launched = { ...toolCall, data: { ...toolCall.data, rawOutput } };
+      expect(normalizeAntigravityToolCall(launched).status).toBe("inProgress");
+      expect(normalizeAntigravityToolCall({ ...launched, status: "failed" }).status).toBe("failed");
+      expect(normalizeAntigravityToolCall({ ...launched, kind: "read" }).status).toBe("completed");
+    }
+    expect(
+      normalizeAntigravityToolCall({
+        ...toolCall,
+        data: {
+          ...toolCall.data,
+          rawOutput: "Tool is running as a background task\nCommand exited with code 0",
+        },
+      }).status,
+    ).toBe("completed");
     expect(toolCall.data.rawOutput).not.toHaveProperty("formatted_output");
     expect(commandCompleted.update.rawOutput.formatted_output).toBe("after\n");
   });

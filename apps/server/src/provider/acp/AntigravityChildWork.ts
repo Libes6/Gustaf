@@ -44,9 +44,14 @@ interface AntigravityChildLaunch {
   readonly prompt: string;
 }
 
-const decodeLaunchInput = Schema.decodeUnknownOption(
+const decodeLaunch = Schema.decodeUnknownOption(
   Schema.Struct({
-    Subagents: Schema.NonEmptyArray(Schema.Struct({ Role: Schema.String, Prompt: Schema.String })),
+    Role: Schema.optional(Schema.String),
+    role: Schema.optional(Schema.String),
+    TypeName: Schema.optional(Schema.String),
+    typeName: Schema.optional(Schema.String),
+    Prompt: Schema.optional(Schema.String),
+    prompt: Schema.optional(Schema.String),
   }),
 );
 
@@ -54,11 +59,28 @@ const decodeLaunchInput = Schema.decodeUnknownOption(
 export function antigravitySubagentLaunches(
   input: unknown,
 ): ReadonlyArray<AntigravityChildLaunch> | undefined {
-  return Option.getOrUndefined(
-    Option.map(decodeLaunchInput(input), (decoded) =>
-      decoded.Subagents.map((entry) => ({ role: entry.Role, prompt: entry.Prompt })),
-    ),
+  let parsed = input;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return undefined;
+    }
+  }
+  const batch = Predicate.isObject(parsed) ? (parsed.Subagents ?? parsed.subagents) : undefined;
+  const entries = Array.isArray(parsed) ? parsed : Array.isArray(batch) ? batch : [parsed];
+  const launches = entries.flatMap((entry) =>
+    Option.match(decodeLaunch(entry), {
+      onNone: () => [],
+      onSome: (launch) => {
+        const prompt = launch.Prompt ?? launch.prompt;
+        if (prompt === undefined || prompt.trim() === "") return [];
+        const role = launch.Role ?? launch.role ?? launch.TypeName ?? launch.typeName;
+        return [{ role: role?.trim() || "Subagent", prompt }];
+      },
+    }),
   );
+  return launches.length > 0 ? launches : undefined;
 }
 
 /** Batch title and prompt; reads match permission-prompt tool call ids against this exact text. */
