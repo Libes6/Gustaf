@@ -26,21 +26,31 @@ run(
   { env: { ...NodeProcess.env, CARGO_TARGET_DIR: target } },
 );
 
-// cef-dll-sys unpacks CEF into its build output, or uses CEF_PATH when one is set.
+const listDir = (dir) => (NodeFS.existsSync(dir) ? NodeFS.readdirSync(dir) : []);
+
+// cef-dll-sys unpacks CEF into its build output, or uses CEF_PATH when one is set. Cargo's build
+// output is build/cef-dll-sys-<hash>/out, or build/cef-dll-sys/<hash>/out since Rust 1.100.
 const findCef = () => {
-  if (NodeProcess.env.CEF_PATH) {
-    const versions = NodeFS.readdirSync(NodeProcess.env.CEF_PATH);
-    for (const version of versions) {
-      const dir = NodePath.join(NodeProcess.env.CEF_PATH, version, "cef_macos_aarch64");
-      if (NodeFS.existsSync(NodePath.join(dir, framework))) return dir;
+  const searched = [];
+  const cefPath = NodeProcess.env.CEF_PATH;
+  const roots = cefPath ? listDir(cefPath).map((version) => NodePath.join(cefPath, version)) : [];
+  const build = NodePath.join(target, "release", "build");
+  for (const name of listDir(build)) {
+    if (name.startsWith("cef-dll-sys-")) roots.push(NodePath.join(build, name, "out"));
+    if (name === "cef-dll-sys") {
+      for (const hash of listDir(NodePath.join(build, name))) {
+        roots.push(NodePath.join(build, name, hash, "out"));
+      }
     }
   }
-  const build = NodePath.join(target, "release", "build");
-  const candidates = NodeFS.readdirSync(build)
-    .filter((name) => name.startsWith("cef-dll-sys-"))
-    .map((name) => NodePath.join(build, name, "out", "cef_macos_aarch64"))
-    .filter((dir) => NodeFS.existsSync(NodePath.join(dir, framework)));
-  if (candidates.length === 0) throw new Error("No CEF download found; build the shell first.");
+  const candidates = roots
+    .map((root) => NodePath.join(root, "cef_macos_aarch64"))
+    .filter((dir) => (searched.push(dir), NodeFS.existsSync(NodePath.join(dir, framework))));
+  if (candidates.length === 0) {
+    throw new Error(
+      `No CEF download found; build the shell first. Searched ${build} and:\n${searched.join("\n")}`,
+    );
+  }
   return candidates.sort((a, b) => NodeFS.statSync(b).mtimeMs - NodeFS.statSync(a).mtimeMs)[0];
 };
 const cef = findCef();
