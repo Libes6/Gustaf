@@ -448,8 +448,8 @@ fn ensure_trailing_slash(url: &str) -> String {
 mod tests {
     use super::{
         advertised_endpoints_json, ensure_trailing_slash, is_host_only_interface,
-        is_tailscale_cgnat, is_vpn_fake_ip, lan_ipv4_addresses, parse_windows_ipconfig,
-        NetworkSnapshot,
+        is_tailscale_cgnat, is_vpn_fake_ip, lan_ipv4_addresses, parse_ifconfig_ipv4,
+        parse_ip_addr_ipv4, parse_windows_ipconfig, NetworkSnapshot,
     };
     use std::net::Ipv4Addr;
 
@@ -664,6 +664,39 @@ Drahtlos-LAN-Adapter WLAN:
             lan_ipv4_addresses(&interfaces),
             ["192.168.1.5", "10.0.0.7", "203.0.113.9"]
         );
+    }
+
+    #[test]
+    fn every_private_address_of_ifconfig_and_ip_output_is_advertised() {
+        let ifconfig = "\
+lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384
+\tinet 127.0.0.1 netmask 0xff000000
+\tinet6 ::1 prefixlen 128
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+\tether aa:bb:cc:dd:ee:ff
+\tinet 192.168.1.5 netmask 0xffffff00 broadcast 192.168.1.255
+en1: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+\tinet 10.0.0.7 netmask 0xffffff00 broadcast 10.0.0.255
+bridge100: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+\tinet 192.168.64.1 netmask 0xffffff00 broadcast 192.168.64.255
+utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1280
+\tinet 198.18.0.1 --> 198.18.0.1 netmask 0xffffffff
+";
+        let ip_addr = "\
+1: lo    inet 127.0.0.1/8 scope host lo\\       valid_lft forever preferred_lft forever
+2: eth0    inet 192.168.1.5/24 brd 192.168.1.255 scope global eth0\\       valid_lft forever
+2: eth0    inet 10.0.0.7/24 scope global secondary eth0\\       valid_lft forever
+3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\\       valid_lft forever
+";
+        let from_ifconfig = parse_ifconfig_ipv4(ifconfig);
+        assert_eq!(from_ifconfig.len(), 5);
+        assert_eq!(
+            lan_ipv4_addresses(&from_ifconfig),
+            ["192.168.1.5", "10.0.0.7"]
+        );
+        let from_ip = parse_ip_addr_ipv4(ip_addr);
+        assert_eq!(from_ip.len(), 4);
+        assert_eq!(lan_ipv4_addresses(&from_ip), ["192.168.1.5", "10.0.0.7"]);
     }
 
     #[test]
