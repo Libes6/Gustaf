@@ -242,7 +242,7 @@ fn apply_with_relaunch(
     Ok(value)
 }
 
-fn read_settings(app: &tauri::AppHandle) -> ShellSettings {
+pub(crate) fn read_settings(app: &tauri::AppHandle) -> ShellSettings {
     if let Some(managed) = app.try_state::<Mutex<ShellSettings>>() {
         if let Ok(guard) = managed.lock() {
             return guard.clone();
@@ -251,7 +251,7 @@ fn read_settings(app: &tauri::AppHandle) -> ShellSettings {
     shell_settings::load(app)
 }
 
-fn write_settings(app: &tauri::AppHandle, settings: &ShellSettings) -> Result<(), String> {
+pub(crate) fn write_settings(app: &tauri::AppHandle, settings: &ShellSettings) -> Result<(), String> {
     shell_settings::save(app, settings)?;
     if let Some(managed) = app.try_state::<Mutex<ShellSettings>>() {
         if let Ok(mut guard) = managed.lock() {

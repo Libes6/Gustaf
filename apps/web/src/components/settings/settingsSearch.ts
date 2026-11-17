@@ -1107,6 +1107,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "browser-built-in",
+    title: "Built-in browser",
+    to: "/settings/browser",
+    macOnly: true,
+    shellAccountOnly: true,
+    searchTerms: ["chromium cef module remove install disk space agent same tab"],
+  },
+  {
     id: "browser-auto-show-floating-preview",
     title: "Show what agents open",
     to: "/settings/browser",

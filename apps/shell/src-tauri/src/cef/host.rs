@@ -20,7 +20,8 @@ use std::sync::OnceLock;
 use cef::{args::Args, *};
 use objc2::ffi;
 use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
-use objc2::{msg_send, sel, MainThreadMarker};
+use objc2::rc::Retained;
+use objc2::{class, msg_send, sel, MainThreadMarker};
 use objc2_app_kit::NSApplication;
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use serde_json::{json, Value};
@@ -74,6 +75,9 @@ struct Tab {
     /// Calls the host makes for itself; ids below `RELAY_FIRST_ID`.
     own: HashMap<i64, Reply>,
     next_own: i64,
+    /// The agent's pointer over the page, and where in the page it points.
+    pointer: Option<Retained<AnyObject>>,
+    pointer_at: Option<(f64, f64)>,
 }
 
 const RELAY_FIRST_ID: i64 = 1_000_000;
@@ -397,6 +401,7 @@ wrap_life_span_handler! {
         }
 
         fn on_before_close(&self, _browser: Option<&mut Browser>) {
+            hide_pointer(&self.tab_id);
             TABS.with(|tabs| tabs.borrow_mut().remove(&self.tab_id));
             emit(HostEvent::Detached { tab_id: self.tab_id.clone() });
         }
@@ -607,6 +612,118 @@ pub fn present(tab_id: &str, rect: Option<Rect>, corner_radius: f64) {
     if let Some(host) = browser_of(tab_id).and_then(|browser| browser.host()) {
         host.was_hidden(rect.is_none().into());
         host.was_resized();
+    }
+    place_pointer(tab_id, false);
+}
+
+const POINTER_SIZE: f64 = 22.0;
+
+/// The agent's pointer: a system arrow drawn above the tab, since the page cannot draw over a
+/// native view. It moves only when the agent does; nothing animates on its own.
+pub fn point(tab_id: &str, x: f64, y: f64, click: bool) {
+    let exists = TABS.with(|tabs| {
+        let mut tabs = tabs.borrow_mut();
+        let Some(tab) = tabs.get_mut(tab_id) else {
+            return false;
+        };
+        tab.pointer_at = Some((x, y));
+        tab.pointer.is_some()
+    });
+    if !exists {
+        let Some(pointer) = make_pointer() else {
+            return;
+        };
+        TABS.with(|tabs| {
+            if let Some(tab) = tabs.borrow_mut().get_mut(tab_id) {
+                tab.pointer = Some(pointer);
+            }
+        });
+    }
+    place_pointer(tab_id, click);
+}
+
+pub fn hide_pointer(tab_id: &str) {
+    let pointer = TABS.with(|tabs| {
+        let mut tabs = tabs.borrow_mut();
+        let tab = tabs.get_mut(tab_id)?;
+        tab.pointer_at = None;
+        tab.pointer.take()
+    });
+    if let Some(pointer) = pointer {
+        // SAFETY: our own view, on the main thread.
+        unsafe {
+            let _: () = msg_send![&*pointer, removeFromSuperview];
+        }
+    }
+}
+
+fn make_pointer() -> Option<Retained<AnyObject>> {
+    // SAFETY: AppKit calls on the main thread with their documented argument types.
+    unsafe {
+        let name = objc2_foundation::NSString::from_str("cursorarrow");
+        let image: *mut AnyObject = msg_send![
+            class!(NSImage),
+            imageWithSystemSymbolName: &*name,
+            accessibilityDescription: std::ptr::null::<AnyObject>()
+        ];
+        if image.is_null() {
+            return None;
+        }
+        let view: Retained<AnyObject> = msg_send![class!(NSImageView), new];
+        let _: () = msg_send![&*view, setImage: image];
+        let color: *mut AnyObject = msg_send![class!(NSColor), systemBlueColor];
+        let _: () = msg_send![&*view, setContentTintColor: color];
+        Some(view)
+    }
+}
+
+/// Puts the pointer at its page point over the tab's view, in the same parent, on top.
+fn place_pointer(tab_id: &str, click: bool) {
+    let (pointer, at) = TABS.with(|tabs| {
+        tabs.borrow()
+            .get(tab_id)
+            .map(|tab| (tab.pointer.clone(), tab.pointer_at))
+            .unwrap_or((None, None))
+    });
+    let (Some(pointer), Some((x, y))) = (pointer, at) else {
+        return;
+    };
+    let Some(view) = view_of(tab_id) else {
+        return;
+    };
+    // SAFETY: CEF's view and our pointer view, on the main thread.
+    unsafe {
+        let hidden: bool = msg_send![view, isHidden];
+        let parent: *mut AnyObject = msg_send![view, superview];
+        if hidden || parent.is_null() {
+            let _: () = msg_send![&*pointer, setHidden: true];
+            return;
+        }
+        let tab_frame: NSRect = msg_send![view, frame];
+        let flipped: bool = msg_send![parent, isFlipped];
+        // The arrow's tip is the image's top left corner.
+        let y = if flipped {
+            tab_frame.origin.y + y
+        } else {
+            tab_frame.origin.y + tab_frame.size.height - y - POINTER_SIZE
+        };
+        let frame = NSRect::new(
+            NSPoint::new(tab_frame.origin.x + x, y),
+            NSSize::new(POINTER_SIZE, POINTER_SIZE),
+        );
+        let current: *mut AnyObject = msg_send![&*pointer, superview];
+        if current != parent {
+            // NSWindowAbove = 1: above the tab's view.
+            let _: () = msg_send![parent, addSubview: &*pointer, positioned: 1isize, relativeTo: view];
+        }
+        let _: () = msg_send![&*pointer, setFrame: frame];
+        let _: () = msg_send![&*pointer, setHidden: false];
+        let tint: *mut AnyObject = if click {
+            msg_send![class!(NSColor), systemOrangeColor]
+        } else {
+            msg_send![class!(NSColor), systemBlueColor]
+        };
+        let _: () = msg_send![&*pointer, setContentTintColor: tint];
     }
 }
 

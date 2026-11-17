@@ -236,8 +236,38 @@ fn on_command(command: Value) {
                 host::from_client(&tab, command["message"].as_str().unwrap_or_default());
             }
         }
-        // The agent's pointer overlay and focus keeping are not drawn yet.
-        Some("pointer" | "turn" | "release") | None => {}
+        Some("pointer") => {
+            if let Some(tab) = shell_tab_of(&server(&command)) {
+                let (Some(x), Some(y)) = (command["x"].as_f64(), command["y"].as_f64()) else {
+                    return;
+                };
+                host::point(&tab, x, y, command["phase"].as_str() == Some("click"));
+            }
+        }
+        Some("release") => {
+            if let Some(tab) = shell_tab_of(&server(&command)) {
+                host::hide_pointer(&tab);
+            }
+        }
+        // A turn that ends takes the agent's pointers off its thread's tabs.
+        Some("turn") => {
+            if command["active"].as_bool() == Some(false) {
+                let thread = command["threadId"].as_str().unwrap_or_default();
+                let tabs: Vec<String> = TABS.with(|tabs| {
+                    tabs.borrow()
+                        .iter()
+                        .filter(|(_, tab)| {
+                            tab.server.as_ref().is_some_and(|server| server.thread_id == thread)
+                        })
+                        .map(|(id, _)| id.clone())
+                        .collect()
+                });
+                for tab in tabs {
+                    host::hide_pointer(&tab);
+                }
+            }
+        }
+        None => {}
         Some(other) => eprintln!("[cef] unknown command {other}"),
     }
 }

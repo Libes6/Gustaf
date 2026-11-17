@@ -1,5 +1,6 @@
 mod account;
 mod bridge;
+mod browser_module;
 mod cli_command;
 mod cloud_api;
 mod computer_use;
@@ -512,6 +513,9 @@ pub fn run() {
             cli_command::cli_command_add_to_path,
             account::client_config,
             account::account_report_problem,
+            browser_module::browser_module_state,
+            browser_module::browser_module_remove,
+            browser_module::browser_module_install,
             native_browser::native_browser_create,
             native_browser::native_browser_close,
             native_browser::native_browser_close_all,
@@ -536,6 +540,7 @@ pub fn run() {
             app.manage(Mutex::new(settings.clone()));
             #[allow(unused_mut)]
             let mut server_env = computer_use::initialize(app.handle(), &settings);
+            browser_module::apply_removal(app.handle());
             #[cfg(all(target_os = "macos", feature = "cef-browser"))]
             if let Some(socket) = cef::start(app.handle()) {
                 server_env.push((

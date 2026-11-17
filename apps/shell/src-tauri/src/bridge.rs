@@ -199,8 +199,19 @@ const INIT_SCRIPT: &str = r#"(() => {
     });
   })();
 
+  // Remove or reinstall the built-in browser (browser_module.rs); each restarts the app.
+  const builtInBrowser =
+    __GUSTAF_PLATFORM__ === "darwin"
+      ? Object.freeze({
+          state: () => invoke("browser_module_state"),
+          remove: () => invoke("browser_module_remove"),
+          install: () => invoke("browser_module_install"),
+        })
+      : undefined;
+
   window.desktopBridge = {
     ...(nativeBrowser ? { nativeBrowser } : {}),
+    ...(builtInBrowser ? { builtInBrowser } : {}),
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
     setNotificationBadge: async () => {},

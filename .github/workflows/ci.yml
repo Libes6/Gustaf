@@ -205,7 +205,8 @@ jobs:
           version=$(jq -er .version apps/shell/src-tauri/tauri.conf.json)
           test "$GITHUB_REF_NAME" = "v$version"
           mapfile -t installers < <(find release-assets -type f -print | sort)
-          test "${#installers[@]}" -eq 13
+          # 13 installers and the macOS built-in browser archive (stage-release.mjs).
+          test "${#installers[@]}" -eq 14
           # The `gustaf` CLI for each desktop platform; cliArchiveFileName in packages/shared/src/cliRelease.ts.
           mapfile -t archives < <(find downloaded -path 'downloaded/cli-*' -type f -print | sort)
           test "${#archives[@]}" -eq 3
