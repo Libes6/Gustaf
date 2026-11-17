@@ -6,6 +6,7 @@ import {
   SecretProviderId,
   ServerSettings as ServerSettingsSchema,
 } from "@t3tools/contracts";
+import type { NativeMcpSources } from "@t3tools/provider-core/server/mcpSession";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
@@ -44,7 +45,7 @@ const resolve = (
     readonly platform?: NodeJS.Platform;
     readonly environment?: NodeJS.ProcessEnv;
     readonly native?: {
-      readonly sources: McpUserServers.NativeMcpSessionSources;
+      readonly sources: NativeMcpSources;
       readonly servers: ReadonlyArray<NativeMcpServer>;
     };
   } = {},

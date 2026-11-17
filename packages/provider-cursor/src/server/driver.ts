@@ -13,6 +13,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import { readCursorUsageLimits } from "./usageLimits.ts";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { makeCursorTextGeneration } from "./textGeneration.ts";
 import { makeCursorAdapterV2, type CursorAdapterV2DriverEnv } from "./adapter.ts";
 import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
@@ -300,7 +301,17 @@ export const CursorDriver: ProviderDriver<
                 ),
               ),
             ]).pipe(Effect.map(([machineSnapshot, skills]) => ({ ...machineSnapshot, skills }))),
-      orchestrationAdapter,
+      orchestrationAdapter: {
+        ...orchestrationAdapter,
+        // The SDK loads user settings, `~/.cursor/mcp.json` among them; home as skills resolve it.
+        nativeMcpSources: {
+          provider: "cursor",
+          homeDir:
+            processEnv.HOME?.trim() ||
+            processEnv.USERPROFILE?.trim() ||
+            (yield* HostProcess.HomeDirectory),
+        },
+      },
       textGeneration,
     } satisfies ProviderInstance;
   }),

@@ -1159,134 +1159,173 @@ describe("AcpRegistryAdapterV2", () => {
     }).pipe(Effect.provide(layerTest), Effect.scoped),
   );
 
-  it.effect("gives Copilot T3's MCP server over HTTP when it advertises HTTP", () =>
-    Effect.gen(function* () {
-      const selfInvocation = yield* resolveSelfInvocation();
-      const mockAgentPath = yield* (yield* Path.Path).fromFileUrl(
-        new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
-      );
-      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
-      const endpoint = "http://127.0.0.1:43123/mcp";
-      const sessionMcpServers = Effect.fn("sessionMcpServers")(function* (
-        config: Record<string, unknown>,
-        agentEnvironment: Record<string, string> = {},
-      ) {
-        const requests: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];
-        const instanceId = ProviderInstanceId.make("acp-registry-mcp-transport");
-        const threadId = ThreadId.make("thread-acp-registry-mcp-transport");
-        const mcpSession = {
-          environmentId: EnvironmentId.make("environment-acp-registry-mcp-transport"),
-          threadId,
-          providerSessionId: "mcp-session-acp-registry-mcp-transport",
-          providerInstanceId: instanceId,
-          endpoint,
-          browserToolsAvailable: false,
-        };
-        yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer opened-token" });
-        const adapter = yield* makeAcpRegistryAdapterV2({
-          selfInvocation,
-          instanceId,
-          settings: yield* decodeAcpRegistryAdapterSettings(config),
-          environment: {},
-          nativeLogging: () => ({
-            requestLogger: (event) =>
-              Effect.sync(() => {
-                if (event.status === "started") requests.push(event);
-              }),
-          }),
-        }).pipe(
-          Effect.provide(
-            Layer.mock(AcpRegistrySupport.AcpRegistryCatalog)({
-              resolve: () =>
-                Effect.succeed({
-                  distribution: "local" as const,
-                  spawn: {
-                    command: process.execPath,
-                    args: [mockAgentPath],
-                    env: { T3_ACP_SESSION_LIFECYCLE: "1", ...agentEnvironment },
-                  },
+  it.effect(
+    "gives Copilot T3's MCP server over HTTP when it advertises HTTP, with user servers",
+    () =>
+      Effect.gen(function* () {
+        const selfInvocation = yield* resolveSelfInvocation();
+        const mockAgentPath = yield* (yield* Path.Path).fromFileUrl(
+          new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
+        );
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const endpoint = "http://127.0.0.1:43123/mcp";
+        const sessionMcpServers = Effect.fn("sessionMcpServers")(function* (
+          config: Record<string, unknown>,
+          agentEnvironment: Record<string, string> = {},
+        ) {
+          const requests: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];
+          const instanceId = ProviderInstanceId.make("acp-registry-mcp-transport");
+          const threadId = ThreadId.make("thread-acp-registry-mcp-transport");
+          const mcpSession = {
+            environmentId: EnvironmentId.make("environment-acp-registry-mcp-transport"),
+            threadId,
+            providerSessionId: "mcp-session-acp-registry-mcp-transport",
+            providerInstanceId: instanceId,
+            endpoint,
+            browserToolsAvailable: false,
+            userServers: [
+              {
+                type: "stdio" as const,
+                id: "blender",
+                command: "uvx",
+                args: ["blender-mcp"],
+                env: { TOKEN: "stdio-secret" },
+                cwd: process.cwd(),
+              },
+              {
+                type: "http" as const,
+                id: "figma",
+                url: "https://mcp.figma.test/mcp",
+                headers: { Authorization: "Bearer figma" },
+              },
+            ],
+          };
+          yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer opened-token" });
+          const adapter = yield* makeAcpRegistryAdapterV2({
+            selfInvocation,
+            instanceId,
+            settings: yield* decodeAcpRegistryAdapterSettings(config),
+            environment: {},
+            nativeLogging: () => ({
+              requestLogger: (event) =>
+                Effect.sync(() => {
+                  if (event.status === "started") requests.push(event);
                 }),
             }),
-          ),
-        );
-        const modelSelection = { instanceId, model: "default" } as const;
-        const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-          runtimeMode: "full-access",
-          interactionMode: "default",
-          cwd: process.cwd(),
-        });
-        const runtime = yield* adapter.openSession({
-          threadId,
-          providerSessionId: ProviderSessionId.make("provider-session-acp-registry-mcp-transport"),
-          modelSelection,
-          runtimePolicy,
-        });
-        const providerThread = yield* runtime.ensureThread({
-          threadId,
-          modelSelection,
-          runtimePolicy,
-        });
-        yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer rotated-token" });
-        yield* runtime.resumeThread({
-          providerThread: {
-            ...providerThread,
-            nativeThreadRef: {
-              driver: ACP_REGISTRY_PROVIDER,
-              nativeId: "mock-session-2",
-              strength: "strong",
+          }).pipe(
+            Effect.provide(
+              Layer.mock(AcpRegistrySupport.AcpRegistryCatalog)({
+                resolve: () =>
+                  Effect.succeed({
+                    distribution: "local" as const,
+                    spawn: {
+                      command: process.execPath,
+                      args: [mockAgentPath],
+                      env: { T3_ACP_SESSION_LIFECYCLE: "1", ...agentEnvironment },
+                    },
+                  }),
+              }),
+            ),
+          );
+          const modelSelection = { instanceId, model: "default" } as const;
+          const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            cwd: process.cwd(),
+          });
+          const runtime = yield* adapter.openSession({
+            threadId,
+            providerSessionId: ProviderSessionId.make(
+              "provider-session-acp-registry-mcp-transport",
+            ),
+            modelSelection,
+            runtimePolicy,
+          });
+          const providerThread = yield* runtime.ensureThread({
+            threadId,
+            modelSelection,
+            runtimePolicy,
+          });
+          yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer rotated-token" });
+          yield* runtime.resumeThread({
+            providerThread: {
+              ...providerThread,
+              nativeThreadRef: {
+                driver: ACP_REGISTRY_PROVIDER,
+                nativeId: "mock-session-2",
+                strength: "strong",
+              },
             },
-          },
+          });
+          const sent = (method: string) => {
+            const payload = requests.find((event) => event.method === method)?.payload;
+            return typeof payload === "object" && payload !== null
+              ? Reflect.get(payload, "mcpServers")
+              : undefined;
+          };
+          return { new: sent("session/new"), load: sent("session/load") };
         });
-        const sent = (method: string) => {
-          const payload = requests.find((event) => event.method === method)?.payload;
-          return typeof payload === "object" && payload !== null
-            ? Reflect.get(payload, "mcpServers")
-            : undefined;
-        };
-        return { new: sent("session/new"), load: sent("session/load") };
-      });
-      const http = (authorization: string) => [
-        {
-          type: "http",
-          name: "t3-code",
-          url: endpoint,
-          headers: [{ name: "Authorization", value: authorization }],
-        },
-      ];
-      const stdio = (authorization: string) => [
-        {
-          name: "t3-code",
-          command: selfInvocation.command,
-          args: [...selfInvocationArgs(selfInvocation, ["acp-mcp-bridge"])],
-          env: [
-            { name: "ELECTRON_RUN_AS_NODE", value: "1" },
-            { name: "T3_ACP_MCP_ENDPOINT", value: endpoint },
-            { name: "T3_ACP_MCP_AUTHORIZATION", value: authorization },
-          ],
-        },
-      ];
+        const http = (authorization: string) => [
+          {
+            type: "http",
+            name: "t3-code",
+            url: endpoint,
+            headers: [{ name: "Authorization", value: authorization }],
+          },
+        ];
+        const stdio = (authorization: string) => [
+          {
+            name: "t3-code",
+            command: selfInvocation.command,
+            args: [...selfInvocationArgs(selfInvocation, ["acp-mcp-bridge"])],
+            env: [
+              { name: "ELECTRON_RUN_AS_NODE", value: "1" },
+              { name: "T3_ACP_MCP_ENDPOINT", value: endpoint },
+              { name: "T3_ACP_MCP_AUTHORIZATION", value: authorization },
+            ],
+          },
+        ];
 
-      assert.deepEqual(
-        yield* sessionMcpServers({ agentId: "github-copilot-cli" }, { T3_ACP_MCP_HTTP: "1" }),
-        { new: http("Bearer opened-token"), load: http("Bearer rotated-token") },
-      );
-      const acp = [{ type: "acp", name: "t3-code", serverId: "t3-code" }];
-      assert.deepEqual(
-        yield* sessionMcpServers(
-          { agentId: "github-copilot-cli" },
-          { T3_ACP_MCP_HTTP: "1", T3_ACP_MCP_ACP: "1" },
-        ),
-        { new: acp, load: acp },
-      );
-      assert.deepEqual(yield* sessionMcpServers({ agentId: "github-copilot-cli" }), {
-        new: stdio("Bearer opened-token"),
-        load: stdio("Bearer rotated-token"),
-      });
-      assert.deepEqual(yield* sessionMcpServers({ agentId: "gemini" }, { T3_ACP_MCP_HTTP: "1" }), {
-        new: stdio("Bearer opened-token"),
-        load: stdio("Bearer rotated-token"),
-      });
-    }).pipe(Effect.provide(layerTest), Effect.scoped),
+        const userStdio = {
+          name: "blender",
+          command: "uvx",
+          args: ["blender-mcp"],
+          env: [{ name: "TOKEN", value: "stdio-secret" }],
+        };
+        const userHttp = {
+          type: "http",
+          name: "figma",
+          url: "https://mcp.figma.test/mcp",
+          headers: [{ name: "Authorization", value: "Bearer figma" }],
+        };
+        // Copilot refuses stdio servers; HTTP ones need the agent to advertise HTTP.
+        assert.deepEqual(
+          yield* sessionMcpServers({ agentId: "github-copilot-cli" }, { T3_ACP_MCP_HTTP: "1" }),
+          {
+            new: [...http("Bearer opened-token"), userHttp],
+            load: [...http("Bearer rotated-token"), userHttp],
+          },
+        );
+        const acp = [{ type: "acp", name: "t3-code", serverId: "t3-code" }, userHttp];
+        assert.deepEqual(
+          yield* sessionMcpServers(
+            { agentId: "github-copilot-cli" },
+            { T3_ACP_MCP_HTTP: "1", T3_ACP_MCP_ACP: "1" },
+          ),
+          { new: acp, load: acp },
+        );
+        assert.deepEqual(yield* sessionMcpServers({ agentId: "github-copilot-cli" }), {
+          new: stdio("Bearer opened-token"),
+          load: stdio("Bearer rotated-token"),
+        });
+        assert.deepEqual(
+          yield* sessionMcpServers({ agentId: "gemini" }, { T3_ACP_MCP_HTTP: "1" }),
+          {
+            new: [...stdio("Bearer opened-token"), userStdio, userHttp],
+            load: [...stdio("Bearer rotated-token"), userStdio, userHttp],
+          },
+        );
+      }).pipe(Effect.provide(layerTest), Effect.scoped),
   );
 
   it.effect("the agent process env names the thread it serves", () =>

@@ -1,6 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off - pure native path normalization also supports Windows configs.
 import * as NodePath from "node:path";
 
+import type { NativeMcpSources } from "@t3tools/provider-core/server/mcpSession";
+
 import type { NativeMcpServer } from "./nativeMcp.ts";
 
 export type NativeMcpCandidate = Pick<NativeMcpServer, "name"> &
@@ -62,7 +64,7 @@ export const findNativeDuplicate = (
     return false;
   });
 
-export type NativeMcpProvider = "claudeAgent" | "codex" | "cursor" | "gemini";
+export type NativeMcpProvider = NativeMcpSources["provider"];
 
 export const nativeServersForProvider = (
   provider: NativeMcpProvider,

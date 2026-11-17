@@ -17,6 +17,8 @@ import {
 
 export interface NativeMcpConfigLocations {
   readonly homeDir: string;
+  /** CODEX_HOME; defaults to `<homeDir>/.codex`. */
+  readonly codexHome?: string;
   readonly projectDir?: string;
 }
 
@@ -40,12 +42,19 @@ const make = Effect.gen(function* () {
 
   const list = Effect.fn("NativeMcpConfigs.list")(function* ({
     homeDir,
+    codexHome,
     projectDir,
   }: NativeMcpConfigLocations) {
     const home = path.resolve(homeDir);
     const project = projectDir === undefined ? undefined : path.resolve(projectDir);
     const files = [
-      { path: path.join(home, ".codex/config.toml"), parse: parseCodexConfig },
+      {
+        path: path.join(
+          codexHome === undefined ? path.join(home, ".codex") : path.resolve(codexHome),
+          "config.toml",
+        ),
+        parse: parseCodexConfig,
+      },
       { path: path.join(home, ".cursor/mcp.json"), parse: parseCursorConfig },
       { path: path.join(home, ".claude.json"), parse: parseClaudeConfig },
       { path: path.join(home, ".gemini/settings.json"), parse: parseGeminiConfig },

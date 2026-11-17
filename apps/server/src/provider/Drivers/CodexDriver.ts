@@ -381,7 +381,15 @@ export const CodexDriver: ProviderDriver<
       snapshot,
       snapshotForCwd,
       consumeResetCredit,
-      orchestrationAdapter,
+      orchestrationAdapter: {
+        ...orchestrationAdapter,
+        // Shadow homes link config.toml from the shared home.
+        nativeMcpSources: {
+          provider: "codex",
+          homeDir: yield* HostProcess.HomeDirectory,
+          codexHome: homeLayout.effectiveHomePath ?? homeLayout.sharedHomePath,
+        },
+      },
       textGeneration,
     } satisfies ProviderInstance;
   }),

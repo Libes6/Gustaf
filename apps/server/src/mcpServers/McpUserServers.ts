@@ -6,7 +6,7 @@ import {
   type SecretReference,
   type SettingsSecretValue,
 } from "@t3tools/contracts";
-import type { McpUserServer } from "@t3tools/provider-core/server/mcpSession";
+import type { McpUserServer, NativeMcpSources } from "@t3tools/provider-core/server/mcpSession";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
@@ -19,19 +19,12 @@ import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
 import {
   findNativeDuplicate,
   nativeServersForProvider,
-  type NativeMcpProvider,
   toMcpServerName,
 } from "./import/matcher.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 /** A user MCP server ready to hand a provider; the provider starts it. */
 export type ResolvedMcpServer = McpUserServer & { readonly id: McpServerId };
-
-export interface NativeMcpSessionSources {
-  readonly provider: NativeMcpProvider;
-  readonly homeDir: string;
-  readonly includeProjectMcpJson?: boolean;
-}
 
 export class McpUserServers extends Context.Service<
   McpUserServers,
@@ -45,10 +38,10 @@ export class McpUserServers extends Context.Service<
       /** The thread's working directory: its worktree when it has one. */
       readonly cwd: string;
       /**
-       * Set when the provider also loads its own native MCP config from `homeDir`: a server it
-       * already loads is left out so it does not start twice. Omit for isolated provider homes.
+       * Set when the provider also loads its own native MCP config: a server it already loads is
+       * left out so it does not start twice. Omit for isolated provider homes.
        */
-      readonly native?: NativeMcpSessionSources;
+      readonly native?: NativeMcpSources;
     }) => Effect.Effect<ReadonlyArray<ResolvedMcpServer>>;
   }
 >()("t3/mcpServers/McpUserServers") {}
@@ -62,11 +55,12 @@ const make = Effect.gen(function* () {
   const nativeConfigs = yield* NativeMcpConfigs;
 
   const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
-    native: NativeMcpSessionSources,
+    native: NativeMcpSources,
     cwd: string,
   ) {
     const { servers, errors } = yield* nativeConfigs.list({
       homeDir: native.homeDir,
+      ...(native.codexHome === undefined ? {} : { codexHome: native.codexHome }),
       projectDir: cwd,
     });
     if (errors.length > 0) {
@@ -89,7 +83,7 @@ const make = Effect.gen(function* () {
   const resolveForThread = Effect.fn("McpUserServers.resolveForThread")(function* (input: {
     readonly projectId: ProjectId;
     readonly cwd: string;
-    readonly native?: NativeMcpSessionSources;
+    readonly native?: NativeMcpSources;
   }) {
     const current = yield* settings.getSettings.pipe(
       Effect.catchTags({

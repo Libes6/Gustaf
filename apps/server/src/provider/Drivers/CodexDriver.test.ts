@@ -479,7 +479,7 @@ it.layer(layerTest)("CodexDriver", (it) => {
     }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn), Effect.scoped),
   );
 
-  it.effect("uses each instance's environment CODEX_HOME for continuation", () =>
+  it.effect("uses each instance's environment CODEX_HOME for continuation and native MCP", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-codex-driver-" });
@@ -493,6 +493,10 @@ it.layer(layerTest)("CodexDriver", (it) => {
           config: CodexDriver.defaultConfig(),
         });
         expect(instance.continuationIdentity.continuationKey).toBe(`codex:home:${codexHome}`);
+        expect(instance.orchestrationAdapter.nativeMcpSources).toMatchObject({
+          provider: "codex",
+          codexHome,
+        });
       }
     }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn), Effect.scoped),
   );

@@ -213,6 +213,14 @@ enabled = false
             [jsonPath, "decode"],
           ],
         );
+        const codexHome = path.join(path.dirname(homeDir), "codex-home");
+        yield* write(path.join(codexHome, "config.toml"), '[mcp_servers.custom]\ncommand = "node"');
+        assert.deepEqual(
+          (yield* service.list({ homeDir, codexHome })).servers
+            .filter((server) => server.source === "codex")
+            .map((server) => server.name),
+          ["custom"],
+        );
       }).pipe(Effect.provide(testLayer)),
   );
 

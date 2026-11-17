@@ -5,6 +5,7 @@ import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
   EnvironmentId,
+  McpServerId,
   type ModelSelection,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
@@ -40,6 +41,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
+import * as McpUserServers from "../mcpServers/McpUserServers.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
@@ -441,6 +443,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly beforeUnload?: Effect.Effect<void>;
     readonly spawnBeforeOpen?: boolean;
     readonly scopeCloseReached?: Deferred.Deferred<void>;
+    readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
   } = {},
 ) {
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -460,6 +463,9 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: ProviderInstanceId.make("codex"),
     driver: CODEX_DRIVER,
+    ...(options.nativeMcpSources === undefined
+      ? {}
+      : { nativeMcpSources: options.nativeMcpSources }),
     getCapabilities: () => Effect.succeed(options.capabilities ?? CodexCapabilities),
     planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
     openSession: (input) =>
@@ -605,6 +611,8 @@ function layerTest(input: {
   readonly scopeCloseReached?: Deferred.Deferred<void>;
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
+  readonly mcpUserServersLayer?: Layer.Layer<McpUserServers.McpUserServers>;
+  readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -644,6 +652,7 @@ function layerTest(input: {
       ...(input.scopeCloseReached === undefined
         ? {}
         : { scopeCloseReached: input.scopeCloseReached }),
+      ...(input.nativeMcpSources === undefined ? {} : { nativeMcpSources: input.nativeMcpSources }),
     }).pipe(Effect.map(ProviderAdapterRegistry.layerSingle)),
   );
   const layerConfiguredMcpRegistry =
@@ -689,6 +698,7 @@ function layerTest(input: {
           layerTestStores,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
+          ...(input.mcpUserServersLayer === undefined ? [] : [input.mcpUserServersLayer]),
         ),
       ),
     ),
@@ -2190,6 +2200,118 @@ it.effect(
             serverSettingsLayer: ServerSettings.layerTest({
               enableAgentBrowserAccess: false,
             }).pipe(Layer.orDie),
+          }),
+        ),
+      );
+    }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 hands each session the thread's user MCP servers without the provider's native ones",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      const projectId = ProjectId.make("project-provider-session-manager-user-mcp");
+      const native = {
+        provider: "codex",
+        homeDir: "/home/user",
+        codexHome: "/home/user/.codex-work",
+      } satisfies McpProviderSession.NativeMcpSources;
+      const figma = {
+        type: "http",
+        id: "figma",
+        url: "https://mcp.figma.test/mcp",
+        headers: { Authorization: "Bearer one" },
+      } satisfies McpProviderSession.McpUserServer;
+      const enabled = yield* Ref.make<ReadonlyArray<McpProviderSession.McpUserServer>>([figma]);
+      const requests = yield* Ref.make<
+        ReadonlyArray<Parameters<McpUserServers.McpUserServers["Service"]["resolveForThread"]>[0]>
+      >([]);
+      const mcpUserServersLayer = Layer.succeed(McpUserServers.McpUserServers, {
+        resolveForThread: (request) =>
+          Ref.update(requests, (current) => [...current, request]).pipe(
+            Effect.andThen(Ref.get(enabled)),
+            Effect.map((servers) =>
+              servers.map((server) => ({ ...server, id: McpServerId.make(server.id) })),
+            ),
+          ),
+      });
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const now = yield* DateTime.now;
+        const owner = ThreadId.make("thread-provider-session-manager-user-mcp-owner");
+        const joiner = ThreadId.make("thread-provider-session-manager-user-mcp-joiner");
+        const sessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId: owner,
+        });
+        const replacementSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId: owner,
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: owner, now, projectId }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: joiner, now, projectId }),
+          ],
+        });
+
+        yield* manager.open({
+          threadId: owner,
+          providerSessionId: sessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        const opened = (yield* Ref.get(mcpConfigs))[0];
+        assert.deepEqual(opened?.userServers, [{ ...figma, id: McpServerId.make("figma") }]);
+
+        // An attach has no runtime policy, so the cwd falls back to the project checkout.
+        yield* manager.open({
+          threadId: joiner,
+          providerSessionId: sessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        assert.deepEqual((yield* mcpSessions.read(joiner))?.userServers, opened?.userServers);
+        assert.deepEqual(yield* Ref.get(requests), [
+          { projectId, cwd: runtimePolicy.cwd, native },
+          { projectId, cwd: "/projects/user-mcp", native },
+        ]);
+
+        // A reused credential still carries the servers enabled now.
+        yield* Ref.set(enabled, []);
+        yield* manager.open({
+          threadId: owner,
+          providerSessionId: replacementSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        const replacement = (yield* Ref.get(mcpConfigs)).at(-1);
+        assert.equal(replacement?.providerSessionId, opened?.providerSessionId);
+        assert.isUndefined(replacement?.userServers);
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            mcpConfigs,
+            nativeMcpSources: native,
+            mcpUserServersLayer,
+            projectServiceLayer: Layer.mock(ProjectService.ProjectService)({
+              getById: (requestedProjectId) =>
+                Effect.succeedSome({
+                  ...makeBrowserAccessProject(requestedProjectId),
+                  workspaceRoot: "/projects/user-mcp",
+                }),
+            }),
           }),
         ),
       );
