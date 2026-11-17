@@ -370,6 +370,7 @@
   "Custom…": "Своё время…",
   "Unpin": "Открепить",
   "Rename": "Переименовать",
+  "Mark unread": "Отметить непрочитанным",
   "Copy thread": "Копировать тред",
   "Wake": "Разбудить",
   "Supervised": "Под контролем",
@@ -599,7 +600,7 @@
   "Could not stop control": "Не удалось остановить управление",
   "This thread's agent controls the Mac": "Агент этого треда управляет Mac",
   "The Mac is controlled by": "Mac управляет",
-  "Add your prefix to the generated branch name.": "Добавьте свой префикс к сгенерированному имени ветки.",
+"Add your prefix to the generated branch name.": "Добавьте свой префикс к сгенерированному имени ветки.",
   "Append instructions to the naming prompt.": "Добавьте инструкции к промпту для именования.",
   "Applies to the composer when a hardware keyboard is connected.": "Действует в поле ввода при подключённой физической клавиатуре.",
   "Checking…": "Проверка…",
@@ -1705,5 +1706,11 @@
   "The {name} app was closed": "Приложение {name} закрыто",
   "The {name} app left its page and was stopped": "Приложение {name} ушло со страницы и остановлено",
   "Unable to load the {name} app": "Не удалось загрузить приложение {name}",
-  "{name} app": "Приложение {name}"
+  "{name} app": "Приложение {name}",
+  "Hide secret": "Скрыть значение",
+  "Show secret": "Показать значение",
+  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Ctrl while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Ctrl при отправке.",
+  "Add a route through the relay": "Добавить маршрут через релей",
+  "Return inserts a new line. {modifier}-Return sends the message.": "Return вставляет новую строку. {modifier}-Return отправляет сообщение.",
+  "No threads in {title}": "В {title} нет тредов"
 }

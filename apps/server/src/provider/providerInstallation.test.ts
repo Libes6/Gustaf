@@ -15,6 +15,7 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 
 import * as ServerSettings from "../serverSettings.ts";
+import * as ClaudeInstallation from "./ClaudeInstallation.ts";
 import * as CodexInstallation from "./CodexInstallation.ts";
 import * as AntigravityInstallation from "./AntigravityInstallation.ts";
 import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
@@ -100,6 +101,19 @@ const makeHarness = Effect.fn("providerInstallation.test.makeHarness")(function*
           protectedPaths = paths ?? [];
           calls.push("codex-remove");
         }),
+    }),
+    Layer.mock(ClaudeInstallation.ClaudeInstallation)({
+      managedDirectory: "/unused-managed-claude",
+      executablePath: "/unused-managed-claude/bin/claude",
+      start: Effect.sync(() => {
+        calls.push("claude-start");
+        return { ...state, driver: ProviderDriverKind.make("claudeAgent") };
+      }),
+      remove: () =>
+        Effect.sync(() => {
+          calls.push("claude-remove");
+        }),
+      state: Effect.succeed({ ...state, driver: ProviderDriverKind.make("claudeAgent") }),
     }),
     Layer.mock(AntigravityInstallation.AntigravityInstallation)({
       managedDirectory: "/unused-managed-runtime",
@@ -221,6 +235,35 @@ describe("provider installation routing", () => {
       const observed = yield* Stream.runCollect(harness.router.subscribe({ instanceId }));
       assert.deepEqual(Array.from(observed), [state]);
       assert.deepEqual(harness.calls, []);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect.each([
+    { config: { setupMode: "managed" }, refusal: null },
+    { config: { setupMode: "managed", binaryPath: "claude" }, refusal: null },
+    { config: {}, refusal: "Choose managed setup to install Claude" },
+    { config: { setupMode: "existing" }, refusal: "Choose managed setup to install Claude" },
+    { config: { setupMode: "managed", binaryPath: "/opt/claude" }, refusal: "custom executable" },
+  ] as const)("routes Claude installs only for managed setup: $config", ({ config, refusal }) =>
+    Effect.gen(function* () {
+      const claude = ProviderInstanceId.make("claude-vps");
+      const harness = yield* makeHarness({
+        instance: instance(ProviderDriverKind.make("claudeAgent"), claude),
+        settings: {
+          providerInstances: {
+            [claude]: { driver: ProviderDriverKind.make("claudeAgent"), config },
+          },
+        },
+      });
+      if (refusal === null) {
+        yield* harness.router.start({ instanceId: claude });
+        yield* harness.router.remove({ instanceId: claude });
+        assert.deepEqual(harness.calls, ["claude-start", "claude-remove", "refresh"]);
+      } else {
+        const error = yield* Effect.flip(harness.router.start({ instanceId: claude }));
+        assert.include(error.detail, refusal);
+        assert.deepEqual(harness.calls, []);
+      }
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 

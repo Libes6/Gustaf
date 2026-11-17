@@ -1,33 +1,7 @@
-import type {
-  DesktopNativeBrowserBridge,
-  DesktopNativeBrowserTabState,
-  EnvironmentId,
-} from "@t3tools/contracts";
+import type { DesktopNativeBrowserBridge, DesktopNativeBrowserTabState } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  createNativeBrowserTabs,
-  nativeBrowserTabState,
-  steppedZoomFactor,
-  usesNativeBrowserTabs,
-} from "./nativeBrowser";
-
-const primary = "env-primary" as EnvironmentId;
-const remote = "env-remote" as EnvironmentId;
-
-describe("usesNativeBrowserTabs", () => {
-  it.each([
-    ["the shell's own server", true, true, primary, primary, true],
-    ["the setting is off", true, false, primary, primary, false],
-    ["no native bridge (web, mobile, Electron)", false, true, primary, primary, false],
-    ["another environment", true, true, remote, primary, false],
-    ["no primary environment yet", true, true, primary, null, false],
-  ] as const)("%s", (_name, available, enabled, environmentId, primaryEnvironmentId, expected) => {
-    expect(usesNativeBrowserTabs({ available, enabled, environmentId, primaryEnvironmentId })).toBe(
-      expected,
-    );
-  });
-});
+import { createNativeBrowserTabs, nativeBrowserTabState, steppedZoomFactor } from "./nativeBrowser";
 
 const state = (overrides: Partial<DesktopNativeBrowserTabState>): DesktopNativeBrowserTabState => ({
   tabId: "tab",

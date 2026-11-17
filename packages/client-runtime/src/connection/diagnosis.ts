@@ -28,6 +28,8 @@ export interface ConnectionDiagnosis {
   readonly facts: ReadonlyArray<readonly [label: string, value: string]>;
   /** The troubleshooting guide section for this failure. Null for direct routes, except a pending T3 Connect sign-in. */
   readonly moreInfoUrl: string | null;
+  /** Only local addresses are saved and none answers: a relay route would work from any network. */
+  readonly suggestRelayRoute: boolean;
 }
 
 export interface ConnectionDiagnosisInput {
@@ -37,6 +39,8 @@ export interface ConnectionDiagnosisInput {
   readonly via: "relay" | "direct";
   /** Every saved route is a private network address, e.g. 192.168.x.x. */
   readonly lanOnly?: boolean;
+  /** This client can add a Gustaf relay route by scanning the computer's "Connect a phone" code. */
+  readonly relayPairing?: boolean;
   /** The relay's last health check, which can name a cause before any connect attempt. */
   readonly relayStatus?: Pick<
     RelayEnvironmentStatusResponse,
@@ -358,12 +362,15 @@ export function presentConnectionDiagnosis(
     failure?.reason === "network" ||
     failure?.reason === "timeout" ||
     failure?.reason === "transport";
-  const lanSteps =
-    input.lanOnly === true && !relayPath && unreachable
-      ? [
-          `${host} is saved only with local network addresses, which work only on the same network as ${host}. Add a stable route, such as a Tailscale address, in ${host}'s settings.`,
-        ]
-      : [];
+  const lanUnreachable = input.lanOnly === true && !relayPath && unreachable;
+  const suggestRelayRoute = lanUnreachable && input.relayPairing === true;
+  const lanSteps = lanUnreachable
+    ? [
+        suggestRelayRoute
+          ? `${host} is saved only with local network addresses, which work only on the same network as ${host}. On ${host}, open Settings → Remote access → Connect a phone and scan its code with Add a route through the relay. That route works from any network.`
+          : `${host} is saved only with local network addresses, which work only on the same network as ${host}. Add a stable route, such as a Tailscale address, in ${host}'s settings.`,
+      ]
+    : [];
 
   return {
     headline: headline(host, located, failure),
@@ -374,6 +381,7 @@ export function presentConnectionDiagnosis(
       relayPath || located.cause === "session_pending"
         ? t3ConnectTroubleshootingUrl(helpSection(located, failure))
         : null,
+    suggestRelayRoute,
   };
 }
 

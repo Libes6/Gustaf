@@ -1,5 +1,6 @@
 mod account;
 mod bridge;
+mod browser_module;
 mod cli_command;
 mod cloud_api;
 mod computer_use;
@@ -8,6 +9,8 @@ mod diagnostics;
 mod exit_guard;
 mod ipc_scope;
 mod local_env;
+#[cfg(all(target_os = "macos", feature = "cef-browser"))]
+mod cef;
 mod native_browser;
 mod navigation;
 mod network;
@@ -440,6 +443,14 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Whether Chromium draws the server's browser tabs in this window.
+fn renders_server_tabs() -> bool {
+    #[cfg(all(target_os = "macos", feature = "cef-browser"))]
+    return cef::running();
+    #[cfg(not(all(target_os = "macos", feature = "cef-browser")))]
+    false
+}
+
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
@@ -502,6 +513,9 @@ pub fn run() {
             cli_command::cli_command_add_to_path,
             account::client_config,
             account::account_report_problem,
+            browser_module::browser_module_state,
+            browser_module::browser_module_remove,
+            browser_module::browser_module_install,
             native_browser::native_browser_create,
             native_browser::native_browser_close,
             native_browser::native_browser_close_all,
@@ -521,12 +535,20 @@ pub fn run() {
             app.manage(bridge::ClientSettingsFile(Mutex::new(())));
             app.manage(connection_storage::CatalogStore::default());
             app.manage(account::AccountStore::default());
-            app.manage(native_browser::NativeBrowser::default());
             set_dock_icon();
             let settings = shell_settings::load(app.handle());
             app.manage(Mutex::new(settings.clone()));
-            let computer_use_env = computer_use::initialize(app.handle(), &settings);
-            let (server, pairing_url) = match start_server(app, &settings, &computer_use_env) {
+            #[allow(unused_mut)]
+            let mut server_env = computer_use::initialize(app.handle(), &settings);
+            browser_module::apply_removal(app.handle());
+            #[cfg(all(target_os = "macos", feature = "cef-browser"))]
+            if let Some(socket) = cef::start(app.handle()) {
+                server_env.push((
+                    "T3CODE_DESKTOP_BROWSER_SOCKET".to_owned(),
+                    socket.to_string_lossy().into_owned(),
+                ));
+            }
+            let (server, pairing_url) = match start_server(app, &settings, &server_env) {
                 Ok(started) => started,
                 Err(reason) => {
                     report_start_failure(app.handle(), &reason);
@@ -591,6 +613,7 @@ pub fn run() {
                     &app.package_info().version.to_string(),
                     &bootstraps,
                     platform,
+                    renders_server_tabs(),
                 ))
                 // Editor and mail links have no page to load; their own app opens them.
                 .on_navigation(move |url| {
@@ -640,6 +663,8 @@ pub fn run() {
                 exit_guard::request_quit(app);
             }
             RunEvent::Exit => {
+                #[cfg(all(target_os = "macos", feature = "cef-browser"))]
+                cef::stop();
                 computer_use::shutdown(app);
                 ssh::stop(app);
                 stop_server(app);

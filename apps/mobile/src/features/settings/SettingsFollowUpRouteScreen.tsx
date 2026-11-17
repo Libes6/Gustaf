@@ -2,6 +2,7 @@ import { t } from "../../i18n";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
@@ -59,9 +60,13 @@ export function SettingsFollowUpRouteScreen() {
         ))}
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        {t(
-          "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.",
-        )}
+        {Platform.OS === "android"
+          ? t(
+              "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Ctrl while sending.",
+            )
+          : t(
+              "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.",
+            )}
       </Text>
     </ScrollView>
   );

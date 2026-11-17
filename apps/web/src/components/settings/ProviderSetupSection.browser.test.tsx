@@ -122,6 +122,7 @@ function section(options: SectionOptions = {}) {
       environmentId={environmentId}
       environmentLabel="Remote Google device"
       instanceId={instanceId}
+      providerName="Antigravity"
       provider={options.provider ?? provider}
       binaryPath={options.binaryPath}
       enabled={options.enabled ?? true}

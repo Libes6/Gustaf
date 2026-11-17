@@ -3,6 +3,7 @@
 Moved out of `TASKS.md` on 2026-11-12. Since 2026-11-09 the shipping app is the T3-based Gustaf (Tauri shell `apps/shell`, server `apps/server`, web `apps/web`); these items describe the previous app (`ModelPicker.tsx`, `lib/data.ts`, `npm run check`, the Rust sidecar) or plans that are done or superseded. Nothing here is a commitment. Take an item back into `TASKS.md` only after checking it against the current code.
 
 ## P0 — hardening and hygiene
+
 - [~] **Strict CSP**: done in `tauri.conf.json` (`csp` for release, `devCsp` for dev, directive allow-list; `'unsafe-eval'` and inline styles only because the canvas srcdoc iframe inherits the parent CSP; the canvas runtime is now served as `public/canvas/runtime.js`), pinned by `tests/csp.test.mjs` (policy shape, build scan, headless Chrome boot and canvas check). Not validated in a real WKWebView. Manual check in `npm run tauri dev` and a debug build: open a canvas card (Preview renders, Code tab, Restart), send a message, attach an image (thumbnail and sent message show it), open every Settings page, press Cmd+K, and look for `Refused to ...` in the web inspector. If something breaks, set `"csp": null` (and drop `devCsp`) under `app.security` in `tauri.conf.json`. A custom URI scheme for the canvas document would let the parent drop `'unsafe-eval'`; not done. Remaining check is part of Release v0.1 → Release smoke checklist.
 
 - [ ] **Green release build on all four jobs** (in progress: 2026-10-03 runs fixed Windows path/LSP/MCP issues; the last run had Windows, Linux and macOS arm green, macOS Intel still running). Acceptance: one `workflow_dispatch` run on the current `dev` head with every job green and artifacts downloadable; link the run here.
@@ -71,9 +72,10 @@ Moved out of `TASKS.md` on 2026-11-12. Since 2026-11-09 the shipping app is the 
   LOST (2026-10-04): the subagent's worktree was deleted before anything was committed, so none of this code exists any more. Previous result for reference: done on branch `worktree-agent-a12953b837eeff6a1`: `@` picker lists chats, drag from the sidebar, "Attach a chat" in the + menu, frozen snapshot with expandable preview, fenced `<attached_chat>` block as untrusted data, shorten toggle above 20k chars and a visible cut above 200k, drafts store `{type:"chat"}`, source chip in sent messages, block hidden from search index. Checks run: tsc, npm test 766/766, vitest 182/182. NOT run: `cargo test` (worktree lacks `sidecar/node_modules`, so the `db.rs` index change is unverified), e2e, manual run. Not built: attach first N messages or a single message; archived chats are not searched.
   RESUMED (2026-10-04): code saved on `gustaf/attach-chats-context` (HEAD `da34d86`) and merged locally into dev. Title search through @, sidebar drag, frozen text snapshot/source links, exact preview, explicit shortened choice. Images are not copied; full snapshots above draft limit are visibly refused. Combined checks: TypeScript/i18n, Node 832/832, UI 238/238, e2e 28/28, Rust 209 passed/1 ignored, frontend build. Remains [~] pending actual app/provider validation; no push. Earlier LOST note is historical, implementation now exists.
 
-
 ## P2
+
 - [ ] **Monorepo layout** (prerequisite for the mobile app). npm workspaces; best done before the first commit so no history is lost.
+
   ```
   package.json          # root: "workspaces" + shared scripts only
   apps/desktop/         # current app: src/, src-tauri/, sidecar/, scripts/, tests/, public/, index.html, vite/tsconfig
@@ -117,22 +119,26 @@ Moved out of `TASKS.md` on 2026-11-12. Since 2026-11-09 the shipping app is the 
 - [~] **Accessibility pass** (focus order, ARIA, contrast): done from code review and tests (shared `useDialogFocus`, menu/model-picker keyboard support, landmarks, labels, live status, contrast tokens + test, reduced motion, 24px hit areas, a11y lint test; see README, Accessibility). Left: a real screen reader / axe run in the app, native checkbox target size, custom-accent contrast outside the focus ring, keyboard alternative for drag-to-section is the chat menu only.
 
 ## P3
+
 - [ ] **Идея: единый интерфейс подключения MCP для всех агентов (2026-10-07)**. Добавлять сервер один раз в Gustaf и выбирать, каким агентам он доступен: API-моделям, Codex, Claude Code, Cursor. Gustaf через адаптеры настраивает подключение для каждого; интерфейс показывает отдельный статус подключения у каждого агента. Пока только идея — позже развить в задачу, уточнив возможности провайдеров, авторизацию и синхронизацию конфигураций.
 - [ ] **Canvas** — open: (1) PNG export: research a way that works in WKWebView (render in a native snapshot via Tauri `webview` capture, or `html-to-image` inside the iframe and accept tainted cases with a clear error); acceptance: a chart-like artifact exports to PNG on macOS or the button is hidden with a reason. (2) Precompiled HTML export (no compile at open time). (3) Check in the real Tauri WebView (part of the release smoke checklist). Already done: multi-file modules (`// file:` sections, relative imports, file tabs), `lucide-react` bundled as an extra library (separate larger runtime, loaded only when imported), export to standalone HTML, revision diff (Changes tab). Not done: export to PNG (not reliably possible through the sandboxed iframe, WebKit taints SVG foreignObject canvases), other bundled libraries (charts etc. are too large or not in `node_modules`), precompiling the HTML export (it compiles at open time). Not verified in the real Tauri WebView.
 
 ## Market research backlog (2026-10-03)
+
 Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, Warp, Cline/Roo/Kilo, OpenCode, Msty, LibreChat and user discussions. Checked against the code on 2026-10-03: the API agent tools are only `read_file`, `list_dir`, `search`, `edit_file`, `write_file`, `run_command` (+ MCP, computer, subagents); no plan mode, skills, memory, terminal pane or semantic index exist.
 
 ### R1 — expected by users (do first)
 
 ### R2 — coding workflow
+
 - [~] **Hooks** (Claude Code). User commands on lifecycle events: before/after tool call, after file edit, on stop, on approval request.
   - [ ] Config per project/global (event, matcher, command, timeout); exit code can block a tool call with a message to the agent.
   - [ ] Go through `run_command` rules; show hook output in the action log.
   - 2026-10-07 (`36d877e`, merged): the item was already fully implemented (five events `pre_tool`/`post_tool`/`post_edit`/`stop`/`approval_request`, global and project `.gustaf/hooks.json` behind a per-project switch, exit 2 blocks a call or sends a follow-up on stop, every command goes through `decideCommand` so hooks never bypass approvals, action log, `hook_exec.rs` with timeout and process-tree kill). Only a 7-step "Manual check (real app, live API provider)" was added to `docs/features/hooks.md`. OPEN: the live smoke run; hooks do not apply to CLI providers (by design).
-- [~] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules. *Done: manual "Review with AI" (read-only, JSON findings, inline + list, dismiss); not done: automatic review before accept, `.mcode/REVIEW.md`.* Automatic review + `.mcode/REVIEW.md` + high-severity (`bug`) confirm MERGED 2026-10-04; model JSON quality unverified.
+- [~] **AI review of changes** (Cursor Bugbot). "Review with AI" in `ChangesPanel` runs the existing `review` subagent on the pending diff; findings shown inline on hunks with severity; optional automatic review before accept; project file `.mcode/REVIEW.md` with review rules. _Done: manual "Review with AI" (read-only, JSON findings, inline + list, dismiss); not done: automatic review before accept, `.mcode/REVIEW.md`._ Automatic review + `.mcode/REVIEW.md` + high-severity (`bug`) confirm MERGED 2026-10-04; model JSON quality unverified.
 
 ### R3 — convenience
+
 - [~] **Git branch switcher under the composer (2026-10-06, owner request; Claude Code desktop, Codex app)**: a bar below the composer shows the project's current branch (`git.rs` `current_branch` already exists) and opens a picker: search local/remote branches, switch (checkout), create a new branch from the current one. Rules: disabled while a run is active or a review/shadow copy has pending changes; dirty working tree → warn and offer stash / cancel, never discard silently; in a workspace/worktree chat show that worktree's branch (read-only or switch inside the worktree); refresh when the branch changes outside the app. Also show the location ("Local checkout" / worktree) like the reference screenshots.
   - Done 2026-10-07 (`5691c48`, `8a755a5`, `01e80cd`; merged `61e65e5`): bar below the composer (Local checkout / Worktree, branch chip, uncommitted count, "Detached at <sha>"), picker with search, local and remote branches and "Create branch X from <current>"; no `--force`; dirty tree refused with `dirty: N` and a "Stash and switch / Cancel" prompt (stash tracked+untracked, switch, pop; a conflicting pop keeps the stash and names it; a failed switch pops it back); locked with a visible reason while a run is active, review-copy changes are pending, or a merge/rebase/cherry-pick/revert is unfinished; a branch checked out in another worktree is shown disabled; worktree chats show their branch read-only; refresh every 4 s and on window focus; remote branch creates a tracking branch; protected names refused. Code: `src-tauri/src/git_branches.rs`, `components/chat/BranchSwitcher.tsx`, `lib/branchSwitch.ts`. 9 Rust + 18 UI tests. OPEN: branch remembered per chat; any change incl. untracked counts as dirty (stricter than git). MANUAL (9 steps, `tauri dev`): bar in en/ru, light/dark, minimum window; clean switch; dirty switch with stash and cancel; `git checkout` in a terminal updates the chip within ~4 s; locks during a run and with pending review copy; worktree chat read-only; remote-only branch; create branch.
 - [ ] **Reasoning level for every provider (2026-10-06, owner request)**: today the Low/Medium/High menu in `Composer.tsx` appears only when `supports.reasoning` is true (OpenAI Responses `reasoning.effort`), and `Reasoning` is `"low" | "medium" | "high"` (`providers/types.ts`). Extend:
@@ -151,13 +157,16 @@ Gaps found by comparing with Cursor, Claude Code desktop, Codex app, Conductor, 
     - Tests: UI test for keyboard/stop snapping and per-model level lists; visual check in `tauri dev` in both themes.
 
 ### R4 — large, later
+
 - [ ] **Integrations**: start a task from a GitHub issue / Linear / Slack message, report back with the result or PR link (via MCP servers where possible). First slice: GitHub issue only, through `gh` (already used for PRs): "New chat from issue" (URL or number) puts title/body/labels into the first message as untrusted content; after a PR is created, offer to comment the PR link on the issue (explicit confirm). Linear/Slack after that, via MCP. (unchanged)
 - [ ] **Cloud/remote agents** that keep running while the laptop is closed (Cursor, Codex). Depends on the mobile app and a server-side runner; evaluate after the mobile companion. Not a task yet: needs a design note first (where it runs, how code and secrets get there, cost), owner decision required.
 - [ ] **Warm agent environments** (Cursor): prepare shadow copies in the background (dependencies installed, setup run) so a new agent starts instantly; cache per project and lockfile hash.
 
 ## Goal: polish model selection (2026-10-06, owner request)
+
 One module, three parts: the composer chip, the model list (`components/ModelPicker.tsx`) and the effort slider (`components/chat/EffortPicker.tsx`), plus their styles (`theme.css` `.picker*`, `.model-row`, `styles/effort.css`).
 **Definition of done** (all must hold, checked in `tauri dev` in en and ru, light and dark, at the minimum window size):
+
 - Nothing jumps, flickers or gets cut off: hover never scrolls, the selected model is visible on open, the popover fits above the composer and never covers its own trigger.
 - One language at a time: no hardcoded strings in adapters; every label goes through i18n.
 - State is obvious at a glance: active provider tab, current model (check mark), current effort level; hover is clearly weaker than selection.
@@ -166,15 +175,18 @@ One module, three parts: the composer chip, the model list (`components/ModelPic
 - Useful details without clutter: context window and image/tool support on the row (from `ModelInfo`), long names truncate with a tooltip, Cursor account shown when a pool is used.
 - Effort fits in: models with effort open the slider from the chip, the model link inside it opens the list and coming back keeps the level; models without effort show no level.
 - Tests: UI tests for every bug below and for keyboard flow; no regressions in `npm run check`.
-**Plan:** (1) bugs below, (2) states and information (loading/error/NEW/details), (3) keyboard and focus, (4) visual pass with screenshots in both themes, (5) smoke test and owner review.
+  **Plan:** (1) bugs below, (2) states and information (loading/error/NEW/details), (3) keyboard and focus, (4) visual pass with screenshots in both themes, (5) smoke test and owner review.
 
 ### Bugs — model picker (2026-10-06, owner screenshot: "слишком забаганный")
+
 Screenshot: English UI, Codex tab of the model picker (`components/ModelPicker.tsx`, styles `theme.css` `.picker*`, `.model-row`).
 Done 2026-10-06 in `gustaf/model-picker-polish` (merge `53e91bf`): plus loading text, provider error with Retry, context window on rows, long-name tooltips, open on the current model's tab. Checked in a browser preview with a mocked backend (dark and light, en); not yet in `tauri dev` with real providers.
 Goal leftovers: shortcut to open the picker; Cursor pool account on rows; Tab order chip → list; the effort part is now a plain menu (`5895b2c`, other session) instead of the slider, so the goal's slider wording no longer applies.
+
 - [ ] Smoke test after the fixes in `tauri dev` (en and ru, light and dark): open picker from the chip and from the effort slider's model link, hover/scroll/arrow keys, ⌘1-9, favourites.
 
 ## Настройки — по обзору T3 Code (2026-10-07)
+
 - [~] **P2 — Редактор пользовательских тем с явным импортом и экспортом (2026-10-07, запрос пользователя)**: реализовать в Gustaf создание, редактирование и дублирование тем с живым предпросмотром, отдельными палитрами Light/Dark и заметными действиями «Import theme» / «Export theme». Пользователь должен иметь возможность выгрузить свою тему в JSON-файл, передать её другому человеку и восстановить через импорт.
   - Перед реализацией изучить [репозиторий T3 Code](https://github.com/pingdotgg/t3code). Проверенный ориентир: коммит `365aa87982a4d81cc8e0c085e8d1a40ca7daecdc`; актуальный `main` мог измениться. Начать с [ThemeEditorPanel.tsx](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/apps/web/src/components/settings/ThemeEditorPanel.tsx), [themePalette.ts](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/apps/web/src/themePalette.ts), [ThemeSettings.tsx](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/apps/web/src/components/settings/ThemeSettings.tsx), [ThemeImportDialog.tsx](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/apps/web/src/components/settings/ThemeImportDialog.tsx), [themeInspector.ts](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/apps/web/src/components/settings/themeInspector.ts) и [документации Appearance](https://github.com/pingdotgg/t3code/blob/365aa87982a4d81cc8e0c085e8d1a40ca7daecdc/docs/user/appearance.md). Проследить связанные store/hooks, общие палитры и тесты импорта/экспорта. В T3 экспорт заявлен в документации; задача Gustaf — сделать его очевидным и доступным.
   - Сначала проверить существующие темы, CSS-переменные и хранение настроек Gustaf; расширить текущую систему, согласовав с задачей Appearance с предпросмотром. Использовать семантические токены для фона, поверхностей, текста, границ, акцента, состояний, кода, diff и терминала. Простой режим — базовые цвета с вычислением остальных; Advanced — редактирование отдельных токенов. Не переносить зависимости и архитектуру T3 целиком; при заимствовании кода учитывать его лицензию.
@@ -183,7 +195,7 @@ Goal leftovers: shortcut to open the picker; Cursor pool account on rows; Tab or
   - Inspect как следующий этап этой задачи: выбор элемента приложения определяет используемый цветовой токен и подсвечивает места его применения; реализацию сверить с `themeInspector.ts` и адаптировать под CSS Gustaf.
   - Критерии готовности: создать тему → сохранить → экспортировать → импортировать в чистом профиле, получив те же Light/Dark цвета; тема сохраняется после перезапуска; Cancel полностью отменяет предпросмотр; некорректный файл не меняет текущую тему. Проверить цвета основных экранов, меню, диалогов, кода, diff и терминала в реальном окне приложения; покрыть round-trip формата, валидацию и отмену предпросмотра содержательными тестами. Отдельно указать статус Inspect и совместимости сторонних форматов, если они остаются следующим этапом.
   - Сделано 2026-10-07 (`ce64566`): создание, правка, дублирование, удаление, палитры Light/Dark, простой и расширенный (31 токен) режимы, предпросмотр, предупреждение о контрасте <4.5:1, «Import theme»/«Export theme» (JSON; импорт отвергает неизвестные поля, не-hex цвета, неверные версию и имя, файлы >64 КБ; ничего не выполняется), лимит 20 тем. ОСТАЛОСЬ: подписи расширенных полей — имена CSS-переменных; производные от акцента вне палитры. ВРУЧНУЮ: диалоги сохранения/открытия, `<input type=color>` в WKWebView.
-Источник: просмотр всех 10 разделов настроек установленного T3 Code 0.0.45, дополнительно Diagnostics и Legacy features. Пользователь одобрил задачи; удалённые окружения исключены. Перед реализацией сверить с существующими возможностями Gustaf; пункты ниже дополняют задачи выше.
+    Источник: просмотр всех 10 разделов настроек установленного T3 Code 0.0.45, дополнительно Diagnostics и Legacy features. Пользователь одобрил задачи; удалённые окружения исключены. Перед реализацией сверить с существующими возможностями Gustaf; пункты ниже дополняют задачи выше.
 - [~] **P1 — Единая вёрстка и структура настроек**: общий компонент строки с названием и описанием слева, управлением справа; связанные параметры группировать в блоки. На узком окне управление переносится под описание. Распределить параметры по тематическим разделам, разгрузив «Общие»; совместить с уже записанной задачей исправления вёрстки. Критерий: все разделы используют согласованные отступы и выравнивание, нет перекрытий и обрезанных подписей на обычной и узкой ширине.
   - Частично сделано 2026-10-07 (`780672b`, merge `61e65e5`): `SettingRow` и `SettingsSection` (`components/SettingRow.tsx`, заголовок и описание слева, элемент справа, на узком окне переносится под текст), перенесены General, Appearance, «Хранилище», Web tools (теперь i18n, были захардкожены ru/en), Computer use, строка Git review-copy, quick-ask. ОСТАЛОСЬ: остальные страницы всё ещё на сыром `card-row` (Budgets, Agents, MCP, Mobile, Memory, Knowledge, Hooks, Providers, Updater и др.), строки Updater без i18n; узкая ширина проверена только regex-тестом на CSS. ВРУЧНУЮ: переносы строк на каждой перенесённой странице при обычной и узкой ширине.
 - [~] **P1 — Поиск по всем настройкам**: искать по названиям, описаниям и сочетаниям клавиш; результат показывает раздел и переводит к нужному параметру с подсветкой. Дополнить существующий поиск страниц через Cmd+K. Критерий: можно найти конкретную настройку без знания её раздела; поиск работает с клавиатуры и в поддерживаемых языках, есть пустое состояние.
@@ -210,7 +222,9 @@ Goal leftovers: shortcut to open the picker; Cursor pool account on rows; Tab or
 - [ ] **P3 — Профили встроенного браузера**: отдельные cookies и авторизации для профилей, временный профиль с очисткой после закрытия, выбор профиля при открытии вкладки. Критерий: авторизация одного профиля не попадает в другой, временные данные удаляются после завершения сессии; возможность согласовать с существующей архитектурой браузера перед реализацией.
 
 ## From T3 Code (research 2026-10-06)
+
 Source: [pingdotgg/t3code releases](https://github.com/pingdotgg/t3code/releases) v0.0.42–v0.0.45 and `main` nightlies up to 2026-10-05. Read the PR before starting: `gh pr view <N> -R pingdotgg/t3code` (best: #15592 `/goal`, #15057 PR watch, #15907 secretRef, #15968 HTML preview threat model). The "today" notes come from a quick code search; check the code again first. Effort: S/M/L.
+
 - [~] **T13. Small UX details** (2026-10-06; done: `04c4468` ⌘[ / ⌘] back/forward, ⌘⌥↵ send + new chat, reading positions across restarts; `c1a96d0` ⌘K jumps to chats (title, #id), settings pages and shortcuts, tool-row times, "Viewed" marks on changed files; `8087d86` ⌘K "Restart agent session", ⌘⌥↑/↓ between your messages (instead of a minimap), per-chat notification mute; automatic cleanup of idle workspace checkouts (off by default, daily, branch kept, dirty ones skipped; Settings → Storage). Left: shell highlighting / card-less tool rows and grouped thinking (look and feel, needs a design decision), worktree setup steps with cancel/retry and a chosen worktree folder, per-project setting overrides, usage cost (providers report no prices; would need a price table)):
   - Restart the agent session from Cmd+K to load new skills or plugins (#14542).
   - Mod+alt+enter sends and opens a new thread (#15050); back/forward between threads with mod+[ / mod+] (#13212).
@@ -227,9 +241,11 @@ Source: [pingdotgg/t3code releases](https://github.com/pingdotgg/t3code/releases
 - Out of scope for now: their mobile app/Live Activities/widgets (we have the read-only mobile server), "Devices" product (3D workspace, simulators over SSH), T3 Connect relay and remote environments (see O9), OTLP (see O11), GitHub stacks / Forgejo / Gitea / Bitbucket. Their "new orchestrator" refactor (#2829) is worth reading before the O-epic.
 
 ## Multi-agent (epic)
+
 Reference: the "Background tasks" panel in Claude Code desktop (running agents with model, elapsed time, tokens, tool uses, current step, stop button, transcript link, finished list).
 
 ## Orchestrator (epic, 2026-10-03)
+
 Goal: from "a chat with subagents" to an orchestrator that runs many agents of any provider in parallel, keeps their work mergeable and keeps the human review load manageable. Based on a comparison with Conductor, Cursor 3 Agents Window, Claude Code agent teams, Vibe Kanban, Mastra and research on agent merge conflicts (see the 2026-10-03 chat). Checked against the code on 2026-10-03: there is no git worktree support anywhere (isolation is the shadow copy in `review.rs`), `spawn_agent` / `delegate_tasks` run only on API providers, `Compare` is read-only, conflict handling is an overlap warning. Order: O1 → O2 → O3 are the foundation; O4–O7 build on them; O8–O10 later.
 
 - [ ] **O1. Workspaces: one git worktree per task, any provider** (foundation; like Conductor / Cursor 3).
@@ -286,7 +302,9 @@ Goal: from "a chat with subagents" to an orchestrator that runs many agents of a
   - Per-task timeline (prompts, tool calls, gate runs, merges), cost per task/role/model, success rate per model and role over time (feeds role presets in O2), export of a task trace as JSON.
 
 ## Log — 2026-10-03 (six priorities)
+
 Summary of one batch of work; the items above are the source of truth (Memory, Skills, Terminal, Diagnostics, Releases and Computer Use entries were reconciled with it on 2026-10-03).
+
 - Computer Use: preserve target app keyboard focus when revealing M Code; bounded read-only macOS Accessibility labels and capture-stage timing. Native Mac task latency / GUI end-to-end still requires a live benchmark. No DOM executor or UI-TARS model was added.
 - Skills: project/global SKILL.md and compatible Claude/Cursor workflows; slash picker and arguments; on-demand `use_skill`; built-in review/test/explain/commit. Skill metadata never widens permissions or changes the selected model.
 - Memory: SQLite facts scoped globally or to the original project, capped relevant prompt injection, settings add/edit/delete, `remember`/`forget` requiring approval by default. Suggested memories/export remain follow-up work.
@@ -295,10 +313,10 @@ Summary of one batch of work; the items above are the source of truth (Memory, S
 - Releases: manual three-OS bundle workflow, macOS signing/notarization gates and verification; updater enabled only with an HTTPS endpoint and public signing key. Credentials, real signed artifacts and Windows/Linux runtime verification remain external prerequisites; nothing was published.
 
 ## New follow-ups (2026-10-04)
+
 - [ ] **Mobile: client to `/v1` + certificate pinning, then write endpoints**: the Expo client still calls unprefixed paths (`/pair`, `/projects/:id/chats`) over an unpinned transport while the desktop server (merged, read-only, LAN-only, TLS + pairing) serves `/v1/...`. Move the client to `/v1`, pin the SHA-256 fingerprint from the QR, then add write endpoints (send message, stop, approvals), streaming deltas, `tool.updated`/approval events.
 - [ ] **Real-app smoke pass of everything merged 2026-10-03/04** (nothing below was run in a real window): workspaces, hooks, scheduled page, lazy keys, review copy setting, image-first messages, composer slim-down, subagent cards (stopped state), merge queue UI, verification gates, auto review, quick ask window, memory dialogs, knowledge base, MCP SSE/OAuth fallback, CLI subagents, mobile server pairing. Use `docs/release-checklist.md`.
 
-
 ## UI follow-up — 2026-10-12
-- [~] **Переделать правую рабочую панель по референсам Claude Desktop**: реализованы компактные иконки терминала, изменений, предпросмотра и устройства; панель встроена в flex-компоновку справа, с закрытием, разворачиванием и изменяемой шириной. Diff остаётся внутри панели. Сохранены открытые инструменты и драйверы. Исправлен устаревший инспектор: сверка кадров вокруг карты, сброс выделения при смене кадра и foreground-проверка привязанного iOS-приложения. Проверки: node 1522, UI 621, tsc/lint/i18n, браузерный E2E ширины 900/1600. В локальном окне проверены панель, терминал (`pwd`), живой iPhone и карта SpringBoard после Home. Полная визуальная приёмка всех инструментов и внешнее переключение iOS-приложений ещё не проверены. Спецификация и референсы: `docs/design-references/right-workspace-panel/README.md`.
 
+- [~] **Переделать правую рабочую панель по референсам Claude Desktop**: реализованы компактные иконки терминала, изменений, предпросмотра и устройства; панель встроена в flex-компоновку справа, с закрытием, разворачиванием и изменяемой шириной. Diff остаётся внутри панели. Сохранены открытые инструменты и драйверы. Исправлен устаревший инспектор: сверка кадров вокруг карты, сброс выделения при смене кадра и foreground-проверка привязанного iOS-приложения. Проверки: node 1522, UI 621, tsc/lint/i18n, браузерный E2E ширины 900/1600. В локальном окне проверены панель, терминал (`pwd`), живой iPhone и карта SpringBoard после Home. Полная визуальная приёмка всех инструментов и внешнее переключение iOS-приложений ещё не проверены. Спецификация и референсы: `docs/design-references/right-workspace-panel/README.md`.

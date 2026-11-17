@@ -43,6 +43,7 @@ export function useConnectionDiagnosis(
     state,
     via: relayOnly ? "relay" : "direct",
     lanOnly: hasOnlyLanRoutes(presentation.entry),
+    relayPairing: true,
     clientVersion: Constants.expoConfig?.version,
     serverVersion: presentation.serverConfig?.environment.serverVersion,
   });
@@ -52,11 +53,16 @@ export function useConnectionDiagnosis(
 export function ConnectionDiagnosisDetails(props: {
   readonly hostLabel: string;
   readonly diagnosis: ConnectionDiagnosis;
+  /** Opens the pairing form as "Add route" for this environment, where the relay code is scanned. */
+  readonly onAddRelayRoute?: () => void;
 }) {
-  const { diagnosis } = props;
+  const { diagnosis, onAddRelayRoute } = props;
   const { moreInfoUrl } = diagnosis;
   return (
     <View className="gap-3">
+      {diagnosis.suggestRelayRoute && onAddRelayRoute ? (
+        <Button label={t("Add a route through the relay")} icon="plus" onPress={onAddRelayRoute} />
+      ) : null}
       <View className="gap-0.5">
         {diagnosis.hops.map((hop) => (
           <Text

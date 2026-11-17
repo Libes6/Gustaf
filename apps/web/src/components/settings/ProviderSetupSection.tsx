@@ -28,6 +28,7 @@ interface ProviderSetupSectionProps {
   readonly environmentId: EnvironmentId;
   readonly environmentLabel: string;
   readonly instanceId: ProviderInstanceId;
+  readonly providerName: string;
   readonly provider: ServerProvider | undefined;
   readonly binaryPath?: string | undefined;
   readonly authMethod?: AntigravityAuthMethod | undefined;
@@ -50,7 +51,10 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
   const t = useT();
   return (
     <section
-      aria-label={t("settingsC.providerSetupSection.setupAria")}
+      aria-label={t("settingsC.providerSetupSection.setupAria").replace(
+        "{provider}",
+        props.providerName,
+      )}
       className="@container/setup divide-y divide-border/50 text-xs [&_[data-slot=settings-row]]:rounded-none"
     >
       <SettingsRow
@@ -64,7 +68,10 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
             </span>
             {!props.enabled && !props.readOnly ? (
               <Button size="sm" variant="outline" onClick={props.onEnable}>
-                {t("settingsC.providerSetupSection.enableAntigravity")}
+                {t("settingsC.providerSetupSection.enableProvider").replace(
+                  "{provider}",
+                  props.providerName,
+                )}
               </Button>
             ) : null}
           </div>
@@ -78,7 +85,10 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
       ) : props.provider?.setup === undefined ? (
         <SettingsRow
           title={t("settingsC.providerSetupSection.updateRequired")}
-          description={t("settingsC.providerSetupSection.updateEnvToManage")}
+          description={t("settingsC.providerSetupSection.updateEnvToManage").replace(
+            "{provider}",
+            props.providerName,
+          )}
         />
       ) : (
         <ProviderSetupActions
@@ -86,6 +96,7 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
           environmentId={props.environmentId}
           environmentLabel={props.environmentLabel}
           instanceId={props.instanceId}
+          providerName={props.providerName}
           provider={props.provider}
           binaryPath={props.binaryPath}
           authMethod={props.authMethod ?? "oauth-personal"}
@@ -100,17 +111,19 @@ function ProviderSetupActions({
   environmentId,
   environmentLabel,
   instanceId,
+  providerName,
   provider,
   enabled,
   binaryPath,
 }: Pick<
   ProviderSetupSectionProps,
-  "environmentId" | "environmentLabel" | "instanceId" | "enabled" | "binaryPath"
+  "environmentId" | "environmentLabel" | "instanceId" | "providerName" | "enabled" | "binaryPath"
 > & {
   readonly provider: ServerProvider;
   readonly authMethod: AntigravityAuthMethod;
 }) {
   const t = useT();
+  const named = (text: string) => text.replace("{provider}", providerName);
   const target = { environmentId, input: { instanceId } };
   const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const installQuery = useEnvironmentQuery(serverEnvironment.providerInstallState(target));
@@ -139,7 +152,7 @@ function ProviderSetupActions({
   const actionsDisabled = pendingLabel !== null || queryError !== null;
   const installationStatusMessage =
     installation === null
-      ? t("webCopy.checkingTheAntigravityRuntime")
+      ? t("webCopy.checkingTheAntigravityRuntime").replace("{name}", providerName)
       : installation?.phase === "downloading"
         ? t("webCopy.downloadingDownloadedMBTotal")
             .replace("{downloaded}", (installation.downloadedBytes / 1_000_000).toFixed(1))
@@ -153,15 +166,21 @@ function ProviderSetupActions({
                   ),
             )
         : installation?.phase === "extracting"
-          ? t("webCopy.extractingAntigravity")
+          ? t("webCopy.extractingAntigravity").replace("{name}", providerName)
           : installation?.phase === "verifying"
             ? t("webCopy.checkingTheDownloadedRuntime")
             : installed
               ? t("webCopy.installed")
               : usesCustomBinary
                 ? enabled
-                  ? t("webCopy.theConfiguredAntigravityRuntimeIsUnavailable")
-                  : t("webCopy.theConfiguredAntigravityRuntimeHasNotBeenChecked")
+                  ? t("webCopy.theConfiguredAntigravityRuntimeIsUnavailable").replace(
+                      "{name}",
+                      providerName,
+                    )
+                  : t("webCopy.theConfiguredAntigravityRuntimeHasNotBeenChecked").replace(
+                      "{name}",
+                      providerName,
+                    )
                 : installation?.totalBytes
                   ? t("webCopy.sizeMBDownload").replace(
                       "{size}",
@@ -201,7 +220,7 @@ function ProviderSetupActions({
 
   async function removeRuntime() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      t("settingsC.providerSetupSection.removeRuntimeConfirm").replace(
+      named(t("settingsC.providerSetupSection.removeRuntimeConfirm")).replace(
         "{environment}",
         environmentLabel,
       ),
@@ -223,7 +242,7 @@ function ProviderSetupActions({
       <SettingsRow
         title={t("settingsC.providerSetupSection.runtime")}
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        description={t("settingsC.providerSetupSection.runtimeDesc")}
+        description={named(t("settingsC.providerSetupSection.runtimeDesc"))}
         status={
           <div className="space-y-2">
             {usesCustomBinary ? (
@@ -248,7 +267,7 @@ function ProviderSetupActions({
               installation.totalBytes !== null &&
               installation.totalBytes > 0 ? (
                 <progress
-                  aria-label={t("settingsC.providerSetupSection.downloadAria")}
+                  aria-label={named(t("settingsC.providerSetupSection.downloadAria"))}
                   // Forced-colors mode repaints the track and fill as Canvas, and
                   // appearance:auto cannot bring the native widget back: the
                   // preflight border reset marks every <progress> as author-styled,
@@ -297,13 +316,13 @@ function ProviderSetupActions({
                     {installation?.installedVersion
                       ? installation.version &&
                         installation.version !== installation.installedVersion
-                        ? t("settingsC.providerSetupSection.updateAntigravity")
-                        : t("settingsC.providerSetupSection.reinstallAntigravity")
+                        ? named(t("settingsC.providerSetupSection.updateProvider"))
+                        : named(t("settingsC.providerSetupSection.reinstallProvider"))
                       : installation?.phase === "failed" || installation?.phase === "cancelled"
                         ? t("settingsC.providerSetupSection.retryInstall")
                         : installed
                           ? t("settingsC.providerSetupSection.installManaged")
-                          : t("settingsC.providerSetupSection.installAntigravity")}
+                          : named(t("settingsC.providerSetupSection.installProvider"))}
                   </Button>
                 ) : null}
               </div>

@@ -37,6 +37,8 @@ import {
   isBuiltInBrowserProfileId,
   resolveBrowserProfiles,
   type BrowserImportSource,
+  type DesktopBuiltInBrowserBridge,
+  type DesktopBuiltInBrowserState,
   type PreviewAppearancePreference,
   type PreviewViewportSetting,
   managedCapabilityDenial,
@@ -46,11 +48,10 @@ import { isValidSearchUrlTemplate } from "@t3tools/shared/preview";
 import { PREVIEW_VIEWPORT_PRESETS } from "@t3tools/shared/previewViewport";
 import { MoreVertical, Plus as PlusIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
 import { resolveEnvironmentOptionLabel } from "~/components/BranchToolbar.logic";
-import { nativeBrowserTabs } from "~/browser/nativeBrowser";
 import { previewBridge } from "~/components/preview/previewBridge";
 import { cn, randomUUID } from "~/lib/utils";
 import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
@@ -825,34 +826,6 @@ function BrowserSearchEngineSetting() {
   );
 }
 
-function BrowserNativeTabsSetting() {
-  const row = useLocalizedSettingLookup();
-  const t = useT();
-  const nativeTabs = useClientSettings((settings) => settings.browserNativeTabs);
-  const updateSettings = useUpdatePrimarySettings();
-
-  return (
-    <SettingsRow
-      {...row("browser-native-tabs")}
-      resetAction={
-        nativeTabs ? null : (
-          <SettingResetButton
-            label={t("settingsB.IntegrationsSettings.resetNativeTabs")}
-            onClick={() => updateSettings({ browserNativeTabs: true })}
-          />
-        )
-      }
-      control={
-        <Switch
-          checked={nativeTabs}
-          onCheckedChange={(checked) => updateSettings({ browserNativeTabs: Boolean(checked) })}
-          aria-label={row("browser-native-tabs").title}
-        />
-      }
-    />
-  );
-}
-
 export function PullRequestLinksOpenInAppSetting() {
   const row = useLocalizedSettingLookup();
   const t = useT();
@@ -1189,6 +1162,59 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
           }
           aria-label={t("settingsB.IntegrationsSettings.autoShowAria")}
         />
+      }
+    />
+  );
+}
+
+function BuiltInBrowserSetting({ bridge }: { readonly bridge: DesktopBuiltInBrowserBridge }) {
+  const t = useT();
+  const [state, setState] = useState<DesktopBuiltInBrowserState | null>(null);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the shell's install state once, from outside React
+  useEffect(() => {
+    let cancelled = false;
+    void bridge.state().then((next) => {
+      if (!cancelled) setState(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bridge]);
+  if (!state?.supported) return null;
+  // Both restart the app when they succeed.
+  const change = (action: () => Promise<void>) => {
+    setWorking(true);
+    setError(null);
+    action().catch((cause: unknown) => {
+      setWorking(false);
+      setError(cause instanceof Error ? cause.message : String(cause));
+    });
+  };
+  const status = state.installed
+    ? t("settingsB.IntegrationsSettings.builtInBrowserInstalled").replace(
+        "{size}",
+        `${Math.round(state.sizeBytes / 1_000_000)} MB`,
+      )
+    : t("settingsB.IntegrationsSettings.builtInBrowserRemoved");
+  return (
+    <SettingsRow
+      {...searchableSetting("browser-built-in")}
+      status={error ?? `${status}. ${t("settingsB.IntegrationsSettings.builtInBrowserRestarts")}`}
+      control={
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={working}
+          onClick={() => change(state.installed ? bridge.remove : bridge.install)}
+        >
+          {working
+            ? t("settingsB.IntegrationsSettings.builtInBrowserWorking")
+            : state.installed
+              ? t("settingsB.IntegrationsSettings.builtInBrowserRemove")
+              : t("settingsB.IntegrationsSettings.builtInBrowserInstall")}
+        </Button>
       }
     />
   );
@@ -1709,7 +1735,9 @@ export function BrowserSettingsPanel() {
         <AgentBrowserAccessSetting />
       </SettingsSection>
       <SettingsSection id="browser" title={t("settingsB.IntegrationsSettings.sectionBrowsing")}>
-        {nativeBrowserTabs ? <BrowserNativeTabsSetting /> : null}
+        {window.desktopBridge?.builtInBrowser ? (
+          <BuiltInBrowserSetting bridge={window.desktopBridge.builtInBrowser} />
+        ) : null}
         {hasNativeBrowser || desktopOnlyMessage ? (
           <SettingsUnavailableGroup message={desktopOnlyMessage}>
             <BrowserProfilesSetting disabled={desktopOnly} />

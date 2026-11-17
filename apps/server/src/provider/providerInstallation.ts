@@ -1,5 +1,6 @@
 import {
   AntigravitySettings,
+  ClaudeSettings,
   CodexSettings,
   ProviderDriverKind,
   type ProviderInstallCancelInput,
@@ -18,6 +19,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
+import * as ClaudeInstallation from "./ClaudeInstallation.ts";
 import * as CodexInstallation from "./CodexInstallation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as AntigravityInstallation from "./AntigravityInstallation.ts";
@@ -27,9 +29,37 @@ import * as ProviderRegistry from "./ProviderRegistry.ts";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 
 const ANTIGRAVITY = ProviderDriverKind.make("antigravity");
+const CODEX = ProviderDriverKind.make("codex");
+const CLAUDE = ProviderDriverKind.make("claudeAgent");
 const hasBinaryPath = Schema.is(Schema.Struct({ binaryPath: Schema.String }));
 const decodeCodexSettings = Schema.decodeUnknownEffect(CodexSettings);
 const decodeAntigravitySettings = Schema.decodeUnknownEffect(AntigravitySettings);
+const decodeClaudeSettings = Schema.decodeUnknownEffect(ClaudeSettings);
+
+type InstallationError =
+  | AntigravityInstallation.AntigravityInstallationError
+  | ClaudeInstallation.ClaudeInstallationError
+  | CodexInstallation.CodexInstallationError;
+interface InstallationTarget {
+  readonly installation: {
+    readonly start: Effect.Effect<ProviderInstallState, InstallationError>;
+    readonly cancel: (
+      operationId: string,
+    ) => Effect.Effect<ProviderInstallState, InstallationError>;
+    readonly state: Effect.Effect<ProviderInstallState>;
+    readonly changes: Stream.Stream<ProviderInstallState>;
+    readonly remove: (
+      protectedBinaryPaths?: ReadonlyArray<string>,
+    ) => Effect.Effect<void, InstallationError>;
+  };
+  readonly decode: (
+    config: unknown,
+  ) => Effect.Effect<
+    { readonly binaryPath: string; readonly setupMode?: "managed" | "existing" },
+    Schema.SchemaError
+  >;
+  readonly managed?: { readonly name: string; readonly defaultBinary: string };
+}
 
 export class ProviderInstallation extends Context.Service<
   ProviderInstallation,
@@ -52,6 +82,7 @@ export class ProviderInstallation extends Context.Service<
 const make = Effect.fn("makeProviderInstallation")(function* () {
   const antigravityInstallation = yield* AntigravityInstallation.AntigravityInstallation;
   const codexInstallation = yield* CodexInstallation.CodexInstallation;
+  const claudeInstallation = yield* ClaudeInstallation.ClaudeInstallation;
   const instances = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
   const providers = yield* ProviderRegistry.ProviderRegistry;
   const settings = yield* ServerSettings.ServerSettingsService;
@@ -83,37 +114,49 @@ const make = Effect.fn("makeProviderInstallation")(function* () {
     managedOnly = false,
   ) {
     const instance = yield* instances.getInstance(instanceId);
-    const isCodex = instance?.driverKind === ProviderDriverKind.make("codex");
-    if (instance?.driverKind !== ANTIGRAVITY && !isCodex) {
+    const target: InstallationTarget | undefined =
+      instance?.driverKind === ANTIGRAVITY
+        ? { installation: antigravityInstallation, decode: decodeAntigravitySettings }
+        : instance?.driverKind === CODEX
+          ? {
+              installation: codexInstallation,
+              decode: decodeCodexSettings,
+              managed: { name: "Codex", defaultBinary: "codex" },
+            }
+          : instance?.driverKind === CLAUDE
+            ? {
+                installation: claudeInstallation,
+                decode: decodeClaudeSettings,
+                managed: { name: "Claude", defaultBinary: "claude" },
+              }
+            : undefined;
+    if (instance === undefined || target === undefined) {
       return yield* new ProviderSetupError({
         instanceId,
         operation,
         detail: "Managed installation is not available for this provider instance.",
       });
     }
-    const installation = isCodex ? codexInstallation : antigravityInstallation;
     const entries = yield* readEntries(instanceId, operation);
-    const invalidConfig = () =>
-      new ProviderSetupError({
-        instanceId,
-        operation,
-        detail: "The provider instance configuration is invalid.",
-      });
-    const config = isCodex
-      ? yield* decodeCodexSettings(entries[instanceId]?.config ?? {}).pipe(
-          Effect.mapError(invalidConfig),
-        )
-      : yield* decodeAntigravitySettings(entries[instanceId]?.config ?? {}).pipe(
-          Effect.mapError(invalidConfig),
-        );
-    if (isCodex && (!("setupMode" in config) || config.setupMode !== "managed")) {
+    const config = yield* target.decode(entries[instanceId]?.config ?? {}).pipe(
+      Effect.mapError(
+        () =>
+          new ProviderSetupError({
+            instanceId,
+            operation,
+            detail: "The provider instance configuration is invalid.",
+          }),
+      ),
+    );
+    const managed = target.managed;
+    if (managed && config.setupMode !== "managed") {
       return yield* new ProviderSetupError({
         instanceId,
         operation,
-        detail: "Choose managed setup to install Codex in Gustaf.",
+        detail: `Choose managed setup to install ${managed.name} in Gustaf.`,
       });
     }
-    if (managedOnly && config.binaryPath && (!isCodex || config.binaryPath !== "codex")) {
+    if (managedOnly && config.binaryPath && config.binaryPath !== managed?.defaultBinary) {
       return yield* new ProviderSetupError({
         instanceId,
         operation,
@@ -121,17 +164,11 @@ const make = Effect.fn("makeProviderInstallation")(function* () {
           "This instance uses a custom executable. Clear its binary path to manage installation in Gustaf.",
       });
     }
-    return { installation, driver: instance.driverKind };
+    return { installation: target.installation, driver: instance.driverKind };
   });
 
-  const failure =
-    (instanceId: ProviderInstanceId) =>
-    (
-      error:
-        | AntigravityInstallation.AntigravityInstallationError
-        | CodexInstallation.CodexInstallationError,
-    ) =>
-      new ProviderSetupError({ instanceId, operation: error.operation, detail: error.detail });
+  const failure = (instanceId: ProviderInstanceId) => (error: InstallationError) =>
+    new ProviderSetupError({ instanceId, operation: error.operation, detail: error.detail });
 
   const start = Effect.fn("ProviderInstallation.start")(function* (input: ProviderSetupInput) {
     const { installation, driver } = yield* requireInstance(input.instanceId, "install", true);

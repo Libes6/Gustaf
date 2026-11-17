@@ -170,6 +170,25 @@ describe("presentConnectionDiagnosis", () => {
     expect(stepsFor(false)).not.toContain("same network");
   });
 
+  it("offers a relay route when every saved route is local and none answers", () => {
+    const failure = mapRemoteEnvironmentError(
+      new RemoteEnvironmentAuthFetchError({ message: "Failed to fetch", cause: new TypeError() }),
+    );
+    const diagnose = (input: { lanOnly: boolean; relayPairing?: boolean }) =>
+      presentConnectionDiagnosis({
+        hostLabel: "Mac mini",
+        state: backoff(failure),
+        via: "direct",
+        ...input,
+      });
+    const phone = diagnose({ lanOnly: true, relayPairing: true });
+    expect(phone?.suggestRelayRoute).toBe(true);
+    expect(phone?.steps[0]).toContain("Remote access → Connect a phone");
+    expect(diagnose({ lanOnly: true })?.suggestRelayRoute).toBe(false);
+    expect(diagnose({ lanOnly: true })?.steps[0]).not.toContain("Connect a phone");
+    expect(diagnose({ lanOnly: false, relayPairing: true })?.suggestRelayRoute).toBe(false);
+  });
+
   it("keeps the relay health status out of a failure that has its own cause", () => {
     const failure = mapRemoteEnvironmentError(
       new RemoteEnvironmentAuthFetchError({ message: "Failed to fetch", cause: new TypeError() }),

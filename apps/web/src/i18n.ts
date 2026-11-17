@@ -211,9 +211,9 @@ const baseMessages = {
     "setting.proactive-panels.title": "Open pull requests and changes panels proactively",
     "setting.proactive-panels.description":
       "Open linked pull requests first. Otherwise, open Changes for edits to at least 3 files or 50 lines.",
-    "setting.browser-native-tabs.title": "Native browser tabs",
-    "setting.browser-native-tabs.description":
-      "Your own tabs run in a native macOS web view, which uses far less CPU. Turn off to stream them from the server's browser like agent tabs. Applies to new tabs.",
+    "setting.browser-built-in.title": "Built-in browser",
+    "setting.browser-built-in.description":
+      "Chromium draws your browser tabs in the app, and agents work in the same tab you see. Without it, tabs stream from the server's browser.",
     "setting.pull-request-links-open-in-app.title": "Open pull requests in Gustaf",
     "setting.pull-request-links-open-in-app.description":
       "Clicking a pull request link opens it in Gustaf. Turn off to open pull request links like any other link, on your git host.",
@@ -423,9 +423,9 @@ const baseMessages = {
     "setting.proactive-panels.title": "Сами открывать запросы и изменения",
     "setting.proactive-panels.description":
       "Сначала открывать связанный запрос. Иначе открывать изменения, если правок не меньше 3 файлов или 50 строк.",
-    "setting.browser-native-tabs.title": "Нативные вкладки браузера",
-    "setting.browser-native-tabs.description":
-      "Ваши вкладки работают в нативном веб-представлении macOS и тратят намного меньше CPU. Выключите, чтобы транслировать их из браузера сервера, как вкладки агентов. Действует для новых вкладок.",
+    "setting.browser-built-in.title": "Встроенный браузер",
+    "setting.browser-built-in.description":
+      "Chromium показывает вкладки браузера прямо в приложении, и агент работает в той же вкладке, что видите вы. Без него вкладки показываются стримом из браузера сервера.",
     "setting.pull-request-links-open-in-app.title": "Открывать запросы в Gustaf",
     "setting.pull-request-links-open-in-app.description":
       "Ссылка на запрос открывается в Gustaf. Выключите, чтобы открывать её как обычную ссылку на хосте git.",

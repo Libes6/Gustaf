@@ -60,6 +60,7 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const inputFd = config.desktopBrowserFd;
   const controlFd = config.desktopBrowserControlFd;
+  const socketPath = config.desktopBrowserSocket;
   const changes = yield* PubSub.unbounded<{ key: DesktopTabKey; attached: boolean }>();
   const attachedTabs = new Set<string>();
   // Missing reports protect desktop tabs until the renderer explicitly marks them hidden.
@@ -67,7 +68,7 @@ const make = Effect.gen(function* () {
   const inbound = new Map<string, Queue.Queue<string>>();
   const writeLock = yield* Semaphore.make(1);
 
-  if (inputFd === undefined || controlFd === undefined) {
+  if (socketPath === undefined && (inputFd === undefined || controlFd === undefined)) {
     return DesktopBrowserChannel.of({
       available: false,
       awaitAttached: Effect.fn("DesktopBrowserChannel.awaitAttached")(function () {
@@ -91,21 +92,30 @@ const make = Effect.gen(function* () {
     });
   }
 
+  // Use cancellable socket reads; filesystem pipe reads keep Node alive after scope shutdown.
+  const readable = yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      socketPath === undefined
+        ? new NodeNet.Socket({ fd: inputFd, readable: true, writable: false })
+        : NodeNet.createConnection(socketPath),
+    ),
+    (stream) => Effect.sync(() => stream.destroy()),
+  );
+  const write = (bytes: Buffer) =>
+    socketPath === undefined && controlFd !== undefined
+      ? writeAllToFileDescriptor(controlFd, bytes)
+      : Effect.callback<void, Error>((resume) => {
+          readable.write(bytes, (error) => resume(error ? Effect.fail(error) : Effect.void));
+        });
   const command = (message: DesktopBrowserCommandType) =>
     writeLock.withPermits(1)(
       encodeCommand(message).pipe(
-        Effect.flatMap((line) => writeAllToFileDescriptor(controlFd, Buffer.from(`${line}\n`))),
+        Effect.flatMap((line) => write(Buffer.from(`${line}\n`))),
         Effect.catchCause((cause) =>
           Effect.logWarning("desktop browser command failed", { cause }),
         ),
       ),
     );
-
-  // Use cancellable socket reads; filesystem pipe reads keep Node alive after scope shutdown.
-  const readable = yield* Effect.acquireRelease(
-    Effect.sync(() => new NodeNet.Socket({ fd: inputFd, readable: true, writable: false })),
-    (stream) => Effect.sync(() => stream.destroy()),
-  );
   yield* NodeStream.fromReadable<Uint8Array, Error>({
     evaluate: () => readable,
     closeOnDone: true,

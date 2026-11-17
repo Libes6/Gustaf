@@ -1,0 +1,8 @@
+{
+  "id": "browser-cef",
+  "version": "156.0.30",
+  "url": "http://127.0.0.1:8765/browser-cef-156.0.30-macos-arm64.tar.xz",
+  "sha256": "c2d5f1ae7e5d97cedcd5feda156dc17447afd86ce323876b488f8cd142e57aee",
+  "size": 105035828,
+  "installDir": "browser-cef"
+}

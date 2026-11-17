@@ -154,9 +154,9 @@ const INIT_SCRIPT: &str = r#"(() => {
     method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
   });
 
-  // The user's browser tabs as native web views over the page (native_browser.rs), macOS only.
+  // Browser tabs drawn by Chromium over the page (native_browser.rs), when the app has it.
   const nativeBrowser = (() => {
-    if (__GUSTAF_PLATFORM__ !== "darwin") return undefined;
+    if (!__GUSTAF_RENDERS_SERVER_TABS__) return undefined;
     const stateListeners = new Set();
     const linkListeners = new Set();
     window.__gustafNativeBrowserState = (state) => {
@@ -199,8 +199,19 @@ const INIT_SCRIPT: &str = r#"(() => {
     });
   })();
 
+  // Remove or reinstall the built-in browser (browser_module.rs); each restarts the app.
+  const builtInBrowser =
+    __GUSTAF_PLATFORM__ === "darwin"
+      ? Object.freeze({
+          state: () => invoke("browser_module_state"),
+          remove: () => invoke("browser_module_remove"),
+          install: () => invoke("browser_module_install"),
+        })
+      : undefined;
+
   window.desktopBridge = {
     ...(nativeBrowser ? { nativeBrowser } : {}),
+    ...(builtInBrowser ? { builtInBrowser } : {}),
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
     setNotificationBadge: async () => {},
@@ -395,6 +406,7 @@ pub(crate) fn init_script(
     version: &str,
     bootstraps_json: &serde_json::Value,
     platform: &str,
+    renders_server_tabs: bool,
 ) -> String {
     let version = serde_json::to_string(version).unwrap_or_else(|_| "null".to_owned());
     let bootstraps = serde_json::to_string(bootstraps_json).unwrap_or_else(|_| "[]".to_owned());
@@ -403,6 +415,7 @@ pub(crate) fn init_script(
         .replace("__GUSTAF_VERSION__", &version)
         .replace("__GUSTAF_BOOTSTRAPS__", &bootstraps)
         .replace("__GUSTAF_PLATFORM__", &platform)
+        .replace("__GUSTAF_RENDERS_SERVER_TABS__", &renders_server_tabs.to_string())
 }
 
 #[tauri::command]
@@ -584,7 +597,7 @@ mod tests {
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {
-        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin");
+        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin", false);
         assert!(script.contains(r#"version: "0.8.3\"; alert(1); \"","#));
         assert!(!script.contains("__GUSTAF_VERSION__"));
     }
@@ -601,8 +614,10 @@ mod tests {
                 "bootstrapToken": "tok",
             }]),
             "darwin",
+            false,
         );
         assert!(script.contains("window.desktopBridge = {"));
+        assert!(!script.contains("__GUSTAF_RENDERS_SERVER_TABS__"));
         assert!(!script.contains("preview:"));
         assert!(script.contains("getLocalEnvironmentBootstraps"));
         assert!(script.contains("http://127.0.0.1:3773"));

@@ -1,0 +1,14 @@
+{
+  "build": {
+    "features": ["cef-browser"],
+    "beforeBundleCommand": "node scripts/stage-browser.mjs"
+  },
+  "bundle": {
+    "macOS": {
+      "files": {
+        "Frameworks/Chromium Embedded Framework.framework": "target/browser/Chromium Embedded Framework.framework",
+        "Frameworks/Gustaf Browser Helper.app": "target/browser/Gustaf Browser Helper.app"
+      }
+    }
+  }
+}
