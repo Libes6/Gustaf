@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { type RefObject, use, useRef, useState } from "react";
 import { Keyboard, type TextInputInstance, View } from "react-native";
 import { useHardwareBack } from "../../lib/backHandler";
@@ -99,7 +100,7 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
       <SearchField
         inputRef={searchState.inputRef}
         accessibilityLabel={searchLabel}
-        clearAccessibilityLabel={search.clearAccessibilityLabel ?? "Clear search"}
+        clearAccessibilityLabel={search.clearAccessibilityLabel ?? t("Clear search")}
         placeholder={
           search.compactToolbar
             ? (search.compactPlaceholder ?? search.placeholder)
@@ -187,7 +188,7 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
       leading={
         (props.onClose ? (
           <AndroidHeaderIconButton
-            accessibilityLabel={props.closeAccessibilityLabel ?? "Close"}
+            accessibilityLabel={props.closeAccessibilityLabel ?? t("Close")}
             icon="xmark"
             onPress={props.onClose}
           />
@@ -225,7 +226,7 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
             {confirmButton}
             {closeInspector ? (
               <AndroidHeaderIconButton
-                accessibilityLabel="Close inspector"
+                accessibilityLabel={t("Close inspector")}
                 icon="xmark"
                 onPress={closeInspector}
               />
@@ -265,20 +266,20 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
               {inline ? (
                 props.onClose ? (
                   <ScreenHeaderButton
-                    accessibilityLabel={props.closeAccessibilityLabel ?? "Close"}
+                    accessibilityLabel={props.closeAccessibilityLabel ?? t("Close")}
                     icon="xmark"
                     onPress={props.onClose}
                   />
                 ) : props.onBack ? (
                   <ScreenHeaderButton
-                    accessibilityLabel="Navigate up"
+                    accessibilityLabel={t("Navigate up")}
                     icon="arrow.left"
                     onPress={props.onBack}
                   />
                 ) : null
               ) : (
                 <ScreenHeaderButton
-                  accessibilityLabel={search.closeAccessibilityLabel ?? "Close search"}
+                  accessibilityLabel={search.closeAccessibilityLabel ?? t("Close search")}
                   icon="arrow.left"
                   onPress={closeSearch}
                 />

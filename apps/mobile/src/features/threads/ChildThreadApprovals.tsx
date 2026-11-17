@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { AuthOrchestrationOperateScope, type ScopedThreadRef } from "@t3tools/contracts";
 import type { ChildThreadApproval } from "@t3tools/client-runtime/state/thread-requests";
@@ -22,7 +23,7 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
   return (
     <View className="mx-3.5 my-2 gap-2">
       <AppText className="font-t3-bold text-sm text-foreground">
-        Approval from {entry.title}
+        {t("Approval from")} {entry.title}
       </AppText>
       <PendingApprovalCard
         canOperateThread={canRespond}

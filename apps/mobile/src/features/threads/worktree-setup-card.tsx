@@ -44,7 +44,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
   const handedOff = turnStarted && worktreeSetupAgentStarted(snapshot);
   const running = snapshot.phase === "running";
   const backgroundSetup = handedOff && running;
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? t("Setup script");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const now = useVisibleSecondClock(running || working);
   const failed =
@@ -85,7 +85,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
           accessibilityLabel={
             backgroundSetup
               ? `Background setup is still running: ${scriptName}. Show setup progress.`
-              : "Worktree setup details"
+              : t("Worktree setup details")
           }
           accessibilityState={{ expanded: detailsOpen }}
           onPress={() => setDetailsOpen(true)}
@@ -116,7 +116,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
               />
             ) : null}
             <Text numberOfLines={1} className="shrink text-2xs text-foreground-secondary">
-              {backgroundSetup ? "Background setup" : "Details"}
+              {backgroundSetup ? t("Background setup") : t("Details")}
             </Text>
             {!backgroundSetup ? (
               <SymbolView name="chevron.right" size={10} tintColorClassName="accent-icon-muted" />
@@ -232,9 +232,9 @@ function SetupDetailsSheet({
         {canCancel ? (
           <View className="mt-3 flex-row items-center justify-end gap-4 border-t border-border pt-1">
             <Button
-              label="Cancel setup"
+              label={t("Cancel setup")}
               tone="danger"
-              accessibilityLabel="Cancel worktree setup"
+              accessibilityLabel={t("Cancel worktree setup")}
               onPress={() => {
                 onClose();
                 onCancel();
@@ -350,7 +350,7 @@ const OUTPUT_TAIL_SLOTS = [0, 1, 2, 3] as const;
 function OutputTail({ lines, failed }: { lines: ReadonlyArray<string>; failed: boolean }) {
   return (
     <View
-      accessibilityLabel="Setup script output"
+      accessibilityLabel={t("Setup script output")}
       className={
         failed
           ? "mb-2 ml-8 rounded-md border border-danger-border bg-danger px-3 py-2"

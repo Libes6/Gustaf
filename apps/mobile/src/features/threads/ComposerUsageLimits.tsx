@@ -22,7 +22,7 @@ export function ComposerUsageLimits({
   const now = Date.parse(report.createdAt);
   const close = (
     <Pressable
-      accessibilityLabel="Dismiss usage limits"
+      accessibilityLabel={t("Dismiss usage limits")}
       accessibilityRole="button"
       hitSlop={12}
       onPress={onClose}

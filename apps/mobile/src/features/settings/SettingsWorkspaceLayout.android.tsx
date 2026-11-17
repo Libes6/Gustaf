@@ -50,7 +50,7 @@ export function SettingsWorkspaceLayout(props: { readonly children: ReactNode })
             <NavigationRouteContext value={route}>
               <SettingsScreen title={t("Settings")} workspaceRoot>
                 <View className="flex-1 items-center justify-center p-6">
-                  <AppText className="text-foreground-muted">Select a setting</AppText>
+                  <AppText className="text-foreground-muted">{t("Select a setting")}</AppText>
                 </View>
               </SettingsScreen>
             </NavigationRouteContext>

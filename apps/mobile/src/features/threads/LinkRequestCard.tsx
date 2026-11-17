@@ -136,7 +136,7 @@ function PendingLinkRequest(props: {
       <View className="gap-1">
         <Text className="font-t3-bold text-base text-foreground">
           {picksMachine(item)
-            ? "Link a machine to this environment"
+            ? t("Link a machine to this environment")
             : `Link ${target} to this environment`}
         </Text>
         {item.reason.trim() ? (
@@ -160,7 +160,7 @@ function PendingLinkRequest(props: {
       {canAnswer ? (
         <>
           <Button
-            label={picksMachine(item) ? "Choose machine…" : "Review link…"}
+            label={picksMachine(item) ? t("Choose machine…") : t("Review link…")}
             disabled={declining}
             onPress={() => setOpen(true)}
             tone="primary"
@@ -319,7 +319,7 @@ function LinkRequestSheet(props: {
 
   return (
     <Sheet
-      title={pickMachine ? "Link a machine" : `Link ${targetName}`}
+      title={pickMachine ? t("Link a machine") : `Link ${targetName}`}
       onClose={props.onClose}
       // An answer that lands after a close would still link, and would close a reopened sheet.
       dismissDisabled={busy}
@@ -333,8 +333,9 @@ function LinkRequestSheet(props: {
       >
         <View className="gap-1">
           <Text className="font-sans text-sm leading-5 text-foreground-muted">
-            Agents here can then launch, message and wait on threads there. It appears in that
-            machine's Connections, where it can be revoked.
+            {t(
+              "Agents here can then launch, message and wait on threads there. It appears in that machine's Connections, where it can be revoked.",
+            )}
           </Text>
           {!pickMachine && item.url !== undefined ? (
             <Text className="font-sans text-xs text-foreground-muted" numberOfLines={1}>
@@ -359,7 +360,9 @@ function LinkRequestSheet(props: {
             ))}
             <SettingsChoiceRow
               label={t("Another address…")}
-              description="Link a machine this app does not know, by its https or Tailscale address."
+              description={t(
+                "Link a machine this app does not know, by its https or Tailscale address.",
+              )}
               selected={selected === ANOTHER_ADDRESS}
               separated={machines.length > 0}
               disabled={busy}
@@ -385,16 +388,18 @@ function LinkRequestSheet(props: {
             />
             {target.kind === "machine" ? (
               <Text className="font-sans text-xs text-foreground-muted">
-                This app has no address for {target.label} that another machine can reach. Enter its
-                https or Tailscale address.
+                {t("This app has no address for")} {target.label}{" "}
+                {t("that another machine can reach. Enter its https or Tailscale address.")}
               </Text>
             ) : null}
           </View>
         ) : null}
         {useExisting ? (
           <Text className="font-sans text-sm leading-5 text-foreground-muted">
-            This environment is already linked to {targetName}. The agent can use that link as it
-            is; change its access in Settings → Connections.
+            {t("This environment is already linked to")} {targetName}
+            {t(
+              ". The agent can use that link as it is; change its access in Settings → Connections.",
+            )}
           </Text>
         ) : target.kind === "none" ? null : (
           <>
@@ -413,8 +418,8 @@ function LinkRequestSheet(props: {
                   spellCheck={false}
                 />
                 <Text className="font-sans text-xs text-foreground-muted">
-                  Create a link on {targetName}: Settings → Connections → Create link, then paste
-                  its code here.
+                  {t("Create a link on")} {targetName}
+                  {t(": Settings → Connections → Create link, then paste its code here.")}
                 </Text>
               </View>
             )}
@@ -432,8 +437,9 @@ function LinkRequestSheet(props: {
               ))}
             </SettingsSection>
             <Text className="font-sans text-xs text-foreground-muted">
-              An agent here never gets more there than its own mode here either. Threads it starts
-              there cannot change that environment's own threads, projects or settings.
+              {t(
+                "An agent here never gets more there than its own mode here either. Threads it starts there cannot change that environment's own threads, projects or settings.",
+              )}
             </Text>
           </>
         )}
@@ -447,7 +453,7 @@ function LinkRequestSheet(props: {
           </Text>
         ) : null}
         <Button
-          label={busy ? "Linking…" : useExisting ? "Use this link" : "Link"}
+          label={busy ? t("Linking…") : useExisting ? t("Use this link") : t("Link")}
           disabled={busy || !ready}
           onPress={() => void submit()}
           tone="primary"

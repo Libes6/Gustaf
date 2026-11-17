@@ -175,8 +175,8 @@ export function AddClaudeAccount({ environment }: { readonly environment: Settin
       ) : (
         <ListActionRow
           icon="plus"
-          label="Add Claude account"
-          description="Use a Claude config folder that is already signed in on this server."
+          label={t("Add Claude account")}
+          description={t("Use a Claude config folder that is already signed in on this server.")}
           onPress={() => setAdding(true)}
         />
       )}
@@ -243,7 +243,7 @@ function ClaudeAccountForm({
         <ControlPill variant="pill" label={t("Cancel")} disabled={pending} onPress={onDone} />
         <ControlPill
           variant="primary"
-          label={instanceId === null ? "Add" : "Save"}
+          label={instanceId === null ? t("Add") : t("Save")}
           disabled={pending}
           onPress={save}
         />

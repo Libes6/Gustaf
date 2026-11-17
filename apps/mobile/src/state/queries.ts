@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   composerPullRequestsFromLinks,
   filterComposerPullRequestMatches,
@@ -434,7 +435,7 @@ export function useComposerPathSearch(target: ComposerPathSearchTarget) {
         ? null
         : canReadFiles
           ? result.error
-          : (fileAccess.error ?? "This connection cannot search host files."),
+          : (fileAccess.error ?? t("This connection cannot search host files.")),
     isPending:
       normalizedTarget.query !== debouncedTarget.query ||
       (hasTarget && (fileAccess.isPending || result.isPending)),

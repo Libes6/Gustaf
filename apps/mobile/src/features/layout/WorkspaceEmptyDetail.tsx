@@ -30,7 +30,7 @@ export function WorkspaceEmptyDetail(props: {
           <View className="w-full max-w-[430px]">
             <EmptyState
               title={t("No environments connected")}
-              detail="Add an environment to load projects and start coding sessions."
+              detail={t("Add an environment to load projects and start coding sessions.")}
               variant="plain"
               action={
                 <FloatingActionButton
@@ -53,19 +53,19 @@ export function WorkspaceEmptyDetail(props: {
             />
             <Text className="text-center text-xl font-t3-bold">
               {settings
-                ? "Select a setting"
+                ? t("Select a setting")
                 : pullRequests
-                  ? "Select a pull request"
-                  : "Select a thread"}
+                  ? t("Select a pull request")
+                  : t("Select a thread")}
             </Text>
             <Text className="text-center text-base text-foreground-muted">
               {settings
-                ? "Choose a page from the sidebar."
+                ? t("Choose a page from the sidebar.")
                 : pullRequests
-                  ? "Choose a pull request from the sidebar to review it."
+                  ? t("Choose a pull request from the sidebar to review it.")
                   : Platform.OS === "android"
-                    ? "Choose a thread from the sidebar or start a new thread."
-                    : "Choose a thread from the sidebar or start a new task."}
+                    ? t("Choose a thread from the sidebar or start a new thread.")
+                    : t("Choose a thread from the sidebar or start a new task.")}
             </Text>
             {props.onStartNewTask && !pullRequests && !settings ? (
               Platform.OS === "android" ? (

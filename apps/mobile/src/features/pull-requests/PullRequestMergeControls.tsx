@@ -171,7 +171,7 @@ export function PullRequestMergeControls(props: {
     if (AsyncResult.isFailure(response)) {
       const cause = squashAtomCommandFailure(response);
       Dialog.alert(
-        "Couldn't complete the merge action",
+        t("Couldn't complete the merge action"),
         cause instanceof Error ? cause.message : "Try again.",
       );
     }
@@ -206,9 +206,9 @@ export function PullRequestMergeControls(props: {
       <SplitButton
         label={
           busy || stateAction.busy
-            ? "Working…"
+            ? t("Working…")
             : !permissions.connected
-              ? "Reconnect to merge"
+              ? t("Reconnect to merge")
               : (status?.label ?? label)
         }
         accessibilityLabel={
@@ -224,7 +224,7 @@ export function PullRequestMergeControls(props: {
         onPress={() =>
           status?.action ? void stateAction.perform(status.action) : confirm("merge")
         }
-        menuTitle="Merge options"
+        menuTitle={t("Merge options")}
         actions={
           status?.final
             ? []
@@ -258,7 +258,7 @@ export function PullRequestMergeControls(props: {
         <Text className="px-1 text-xs text-foreground-muted">{reason}</Text>
       ) : null}
       {stack.error && stack.supportsStackActions ? (
-        <Button label="Retry stack lookup" tone="text" onPress={stack.refresh} />
+        <Button label={t("Retry stack lookup")} tone="text" onPress={stack.refresh} />
       ) : null}
     </View>
   );

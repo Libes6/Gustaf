@@ -147,9 +147,9 @@ export function ThreadMarkdownImageView(props: {
         <MediaActionsMenu media={mediaActions}>
           <Pressable
             accessibilityRole="imagebutton"
-            accessibilityLabel={props.alt ?? "Markdown image"}
+            accessibilityLabel={props.alt ?? t("Markdown image")}
             accessibilityHint={
-              mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
+              mediaActions.actions.length > 0 ? t("Touch and hold for media actions") : undefined
             }
             className="items-center justify-center rounded-[10px] bg-md-code-bg"
             style={frameStyle}
@@ -158,7 +158,7 @@ export function ThreadMarkdownImageView(props: {
               <Text className="px-3 text-center text-xs text-foreground-muted">
                 {props.unavailableDetail
                   ? `Image unavailable. ${props.unavailableDetail}`
-                  : "Image unavailable"}
+                  : t("Image unavailable")}
               </Text>
             ) : (
               <AppActivityIndicator />
@@ -170,16 +170,16 @@ export function ThreadMarkdownImageView(props: {
           <MediaActionsMenu media={mediaActions}>
             <Pressable
               accessibilityRole="imagebutton"
-              accessibilityLabel={props.alt ?? "Markdown image"}
+              accessibilityLabel={props.alt ?? t("Markdown image")}
               accessibilityHint={
-                mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
+                mediaActions.actions.length > 0 ? t("Touch and hold for media actions") : undefined
               }
               onPress={() =>
                 props.onPressPreview(
                   withGallery({
                     kind: "image",
                     uri: props.uri!,
-                    name: props.actionsSource?.name ?? props.alt ?? "Image",
+                    name: props.actionsSource?.name ?? props.alt ?? t("Image"),
                     sourceIdentifier,
                     actionsSource: props.actionsSource,
                   }),

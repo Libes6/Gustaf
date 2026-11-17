@@ -286,19 +286,19 @@ function UsageScreen(props: {
                 <ChatGptUsageSummary selectedEnvironmentIds={selectedEnvironmentIds} />
                 {merged.duplicateSources.length > 0 ? (
                   <Text className="text-sm text-foreground-muted">
-                    Counted once across environments sharing a transcript directory:{" "}
+                    {t("Counted once across environments sharing a transcript directory:")}{" "}
                     {merged.duplicateSources.join(", ")}
                   </Text>
                 ) : null}
                 {isPending ? (
                   <Text className="py-16 text-center text-base text-foreground-muted">
-                    Scanning provider transcripts…
+                    {t("Scanning provider transcripts…")}
                   </Text>
                 ) : selectedEnvironments.length === 0 ? (
                   <Text className="py-16 text-center text-base text-foreground-muted">
                     {environments.length === 0
-                      ? "Connect an environment to see usage."
-                      : "Select an environment to see usage."}
+                      ? t("Connect an environment to see usage.")
+                      : t("Select an environment to see usage.")}
                   </Text>
                 ) : !canReadDiagnostics ? (
                   <View className="gap-2 py-16">
@@ -426,7 +426,7 @@ function ChartCard(props: {
     <UsageDailyChart days={props.days} daily={props.daily} metric={metric} height={height} />
   ) : (
     <View style={{ height }} className="items-center justify-center">
-      <Text className="text-base text-foreground-muted">No activity in this window.</Text>
+      <Text className="text-base text-foreground-muted">{t("No activity in this window.")}</Text>
     </View>
   );
 
@@ -489,14 +489,14 @@ function UsageSummary(props: { readonly merged: MergedUsage; readonly metric: Us
   return (
     <View className="gap-0.5">
       <Text className="text-sm text-foreground-muted">
-        {metric === "cost" ? "Raw token cost" : "Processed tokens"}
+        {metric === "cost" ? t("Raw token cost") : t("Processed tokens")}
       </Text>
       <Text className="text-4xl font-t3-bold tabular-nums text-foreground">
         {metric === "cost" ? `${formatUsd(merged.costUsd)}*` : formatTokens(merged.totalTokens)}
       </Text>
       <Text className="text-sm text-foreground-muted">
         {metric === "cost"
-          ? "* if billed at full API rate"
+          ? t("* if billed at full API rate")
           : `Across ${formatCount(merged.sessions)} sessions`}
       </Text>
     </View>
@@ -606,7 +606,7 @@ function TotalsSection(props: {
           detail={
             merged.costUsd > 0
               ? `${(merged.costQuality.cacheSavingsUsd / merged.costUsd).toFixed(1)}x the raw cost`
-              : "vs full input rates"
+              : t("vs full input rates")
           }
         />
         <MetricCell
@@ -631,7 +631,7 @@ function TotalsSection(props: {
           columns={props.columns}
           label={t("Unpriced")}
           value={formatPercent(merged.costQuality.unpricedShare)}
-          detail="of records, excluded from cost"
+          detail={t("of records, excluded from cost")}
         />
       </View>
     </SettingsSection>
@@ -665,7 +665,7 @@ function CostSection(props: { readonly merged: MergedUsage; readonly wide: boole
     <SettingsSection title={t("Cost")}>
       <View className={props.wide ? "flex-row" : undefined}>
         <View className={props.wide ? "min-w-0 flex-1" : undefined}>
-          <ShareBar label="By type" segments={byType} />
+          <ShareBar label={t("By type")} segments={byType} />
         </View>
         {speedCost.fast + speedCost.ultrafast > 0 ? (
           <View
@@ -676,7 +676,7 @@ function CostSection(props: { readonly merged: MergedUsage; readonly wide: boole
             }
           >
             <ShareBar
-              label="By speed"
+              label={t("By speed")}
               segments={bySpeed}
               aside={`${formatUsd(speedCost.premium)} premium`}
             />
@@ -757,7 +757,7 @@ function ModelsSection(props: {
   );
 
   return (
-    <SettingsSection title="By model">
+    <SettingsSection title={t("By model")}>
       <View className="flex-row flex-wrap">
         {ordered.map((model, index) => (
           <View
@@ -791,7 +791,7 @@ function ModelsSection(props: {
               {metric === "tokens"
                 ? formatTokens(model.totalTokens)
                 : isModelCostUnknown(model)
-                  ? "Unpriced"
+                  ? t("Unpriced")
                   : formatUsd(model.costUsd)}
             </Text>
           </View>

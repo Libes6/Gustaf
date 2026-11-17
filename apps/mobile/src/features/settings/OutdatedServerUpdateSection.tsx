@@ -77,23 +77,23 @@ export function OutdatedServerUpdateSection({
   }
 
   return (
-    <SettingsSection title="Gustaf">
+    <SettingsSection title={t("Gustaf")}>
       <View className="gap-1 p-4">
         <Text className="text-base text-foreground">
-          {release ? `Version ${release.fromVersion}` : "Update required"}
+          {release ? `Version ${release.fromVersion}` : t("Update required")}
         </Text>
         <Text className="text-sm text-foreground-muted">
           {state.status === "running"
             ? state.stage === "resuming"
-              ? "Restarting and reconnecting…"
+              ? t("Restarting and reconnecting…")
               : state.stage === "installing"
-                ? "Installing update…"
-                : "Downloading update…"
+                ? t("Installing update…")
+                : t("Downloading update…")
             : release
               ? release.targetVersion
                 ? `Version ${release.targetVersion} is available.`
-                : "No newer version is available yet."
-              : "This app needs a newer version of Gustaf on this machine."}
+                : t("No newer version is available yet.")
+              : t("This app needs a newer version of Gustaf on this machine.")}
         </Text>
         {error || state.status === "failed" ? (
           <Text selectable accessibilityRole="alert" className="text-sm text-danger-foreground">
@@ -115,7 +115,9 @@ export function OutdatedServerUpdateSection({
       ) : release?.targetVersion ? (
         <SettingsActionRow
           icon="arrow.up.circle"
-          label={state.status === "failed" ? "Retry update" : `Update to ${release.targetVersion}`}
+          label={
+            state.status === "failed" ? t("Retry update") : `Update to ${release.targetVersion}`
+          }
           disabled={busy}
           loading={state.status === "running"}
           onPress={requestUpdate}

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import {
   capitalizeTerm,
@@ -133,7 +134,7 @@ export function PullRequestEditScreen({ route }: StaticScreenProps<PullRequestEd
         <Button
           fullWidth
           tone="contrast"
-          label={busy ? "Saving…" : "Save"}
+          label={busy ? t("Saving…") : t("Save")}
           loading={busy}
           disabled={!allowed || unchanged || invalid || original === null}
           onPress={() => void save()}
@@ -153,9 +154,9 @@ export function PullRequestEditScreen({ route }: StaticScreenProps<PullRequestEd
             ? `${capitalizeTerm(singular)} title`
             : params.field === "body"
               ? `${capitalizeTerm(singular)} description`
-              : "Comment"
+              : t("Comment")
         }
-        placeholder={params.field === "title" ? "Title" : "Write in Markdown…"}
+        placeholder={params.field === "title" ? t("Title") : t("Write in Markdown…")}
         placeholderTextColorClassName="accent-foreground-muted"
         maxLength={params.field === "title" ? 1024 : 65536}
         value={value}

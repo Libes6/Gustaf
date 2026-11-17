@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   createNavigatorFactory,
   NavigationContext,
@@ -476,7 +477,7 @@ function WorkspaceColumns(
                     pointerEvents="box-none"
                   >
                     <WorkspacePaneDivider
-                      accessibilityLabel="Resize inspector"
+                      accessibilityLabel={t("Resize inspector")}
                       currentWidth={inspectorWidth}
                       resizeDirection={-1}
                       onResizeStart={() => {

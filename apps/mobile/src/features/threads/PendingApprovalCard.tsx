@@ -41,7 +41,7 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   return (
     <View className="gap-2.5 rounded-[20px] border border-border bg-card-alt p-4">
       <Text className="font-t3-bold text-2xs uppercase tracking-[1.1px] text-foreground-secondary">
-        Approval needed
+        {t("Approval needed")}
       </Text>
       <Text className="font-t3-bold text-lg text-foreground">
         {props.approval.appName ?? props.approval.requestKind}
@@ -74,8 +74,9 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
       ) : null}
       {!canRespond ? (
         <Text className="font-sans text-sm leading-5 text-foreground-muted">
-          The provider process for this request is no longer available. Interrupt or restart the run
-          to continue.
+          {t(
+            "The provider process for this request is no longer available. Interrupt or restart the run to continue.",
+          )}
         </Text>
       ) : null}
       {warning ? (
@@ -101,7 +102,7 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
       </View>
       {!props.canOperateThread ? (
         <Text className="font-sans text-xs text-foreground-muted">
-          This connection cannot respond to approvals.
+          {t("This connection cannot respond to approvals.")}
         </Text>
       ) : null}
     </View>

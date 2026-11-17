@@ -123,12 +123,12 @@ function EnvironmentPickerRow(props: {
           )}
           {state.retryAt ? (
             <Text className="text-sm text-foreground-muted">
-              Next reconnect at {new Date(state.retryAt).toLocaleTimeString()}
+              {t("Next reconnect at")} {new Date(state.retryAt).toLocaleTimeString()}
             </Text>
           ) : null}
           {connection?.phase !== "connected" ? (
             <Button
-              label="Reconnect now"
+              label={t("Reconnect now")}
               onPress={() => onReconnectEnvironment(props.environmentId)}
             />
           ) : null}
@@ -282,7 +282,7 @@ export function NewTaskBranchPickerRouteScreen() {
       if (navigation.isFocused() && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         Dialog.alert(
-          "Could not switch branch",
+          t("Could not switch branch"),
           error instanceof Error ? error.message : "The branch could not be checked out.",
         );
       }
@@ -301,7 +301,7 @@ export function NewTaskBranchPickerRouteScreen() {
 
   return (
     <BranchPickerScreen
-      title={flow.workspaceMode === "worktree" ? "Base branch" : "Branch"}
+      title={flow.workspaceMode === "worktree" ? t("Base branch") : t("Branch")}
       project={flow.selectedProject}
       branches={filterNewTaskBranches(branchState.refs, branchQuery)}
       selectedBranchName={
@@ -425,12 +425,12 @@ export function BranchPickerScreen(props: {
           {props.loading ? <AppActivityIndicator /> : null}
           <Text className="text-center text-sm text-foreground-muted">
             {props.loading
-              ? "Loading branches…"
+              ? t("Loading branches…")
               : props.error
                 ? props.error
                 : props.query
-                  ? "No matching branches"
-                  : "No branches available"}
+                  ? t("No matching branches")
+                  : t("No branches available")}
           </Text>
           {!props.loading && props.error ? (
             <View className="self-center">

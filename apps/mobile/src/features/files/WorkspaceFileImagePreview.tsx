@@ -28,7 +28,7 @@ function ResolvedWorkspaceFileImagePreview(props: {
           accessibilityRole="button"
           accessibilityLabel={`Open full-screen preview of ${props.accessibilityLabel}`}
           accessibilityHint={
-            mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
+            mediaActions.actions.length > 0 ? t("Touch and hold for media actions") : undefined
           }
           disabled={loadError !== null}
           className="flex-1 p-4 active:bg-subtle-strong"
@@ -75,7 +75,7 @@ export function WorkspaceFileImagePreview(props: {
   readonly actionsSource?: MediaActionsSource;
 }) {
   if (props.uri === null) {
-    return <FilePreviewLoading message="Preparing image preview..." background="card" />;
+    return <FilePreviewLoading message={t("Preparing image preview...")} background="card" />;
   }
 
   return (

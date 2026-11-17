@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import * as Dialog from "../components/ui/Dialog";
 import {
@@ -1424,8 +1425,10 @@ function loadThreadOutbox(isActive: () => boolean): void {
   void threadOutboxManager.load().then((loaded) => {
     if (loaded || !isActive()) return;
     Dialog.alert(
-      "Some queued messages could not be loaded",
-      "Unreadable records and attachment files are still saved. Other messages can still be sent.",
+      t("Some queued messages could not be loaded"),
+      t(
+        "Unreadable records and attachment files are still saved. Other messages can still be sent.",
+      ),
       [
         { text: "Dismiss", style: "cancel" },
         { text: "Retry", onPress: () => loadThreadOutbox(isActive) },

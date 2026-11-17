@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Box, Icon, IconButton, RNHostView } from "@expo/ui/jetpack-compose";
 import { size } from "@expo/ui/jetpack-compose/modifiers";
 import type { MenuAction } from "@react-native-menu/menu";
@@ -219,7 +220,7 @@ function WorkspaceAppBarView(props: WorkspaceAppBarProps) {
         >
           <View className="flex-1 flex-row items-center gap-1">
             <AndroidHeaderIconButton
-              accessibilityLabel="Close search"
+              accessibilityLabel={t("Close search")}
               icon="arrow.left"
               onPress={search.onClose}
             />

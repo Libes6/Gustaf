@@ -103,7 +103,7 @@ function offerDownload(download: PreviewStreamDownload) {
           signal: new AbortController().signal,
         }).catch((cause: unknown) =>
           Dialog.alert(
-            "Could not save the download",
+            t("Could not save the download"),
             cause instanceof Error ? cause.message : undefined,
           ),
         ),
@@ -148,7 +148,7 @@ export function PreviewStreamWebView(
               error ? "text-center text-sm text-foreground-muted" : "text-sm text-foreground-muted"
             }
           >
-            {error || "Connecting to browser..."}
+            {error || t("Connecting to browser...")}
           </AppText>
           {error && (
             <View className="items-center">
@@ -254,7 +254,7 @@ function PreviewStreamDocumentView({
     setFileChooser(null);
     void sendFilesToPage(chooser, pick).catch((cause: unknown) =>
       Dialog.alert(
-        "Could not send the files to the page",
+        t("Could not send the files to the page"),
         cause instanceof Error ? cause.message : undefined,
       ),
     );
@@ -270,7 +270,7 @@ function PreviewStreamDocumentView({
       (text) => {
         if (text) command({ type: "text", text });
       },
-      () => Dialog.alert("Could not read the clipboard"),
+      () => Dialog.alert(t("Could not read the clipboard")),
     );
   const clearBootstrapTimer = () => {
     if (bootstrapTimer.current === null) return;
@@ -333,7 +333,7 @@ function PreviewStreamDocumentView({
           </AppText>
           {control?.canOperate ? (
             <Button
-              label={control.controller === "you" ? "Release control" : "Take control"}
+              label={control.controller === "you" ? t("Release control") : t("Take control")}
               tone="secondary"
               disabled={control.controller === "another-viewer"}
               onPress={() =>
@@ -410,7 +410,7 @@ function PreviewStreamDocumentView({
               case "status":
                 clearBootstrapTimer();
                 if (message.status === "error") {
-                  fail(message.detail ?? "Browser stream failed.");
+                  fail(message.detail ?? t("Browser stream failed."));
                   return;
                 }
                 setStatus(message.status);
@@ -434,7 +434,7 @@ function PreviewStreamDocumentView({
       {!compact && fileChooser && control?.controller === "you" ? (
         <View className="absolute inset-x-3 top-16 gap-3 rounded-xl border border-secondary-border bg-secondary p-4">
           <AppText className="text-sm text-secondary-foreground">
-            The page asks for {fileChooser.multiple ? "files" : "a file"}.
+            {t("The page asks for")} {fileChooser.multiple ? t("files") : t("a file")}.
           </AppText>
           <View className="flex-row justify-end gap-3">
             <Button label={t("Cancel")} tone="text" onPress={() => answerFileChooser(false)} />
@@ -453,7 +453,7 @@ function PreviewStreamDocumentView({
             <>
               {control.dialog.type === "prompt" ? (
                 <TextInput
-                  accessibilityLabel="Dialog response"
+                  accessibilityLabel={t("Dialog response")}
                   className="rounded-lg border border-input-border bg-input px-3 py-2 text-foreground"
                   placeholderTextColorClassName="accent-placeholder"
                   selectionColorClassName="accent-focus/32"
@@ -468,7 +468,7 @@ function PreviewStreamDocumentView({
                   onPress={() => command({ type: "dialog", accept: false })}
                 />
                 <Button
-                  label="Accept"
+                  label={t("Accept")}
                   tone="secondary"
                   onPress={() =>
                     command({
@@ -481,7 +481,9 @@ function PreviewStreamDocumentView({
               </View>
             </>
           ) : (
-            <AppText className="text-xs text-foreground-muted">Take control to respond.</AppText>
+            <AppText className="text-xs text-foreground-muted">
+              {t("Take control to respond.")}
+            </AppText>
           )}
         </View>
       ) : null}
@@ -496,7 +498,7 @@ function PreviewStreamDocumentView({
               accessibilityLiveRegion="polite"
               className="text-center text-sm text-foreground-muted"
             >
-              {status === "error" ? error : "Connecting to browser..."}
+              {status === "error" ? error : t("Connecting to browser...")}
             </AppText>
           )}
           {status === "error" && hostSetup && !compact ? (
@@ -517,7 +519,7 @@ function PreviewStreamDocumentView({
           {status === "error" && !gone && !compact ? (
             <View className="items-center">
               <Button
-                label={hostSetup ? "Try again" : "Reconnect"}
+                label={hostSetup ? t("Try again") : t("Reconnect")}
                 tone="secondary"
                 onPress={onRetry}
               />

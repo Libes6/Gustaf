@@ -46,7 +46,7 @@ function PdfDocumentPreview(props: {
       >
         <SheetHeader
           presentation="inline"
-          title={props.source.name ?? "PDF"}
+          title={props.source.name ?? t("PDF")}
           onClose={props.onRequestClose}
           actions={
             save
@@ -79,8 +79,8 @@ function DocumentPreview(props: {
     if (props.onOpenError) props.onOpenError(error);
     else
       Dialog.alert(
-        "Could not open document",
-        "A compatible viewer must be installed. Check your connection and try again.",
+        t("Could not open document"),
+        t("A compatible viewer must be installed. Check your connection and try again."),
       );
   });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- opens the attachment in an external viewer and aborts the open on cleanup
@@ -89,7 +89,7 @@ function DocumentPreview(props: {
     const input = {
       uri,
       attachment: {
-        name: name ?? "Document",
+        name: name ?? t("Document"),
         mimeType:
           props.source.mimeType ??
           (props.source.kind === "pdf" ? "application/pdf" : "application/octet-stream"),
@@ -110,9 +110,9 @@ function DocumentPreview(props: {
     <Modal transparent animationType="fade" onRequestClose={props.onRequestClose}>
       <View className="flex-1 items-center justify-center bg-backdrop p-6">
         <View className="w-full max-w-sm gap-4 rounded-2xl bg-sheet-solid p-6">
-          <Text className="font-t3-semibold text-foreground">Opening document…</Text>
+          <Text className="font-t3-semibold text-foreground">{t("Opening document…")}</Text>
           <Text className="text-foreground-muted" numberOfLines={2}>
-            {name ?? "Document"}
+            {name ?? t("Document")}
           </Text>
           <View className="items-end">
             <Button label={t("Cancel")} tone="text" onPress={props.onRequestClose} />
@@ -138,9 +138,9 @@ function ImagePreviewHeader(header: { readonly imageIndex: number }) {
   return (
     <View className="bg-black/70" style={{ paddingTop: insets.top }}>
       <MediaPreviewHeader
-        title={source?.name ?? "Image"}
+        title={source?.name ?? t("Image")}
         media={mediaActions}
-        closeAccessibilityLabel="Close image"
+        closeAccessibilityLabel={t("Close image")}
         onClose={props.onRequestClose}
       />
     </View>

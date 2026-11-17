@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { View } from "react-native";
 import { Notice } from "../../components/ui/Notice";
 
@@ -13,7 +14,7 @@ export function ComposerErrorNotice(props: {
         iconTone="danger"
         floating
         onDismiss={props.onDismiss}
-        dismissLabel="Dismiss error"
+        dismissLabel={t("Dismiss error")}
       />
     </View>
   );

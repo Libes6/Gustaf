@@ -68,7 +68,7 @@ const branchCheckouts = makeNewTaskBranchCheckouts({
     if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       Dialog.alert(
-        "Could not switch branch",
+        t("Could not switch branch"),
         error instanceof Error ? error.message : "The branch could not be checked out.",
       );
     }
@@ -202,7 +202,7 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
       {preparingBranch ? (
         <ThreadScreenFallback header={<AppBar title={t("New thread")} onBack={goBack} />}>
           <View className="flex-1 items-center justify-center bg-screen">
-            <Text className="text-foreground">Switching branch...</Text>
+            <Text className="text-foreground">{t("Switching branch...")}</Text>
           </View>
         </ThreadScreenFallback>
       ) : (

@@ -322,15 +322,15 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
         {!hasConnectedSelection || reference === null ? (
           <Text className="px-2 text-base text-foreground-muted">
             {projectSelected
-              ? "Select a project with a checkout on a connected environment."
-              : "Use the filter above to select a connected environment."}
+              ? t("Select a project with a checkout on a connected environment.")
+              : t("Use the filter above to select a connected environment.")}
           </Text>
         ) : (
           <>
             <ManagedPolicyNotice targets={targets} />
             {projectSelected ? (
               <SettingsProjectOverridesSection
-                projectLabel={selectedProject?.label ?? "Unavailable project"}
+                projectLabel={selectedProject?.label ?? t("Unavailable project")}
                 hasOverrides={targets.some((target) =>
                   PAGE_PROJECT_KEYS[props.page].some((key) => target.sources[key] === "project"),
                 )}
@@ -411,7 +411,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     />
                   ))}
                 </SettingsSection>
-                <SettingsSection title="Preview browser">
+                <SettingsSection title={t("Preview browser")}>
                   <SettingsSwitchRow
                     icon="globe"
                     label={t("Agent browser access")}
@@ -462,11 +462,13 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     onValueChange={(value) => write({ defaultAutoPull: value })}
                   />
                 </SettingsSection>
-                <SettingsSection title="Clones">
+                <SettingsSection title={t("Clones")}>
                   <SettingsSwitchRow
                     icon="folder"
                     label={t("Clone into host folders")}
-                    subtitle="Clones go to github.com/owner/repo under the Add project folder, like ghq."
+                    subtitle={t(
+                      "Clones go to github.com/owner/repo under the Add project folder, like ghq.",
+                    )}
                     value={uniform("ghqCloneLayout")}
                     disabled={disabledFor("ghqCloneLayout")}
                     onValueChange={(value) => write({ ghqCloneLayout: value })}
@@ -477,7 +479,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
 
             {props.page === "worktrees" ? (
               <>
-                <SettingsSection title="New worktrees">
+                <SettingsSection title={t("New worktrees")}>
                   <SettingsSwitchRow
                     icon="arrow.triangle.branch"
                     label={t("Start from remote")}
@@ -561,7 +563,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                 <SettingsSection title={t("Updates")}>
                   <SettingsSwitchRow
                     icon="arrow.clockwise"
-                    label="Check provider updates"
+                    label={t("Check provider updates")}
                     subtitle={managedSubtitle(
                       "enableProviderUpdateChecks",
                       projectSelected
@@ -575,7 +577,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   <View className="border-t border-border-subtle">
                     <SettingsSwitchRow
                       icon="arrow.uturn.forward"
-                      label="Continue after restart"
+                      label={t("Continue after restart")}
                       subtitle={managedSubtitle(
                         "continueThreadsAfterServerUpdate",
                         "Resume interrupted threads after an update or restart.",
@@ -630,8 +632,8 @@ function MixedValuesLabel(props: { readonly projectSelected: boolean }) {
     <Text
       accessibilityLabel={
         props.projectSelected
-          ? "Selected project checkouts use different values"
-          : "Selected environments use different values"
+          ? t("Selected project checkouts use different values")
+          : t("Selected environments use different values")
       }
       className="px-2 text-sm text-foreground-muted android:px-4"
     >
@@ -655,7 +657,8 @@ function ManagedPolicyNotice(props: { readonly targets: readonly ScopedMobileSet
   if (organizations.length === 0) return null;
   return (
     <Text className="px-2 text-sm text-foreground-muted android:px-4">
-      Some settings are managed by {organizations.join(", ")} and cannot be changed here.
+      {t("Some settings are managed by")} {organizations.join(", ")}{" "}
+      {t("and cannot be changed here.")}
     </Text>
   );
 }

@@ -58,7 +58,7 @@ export function PullRequestGuideContent({
   return (
     <Animated.View layout={PR_ROW_LAYOUT} className="w-full max-w-[760px] self-center">
       {!state.enabled ? (
-        <Text>Review guides are disabled for this server.</Text>
+        <Text>{t("Review guides are disabled for this server.")}</Text>
       ) : (
         <>
           <GuideNotice state={state} />
@@ -155,11 +155,11 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
         >
           <View className="w-full max-w-[760px] self-center gap-5">
             {!state.enabled ? (
-              <Text>Review guides are disabled for this server.</Text>
+              <Text>{t("Review guides are disabled for this server.")}</Text>
             ) : changedGuide ? (
-              <Text>This guide was rewritten. Go back to start the new tour.</Text>
+              <Text>{t("This guide was rewritten. Go back to start the new tour.")}</Text>
             ) : !stop ? (
-              <Text>{state.error ?? "Loading stop…"}</Text>
+              <Text>{state.error ?? t("Loading stop…")}</Text>
             ) : (
               <>
                 <GuideNotice state={state} />
@@ -178,7 +178,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 ) : null}
                 {stale ? (
                   <Text className="text-sm text-foreground-muted">
-                    Excerpts are hidden until the guide is rewritten for the current head.
+                    {t("Excerpts are hidden until the guide is rewritten for the current head.")}
                   </Text>
                 ) : (
                   stop.excerpts.map((excerpt) => (
@@ -202,7 +202,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 {diff.error ? <Text className="text-danger-foreground">{diff.error}</Text> : null}
                 {notes.length ? (
                   <View className="gap-4">
-                    <Text className="font-t3-semibold">Notes on this stop</Text>
+                    <Text className="font-t3-semibold">{t("Notes on this stop")}</Text>
                     {notes.map(({ marker, note }) => (
                       <View key={marker} className="flex-row gap-3">
                         <View className="h-7 w-7 items-center justify-center rounded-lg bg-grouped-card">
@@ -250,10 +250,10 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                   accessibilityRole="button"
                   accessibilityLabel={
                     guide && position < guide.stops.length - 1
-                      ? "Next stop"
+                      ? t("Next stop")
                       : canReview
-                        ? "Finish review"
-                        : "Finish tour"
+                        ? t("Finish review")
+                        : t("Finish tour")
                   }
                   className="mt-2 flex-row items-center gap-4 border-t border-border-subtle pt-5 pb-2 active:opacity-60"
                   onPress={() =>
@@ -276,14 +276,14 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                     <Text className="text-xs text-foreground-muted">
                       {guide && position < guide.stops.length - 1
                         ? `Next · ${position + 2} of ${guide.stops.length}`
-                        : "End of guide"}
+                        : t("End of guide")}
                     </Text>
                     <Text className="text-base font-t3-semibold">
                       {guide && position < guide.stops.length - 1
                         ? guide.stops[position + 1]?.title
                         : canReview
-                          ? "Finish review"
-                          : "Finish tour"}
+                          ? t("Finish review")
+                          : t("Finish tour")}
                     </Text>
                   </View>
                   <View className="h-11 w-11 items-center justify-center rounded-full bg-foreground">

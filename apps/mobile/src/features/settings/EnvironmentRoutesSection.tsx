@@ -137,7 +137,7 @@ export function EnvironmentRoutesSection({
       trailing={
         routes.length > 1 ? (
           <Button
-            label={editing ? "Done" : "Edit"}
+            label={editing ? t("Done") : t("Edit")}
             tone="text"
             onPress={() => setEditing((value) => !value)}
           />
@@ -146,7 +146,7 @@ export function EnvironmentRoutesSection({
     >
       <SettingsActionRow
         icon="checkmark.circle"
-        label="Your permissions"
+        label={t("Your permissions")}
         onPress={() => setPermissionsOpen((open) => !open)}
       />
       {permissionsOpen ? (
@@ -157,12 +157,13 @@ export function EnvironmentRoutesSection({
           session?.authenticated ? (
             <>
               <Text className="text-sm text-foreground-muted">
-                Applies to the route marked In use. Other routes may have different permissions and
-                have not been checked.
+                {t(
+                  "Applies to the route marked In use. Other routes may have different permissions and have not been checked.",
+                )}
               </Text>
               {AUTH_SCOPE_OPTIONS.map(({ scope, title }) => (
                 <Text key={scope} className="text-sm text-foreground">
-                  {title}: {sessionGrantsScope(session, scope) ? "Allowed" : "Not granted"}
+                  {title}: {sessionGrantsScope(session, scope) ? t("Allowed") : t("Not granted")}
                 </Text>
               ))}
             </>

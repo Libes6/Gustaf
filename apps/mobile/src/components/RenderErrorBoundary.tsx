@@ -89,7 +89,7 @@ export function RenderFailureView(
     readonly exit?: { readonly label: string; readonly onPress: () => void };
   },
 ) {
-  const title = props.title ?? "This screen couldn't be displayed";
+  const title = props.title ?? t("This screen couldn't be displayed");
   return (
     <ScrollView
       className="flex-1 bg-screen"

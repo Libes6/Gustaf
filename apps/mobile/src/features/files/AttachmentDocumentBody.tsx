@@ -44,28 +44,28 @@ export function AttachmentDocumentBody(props: {
     return (
       <View className="flex-1 items-center justify-center bg-sheet px-6">
         <EmptyState
-          title="File unavailable"
+          title={t("File unavailable")}
           detail={document.error}
-          actionLabel="Try again"
+          actionLabel={t("Try again")}
           onAction={document.retry}
         />
       </View>
     );
   }
   if (props.nativeViewer !== null && props.nativeViewer !== "unavailable") {
-    return <FilePreviewLoading message="Opening in file viewer..." />;
+    return <FilePreviewLoading message={t("Opening in file viewer...")} />;
   }
   // ZIP text entries are read into memory and have no file URI.
   if (document.needsText ? !document.content : !document.uri) {
-    return <FilePreviewLoading message="Loading file..." />;
+    return <FilePreviewLoading message={t("Loading file...")} />;
   }
   if (document.needsText && document.content) {
     const { content, table } = document;
     return (
       <View className="flex-1 bg-sheet">
         {content.truncated ? (
-          <FilePreviewNotice title="Partial file">
-            Preview limited to the first 1 MB. Save or share the file to read it in full.
+          <FilePreviewNotice title={t("Partial file")}>
+            {t("Preview limited to the first 1 MB. Save or share the file to read it in full.")}
           </FilePreviewNotice>
         ) : null}
         {table && document.activeMode === "table" ? (
@@ -102,9 +102,9 @@ export function AttachmentDocumentBody(props: {
         title={t("No preview for this file")}
         detail={
           props.nativeError ??
-          "No app on this device can show this format. Save or share it to open it elsewhere."
+          t("No app on this device can show this format. Save or share it to open it elsewhere.")
         }
-        actionLabel="Try again"
+        actionLabel={t("Try again")}
         onAction={props.onOpenNative}
       />
     </View>

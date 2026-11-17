@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Platform } from "react-native";
 import type { PullRequestDetail } from "@t3tools/contracts";
 import {
@@ -50,7 +51,7 @@ export function usePullRequestAgentActions(
         : items;
     return {
       id: task,
-      title: action?.title ?? "Open thread",
+      title: action?.title ?? t("Open thread"),
       image: action?.icon,
       attributes: { disabled: disabled || !links.canAsk || action?.disabled },
       ...(chooseThread ? { subactions } : {}),

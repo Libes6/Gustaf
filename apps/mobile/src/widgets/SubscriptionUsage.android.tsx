@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   Button,
   Column,
@@ -71,7 +72,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
               </Text>
               {shown.length === 0 ? (
                 <Text color={muted} maxLines={1} style={{ fontSize: 11 }}>
-                  {stale ? "Open T3 to refresh" : provider.detail}
+                  {stale ? t("Open T3 to refresh") : provider.detail}
                 </Text>
               ) : null}
               {shown.map((window) => {
@@ -115,7 +116,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
         >
           {props.checkedAt
             ? `As of ${new Date(props.checkedAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}`
-            : "Tap to connect in T3"}
+            : t("Tap to connect in T3")}
         </Text>
       </Column>
     </Button>

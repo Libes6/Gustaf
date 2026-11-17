@@ -216,7 +216,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
         await releaseShareReservation(incomingShare.id, incomingShare.destination);
       } catch (error) {
         Dialog.alert(
-          "Could not change project",
+          t("Could not change project"),
           error instanceof Error
             ? error.message
             : "The shared content reservation could not be updated.",
@@ -256,7 +256,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         Dialog.alert(
-          "Could not start without a project",
+          t("Could not start without a project"),
           error instanceof Error
             ? error.message
             : "The folder for threads without a project could not be created.",
@@ -335,7 +335,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 <NavigationRow
                   className="bg-grouped-card"
                   title={t("No project")}
-                  subtitle="Start a task without a project"
+                  subtitle={t("Start a task without a project")}
                   disabled={!canStartScratch}
                   onPress={() => void startScratch()}
                   leading={
@@ -371,7 +371,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   <View className="min-w-0 flex-1">
                     <Text className="text-base font-t3-bold leading-snug">{t("No project")}</Text>
                     <Text className="text-xs leading-snug text-foreground-muted" numberOfLines={1}>
-                      Start a task without a project
+                      {t("Start a task without a project")}
                     </Text>
                   </View>
                   <SymbolView
@@ -406,7 +406,9 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   <View>
                     <Button
                       label={
-                        catalogState.hasReadyEnvironment ? "Add new project" : "Add environment"
+                        catalogState.hasReadyEnvironment
+                          ? t("Add new project")
+                          : t("Add environment")
                       }
                       tone="primary"
                       onPress={() =>
@@ -438,7 +440,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 <>
                   <View className="mt-1">
                     <Button
-                      label="Add new project"
+                      label={t("Add new project")}
                       tone="primary"
                       onPress={() => navigation.dispatch(StackActions.push("AddProject"))}
                     />
@@ -458,10 +460,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
           ) : visibleScopes.length === 0 ? (
             <View className="items-center gap-2 px-6 py-8">
               <Text className="text-center text-lg font-t3-bold text-foreground">
-                No matching projects
+                {t("No matching projects")}
               </Text>
               <Text className="text-center text-sm leading-normal text-foreground-muted">
-                Try a different project name or workspace path.
+                {t("Try a different project name or workspace path.")}
               </Text>
             </View>
           ) : (

@@ -243,7 +243,7 @@ export function usePullRequestListFilters(props: {
         projects.find(
           (project) =>
             project.id === value.projectId && project.environmentId === value.projectEnvironmentId,
-        )?.title ?? "Project",
+        )?.title ?? t("Project"),
       subactions: choices(
         "project",
         Object.fromEntries([
@@ -334,7 +334,7 @@ export function usePullRequestListFilters(props: {
     environmentLabel:
       props.environments.length > 1
         ? (props.environments.find((environment) => environment.id === props.environmentId)
-            ?.label ?? "All environments")
+            ?.label ?? t("All environments"))
         : null,
     environmentActions,
     state: value.state,
@@ -369,10 +369,10 @@ export function PullRequestListFilters(props: {
     >
       {Platform.OS === "android" ? null : (
         <ListFilterMenu
-          label={count ? String(count) : "Filters"}
+          label={count ? String(count) : t("Filters")}
           icon
           active={count > 0}
-          accessibilityLabel={count ? `Filters, ${count} active` : "More filters"}
+          accessibilityLabel={count ? `Filters, ${count} active` : t("More filters")}
           actions={[...more, reset(false)]}
           onSelect={select}
         />
@@ -380,7 +380,7 @@ export function PullRequestListFilters(props: {
       {props.filters.environmentLabel !== null ? (
         <ListFilterMenu
           label={props.filters.environmentLabel}
-          accessibilityLabel="Choose pull request environment"
+          accessibilityLabel={t("Choose pull request environment")}
           actions={props.filters.environmentActions}
           onSelect={select}
         />
@@ -400,16 +400,16 @@ export function PullRequestListFilters(props: {
         onSelect={select}
       />
       <ListFilterMenu
-        label={selectedLabelCount ? `Labels ${selectedLabelCount}` : "Labels"}
+        label={selectedLabelCount ? `Labels ${selectedLabelCount}` : t("Labels")}
         active={selectedLabelCount > 0}
-        accessibilityLabel="Filter by label"
+        accessibilityLabel={t("Filter by label")}
         actions={props.filters.labelActions}
         onSelect={select}
       />
       <ListFilterMenu
-        label={author === "me" ? "By you" : (author ?? "Author")}
+        label={author === "me" ? t("By you") : (author ?? t("Author"))}
         active={Boolean(author)}
-        accessibilityLabel="Filter by author"
+        accessibilityLabel={t("Filter by author")}
         actions={props.filters.authorActions}
         onSelect={select}
       />

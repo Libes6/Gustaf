@@ -95,12 +95,13 @@ export function SettingsProjectOverviewRouteScreen() {
       >
         {selectedProjectKey === null ? (
           <Text className="px-2 text-base text-foreground-muted">
-            Choose a project with the filter above to manage its name, checkouts and removal.
+            {t("Choose a project with the filter above to manage its name, checkouts and removal.")}
           </Text>
         ) : !group || members.length === 0 ? (
           <Text className="px-2 text-base text-foreground-muted">
-            This project has no checkout on the selected connected environments. Change the filter
-            above.
+            {t(
+              "This project has no checkout on the selected connected environments. Change the filter above.",
+            )}
           </Text>
         ) : (
           <ProjectOverviewContent
@@ -179,7 +180,7 @@ function ProjectOverviewContent(props: {
     setIsOrganizing(true);
     for (const member of allMembers) {
       if (!readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope)) {
-        Dialog.alert("Failed to update project", "This connection can no longer change it.");
+        Dialog.alert(t("Failed to update project"), t("This connection can no longer change it."));
         break;
       }
       const result = await organizeProject({
@@ -211,7 +212,7 @@ function ProjectOverviewContent(props: {
       (entry) => entry.environmentId === denied.environmentId,
     );
     Dialog.alert(
-      "Failed to remove project",
+      t("Failed to remove project"),
       `This connection cannot change projects in ${environment?.label ?? "this environment"}.`,
     );
     return false;
@@ -315,7 +316,7 @@ function ProjectOverviewContent(props: {
             {displayName}
           </Text>
           <Text className="text-sm text-foreground-muted">
-            {props.members.length === 1 ? "1 checkout" : `${props.members.length} checkouts`}
+            {props.members.length === 1 ? t("1 checkout") : `${props.members.length} checkouts`}
           </Text>
         </View>
       </View>
@@ -336,7 +337,7 @@ function ProjectOverviewContent(props: {
             {canSave ? (
               <Button
                 label={t("Save")}
-                accessibilityHint="Save project name"
+                accessibilityHint={t("Save project name")}
                 tone="secondary"
                 onPress={saveName}
               />
@@ -346,14 +347,14 @@ function ProjectOverviewContent(props: {
       </SettingsSection>
 
       {canOrganize ? (
-        <SettingsSection title="Organize">
+        <SettingsSection title={t("Organize")}>
           <SettingsSwitchRow
             icon="pin"
             label={t("Pin")}
             subtitle={
               offline
-                ? "Connect every machine with this project to change this."
-                : "Pinned projects come first in project pickers."
+                ? t("Connect every machine with this project to change this.")
+                : t("Pinned projects come first in project pickers.")
             }
             value={props.group.pinned}
             disabled={isOrganizing || offline}
@@ -361,11 +362,11 @@ function ProjectOverviewContent(props: {
           />
           <SettingsActionRow
             icon="archivebox"
-            label={props.group.archived ? "Unarchive project" : "Archive project"}
+            label={props.group.archived ? t("Unarchive project") : t("Archive project")}
             description={
               props.group.archived
-                ? "Hidden from project pickers. Threads and files are kept."
-                : "Hides the project from project pickers. Threads and files are kept."
+                ? t("Hidden from project pickers. Threads and files are kept.")
+                : t("Hides the project from project pickers. Threads and files are kept.")
             }
             disabled={isOrganizing || offline}
             onPress={() => void organize({ archived: !props.group.archived })}
@@ -390,7 +391,7 @@ function ProjectOverviewContent(props: {
                     : "text-lg text-foreground"
                 }
               >
-                {environment?.label ?? "Environment"}
+                {environment?.label ?? t("Environment")}
               </Text>
               {environment?.displayUrl ? (
                 <Text className="text-sm leading-normal text-foreground-muted">
@@ -416,17 +417,19 @@ function ProjectOverviewContent(props: {
           icon="trash"
           label={
             props.hasOtherMembers
-              ? "Remove checkout"
+              ? t("Remove checkout")
               : props.members.length > 1
-                ? "Remove this project everywhere"
-                : "Remove project"
+                ? t("Remove this project everywhere")
+                : t("Remove project")
           }
           description={
             props.hasOtherMembers
-              ? "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched."
+              ? t(
+                  "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched.",
+                )
               : props.members.length > 1
                 ? `Deletes all ${props.members.length} checkout entries and their threads on every machine. Files on disk are not touched.`
-                : "Deletes the project entry and its threads. Files on disk are not touched."
+                : t("Deletes the project entry and its threads. Files on disk are not touched.")
           }
           tone="danger"
           disabled={!canRemoveGroup || isRemoving}

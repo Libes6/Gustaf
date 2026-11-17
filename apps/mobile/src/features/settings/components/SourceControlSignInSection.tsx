@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import type { EnvironmentId, SourceControlSignInPrompt } from "@t3tools/contracts";
 import {
   readHostCredentialSettings,
@@ -143,7 +144,7 @@ function AppSignInRow(props: {
     const started = await start({ environmentId, input });
     if (started._tag !== "Success") {
       setPending(null);
-      Dialog.alert("Could not start the sign-in", failureMessage(started.cause));
+      Dialog.alert(t("Could not start the sign-in"), failureMessage(started.cause));
       return;
     }
     const prompt = started.value;
@@ -155,7 +156,7 @@ function AppSignInRow(props: {
     attempt.current = null;
     setPending(null);
     if (finished._tag !== "Success") {
-      Dialog.alert("Sign-in did not finish", failureMessage(finished.cause));
+      Dialog.alert(t("Sign-in did not finish"), failureMessage(finished.cause));
     }
   };
 
@@ -174,7 +175,9 @@ function AppSignInRow(props: {
     if (signedIn) {
       Dialog.alert(
         appSignIn.appName,
-        "Signed in. GitHub requests use the app's higher rate limit, in repositories where the app is installed.",
+        t(
+          "Signed in. GitHub requests use the app's higher rate limit, in repositories where the app is installed.",
+        ),
         [
           { text: "Install on an organization", onPress: () => openUrl(appSignIn.installUrl) },
           { text: "Sign out", style: "destructive", onPress: signOut },

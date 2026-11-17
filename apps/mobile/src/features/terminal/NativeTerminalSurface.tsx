@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { TerminalGrid, TerminalOutputState } from "@t3tools/client-runtime/state/terminal";
 import { memo, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import {
@@ -159,7 +160,7 @@ const FallbackTerminalSurface = memo(function FallbackTerminalSurface({
           autoCorrect={false}
           blurOnSubmit={false}
           editable={props.isRunning && !props.readOnly}
-          placeholder="type and press return"
+          placeholder={t("type and press return")}
           placeholderTextColor={theme.mutedForeground}
           returnKeyType="send"
           className="text-sm"
@@ -189,7 +190,7 @@ const FallbackTerminalSurface = memo(function FallbackTerminalSurface({
           onPress={() => props.onInput("\u0003")}
         >
           <Text className="text-2xs font-t3-bold" style={{ color: theme.foreground }}>
-            Ctrl-C
+            {t("Ctrl-C")}
           </Text>
         </Pressable>
       </View>

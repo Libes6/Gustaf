@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { HStack, Image, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
 import type { ComponentProps } from "react";
 import {
@@ -346,10 +347,10 @@ function AgentActivity(
       >
         {attentionRow
           ? attentionRow.phase === "waiting_for_approval"
-            ? "Approval"
-            : "Input"
+            ? t("Approval")
+            : t("Input")
           : failedRow
-            ? "Failed"
+            ? t("Failed")
             : activeLabel}
       </Text>
     ),

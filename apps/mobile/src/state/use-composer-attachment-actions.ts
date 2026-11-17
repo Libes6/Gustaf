@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import * as Dialog from "../components/ui/Dialog";
 import { useRef } from "react";
 import { PROVIDER_SEND_TURN_MAX_ATTACHMENTS, type ServerConfig } from "@t3tools/contracts";
@@ -79,7 +80,7 @@ export function useComposerAttachmentActions(props: {
     if (!key || props.locked) return;
     const maxBytes = capabilities?.fileAttachments?.maxUploadBytes;
     if (maxBytes === undefined) {
-      Dialog.alert("Could not attach file", "This server does not support file attachments.");
+      Dialog.alert(t("Could not attach file"), t("This server does not support file attachments."));
       return;
     }
     const insertion = captureComposerDraftInsertion(key);
@@ -108,7 +109,7 @@ export function useComposerAttachmentActions(props: {
         report("Could not paste images", null, await append(key, signal, images, insertion));
       } catch (error) {
         Dialog.alert(
-          "Could not paste images",
+          t("Could not paste images"),
           error instanceof Error ? error.message : "Try again.",
         );
       }
@@ -139,7 +140,7 @@ export function useComposerAttachmentActions(props: {
         report("Could not attach pasted text", null, rejected);
       } catch (error) {
         Dialog.alert(
-          "Could not attach pasted text",
+          t("Could not attach pasted text"),
           error instanceof Error ? error.message : "Try again.",
         );
       }
