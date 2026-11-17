@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
+  chatMarkdownClipboardPayload,
   serializeRenderedMarkdownFragment,
   serializeTableElementToMarkdown,
 } from "./markdown-clipboard";
@@ -317,6 +318,32 @@ describe("copying rendered Markdown tables", () => {
     expect(linkRow?.children[0]?.children[0]).toMatchObject({
       type: "link",
       url: "https://example.com/?q=a|b",
+    });
+  });
+});
+
+describe("copying a selection inside inline code", () => {
+  beforeEach(() => {
+    vi.stubGlobal("Node", { TEXT_NODE, ELEMENT_NODE });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("copies the selected text without backticks", () => {
+    const code = new FakeElement("CODE").append(new FakeText("core.hooksPath"));
+    const inCode = { nodeType: ELEMENT_NODE, closest: (s: string) => (s === "code" ? code : null) };
+    const range = {
+      collapsed: false,
+      commonAncestorContainer: inCode,
+      toString: () => "core.hooksPath",
+    };
+    const selection = { rangeCount: 1, getRangeAt: () => range } as unknown as Selection;
+
+    expect(chatMarkdownClipboardPayload(selection)).toEqual({
+      text: "core.hooksPath",
+      html: '<meta charset="utf-8">core.hooksPath',
     });
   });
 });
