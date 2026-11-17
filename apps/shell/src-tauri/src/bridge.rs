@@ -428,22 +428,30 @@ pub(crate) enum SystemSettingsPane {
     FullDiskAccess,
 }
 
-/// The page asks whether the system took the link, so the answer is the real one.
+/// The page asks whether the system took the link, so the answer is the opener's real exit status.
 #[tauri::command]
-pub(crate) fn open_external(url: String) -> bool {
-    url.parse::<tauri::Url>()
-        .is_ok_and(|url| crate::open_external_url(&url))
+pub(crate) async fn open_external(url: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || {
+        url.parse::<tauri::Url>()
+            .is_ok_and(|url| crate::open_external_url_checked(&url))
+    })
+    .await
+    .unwrap_or(false)
 }
 
 #[tauri::command]
-pub(crate) fn open_system_settings(pane: SystemSettingsPane) -> bool {
+pub(crate) async fn open_system_settings(pane: SystemSettingsPane) -> bool {
     #[cfg(target_os = "macos")]
     {
         let SystemSettingsPane::FullDiskAccess = pane;
-        std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
-            .spawn()
-            .is_ok()
+        tauri::async_runtime::spawn_blocking(|| {
+            std::process::Command::new("open")
+                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+                .spawn()
+                .is_ok_and(|child| crate::opener_succeeded(child, crate::OPENER_GRACE))
+        })
+        .await
+        .unwrap_or(false)
     }
     #[cfg(not(target_os = "macos"))]
     {
