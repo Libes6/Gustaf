@@ -836,13 +836,14 @@ it.live("streams to a read-only viewer without allowing takeover, input, or view
         expect.objectContaining({ _tag: "control", canOperate: false, controller: "agent" }),
       );
       const operator = yield* browser.attachViewer(viewerInput(tabId, true));
+      // The agent still drives the tab; the panel's size applies anyway.
+      yield* operator.input({ type: "resize", width: 390, height: 844 });
+      expect(page.setViewportSize).toHaveBeenCalledWith({ width: 390, height: 844 });
       yield* operator.input({ type: "takeControl" });
       yield* operator.input({ type: "text", text: "typed" });
-      yield* operator.input({ type: "resize", width: 390, height: 844 });
       expect(contexts[0]!.sessions.at(-1)!.send).toHaveBeenCalledWith("Input.insertText", {
         text: "typed",
       });
-      expect(page.setViewportSize).toHaveBeenCalledWith({ width: 390, height: 844 });
       yield* operator.input({ type: "releaseControl" });
     }),
   ).pipe(Effect.provide(layer)),

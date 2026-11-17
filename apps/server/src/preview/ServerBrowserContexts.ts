@@ -31,6 +31,14 @@ interface Options {
   readonly onContextClose?: (context: BrowserContext) => void;
 }
 
+/**
+ * Without a GPU, WebGL falls back to SwiftShader on the CPU: an animated page such as
+ * github.com kept ~5 cores busy on an M4. Every Mac has Metal; elsewhere a server may
+ * have no GPU, and software compositing stays cheaper there.
+ */
+const renderingArgs = (platform: NodeJS.Platform) =>
+  platform === "darwin" ? ["--use-angle=metal"] : ["--disable-gpu"];
+
 const UA_PLATFORMS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "macOS",
   linux: "Linux",
@@ -96,7 +104,7 @@ export class ServerBrowserContexts {
       executable,
       env,
       args: [
-        "--disable-gpu",
+        ...renderingArgs(process.platform),
         "--force-device-scale-factor=2",
         "--disable-blink-features=AutomationControlled",
       ],

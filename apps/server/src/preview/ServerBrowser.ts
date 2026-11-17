@@ -1,6 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off globalDate:off globalTimers:off - Playwright callbacks run outside the Effect runtime.
 // Screencasts ignore emulated device scale; real 2x keeps captures sharp.
-// --disable-gpu uses cheaper software compositing while preserving SwiftShader WebGL.
 import {
   BUILT_IN_BROWSER_PROFILES,
   DEFAULT_BROWSER_PROFILE_ID,
@@ -2715,6 +2714,10 @@ const make = Effect.gen(function* () {
                   ? { promptText: message.promptText }
                   : {}),
               });
+            } else if (message.type === "resize") {
+              // A fill viewport follows the panel whoever drives the tab, as a desktop
+              // webview does; waiting for control would letterbox every agent tab.
+              await dispatchViewerInput(tab, session, viewer, message);
             } else {
               const dispatch = (input: Record<string, unknown>) =>
                 dispatchViewerInput(tab, session, viewer, input);
