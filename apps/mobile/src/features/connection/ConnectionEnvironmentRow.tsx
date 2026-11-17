@@ -6,6 +6,7 @@ import { hasSavedBearerRoute, hostFreezeNotice } from "@t3tools/client-runtime/c
 import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
 import { type EnvironmentId, resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
+import { useNavigation } from "@react-navigation/native";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import { useState } from "react";
@@ -50,6 +51,7 @@ export function ConnectionEnvironmentRow(props: {
     updates: { readonly label: string; readonly displayUrl: string },
   ) => Promise<AtomCommandResult<unknown, unknown>>;
 }) {
+  const navigation = useNavigation();
   const [label, setLabel] = useState(props.environment.environmentLabel);
   const [url, setUrl] = useState(props.environment.displayUrl);
   const serverConfig = useAtomValue(
@@ -207,6 +209,11 @@ export function ConnectionEnvironmentRow(props: {
             <ConnectionDiagnosisDetails
               hostLabel={props.environment.environmentLabel}
               diagnosis={diagnosis}
+              onAddRelayRoute={() =>
+                navigation.navigate("ConnectionsNew", {
+                  routeFor: props.environment.environmentId,
+                })
+              }
             />
           ) : null}
           {props.environment.isRelayManaged ? (
