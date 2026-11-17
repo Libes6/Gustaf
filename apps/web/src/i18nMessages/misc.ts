@@ -3,6 +3,24 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "misc." and both languages list the same keys.
 export const miscMessages = {
   en: {
+    "misc.serverBrowserSurface.asksFiles": "The page asks for files",
+    "misc.serverBrowserSurface.asksFile": "The page asks for a file",
+    "misc.serverBrowserSurface.chooseFiles": "Choose files",
+    "misc.serverBrowserSurface.chooseFile": "Choose file",
+    "misc.serverBrowserSurface.couldNotSendTheFilesToThePage":
+      "Could not send the files to the page",
+    "misc.serverBrowserSurface.releaseControl": "Release control",
+    "misc.serverBrowserSurface.takeControl": "Take control",
+    "misc.serverBrowserSurface.pdfDocument": "PDF document",
+    "misc.serverBrowserSurface.browserPage": "Browser page",
+    "misc.serverBrowserSurface.pressShiftescapeToLeaveTheBrowserPage":
+      "Press Shift+Escape to leave the browser page.",
+    "misc.serverBrowserSurface.chooseFilesForThePage": "Choose files for the page",
+    "misc.serverBrowserSurface.browserDialog": "Browser dialog",
+    "misc.serverBrowserSurface.dialogResponse": "Dialog response",
+    "misc.serverBrowserSurface.accept": "Accept",
+    "misc.serverBrowserSurface.takeControlToRespond": "Take control to respond.",
+    "misc.serverBrowserSurface.browserConnectionWasRefused": "Browser connection was refused.",
     "misc.welcomeWizard.skippedComputers":
       "Not connected, so setup skips {computers}. You can set them up later from Settings.",
     "misc.welcomeWizard.telemetryNotice":
@@ -1243,6 +1261,24 @@ export const miscMessages = {
     "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
+    "misc.serverBrowserSurface.asksFiles": "Страница запрашивает файлы",
+    "misc.serverBrowserSurface.asksFile": "Страница запрашивает файл",
+    "misc.serverBrowserSurface.chooseFiles": "Выбрать файлы",
+    "misc.serverBrowserSurface.chooseFile": "Выбрать файл",
+    "misc.serverBrowserSurface.couldNotSendTheFilesToThePage":
+      "Не удалось отправить файлы на страницу",
+    "misc.serverBrowserSurface.releaseControl": "Передать управление",
+    "misc.serverBrowserSurface.takeControl": "Взять управление",
+    "misc.serverBrowserSurface.pdfDocument": "Документ PDF",
+    "misc.serverBrowserSurface.browserPage": "Страница браузера",
+    "misc.serverBrowserSurface.pressShiftescapeToLeaveTheBrowserPage":
+      "Нажмите Shift+Escape, чтобы выйти со страницы браузера.",
+    "misc.serverBrowserSurface.chooseFilesForThePage": "Выберите файлы для страницы",
+    "misc.serverBrowserSurface.browserDialog": "Диалог браузера",
+    "misc.serverBrowserSurface.dialogResponse": "Ответ в диалоге",
+    "misc.serverBrowserSurface.accept": "Принять",
+    "misc.serverBrowserSurface.takeControlToRespond": "Возьмите управление, чтобы ответить.",
+    "misc.serverBrowserSurface.browserConnectionWasRefused": "Подключение к браузеру отклонено.",
     "misc.welcomeWizard.skippedComputers":
       "Нет подключения к {computers}, настройка пропущена. Настройте их позже в настройках.",
     "misc.welcomeWizard.telemetryNotice":
