@@ -32,6 +32,8 @@ export const miscMessages = {
     "wallpaper.importFailed":
       "Could not import the scene. Check the file or download it and import it locally.",
     "wallpaper.sceneFailed": "Wallpaper could not run",
+    "wallpaper.stalled":
+      "Wallpaper stopped responding and was stopped. Choose another scene or turn wallpapers off in Appearance settings.",
     "wallpaper.change": "Change chat wallpaper",
     "misc.attachmentFilePreview.attachment": "Attachment",
     "misc.attachmentFilePreview.close": "Close",
@@ -1234,6 +1236,8 @@ export const miscMessages = {
     "wallpaper.importFailed":
       "Не удалось импортировать сцену. Проверьте файл или скачайте его и импортируйте с диска.",
     "wallpaper.sceneFailed": "Не удалось запустить обои",
+    "wallpaper.stalled":
+      "Обои перестали отвечать и были остановлены. Выберите другую сцену или выключите обои в настройках внешнего вида.",
     "wallpaper.change": "Сменить обои чата",
     "misc.attachmentFilePreview.attachment": "Вложение",
     "misc.attachmentFilePreview.close": "Закрыть",

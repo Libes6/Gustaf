@@ -1,10 +1,11 @@
 // Scene kit and renderer adapted from Claude Desktop Themes by 0toshigami (MIT, wallpapers/LICENSE).
 // Scenes written for that mod run here unchanged: each one adds SCENES['<id>'] = { cell, sprites, size? }.
-(() => {
-  const root = document.documentElement;
-  const canvas = document.getElementById("wallpaper");
+function createWallpaperRenderer({ canvas, root, report, schedule, cancel }) {
   const ctx = canvas.getContext("2d");
-  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  let width = 0,
+    height = 0,
+    dpr = 1,
+    reducedMotion = false;
 
   const rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255);
   const hex = (c) =>
@@ -119,8 +120,8 @@
 
   const draw = () => {
     const t = time,
-      W = innerWidth,
-      H = innerHeight,
+      W = width,
+      H = height,
       cols = Math.ceil(W / CELL),
       rows = Math.ceil(H / CELL);
     ctx.clearRect(0, 0, W, H);
@@ -198,23 +199,25 @@
 
   const fail = (error) => {
     scene = undefined;
-    cancelAnimationFrame(raf);
-    ctx.clearRect(0, 0, innerWidth, innerHeight);
-    parent.postMessage({ type: "wallpaper:error", message: String(error?.message ?? error) }, "*");
+    cancel(raf);
+    ctx.clearRect(0, 0, width, height);
+    report({ type: "wallpaper:error", message: String(error?.message ?? error) });
   };
 
   const safeDraw = () => {
     try {
       draw();
+      if (!scene) return;
+      report({ type: "wallpaper:frame" });
+      if (reducedMotion) report({ type: "wallpaper:watch", active: false });
     } catch (error) {
       fail(error);
     }
   };
 
   const size = () => {
-    const dpr = devicePixelRatio || 1;
-    canvas.width = Math.round(innerWidth * dpr);
-    canvas.height = Math.round(innerHeight * dpr);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.font = `bold ${Math.round((CELL * 13) / 22)}px ui-monospace, Menlo, Consolas, monospace`;
     ctx.textAlign = "center";
@@ -223,7 +226,7 @@
   };
 
   const tick = (now) => {
-    raf = requestAnimationFrame(tick);
+    raf = schedule(tick);
     if (now - last < 33) return;
     time += (last ? Math.min(now - last, 250) / 1000 : 0) * (working ? 3 : 1);
     last = now;
@@ -231,12 +234,12 @@
   };
 
   const run = () => {
-    cancelAnimationFrame(raf);
+    cancel(raf);
     last = 0;
-    if (scene && !paused && !calm.matches) raf = requestAnimationFrame(tick);
+    if (scene && !paused && !reducedMotion) raf = schedule(tick);
   };
 
-  const load = ({ id, source, sky }) => {
+  const load = ({ id, source }) => {
     const SCENES = Object.create(null);
     const kit = {
       root,
@@ -265,7 +268,6 @@
     };
     scene = undefined;
     time = 0;
-    document.body.style.background = typeof sky === "string" ? sky : "transparent";
     try {
       new Function(...Object.keys(kit), source)(...Object.values(kit));
       scene = Object.hasOwn(SCENES, id) ? SCENES[id] : Object.values(SCENES)[0];
@@ -282,21 +284,200 @@
     run();
   };
 
-  addEventListener("message", (event) => {
-    if (event.source !== parent) return;
-    const message = event.data;
-    if (message?.type === "wallpaper:scene") load(message);
-    if (message?.type === "wallpaper:state") {
+  return {
+    load,
+    state(message) {
       working = message.working === true;
       if (working) root.dataset.themeState = "thinking";
       else delete root.dataset.themeState;
-      if (paused !== (message.paused === true)) {
-        paused = message.paused === true;
-        run();
+      paused = message.paused === true;
+      reducedMotion = message.reducedMotion === true;
+      run();
+    },
+    resize(message) {
+      width = message.width;
+      height = message.height;
+      dpr = message.dpr || 1;
+      size();
+    },
+    stop() {
+      cancel(raf);
+    },
+  };
+}
+
+(() => {
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  let canvas = document.getElementById("wallpaper");
+  let worker, renderer, scene, probing;
+  let mode,
+    failed = false;
+  let state = { working: false, paused: true, reducedMotion: calm.matches };
+  const report = (message) => parent.postMessage(message, "*");
+  const dimensions = () => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio || 1 });
+  const watch = (active) => report({ type: "wallpaper:watch", active });
+  const stop = () => {
+    if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    }
+    worker = undefined;
+    renderer?.stop();
+    renderer = undefined;
+    clearTimeout(probing);
+    watch(false);
+  };
+  const fail = (message) => {
+    failed = true;
+    stop();
+    canvas.style.visibility = "hidden";
+    report({ type: "wallpaper:error", message });
+  };
+
+  function workerMain(createRenderer) {
+    let renderer;
+    try {
+      if (!new OffscreenCanvas(1, 1).getContext("2d")) throw new Error("No 2D context");
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- dedicated workers have no targetOrigin
+      self.postMessage({ type: "supported" });
+    } catch {
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- dedicated workers have no targetOrigin
+      self.postMessage({ type: "unsupported" });
+      return;
+    }
+    onmessage = ({ data }) => {
+      if (data.type === "start") {
+        renderer = createRenderer({
+          canvas: data.canvas,
+          root: { dataset: {} },
+          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- dedicated workers have no targetOrigin
+          report: (message) => self.postMessage(message),
+          schedule: (tick) => setTimeout(() => tick(performance.now()), 33),
+          cancel: clearTimeout,
+        });
+        renderer.state(data.state);
+        renderer.resize(data.dimensions);
+        renderer.load(data.scene);
+      } else if (data.type === "state") renderer?.state(data.state);
+      else if (data.type === "resize") renderer?.resize(data.dimensions);
+    };
+  }
+
+  const fallback = () => {
+    stop();
+    mode = "iframe";
+    start();
+  };
+  const start = () => {
+    if (!scene || state.paused || failed || worker || renderer) return;
+    if (
+      mode === "iframe" ||
+      typeof canvas.transferControlToOffscreen !== "function" ||
+      typeof Worker !== "function"
+    ) {
+      mode = "iframe";
+      renderer = createWallpaperRenderer({
+        canvas,
+        root: document.documentElement,
+        report,
+        schedule: requestAnimationFrame,
+        cancel: cancelAnimationFrame,
+      });
+      renderer.state(state);
+      renderer.resize(dimensions());
+      renderer.load(scene);
+      return;
+    }
+    const url = URL.createObjectURL(
+      new Blob([`(${workerMain.toString()})(${createWallpaperRenderer.toString()});`], {
+        type: "text/javascript",
+      }),
+    );
+    try {
+      worker = new Worker(url);
+    } catch {
+      URL.revokeObjectURL(url);
+      fallback();
+      return;
+    }
+    URL.revokeObjectURL(url);
+    // Probe before transferring the visible canvas or evaluating third-party code.
+    probing = setTimeout(fallback, 1000);
+    worker.onerror = () => {
+      if (mode === "worker") fail("Worker failed");
+      else fallback();
+    };
+    worker.onmessage = ({ data }) => {
+      if (data.type === "unsupported") {
+        fallback();
+        return;
       }
+      if (data.type === "supported") {
+        clearTimeout(probing);
+        try {
+          const next = canvas.cloneNode();
+          canvas.replaceWith(next);
+          canvas = next;
+          const offscreen = canvas.transferControlToOffscreen();
+          mode = "worker";
+          watch(true);
+          worker.postMessage(
+            { type: "start", canvas: offscreen, scene, state, dimensions: dimensions() },
+            [offscreen],
+          );
+        } catch {
+          canvas.replaceWith(canvas.cloneNode());
+          canvas = document.getElementById("wallpaper");
+          fallback();
+        }
+      } else if (data.type === "wallpaper:error") fail(data.message);
+      else report(data);
+    };
+  };
+  const update = () => {
+    if (state.paused) {
+      stop();
+      return;
+    }
+    start();
+    if (worker && mode === "worker") {
+      watch(true);
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- dedicated workers have no targetOrigin
+      worker.postMessage({ type: "state", state });
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- dedicated workers have no targetOrigin
+      worker.postMessage({ type: "resize", dimensions: dimensions() });
+    }
+    if (renderer) {
+      renderer.state(state);
+      renderer.resize(dimensions());
+    }
+  };
+  addEventListener("message", ({ source, data }) => {
+    if (source !== parent) return;
+    if (data?.type === "wallpaper:scene") {
+      stop();
+      scene = data;
+      document.body.style.background = typeof data.sky === "string" ? data.sky : "transparent";
+      start();
+    } else if (data?.type === "wallpaper:state") {
+      state = {
+        working: data.working === true,
+        paused: data.paused === true,
+        reducedMotion: calm.matches,
+      };
+      update();
+    } else if (data?.type === "wallpaper:stop") {
+      failed = true;
+      stop();
+      canvas.style.visibility = "hidden";
     }
   });
-  addEventListener("resize", size);
-  calm.addEventListener("change", run);
-  parent.postMessage({ type: "wallpaper:ready" }, "*");
+  addEventListener("resize", update);
+  calm.addEventListener("change", () => {
+    state.reducedMotion = calm.matches;
+    update();
+  });
+  addEventListener("pagehide", stop);
+  report({ type: "wallpaper:ready" });
 })();
