@@ -76,17 +76,22 @@ const INIT_SCRIPT: &str = r#"(() => {
 
   const fullscreenListeners = new Set();
   let fullscreen = false;
-  window.__gustafFullscreenState = (value) => {
+  const setFullscreen = (value) => {
     if (fullscreen === value) return;
     fullscreen = value;
     for (const listener of fullscreenListeners) listener(value);
   };
   let fullscreenRequest = 0;
+  // A push is newer than any seed answer still in flight, so that answer must not overwrite it.
+  window.__gustafFullscreenState = (value) => {
+    fullscreenRequest++;
+    setFullscreen(value);
+  };
   const refreshFullscreen = async () => {
     const request = ++fullscreenRequest;
     try {
       const value = await invoke("window_fullscreen_state");
-      if (request === fullscreenRequest) window.__gustafFullscreenState(value);
+      if (request === fullscreenRequest) setFullscreen(value);
     } catch (error) {
       console.error(error);
     }
@@ -691,6 +696,55 @@ mod tests {
         assert!(fullscreen_changed(&last, true));
         assert!(!fullscreen_changed(&last, true));
         assert!(fullscreen_changed(&last, false));
+    }
+
+    /// Runs the init script in node with a fake window. The seed query answers `false`
+    /// only after the shell has pushed `true`; returns what the page believes at the end.
+    fn page_fullscreen_after_late_seed_answer() -> String {
+        use std::io::Write;
+        const HARNESS: &str = r#"
+const script = require("fs").readFileSync(0, "utf8");
+let answerSeed;
+const window = {
+  location: { hostname: "localhost" },
+  localStorage: { getItem: () => null, removeItem() {} },
+  __TAURI_INTERNALS__: {
+    invoke: (command) =>
+      command === "window_fullscreen_state"
+        ? new Promise((resolve) => { answerSeed = resolve; })
+        : new Promise(() => {}),
+  },
+};
+window.top = window;
+const document = { addEventListener() {}, documentElement: {} };
+new Function("window", "document", "navigator", script)(window, document, { language: "en" });
+(async () => {
+  window.__gustafFullscreenState(true);
+  answerSeed(false);
+  await new Promise((resolve) => setImmediate(resolve));
+  console.log(window.desktopBridge.getWindowFullscreenState());
+})();
+"#;
+        let mut node = std::process::Command::new("node")
+            .args(["-e", HARNESS])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("node runs the init script");
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin");
+        node.stdin
+            .take()
+            .unwrap()
+            .write_all(script.as_bytes())
+            .unwrap();
+        let output = node.wait_with_output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    }
+
+    #[test]
+    fn a_late_seed_answer_does_not_undo_a_pushed_fullscreen_change() {
+        assert_eq!(page_fullscreen_after_late_seed_answer(), "true");
     }
 
     #[test]
