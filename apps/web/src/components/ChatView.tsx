@@ -3377,7 +3377,7 @@ export default function ChatView(props: ChatViewProps) {
               {...conversationArea}
               className="relative isolate flex min-h-0 flex-1 flex-col bg-background"
             >
-              <ChatWallpaper working={isWorking} />
+              {embedded ? null : <ChatWallpaper working={isWorking} />}
               <WorkspaceMutationIdContext value={workspaceMutationId}>
                 <ThreadTimeline
                   pendingApprovals={pendingApprovals}
