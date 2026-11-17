@@ -829,6 +829,7 @@ function listItemFromShell(
 function threadDetail(
   scope: McpInvocationScope,
   projection: Pick<OrchestrationV2ThreadProjection, "thread" | "runs" | "runtimeRequests">,
+  runCount: number,
   itemCount: number,
   shell: OrchestrationV2ThreadShell,
   nowMs: number,
@@ -863,7 +864,7 @@ function threadDetail(
     worktreePath: projection.thread.worktreePath,
     parentThreadId: projection.thread.lineage.parentThreadId,
     relationshipToParent: projection.thread.lineage.relationshipToParent,
-    runCount: projection.runs.length,
+    runCount,
     itemCount,
     pendingRequestCount: projection.runtimeRequests.filter(
       (request) => request.status === "pending",
@@ -1216,6 +1217,7 @@ const make = Effect.gen(function* () {
   const loadReadableThread = Effect.fn("OrchestratorMcpService.loadReadableThread")(function* (
     scope: McpInvocationScope,
     threadId: ThreadId,
+    runLimit: number,
   ) {
     const { parent } = yield* loadCaller(scope, []);
     const shell = yield* threadManagement
@@ -1229,19 +1231,38 @@ const make = Effect.gen(function* () {
       );
     }
     const input = { projectId: shell.projectId, threadId };
-    // Transfers are needed only to acknowledge a caller's child-task result.
-    const records =
-      parent === undefined
-        ? threadManagement
-            .getProjectThreadRecords(input, ["runs", "runtimeRequests"])
-            .pipe(Effect.map((target) => ({ ...target, contextTransfers: [] })))
-        : threadManagement.getProjectThreadRecords(input, [
-            "runs",
-            "runtimeRequests",
-            "contextTransfers",
-          ]);
-    const target = yield* records.pipe(Effect.mapError(threadManagementFailure));
-    return { parent, target, shell } as const;
+    // Acknowledging a caller's child-task result matches it against every run and transfer.
+    if (
+      parent !== undefined &&
+      shell.lineage.parentThreadId === parent.thread.id &&
+      shell.lineage.relationshipToParent === "subagent"
+    ) {
+      const target = yield* threadManagement
+        .getProjectThreadRecords(input, [
+          "runs",
+          "providerTurns",
+          "runtimeRequests",
+          "contextTransfers",
+        ])
+        .pipe(Effect.mapError(threadManagementFailure));
+      return { parent, target, shell, runCount: target.runs.length } as const;
+    }
+    // Long threads hold thousands of runs; the read shows only the recent and active ones.
+    const [records, runCount] = yield* Effect.all([
+      threadManagement.getProjectThreadRecords(input, ["runs", "runtimeRequests"], {
+        latestRunLimit: runLimit,
+        runStatuses: ThreadManagementService.ACTIVE_RUN_STATUSES,
+        runtimeRequestStatuses: ["pending"],
+      }),
+      threadManagement.getRunCount(threadId),
+    ]).pipe(Effect.mapError(threadManagementFailure));
+    const { providerTurns } = yield* threadManagement
+      .getProjectThreadRecords(input, ["providerTurns"], {
+        providerTurnAttemptIds: records.runs.flatMap((run) => run.activeAttemptId ?? []),
+      })
+      .pipe(Effect.mapError(threadManagementFailure));
+    const target = { ...records, providerTurns, contextTransfers: [] };
+    return { parent, target, shell, runCount } as const;
   });
 
   const loadProviders = providerRegistry.getProviders;
@@ -2963,7 +2984,12 @@ const make = Effect.gen(function* () {
       } satisfies OrchestratorMcpThreadListResult;
     }),
     readThread: Effect.fn("OrchestratorMcpService.readThread")(function* (scope, input) {
-      const { parent, target, shell } = yield* loadReadableThread(scope, input.threadId);
+      const runLimit = input.runLimit ?? DEFAULT_THREAD_RUN_LIMIT;
+      const { parent, target, shell, runCount } = yield* loadReadableThread(
+        scope,
+        input.threadId,
+        runLimit,
+      );
       const view = input.view ?? "messages";
       const afterPosition = input.afterPosition ?? -1;
       const limit = input.limit ?? DEFAULT_THREAD_READ_LIMIT;
@@ -3052,6 +3078,7 @@ const make = Effect.gen(function* () {
         thread: threadDetail(
           scope,
           target,
+          runCount,
           timeline.totalItems,
           shell,
           yield* Clock.currentTimeMillis,

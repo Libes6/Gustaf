@@ -350,6 +350,8 @@ export interface ProjectionRecordFilter {
   readonly runStatuses?: ReadonlyArray<OrchestrationV2Run["status"]>;
   /** Keeps the thread's highest-ordinal run even when `runStatuses` excludes it. */
   readonly includeLatestRun?: true;
+  /** The thread's N highest-ordinal runs, plus any run `runStatuses` matches. Ignores `includeLatestRun`. */
+  readonly latestRunLimit?: number;
   readonly providerTurnThreadIds?: ReadonlyArray<ProviderThreadId>;
   /** Only the provider turn whose token usage was updated last. */
   readonly latestProviderTurnUsageOnly?: true;
@@ -468,6 +470,7 @@ export interface ProjectionStoreV2Shape {
   ) => Effect.Effect<ProjectionTimelinePage, ProjectionStoreV2Error>;
   readonly getMessageCount: (threadId: ThreadId) => Effect.Effect<number, ProjectionStoreV2Error>;
   readonly getSubagentCount: (threadId: ThreadId) => Effect.Effect<number, ProjectionStoreV2Error>;
+  readonly getRunCount: (threadId: ThreadId) => Effect.Effect<number, ProjectionStoreV2Error>;
   /** Child threads of the thread's app-owned tasks, in task order, without decoding the tasks. */
   readonly listAppOwnedChildThreadIds: (
     threadId: ThreadId,
@@ -3404,23 +3407,43 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           (fields !== undefined && !fields.includes("runs")) ||
           (window === undefined &&
             (matchesNothing(filter?.runIds) ||
-              (matchesNothing(filter?.runStatuses) && filter?.includeLatestRun !== true)))
+              (matchesNothing(filter?.runStatuses) &&
+                filter?.includeLatestRun !== true &&
+                filter?.latestRunLimit === undefined)))
             ? Effect.succeed([])
             : window === undefined
               ? sql<PayloadRow>`
             SELECT payload_json
             FROM orchestration_v2_projection_runs
-            WHERE ${threadColumn(filter?.runIds)} = ${threadId}
+            WHERE ${threadColumn(filter?.latestRunLimit === undefined ? filter?.runIds : [])} = ${threadId}
               ${filter?.runIds === undefined ? sql`` : sql`AND run_id IN (SELECT value FROM json_each(${encodeIdList(filter.runIds)}))`}
               ${
-                filter?.runStatuses === undefined
-                  ? sql`ORDER BY ordinal ASC`
-                  : filter.includeLatestRun !== true
-                    ? // `+ordinal` stops SQLite from walking every run in the (thread_id, ordinal)
-                      // index to skip a sort; a status index reads only matching runs.
-                      sql`AND status IN (SELECT value FROM json_each(${encodeIdList(filter.runStatuses)}))
+                filter?.latestRunLimit !== undefined
+                  ? sql`AND run_id IN (
+                      SELECT run_id FROM (
+                        SELECT run_id FROM orchestration_v2_projection_runs
+                        WHERE thread_id = ${threadId}
+                        ORDER BY ordinal DESC
+                        LIMIT ${filter.latestRunLimit}
+                      )
+                      ${
+                        filter.runStatuses === undefined
+                          ? sql``
+                          : sql`UNION
+                      SELECT run_id FROM orchestration_v2_projection_runs
+                      WHERE thread_id = ${threadId}
+                        AND status IN (SELECT value FROM json_each(${encodeIdList(filter.runStatuses)}))`
+                      }
+                    )
+                    ORDER BY ordinal ASC`
+                  : filter?.runStatuses === undefined
+                    ? sql`ORDER BY ordinal ASC`
+                    : filter.includeLatestRun !== true
+                      ? // `+ordinal` stops SQLite from walking every run in the (thread_id, ordinal)
+                        // index to skip a sort; a status index reads only matching runs.
+                        sql`AND status IN (SELECT value FROM json_each(${encodeIdList(filter.runStatuses)}))
                     ORDER BY +ordinal ASC`
-                    : sql`AND (status IN (SELECT value FROM json_each(${encodeIdList(filter.runStatuses)}))
+                      : sql`AND (status IN (SELECT value FROM json_each(${encodeIdList(filter.runStatuses)}))
                     OR run_id = (
                       SELECT run_id FROM orchestration_v2_projection_runs
                       WHERE thread_id = ${threadId}
@@ -5601,6 +5624,13 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         Effect.map((rows) => rows[0]?.count ?? 0),
         Effect.mapError(controlReadError(threadId)),
       );
+    const getRunCount: ProjectionStoreV2Shape["getRunCount"] = (threadId) =>
+      sql<{
+        count: number;
+      }>`SELECT COUNT(*) AS count FROM orchestration_v2_projection_runs WHERE thread_id = ${threadId}`.pipe(
+        Effect.map((rows) => rows[0]?.count ?? 0),
+        Effect.mapError(controlReadError(threadId)),
+      );
     const getSubagentCount: ProjectionStoreV2Shape["getSubagentCount"] = (threadId) =>
       sql<{
         count: number;
@@ -7637,6 +7667,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       isNodeStored: readOnReader(isNodeStored),
       getMessageCount: readOnReader(getMessageCount),
       getSubagentCount: readOnReader(getSubagentCount),
+      getRunCount: readOnReader(getRunCount),
       listAppOwnedChildThreadIds: readOnReader(listAppOwnedChildThreadIds),
       getNextTurnItemOrdinal: readOnReader(getNextTurnItemOrdinal),
       getTurnItem: readOnReader(getTurnItem),
