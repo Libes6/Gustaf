@@ -39,7 +39,7 @@ function readMeasuredHeights(value: unknown) {
     entry[0] <= 10_000 &&
     typeof entry[1] === "number" &&
     Number.isFinite(entry[1])
-      ? [[entry[0] as number, clampHtmlRenderHeight(entry[1])] as const]
+      ? [[entry[0] as number, clampHtmlRenderFitHeight(entry[1])] as const]
       : [],
   );
   return heights.length === value.length
@@ -91,31 +91,21 @@ function measuredHeight(heights: NonNullable<HtmlRenderReference["heights"]>, wi
 }
 
 /**
- * A page even a few pixels taller than its frame scrolls inside it and takes
- * the reader's scroll, so the frame fits the page. A client that measured the
- * live page passes `contentHeight`, which wins over the agent's height: client
- * fonts often wrap the page taller than the server or agent measured it.
+ * A page even a few pixels taller than its frame scrolls inside it, so the frame fits the page:
+ * live `contentHeight` over the server's measurement over the agent's height, since client
+ * fonts can wrap taller than measured and agents ask for at most HTML_RENDER_MAX_HEIGHT.
  */
 export function htmlRenderFrameHeight(
   reference: HtmlRenderReference,
   width: number,
   contentHeight?: number,
 ) {
-  if (contentHeight !== undefined) {
-    return Math.min(
-      HTML_RENDER_MAX_FIT_HEIGHT,
-      Math.max(HTML_RENDER_MIN_HEIGHT, Math.ceil(contentHeight)),
-    );
-  }
+  if (contentHeight !== undefined) return clampHtmlRenderFitHeight(Math.ceil(contentHeight));
   const heights = reference.heights;
   if (heights === undefined || heights.length === 0) {
     return clampHtmlRenderHeight(reference.height);
   }
-  const cap =
-    measuredHeight(heights, HTML_RENDER_COLUMN_WIDTH) > reference.height
-      ? reference.height
-      : HTML_RENDER_MAX_HEIGHT;
-  return clampHtmlRenderHeight(Math.min(cap, measuredHeight(heights, width)));
+  return clampHtmlRenderFitHeight(measuredHeight(heights, width));
 }
 
 export function htmlRenderFileName(title: string) {
@@ -130,6 +120,10 @@ export function htmlRenderFileName(title: string) {
 
 export function clampHtmlRenderHeight(height: number): number {
   return Math.min(HTML_RENDER_MAX_HEIGHT, Math.max(HTML_RENDER_MIN_HEIGHT, Math.round(height)));
+}
+
+function clampHtmlRenderFitHeight(height: number): number {
+  return Math.min(HTML_RENDER_MAX_FIT_HEIGHT, Math.max(HTML_RENDER_MIN_HEIGHT, Math.round(height)));
 }
 
 export interface HtmlRenderFonts {

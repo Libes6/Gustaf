@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  htmlRenderFrameHeight,
   injectHtmlRenderBootstrap,
+  readHtmlRenderReference,
   readHtmlRenderImageRequest,
   readHtmlRenderLinkRequest,
 } from "./htmlRender.ts";
@@ -130,5 +132,31 @@ describe("htmlRenderFromToolItem", () => {
     ] as const) {
       expect(htmlRenderFromToolItem({ toolName, output })).toEqual(reference);
     }
+  });
+});
+
+describe("htmlRenderFrameHeight", () => {
+  const measured = (height: number, heights: ReadonlyArray<readonly [number, number]>) =>
+    readHtmlRenderReference({ ...reference, height, heights })!;
+  const tall = measured(2000, [
+    [320, 5200],
+    [728, 3430],
+    [1144, 2800],
+  ]);
+
+  it.each([
+    ["no measurement uses the agent's height", { ...reference, height: 420 }, 728, undefined, 420],
+    ["measured taller than the agent's height wins", tall, 728, undefined, 3430],
+    ["measured height follows the width", tall, 320, undefined, 5200],
+    [
+      "measured height is capped at the fit limit",
+      measured(2000, [[728, 90_000]]),
+      728,
+      undefined,
+      20_000,
+    ],
+    ["live height wins over the measured height", tall, 728, 3600.2, 3601],
+  ])("%s", (_name, ref, width, contentHeight, expected) => {
+    expect(htmlRenderFrameHeight(ref, width, contentHeight)).toBe(expected);
   });
 });
