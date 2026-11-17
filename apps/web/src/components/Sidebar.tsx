@@ -3367,7 +3367,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               >
                 {threadSearch.isPending
                   ? t("sidebar.Sidebar.searchingThreadMessages")
-                  : t("sidebar.Sidebar.noThreadsFound")}
+                  : threadSearch.failed
+                    ? t("sidebar.Sidebar.threadSearchFailed")
+                    : t("sidebar.Sidebar.noThreadsFound")}
               </p>
             )
           ) : null}

@@ -1725,5 +1725,9 @@
   "No MCP servers configured.": "MCP-серверы не настроены.",
   "Local (stdio)": "Локальный (stdio)",
   "Remote (HTTP)": "Удалённый (HTTP)",
-  "Managed by your organization": "Управляется вашей организацией"
+  "Managed by your organization": "Управляется вашей организацией",
+  "Search failed": "Поиск не удался",
+  "Couldn't search messages": "Не удалось выполнить поиск по сообщениям",
+  "Couldn't search thread messages": "Не удалось выполнить поиск по сообщениям тредов",
+  "Couldn't search messages for \"{query}\". Change the search to try again.": "Не удалось выполнить поиск сообщений по запросу «{query}». Измените запрос и попробуйте снова."
 }
