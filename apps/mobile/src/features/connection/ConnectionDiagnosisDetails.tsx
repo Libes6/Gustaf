@@ -61,11 +61,7 @@ export function ConnectionDiagnosisDetails(props: {
   return (
     <View className="gap-3">
       {diagnosis.suggestRelayRoute && onAddRelayRoute ? (
-        <Button
-          label={t("Add a route through the relay")}
-          icon="plus"
-          onPress={onAddRelayRoute}
-        />
+        <Button label={t("Add a route through the relay")} icon="plus" onPress={onAddRelayRoute} />
       ) : null}
       <View className="gap-0.5">
         {diagnosis.hops.map((hop) => (
