@@ -20,8 +20,8 @@ export function SettingsProjectOverridesSection(props: {
         </Text>
         {!props.pending && props.hasOverrides ? (
           <Button
-            label="Use defaults"
-            accessibilityHint="Use environment defaults for this project"
+            label={t("Use defaults")}
+            accessibilityHint={t("Use environment defaults for this project")}
             tone="text"
             disabled={props.disabled}
             onPress={props.onClear}
