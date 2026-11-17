@@ -1,3 +1,4 @@
+import { SettingsMcpRouteScreen } from "./features/settings/SettingsMcpRouteScreen";
 import { t } from "./i18n";
 import { isDraftThreadRoute } from "./features/threads/thread-route-state";
 import { ComponentCatalogScreen } from "./features/development/ComponentCatalogScreen";
@@ -282,6 +283,11 @@ const SETTINGS_SCREENS = {
   SettingsVoiceModels: createNativeStackScreen({
     screen: SettingsVoiceModelsRouteScreen,
     options: SEARCH_SHEET_ROUTE,
+  }),
+  SettingsMcp: createNativeStackScreen({
+    screen: SettingsMcpRouteScreen,
+    linking: "settings/mcp",
+    options: settingsPage("MCP servers"),
   }),
   SettingsFollowUp: createNativeStackScreen({
     screen: SettingsFollowUpRouteScreen,
