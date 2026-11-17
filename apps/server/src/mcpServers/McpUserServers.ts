@@ -14,6 +14,13 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
+import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
+import {
+  findNativeDuplicate,
+  nativeServersForProvider,
+  type NativeMcpProvider,
+  toMcpServerName,
+} from "./import/matcher.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 /** A user MCP server ready to hand a provider; the provider starts it. */
@@ -34,6 +41,12 @@ export type ResolvedMcpServer =
       readonly headers: Readonly<Record<string, string>>;
     };
 
+export interface NativeMcpSessionSources {
+  readonly provider: NativeMcpProvider;
+  readonly homeDir: string;
+  readonly includeProjectMcpJson?: boolean;
+}
+
 export class McpUserServers extends Context.Service<
   McpUserServers,
   {
@@ -45,6 +58,11 @@ export class McpUserServers extends Context.Service<
       readonly projectId: ProjectId;
       /** The thread's working directory: its worktree when it has one. */
       readonly cwd: string;
+      /**
+       * Set when the provider also loads its own native MCP config from `homeDir`: a server it
+       * already loads is left out so it does not start twice. Omit for isolated provider homes.
+       */
+      readonly native?: NativeMcpSessionSources;
     }) => Effect.Effect<ReadonlyArray<ResolvedMcpServer>>;
   }
 >()("t3/mcpServers/McpUserServers") {}
@@ -55,10 +73,37 @@ const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const secrets = yield* SecretResolver.SecretResolver;
   const policy = yield* ManagedPolicy.ManagedPolicy;
+  const nativeConfigs = yield* NativeMcpConfigs;
+
+  const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
+    native: NativeMcpSessionSources,
+    cwd: string,
+  ) {
+    const { servers, errors } = yield* nativeConfigs.list({
+      homeDir: native.homeDir,
+      projectDir: cwd,
+    });
+    if (errors.length > 0) {
+      yield* Effect.logWarning("Some native MCP configs could not be read", {
+        paths: errors.map((error) => error.sourcePath),
+      });
+    }
+    const loaded = nativeServersForProvider(native.provider, servers, cwd, {
+      includeProjectMcpJson: native.includeProjectMcpJson ?? false,
+    }).map((server) => ({ ...server, name: toMcpServerName(server.name) }));
+    return ([id, { transport }]: readonly [McpServerId, McpServerConfig]) =>
+      findNativeDuplicate(
+        transport.type === "stdio"
+          ? { name: id, transport: "stdio", command: transport.command, args: transport.args }
+          : { name: id, transport: "http", url: transport.url },
+        loaded,
+      ) !== undefined;
+  });
 
   const resolveForThread = Effect.fn("McpUserServers.resolveForThread")(function* (input: {
     readonly projectId: ProjectId;
     readonly cwd: string;
+    readonly native?: NativeMcpSessionSources;
   }) {
     const current = yield* settings.getSettings.pipe(
       Effect.catchTags({
@@ -71,10 +116,15 @@ const make = Effect.gen(function* () {
     if (current === undefined) return [];
     const overrides = current.projectSettingsOverrides[input.projectId]?.mcpServers;
     const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
-    const enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
+    let enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
       .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
       .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
     if (enabled.length === 0) return [];
+    if (input.native !== undefined) {
+      const isDuplicate = yield* nativeDuplicateFilter(input.native, input.cwd);
+      enabled = enabled.filter((entry) => !isDuplicate(entry));
+      if (enabled.length === 0) return [];
+    }
 
     const slotsOf = ({ transport }: McpServerConfig) =>
       transport.type === "stdio" ? transport.env : transport.headers;

@@ -15,6 +15,8 @@ import * as Schema from "effect/Schema";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
+import type { NativeMcpServer } from "./import/nativeMcp.ts";
 import * as McpUserServers from "./McpUserServers.ts";
 
 const projectId = ProjectId.make("project-a");
@@ -41,6 +43,10 @@ const resolve = (
     readonly policy?: ManagedPolicyDocument;
     readonly platform?: NodeJS.Platform;
     readonly environment?: NodeJS.ProcessEnv;
+    readonly native?: {
+      readonly sources: McpUserServers.NativeMcpSessionSources;
+      readonly servers: ReadonlyArray<NativeMcpServer>;
+    };
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -48,6 +54,7 @@ const resolve = (
     return yield* service.resolveForThread({
       projectId: options.projectId ?? projectId,
       cwd: threadCwd,
+      ...(options.native === undefined ? {} : { native: options.native.sources }),
     });
   }).pipe(
     Effect.provide(
@@ -60,6 +67,9 @@ const resolve = (
             read: (references) =>
               Effect.succeed(references.map(({ reference }) => options.secrets?.[reference])),
             invalidate: () => Effect.void,
+          }),
+          Layer.succeed(NativeMcpConfigs, {
+            list: () => Effect.succeed({ servers: options.native?.servers ?? [], errors: [] }),
           }),
         ]),
       ),
@@ -191,6 +201,42 @@ it.effect("points Windows at the npm shim a bare command names", () =>
         ["C:\\npm\\npx.cmd", { Path: "C:\\npm" }],
         ["uvx", { Path: "C:\\npm" }],
       ],
+    );
+  }),
+);
+
+it.effect("leaves out a server the provider already loads from its own config", () =>
+  Effect.gen(function* () {
+    const native = (name: string, args: ReadonlyArray<string>): NativeMcpServer => ({
+      source: "codex",
+      sourcePath: "/home/u/.codex/config.toml",
+      name,
+      enabled: true,
+      transport: "stdio",
+      command: "npx",
+      args,
+      env: {},
+    });
+    const servers = yield* resolve(
+      {
+        mcpServers: {
+          playwright: stdio(true, { args: ["-y", "@playwright/mcp@latest"] }),
+          other: stdio(true, { args: ["-y", "server"] }),
+        },
+      },
+      {
+        native: {
+          sources: { provider: "codex", homeDir: "/home/u" },
+          servers: [
+            native("Playwright", ["-y", "@playwright/mcp@latest"]),
+            native("other", ["-y", "different"]),
+          ],
+        },
+      },
+    );
+    assert.deepStrictEqual(
+      servers.map((server) => server.id),
+      ["other"],
     );
   }),
 );

@@ -33,6 +33,15 @@ const normalizeUrl = (url: string) => {
   }
 };
 
+/** The Gustaf server id an imported native server name becomes; also how duplicates are matched. */
+export const toMcpServerName = (name: string) =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+
 export const findNativeDuplicate = (
   candidate: NativeMcpCandidate,
   nativeList: ReadonlyArray<NativeMcpServer>,
