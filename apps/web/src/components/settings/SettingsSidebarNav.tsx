@@ -109,6 +109,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/worktrees": FolderTreeIcon,
   "/settings/connections": ServerIcon,
   "/settings/access": ShieldCheckIcon,
+  "/settings/mcp": KeyRoundIcon,
   "/settings/secrets": KeyRoundIcon,
   "/settings/subscriptions": CreditCardIcon,
   "/settings/maintenance": WrenchIcon,

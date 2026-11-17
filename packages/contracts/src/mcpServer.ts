@@ -75,3 +75,110 @@ export const ProjectMcpServerOverride = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
 });
 export type ProjectMcpServerOverride = typeof ProjectMcpServerOverride.Type;
+
+export const McpImportSource = Schema.Literals([
+  "codex",
+  "cursor",
+  "claude",
+  "gemini",
+  "project-mcp-json",
+]);
+export type McpImportSource = typeof McpImportSource.Type;
+
+/** Which native entry to import: `projectDir` tells Claude's per-project entries apart. */
+export const McpImportEntryKey = Schema.Struct({
+  source: McpImportSource,
+  name: Schema.String,
+  projectDir: Schema.optionalKey(Schema.String),
+});
+export type McpImportEntryKey = typeof McpImportEntryKey.Type;
+
+/** A server another agent's config defines. Env and header values never leave the environment. */
+export const McpImportableServer = Schema.Struct({
+  ...McpImportEntryKey.fields,
+  sourcePath: Schema.String,
+  /** The id it would get here; may still fail `McpServerId`, so clients validate it. */
+  suggestedId: Schema.String,
+  enabledInSource: Schema.Boolean,
+  transport: Schema.Union([
+    Schema.Struct({
+      type: Schema.Literal("stdio"),
+      command: Schema.String,
+      args: Schema.Array(Schema.String),
+      envKeys: Schema.Array(Schema.String),
+    }),
+    Schema.Struct({
+      type: Schema.Literal("http"),
+      url: Schema.String,
+      headerKeys: Schema.Array(Schema.String),
+      /** Codex reads the bearer token from this variable; importing does not carry it over. */
+      bearerTokenEnvVar: Schema.optionalKey(Schema.String),
+    }),
+  ]),
+  /** A Gustaf server already runs the same command and arguments, or the same URL. */
+  alreadyInGustaf: Schema.Boolean,
+});
+export type McpImportableServer = typeof McpImportableServer.Type;
+
+export const McpListImportableInput = Schema.Struct({
+  /** Also reads the project's `.mcp.json` and `.cursor/mcp.json`. */
+  projectDir: Schema.optionalKey(TrimmedNonEmptyString),
+});
+export type McpListImportableInput = typeof McpListImportableInput.Type;
+
+export const McpListImportableResult = Schema.Struct({
+  servers: Schema.Array(McpImportableServer),
+  /** Config files that exist but could not be read. */
+  unreadablePaths: Schema.Array(Schema.String),
+});
+export type McpListImportableResult = typeof McpListImportableResult.Type;
+
+export const McpImportInput = Schema.Struct({
+  projectDir: Schema.optionalKey(TrimmedNonEmptyString),
+  entries: Schema.NonEmptyArray(
+    Schema.Struct({
+      ...McpImportEntryKey.fields,
+      id: McpServerId,
+      /** Declared so the required grant is known before the server reads the entry. */
+      transport: Schema.Literals(["stdio", "http"]),
+    }),
+  ),
+});
+export type McpImportInput = typeof McpImportInput.Type;
+
+export const McpImportResult = Schema.Struct({ imported: Schema.Array(McpServerId) });
+export type McpImportResult = typeof McpImportResult.Type;
+
+export class McpServerImportError extends Schema.TaggedError<McpServerImportError>()(
+  "McpServerImportError",
+  {
+    reason: Schema.Literals([
+      "entry-not-found",
+      "transport-mismatch",
+      "id-taken",
+      "invalid-entry",
+      "local-servers-disallowed",
+      "settings",
+    ]),
+    id: Schema.optionalKey(Schema.String),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    const subject = this.id === undefined ? "An MCP server" : `MCP server "${this.id}"`;
+    switch (this.reason) {
+      case "entry-not-found":
+        return `${subject} is no longer in its source config.`;
+      case "transport-mismatch":
+        return `${subject} changed transport in its source config.`;
+      case "id-taken":
+        return `${subject} already exists.`;
+      case "invalid-entry":
+        return `${subject} cannot be imported: its command, URL, or a key is not valid here.`;
+      case "local-servers-disallowed":
+        return "Your organization's policy does not allow local MCP servers.";
+      case "settings":
+        return "The MCP servers could not be saved.";
+    }
+  }
+}

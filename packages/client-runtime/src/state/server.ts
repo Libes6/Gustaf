@@ -1205,6 +1205,14 @@ export function createServerEnvironmentAtoms<R, E>(
 
   return {
     configValueAtom,
+    mcpListImportable: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:mcp-list",
+      tag: WS_METHODS.mcpServersListImportable,
+    }),
+    importMcpServers: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:import",
+      tag: WS_METHODS.mcpServersImport,
+    }),
     runStorageCleanup: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:run-storage-cleanup",
       tag: WS_METHODS.serverRunStorageCleanup,

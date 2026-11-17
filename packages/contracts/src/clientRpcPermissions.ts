@@ -12,6 +12,7 @@ import {
   AuthTerminalOperateScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
+import { McpImportInput } from "./mcpServer.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
 
@@ -71,6 +72,9 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.scheduledTasksRotateWebhookToken]: AuthOrchestrationOperateScope,
   [WS_METHODS.subscriptionsUpsert]: AuthSettingsWriteScope,
   [WS_METHODS.subscriptionsDelete]: AuthSettingsWriteScope,
+  // Both need settings:write too, and importing a stdio server terminal:operate; see below.
+  [WS_METHODS.mcpServersListImportable]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersImport]: AuthProvidersManageScope,
   [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: AuthOrchestrationOperateScope,
   // Force stop kills agent processes, as Stop on a terminal does.
   [ORCHESTRATION_V2_WS_METHODS.forceStopThread]: AuthOrchestrationOperateScope,
@@ -88,6 +92,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
+const decodeMcpImport = Schema.decodeUnknownSync(McpImportInput);
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
 
@@ -107,6 +112,19 @@ export function clientRpcRequiredScopes(
       (payload.action === "create_pr" || payload.action === "commit_push_pr")
     )
       return [AuthSourceControlWriteScope, AuthOrchestrationReadScope];
+  }
+  // The same grants as editing these servers in settings: `requiredScopesForServerSettingsPatch`.
+  if (method === WS_METHODS.mcpServersListImportable) {
+    return [AuthSettingsWriteScope, AuthProvidersManageScope];
+  }
+  if (method === WS_METHODS.mcpServersImport) {
+    const stdio =
+      input === undefined || decodeMcpImport(input).entries.some((e) => e.transport === "stdio");
+    return [
+      AuthSettingsWriteScope,
+      AuthProvidersManageScope,
+      ...(stdio ? [AuthTerminalOperateScope] : []),
+    ];
   }
   return Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, method)
     ? [CLIENT_GUARDED_RPC_SCOPES[method as ClientGuardedRpcTag]]
