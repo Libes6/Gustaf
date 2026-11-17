@@ -603,5 +603,6 @@
   "Show secret": "Показать значение",
   "Searching thread messages…": "Ищем в сообщениях тредов…",
   "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Ctrl while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Ctrl при отправке.",
-  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Command при отправке."
+  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Command при отправке.",
+  "Add a route through the relay": "Добавить маршрут через релей"
 }

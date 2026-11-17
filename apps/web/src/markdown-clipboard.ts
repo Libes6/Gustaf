@@ -415,6 +415,10 @@ function sanitizedHtmlFrom(container: Element): string {
   return `<meta charset="utf-8">${container.innerHTML}`;
 }
 
+function escapeHtml(text: string): string {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
 export function chatMarkdownClipboardPayload(
   selection: Selection,
 ): MarkdownClipboardPayload | null {
@@ -423,11 +427,21 @@ export function chatMarkdownClipboardPayload(
   for (let index = 0; index < selection.rangeCount; index += 1) {
     const range = selection.getRangeAt(index);
     if (range.collapsed) continue;
-    const container = document.createElement("div");
-    container.appendChild(range.cloneContents());
     const ancestor = range.commonAncestorContainer;
     const ancestorElement =
       ancestor.nodeType === Node.ELEMENT_NODE ? (ancestor as Element) : ancestor.parentElement;
+    // Inline code copies as the words the reader selected, not as backtick-wrapped Markdown.
+    const inlineCode = ancestorElement?.closest("code");
+    if (inlineCode && !inlineCode.closest("pre")) {
+      const text = range.toString();
+      if (text && !text.includes("\n") && !isBlockCodeElement(inlineCode, text)) {
+        texts.push(text);
+        htmls.push(`<meta charset="utf-8">${escapeHtml(text)}`);
+        continue;
+      }
+    }
+    const container = document.createElement("div");
+    container.appendChild(range.cloneContents());
     const diagramSource = ancestorElement
       ?.closest("[data-markdown-mermaid]")
       ?.getAttribute("data-markdown-copy");
