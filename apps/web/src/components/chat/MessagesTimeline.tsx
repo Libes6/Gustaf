@@ -1580,7 +1580,7 @@ function ContextCompactionTimelineRow({
         <>
           {row.title ?? t("chatB.MessagesTimeline.contextCompacted")} {row.tokenCounts.before}
           <ArrowRightIcon aria-hidden="true" className="size-3" />
-          {row.tokenCounts.after} tokens
+          {row.tokenCounts.after} {t("webCopy.tokens")}
         </>
       ) : (
         label
@@ -1653,8 +1653,13 @@ function useDeferredWorkLoading(
 }
 
 function WorkHistorySkeleton() {
+  const t = useT();
   return (
-    <div role="status" aria-label="Loading work history" className="space-y-2 px-1 pb-1 pt-3">
+    <div
+      role="status"
+      aria-label={t("webCopy.loadingWorkHistory")}
+      className="space-y-2 px-1 pb-1 pt-3"
+    >
       {[0, 1, 2].map((index) => (
         <div key={index} className="flex items-center gap-2" aria-hidden="true">
           <Skeleton className="size-3 shrink-0" />

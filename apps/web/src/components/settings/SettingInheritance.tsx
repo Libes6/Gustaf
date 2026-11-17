@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   DEFAULT_SERVER_SETTINGS,
   PROJECT_FILE_BACKED_SETTINGS,
@@ -48,18 +50,18 @@ const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
     return key === "pullRequestMergeMethod"
-      ? "Last selected"
+      ? translate(getUiLanguage(), "webCopy.lastSelected")
       : key === "sidebarAutoSettleAfterDays"
         ? "Never"
         : key === "defaultModelSelection"
           ? "Automatic"
           : key === "sourceControlWriterModelSelection"
-            ? "Text generation model"
+            ? translate(getUiLanguage(), "webCopy.textGenerationModel")
             : key === "reviewGuideModelSelection"
-              ? "Source control writer model"
+              ? translate(getUiLanguage(), "webCopy.sourceControlWriterModel")
               : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
                 ? "Inherit"
-                : "Not set";
+                : translate(getUiLanguage(), "webCopy.notSet");
   }
   if (typeof value === "boolean") return value ? "On" : "Off";
   if (typeof value === "number") {
@@ -292,7 +294,9 @@ export function SettingInheritance({
                         layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {layer.key === "environment" ? "Environment" : layer.label}
+                      {layer.key === "environment"
+                        ? t("settingsD.settingInheritance.environment")
+                        : layer.label}
                     </span>
                     <span
                       className={cn(
@@ -405,7 +409,8 @@ export function SettingInheritance({
                       )}
                       {onClearOverrides ? (
                         <InlineButton onClick={() => onClearOverrides(overriding)}>
-                          Reset {overriding.length === 1 ? "it" : "all"}
+                          {t("misc.deviceToolsPanel.reset")}{" "}
+                          {overriding.length === 1 ? t("webCopy.it") : t("webCopy.all")}
                         </InlineButton>
                       ) : null}
                     </div>

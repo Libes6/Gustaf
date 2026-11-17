@@ -26,7 +26,7 @@ export function ChatGptSharingControl({ provider }: { provider: ServerProvider |
           }
         >
           <OpenAI className="size-3.5" aria-hidden="true" />
-          Using ChatGPT plan
+          {t("webCopy.usingChatGPTPlan")}
         </TooltipTrigger>
         <span id={speedNoticeId} className="sr-only">
           {t(speedNoticeKey)}

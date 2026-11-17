@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { useAuth } from "@clerk/react";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
@@ -66,6 +67,7 @@ function tunnelLimitFromLinkFailure(cause: unknown): number | null {
 }
 
 export function useCloudLinkController(environmentId: EnvironmentId | null) {
+  const t = useT();
   const { getToken, isSignedIn } = useAuth();
   const refreshRelayEnvironments = useAtomCommand(relayEnvironmentDiscovery.refresh, {
     reportFailure: false,
@@ -96,7 +98,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not update Gustaf Connect",
+        title: t("webCopy.couldNotUpdateGustafConnect"),
         description: reason ?? relayFailureReason(cause) ?? message,
         ...(traceId
           ? {

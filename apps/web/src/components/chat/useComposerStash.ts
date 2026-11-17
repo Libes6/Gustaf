@@ -656,7 +656,7 @@ export function useComposerStash(input: {
       } else if (kept.length > 0) {
         toastManager.add({
           type: "warning",
-          title: "Stashed images did not attach",
+          title: t("webCopy.stashedImagesDidNotAttach"),
           description: `That prompt was restored or deleted before ${kept.length} image${kept.length === 1 ? "" : "s"} finished saving. Re-attach ${kept.length === 1 ? "it" : "them"} if you still need ${kept.length === 1 ? "it" : "them"}.`,
           data: { hideCopyButton: true },
         });

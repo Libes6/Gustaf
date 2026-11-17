@@ -550,7 +550,7 @@ function ProjectDetail({
             resetAction={
               canResetScratchTitle ? (
                 <SettingResetButton
-                  label="project name"
+                  label={t("webCopy.projectName")}
                   disabled={!canEditGroup}
                   onClick={() =>
                     void updateAllMembers(
@@ -598,7 +598,7 @@ function ProjectDetail({
             resetAction={
               group.memberProjects.some((member) => !hasDefaultProjectIcon(member)) ? (
                 <SettingResetButton
-                  label="project icon"
+                  label={t("webCopy.projectIcon")}
                   disabled={isSavingFavicon || !canEditGroup}
                   onClick={() => void setProjectIcon(defaultProjectIcon)}
                 />

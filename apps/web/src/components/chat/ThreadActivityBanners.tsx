@@ -1,3 +1,4 @@
+import { getUiLanguage } from "~/uiLanguageStore";
 import type {
   EnvironmentId,
   OrchestrationV2PendingBackgroundTask,
@@ -313,7 +314,9 @@ export function branchMismatchBannerItem(input: {
     icon: <GitBranchIcon />,
     title: (
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-normal text-muted-foreground">Branch changed from</span>
+        <span className="shrink-0 font-normal text-muted-foreground">
+          {translate(getUiLanguage(), "webCopy.branchChangedFrom")}
+        </span>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -323,15 +326,15 @@ export function branchMismatchBannerItem(input: {
             }
           />
           <TooltipPopup side="top">
-            This thread last ran on {mismatch.threadBranch}. Sending will continue on{" "}
-            {mismatch.currentBranch}.
+            {translate(getUiLanguage(), "webCopy.thisThreadLastRanOn")} {mismatch.threadBranch}
+            {translate(getUiLanguage(), "webCopy.sendingWillContinueOn")} {mismatch.currentBranch}.
           </TooltipPopup>
         </Tooltip>
       </span>
     ),
     actions: (
       <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
-        {input.restoring ? "Restoring..." : "Restore branch"}
+        {input.restoring ? "Restoring..." : translate(getUiLanguage(), "webCopy.restoreBranch")}
       </Button>
     ),
     dismissLabel: "Dismiss branch change notice",

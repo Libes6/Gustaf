@@ -167,7 +167,7 @@ export default function SideChatPane(props: {
       </div>
       {shell === null ? (
         snapshotLoaded ? (
-          <p className="p-3 text-xs text-muted-foreground">This side chat was deleted.</p>
+          <p className="p-3 text-xs text-muted-foreground">{t("webCopy.thisSideChatWasDeleted")}</p>
         ) : null
       ) : (
         <BackgroundThreadContext value>

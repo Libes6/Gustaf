@@ -14,7 +14,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-const getSnapshot = () => current;
+export const getUiLanguage = () => current;
 
 export function setUiLanguage(language: UiLanguage) {
   if (language === current) return;
@@ -23,5 +23,5 @@ export function setUiLanguage(language: UiLanguage) {
 }
 
 export function useUiLanguage(): UiLanguage {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return useSyncExternalStore(subscribe, getUiLanguage, getUiLanguage);
 }

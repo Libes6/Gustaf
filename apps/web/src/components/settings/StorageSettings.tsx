@@ -77,7 +77,7 @@ export function WorktreesDirectoryRow() {
       resetAction={
         mixed || settings.worktreesDirectory !== "" ? (
           <SettingResetButton
-            label="worktree location"
+            label={t("webCopy.worktreeLocation")}
             onClick={() => updateSettings({ worktreesDirectory: "" })}
           />
         ) : null
@@ -278,7 +278,7 @@ function CleanupResults({
       })}
       {report.omittedCount > 0 && (
         <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-          {environmentLabel}: {report.omittedCount.toLocaleString()} more results.
+          {environmentLabel}: {report.omittedCount.toLocaleString()} {t("webCopy.moreResults")}
         </p>
       )}
       {report.entries.length === 0 && report.omittedCount === 0 && (

@@ -210,7 +210,7 @@ export function SourceControlWritingSettingsSection() {
         resetAction={
           isSourceControlWritingStyleDirty ? (
             <SettingResetButton
-              label="source control writing style"
+              label={t("webCopy.sourceControlWritingStyle")}
               onClick={() =>
                 updateSettings({
                   sourceControlWritingStyle: {
@@ -457,7 +457,7 @@ export function SourceControlWritingSettingsSection() {
             resetAction={
               mixedReviewGuideInstructions || settings.reviewGuideInstructions !== "" ? (
                 <SettingResetButton
-                  label="review guide instructions"
+                  label={t("webCopy.reviewGuideInstructions")}
                   onClick={() => updateSettings({ reviewGuideInstructions: "" })}
                 />
               ) : null
@@ -507,7 +507,7 @@ export function SourceControlWritingSettingsSection() {
             templatesMixed ||
             style.followChangeRequestTemplates !== defaults.followChangeRequestTemplates ? (
               <SettingResetButton
-                label="change request templates"
+                label={t("webCopy.changeRequestTemplates")}
                 onClick={() =>
                   updateSettings({
                     sourceControlWritingStyle: {

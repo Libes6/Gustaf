@@ -41,7 +41,7 @@ export function AddCodexAccountDialog({
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const settings = useEnvironmentSettings(environmentId);
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
-  const update = useAtomCommand(serverEnvironment.updateSettings, "Add ChatGPT account");
+  const update = useAtomCommand(serverEnvironment.updateSettings, t("webCopy.addChatGPTAccount"));
   const [name, setName] = useState("Personal");
   const displayName = `ChatGPT - ${name.trim()}`;
   const [instanceId, setInstanceId] = useState<ProviderInstanceId | null>(null);

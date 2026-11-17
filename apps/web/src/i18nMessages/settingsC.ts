@@ -706,7 +706,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.processScan": "Сканирование процессов",
     "settingsC.resourceTelemetry.scanRetained": "{retained}/{scanned} сохранено",
     "settingsC.resourceTelemetry.inaccessible": "Нет доступа",
-    "settingsC.resourceTelemetry.sidecar": "Sidecar",
+    "settingsC.resourceTelemetry.sidecar": "Вспомогательный процесс",
     "settingsC.resourceTelemetry.restarts": "Перезапуски",
     "settingsC.resourceTelemetry.waitingHealth": "Ожидание данных о состоянии сбора.",
     "settingsC.resourceTelemetry.retryMonitor": "Повторить монитор",
@@ -770,7 +770,7 @@ export const settingsCMessages = {
     "settingsC.secretProviderDialog.description":
       "Переменные провайдеров в {environment} могут читать из него значения по имени. Значения читаются через op CLI на этом сервере при запуске провайдера.",
     "settingsC.secretProviderDialog.name": "Имя",
-    "settingsC.secretProviderDialog.namePlaceholder": "Personal",
+    "settingsC.secretProviderDialog.namePlaceholder": "Личный",
     "settingsC.secretProviderDialog.account": "Аккаунт",
     "settingsC.secretProviderDialog.accountHint":
       "Краткое имя аккаунта, адрес входа без https:// или ID из op account list.",

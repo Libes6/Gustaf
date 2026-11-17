@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import { PlayIcon, RotateCwIcon, TriangleAlertIcon } from "lucide-react";
@@ -45,6 +46,7 @@ export function MediaVideoPlayer({
   onRetry,
   actionsSource,
 }: MediaVideoPlayerProps) {
+  const t = useT();
   const [playbackSource, setPlaybackSource] = useState<{
     src: string;
     revision: string | null;
@@ -138,7 +140,8 @@ export function MediaVideoPlayer({
         >
           <span className="inline-flex items-center gap-1.5">
             <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
-            Video unavailable{label ? ` · ${label}` : ""}
+            {t("chatA.chatMarkdownMedia.videoUnavailable")}
+            {label ? ` · ${label}` : ""}
           </span>
           <span className="flex flex-wrap items-center justify-center gap-2">
             {latestSrc !== null || onRetry ? (
@@ -149,7 +152,7 @@ export function MediaVideoPlayer({
                 onClick={() => void retry()}
               >
                 <RotateCwIcon />
-                {retrying ? "Retrying…" : "Retry video"}
+                {retrying ? t("settingsA.connectionsSettings.retrying") : t("webCopy.retryVideo")}
               </Button>
             ) : null}
             <OpenMediaLink originalUrl={originalUrl} src={latestSrc ?? src} fileName={label} />
@@ -160,7 +163,7 @@ export function MediaVideoPlayer({
           key={loadAttempt}
           ref={attachVideo}
           src={src}
-          aria-label={label || "Video preview"}
+          aria-label={label || t("webCopy.videoPreview")}
           aria-hidden={onOpen ? true : undefined}
           autoPlay={onOpen ? false : autoPlay}
           controls={!onOpen}
@@ -192,7 +195,7 @@ export function MediaVideoPlayer({
       ) : (
         <span
           role="status"
-          aria-label={failed ? "Video preview unavailable" : "Loading video"}
+          aria-label={failed ? t("webCopy.videoPreviewUnavailable") : t("webCopy.loadingVideo")}
           className={cn("block aspect-video w-full rounded-lg bg-muted/60", stateClassName)}
           style={style}
         />
@@ -200,7 +203,7 @@ export function MediaVideoPlayer({
       {onOpen ? (
         <button
           type="button"
-          aria-label={label ? `Play ${label}` : "Play video"}
+          aria-label={label ? `Play ${label}` : t("webCopy.playVideo")}
           onClick={onOpen}
           className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
         >

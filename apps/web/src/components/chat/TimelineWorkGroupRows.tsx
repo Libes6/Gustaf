@@ -290,7 +290,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {t("webCopy.workingFor")} <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
     t("chatB.TimelineWorkGroupRows.working")
@@ -336,7 +336,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
         }
       >
         <Spinner className="size-3 shrink-0" />
-        <span className="truncate">Background setup</span>
+        <span className="truncate">{t("webCopy.backgroundSetup")}</span>
       </PopoverTrigger>
       <PopoverPopup side="bottom" align="end" width="lg" padding="compact">
         <WorktreeSetupCard
@@ -358,7 +358,7 @@ function CompactingLabel({ createdAt }: { createdAt: string | null }) {
       <Minimize2Icon aria-hidden="true" className="size-3" />
       {createdAt ? (
         <span>
-          Compacting for <WorkingTimer createdAt={createdAt} />
+          {t("webCopy.compactingFor")} <WorkingTimer createdAt={createdAt} />
         </span>
       ) : (
         t("chatB.TimelineWorkGroupRows.compacting")

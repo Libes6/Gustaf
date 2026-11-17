@@ -54,7 +54,7 @@ export function ManagedByOrganization({ policy }: { policy: ManagedPolicySummary
   const t = useT();
   return (
     <ManagedNotice>
-      This environment is managed by {policy.organization}.
+      {t("webCopy.thisEnvironmentIsManagedBy")} {policy.organization}.
       {policy.supportUrl ? (
         <>
           {" "}

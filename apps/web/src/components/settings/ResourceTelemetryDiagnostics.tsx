@@ -246,7 +246,8 @@ function LastSampleLabel({ sampledAt }: { sampledAt: DateTime.Utc | null }) {
   }
   return (
     <span className="text-2xs text-muted-foreground/60">
-      Updated <span className="font-mono tabular-nums">{relative.value}</span>
+      {t("chatB.V2LifecycleRow.outcomeUpdated")}{" "}
+      <span className="font-mono tabular-nums">{relative.value}</span>
       {relative.suffix ? ` ${relative.suffix}` : ""}
     </span>
   );
@@ -307,7 +308,8 @@ function AggregateCard({
           {label}
         </div>
         <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-3xs tabular-nums text-muted-foreground/70">
-          {aggregate.processCount} {aggregate.processCount === 1 ? "process" : "processes"}
+          {aggregate.processCount}{" "}
+          {aggregate.processCount === 1 ? t("webCopy.process") : t("webCopy.processes")}
         </div>
       </div>
       <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -1457,7 +1459,7 @@ function ResourceTelemetryDiagnosticsBody({
         headerAction={
           snapshot ? (
             <span className="text-3xs text-muted-foreground/55">
-              Identity: <span className="font-mono">PID + start time</span>
+              {t("webCopy.identity")} <span className="font-mono">{t("webCopy.pIDStartTime")}</span>
             </span>
           ) : null
         }

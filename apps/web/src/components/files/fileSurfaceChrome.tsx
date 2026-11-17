@@ -134,6 +134,7 @@ export function FileSurfaceFailure(props: {
   readonly message: string;
   readonly onRetry?: () => void;
 }) {
+  const t = useT();
   return (
     <div
       role="alert"
@@ -146,7 +147,7 @@ export function FileSurfaceFailure(props: {
           onClick={props.onRetry}
           className="rounded-md border border-input px-2.5 py-1 text-xs text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
-          Try again
+          {t("settingsD.sourceControlAppSignIn.tryAgain")}
         </button>
       ) : null}
     </div>

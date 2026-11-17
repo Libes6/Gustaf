@@ -536,7 +536,7 @@ export const settingsEMessages = {
     "settingsE.worktreeInventory.missing": "Папка отсутствует",
     "settingsE.worktreeInventory.registered": "Git worktree",
     "settingsE.worktreeInventory.historyPath": "Путь из истории треда",
-    "settingsE.worktreeInventory.prunable": " · Git: prunable",
+    "settingsE.worktreeInventory.prunable": " · Git: можно очистить",
     "settingsE.worktreeInventory.unknownOrigin": " · Происхождение не подтверждено",
     "settingsE.worktreeInventory.inspect": "Проверить изменения",
     "settingsE.worktreeInventory.deleted": " · удалён",

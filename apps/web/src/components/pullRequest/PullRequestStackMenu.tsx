@@ -170,7 +170,9 @@ export function PullRequestStackMenu({
             }
           />
           <TooltipPopup>
-            View stack #{stack.number}, layer {position} of {stack.layers.length}
+            {t("webCopy.viewStack")}
+            {stack.number}
+            {t("webCopy.layer")} {position} {t("misc.officeViewer.pageOf")} {stack.layers.length}
             {notice ? ` · ${notice}` : null}
           </TooltipPopup>
         </Tooltip>
@@ -200,7 +202,8 @@ export function PullRequestStackMenu({
               {canMerge ? (
                 <MenuItem disabled={mergeDisabled} onClick={() => setConfirmation("merge")}>
                   <PullRequestGlyph.merged aria-hidden />
-                  Merge stack ({mergeLayers.length})
+                  {t("webCopy.mergeStack")}
+                  {mergeLayers.length})
                 </MenuItem>
               ) : null}
               {canRebase ? (
@@ -209,12 +212,12 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("update-branch")}
                 >
                   <RefreshCwIcon aria-hidden />
-                  Rebase stack
+                  {t("misc.pullRequestStackMenu.rebaseStack")}
                 </MenuItem>
               ) : null}
               {mergeHasClosed || mergeLayers.some((layer) => layer.isDraft) ? (
                 <p className="px-2 py-1 text-xs text-muted-foreground">
-                  Every layer being merged must be open and ready for review.
+                  {t("webCopy.everyLayerBeingMergedMustBeOpenAndReadyFor")}
                 </p>
               ) : null}
             </>
@@ -235,7 +238,7 @@ export function PullRequestStackMenu({
                   onClick={mergeDisabled ? undefined : () => setConfirmation("merge")}
                 >
                   <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                  Merge stack
+                  {t("misc.pullRequestStackMenu.mergeStack")}
                 </Button>
               </span>
             }
@@ -280,7 +283,7 @@ export function PullRequestStackMenu({
           </DialogPanel>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmation(null)}>
-              Cancel
+              {t("subscriptions.cancel")}
             </Button>
             <Button onClick={() => void run()}>
               {confirmation === "merge"

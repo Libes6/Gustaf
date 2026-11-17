@@ -306,6 +306,7 @@ function EffortLevels(props: { traits: TraitsSelectionInput }) {
 type TraitsSelection = ReturnType<typeof useTraitsSelection>;
 
 function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; locked: boolean }) {
+  const t = useT();
   const { control, traits } = props;
   const { descriptor } = control;
   if (control.kind === "boolean") {
@@ -314,7 +315,7 @@ function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; lo
         {([true, false] as const).map((value) => (
           <ColumnRow
             key={String(value)}
-            label={value ? "On" : "Off"}
+            label={value ? t("shell.smallUi.on") : t("settingsE.voiceSettingsPanel.off")}
             selected={(control.descriptor.currentValue === true) === value}
             tabStop={(control.descriptor.currentValue === true) === value}
             onPick={() => traits.changeBoolean(descriptor.id, value)}
@@ -569,6 +570,7 @@ function SpeedSegment(props: {
 }
 
 function SpeedControl(props: { traits: TraitsSelectionInput }) {
+  const t = useT();
   const traits = useTraitsSelection(props.traits);
   const { speedSelect, fastToggle } = splitSpeed(
     traits.selectDescriptors,
@@ -596,7 +598,7 @@ function SpeedControl(props: { traits: TraitsSelectionInput }) {
               <SpeedSegment
                 key={String(value)}
                 checked={(fastToggle.currentValue === true) === value}
-                label={value ? "Fast" : "Standard"}
+                label={value ? t("webCopy.fast") : t("settingsB.IntegrationsSettings.standard")}
                 onPick={() => traits.changeBoolean(fastToggle.id, value)}
               />
             ))

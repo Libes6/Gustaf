@@ -28,7 +28,7 @@ export function ThreadDetailsItemsRow() {
       resetAction={
         isDefaultThreadDetailsVisibility(visibility) ? null : (
           <SettingResetButton
-            label="thread details"
+            label={t("webCopy.threadDetails")}
             onClick={() => updateClientSettings(RESET_THREAD_DETAILS_ITEMS)}
           />
         )

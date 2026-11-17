@@ -214,7 +214,7 @@ export default function BinaryViewer(props: {
             {selectedPath ?? (folder || t("misc.binaryViewer.archiveContents"))}
           </span>
           <span className="shrink-0 text-muted-foreground">
-            {archive.entries.length.toLocaleString()} entries
+            {archive.entries.length.toLocaleString()} {t("webCopy.entries")}
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </span>
         </div>
@@ -257,7 +257,7 @@ export default function BinaryViewer(props: {
             </FileSurfaceAction>
             <span className="shrink-0 tabular-nums" aria-live="polite">
               {table.count === 0
-                ? "0 rows"
+                ? t("webCopy.0Rows")
                 : `${page * SQLITE_PAGE_SIZE + 1}–${Math.min(table.count, (page + 1) * SQLITE_PAGE_SIZE)} of ${table.count.toLocaleString()}`}
             </span>
             <FileSurfaceAction
@@ -272,11 +272,12 @@ export default function BinaryViewer(props: {
             className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
             role="status"
           >
-            {table.count.toLocaleString()} rows · {rows?.columns.length ?? "…"} columns
+            {table.count.toLocaleString()} {t("webCopy.rows")} {rows?.columns.length ?? "…"}{" "}
+            {t("webCopy.columns")}
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </div>
           <FileSurfaceNotice>
-            Read-only. Up to 50 columns and 1,024 characters per cell. Blob contents are omitted.
+            {t("webCopy.readOnlyUpTo50ColumnsAnd1024Characters")}
           </FileSurfaceNotice>
         </>
       ) : null}
@@ -300,13 +301,13 @@ export default function BinaryViewer(props: {
             <thead className="sticky top-0 bg-background text-muted-foreground">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left font-normal">
-                  Name
+                  {t("subscriptions.field.name")}
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  Size
+                  {t("webCopy.size")}
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  Modified
+                  {t("webCopy.modified")}
                 </th>
               </tr>
             </thead>

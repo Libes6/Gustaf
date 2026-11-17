@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
@@ -91,6 +92,7 @@ function IndexDraftLanding() {
 }
 
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
+  const t = useT();
   const contentArea = workspaceAreaProps("home", 1, "Home");
   return (
     <SidebarInset
@@ -101,14 +103,14 @@ function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
       {isElectron ? <WorkspacePageHeader electron /> : null}
       <Empty className="flex-1">
         <EmptyHeader className="max-w-md">
-          <EmptyTitle>Couldn’t start a new thread</EmptyTitle>
+          <EmptyTitle>{t("webCopy.couldnTStartANewThread")}</EmptyTitle>
           <EmptyDescription>
-            The project is still available. Try opening the draft again.
+            {t("webCopy.theProjectIsStillAvailableTryOpeningTheDraftAgain")}
           </EmptyDescription>
           <div className="mt-5 flex justify-center">
             <Button size="sm" onClick={onRetry}>
               <RefreshIcon size="md" />
-              Try again
+              {t("settingsD.sourceControlAppSignIn.tryAgain")}
             </Button>
           </div>
         </EmptyHeader>

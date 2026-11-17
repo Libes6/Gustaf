@@ -121,7 +121,9 @@ export function PullRequestComposer({
             >
               <Toggle value="comment">{t("misc.pullRequestComposer.comment")}</Toggle>
               <Toggle value="review">
-                {pendingComments.length > 0 ? `Review (${pendingComments.length})` : "Review"}
+                {pendingComments.length > 0
+                  ? `Review (${pendingComments.length})`
+                  : t("misc.pullRequestListFilters.review")}
               </Toggle>
             </ToggleGroup>
           ) : (

@@ -179,6 +179,7 @@ export function ProviderAccentColorPicker(props: {
   readonly description?: string;
   readonly layout?: "stacked" | "inline";
 }) {
+  const t = useT();
   const { description, displayName, layout = "stacked", onCommit } = props;
   const value = props.value ?? "";
   // The draft shows a dragged or just-committed color only while `value` is
@@ -225,7 +226,9 @@ export function ProviderAccentColorPicker(props: {
 
   return (
     <div className="grid gap-2">
-      <span className="text-xs font-medium text-foreground">Accent color</span>
+      <span className="text-xs font-medium text-foreground">
+        {t("settingsE.themeColorPicker.roleAccent")}
+      </span>
       {picker}
       {description ? <span className="text-xs text-muted-foreground">{description}</span> : null}
     </div>

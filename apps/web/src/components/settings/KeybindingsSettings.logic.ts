@@ -1,3 +1,5 @@
+import { keybindingLabel } from "../../i18n";
+import type { UiLanguage } from "@t3tools/contracts/settings";
 import {
   STATIC_KEYBINDING_COMMANDS,
   type KeybindingCommand,
@@ -367,7 +369,9 @@ export function buildKeybindingCommandOptions(
   return [...commands].toSorted((left, right) => compareCommands(left, right, commandLabel));
 }
 
-export function commandLabel(command: KeybindingCommand): string {
+export function commandLabel(command: KeybindingCommand, language: UiLanguage = "en"): string {
+  const localized = keybindingLabel(language, command);
+  if (localized !== null) return localized;
   if (command === "workspace.focusNext") return "Focus Next Workspace Area";
   if (command === "workspace.focusPrevious") return "Focus Previous Workspace Area";
   if (command === "composer.sendAlternate") return "Composer: Opposite Queue or Steer Action";

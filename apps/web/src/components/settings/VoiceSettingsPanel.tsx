@@ -461,7 +461,7 @@ function ProjectDictionaryRow() {
       }
       control={
         <span className="text-xs text-muted-foreground">
-          {words.length} {words.length === 1 ? "entry" : "entries"}
+          {words.length} {words.length === 1 ? t("webCopy.entry") : t("webCopy.entries")}
         </span>
       }
     >
@@ -1623,7 +1623,7 @@ export function VoiceSettingsPanel() {
           control={
             <span className="text-xs text-muted-foreground">
               {settings.speechCustomWords.length}{" "}
-              {settings.speechCustomWords.length === 1 ? "entry" : "entries"}
+              {settings.speechCustomWords.length === 1 ? t("webCopy.entry") : t("webCopy.entries")}
             </span>
           }
         >

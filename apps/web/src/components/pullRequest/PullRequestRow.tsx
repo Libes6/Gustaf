@@ -218,10 +218,10 @@ function PullRequestRowImpl({
                       <span className="flex min-w-6 items-center gap-1 overflow-hidden rounded-full border border-border/60 px-1 text-3xs" />
                     }
                   >
-                    <span className="sr-only">matched in the description</span>
+                    <span className="sr-only">{t("webCopy.matchedInTheDescription")}</span>
                     <SearchIcon aria-hidden className="size-3 shrink-0" />
                     <span aria-hidden className="hidden truncate @xs/pr-row-meta:block">
-                      matched in the description
+                      {t("webCopy.matchedInTheDescription")}
                     </span>
                   </TooltipTrigger>
                   <TooltipPopup side="top">

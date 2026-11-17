@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { projectChangeRequestUrl } from "@t3tools/client-runtime/change-request-links";
 import { normalizeThreadPullRequestKey } from "@t3tools/client-runtime/thread-pull-requests";
 import { useAtomValue } from "@effect/atom-react";
@@ -212,7 +214,7 @@ const PullRequestCodeTab = lazy(loadCodeTab);
 function reportCheckoutCommandError(error: Error) {
   toastManager.add({
     type: "error",
-    title: "Could not copy checkout command",
+    title: translate(getUiLanguage(), "webCopy.couldNotCopyCheckoutCommand"),
     description: error.message,
   });
 }
@@ -1319,7 +1321,7 @@ export function PullRequestDetailPanel({
               ) : null}
               {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
                 <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  Retry stack lookup
+                  {t("webCopy.retryStackLookup")}
                 </Button>
               ) : null}
               {nativeStack ? (
@@ -1534,7 +1536,8 @@ export function PullRequestDetailPanel({
                 }
                 updated={
                   <span>
-                    updated <RelativeTime timestamp={detail.updatedAt} />
+                    {t("settingsE.themeSettings.themeVerbUpdated")}{" "}
+                    <RelativeTime timestamp={detail.updatedAt} />
                   </span>
                 }
                 checkout={
@@ -1604,7 +1607,11 @@ export function PullRequestDetailPanel({
               ) : (
                 <PullRequestChecksStatusLine
                   className="text-muted-foreground"
-                  aria-label={checksSummary ? `Checks: ${checksSummary}` : "Checks"}
+                  aria-label={
+                    checksSummary
+                      ? `Checks: ${checksSummary}`
+                      : t("misc.pullRequestSummaryTab.checks")
+                  }
                   icon={
                     checksState !== null ? (
                       <PullRequestChecksPopover
@@ -1672,7 +1679,7 @@ export function PullRequestDetailPanel({
                       <PullRequestReviewOutcomeIcon outcome="approved" className="size-3" />
                       {approvalCount.toLocaleString()}
                       <span className="sr-only">
-                        {approvalCount === 1 ? "approval" : "approvals"}
+                        {approvalCount === 1 ? t("webCopy.approval") : t("webCopy.approvals")}
                       </span>
                     </span>
                   ) : null}

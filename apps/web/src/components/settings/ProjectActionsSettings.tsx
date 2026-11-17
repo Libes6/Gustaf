@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { EnvironmentId, type T3ProjectFileScript } from "@t3tools/contracts";
@@ -104,7 +106,10 @@ export function ProjectActionsSettings() {
       setRequest({
         scriptId: null,
         initial: payload,
-        error: error instanceof Error ? error.message : "Failed to import action.",
+        error:
+          error instanceof Error
+            ? error.message
+            : translate(getUiLanguage(), "webCopy.failedToImportAction"),
       });
     }
   };

@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import {
   findSearchTokenRanges,
   splitSearchText,
@@ -36,11 +37,12 @@ export function ThreadSearchMatchExcerpt(props: {
     readonly query: string;
   };
 }) {
+  const t = useT();
   const isUser = props.match.source === "user";
   return (
     <span className="truncate text-xs text-muted-foreground/85">
       <span className={isUser ? "text-info-foreground" : "text-success-foreground"}>
-        {isUser ? "You:" : "Agent:"}
+        {isUser ? t("webCopy.you") : t("webCopy.agent")}
       </span>{" "}
       <HighlightedSearchText
         text={props.match.snippet}

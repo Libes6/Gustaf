@@ -15,7 +15,10 @@ export function PullRequestStackHeader({
   return (
     <MenuGroupLabel>
       <div className="flex items-center justify-between gap-2">
-        <span>Stack #{number}</span>
+        <span>
+          {t("webCopy.stackMore")}
+          {number}
+        </span>
         {notice ? (
           <Tooltip>
             <TooltipTrigger render={<span role="status" className="text-xs font-normal" />}>

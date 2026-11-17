@@ -1,3 +1,8 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
+import { settingCopy } from "../../i18n";
+import { useUiLanguage } from "../../uiLanguageStore";
+import { useT } from "~/useUiLanguage";
 import { SettingsGroup } from "./SettingsGroup";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { usePrimaryEnvironmentId, usePrimaryEnvironment } from "../../state/environments";
@@ -189,12 +194,17 @@ export const SETTINGS_PICKER_TRIGGER_CLASSNAME =
   "min-w-0 max-w-none shrink-0 border-input bg-background font-normal text-foreground shadow-xs/5 hover:bg-accent/50 dark:bg-input/32 [&_svg[data-composer-control-chevron]]:stroke-[1.75] [&_svg[data-composer-control-chevron]]:opacity-70";
 
 export function PolicyTooltip({ children }: { readonly children: string }) {
+  const t = useT();
   return (
     <Tooltip>
       <TooltipTrigger
         delay={200}
         render={
-          <Button size="icon-micro" variant="ghost-muted" aria-label="Background policy details">
+          <Button
+            size="icon-micro"
+            variant="ghost-muted"
+            aria-label={t("webCopy.backgroundPolicyDetails")}
+          >
             <InfoIcon className="size-3.5" />
           </Button>
         }
@@ -223,6 +233,10 @@ export function SettingsSection({
   variant?: "grouped" | "plain";
   children: ReactNode;
 }) {
+  const language = useUiLanguage();
+  const localizedTitle = sectionProps.id
+    ? (settingCopy(language, sectionProps.id)?.title ?? title)
+    : title;
   const targetRef = useSettingsSearchTarget<HTMLElement>(sectionProps.id);
 
   return (
@@ -233,7 +247,7 @@ export function SettingsSection({
       className={cn(!hideTitle && "space-y-2.5", className)}
     >
       {hideTitle ? (
-        <h2 className="sr-only">{title}</h2>
+        <h2 className="sr-only">{localizedTitle}</h2>
       ) : (
         <div
           data-settings-scroll-target
@@ -242,7 +256,7 @@ export function SettingsSection({
           <div className="flex min-w-0 items-center gap-1">
             <h2 className="flex min-h-7 items-center gap-2 text-base font-semibold text-foreground">
               {icon}
-              {title}
+              {localizedTitle}
             </h2>
             {titleAction}
           </div>
@@ -333,6 +347,9 @@ export function SettingsRow({
   managed?: string | undefined;
   children?: ReactNode;
 }) {
+  const t = useT();
+  const language = useUiLanguage();
+  const localizedTitle = rowProps.id ? (settingCopy(language, rowProps.id)?.title ?? title) : title;
   const targetRef = useSettingsSearchTarget<HTMLDivElement>(rowProps.id);
   const primarySettingsAvailable = usePrimarySettingsAvailable();
   const context = useOptionalSettingsScope();
@@ -397,7 +414,7 @@ export function SettingsRow({
       source === "project" || source === "mixed" ? (
         <SettingResetButton
           label={typeof title === "string" ? title : "override"}
-          tooltip="Reset to inherited value"
+          tooltip={t("webCopy.resetToInheritedValue")}
           onClick={() => (onResetOverride ? onResetOverride() : clearOverrides(scopedKeys))}
         />
       ) : null
@@ -437,7 +454,7 @@ export function SettingsRow({
                       ? context.connectedEnvironments
                           .filter((target) => !writableIds.has(target.environmentId))
                           .map((target) => target.label)
-                          .join(", ") || "the selected environment"
+                          .join(", ") || t("webCopy.theSelectedEnvironment")
                       : (primaryEnvironment?.label ?? "the primary environment")
                   }.`
                 : context
@@ -445,7 +462,7 @@ export function SettingsRow({
                   : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
             )
           : environmentWide && control
-            ? inertControl("Environment-wide setting. Select an environment to change it.")
+            ? inertControl(t("webCopy.environmentWideSettingSelectAnEnvironmentToChangeIt"))
             : control;
   const customized =
     context !== null &&
@@ -461,7 +478,7 @@ export function SettingsRow({
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
     ? { state: "mixed", summary: "Mixed across selected environments" }
     : source === "project"
-      ? { state: "overridden", summary: "Overridden for this project" }
+      ? { state: "overridden", summary: t("webCopy.overriddenForThisProject") }
       : source === "t3.json"
         ? { state: "inherited", summary: "Inherited from the repository's t3.json" }
         : source === "environment" && scopedKeys.length > 0
@@ -503,7 +520,7 @@ export function SettingsRow({
       <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_auto] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-medium text-foreground">{localizedTitle}</h3>
             {renderedInheritance ? (
               <span
                 className={cn(
@@ -549,7 +566,7 @@ export function SettingsRow({
 
 export function SettingResetButton({
   label,
-  tooltip = "Reset to default",
+  tooltip = translate(getUiLanguage(), "webCopy.resetToDefault"),
   disabled = false,
   onClick,
 }: {

@@ -1310,8 +1310,9 @@ export function ProviderInstanceCard({
       title={t("settingsC.providerInstanceCard.driver")}
       description={
         <span>
-          This instance uses <code className="text-foreground">{String(instance.driver)}</code>,
-          which is not available in this build. Its configuration is preserved.
+          {t("webCopy.thisInstanceUses")}{" "}
+          <code className="text-foreground">{String(instance.driver)}</code>
+          {t("webCopy.whichIsNotAvailableInThisBuildItsConfigurationIs")}
         </span>
       }
     />

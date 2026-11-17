@@ -177,6 +177,7 @@ function PullRequestFilterRadioGroup<Value extends string>({
   options: ReadonlyArray<PullRequestFilterOption<Value>>;
   onChange: (value: Value) => void;
 }) {
+  const t = useT();
   return (
     <MenuRadioGroup
       value={value}
@@ -196,7 +197,9 @@ function PullRequestFilterRadioGroup<Value extends string>({
             <span className="flex min-w-0 items-center gap-2">
               <PullRequestFilterOptionIcon option={option} />
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {option.unavailable ? <span className="shrink-0">· Unavailable</span> : null}
+              {option.unavailable ? (
+                <span className="shrink-0">{t("webCopy.unavailable")}</span>
+              ) : null}
               <MenuRadioItemIndicator />
             </span>
           </MenuRadioItem>
@@ -308,7 +311,7 @@ function PullRequestAuthorChoices({
         <MenuRadioItem value="">
           <span className="flex min-w-0 items-center gap-2">
             <LayersIcon aria-hidden className="size-3.5" />
-            Anyone
+            {t("misc.pullRequestListFilters.anyone")}
           </span>
         </MenuRadioItem>
         {visible.map((option) => (
@@ -318,7 +321,7 @@ function PullRequestAuthorChoices({
               <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
               {option.mergedCount > 0 ? (
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {option.mergedCount} merges loaded
+                  {option.mergedCount} {t("webCopy.mergesLoaded")}
                 </span>
               ) : null}
             </span>
@@ -461,7 +464,7 @@ function PullRequestLabelFilter({
         <TagIcon aria-hidden className="size-3.5" />
         <span className="flex-1">{t("misc.pullRequestListFilters.labels")}</span>
         <span className="text-xs text-muted-foreground">
-          {value.length === 0 ? "Any" : `${value.length} selected`}
+          {value.length === 0 ? t("webCopy.any") : `${value.length} selected`}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>

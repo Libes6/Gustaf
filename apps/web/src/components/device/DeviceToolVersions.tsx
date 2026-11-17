@@ -91,7 +91,8 @@ export function DeviceToolVersions({
           </p>
         )}
         <p className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground">
-          {owner ? `Managed by ${owner}. ` : ""}Tools update automatically on this host when needed.
+          {owner ? `Managed by ${owner}. ` : ""}
+          {t("webCopy.toolsUpdateAutomaticallyOnThisHostWhenNeeded")}
         </p>
         {error ? (
           <p role="status" className="mt-2 text-xs text-destructive">

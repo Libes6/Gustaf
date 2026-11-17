@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { AuthPreviewOperateScope, type EnvironmentId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 
@@ -155,8 +157,11 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: "Preview is desktop-only",
-              description: "Open Gustaf in the desktop app to use the in-app preview.",
+              title: translate(getUiLanguage(), "webCopy.previewIsDesktopOnly"),
+              description: translate(
+                getUiLanguage(),
+                "webCopy.openGustafInTheDesktopAppToUseTheIn",
+              ),
             }),
           );
           return;

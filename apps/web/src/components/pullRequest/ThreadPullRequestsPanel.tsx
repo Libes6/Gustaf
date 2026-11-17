@@ -203,8 +203,7 @@ function LinkRowImpl({
                       />
                     </TooltipTrigger>
                     <TooltipPopup>
-                      Watching: the agent wakes when checks finish, someone comments, or the branch
-                      conflicts
+                      {t("webCopy.watchingTheAgentWakesWhenChecksFinishSomeoneCommentsOr")}
                     </TooltipPopup>
                   </Tooltip>
                 ) : null}
@@ -330,11 +329,11 @@ function LinkRowImpl({
           >
             <MenuItem onClick={() => void writeTextToClipboard(link.url, "link")}>
               <LinkIcon className="size-3.5" />
-              Copy link
+              {t("settingsA.authorizedClients.copyLink")}
             </MenuItem>
             <MenuItem onClick={(event) => openPrLink(event, link.url, threadRef)}>
               <ArrowUpRightIcon className="size-3.5" />
-              Open
+              {t("misc.pullRequestReviewAnnotation.open")}
             </MenuItem>
             {onSetWatching !== null && open ? (
               <MenuItem onClick={() => onSetWatching(link, !watching)}>
@@ -443,12 +442,11 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
         <p className="text-sm font-medium">{t("misc.threadPullRequestsPanel.noLinked")}</p>
         <p className="max-w-60 text-xs text-muted-foreground">
-          Pull requests the agent opens from this thread land here. Link one yourself from a URL or
-          a number.
+          {t("webCopy.pullRequestsTheAgentOpensFromThisThreadLandHere")}
         </p>
         <Button size="sm" variant="outline" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link pull request
+          {t("misc.linkPullRequestDialog.title")}
         </Button>
       </div>
     );
@@ -485,17 +483,17 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         />
         <footer className="flex items-center justify-between border-t border-border/60 px-2 py-1.5 text-2xs text-muted-foreground">
           <span>
-            {openCount} open · {linkCount} linked
+            {openCount} {t("webCopy.open")} {linkCount} {t("webCopy.linked")}
             {lastSynced ? (
               <>
-                {" · synced "}
+                {t("webCopy.synced")}
                 <RelativeTime timestamp={lastSynced} />
               </>
             ) : null}
           </span>
           <Button size="xs" variant="ghost" onClick={openLinkDialog}>
             <PlusIcon className="size-3.5" />
-            Link
+            {t("settingsB.LinkedEnvironmentsSettings.link")}
           </Button>
         </footer>
       </div>

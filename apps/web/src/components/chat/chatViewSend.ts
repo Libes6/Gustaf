@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   CommandId,
   type EnvironmentId,
@@ -117,7 +119,10 @@ export async function startFanoutThread(input: {
                   onClick: () => {
                     void readLocalApi()
                       ?.dialogs.confirm(
-                        "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?",
+                        translate(
+                          getUiLanguage(),
+                          "webCopy.thePreviousRequestMayAlreadyBeRunningCheckItsThread",
+                        ),
                       )
                       .then(
                         (confirmed) => {

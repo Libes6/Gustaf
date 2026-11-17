@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import type { EnvironmentId, UsageLimitsReport } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { limitsNotice } from "@t3tools/shared/usageLimits";
@@ -96,7 +98,7 @@ export function modelFallbackBannerItem({
     description: `${defaultProviderName} is out of usage${resetsAt ? ` · resets ${formatUpcomingTimestamp(resetsAt, timestampFormat)}` : ""}`,
     actions: (
       <Button size="xs" variant="ghost" onClick={onUseDefault}>
-        Use {defaultModelName}
+        {translate(getUiLanguage(), "webCopy.use")} {defaultModelName}
       </Button>
     ),
     dismissLabel: "Dismiss fallback model notice",
@@ -111,6 +113,7 @@ function UsageLimitsBannerBody({
   readonly report: UsageLimitsReport;
   readonly environmentId: EnvironmentId;
 }) {
+  const t = useT();
   const now = Date.parse(report.createdAt);
   return (
     <ComposerBanner.Scroll>
@@ -146,7 +149,7 @@ function UsageLimitsBannerBody({
                   className="self-start"
                   onClick={() => void ensureLocalApi().shell.openExternal(externalUsage.url)}
                 >
-                  Manage usage
+                  {t("settingsA.chatGptUsage.manageUsage")}
                 </Button>
               ) : null}
               {resetCreditInput && account.limits.resetCredits ? (

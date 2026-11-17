@@ -158,7 +158,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
       resetAction={
         settings.defaultModelSelection !== null ? (
-          <SettingResetButton label="default model" onClick={() => setModel(null)} />
+          <SettingResetButton label={t("webCopy.defaultModel")} onClick={() => setModel(null)} />
         ) : null
       }
       control={
@@ -230,7 +230,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
           <SettingResetButton
-            label="default workspace"
+            label={t("webCopy.defaultWorkspace")}
             onClick={() => updateSettings({ defaultThreadEnvMode: null })}
           />
         ) : null
@@ -276,7 +276,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
-            label="fallback model"
+            label={t("webCopy.fallbackModel")}
             onClick={() => updateSettings({ fallbackModelSelection: null })}
           />
         ) : null
@@ -373,7 +373,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             resetAction={
               settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
                 <SettingResetButton
-                  label="default permissions"
+                  label={t("webCopy.defaultPermissions")}
                   onClick={() =>
                     updateSettings({
                       defaultRuntimeMode: DEFAULT_SERVER_SETTINGS.defaultRuntimeMode,
@@ -453,7 +453,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             resetAction={
               settings.defaultAutoPull ? (
                 <SettingResetButton
-                  label="default automatic pull"
+                  label={t("webCopy.defaultAutomaticPull")}
                   tooltip={t("settingsC.projectDefaultsSettings.autoPullReset")}
                   onClick={() => updateSettings({ defaultAutoPull: false })}
                 />
@@ -477,7 +477,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             resetAction={
               settings.removeAgentCreditsOnMerge ? (
                 <SettingResetButton
-                  label="agent credit removal"
+                  label={t("webCopy.agentCreditRemoval")}
                   tooltip={t("settingsC.projectDefaultsSettings.keepCredits")}
                   onClick={() => updateSettings({ removeAgentCreditsOnMerge: false })}
                 />
@@ -507,7 +507,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             resetAction={
               settings.pullRequestMergeMethod !== null ? (
                 <SettingResetButton
-                  label="default merge method"
+                  label={t("webCopy.defaultMergeMethod")}
                   tooltip={t("settingsC.projectDefaultsSettings.resetToLastSelected")}
                   onClick={() => updateSettings({ pullRequestMergeMethod: null })}
                 />
@@ -579,7 +579,7 @@ export function WorktreeSubmodulesRow() {
       resetAction={
         !isProjectScope && settings.worktreeSubmodules !== null ? (
           <SettingResetButton
-            label="worktree submodules"
+            label={t("webCopy.worktreeSubmodules")}
             onClick={() => updateSettings({ worktreeSubmodules: null })}
           />
         ) : null

@@ -214,9 +214,9 @@ function itemSummary({
     if (auth.status === "unauthenticated") {
       return (
         <span>
-          {item.label} is not authenticated on this server. Sign in or configure credentials using
-          the <code className="rounded bg-muted px-1 py-px text-2xs">{item.executable}</code> tool
-          on the server host to enable change request features.
+          {item.label} {t("webCopy.isNotAuthenticatedOnThisServerSignInOrConfigure")}{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{item.executable}</code>{" "}
+          {t("webCopy.toolOnTheServerHostToEnableChangeRequestFeatures")}
         </span>
       );
     }

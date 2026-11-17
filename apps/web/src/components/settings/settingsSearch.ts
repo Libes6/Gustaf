@@ -1,3 +1,5 @@
+import { settingCopy, translateSettingsNav, keybindingLabel } from "../../i18n";
+import type { UiLanguage } from "@t3tools/contracts/settings";
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron, isSecretsFeatureEnabled } from "~/env";
 import { hasShellAccount } from "~/shellAccount";
@@ -1434,14 +1436,14 @@ export function movedSettingsPath(pathname: string, hash: string): SettingsPath 
   return to === pathname ? null : to;
 }
 
-export function getSettingsSearchTargetScope(targetId: string) {
+export function getSettingsSearchTargetScope(targetId: string, language: UiLanguage = "en") {
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const item =
     items.find((candidate) => candidate.id === targetId) ??
     items.find((candidate) => candidate.targetId === targetId);
   return item
     ? {
-        title: item.title,
+        title: settingCopy(language, item.id)?.title ?? item.title,
         scope: item.scope ?? SETTINGS_CATEGORY_SCOPES[item.to],
         ...(item.requiresThreadAutoSettlement ? { requiresThreadAutoSettlement: true } : {}),
       }
@@ -1549,17 +1551,30 @@ export function settingsForThisPlatform(
 export function searchSettings(
   query: string,
   items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS,
+  language: UiLanguage = "en",
 ): ReadonlyArray<SettingsSearchItem> {
   const normalizedQuery = normalizeSearchText(query);
   if (normalizedQuery.length === 0) return [];
   const queryTokens = normalizedQuery.split(" ");
 
   return settingsForThisPlatform(items)
+    .map((item) => ({
+      ...item,
+      title:
+        settingCopy(language, item.id)?.title ??
+        (item.id.startsWith("keybinding-")
+          ? keybindingLabel(language, item.id.slice("keybinding-".length))
+          : null) ??
+        item.title,
+      searchTerms: [item.title, ...(item.searchTerms ?? [])],
+    }))
     .flatMap((item, index) => {
       const title = normalizeSearchText(item.title);
       const fields = [
         title,
-        normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
+        normalizeSearchText(
+          translateSettingsNav(language, item.to, SETTINGS_SECTION_LABELS[item.to]),
+        ),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];

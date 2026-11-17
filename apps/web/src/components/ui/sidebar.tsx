@@ -330,7 +330,7 @@ function Sidebar({
           >
             <SheetHeader className="sr-only">
               <SheetTitle>{props["aria-label"] ?? t("shell.sidebar.title")}</SheetTitle>
-              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+              <SheetDescription>{t("webCopy.displaysTheMobileSidebar")}</SheetDescription>
             </SheetHeader>
             <div
               className={cn(

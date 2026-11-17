@@ -40,8 +40,7 @@ export function DeviceHostUpdates({
               </p>
               {failed ? (
                 <p className="mt-1 text-muted-foreground">
-                  Check the host connection and network access, then retry. Your device settings are
-                  saved.
+                  {t("webCopy.checkTheHostConnectionAndNetworkAccessThenRetryYour")}
                 </p>
               ) : null}
             </div>

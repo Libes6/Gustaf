@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { useAtomValue } from "@effect/atom-react";
 import { serverUpdateStateAtom } from "@t3tools/client-runtime/state/server";
 import { EnvironmentId } from "@t3tools/contracts";
@@ -341,7 +343,7 @@ export function startDesktopUpdateLaunchNotice(): () => void {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Update did not apply",
+          title: translate(getUiLanguage(), "webCopy.updateDidNotApply"),
           description: `Gustaf is still on ${APP_VERSION}. Install ${notAppliedVersion} again from the update button.`,
         }),
       );

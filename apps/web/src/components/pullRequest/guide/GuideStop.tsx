@@ -87,7 +87,8 @@ export function GuideStop({
         <Collapsible open={railOpen} onOpenChange={onRailOpenChange}>
           <header className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
-              Stop {index + 1} of {stopCount}
+              {t("misc.previewChromeRow.stop")} {index + 1} {t("misc.officeViewer.pageOf")}{" "}
+              {stopCount}
             </p>
             <CollapsibleTrigger
               render={
@@ -95,7 +96,8 @@ export function GuideStop({
               }
             >
               <span className="tabular-nums">
-                Stop {index + 1} of {stopCount}
+                {t("misc.previewChromeRow.stop")} {index + 1} {t("misc.officeViewer.pageOf")}{" "}
+                {stopCount}
               </span>
               <ChevronDownIcon aria-hidden className={cn(railOpen && "rotate-180")} />
             </CollapsibleTrigger>
@@ -267,7 +269,7 @@ export function GuideStop({
               {onAsk !== null ? (
                 <Button size="sm" variant="ghost-muted" onClick={() => onAsk("")}>
                   <MessageCircleQuestionIcon aria-hidden />
-                  Ask about this stop
+                  {t("webCopy.askAboutThisStop")}
                 </Button>
               ) : null}
             </div>
@@ -277,13 +279,15 @@ export function GuideStop({
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 pt-4">
           {nextTitle !== null ? (
             <Button size="multiline" className="max-w-full" onClick={() => onStep(1)}>
-              <span className="min-w-0 break-words">Next: {nextTitle}</span>
+              <span className="min-w-0 break-words">
+                {t("webCopy.nextMore")} {nextTitle}
+              </span>
               <ArrowRightIcon aria-hidden />
             </Button>
           ) : onFinish !== null ? (
             <Button onClick={onFinish}>
               <MessageSquareIcon aria-hidden />
-              Finish review
+              {t("webCopy.finishReview")}
             </Button>
           ) : null}
         </footer>

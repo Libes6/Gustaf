@@ -33,8 +33,7 @@ export function TriageDraftHero(props: {
             )}
           </TooltipTrigger>
           <TooltipPopup side="bottom">
-            The agent reads Gustaf's logs and source here, and asks before it applies a fix or posts
-            anything.
+            {t("webCopy.theAgentReadsGustafSLogsAndSourceHereAnd")}
           </TooltipPopup>
         </Tooltip>
         <span aria-hidden className="text-muted-foreground">

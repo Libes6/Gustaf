@@ -106,6 +106,7 @@ function CommentIdentity({
   comment: PullRequestComment;
   detail: PullRequestDetailView;
 }) {
+  const t = useT();
   const actor = comment.author;
   const profileUrl = actor
     ? sourceControlClients.get(detail.provider).authorProfileUrl(actor.login, detail.url)
@@ -134,7 +135,7 @@ function CommentIdentity({
         </TooltipTrigger>
         <TooltipPopup>
           {new Date(comment.createdAt).toLocaleString()}
-          {comment.url ? " · Open comment on host" : ""}
+          {comment.url ? t("webCopy.openCommentOnHost") : ""}
         </TooltipPopup>
       </Tooltip>
     </div>
@@ -282,6 +283,7 @@ function CollapsedComment({
   moreReplies?: ReactNode;
   onAddToChat?: (() => void) | undefined;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   return (
@@ -292,7 +294,7 @@ function CollapsedComment({
             <CommentIdentity comment={comment} detail={detail} />
             {replyCount > 0 ? (
               <span className="shrink-0 py-1 text-xs text-muted-foreground">
-                {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                {replyCount} {replyCount === 1 ? t("webCopy.reply") : t("webCopy.replies")}
               </span>
             ) : null}
             <CollapsibleTrigger
@@ -499,7 +501,8 @@ export function PullRequestSummaryTab({
         className="w-full"
         onClick={() => setShown({ url: detail.url, count: shownConversations + COMMENT_PAGE })}
       >
-        Show {Math.min(hiddenConversationCount, COMMENT_PAGE)} older conversation
+        {t("misc.pullRequestSummaryTab.show")} {Math.min(hiddenConversationCount, COMMENT_PAGE)}{" "}
+        {t("webCopy.olderConversation")}
         {hiddenConversationCount === 1 ? "" : "s"} ({hiddenConversationCount} hidden)
       </Button>
     ) : null;
@@ -919,7 +922,7 @@ export function PullRequestSummaryTab({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{t("misc.pullRequestSummaryTab.checksOutdated")}</span>
             <Button size="xs" variant="ghost" onClick={onRefreshChecks}>
-              Refresh
+              {t("settingsE.textGeneratorsSettings.refresh")}
             </Button>
           </div>
         ) : detail.checks.length === 0 ? (
@@ -988,17 +991,17 @@ export function PullRequestSummaryTab({
                 aria-label={t("misc.pullRequestSummaryTab.filterComments")}
               >
                 <ListFilterIcon aria-hidden className="size-3" />
-                {filteredOutCount > 0 ? `${filteredOutCount} hidden` : "Filter"}
+                {filteredOutCount > 0 ? `${filteredOutCount} hidden` : t("webCopy.filter")}
               </MenuTrigger>
               <MenuPopup align="end">
                 <MenuGroup>
-                  <MenuGroupLabel>{t("misc.pullRequestSummaryTab.show")}</MenuGroupLabel>
+                  <MenuGroupLabel>{t("misc.pullRequestSummaryTab.show")} </MenuGroupLabel>
                   <MenuCheckboxItem
                     checked={commentFilter.bots}
                     closeOnClick={false}
                     onCheckedChange={(bots) => setCommentFilter((value) => ({ ...value, bots }))}
                   >
-                    Bot comments
+                    {t("webCopy.botComments")}
                   </MenuCheckboxItem>
                   <MenuCheckboxItem
                     checked={commentFilter.resolved}
@@ -1007,7 +1010,7 @@ export function PullRequestSummaryTab({
                       setCommentFilter((value) => ({ ...value, resolved }))
                     }
                   >
-                    Resolved or dismissed
+                    {t("webCopy.resolvedOrDismissed")}
                   </MenuCheckboxItem>
                 </MenuGroup>
               </MenuPopup>
@@ -1043,8 +1046,10 @@ export function PullRequestSummaryTab({
           <>
             {detail.commentsTruncated ? (
               <p className="mb-2 rounded-md border border-warning/30 bg-warning-surface px-2 py-1.5 text-xs">
-                This conversation is only partially loaded. {commentCount} comment
-                {commentCount === 1 ? " is" : "s are"} loaded; open it on the host to read the rest.
+                {t("webCopy.thisConversationIsOnlyPartiallyLoaded")} {commentCount}{" "}
+                {t("webCopy.comment")}
+                {commentCount === 1 ? t("webCopy.is") : t("webCopy.sAre")}{" "}
+                {t("webCopy.loadedOpenItOnTheHostToReadTheRest")}
               </p>
             ) : null}
             {items.length === 0 ? (
@@ -1054,7 +1059,7 @@ export function PullRequestSummaryTab({
             ) : filteredItems.length === 0 ? (
               <p className="py-2 text-xs text-muted-foreground">
                 {filteredOutCount === 1
-                  ? "The only comment is hidden by the filter."
+                  ? t("webCopy.theOnlyCommentIsHiddenByTheFilter")
                   : `All ${filteredOutCount} comments are hidden by the filter.`}
               </p>
             ) : (
@@ -1069,7 +1074,7 @@ export function PullRequestSummaryTab({
                     className="w-full"
                     onClick={() => setShown({ url: detail.url, count: COMMENT_PAGE })}
                   >
-                    Show only {COMMENT_PAGE} recent conversations
+                    {t("webCopy.showOnly")} {COMMENT_PAGE} {t("webCopy.recentConversations")}
                   </Button>
                 ) : null}
               </div>

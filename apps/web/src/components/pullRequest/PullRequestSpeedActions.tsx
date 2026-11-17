@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction, PullRequestSummary } from "@t3tools/contracts";
 import { createContext, use, type ReactNode } from "react";
@@ -45,6 +46,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   sweeping?: boolean;
   onCloseSweepStart?: (entry: Entry, event: PointerEvent) => void;
 }) {
+  const t = useT();
   const canWrite = useAtomValue(
     pullRequestEnvironment.runAction.permissionAtom(entry.environmentId),
   );
@@ -114,7 +116,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
               {action === "merge" && entry.stack
                 ? `Open this ${terminology.singular} to merge its stack`
                 : action === "close" && onCloseSweepStart
-                  ? "Close immediately, or drag across rows to close several"
+                  ? t("webCopy.closeImmediatelyOrDragAcrossRowsToCloseSeveral")
                   : `${label} immediately`}
             </TooltipPopup>
           </Tooltip>

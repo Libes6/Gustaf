@@ -225,7 +225,7 @@ export function ConnectAgentSurface() {
         )}
         description={
           <>
-            This agent wants to use the threads in every project on{" "}
+            {t("webCopy.thisAgentWantsToUseTheThreadsInEveryProject")}{" "}
             <span className="font-medium text-foreground">{details.environmentHost}</span>.
           </>
         }
@@ -233,14 +233,14 @@ export function ConnectAgentSurface() {
       <p className="mt-2 text-xs text-muted-foreground">
         {redirectsToThisComputer(details.redirectHost) ? (
           <>
-            The name is chosen by the agent. Approval returns to {details.redirectHost} on the
-            computer that opened this page. Only approve a sign-in you just started.
+            {t("webCopy.theNameIsChosenByTheAgentApprovalReturnsTo")} {details.redirectHost}{" "}
+            {t("webCopy.onTheComputerThatOpenedThisPageOnlyApproveA")}
           </>
         ) : (
           <>
-            The name is chosen by the agent. Approval gives access to whoever runs{" "}
-            <span className="font-medium text-foreground">{details.redirectHost}</span>. Only
-            approve a sign-in you just started there.
+            {t("webCopy.theNameIsChosenByTheAgentApprovalGivesAccess")}{" "}
+            <span className="font-medium text-foreground">{details.redirectHost}</span>
+            {t("webCopy.onlyApproveASignInYouJustStartedThere")}
           </>
         )}
       </p>
@@ -293,8 +293,8 @@ export function ConnectAgentSurface() {
               value={pairingCode}
             />
             <p className="text-xs text-muted-foreground">
-              Create one in Settings → Sharing & access, or run{" "}
-              <code>gustaf auth pairing create</code> on this machine.
+              {t("webCopy.createOneInSettingsSharingAccessOrRun")}{" "}
+              <code>gustaf auth pairing create</code> {t("webCopy.onThisMachine")}
             </p>
           </div>
         )}

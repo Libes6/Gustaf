@@ -63,7 +63,8 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
       >
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-foreground">
           <span>
-            {totals.count.toLocaleString()} changed file{totals.count === 1 ? "" : "s"}
+            {totals.count.toLocaleString()} {t("webCopy.changedFile")}
+            {totals.count === 1 ? "" : "s"}
           </span>
           {hasNonZeroStat(totals) && (
             <DiffStatLabel
@@ -146,8 +147,8 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
             variant="ghost-muted"
             onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
           >
-            {hiddenFileCount.toLocaleString()} more file{hiddenFileCount === 1 ? "" : "s"} in the
-            full diff
+            {hiddenFileCount.toLocaleString()} {t("webCopy.moreFile")}
+            {hiddenFileCount === 1 ? "" : "s"} {t("webCopy.inTheFullDiff")}
           </Button>
         </div>
       )}

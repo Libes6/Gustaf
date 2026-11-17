@@ -139,22 +139,35 @@ function ProviderSetupActions({
   const actionsDisabled = pendingLabel !== null || queryError !== null;
   const installationStatusMessage =
     installation === null
-      ? "Checking the Antigravity runtime."
+      ? t("webCopy.checkingTheAntigravityRuntime")
       : installation?.phase === "downloading"
-        ? `Downloading ${(installation.downloadedBytes / 1_000_000).toFixed(1)} MB${installation.totalBytes === null ? "" : ` of ${(installation.totalBytes / 1_000_000).toFixed(1)} MB`}.`
+        ? t("webCopy.downloadingDownloadedMBTotal")
+            .replace("{downloaded}", (installation.downloadedBytes / 1_000_000).toFixed(1))
+            .replace(
+              "{total}",
+              installation.totalBytes === null
+                ? ""
+                : t("webCopy.ofTotalMB").replace(
+                    "{total}",
+                    (installation.totalBytes / 1_000_000).toFixed(1),
+                  ),
+            )
         : installation?.phase === "extracting"
-          ? "Extracting Antigravity."
+          ? t("webCopy.extractingAntigravity")
           : installation?.phase === "verifying"
-            ? "Checking the downloaded runtime."
+            ? t("webCopy.checkingTheDownloadedRuntime")
             : installed
-              ? "Installed."
+              ? t("webCopy.installed")
               : usesCustomBinary
                 ? enabled
-                  ? "The configured Antigravity runtime is unavailable."
-                  : "The configured Antigravity runtime has not been checked."
+                  ? t("webCopy.theConfiguredAntigravityRuntimeIsUnavailable")
+                  : t("webCopy.theConfiguredAntigravityRuntimeHasNotBeenChecked")
                 : installation?.totalBytes
-                  ? `${Math.ceil(installation.totalBytes / 1_000_000)} MB download.`
-                  : "Not installed.";
+                  ? t("webCopy.sizeMBDownload").replace(
+                      "{size}",
+                      String(Math.ceil(installation.totalBytes / 1_000_000)),
+                    )
+                  : t("webCopy.notInstalled");
 
   async function runCommand<A, E>(
     label: string,

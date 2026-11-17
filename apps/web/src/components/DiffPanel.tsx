@@ -1028,7 +1028,7 @@ export default function DiffPanel({
               <TooltipTrigger
                 render={<span aria-hidden className="hidden @max-[20rem]/diff-refs:inline" />}
               >
-                vs
+                {t("webCopy.vs")}
               </TooltipTrigger>
               <TooltipPopup side="top">
                 {`${comparisonHeadRef} → ${comparisonBaseRef}`}
@@ -1364,16 +1364,17 @@ export default function DiffPanel({
             )}
             {isSelectedPatchTruncated && !lazySource && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
-                This preview exceeds the size limit. Changes shown are incomplete.
+                {t("webCopy.thisPreviewExceedsTheSizeLimitChangesShownAreIncomplete")}
                 {isGitSelection && selectedGitSource?.files && !preview?.incomplete
-                  ? " Totals include all changes."
+                  ? t("webCopy.totalsIncludeAllChanges")
                   : ""}
               </p>
             )}
             {omittedToolCallFiles > 0 && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
-                This tool call changed {recordedToolCallFileCount} files. The recorded patch omits{" "}
-                {omittedToolCallFiles} of them.
+                {t("webCopy.thisToolCallChanged")} {recordedToolCallFileCount}{" "}
+                {t("webCopy.filesTheRecordedPatchOmits")} {omittedToolCallFiles}{" "}
+                {t("webCopy.ofThem")}
               </p>
             )}
             {selectedPatchError && !renderablePatch && (
@@ -1384,7 +1385,7 @@ export default function DiffPanel({
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (
               <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
                 <p className="text-muted-foreground">
-                  The provider recorded file content without a diff.
+                  {t("webCopy.theProviderRecordedFileContentWithoutADiff")}
                 </p>
                 {toolCallPreview.content.map(({ label, text }) => (
                   <div key={label} className="space-y-1">

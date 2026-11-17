@@ -250,7 +250,7 @@ export function ReviewThreadCard({
           {thread.isResolved
             ? t("misc.pullRequestReviewAnnotation.resolvedOpen")
             : t("misc.pullRequestReviewAnnotation.open")}{" "}
-          · {commentCount} {commentCount === 1 ? "comment" : "comments"}
+          · {commentCount} {commentCount === 1 ? t("webCopy.comment") : t("webCopy.comments")}
         </button>
         {thread.isOutdated ? <span>{t("misc.pullRequestReviewAnnotation.outdated")}</span> : null}
         {onFix ? (
@@ -273,7 +273,7 @@ export function ReviewThreadCard({
             onClick={() => onAddToChat({ ...thread, comments })}
           >
             <MessageSquarePlusIcon className="size-3" />
-            Add to chat
+            {t("shell.terminal.addToChat")}
           </Button>
         ) : null}
         {canResolve ? (
@@ -392,7 +392,7 @@ export function ReviewThreadCard({
                     <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                       <TextFieldSpeechControls speech={speech} disabled={pending} />
                       <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                        Cancel
+                        {t("subscriptions.cancel")}
                       </Button>
                       <Button
                         size="xs"
@@ -403,7 +403,7 @@ export function ReviewThreadCard({
                         }
                         onClick={() => speech.submitAfterDictation((text) => void send(text))}
                       >
-                        Reply
+                        {t("misc.pullRequestReviewAnnotation.replyPlaceholder")}
                       </Button>
                     </div>
                   </div>
@@ -411,7 +411,7 @@ export function ReviewThreadCard({
               </SpeechTextField>
             ) : (
               <Button size="xs" variant="ghost" className="mt-2" onClick={() => setReplying(true)}>
-                Reply
+                {t("misc.pullRequestReviewAnnotation.replyPlaceholder")}
               </Button>
             )
           ) : null}

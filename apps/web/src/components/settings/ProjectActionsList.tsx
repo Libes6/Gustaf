@@ -37,17 +37,17 @@ export function ProjectActionsList({
             <span className="min-w-0 truncate">{script.name}</span>
             {script.runOnWorktreeCreate ? (
               <span className="shrink-0 rounded-sm border border-border/60 px-1.5 py-px text-2xs font-normal text-muted-foreground">
-                setup
+                {t("webCopy.setup")}
               </span>
             ) : null}
             {script.runOnSettle ? (
               <span className="shrink-0 rounded-sm border border-border/60 px-1.5 py-px text-2xs font-normal text-muted-foreground">
-                on settle
+                {t("webCopy.onSettle")}
               </span>
             ) : null}
             {script.previewUrl ? (
               <span className="shrink-0 rounded-sm border border-border/60 px-1.5 py-px text-2xs font-normal text-muted-foreground max-sm:hidden">
-                preview · desktop only
+                {t("webCopy.previewDesktopOnly")}
               </span>
             ) : null}
           </span>

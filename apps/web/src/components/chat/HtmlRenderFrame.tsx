@@ -120,7 +120,7 @@ export function HtmlRenderFrame(props: {
         </>
       ) : failed ? (
         <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          Unable to load {title}
+          {t("webCopy.unableToLoad")} {title}
         </p>
       ) : null}
     </div>

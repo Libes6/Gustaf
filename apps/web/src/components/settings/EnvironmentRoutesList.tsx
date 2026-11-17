@@ -62,7 +62,7 @@ export function EnvironmentRoutesList({
       ? connectionRouteId(prepared.value.target)
       : null;
   const reorder = useAtomCommand(environmentCatalog.reorderRoutes, "Reorder routes");
-  const removeRoute = useAtomCommand(environmentCatalog.removeRoute, "Remove route");
+  const removeRoute = useAtomCommand(environmentCatalog.removeRoute, t("webCopy.removeRoute"));
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),

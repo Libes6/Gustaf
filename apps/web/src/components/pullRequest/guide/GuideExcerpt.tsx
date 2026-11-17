@@ -143,6 +143,7 @@ export function GuideExcerpt({
   loadDiffFiles: FileDiffContentsLoader;
   onOpenFile: (path: string) => void;
 }) {
+  const t = useT();
   // Keep selections outside ExcerptDiff to survive head reloads.
   const [draft, setDraft] = useState<ExcerptDraft | null>(null);
   const slice = excerptSlice(file, excerpt);
@@ -168,16 +169,16 @@ export function GuideExcerpt({
         />
       ) : loading ? (
         <p className="rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          Loading {excerpt.path}...
+          {t("sidebar.Sidebar.loading")} {excerpt.path}...
         </p>
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 truncate">
-            <span className="font-mono text-foreground">{excerpt.path}</span> lines {excerpt.start}-
-            {excerpt.end} are not in the loaded diff.
+            <span className="font-mono text-foreground">{excerpt.path}</span> {t("webCopy.lines")}{" "}
+            {excerpt.start}-{excerpt.end} {t("webCopy.areNotInTheLoadedDiff")}
           </span>
           <Button size="xs" variant="outline" onClick={() => onOpenFile(excerpt.path)}>
-            Open in Code
+            {t("webCopy.openInCode")}
           </Button>
         </div>
       )}
@@ -368,8 +369,9 @@ function ExcerptDiff({
         renderHeaderMetadata={() => (
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="tabular-nums">
-              {excerpt.side === "old" ? "removed code, " : ""}showing {slice.shown} of {slice.total}{" "}
-              diff lines
+              {excerpt.side === "old" ? t("webCopy.removedCode") : ""}
+              {t("webCopy.showing")} {slice.shown} {t("misc.officeViewer.pageOf")} {slice.total}{" "}
+              {t("webCopy.diffLines")}
             </span>
             <Button
               size="icon-xs"

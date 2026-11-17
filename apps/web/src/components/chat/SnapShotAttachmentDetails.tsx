@@ -125,12 +125,11 @@ export function SnapShotContentsButton({
             />
           ) : includesAccessibility ? (
             <div className="rounded-md border border-border/70 bg-muted/45 p-2.5 text-muted-foreground text-xs leading-4">
-              Structured accessibility elements were included, but they have no readable names or
-              values.
+              {t("webCopy.structuredAccessibilityElementsWereIncludedButTheyHaveNoReadable")}
             </div>
           ) : (
             <div className="rounded-md border border-border/70 bg-muted/45 p-2.5 text-muted-foreground text-xs leading-4">
-              The app or capture backend did not provide verified accessibility data.
+              {t("webCopy.theAppOrCaptureBackendDidNotProvideVerifiedAccessibility")}
             </div>
           )}
         </div>

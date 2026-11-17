@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { useAtomValue } from "@effect/atom-react";
 import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
 import { AsyncResult } from "effect/reactivity";
@@ -310,7 +312,7 @@ function WebhookFiltersField({
                     "{index}",
                     String(index + 1),
                   )}
-                  placeholder={filter.op === "in" ? "opened, reopened" : "opened"}
+                  placeholder={filter.op === "in" ? t("webCopy.openedReopened") : "opened"}
                   value={filter.value}
                   onChange={(event) => update(index, { value: event.target.value })}
                 />
@@ -362,39 +364,60 @@ const ONCE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 });
 
 export function scheduleLabel(schedule: ScheduledTaskSchedule): string {
-  if (schedule.type === "webhook") return "On webhook";
-  if (schedule.type === "once") return `Once, ${ONCE_FORMATTER.format(new Date(schedule.runAt))}`;
+  if (schedule.type === "webhook") return translate(getUiLanguage(), "webCopy.onWebhook");
+  if (schedule.type === "once")
+    return translate(getUiLanguage(), "webCopy.onceDate").replace(
+      "{date}",
+      ONCE_FORMATTER.format(new Date(schedule.runAt)),
+    );
   if (schedule.type === "interval") {
     const minutes = schedule.everyMs / 60_000;
     return Number.isInteger(minutes)
-      ? `Every ${minutes} min`
-      : `Every ${Math.round(schedule.everyMs / 1000)} sec`;
+      ? translate(getUiLanguage(), "webCopy.everyCountMin").replace("{count}", String(minutes))
+      : translate(getUiLanguage(), "webCopy.everyCountSec").replace(
+          "{count}",
+          String(Math.round(schedule.everyMs / 1000)),
+        );
   }
   const weekdays = schedule.weekdays ?? [];
   const days =
     weekdays.length === 0
-      ? "Daily"
+      ? translate(getUiLanguage(), "webCopy.daily")
       : weekdays.length === 5 && weekdays.every((day) => day >= 1 && day <= 5)
-        ? "Weekdays"
-        : weekdays.map((day) => WEEKDAY_LABELS[day]).join(", ");
-  return `${days} at ${schedule.timeOfDay}`;
+        ? translate(getUiLanguage(), "webCopy.weekdays")
+        : weekdays
+            .map(
+              (day) =>
+                (getUiLanguage() === "ru"
+                  ? ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
+                  : WEEKDAY_LABELS)[day],
+            )
+            .join(", ");
+  return translate(getUiLanguage(), "webCopy.daysAtTime")
+    .replace("{days}", days)
+    .replace("{time}", schedule.timeOfDay);
 }
 
 /** formatRelativeTime handles only the past; upcoming runs need future labels. */
 function relativeLabel(value: string | null, nowMs: number): string {
-  if (!value) return "Not scheduled";
+  if (!value) return translate(getUiLanguage(), "webCopy.notScheduled");
   const diffMs = new Date(value).getTime() - nowMs;
   if (diffMs <= 0) {
     const relative = formatRelativeTime(value, nowMs);
-    if (!relative) return "Not scheduled";
+    if (!relative) return translate(getUiLanguage(), "webCopy.notScheduled");
     return relative.suffix ? `${relative.value} ${relative.suffix}` : relative.value;
   }
   const minutes = Math.ceil(diffMs / 60_000);
-  if (minutes < 2) return "in under a minute";
-  if (minutes < 60) return `in ${minutes}m`;
+  if (minutes < 2) return translate(getUiLanguage(), "webCopy.inUnderAMinute");
+  if (minutes < 60)
+    return translate(getUiLanguage(), "webCopy.inCountM").replace("{count}", String(minutes));
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `in ${hours}h`;
-  return `in ${Math.round(hours / 24)}d`;
+  if (hours < 24)
+    return translate(getUiLanguage(), "webCopy.inCountH").replace("{count}", String(hours));
+  return translate(getUiLanguage(), "webCopy.inCountD").replace(
+    "{count}",
+    String(Math.round(hours / 24)),
+  );
 }
 
 // Use the label's minute tick because the compiler caches render-time Date.now() on the timestamp.
@@ -850,7 +873,7 @@ function ScheduledTaskRow({
               t("settingsD.scheduledTasksSettings.listening")
             ) : task.nextRunAt ? (
               <>
-                Next run <ScheduledRelativeLabel value={task.nextRunAt} />
+                {t("webCopy.nextRun")} <ScheduledRelativeLabel value={task.nextRunAt} />
               </>
             ) : (
               t("settingsD.scheduledTasksSettings.notScheduled")
@@ -1105,7 +1128,7 @@ function WebhookDeliveriesDialog({
                     ) : null}
                     {delivery.missingFields.length > 0 ? (
                       <span className="text-muted-foreground">
-                        {delivery.missingFields.length} empty placeholder
+                        {delivery.missingFields.length} {t("webCopy.emptyPlaceholder")}
                         {delivery.missingFields.length === 1 ? "" : "s"}
                       </span>
                     ) : null}

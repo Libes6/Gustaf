@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
   type AtomCommandResult,
@@ -36,6 +37,7 @@ export const isTriagePrompt = (prompt: string) => prompt.includes(`[${TRIAGE_PRO
  * the problem.
  */
 export function useStartTriage() {
+  const t = useT();
   const router = useRouter();
   const { scratchWorkspaceRootFor } = useScratchProject();
   const handleNewThread = useNewThreadHandler();
@@ -47,7 +49,7 @@ export function useStartTriage() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not start triage",
+        title: t("webCopy.couldNotStartTriage"),
         description: `${description} Run ${TRIAGE_CLI_COMMAND} in a terminal on that machine instead.`,
         timeout: 0,
         actionProps: { children: "Copy command", onClick: () => void copyTriageCliCommand() },
@@ -92,7 +94,7 @@ export function useStartTriage() {
     const pendingTimer = setTimeout(() => {
       pendingToastId = toastManager.add({
         type: "loading",
-        title: "Starting triage…",
+        title: t("webCopy.startingTriage"),
         timeout: 0,
       });
     }, 400);

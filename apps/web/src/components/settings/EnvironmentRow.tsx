@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   type ConnectionTarget,
   connectionRouteId,
@@ -24,7 +26,8 @@ export function environmentTransportLabel(
   activeTarget: ConnectionTarget | null = null,
 ): string {
   const { entry } = environment;
-  if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
+  if (entry.target._tag === "PrimaryConnectionTarget")
+    return translate(getUiLanguage(), "webCopy.thisMachine");
   const routes = connectionRoutes(entry);
   if (routes.length > 1) {
     const active =
@@ -46,7 +49,7 @@ export function environmentTransportLabel(
   ) {
     return `SSH ${formatDesktopSshTarget(entry.profile.value.target)}`;
   }
-  return environment.displayUrl ?? "Remote link";
+  return environment.displayUrl ?? translate(getUiLanguage(), "webCopy.remoteLink");
 }
 
 export function useEnvironmentTransportLabel(environment: EnvironmentPresentation): string {

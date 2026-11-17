@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { Discovery } from "@t3tools/client-runtime/relay";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useState } from "react";
@@ -26,6 +27,7 @@ export function RemoveT3ConnectEnvironmentDialog({
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }) {
+  const t = useT();
   const accountPage = useT3ConnectAccountPage();
   const discovery = useRelayEnvironmentDiscovery();
   const registration = environmentId
@@ -46,7 +48,7 @@ export function RemoveT3ConnectEnvironmentDialog({
         openAccountPage();
       }}
     >
-      Gustaf Connect settings
+      {t("webCopy.gustafConnectSettings")}
     </InlineButton>
   ) : (
     "Gustaf Connect settings"
@@ -62,30 +64,35 @@ export function RemoveT3ConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shown.label} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settingsE.textGeneratorsSettings.remove")} {shown.label}{" "}
+              {t("webCopy.fromThisDevice")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This forgets its pairing, credentials, and cached threads here.
+              {t("webCopy.thisForgetsItsPairingCredentialsAndCachedThreadsHere")}
             </AlertDialogDescription>
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
                 <>
-                  It stays on your Gustaf Connect account and keeps its host space. Deregister it in{" "}
-                  {accountPageLink} to free it.
+                  {t("webCopy.itStaysOnYourGustafConnectAccountAndKeepsIts")} {accountPageLink}{" "}
+                  {t("webCopy.toFreeIt")}
                 </>
               ) : shown.registration === "unregistered" ? (
                 "It's no longer on your Gustaf Connect account."
               ) : (
                 <>
-                  This doesn't change your Gustaf Connect account. To deregister it there, use{" "}
+                  {t("webCopy.thisDoesnTChangeYourGustafConnectAccountToDeregister")}{" "}
                   {accountPageLink}.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {t("subscriptions.cancel")}
+            </AlertDialogClose>
             <Button variant="destructive" onClick={onConfirm}>
-              Remove from this device
+              {t("webCopy.removeFromThisDevice")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

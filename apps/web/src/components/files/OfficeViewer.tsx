@@ -164,7 +164,7 @@ function ExtendedOfficeViewer(props: {
       >
         <p className="text-sm font-medium">{t("misc.officeViewer.noPreview")}</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-          {error} Save it or open it in another app.
+          {error} {t("webCopy.saveItOrOpenItInAnotherApp")}
         </p>
       </div>
     );
@@ -253,8 +253,9 @@ function ExtendedOfficeViewer(props: {
           className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
           role="status"
         >
-          Sheet {page + 1} of {count} · {sheet.rowCount.toLocaleString()} rows ·{" "}
-          {sheet.columns.toLocaleString()} columns
+          {t("misc.officeViewer.sheet")} {page + 1} {t("misc.officeViewer.pageOf")} {count} ·{" "}
+          {sheet.rowCount.toLocaleString()} {t("webCopy.rows")} {sheet.columns.toLocaleString()}{" "}
+          {t("webCopy.columns")}
           {fileSize !== undefined
             ? ` · ${fileSize === 0 ? "0 bytes" : formatAttachmentSize(fileSize)}`
             : ""}
@@ -264,7 +265,7 @@ function ExtendedOfficeViewer(props: {
         <>
           {props.kind !== "epub" ? (
             <FileSurfaceNotice>
-              Text and images. Layout and embedded objects may differ from the original.
+              {t("webCopy.textAndImagesLayoutAndEmbeddedObjectsMayDifferFrom")}
             </FileSurfaceNotice>
           ) : null}
           <Suspense fallback={<FileSurfaceLoading />}>
@@ -278,11 +279,11 @@ function ExtendedOfficeViewer(props: {
       ) : sheet ? (
         <>
           <FileSurfaceNotice>
-            Cell values only. Charts, images, and formatting are not shown.
+            {t("webCopy.cellValuesOnlyChartsImagesAndFormattingAreNotShown")}
             {sheet.truncated
               ? props.kind === "ods"
-                ? " Limited to 500 rows and 50 columns."
-                : " Preview limited to 250,000 rows, 1,024 columns, and bounded cell text."
+                ? t("webCopy.limitedTo500RowsAnd50Columns")
+                : t("webCopy.previewLimitedTo250000Rows1024ColumnsAnd")
               : ""}
           </FileSurfaceNotice>
           {sheet.rowCount === 0 ? (

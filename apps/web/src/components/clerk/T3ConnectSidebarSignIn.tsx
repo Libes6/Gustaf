@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { UserButton, useAuth } from "@clerk/react";
 import { LogInIcon } from "lucide-react";
 
@@ -48,6 +49,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
 }
 
 function ConfiguredT3ConnectSidebarSignIn() {
+  const t = useT();
   const { isLoaded, isSignedIn } = useAuth();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
 
@@ -58,7 +60,7 @@ function ConfiguredT3ConnectSidebarSignIn() {
       <SidebarMenuItem>
         <SidebarMenuButton onClick={openAuthPrompt}>
           <LogInIcon />
-          <span>Sign in to Gustaf Connect</span>
+          <span>{t("webCopy.signInToGustafConnect")}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

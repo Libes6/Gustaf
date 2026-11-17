@@ -423,7 +423,9 @@ export function McpAppFrame(props: {
   if (closed) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-muted-foreground text-xs">
-        <span>The {app.server} app was closed</span>
+        <span>
+          {t("webCopy.the")} {app.server} {t("webCopy.appWasClosed")}
+        </span>
         <Button
           size="xs"
           variant="ghost"
@@ -476,7 +478,7 @@ export function McpAppFrame(props: {
         ) : null}
         {navigatedAway ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            The {app.server} app left its page and was stopped
+            {t("webCopy.the")} {app.server} {t("webCopy.appLeftItsPageAndWasStopped")}
           </p>
         ) : src !== null ? (
           <iframe
@@ -492,7 +494,7 @@ export function McpAppFrame(props: {
           />
         ) : asset._tag === "Failure" ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            Unable to load the {app.server} app
+            {t("webCopy.unableToLoadThe")} {app.server} {t("webCopy.app")}
           </p>
         ) : null}
       </div>

@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -102,6 +103,7 @@ export function BrowserViewportResizeHandles({
   onPointerDown,
   onKeyDown,
 }: Props) {
+  const t = useT();
   const left = layout.viewportX;
   const top = layout.viewportY;
   const right = left + layout.viewportWidth;
@@ -113,7 +115,7 @@ export function BrowserViewportResizeHandles({
     <>
       <ResizeHandle
         direction="west"
-        label="Resize browser viewport from left edge"
+        label={t("webCopy.resizeBrowserViewportFromLeftEdge")}
         kind="vertical"
         cursorClassName="cursor-ew-resize"
         style={{ left: left - railSize, top, width: railSize, height: layout.viewportHeight }}
@@ -123,7 +125,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="east"
-        label="Resize browser viewport from right edge"
+        label={t("webCopy.resizeBrowserViewportFromRightEdge")}
         kind="vertical"
         cursorClassName="cursor-ew-resize"
         style={{ left: right, top, width: railSize, height: layout.viewportHeight }}
@@ -133,7 +135,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="south"
-        label="Resize browser viewport from bottom edge"
+        label={t("webCopy.resizeBrowserViewportFromBottomEdge")}
         kind="horizontal"
         cursorClassName="cursor-ns-resize"
         style={{ left, top: bottom, width: layout.viewportWidth, height: railSize }}
@@ -143,7 +145,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="southwest"
-        label="Resize browser viewport from bottom-left corner"
+        label={t("webCopy.resizeBrowserViewportFromBottomLeftCorner")}
         kind="corner"
         cursorClassName="cursor-nesw-resize"
         style={{ left: left - railSize, top: bottom, width: railSize, height: railSize }}
@@ -154,7 +156,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="southeast"
-        label="Resize browser viewport from bottom-right corner"
+        label={t("webCopy.resizeBrowserViewportFromBottomRightCorner")}
         kind="corner"
         cursorClassName="cursor-nwse-resize"
         style={{ left: right, top: bottom, width: railSize, height: railSize }}

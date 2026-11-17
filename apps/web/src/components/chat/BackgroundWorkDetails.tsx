@@ -89,7 +89,7 @@ export function BackgroundWorkDetails(props: {
                         props.onOpenThread(childThreadId);
                       }}
                     >
-                      Open thread
+                      {t("shell.smallUi.openThread")}
                     </InlineButton>
                   ) : null}
                 </section>

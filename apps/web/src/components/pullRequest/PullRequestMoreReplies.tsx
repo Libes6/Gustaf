@@ -22,7 +22,7 @@ export function PullRequestMoreReplies({
           rel="noopener noreferrer"
           className="hover:text-foreground hover:underline"
         >
-          View on host
+          {t("webCopy.viewOnHost")}
         </a>
       ) : null}
     </div>

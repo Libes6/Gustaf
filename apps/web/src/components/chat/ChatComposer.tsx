@@ -2496,7 +2496,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       variant="ghost"
                       onClick={() => handleRuntimeModeChange(runtimeModeCeilingFallback)}
                     >
-                      Switch to {runtimeModeConfig[runtimeModeCeilingFallback].label}
+                      {t("webCopy.switchTo")} {runtimeModeConfig[runtimeModeCeilingFallback].label}
                     </Button>
                   ),
                 }),

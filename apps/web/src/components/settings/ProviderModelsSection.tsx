@@ -344,7 +344,8 @@ export function ProviderModelsSection({
             </Button>
           ) : null}
           <span className="text-xs text-muted-foreground">
-            {models.length} model{models.length === 1 ? "" : "s"}
+            {models.length} {t("webCopy.model")}
+            {models.length === 1 ? "" : "s"}
             {favoriteCount > 0
               ? ` · ${favoriteCount} favorite${favoriteCount === 1 ? "" : "s"}`
               : ""}

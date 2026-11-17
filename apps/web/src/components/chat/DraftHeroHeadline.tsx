@@ -433,7 +433,9 @@ export function DraftHeroHeadline({
           {isScratchDraft ? (
             <>{t("chatA.draftHeroHeadline.whatToWorkOn")}</>
           ) : canChooseProject ? (
-            <>{projectSelector} to start</>
+            <>
+              {projectSelector} {t("webCopy.toStart")}
+            </>
           ) : (
             <>{t("chatA.draftHeroHeadline.addProjectToStart")}</>
           )}

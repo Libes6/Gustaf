@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import type { ReactNode } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
@@ -524,13 +526,15 @@ function FontFamilySettingsRow({
         }}
       >
         <SelectTrigger size="sm" className="w-22 shrink-0" aria-label={size.label}>
-          <SelectValue>{size.value} px</SelectValue>
+          <SelectValue>
+            {size.value} {translate(getUiLanguage(), "webCopy.px")}
+          </SelectValue>
         </SelectTrigger>
         <SelectPopup align="end" alignItemWithTrigger={false}>
           {Array.from({ length: size.max - size.min + 1 }, (_, index) => size.min + index).map(
             (px) => (
               <SelectItem hideIndicator key={px} value={String(px)}>
-                {px} px
+                {px} {translate(getUiLanguage(), "webCopy.px")}
               </SelectItem>
             ),
           )}

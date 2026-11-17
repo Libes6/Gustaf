@@ -301,7 +301,7 @@ function SavePlanToWorkspaceForm({
       <DialogHeader>
         <DialogTitle>{t("chatB.ProposedPlanCard.savePlanDialogTitle")}</DialogTitle>
         <DialogDescription>
-          Enter a path relative to{" "}
+          {t("webCopy.enterAPathRelativeTo")}{" "}
           <code>{workspaceRoot ?? t("chatB.ProposedPlanCard.workspaceFallback")}</code>.
         </DialogDescription>
       </DialogHeader>

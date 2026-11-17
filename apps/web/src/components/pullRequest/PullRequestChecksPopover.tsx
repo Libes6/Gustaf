@@ -115,7 +115,7 @@ function ChecksBody({
                       });
                     }}
                   >
-                    Details
+                    {t("settingsD.relay.detailsTitle")}
                   </button>
                 )}
               </li>
@@ -160,6 +160,7 @@ export function PullRequestChecksPopover({
   className?: string;
   render?: React.ReactElement;
 }) {
+  const t = useT();
   const presentation = pullRequestChecksStatePresentation(checksState);
   const incompleteCount =
     checks?.filter((check) => check.status === "pending" || check.status === "action-required")
@@ -195,10 +196,12 @@ export function PullRequestChecksPopover({
           <>
             {checks !== undefined && incompleteCount > 0 ? (
               <span className="tabular-nums">
-                {checks.length - incompleteCount}/{checks.length} checks
+                {checks.length - incompleteCount}/{checks.length} {t("webCopy.checks")}
               </span>
             ) : failedCount > 0 ? (
-              <span className="tabular-nums">{failedCount} failed</span>
+              <span className="tabular-nums">
+                {failedCount} {t("settingsE.themeImportDialog.failed")}
+              </span>
             ) : null}
           </>
         ) : null}
@@ -208,7 +211,7 @@ export function PullRequestChecksPopover({
         {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
         {stale ? (
           <p className="text-muted-foreground text-xs">
-            Check details are out of date. Refresh the pull request to update them.
+            {t("webCopy.checkDetailsAreOutOfDateRefreshThePullRequest")}
           </p>
         ) : checks !== undefined ? (
           <ChecksBody checks={checks} threadRef={threadRef} />

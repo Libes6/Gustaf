@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import {
   type DesktopBridge,
   type DesktopPendingSnapShot,
@@ -228,6 +229,7 @@ export async function deliverSnapShot(
 }
 
 export function SnapShotCoordinator() {
+  const t = useT();
   const {
     activeDraftThread,
     activeThread,
@@ -374,8 +376,8 @@ export function SnapShotCoordinator() {
               "missing-project",
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot taken, but no project is available",
-                description: "Add a project, then capture the window again.",
+                title: t("webCopy.snapshotTakenButNoProjectIsAvailable"),
+                description: t("webCopy.addAProjectThenCaptureTheWindowAgain"),
               }),
             );
             continue;
@@ -398,7 +400,7 @@ export function SnapShotCoordinator() {
               "delivery",
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot failed",
+                title: t("webCopy.snapshotFailed"),
                 description: `Capture ${item.id}: ${
                   error instanceof Error ? error.message : "Try the capture again."
                 }`,
@@ -414,7 +416,7 @@ export function SnapShotCoordinator() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Snapshot failed",
+            title: t("webCopy.snapshotFailed"),
             description: error instanceof Error ? error.message : "Try the capture again.",
           }),
         );
@@ -483,7 +485,7 @@ export function SnapShotCoordinator() {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot failed",
+                title: t("webCopy.snapshotFailed"),
                 description: state.message ?? "Try the capture again.",
               }),
             );

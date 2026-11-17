@@ -255,7 +255,7 @@ export function DeviceSetup(props: {
             </div>
             <AgentDeviceSetupStatus state={props.state} pending={pending === "agent"} />
             <p className="text-xs text-muted-foreground">
-              Leave this off to keep manual device controls without giving agents access.
+              {t("webCopy.leaveThisOffToKeepManualDeviceControlsWithoutGiving")}
             </p>
           </section>
         ) : null}
@@ -277,12 +277,12 @@ export function DeviceSetup(props: {
             disabled={busy || pending !== null}
             onClick={() => setStep(step - 1)}
           >
-            Back
+            {t("sidebar.SidebarUtilityMenu.back")}
           </Button>
         )}
         {step < 2 ? (
           <Button disabled={!ready || pending !== null} onClick={() => setStep(step + 1)}>
-            Continue
+            {t("shell.gitActions.continue")}
           </Button>
         ) : (
           <Button
@@ -341,7 +341,7 @@ function DevicePlatformSetup(props: {
       <PlatformStatus platform="Android" status={platformSetupStatus(props.state, "android")} />
       <DeviceHostDiagnostics hosts={props.state.hosts} hostStatuses={props.state.hostStatuses} />
       <p className="text-xs text-muted-foreground">
-        You can use either platform. Fixing a missing platform does not block the other one.
+        {t("webCopy.youCanUseEitherPlatformFixingAMissingPlatformDoes")}
       </p>
       <Button size="compact" variant="outline" disabled={props.disabled} onClick={props.onCheck}>
         {props.checking ? <Spinner size="xs" /> : null}
@@ -385,7 +385,7 @@ export function AgentDeviceSetupStatus(props: {
     return (
       <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
         <Check className="size-3 text-success" />
-        Agent tools are ready.
+        {t("webCopy.agentToolsAreReady")}
       </p>
     );
   }

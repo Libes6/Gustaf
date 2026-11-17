@@ -216,7 +216,7 @@ export function AssistantCitationChip({
             render={<Button variant="outline" size="sm" render={<Link {...sourceLinkProps} />} />}
           >
             <ArrowUpRightIcon aria-hidden="true" />
-            Go to source
+            {t("webCopy.goToSource")}
           </PopoverClose>
         </div>
       </ContextChipPopover>

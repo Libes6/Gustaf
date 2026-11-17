@@ -154,7 +154,10 @@ function EnabledPullRequestThreadLinks({
               </Button>
             }
           />
-          <TooltipPopup>{linkedThreadsLabel}. Search in the command palette.</TooltipPopup>
+          <TooltipPopup>
+            {linkedThreadsLabel}
+            {t("webCopy.searchInTheCommandPalette")}
+          </TooltipPopup>
         </Tooltip>
       ) : null}
       {display === "menu-item" ? (
@@ -183,7 +186,9 @@ function EnabledPullRequestThreadLinks({
       {display === "picker" ? (
         <Dialog open onOpenChange={onPickerOpenChange}>
           <DialogPopup className="max-w-md" showCloseButton={false}>
-            <DialogTitle className="sr-only">Link {term} to a thread</DialogTitle>
+            <DialogTitle className="sr-only">
+              {t("settingsB.LinkedEnvironmentsSettings.link")} {term} {t("webCopy.toAThread")}
+            </DialogTitle>
             <ThreadPicker
               environmentId={environmentId}
               url={url}
@@ -245,7 +250,7 @@ function ThreadPicker({
       <CommandList className="max-h-80 overflow-y-auto">
         {candidates.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No active threads found.
+            {t("webCopy.noActiveThreadsFound")}
           </div>
         ) : (
           candidates.map((thread) => {

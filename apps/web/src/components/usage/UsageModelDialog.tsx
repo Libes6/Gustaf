@@ -147,7 +147,7 @@ export function UsageModelDialog({
         {model.unpricedTokens > 0 ? (
           <DialogFooter variant="bare" className="items-center sm:justify-between">
             <span className="text-xs text-muted-foreground">
-              {formatTokens(model.unpricedTokens)} tokens have no known price
+              {formatTokens(model.unpricedTokens)} {t("webCopy.tokensHaveNoKnownPrice")}
             </span>
             <Button onClick={onSetPrice}>{t("misc.usageModelDialog.setPrice")}</Button>
           </DialogFooter>

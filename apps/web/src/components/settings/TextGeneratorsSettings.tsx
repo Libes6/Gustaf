@@ -493,8 +493,9 @@ function TextGeneratorWizard({
           ) : (
             <div className="grid gap-4">
               <p className="text-sm text-muted-foreground">
-                {name} is connected and lists {modelCount} {modelCount === 1 ? "model" : "models"}.
-                Switch any of these to it, or keep what they use now.
+                {name} {t("webCopy.isConnectedAndLists")} {modelCount}{" "}
+                {modelCount === 1 ? t("webCopy.model") : t("webCopy.models")}
+                {t("webCopy.switchAnyOfTheseToItOrKeepWhatThey")}
               </p>
               {/* One grid for all rows, so pickers and Test buttons line up in columns. */}
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-4">

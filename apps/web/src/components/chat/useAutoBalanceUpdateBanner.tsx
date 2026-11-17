@@ -111,7 +111,7 @@ export function useAutoBalanceUpdateBanner(
                   <ServerUpdateProgress state={machine.state} />
                 ) : !machine.remoteUpdate ? (
                   <>
-                    <div className="text-muted-foreground">Manual update required</div>
+                    <div className="text-muted-foreground">{t("webCopy.manualUpdateRequired")}</div>
                     <ServerUpdateAction {...machine} />
                   </>
                 ) : (

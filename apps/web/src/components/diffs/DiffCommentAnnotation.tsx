@@ -157,10 +157,12 @@ export function DiffCommentAnnotation({
         }}
       />
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <span className="mr-auto text-3xs text-muted-foreground/70">⌘/Ctrl Enter to send</span>
+        <span className="mr-auto text-3xs text-muted-foreground/70">
+          {t("webCopy.ctrlEnterToSend")}
+        </span>
         {speech ? <TextFieldSpeechControls speech={speech} disabled={pending} /> : null}
         <Button variant="ghost-muted" size="xs" onClick={onCancel}>
-          Cancel
+          {t("subscriptions.cancel")}
         </Button>
         {secondaryAction ? (
           <Button

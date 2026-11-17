@@ -41,10 +41,7 @@ export function PreviewEmptyState({
           <Globe className="size-4.5 text-muted-foreground" />
         </EmptyMedia>
         <EmptyTitle>{t("misc.previewEmptyState.noPreviewYet")}</EmptyTitle>
-        <EmptyDescription>
-          Type a URL above, or run a dev script. Local servers this thread starts will show up here
-          automatically.
-        </EmptyDescription>
+        <EmptyDescription>{t("webCopy.typeAURLAboveOrRunADevScriptLocal")}</EmptyDescription>
       </Empty>
     );
   }
@@ -88,7 +85,7 @@ export function PreviewEmptyState({
               ))}
             </DiscoveryList>
             <p className="px-1 text-xs text-muted-foreground">
-              Select a live local server to open it in this browser tab.
+              {t("webCopy.selectALiveLocalServerToOpenItInThis")}
             </p>
           </div>
         ) : null}

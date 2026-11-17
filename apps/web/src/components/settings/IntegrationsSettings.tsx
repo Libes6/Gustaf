@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { DeviceHostUpdates } from "../device/DeviceHostUpdates";
 import { DeviceToolVersions } from "../device/DeviceToolVersions";
 import { useT } from "../../useUiLanguage";
@@ -661,12 +663,14 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
             className="w-full sm:w-40"
             aria-label={t("settingsB.IntegrationsSettings.frameRateAria")}
           >
-            <SelectValue>{frameRate} fps</SelectValue>
+            <SelectValue>
+              {frameRate} {t("webCopy.fps")}
+            </SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             {BROWSER_RECORDING_FRAME_RATES.map((rate) => (
               <SelectItem hideIndicator key={rate} value={String(rate)}>
-                {rate} fps
+                {rate} {translate(getUiLanguage(), "webCopy.fps")}
               </SelectItem>
             ))}
           </SelectPopup>
@@ -1035,7 +1039,7 @@ function DeviceIntegrationControls({
         settingKeys={["enableDeviceSupport"]}
         description={
           <>
-            Open simulators and emulators in the Device panel. Hub:{" "}
+            {t("webCopy.openSimulatorsAndEmulatorsInTheDevicePanelHub")}{" "}
             <DeviceToolVersions
               action={versionActions("hub")}
               kind="hub"
@@ -1074,7 +1078,7 @@ function DeviceIntegrationControls({
         settingKeys={["enableAgentDeviceAccess"]}
         description={
           <>
-            New agent sessions can open and drive these devices. agent-device:{" "}
+            {t("webCopy.newAgentSessionsCanOpenAndDriveTheseDevicesAgent")}{" "}
             <DeviceToolVersions
               action={versionActions("agent")}
               kind="agent"
@@ -1401,12 +1405,12 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
             }
           >
             <PlusIcon />
-            Add profile
+            {t("webCopy.addProfile")}
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem
               disabled={!settingsHydrated || atProfileLimit}
-              onClick={() => createProfile("New profile")}
+              onClick={() => createProfile(translate(getUiLanguage(), "webCopy.newProfile"))}
             >
               {t("settingsB.IntegrationsSettings.blankProfile")}
             </MenuItem>

@@ -862,7 +862,7 @@ export const shellMessages = {
       "Настройте провайдера в разделе «Настройки → Контроль версий».",
     "shell.gitActions.continue": "Продолжить",
     "shell.gitActions.defaultBranch": "Основная ветка",
-    "shell.gitActions.detachedHeadLabel": "(detached HEAD)",
+    "shell.gitActions.detachedHeadLabel": "(HEAD вне ветки)",
     "shell.gitActions.detachedHeadMenu":
       "Detached HEAD: создайте и переключитесь на ветку, чтобы включить отправку и действия с {term}.",
     "shell.gitActions.createUnavailable": "Создание {term} сейчас недоступно.",

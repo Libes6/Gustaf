@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
@@ -60,6 +61,7 @@ export function useOpenChangeRequestLink(
   targetEnvironmentId?: EnvironmentId,
   onCommitUnavailable?: () => void,
 ) => boolean {
+  const t = useT();
   const navigate = useNavigate();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
@@ -202,7 +204,7 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: "This commit is not in the thread's workspace",
+                title: t("webCopy.thisCommitIsNotInTheThreadSWorkspace"),
                 actionProps: {
                   children: "Open link",
                   onClick: () => {
@@ -230,6 +232,7 @@ export function useOpenChangeRequestLink(
 }
 
 export function useOpenPrLink(threadRef?: ScopedThreadRef) {
+  const t = useT();
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
   const openLink = useOpenLink(threadRef);
   return (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
@@ -249,7 +252,7 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to open pull request link",
+          title: t("webCopy.unableToOpenPullRequestLink"),
           description: error instanceof Error ? error.message : "An error occurred.",
         }),
       );

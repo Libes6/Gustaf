@@ -216,7 +216,10 @@ export function ProjectScriptEditorDialog({
       <AlertDialog open={deleteConfirmOpen && canEditActions} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete action "{deleteName}"?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("webCopy.deleteAction")}
+              {deleteName}"?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("shell.scriptEditor.cannotBeUndone")}
             </AlertDialogDescription>
@@ -422,7 +425,7 @@ function ProjectScriptEditorForm({
           {isEditing ? t("shell.scriptEditor.editAction") : t("shell.scriptEditor.addAction")}
         </DialogTitle>
         <DialogDescription>
-          Actions are project-scoped commands you can run from the top bar or keybindings.
+          {t("webCopy.actionsAreProjectScopedCommandsYouCanRunFromThe")}
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
@@ -490,8 +493,8 @@ function ProjectScriptEditorForm({
                 onKeyDown={captureKeybinding}
               />
               <p className="text-xs text-muted-foreground">
-                Press a shortcut. Use <code>Backspace</code> to clear. Shortcuts are
-                environment-wide. Projects using the same action share its shortcut.
+                {t("webCopy.pressAShortcutUse")} <code>Backspace</code>{" "}
+                {t("webCopy.toClearShortcutsAreEnvironmentWideProjectsUsingTheSame")}
               </p>
             </div>
             <div className="space-y-1.5">
@@ -514,7 +517,7 @@ function ProjectScriptEditorForm({
                 onChange={(event) => setPreviewUrl(event.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Open this URL in the in-app preview when this action runs.
+                {t("webCopy.openThisURLInTheInAppPreviewWhenThis")}
               </p>
             </div>
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
@@ -575,7 +578,7 @@ function ProjectScriptEditorForm({
             disabled={isSaving || !canEditActions}
             onClick={() => onRequestDelete(name)}
           >
-            Delete
+            {t("subscriptions.delete")}
           </Button>
         )}
         <Button type="button" variant="outline" onClick={close}>
