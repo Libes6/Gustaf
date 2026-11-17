@@ -598,5 +598,10 @@
   "Failed to copy PR link": "Не удалось скопировать ссылку на PR",
   "Could not stop control": "Не удалось остановить управление",
   "This thread's agent controls the Mac": "Агент этого треда управляет Mac",
-  "The Mac is controlled by": "Mac управляет"
+  "The Mac is controlled by": "Mac управляет",
+  "Hide secret": "Скрыть значение",
+  "Show secret": "Показать значение",
+  "Searching thread messages…": "Ищем в сообщениях тредов…",
+  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Ctrl while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Ctrl при отправке.",
+  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Command при отправке."
 }

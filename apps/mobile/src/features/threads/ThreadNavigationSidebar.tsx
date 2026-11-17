@@ -585,7 +585,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             tone="primary"
             size="compact"
             icon="plus"
-            label="Add environment"
+            label={t("Add environment")}
             onPress={props.onOpenEnvironmentSettings}
           />
         </View>

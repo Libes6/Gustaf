@@ -1,5 +1,6 @@
 import { Pressable } from "react-native";
 
+import { t } from "../../i18n";
 import { SymbolView } from "./AppSymbol";
 
 /** Eye toggle that shows or hides a secret field's typed text. */
@@ -12,7 +13,7 @@ export function SecretRevealButton(props: {
       onPress={props.onPress}
       hitSlop={6}
       accessibilityRole="button"
-      accessibilityLabel={props.revealed ? "Hide secret" : "Show secret"}
+      accessibilityLabel={props.revealed ? t("Hide secret") : t("Show secret")}
       className="size-10 items-center justify-center"
     >
       <SymbolView
