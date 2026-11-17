@@ -639,6 +639,11 @@ pub fn run() {
                 api.prevent_close();
                 exit_guard::request_quit(app);
             }
+            RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Resized(_),
+                ..
+            } if label == "main" => bridge::push_fullscreen(app),
             RunEvent::Exit => {
                 computer_use::shutdown(app);
                 ssh::stop(app);

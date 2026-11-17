@@ -7,6 +7,7 @@
 //! the desktop app) and keeps `window.gustafShell` for shell-only helpers.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 
 /// Runs in the main frame before the page's own code.
@@ -93,7 +94,7 @@ const INIT_SCRIPT: &str = r#"(() => {
       console.error(error);
     }
   };
-  window.addEventListener("resize", refreshFullscreen);
+  // The shell pushes later changes (`push_fullscreen`); this only seeds a freshly loaded page.
   refreshFullscreen();
 
   // Migrate the previous, port-specific browser settings only after saving succeeds.
@@ -417,6 +418,25 @@ pub(crate) fn window_fullscreen_state(window: tauri::Window) -> Result<bool, Str
     window.is_fullscreen().map_err(|error| error.to_string())
 }
 
+/// True when `now` differs from what was last pushed; remembers `now`.
+fn fullscreen_changed(last: &AtomicBool, now: bool) -> bool {
+    last.swap(now, Ordering::SeqCst) != now
+}
+
+/// Tells the page when the window enters or leaves fullscreen, so it need not ask on every resize.
+pub(crate) fn push_fullscreen(app: &tauri::AppHandle) {
+    static LAST: AtomicBool = AtomicBool::new(false);
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(now) = window.is_fullscreen() else {
+        return;
+    };
+    if fullscreen_changed(&LAST, now) {
+        let _ = window.eval(format!("window.__gustafFullscreenState?.({now})"));
+    }
+}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum WindowTheme {
@@ -580,7 +600,23 @@ pub(crate) fn dropped_paths(app: tauri::AppHandle) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{free_destination, init_script, is_handoff_url};
+    use super::{free_destination, fullscreen_changed, init_script, is_handoff_url};
+    use std::sync::atomic::AtomicBool;
+
+    #[test]
+    fn the_page_hears_only_fullscreen_changes() {
+        let last = AtomicBool::new(false);
+        assert!(!fullscreen_changed(&last, false));
+        assert!(fullscreen_changed(&last, true));
+        assert!(!fullscreen_changed(&last, true));
+        assert!(fullscreen_changed(&last, false));
+    }
+
+    #[test]
+    fn the_page_no_longer_asks_on_every_resize() {
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin");
+        assert!(!script.contains(r#"addEventListener("resize""#));
+    }
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {
