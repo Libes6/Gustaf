@@ -50,3 +50,8 @@ node_modules/
 
 # pnpm content-addressable store; never belongs in the repo.
 .pnpm-store/
+
+# Old app build tree, mobile export and updater smoke fixtures; local artifacts only.
+apps/desktop/
+apps/mobile/out/
+updater-smoke.local/
