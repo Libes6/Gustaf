@@ -764,7 +764,13 @@ export function HomeScreen(props: HomeScreenProps) {
   );
 
   const v2ListEmpty =
-    hasSearchQuery && threadSearch.isPending ? undefined : hasSearchQuery ? (
+    hasSearchQuery && threadSearch.isPending ? (
+      <EmptyState
+        title={t("Searching thread messages…")}
+        detail={`Looking for "${props.searchQuery}" in messages.`}
+        variant={Platform.OS === "android" ? "plain" : undefined}
+      />
+    ) : hasSearchQuery ? (
       <EmptyState
         title={t("No results")}
         detail={`No threads matching "${props.searchQuery}".`}
