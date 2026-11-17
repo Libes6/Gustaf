@@ -407,6 +407,7 @@ it.layer(
         expect(frame.headers["content-security-policy"]).toContain(
           "script-src 'self' 'unsafe-eval'",
         );
+        expect(frame.headers["content-security-policy"]).toContain("worker-src blob:");
         expect(frame.headers["content-security-policy"]).toContain("connect-src 'none'");
         expect(frame.headers["content-security-policy"]).toContain("frame-ancestors 'self'");
         yield* frame.text;
