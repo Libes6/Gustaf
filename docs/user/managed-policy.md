@@ -169,6 +169,7 @@ A few settings need care:
     "connect": false,
     "webhookTasks": false,
     "browserCookieImport": false,
+    "localMcpServers": false,
     "telemetry": false,
     "providers": {
       "allowedDrivers": ["claudeAgent", "codex"],
@@ -251,6 +252,8 @@ so restart Gustaf after that.
   but do not run, and cannot be turned back on. Users can still edit or delete them.
 - `browserCookieImport: false`: users cannot import cookies from another browser into Gustaf's
   browser.
+- `localMcpServers: false`: users cannot turn on MCP servers that run a command on this machine,
+  and saved ones are left out of agent sessions. MCP servers reached over HTTP are still allowed.
 - `telemetry: false`: the server and desktop app send no [product usage data](./telemetry.md) or
   relay connection traces. A policy cannot turn them on. A browser that opens the server
   still sends its own relay traces when that build has them configured.

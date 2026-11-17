@@ -5,6 +5,7 @@ import {
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
   DEFAULT_SERVER_SETTINGS,
+  McpServerId,
   ProviderDriverKind,
   ProviderInstanceId,
   SecretProviderId,
@@ -288,6 +289,11 @@ describe("settings mutation authorization", () => {
       expect(
         yield* client[WS_METHODS.serverUpdateSettings]({
           patch: { secretProviders: { [SecretProviderId.make("personal")]: null } },
+        }).pipe(Effect.flip),
+      ).toMatchObject({ requiredPermission: AuthProvidersManageScope });
+      expect(
+        yield* client[WS_METHODS.serverUpdateSettings]({
+          patch: { mcpServers: { [McpServerId.make("figma")]: null } },
         }).pipe(Effect.flip),
       ).toMatchObject({ requiredPermission: AuthProvidersManageScope });
       expect(handled).toBe(false);

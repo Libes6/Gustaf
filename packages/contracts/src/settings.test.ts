@@ -16,6 +16,7 @@ import {
   idleCompactionPatch,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   requiredScopesForProjectMutation,
+  requiredScopesForServerSettingsPatch,
   resolveIdleCompaction,
   resolveProjectProviderInstanceEnabled,
   resolveProviderInstanceEnabled,
@@ -491,6 +492,60 @@ describe("requiredScopesForProjectMutation", () => {
         scripts: [],
       }),
     ).toEqual(["orchestration:operate", "settings:write"]);
+  });
+});
+
+describe("MCP server settings", () => {
+  const stdio = { transport: { type: "stdio", command: "npx", args: ["-y", "figma-mcp"] } };
+  const http = { enabled: true, transport: { type: "http", url: "https://mcp.linear.app/mcp" } };
+
+  it("defaults a server to off and running in the thread's directory", () => {
+    expect(decodeServerSettings({ mcpServers: { figma: stdio } }).mcpServers).toEqual({
+      figma: {
+        enabled: false,
+        transport: {
+          type: "stdio",
+          command: "npx",
+          args: ["-y", "figma-mcp"],
+          env: {},
+          cwd: "thread",
+        },
+      },
+    });
+  });
+
+  it("drops reserved and malformed ids, and rejects relative directories and non-HTTP URLs", () => {
+    for (const id of ["t3-code", "t3-code-thread", "ext", "Figma", "-figma", "a".repeat(33)]) {
+      expect(decodeServerSettings({ mcpServers: { [id]: stdio } }).mcpServers, id).toEqual({});
+      expect(decodeServerSettingsPatch({ mcpServers: { [id]: stdio } }).mcpServers, id).toEqual({});
+    }
+    for (const cwd of ["/srv/app", "C:\\work", "D:/work"]) {
+      expect(
+        decodeServerSettings({ mcpServers: { a: { transport: { ...stdio.transport, cwd } } } })
+          .mcpServers,
+      ).toHaveProperty("a.transport.cwd", cwd);
+    }
+    for (const transport of [
+      { ...stdio.transport, cwd: "relative/dir" },
+      { type: "http", url: "ftp://example.com" },
+    ]) {
+      expect(() => decodeServerSettings({ mcpServers: { a: { transport } } })).toThrow();
+    }
+  });
+
+  it("needs provider authority to change servers, and terminal authority to add a command", () => {
+    const patch = (entry: unknown) =>
+      requiredScopesForServerSettingsPatch(decodeServerSettingsPatch({ mcpServers: { a: entry } }));
+    expect(patch(http)).toEqual(["settings:write", "providers:manage"]);
+    expect(patch(null)).toEqual(["settings:write", "providers:manage"]);
+    expect(patch(stdio)).toEqual(["settings:write", "providers:manage", "terminal:operate"]);
+    expect(
+      requiredScopesForServerSettingsPatch(
+        decodeServerSettingsPatch({
+          projectSettingsOverrides: { "project-1": { mcpServers: { a: { enabled: true } } } },
+        }),
+      ),
+    ).toEqual(["settings:write"]);
   });
 });
 

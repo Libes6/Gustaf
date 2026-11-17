@@ -4,6 +4,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   DEFAULT_SERVER_SETTINGS,
   globalIdleCompaction,
+  McpServerId,
   type ManagedPolicyDocument,
   ModelSelection,
   ProjectId,
@@ -37,7 +38,7 @@ import * as ServerConfig from "./config.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as ServerSettingsModule from "./serverSettings.ts";
-import { SECRET_REDACTED } from "./settingsSecrets.ts";
+import { mcpServerSecretName, SECRET_REDACTED } from "./settingsSecrets.ts";
 import * as ManagedPolicy from "./policy/ManagedPolicy.ts";
 import { resolveProviderInstanceTerminalEnvironment } from "./terminal/Manager.ts";
 
@@ -1581,6 +1582,73 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
   );
 
+  it.effect("keeps MCP server env and header secrets out of clients and cleans them up", () =>
+    Effect.gen(function* () {
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const store = yield* ServerSecretStore.ServerSecretStore;
+      const figma = McpServerId.make("figma");
+      const linear = McpServerId.make("linear");
+      const reference = {
+        provider: SecretProviderId.make("personal"),
+        reference: "op://Private/Figma/token",
+      };
+      const stdio = (env: Record<string, unknown>) => ({
+        enabled: true,
+        transport: { type: "stdio", command: "npx", args: ["figma-mcp"], env, cwd: "thread" },
+      });
+      const http = {
+        enabled: true,
+        transport: {
+          type: "http",
+          url: "https://mcp.linear.app/mcp",
+          headers: { Authorization: "Bearer linear-secret" },
+        },
+      };
+      const save = (mcpServers: Record<string, unknown>) =>
+        decodeServerSettingsPatch({ mcpServers }).pipe(Effect.flatMap(service.updateSettings));
+      const saved = yield* save({
+        [figma]: stdio({ FIGMA_TOKEN: "figma-secret", Mixed_Case: "case-secret", REF: reference }),
+        [linear]: http,
+      });
+      const tokenName = mcpServerSecretName(figma, "env", "FIGMA_TOKEN");
+      const headerName = mcpServerSecretName(linear, "headers", "Authorization");
+      const client = ServerSettingsModule.redactServerSettingsForClient(saved, {
+        secretReferences: true,
+      });
+      const disk = yield* fs.readFileString(config.settingsPath);
+      for (const value of ["figma-secret", "case-secret", "linear-secret"]) {
+        assert.include(JSON.stringify(saved), value);
+        assert.notInclude(JSON.stringify(client), value);
+        assert.notInclude(disk, value);
+      }
+      assert.deepEqual(client.mcpServers[figma]?.transport, {
+        type: "stdio",
+        command: "npx",
+        args: ["figma-mcp"],
+        env: { FIGMA_TOKEN: SECRET_REDACTED, Mixed_Case: SECRET_REDACTED, REF: reference },
+        cwd: "thread",
+      });
+      assert.isTrue(Option.isSome(yield* store.get(tokenName)));
+      assert.isTrue(Option.isSome(yield* store.get(headerName)));
+
+      // The client sends the redacted markers back; the stored secrets stay.
+      const echoed = yield* save({ [figma]: client.mcpServers[figma], [linear]: null });
+      assert.deepEqual(echoed.mcpServers[figma]?.transport, saved.mcpServers[figma]?.transport);
+      assert.deepEqual(Object.keys(echoed.mcpServers), [figma]);
+      assert.isTrue(Option.isNone(yield* store.get(headerName)));
+
+      // A removed key, and every key of a renamed server, gives up its stored secret.
+      const caseName = mcpServerSecretName(figma, "env", "Mixed_Case");
+      yield* save({ [figma]: stdio({ Mixed_Case: SECRET_REDACTED }) });
+      assert.isTrue(Option.isNone(yield* store.get(tokenName)));
+      assert.isTrue(Option.isSome(yield* store.get(caseName)));
+      yield* save({ [figma]: null, figma2: stdio({ Mixed_Case: SECRET_REDACTED }) });
+      assert.isTrue(Option.isNone(yield* store.get(caseName)));
+    }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
+  );
+
   it.effect("moves saved provider credentials to the secret store when settings load", () =>
     Effect.gen(function* () {
       const service = yield* ServerSettingsModule.ServerSettingsService;
@@ -1944,6 +2012,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         "simlockDeviceHosts.[].agentToken",
         "usageLimitSources.*.managementKey",
         "textGenerators.*.apiKey",
+        "mcpServers.*.transport.env.*",
+        "mcpServers.*.transport.headers.*",
       ]);
     }),
   );
@@ -2687,6 +2757,42 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         },
       },
     };
+
+    it.effect(
+      "refuses turning on a local MCP server the policy forbids, and allows HTTP ones",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ServerSettingsModule.ServerSettingsService;
+          const stdio = (enabled: boolean) => ({
+            enabled,
+            transport: { type: "stdio", command: "npx" },
+          });
+          const save = (mcpServers: Record<string, unknown>) =>
+            decodeServerSettingsPatch({ mcpServers }).pipe(
+              Effect.orDie,
+              Effect.flatMap(service.updateSettings),
+            );
+          const rejected = yield* save({ figma: stdio(true) }).pipe(Effect.flip);
+          assert.equal(rejected.operation, "use-disallowed-mcp-server");
+          assert.equal(rejected.message, "Example Corp's policy does not allow local MCP servers.");
+          yield* save({
+            figma: stdio(false),
+            linear: { enabled: true, transport: { type: "http", url: "https://mcp.linear.app" } },
+          });
+          assert.deepEqual(Object.keys((yield* service.getSettings).mcpServers), [
+            "figma",
+            "linear",
+          ]);
+        }).pipe(
+          Effect.provide(
+            layerServerSettings({
+              schemaVersion: 1,
+              organization: "Example Corp",
+              limits: { localMcpServers: false },
+            }),
+          ),
+        ),
+    );
 
     it.effect("refuses enabling a driver the policy leaves out, and keeps existing ones", () =>
       Effect.gen(function* () {
