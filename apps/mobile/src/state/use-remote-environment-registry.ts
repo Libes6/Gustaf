@@ -1,11 +1,10 @@
 import * as Dialog from "../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import { ConnectionBlockedError } from "@t3tools/client-runtime/connection";
+import { alreadySavedEnvironment } from "@t3tools/client-runtime/connection";
 import { Discovery } from "@t3tools/client-runtime/relay";
 import type { EnvironmentId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
-import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 
@@ -53,8 +52,6 @@ export interface PairingOutcome {
   readonly alreadySaved?: { readonly environmentId: EnvironmentId; readonly address: string };
 }
 
-const isConnectionBlockedError = Schema.is(ConnectionBlockedError);
-
 /** Pairs with the environment behind a pairing link and saves it. */
 export async function pairEnvironment(
   pairingUrl: string,
@@ -81,9 +78,8 @@ export async function pairEnvironment(
     Dialog.alert("Client not supported", message);
     return { ok: false, error: null };
   }
-  if (isConnectionBlockedError(error) && error.alreadySaved !== undefined) {
-    return { ok: false, error: message, alreadySaved: error.alreadySaved };
-  }
+  const alreadySaved = alreadySavedEnvironment(error);
+  if (alreadySaved !== null) return { ok: false, error: message, alreadySaved };
   return { ok: false, error: message };
 }
 

@@ -436,11 +436,14 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
       return { prepared, session };
     });
   const driver = ConnectionDriver.ConnectionDriver.of({
-    connect: (entry, reportProgress) =>
+    connect: (entry, reportProgress, reportRoute) =>
       reportProgress({ stage: "preparing" }).pipe(
         Effect.andThen(
-          ConnectionDriver.connectOverRoutes(entry, checkRoute, (route) =>
-            connectRoute(entry, route),
+          ConnectionDriver.connectOverRoutes(
+            entry,
+            checkRoute,
+            (route) => connectRoute(entry, route),
+            reportRoute,
           ),
         ),
       ),
@@ -2192,6 +2195,49 @@ describe("EnvironmentRegistry routes", () => {
           .reorderRoutes(LAN_TARGET.environmentId, ["relay"])
           .pipe(Effect.flip);
         expect(error._tag).toBe("ConnectionBlockedError");
+      }).pipe(Effect.provide(harness.layer), Effect.scoped);
+    }),
+  );
+
+  it.effect("keeps each route's last attempt until the environment is removed", () =>
+    Effect.gen(function* () {
+      const refused = new ConnectionBlockedError({
+        reason: "authentication",
+        detail: "The LAN address refused the saved credential.",
+      });
+      const harness = yield* makeHarness(
+        [LAN_TARGET, RELAY_TARGET],
+        [LAN_PROFILE],
+        [[LAN_TARGET.connectionId, BEARER_CREDENTIAL]],
+        {
+          prepareRoute: (target) =>
+            target._tag === "BearerConnectionTarget" ? refused : undefined,
+        },
+      );
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        yield* registry.start;
+        yield* awaitConnectionState(
+          registry,
+          LAN_TARGET.environmentId,
+          (state) => state.phase === "connected",
+        );
+        const results = () =>
+          SubscriptionRef.get(registry.routeResults).pipe(
+            Effect.map((all) => all.get(LAN_TARGET.environmentId)),
+          );
+        const lastAttempts = new Map([
+          [LAN_TARGET.connectionId, { outcome: "failed", at: 0, detail: refused.detail }],
+          ["relay", { outcome: "connected", at: 0, detail: null }],
+        ]);
+        expect(yield* results()).toEqual(lastAttempts);
+
+        // Reordering replaces the supervisor; what the routes did before stays visible.
+        yield* registry.reorderRoutes(LAN_TARGET.environmentId, ["relay", LAN_TARGET.connectionId]);
+        expect(yield* results()).toEqual(lastAttempts);
+
+        yield* registry.remove(LAN_TARGET.environmentId);
+        expect(yield* results()).toBeUndefined();
       }).pipe(Effect.provide(harness.layer), Effect.scoped);
     }),
   );

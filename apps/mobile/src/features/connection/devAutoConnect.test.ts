@@ -371,6 +371,15 @@ it.each(["relay", "pairing"])(
       error,
     });
     expect(harness.goBack).not.toHaveBeenCalled();
+
+    // A failed link is not spent on this device: opening it again pairs again.
+    const relayCalls = harness.relay.mock.calls.length;
+    harness.relay.mockRejectedValueOnce(new Error(error));
+    using retry = relayCompletion();
+    startRelayPairingLink(state);
+    await retry.done;
+    expect(harness.relay).toHaveBeenCalledTimes(relayCalls + 1);
+    expect(appAtomRegistry.get(relayLinkAttemptAtom)).toMatchObject({ status: "failed" });
   },
 );
 

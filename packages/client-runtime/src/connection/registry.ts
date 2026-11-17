@@ -28,6 +28,7 @@ import * as ConnectionProfileStore from "./profileStore.ts";
 import * as Connectivity from "./connectivity.ts";
 import type {
   ConnectionAttemptError,
+  ConnectionRouteResult,
   ConnectionTarget,
   NetworkStatus,
   PersistedConnectionTarget,
@@ -99,6 +100,10 @@ export class EnvironmentRegistry extends Context.Service<
       ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>
     >;
     readonly networkStatus: SubscriptionRef.SubscriptionRef<NetworkStatus>;
+    /** Each environment's last attempt per route id; outlives the supervisor that a route change replaces. */
+    readonly routeResults: SubscriptionRef.SubscriptionRef<
+      ReadonlyMap<EnvironmentId, ReadonlyMap<string, ConnectionRouteResult>>
+    >;
     readonly start: Effect.Effect<void>;
     /**
      * Succeeds with `false` and changes nothing when the environment is
@@ -270,6 +275,9 @@ export const make = Effect.gen(function* () {
   const entries =
     yield* SubscriptionRef.make<ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>>(initialEntries);
   const networkStatus = yield* SubscriptionRef.make(yield* connectivity.status);
+  const routeResults = yield* SubscriptionRef.make<
+    ReadonlyMap<EnvironmentId, ReadonlyMap<string, ConnectionRouteResult>>
+  >(new Map());
   const serviceScopes = yield* SubscriptionRef.make<
     ReadonlyMap<EnvironmentId, EnvironmentServiceScope>
   >(new Map());
@@ -369,6 +377,13 @@ export const make = Effect.gen(function* () {
             // before an enabled, compatible environment starts connecting.
             initiallyDesired: entry.enabled && entry.unsupportedReason === undefined,
             learnRoutes: (input) => learnRoutes({ environmentId, ...input }),
+            reportRoute: (routeId, result) =>
+              SubscriptionRef.update(routeResults, (current) =>
+                new Map(current).set(
+                  environmentId,
+                  new Map(current.get(environmentId)).set(routeId, result),
+                ),
+              ),
           }).pipe(
             Effect.provideService(Connectivity.Connectivity, connectivity),
             Effect.provideService(ConnectionDriver.ConnectionDriver, driver),
@@ -875,6 +890,11 @@ export const make = Effect.gen(function* () {
       next.delete(environmentId);
       return next;
     });
+    yield* SubscriptionRef.update(routeResults, (current) => {
+      const next = new Map(current);
+      next.delete(environmentId);
+      return next;
+    });
     yield* Effect.all(
       [
         cache.clear(environmentId).pipe(
@@ -1188,6 +1208,7 @@ export const make = Effect.gen(function* () {
   return EnvironmentRegistry.of({
     entries,
     networkStatus,
+    routeResults,
     start,
     register,
     assertKnownAddress,

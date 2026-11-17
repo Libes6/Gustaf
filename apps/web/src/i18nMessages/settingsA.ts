@@ -335,6 +335,9 @@ export const settingsAMessages = {
     "settingsA.addEnvironment.backendSaved":
       "The environment is saved and will reconnect on app startup.",
     "settingsA.addEnvironment.couldNotAddRoute": "Could not add the route.",
+    "settingsA.addEnvironment.alreadySaved":
+      "{name} is already saved here. This address can be added to it as another route.",
+    "settingsA.addEnvironment.addAsRouteTo": "Add this address as a route to {name}",
     "settingsA.addEnvironment.fallbackRoute":
       "{label} falls back to Gustaf Connect when its other routes are unreachable.",
     "settingsA.addEnvironment.host": "Host",
@@ -1097,6 +1100,9 @@ export const settingsAMessages = {
     "settingsA.addEnvironment.backendSaved":
       "Окружение сохранено и будет переподключаться при запуске приложения.",
     "settingsA.addEnvironment.couldNotAddRoute": "Не удалось добавить маршрут.",
+    "settingsA.addEnvironment.alreadySaved":
+      "«{name}» уже сохранено здесь. Этот адрес можно добавить к нему как ещё один маршрут.",
+    "settingsA.addEnvironment.addAsRouteTo": "Добавить этот адрес как маршрут к «{name}»",
     "settingsA.addEnvironment.fallbackRoute":
       "{label} переключается на Gustaf Connect, когда остальные маршруты недоступны.",
     "settingsA.addEnvironment.host": "Хост",

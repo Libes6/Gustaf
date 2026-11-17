@@ -1,8 +1,11 @@
 import { Alert, AlertDescription } from "../ui/alert";
-import type { AuthSessionState } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import type { AuthSessionState, EnvironmentId } from "@t3tools/contracts";
+import { alreadySavedEnvironment } from "@t3tools/client-runtime/connection";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import React, { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { environmentCatalog } from "../../connection/catalog";
 import { connectPairing } from "../../connection/onboarding";
 import {
   peekPairingTokenFromUrl,
@@ -156,10 +159,16 @@ export function HostedPairingRouteSurface() {
       : t("misc.pairingRouteSurface.linkMissingBackend"),
   );
   const [canRetry, setCanRetry] = useState(false);
+  const savedEntries = useAtomValue(environmentCatalog.catalogValueAtom).entries;
+  // The link reached an environment saved under other addresses; its unspent token can add this one.
+  const [alreadySaved, setAlreadySaved] = useState<{
+    readonly environmentId: EnvironmentId;
+    readonly label: string;
+  } | null>(null);
   const submitAttemptedRef = useRef(false);
   const tokenSubmittedRef = useRef(false);
 
-  const submitHostedPairingRequest = async () => {
+  const submitHostedPairingRequest = async (expectedEnvironmentId?: EnvironmentId) => {
     if (!request) {
       setStatus("error");
       setMessage(t("misc.pairingRouteSurface.linkMissingBackend"));
@@ -177,11 +186,13 @@ export function HostedPairingRouteSurface() {
     setStatus("pairing");
     setMessage(t("misc.pairingRouteSurface.connectingBackend"));
     setCanRetry(false);
+    setAlreadySaved(null);
     tokenSubmittedRef.current = true;
 
     const result = await connectPairingEnvironment({
       host: request.host,
       pairingCode: request.token,
+      ...(expectedEnvironmentId === undefined ? {} : { expectedEnvironmentId }),
     });
     if (result._tag === "Success") {
       setStatus("paired");
@@ -196,9 +207,17 @@ export function HostedPairingRouteSurface() {
 
     tokenSubmittedRef.current = false;
     setStatus("error");
+    const error = squashAtomCommandFailure(result);
+    const saved = expectedEnvironmentId === undefined ? alreadySavedEnvironment(error) : null;
+    if (saved !== null) {
+      const label = savedEntries.get(saved.environmentId)?.target.label ?? saved.address;
+      setAlreadySaved({ environmentId: saved.environmentId, label });
+      setMessage(t("settingsA.addEnvironment.alreadySaved").replace("{name}", label));
+      return;
+    }
     setCanRetry(true);
     setMessage(
-      `${errorMessageFromUnknown(squashAtomCommandFailure(result), t)} ${t("misc.pairingRouteSurface.retryPairingHint")}`,
+      `${errorMessageFromUnknown(error, t)} ${t("misc.pairingRouteSurface.retryPairingHint")}`,
     );
   };
 
@@ -237,7 +256,7 @@ export function HostedPairingRouteSurface() {
         </div>
       ) : null}
 
-      {status === "error" ? (
+      {status === "error" && alreadySaved === null ? (
         <Alert variant="error" className="mt-5">
           <AlertDescription>{t("misc.pairingRouteSurface.verifyBackend")}</AlertDescription>
         </Alert>
@@ -247,6 +266,13 @@ export function HostedPairingRouteSurface() {
         {status === "pairing" ? (
           <Button disabled size="sm">
             {t("misc.pairingRouteSurface.pairing")}
+          </Button>
+        ) : alreadySaved !== null ? (
+          <Button
+            size="sm"
+            onClick={() => void submitHostedPairingRequest(alreadySaved.environmentId)}
+          >
+            {t("settingsA.addEnvironment.addAsRouteTo").replace("{name}", alreadySaved.label)}
           </Button>
         ) : canRetry ? (
           <Button size="sm" onClick={() => void submitHostedPairingRequest()}>

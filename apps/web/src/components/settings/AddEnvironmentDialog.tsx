@@ -7,9 +7,11 @@ import {
   type DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
 import {
+  alreadySavedEnvironment,
   RelayConnectionRegistration,
   RelayConnectionTarget,
 } from "@t3tools/client-runtime/connection";
+import type { EnvironmentId } from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -120,6 +122,11 @@ export function AddEnvironmentDialog({
   const [sshHostSuggestionsOpen, setSshHostSuggestionsOpen] = useState(false);
   const highlightedSshHostRef = useRef<DesktopDiscoveredSshHost | undefined>(undefined);
   const [isAddingSavedBackend, setIsAddingSavedBackend] = useState(false);
+  // A refused pairing reached this saved environment; the same code can add the address to it.
+  const [alreadySaved, setAlreadySaved] = useState<{
+    readonly environmentId: EnvironmentId;
+    readonly label: string;
+  } | null>(null);
   const savedBackendSessionRef = useRef(0);
   const isSshDiscoveryActive = desktopBridge !== undefined && open && savedBackendMode === "ssh";
   const desktopSshHosts = useEnvironmentQuery(
@@ -158,6 +165,7 @@ export function AddEnvironmentDialog({
       setSavedBackendSshHost("");
       setSavedBackendSshUsername("");
       setSavedBackendSshPort("");
+      setAlreadySaved(null);
     }
     onOpenChange(nextOpen);
   };
@@ -193,7 +201,10 @@ export function AddEnvironmentDialog({
     setIsAddingSavedBackend(false);
   };
 
-  const handleAddSavedBackend = async () => {
+  const handleAddSavedBackend = async (
+    target: { readonly environmentId: EnvironmentId; readonly label: string } | null = routeTarget,
+  ) => {
+    setAlreadySaved(null);
     if (savedBackendMode === "ssh") {
       let target: DesktopSshEnvironmentTarget;
       try {
@@ -236,11 +247,22 @@ export function AddEnvironmentDialog({
 
     const result = await connectPairing({
       ...remotePairingInput,
-      ...(routeTarget ? { expectedEnvironmentId: routeTarget.environmentId } : {}),
+      ...(target ? { expectedEnvironmentId: target.environmentId } : {}),
     });
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
+        const saved = target === null ? alreadySavedEnvironment(error) : null;
+        if (saved !== null) {
+          const label =
+            savedEnvironments.find(
+              (environment) => environment.environmentId === saved.environmentId,
+            )?.label ?? saved.address;
+          setAlreadySaved({ environmentId: saved.environmentId, label });
+          onErrorChange(t("settingsA.addEnvironment.alreadySaved").replace("{name}", label));
+          setIsAddingSavedBackend(false);
+          return;
+        }
         const message =
           error instanceof Error ? error.message : t("settingsA.addEnvironment.failedAddBackend");
         onErrorChange(message);
@@ -258,13 +280,13 @@ export function AddEnvironmentDialog({
 
     handleOpenChange(false);
     toastManager.add(
-      routeTarget
+      target
         ? {
             type: "success",
             title: t("settingsA.addEnvironment.routeAdded"),
             description: t("settingsA.addEnvironment.routeNowAnother").replace(
               "{label}",
-              routeTarget.label,
+              target.label,
             ),
           }
         : {
@@ -350,6 +372,7 @@ export function AddEnvironmentDialog({
   };
 
   const handleSavedBackendHostChange = (value: string) => {
+    setAlreadySaved(null);
     const parsedPairingUrl = parsePairingUrlFields(value);
     if (parsedPairingUrl) {
       setSavedBackendHost(parsedPairingUrl.host);
@@ -421,7 +444,10 @@ export function AddEnvironmentDialog({
           </span>
           <Input
             value={savedBackendPairingCode}
-            onChange={(event) => setSavedBackendPairingCode(event.target.value)}
+            onChange={(event) => {
+              setSavedBackendPairingCode(event.target.value);
+              setAlreadySaved(null);
+            }}
             placeholder="PAIRCODE"
             disabled={isAddingSavedBackend}
             spellCheck={false}
@@ -491,6 +517,17 @@ export function AddEnvironmentDialog({
       ) : null}
       {renderRemoteFields()}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {alreadySaved !== null ? (
+        <Button
+          variant="default"
+          className="w-full"
+          disabled={isAddingSavedBackend}
+          onClick={() => void handleAddSavedBackend(alreadySaved)}
+        >
+          <PlusIcon className="size-3.5" />
+          {t("settingsA.addEnvironment.addAsRouteTo").replace("{name}", alreadySaved.label)}
+        </Button>
+      ) : null}
       <Button
         variant="outline"
         className="w-full"

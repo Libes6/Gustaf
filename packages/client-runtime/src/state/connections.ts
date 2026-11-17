@@ -6,7 +6,7 @@ import { AsyncResult, Atom } from "effect/reactivity";
 
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import type { ConnectionCatalogEntry } from "../connection/catalog.ts";
-import { AVAILABLE_CONNECTION_STATE } from "../connection/model.ts";
+import { AVAILABLE_CONNECTION_STATE, type ConnectionRouteResult } from "../connection/model.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import {
   PullRequestRoutingPermissions,
@@ -34,6 +34,8 @@ export function* enabledEnvironmentIds(
     }
   }
 }
+
+const NO_ROUTE_RESULTS: ReadonlyMap<string, ConnectionRouteResult> = new Map();
 
 const EMPTY_ENVIRONMENT_CATALOG_STATE: EnvironmentCatalogState = Object.freeze({
   isReady: false,
@@ -120,6 +122,23 @@ export function createEnvironmentCatalogAtoms<R, E>(
     ),
   );
 
+  const routeResultsAtom = Atom.family((environmentId: EnvironmentIdType) => {
+    const results = runtime.atom(
+      Stream.unwrap(
+        EnvironmentRegistry.EnvironmentRegistry.pipe(
+          Effect.map((registry) =>
+            SubscriptionRef.changes(registry.routeResults).pipe(
+              Stream.map((all) => all.get(environmentId) ?? NO_ROUTE_RESULTS),
+              Stream.changes,
+            ),
+          ),
+        ),
+      ),
+      { initialValue: NO_ROUTE_RESULTS },
+    );
+    return Atom.make((get) => AsyncResult.getOrElse(get(results), () => NO_ROUTE_RESULTS));
+  });
+
   const sessionGenerationAtom = (environmentId: EnvironmentIdType) =>
     environmentSessionGenerationAtom(runtime, environmentId);
 
@@ -200,6 +219,7 @@ export function createEnvironmentCatalogAtoms<R, E>(
     networkStatusAtom,
     networkStatusValueAtom,
     stateAtom,
+    routeResultsAtom,
     sessionGenerationAtom,
     register,
     remove,
