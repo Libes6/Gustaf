@@ -89,8 +89,8 @@ import { installPdfDocumentNavigation, isPdfAssetUrl } from "./PdfDocumentNaviga
 
 const SERVER_HOST_CLIENT_ID = SERVER_BROWSER_AUTOMATION_CLIENT_ID;
 const RENDER_SCALE = 2;
-// Chromium keeps a few frames unacked; 50 ms pacing measured ~36 fps (100 ms gave ~24).
-const SCREENCAST_ACK_PACE_MS = 50;
+// Chromium keeps a few frames unacked, so only spacing every ack caps the frame rate (30 fps).
+const SCREENCAST_FRAME_INTERVAL_MS = 1000 / 30;
 const SCREENCAST_SETTLE_MS = 200;
 // A caret blink or typing stays below this rate, so they keep sharp full-size frames.
 const SCREENCAST_MOTION_FRAMES = 4;
@@ -108,6 +108,15 @@ const DESKTOP_VIEWPORT_READ_TIMEOUT = "1 second";
 
 const sleepUntil = (deadline: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, deadline - Date.now())));
+
+export const makeAckPacer = (intervalMs: number) => {
+  let nextAt = Number.NEGATIVE_INFINITY;
+  return (now: number) => {
+    const at = Math.max(now, nextAt);
+    nextAt = at + intervalMs;
+    return at;
+  };
+};
 
 const EDITABLE_AT_POINT_SCRIPT = `(x, y) => {
   let element = document.elementFromPoint(x, y);
@@ -2544,6 +2553,8 @@ const make = Effect.gen(function* () {
     // Chromium may drop the final frame during a burst; send a still when it settles.
     let framesInFlight = 0;
     let mayHaveDropped = false;
+    const ackAt = makeAckPacer(SCREENCAST_FRAME_INTERVAL_MS);
+    const waitForAckSlot = () => sleepUntil(ackAt(Date.now()));
     let motion = false;
     const recentFrames: Array<number> = [];
     let screencastParams = Promise.resolve();
@@ -2671,7 +2682,7 @@ const make = Effect.gen(function* () {
         _tag: "frame",
         data: Buffer.from(frame.data, "base64"),
         ack: Effect.promise(() =>
-          sleepUntil(arrivedAt + SCREENCAST_ACK_PACE_MS).then(() => {
+          waitForAckSlot().then(() => {
             framesInFlight -= 1;
             return session
               .send("Page.screencastFrameAck", { sessionId: frame.sessionId })

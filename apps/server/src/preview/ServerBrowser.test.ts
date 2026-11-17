@@ -468,6 +468,11 @@ beforeEach(() => {
   desktopConnections.length = 0;
 });
 
+it("spaces screencast acks so a page repainting nonstop streams at a capped rate", () => {
+  const ackAt = ServerBrowser.makeAckPacer(50);
+  expect([0, 0, 10, 10, 500, 510].map(ackAt)).toEqual([0, 50, 100, 150, 500, 550]);
+});
+
 it.live("tells the desktop once per thread when its agent turns start and end", () =>
   Effect.gen(function* () {
     yield* ServerBrowser.ServerBrowser;
