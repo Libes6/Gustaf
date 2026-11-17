@@ -354,7 +354,7 @@ function AboutVersionSection() {
                   disabled={updateRun !== null}
                   onClick={() => setSwitchChannel(selectedUpdateChannel)}
                 >
-                  Review
+                  {t("settingsD.settingsPanels.reviewUpdates")}
                 </Button>
               </>
             ) : (
@@ -381,14 +381,14 @@ function AboutVersionSection() {
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Stable
+                  {t("settingsD.settingsPanels.stable")}
                 </SelectItem>
                 <SelectItem
                   hideIndicator
                   value="nightly"
                   disabled={nightlyDeniedBy !== undefined && selectedUpdateChannel !== "nightly"}
                 >
-                  Nightly
+                  {t("settingsD.settingsPanels.nightly")}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -417,10 +417,10 @@ function AboutVersionSection() {
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Latest
+                  {t("settingsD.settingsPanels.latest")}
                 </SelectItem>
                 <SelectItem hideIndicator value="nightly">
-                  Nightly
+                  {t("settingsD.settingsPanels.nightly")}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -797,7 +797,7 @@ export function GeneralSettingsPanel() {
             settings.sidebarProjectGroupingMode !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
               <SettingResetButton
-                label="project grouping"
+                label={t("settingsD.settingsPanels.projectGrouping")}
                 onClick={() =>
                   updateSettings({
                     sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
@@ -831,7 +831,7 @@ export function GeneralSettingsPanel() {
             settings.sidebarProjectSortOrder !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder ? (
               <SettingResetButton
-                label="project order"
+                label={t("settingsD.settingsPanels.projectOrder")}
                 onClick={() =>
                   updateSettings({
                     sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
@@ -886,7 +886,7 @@ export function GeneralSettingsPanel() {
             settings.sidebarWorkingShelfEnabled !==
             DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled ? (
               <SettingResetButton
-                label="working section"
+                label={t("settingsD.settingsPanels.workingSection")}
                 onClick={() =>
                   updateSettings({
                     sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
@@ -913,7 +913,7 @@ export function GeneralSettingsPanel() {
           resetAction={
             settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin ? (
               <SettingResetButton
-                label="unpin confirmation"
+                label={t("settingsD.settingsPanels.unpinConfirmation")}
                 onClick={() =>
                   updateSettings({
                     confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -937,7 +937,7 @@ export function GeneralSettingsPanel() {
           resetAction={
             settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive ? (
               <SettingResetButton
-                label="archive confirmation"
+                label={t("settingsD.settingsPanels.archiveConfirmation")}
                 onClick={() =>
                   updateSettings({
                     confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
@@ -961,7 +961,7 @@ export function GeneralSettingsPanel() {
           resetAction={
             settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete ? (
               <SettingResetButton
-                label="delete confirmation"
+                label={t("settingsD.settingsPanels.deleteConfirmation")}
                 onClick={() =>
                   updateSettings({
                     confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -986,7 +986,7 @@ export function GeneralSettingsPanel() {
             resetAction={
               settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? (
                 <SettingResetButton
-                  label="quit shortcut behavior"
+                  label={t("settingsD.settingsPanels.quitShortcutBehavior")}
                   onClick={() =>
                     updateSettings({ confirmQuit: DEFAULT_UNIFIED_SETTINGS.confirmQuit })
                   }
@@ -1042,7 +1042,7 @@ export function GeneralSettingsPanel() {
           resetAction={
             settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? (
               <SettingResetButton
-                label="time format"
+                label={t("settingsD.settingsPanels.timeFormat")}
                 onClick={() =>
                   updateSettings({
                     timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
@@ -1117,7 +1117,7 @@ export function ChatSettingsPanel() {
             settings.composerRichTextEnabled !==
             DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled ? (
               <SettingResetButton
-                label="rich text composer"
+                label={t("settingsD.settingsPanels.richTextComposer")}
                 onClick={() =>
                   updateSettings({
                     composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
@@ -1141,7 +1141,7 @@ export function ChatSettingsPanel() {
           resetAction={
             settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? (
               <SettingResetButton
-                label="send shortcut"
+                label={t("settingsD.settingsPanels.sendShortcut")}
                 onClick={() =>
                   updateSettings({ sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut })
                 }
@@ -1187,7 +1187,7 @@ export function ChatSettingsPanel() {
             resetAction={
               settings.showSkillsInSlashMenu !== DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu ? (
                 <SettingResetButton
-                  label="skills in slash menu"
+                  label={t("settingsD.settingsPanels.skillsInSlashMenu")}
                   onClick={() =>
                     updateSettings({
                       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
@@ -1223,7 +1223,7 @@ export function ChatSettingsPanel() {
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
               <SettingResetButton
-                label="follow-up behavior"
+                label={t("settingsD.settingsPanels.followupBehavior")}
                 onClick={() =>
                   updateSettings({
                     followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
@@ -1287,7 +1287,7 @@ function ToolCallVisibilityRow() {
       resetAction={
         settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
           <SettingResetButton
-            label="tool calls in chat"
+            label={t("settingsD.settingsPanels.toolCallsInChat")}
             onClick={() =>
               updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
             }
@@ -1332,7 +1332,7 @@ function DiffColorsSettingsRow() {
       resetAction={
         settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? (
           <SettingResetButton
-            label="diff colors"
+            label={t("settingsD.settingsPanels.diffColors")}
             onClick={() =>
               updateSettings({ diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme })
             }
@@ -1395,7 +1395,7 @@ export function DiffsSettingsPanel() {
           resetAction={
             settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? (
               <SettingResetButton
-                label="diff layout"
+                label={t("settingsD.settingsPanels.diffLayout")}
                 onClick={() => updateSettings({ diffLayout: DEFAULT_UNIFIED_SETTINGS.diffLayout })}
               />
             ) : null
@@ -1436,7 +1436,7 @@ export function DiffsSettingsPanel() {
           resetAction={
             settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace ? (
               <SettingResetButton
-                label="diff whitespace changes"
+                label={t("settingsD.settingsPanels.diffWhitespaceChanges")}
                 onClick={() =>
                   updateSettings({
                     diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
@@ -1460,7 +1460,7 @@ export function DiffsSettingsPanel() {
           resetAction={
             settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed ? (
               <SettingResetButton
-                label="default diff file state"
+                label={t("settingsD.settingsPanels.defaultDiffFileState")}
                 onClick={() =>
                   updateSettings({
                     diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,
@@ -1509,7 +1509,7 @@ export function DiffsSettingsPanel() {
           resetAction={
             settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled ? (
               <SettingResetButton
-                label="proactive panels"
+                label={t("settingsD.settingsPanels.proactivePanels")}
                 onClick={() =>
                   updateSettings({
                     proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
@@ -1556,7 +1556,7 @@ function ScopedCompactIdleThreadsRow() {
       resetAction={
         globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
           <SettingResetButton
-            label="compact idle threads"
+            label={t("settingsD.settingsPanels.compactIdleThreadsResetLabel")}
             onClick={() =>
               updateSettings({ idleCompaction: globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) })
             }
@@ -1574,7 +1574,7 @@ function ScopedCompactIdleThreadsRow() {
           <SelectTrigger
             size="sm"
             className="w-full sm:w-56"
-            aria-label={t("settingsD.settingsPanels.compactIdleThreads")}
+            aria-label={t("settingsD.settingsPanels.compactIdleThreadsResetLabel")}
           >
             <SelectValue>
               {(value: string | null) =>
@@ -1670,12 +1670,12 @@ export function ThreadsSettingsPanel() {
           serverScoped
           settingKeys={["addProjectBaseDirectory"]}
           {...searchableSetting("add-project-starts-in")}
-          description='Leave empty to use "~/" when the Add Project browser opens.'
+          description={t("settingsD.settingsPanels.leaveEmptyToUseWhenTheAddProjectBrowserOpens")}
           resetAction={
             settings.addProjectBaseDirectory !==
             DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
               <SettingResetButton
-                label="add project base directory"
+                label={t("settingsD.settingsPanels.addProjectBaseDirectoryResetLabel")}
                 onClick={() =>
                   updateSettings({
                     addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
@@ -1695,7 +1695,7 @@ export function ThreadsSettingsPanel() {
                 mixedAddProjectBaseDirectory ? t("settingsD.settingsPanels.mixed") : "~/"
               }
               spellCheck={false}
-              aria-label={t("settingsD.settingsPanels.addProjectBaseDirectory")}
+              aria-label={t("settingsD.settingsPanels.addProjectBaseDirectoryResetLabel")}
             />
           }
         />
@@ -1707,7 +1707,7 @@ export function ThreadsSettingsPanel() {
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="clone into host folders"
+                label={t("settingsD.settingsPanels.cloneIntoHostFoldersResetLabel")}
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1719,7 +1719,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label={t("settingsD.settingsPanels.cloneIntoHostFolders")}
+              aria-label={t("settingsD.settingsPanels.cloneIntoHostFoldersResetLabel")}
             />
           }
         />
@@ -1779,7 +1779,7 @@ export function ThreadsSettingsPanel() {
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
                 <SettingResetButton
-                  label="auto-settle on merge"
+                  label={t("settingsD.settingsPanels.autosettleOnMerge")}
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -1876,7 +1876,7 @@ export function ThreadsSettingsPanel() {
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
-                label="text generation model"
+                label={t("settingsD.settingsPanels.textGenerationModel")}
                 onClick={() =>
                   updateSettings({
                     textGenerationModelSelection:
@@ -1889,11 +1889,11 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                Connect an environment to choose its text generation model.
+                {t("settingsD.settingsPanels.connectAnEnvironmentToChooseItsTextGenerationModel")}
               </span>
             ) : !hasTextGenerationProvider ? (
               <span className="text-sm text-muted-foreground">
-                No text generation providers available.
+                {t("settingsE.voiceSettingsPanel.noTextProviders")}
               </span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -1989,7 +1989,7 @@ export function ThreadsSettingsPanel() {
             resetAction={
               settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode ? (
                 <SettingResetButton
-                  label="response streaming"
+                  label={t("settingsD.settingsPanels.responseStreamingResetLabel")}
                   onClick={() =>
                     updateSettings({
                       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
@@ -2010,7 +2010,7 @@ export function ThreadsSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-56"
-                  aria-label={t("settingsD.settingsPanels.responseStreaming")}
+                  aria-label={t("settingsD.settingsPanels.responseStreamingResetLabel")}
                 >
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
@@ -2059,7 +2059,7 @@ export function MaintenanceSettingsPanel() {
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
               <SettingResetButton
-                label="provider update checks"
+                label={t("settingsD.settingsPanels.providerUpdateChecks")}
                 onClick={() =>
                   updateSettings({
                     enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -2094,7 +2094,7 @@ export function MaintenanceSettingsPanel() {
             settings.continueThreadsAfterServerUpdate !==
               DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate ? (
               <SettingResetButton
-                label="continue threads after restarts"
+                label={t("settingsD.settingsPanels.continueThreadsAfterRestarts")}
                 onClick={() =>
                   updateSettings({
                     continueThreadsAfterServerUpdate:
@@ -2128,7 +2128,7 @@ export function MaintenanceSettingsPanel() {
           resetAction={
             hasServerTargets && settings.keepAwake !== DEFAULT_UNIFIED_SETTINGS.keepAwake ? (
               <SettingResetButton
-                label="keep computer awake"
+                label={t("settingsD.settingsPanels.keepComputerAwake")}
                 onClick={() => updateSettings({ keepAwake: DEFAULT_UNIFIED_SETTINGS.keepAwake })}
               />
             ) : null
@@ -2194,7 +2194,7 @@ export function MaintenanceSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View diagnostics
+              {t("settingsD.settingsPanels.viewDiagnostics")}
             </Button>
           }
         />
@@ -2223,7 +2223,7 @@ export function AboutSettingsPanel() {
                   size="sm"
                   variant="outline"
                 >
-                  Get help
+                  {t("shell.smallUi.getHelp")}
                 </Button>
               ) : null
             }
@@ -2257,7 +2257,7 @@ export function AboutSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View policy
+              {t("settingsD.settingsPanels.viewPolicy")}
             </Button>
           }
         />
@@ -2270,7 +2270,7 @@ export function AboutSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View licenses
+              {t("settingsD.settingsPanels.viewLicenses")}
             </Button>
           }
         />
