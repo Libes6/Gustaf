@@ -1591,6 +1591,13 @@ describe("EnvironmentRegistry", () => {
         expect(
           (yield* SubscriptionRef.get(registry.entries)).get(TARGET.environmentId)?.target,
         ).toEqual(TARGET);
+        expect((yield* SubscriptionRef.get(registry.routeResults)).has(TARGET.environmentId)).toBe(
+          true,
+        );
+        yield* registry.reconcilePlatform([]);
+        expect((yield* SubscriptionRef.get(registry.routeResults)).has(TARGET.environmentId)).toBe(
+          false,
+        );
       }).pipe(Effect.provide(harness.layer));
     }),
   );
@@ -2235,6 +2242,12 @@ describe("EnvironmentRegistry routes", () => {
         // Reordering replaces the supervisor; what the routes did before stays visible.
         yield* registry.reorderRoutes(LAN_TARGET.environmentId, ["relay", LAN_TARGET.connectionId]);
         expect(yield* results()).toEqual(lastAttempts);
+
+        yield* registry.setEnabled(LAN_TARGET.environmentId, false);
+        yield* registry.removeRoute(LAN_TARGET.environmentId, LAN_TARGET.connectionId);
+        expect((yield* results())?.has(LAN_TARGET.connectionId)).toBe(false);
+        yield* registry.register(lanRegistration());
+        expect((yield* results())?.has(LAN_TARGET.connectionId)).toBe(false);
 
         yield* registry.remove(LAN_TARGET.environmentId);
         expect(yield* results()).toBeUndefined();

@@ -222,6 +222,7 @@ export function AddEnvironmentDialog({
       return;
     }
 
+    const session = savedBackendSessionRef.current;
     setIsAddingSavedBackend(true);
     onErrorChange(null);
     let remotePairingInput: ReturnType<typeof parseRemotePairingFields>;
@@ -249,6 +250,10 @@ export function AddEnvironmentDialog({
       ...remotePairingInput,
       ...(target ? { expectedEnvironmentId: target.environmentId } : {}),
     });
+    if (session !== savedBackendSessionRef.current) {
+      setIsAddingSavedBackend(false);
+      return;
+    }
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);

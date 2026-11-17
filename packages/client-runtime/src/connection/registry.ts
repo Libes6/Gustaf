@@ -519,6 +519,18 @@ export const make = Effect.gen(function* () {
     }
 
     yield* closeServiceScope(target.environmentId);
+    const routeIds = new Set(
+      connectionRoutes(entry).map((route) => connectionRouteId(route.target)),
+    );
+    yield* SubscriptionRef.update(routeResults, (current) => {
+      const results = current.get(target.environmentId);
+      if (results === undefined || [...results.keys()].every((id) => routeIds.has(id)))
+        return current;
+      return new Map(current).set(
+        target.environmentId,
+        new Map([...results].filter(([id]) => routeIds.has(id))),
+      );
+    });
     yield* SubscriptionRef.update(entries, (current) => {
       const next = new Map(current);
       next.set(target.environmentId, entry);
@@ -801,6 +813,11 @@ export const make = Effect.gen(function* () {
           });
           yield* closeServiceScope(environmentId);
           yield* SubscriptionRef.update(entries, (current) => {
+            const next = new Map(current);
+            next.delete(environmentId);
+            return next;
+          });
+          yield* SubscriptionRef.update(routeResults, (current) => {
             const next = new Map(current);
             next.delete(environmentId);
             return next;
