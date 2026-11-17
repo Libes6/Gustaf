@@ -44,6 +44,8 @@ export interface ProviderClientDefinition {
   readonly badgeLabel?: string;
   /** `false` lists the provider under Add provider's "Show more" instead of up front. */
   readonly featured?: boolean;
+  /** Plain chat with no tools, files or MCP: clients show a note so nobody expects an agent. */
+  readonly chatOnly?: boolean;
   /** ACP Registry entries for this same agent, left out of Add provider's Registry list. */
   readonly acpRegistryAgentIds?: ReadonlyArray<string>;
 }

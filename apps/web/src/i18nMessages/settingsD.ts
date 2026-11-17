@@ -201,7 +201,7 @@ export const settingsDMessages = {
     "settingsD.scheduledTasksSettings.weekdayLongFri": "Fri",
     "settingsD.scheduledTasksSettings.weekdayLongSat": "Sat",
     "settingsD.storageSettings.worktreesLocationDescription":
-      "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.",
+      "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the Gustaf home folder.",
     "settingsD.storageSettings.worktreeLocation": "Worktree location",
     "settingsD.storageSettings.mixed": "Mixed",
     "settingsD.storageSettings.default": "Default",
@@ -1102,7 +1102,7 @@ export const settingsDMessages = {
     "settingsD.scheduledTasksSettings.weekdayLongFri": "Пятница",
     "settingsD.scheduledTasksSettings.weekdayLongSat": "Суббота",
     "settingsD.storageSettings.worktreesLocationDescription":
-      "Папка, где создаются новые worktree, на любом диске, например D:\\worktrees или ~/worktrees. Существующие worktree остаются на месте. Оставьте поле пустым, чтобы использовать домашнюю папку T3.",
+      "Папка, где создаются новые worktree, на любом диске, например D:\\worktrees или ~/worktrees. Существующие worktree остаются на месте. Оставьте поле пустым, чтобы использовать домашнюю папку Gustaf.",
     "settingsD.storageSettings.worktreeLocation": "Расположение worktree",
     "settingsD.storageSettings.mixed": "Разные",
     "settingsD.storageSettings.default": "По умолчанию",

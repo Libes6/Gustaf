@@ -65,6 +65,7 @@ import {
   type ProviderInstanceEntry,
 } from "../../providerInstances";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
+import { providerClients } from "../settings/providerDriverMeta";
 
 type ModelPickerItem = {
   slug: string;
@@ -1084,9 +1085,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 );
               }}
             />
-            {!isSearching && selectedEntry?.driverKind === "ollama" ? (
+            {!isSearching && providerClients.get(selectedEntry?.driverKind)?.chatOnly ? (
               <p className="shrink-0 border-t border-border/70 px-3 py-2 text-xs leading-snug text-muted-foreground">
-                {t("chatB.ModelPickerContent.ollamaChatOnly")}
+                {t("chatB.ModelPickerContent.chatOnlyNote")}
               </p>
             ) : null}
             <ModelPickerProviderNotices
