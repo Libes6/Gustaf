@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { HStack, Image, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import {
   containerBackground,
@@ -91,7 +92,7 @@ export function AgentActivityWidget(
               : "";
   const summaryTint = rows[0] ? phaseTint(rows[0].phase) : secondaryForeground;
   const emptyMessage = loaded
-    ? (props.subtitle ?? "No active agents")
+    ? (props.subtitle ?? t("No active agents"))
     : "Open Gustaf to load agent activity";
 
   // Widget taps open the containing app, and every build accepts the prod

@@ -50,7 +50,7 @@ export function PullRequestRoutingSettings() {
 
   return (
     <View className="mt-5 gap-3">
-      <SettingsSection title="Pull request routing">
+      <SettingsSection title={t("Pull request routing")}>
         {[...catalog.entries.values()].map((entry) => {
           const environmentId = entry.target.environmentId;
           const selected = pullRequestRoutingPermissionFor(entry, permissions);
@@ -70,7 +70,7 @@ export function PullRequestRoutingSettings() {
                     {entry.target.label}
                   </Text>
                   <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-                    {connectionCatalogDisplayUrl(entry) ?? "T3 Connect"}
+                    {connectionCatalogDisplayUrl(entry) ?? t("T3 Connect")}
                   </Text>
                 </View>
                 <Text className="text-sm text-foreground-muted">
@@ -96,8 +96,8 @@ export function PullRequestRoutingSettings() {
                           setSaving(false);
                           if (result._tag === "Failure")
                             Dialog.alert(
-                              "Could not save pull request routing permission",
-                              "Try again before leaving this screen.",
+                              t("Could not save pull request routing permission"),
+                              t("Try again before leaving this screen."),
                             );
                         });
                       }}
@@ -109,8 +109,9 @@ export function PullRequestRoutingSettings() {
         })}
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        Choose environments you trust to share PR data and use each other's source control access.
-        Enable both environments. This applies only to this client.
+        {t(
+          "Choose environments you trust to share PR data and use each other's source control access. Enable both environments. This applies only to this client.",
+        )}
       </Text>
     </View>
   );

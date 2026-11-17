@@ -242,7 +242,7 @@ export function FileTreeBrowser(props: {
           ) : null}
           {props.searchTruncated ? (
             <Text className="mx-4 my-2 text-xs text-foreground-muted">
-              More search results available. Refine your search to see them.
+              {t("More search results available. Refine your search to see them.")}
             </Text>
           ) : null}
         </>
@@ -251,7 +251,7 @@ export function FileTreeBrowser(props: {
         <View className="px-4 py-5">
           {props.error && props.entries.length === 0 ? (
             <>
-              <Text className="text-sm font-t3-bold text-foreground">Files unavailable</Text>
+              <Text className="text-sm font-t3-bold text-foreground">{t("Files unavailable")}</Text>
               <Text
                 accessibilityRole="alert"
                 className="mt-1 text-xs leading-normal text-foreground-muted"
@@ -271,11 +271,11 @@ export function FileTreeBrowser(props: {
             <AppActivityIndicator size="small" />
           ) : (
             <>
-              <Text className="text-sm font-t3-bold text-foreground">No files found</Text>
+              <Text className="text-sm font-t3-bold text-foreground">{t("No files found")}</Text>
               <Text className="mt-1 text-xs leading-normal text-foreground-muted">
                 {props.searchQuery.trim().length > 0
-                  ? "Try a different search."
-                  : "The workspace is empty."}
+                  ? t("Try a different search.")
+                  : t("The workspace is empty.")}
               </Text>
             </>
           )}

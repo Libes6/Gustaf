@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useEffect, useRef, useState } from "react";
 import Animated, {
   cubicBezier,
@@ -99,7 +100,7 @@ export function WorkspaceInspectorPane(props: {
     <>
       {inspectorVisible ? (
         <WorkspacePaneDivider
-          accessibilityLabel="Resize detail pane"
+          accessibilityLabel={t("Resize detail pane")}
           currentWidth={inspectorWidth ?? 0}
           resizeDirection={-1}
           onResizeStart={beginResize}

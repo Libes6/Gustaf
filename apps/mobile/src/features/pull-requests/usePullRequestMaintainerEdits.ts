@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomRefresh } from "@effect/atom-react";
 import {
   maintainerEditsChoiceInForce,
@@ -44,7 +45,7 @@ export function usePullRequestMaintainerEdits(
       setChoice(previousChoice);
       const cause = squashAtomCommandFailure(response);
       Dialog.alert(
-        "Could not save maintainer access",
+        t("Could not save maintainer access"),
         cause instanceof Error ? cause.message : "Try again.",
       );
       return;

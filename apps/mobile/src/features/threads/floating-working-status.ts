@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
 
 export interface FloatingStatusAction {
@@ -53,7 +54,7 @@ export function connectionFloatingStatus(input: {
   readonly environmentLabel: string | null;
   readonly onReconnect: () => void;
 }): FloatingWorkingStatus | null {
-  const environmentLabel = input.environmentLabel ?? "Environment";
+  const environmentLabel = input.environmentLabel ?? t("Environment");
   const unavailable = (label: string): FloatingWorkingStatus => ({
     kind: "connection",
     tone: "unavailable",

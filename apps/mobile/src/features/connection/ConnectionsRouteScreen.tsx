@@ -33,7 +33,7 @@ export function ConnectionsRouteScreen() {
       <AppBar
         title={t("Environments")}
         onClose={() => navigation.goBack()}
-        closeAccessibilityLabel="Close environments"
+        closeAccessibilityLabel={t("Close environments")}
         actions={[
           {
             accessibilityLabel: t("Add environment"),

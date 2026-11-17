@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -133,7 +134,7 @@ export function useAttachmentDocument(input: {
   );
   const content = AsyncResult.isSuccess(text) ? text.value : null;
   const contentError = AsyncResult.isFailure(text)
-    ? (Option.getOrNull(AsyncResult.error(text))?.message ?? "Could not read this file.")
+    ? (Option.getOrNull(AsyncResult.error(text))?.message ?? t("Could not read this file."))
     : null;
   const table = content && delimiter ? parseDelimitedPreview(content.text, delimiter) : null;
   const presentation = attachmentDocumentPresentation({
@@ -145,7 +146,8 @@ export function useAttachmentDocument(input: {
   const error = attachment
     ? localPreview.error && (localPreview.error.message || "The local file is unavailable.")
     : AsyncResult.isFailure(remote)
-      ? (Option.getOrNull(AsyncResult.error(remote))?.message ?? "The attachment is unavailable.")
+      ? (Option.getOrNull(AsyncResult.error(remote))?.message ??
+        t("The attachment is unavailable."))
       : null;
   const share = async () => {
     if (!uri || sharing) return;
@@ -166,7 +168,7 @@ export function useAttachmentDocument(input: {
     if (AsyncResult.isFailure(result)) {
       const cause = squashAtomCommandFailure(result);
       Dialog.alert(
-        "Could not share file",
+        t("Could not share file"),
         cause instanceof Error ? cause.message : "Please try again.",
       );
     }

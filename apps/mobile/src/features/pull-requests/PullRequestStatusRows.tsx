@@ -128,17 +128,17 @@ export function PullRequestChecksRow(props: RowProps) {
         >
           {props.pr.state === "open" &&
           props.pr.checks.some((check) => check.status === "failure") ? (
-            <PullRequestAgentRow {...props} task="feedback" title="Fix failing checks" />
+            <PullRequestAgentRow {...props} task="feedback" title={t("Fix failing checks")} />
           ) : null}
           {action.available("approve-workflows") ? (
             <PullRequestCardRow
-              title="Approve workflows"
+              title={t("Approve workflows")}
               icon="checkmark"
               detail={`${props.pr.workflowApprovalsRequired} waiting for approval`}
               onPress={() =>
                 action.confirm(
                   "approve-workflows",
-                  "Approve workflows",
+                  t("Approve workflows"),
                   `Allow this ${definition.changeRequest.singular}'s workflows to run? Review the workflow changes first.`,
                 )
               }
@@ -167,7 +167,7 @@ export function PullRequestChecksRow(props: RowProps) {
             </Text>
           ) : null}
           <PullRequestCardRow
-            title="Open checks on provider"
+            title={t("Open checks on provider")}
             icon="arrow.up.right"
             onPress={() =>
               void Linking.openURL(
@@ -197,7 +197,7 @@ export function PullRequestBranchRow(props: RowProps) {
           ? `Conflicts with ${props.pr.baseBranch}`
           : clean
             ? `No conflicts with ${props.pr.baseBranch}`
-            : "Branch"
+            : t("Branch")
       }
       icon={
         conflicting ? PullRequestGlyph.conflicting : clean ? "checkmark.circle" : "arrow.branch"
@@ -278,7 +278,7 @@ export function PullRequestReviewersRow(props: RowProps) {
           {summary.reviews.map((review) => (
             <View
               key={review.id}
-              accessibilityLabel={`${review.author?.login ?? "Unknown reviewer"}, ${review.reviewState === "APPROVED" ? "Approved" : review.reviewState === "CHANGES_REQUESTED" ? "Changes requested" : "Commented"}`}
+              accessibilityLabel={`${review.author?.login ?? t("Unknown reviewer")}, ${review.reviewState === "APPROVED" ? t("Approved") : review.reviewState === "CHANGES_REQUESTED" ? t("Changes requested") : t("Commented")}`}
               className="min-h-14 flex-row items-center gap-3 px-4 py-2"
             >
               <SymbolView
@@ -300,7 +300,7 @@ export function PullRequestReviewersRow(props: RowProps) {
               />
               <PullRequestAvatar actor={review.author} size={32} />
               <Text className="min-w-0 flex-1 text-sm font-t3-medium" numberOfLines={1}>
-                {review.author?.login ?? "Unknown reviewer"}
+                {review.author?.login ?? t("Unknown reviewer")}
               </Text>
             </View>
           ))}
@@ -324,13 +324,13 @@ export function PullRequestReviewersRow(props: RowProps) {
             ))}
           {canRequest ? (
             <PullRequestCardRow
-              title="Request review"
+              title={t("Request review")}
               icon="person.badge.plus"
               onPress={() => navigation.navigate("PullRequestReviewers", props.params)}
             />
           ) : (
             <PullRequestCardRow
-              title="View reviewers on provider"
+              title={t("View reviewers on provider")}
               icon="arrow.up.right"
               onPress={() => void Linking.openURL(props.pr.url)}
             />

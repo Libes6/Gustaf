@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { FilePreviewGallery, useFilePreviewGallery } from "./ui/FilePreviewGallery";
 import { composerImageGallery } from "../lib/composerImageGallery";
 import { SymbolView } from "./ui/AppSymbol";
@@ -87,7 +88,7 @@ export function ComposerAttachmentThumbnail(props: ComposerAttachmentThumbnailPr
           />
           {!props.compact ? (
             <Text className="text-2xs text-white">
-              {upload.status === "failed" ? "Retry" : `${Math.floor(upload.progress * 100)}%`}
+              {upload.status === "failed" ? t("Retry") : `${Math.floor(upload.progress * 100)}%`}
             </Text>
           ) : null}
         </Pressable>

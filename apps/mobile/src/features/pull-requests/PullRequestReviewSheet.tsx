@@ -142,21 +142,21 @@ export function PullRequestReviewSheet({
     });
   return (
     <SheetContent
-      title={reviewing ? "Submit review" : "Add comment"}
+      title={reviewing ? t("Submit review") : t("Add comment")}
       subtitle={`#${params.number}${reviewing && result.data?.headSha ? ` · reviewing ${result.data.headSha.slice(0, 7)}` : ` · ${params.repository}`}`}
       busy={submission.busy}
       footer={
         <Button
           label={
             submission.busy
-              ? "Submitting…"
+              ? t("Submitting…")
               : reviewing
                 ? verdict?.value === "approve"
-                  ? "Approve"
+                  ? t("Approve")
                   : verdict?.value === "request-changes"
-                    ? "Request changes"
-                    : "Submit review"
-                : "Post comment"
+                    ? t("Request changes")
+                    : t("Submit review")
+                : t("Post comment")
           }
           fullWidth
           tone={Platform.OS === "android" ? "primary" : "contrast"}
@@ -177,7 +177,7 @@ export function PullRequestReviewSheet({
         />
       ) : null}
       <Text className="px-4 text-xs text-foreground-muted">
-        {reviewing ? "Summary" : "Comment"}
+        {reviewing ? t("Summary") : t("Comment")}
       </Text>
       <PullRequestCompletionSuggestions completions={completions} />
       <TextInput
@@ -185,13 +185,13 @@ export function PullRequestReviewSheet({
         selection={completions.selection}
         onSelectionChange={completions.onSelectionChange}
         onBlur={completions.onBlur}
-        accessibilityLabel={reviewing ? "Review summary" : "Comment"}
+        accessibilityLabel={reviewing ? t("Review summary") : t("Comment")}
         placeholder={
           reviewing
             ? summaryRequired
-              ? "Summary required to request changes…"
-              : "Summarize your review…"
-            : "Write a comment…"
+              ? t("Summary required to request changes…")
+              : t("Summarize your review…")
+            : t("Write a comment…")
         }
         placeholderTextColorClassName="accent-foreground-muted"
         editable={store.ready && !submission.busy}
@@ -204,8 +204,8 @@ export function PullRequestReviewSheet({
       {reviewing && store.draft.comments.length ? (
         <View className="gap-2">
           <Text className="text-sm font-t3-medium">
-            {store.draft.comments.length} pending line{" "}
-            {store.draft.comments.length === 1 ? "comment" : "comments"}
+            {store.draft.comments.length} {t("pending line")}{" "}
+            {store.draft.comments.length === 1 ? t("comment") : t("comments")}
           </Text>
           {store.draft.comments.map((draft) => (
             <Pressable
@@ -241,8 +241,8 @@ export function PullRequestReviewSheet({
               </Text>
               <Text className="text-2xs text-foreground-muted">
                 {draft.headSha !== result.data?.headSha
-                  ? "Branch changed · Tap to choose a new line"
-                  : "Tap to edit"}
+                  ? t("Branch changed · Tap to choose a new line")
+                  : t("Tap to edit")}
               </Text>
             </Pressable>
           ))}
@@ -250,14 +250,16 @@ export function PullRequestReviewSheet({
       ) : null}
       {reviewing && stale ? (
         <Text className="text-sm text-danger-foreground">
-          The branch changed since you wrote a comment. Choose its current line before submitting.
+          {t(
+            "The branch changed since you wrote a comment. Choose its current line before submitting.",
+          )}
         </Text>
       ) : null}
       {reviewing && !canSubmitComments ? (
         <Text className="text-sm text-danger-foreground">
-          You can no longer submit line comments on this{" "}
-          {sourceControlClients.get(result.data?.provider).changeRequest.singular}. Your drafts are
-          kept here.
+          {t("You can no longer submit line comments on this")}{" "}
+          {sourceControlClients.get(result.data?.provider).changeRequest.singular}
+          {t(". Your drafts are kept here.")}
         </Text>
       ) : null}
       {submission.error || result.error || store.error ? (

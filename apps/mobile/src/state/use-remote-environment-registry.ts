@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import * as Dialog from "../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
@@ -78,7 +79,7 @@ export async function pairEnvironment(
     "reason" in error &&
     error.reason === "unsupported"
   ) {
-    Dialog.alert("Client not supported", message);
+    Dialog.alert(t("Client not supported"), message);
     return { ok: false, error: null };
   }
   if (isConnectionBlockedError(error) && error.alreadySaved !== undefined) {
@@ -208,7 +209,7 @@ export function useRemoteConnections() {
         onPress: () => navigation.navigate("SettingsAuth"),
       };
       Dialog.alert(
-        "Remove from this device?",
+        t("Remove from this device?"),
         `Forget ${environment.environmentLabel} and its cached threads on this device.\n\n${RELAY_REMOVAL_ACCOUNT_NOTE[registration]}`,
         registration === "unregistered" || !hasCloudPublicConfig()
           ? [{ text: "Cancel", style: "cancel" }, remove]
@@ -217,7 +218,7 @@ export function useRemoteConnections() {
       return;
     }
     Dialog.alert(
-      "Remove from this device?",
+      t("Remove from this device?"),
       `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,
       [{ text: "Cancel", style: "cancel" }, remove],
     );

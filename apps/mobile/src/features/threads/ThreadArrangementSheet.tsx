@@ -129,7 +129,9 @@ function DragHandle(props: {
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={`Reorder ${props.title}`}
-        accessibilityHint="Move up and Move down reorder within this section. Other actions move between sections."
+        accessibilityHint={t(
+          "Move up and Move down reorder within this section. Other actions move between sections.",
+        )}
         accessibilityState={{ disabled: props.disabled }}
         accessibilityActions={[
           ...props.sectionActions,
@@ -395,12 +397,12 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
             <SafeAreaView style={{ flex: 1 }}>
               <SheetHeader
                 presentation="inline"
-                title="Arrange threads"
+                title={t("Arrange threads")}
                 onClose={props.onClose}
-                accessibilityLabel="Close arrange threads"
+                accessibilityLabel={t("Close arrange threads")}
               />
               <Text className="px-5 pb-3 text-sm text-foreground-muted">
-                Drag to reorder, pin, or settle. Changes save when you drop.
+                {t("Drag to reorder, pin, or settle. Changes save when you drop.")}
               </Text>
               <View
                 onLayout={(event) => {
@@ -530,9 +532,9 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
                           >
                             <Text className="text-sm text-foreground-muted">
                               {olderSettledShelf.loading
-                                ? "Loading"
+                                ? t("Loading")
                                 : olderSettledShelf.failed
-                                  ? "Could not load older threads. Retry"
+                                  ? t("Could not load older threads. Retry")
                                   : `Show more (${settledCount - visibleSettled.length} settled hidden)`}
                             </Text>
                           </Pressable>

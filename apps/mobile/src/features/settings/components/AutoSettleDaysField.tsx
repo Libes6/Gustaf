@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import {
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
@@ -16,8 +17,8 @@ export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
       {...props}
       min={MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
       max={MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
-      label="Days before auto-settle"
-      formatValue={(value) => `${value} ${value === 1 ? "day" : "days"}`}
+      label={t("Days before auto-settle")}
+      formatValue={(value) => `${value} ${value === 1 ? t("day") : t("days")}`}
     />
   );
 }

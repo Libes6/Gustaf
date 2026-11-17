@@ -10,15 +10,15 @@ import { SettingsSection } from "./SettingsSection";
 const MODES = {
   static: {
     label: t("Static prefix"),
-    description: "Add your prefix to the generated branch name.",
+    description: t("Add your prefix to the generated branch name."),
   },
   semantic: {
     label: t("Semantic prefix"),
-    description: "Let the model choose feat/, fix/, refactor/, or another prefix.",
+    description: t("Let the model choose feat/, fix/, refactor/, or another prefix."),
   },
   custom: {
     label: t("Custom instructions"),
-    description: "Generate the complete name with no added prefix or suffix.",
+    description: t("Generate the complete name with no added prefix or suffix."),
   },
 } satisfies Record<BranchNamingMode, { label: string; description: string }>;
 
@@ -80,14 +80,14 @@ export function BranchNamingSettings(props: {
       {props.mode === "static" ? (
         <View className="gap-2 px-4 py-3">
           <Text className="text-sm text-foreground-muted">
-            Use t3 or t3/ for t3/add-search. Leave empty for no prefix.
+            {t("Use t3 or t3/ for t3/add-search. Leave empty for no prefix.")}
           </Text>
           <AppTextInput
             key={props.prefix}
             accessibilityLabel={t("Branch prefix")}
             onChangeText={(text) => edit("branchNamePrefix", text)}
             defaultValue={props.prefix ?? ""}
-            placeholder={props.prefix === null ? "Mixed" : "No prefix"}
+            placeholder={props.prefix === null ? t("Mixed") : t("No prefix")}
             editable={!props.disabled.prefix}
             autoCapitalize="none"
             autoCorrect={false}
@@ -99,7 +99,7 @@ export function BranchNamingSettings(props: {
       {props.mode === "custom" ? (
         <View className="gap-2 px-4 py-3">
           <Text className="text-sm text-foreground-muted">
-            Append instructions to the naming prompt.
+            {t("Append instructions to the naming prompt.")}
           </Text>
           <AppTextInput
             key={props.instructions}
@@ -108,8 +108,8 @@ export function BranchNamingSettings(props: {
             defaultValue={props.instructions ?? ""}
             placeholder={
               props.instructions === null
-                ? "Mixed. Enter instructions for all selected targets."
-                : "Use julius/ followed by the issue ID and a short description."
+                ? t("Mixed. Enter instructions for all selected targets.")
+                : t("Use julius/ followed by the issue ID and a short description.")
             }
             editable={!props.disabled.instructions}
             multiline

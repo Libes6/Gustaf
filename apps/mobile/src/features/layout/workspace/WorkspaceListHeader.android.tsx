@@ -1,3 +1,4 @@
+import { t } from "../../../i18n";
 import { useEffect, useState } from "react";
 import { useNavigation, useNavigationState } from "@react-navigation/native";
 import { BackHandler, Keyboard } from "react-native";
@@ -58,7 +59,7 @@ export function WorkspaceListHeader(props: WorkspaceListHeaderProps) {
 
   return (
     <AppBar
-      title="Gustaf"
+      title={t("Gustaf")}
       titleContent={
         <WorkspaceBrandTitle
           accessibilityLabel={props.accessibilityLabel}

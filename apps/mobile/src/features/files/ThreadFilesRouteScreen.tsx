@@ -255,7 +255,7 @@ function FileContent(props: {
 
   if (isAudioFile) {
     return props.previewUri === null ? (
-      <FilePreviewLoading message="Loading file..." />
+      <FilePreviewLoading message={t("Loading file...")} />
     ) : (
       <AudioFilePreview uri={props.previewUri} onRetry={props.onRetryPreview} />
     );
@@ -281,20 +281,20 @@ function FileContent(props: {
   if (props.fileError && props.fileContents === null) {
     return (
       <View className="flex-1 items-center justify-center bg-sheet px-6">
-        <EmptyState title="File unavailable" detail={props.fileError} />
+        <EmptyState title={t("File unavailable")} detail={props.fileError} />
       </View>
     );
   }
 
   if (props.fileContents === null) {
-    return <FilePreviewLoading message="Loading file..." />;
+    return <FilePreviewLoading message={t("Loading file...")} />;
   }
 
   return (
     <View className="flex-1 bg-sheet" style={{ paddingTop: reservedHeaderInset }}>
       {props.truncated ? (
-        <FilePreviewNotice title="Partial file">
-          Preview limited to the first 1 MB of a truncated file.
+        <FilePreviewNotice title={t("Partial file")}>
+          {t("Preview limited to the first 1 MB of a truncated file.")}
         </FilePreviewNotice>
       ) : null}
       {props.activeMode === "preview" && delimiter ? (
@@ -363,7 +363,7 @@ function useThreadFilesWorkspace(params: {
   return {
     cwd: routeCwd ?? selectedThreadCwd ?? project?.workspaceRoot ?? null,
     environmentId,
-    projectName: routeProjectName ?? project?.title ?? "Files",
+    projectName: routeProjectName ?? project?.title ?? t("Files"),
     relativePath: normalizeRoutePath(params.path),
     selectedThread,
     threadId,
@@ -509,16 +509,18 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
         />
       );
     }
-    return <LoadingScreen message="Opening files..." messagePlacement="above-spinner" />;
+    return <LoadingScreen message={t("Opening files...")} messagePlacement="above-spinner" />;
   }
 
   if (!canReadFiles) {
     if (fileAccess.isPending) {
-      return <LoadingScreen message="Checking file access..." messagePlacement="above-spinner" />;
+      return (
+        <LoadingScreen message={t("Checking file access...")} messagePlacement="above-spinner" />
+      );
     }
     return (
       <FilesUnavailable
-        detail={fileAccess.error ?? "This connection cannot read host files."}
+        detail={fileAccess.error ?? t("This connection cannot read host files.")}
         onBack={handleReturnToThread}
       />
     );
@@ -904,19 +906,19 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
 
   if (environmentId === null || (threadId !== null && selectedThread === null)) {
     return withInspector(
-      <LoadingScreen message="Opening file..." messagePlacement="above-spinner" />,
+      <LoadingScreen message={t("Opening file...")} messagePlacement="above-spinner" />,
     );
   }
 
   if (!canReadFiles) {
     if (fileAccess.isPending) {
       return withInspector(
-        <LoadingScreen message="Checking file access..." messagePlacement="above-spinner" />,
+        <LoadingScreen message={t("Checking file access...")} messagePlacement="above-spinner" />,
       );
     }
     return withInspector(
       <FilesUnavailable
-        detail={fileAccess.error ?? "This connection cannot read host files."}
+        detail={fileAccess.error ?? t("This connection cannot read host files.")}
         onBack={handleBack}
       />,
     );
@@ -928,8 +930,8 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
   if (relativePath === null) {
     return withInspector(
       <FilesUnavailable
-        title="File unavailable"
-        detail="This file path is invalid."
+        title={t("File unavailable")}
+        detail={t("This file path is invalid.")}
         onBack={handleBack}
       />,
     );
@@ -937,7 +939,7 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
 
   if (metadataPending) {
     return withInspector(
-      <LoadingScreen message="Opening file..." messagePlacement="above-spinner" />,
+      <LoadingScreen message={t("Opening file...")} messagePlacement="above-spinner" />,
     );
   }
   if (directoryPath !== null) {

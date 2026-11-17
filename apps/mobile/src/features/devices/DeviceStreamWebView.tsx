@@ -200,7 +200,7 @@ function DeviceStreamDocumentView({
             accessibilityLiveRegion="polite"
             className="text-center text-sm text-foreground-muted"
           >
-            {status === "error" ? error : "Connecting to device..."}
+            {status === "error" ? error : t("Connecting to device...")}
           </AppText>
           {status === "error" ? (
             <View className="items-center">

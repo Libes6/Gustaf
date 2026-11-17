@@ -84,7 +84,7 @@ function QueuedRunSender(props: {
       ? {
           icon: "calendar.badge.clock" as const,
           label:
-            tasks.data?.tasks.find((task) => task.id === scheduledTaskId)?.title ?? "Automation",
+            tasks.data?.tasks.find((task) => task.id === scheduledTaskId)?.title ?? t("Automation"),
         }
       : attribution === "agent"
         ? {
@@ -208,9 +208,9 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
     >
       {workflow?.isHeld && queuedRuns.length > 0 ? (
         <View className="gap-2 py-3">
-          <Text className="text-sm text-foreground-muted">Queue paused</Text>
+          <Text className="text-sm text-foreground-muted">{t("Queue paused")}</Text>
           <Button
-            label="Resume queue"
+            label={t("Resume queue")}
             disabled={resuming || busyRunId !== null}
             onPress={async () => {
               if (busyRef.current) return;
@@ -228,7 +228,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
       ) : null}
       {queuedRuns.length === 0 ? (
         <Text className="pt-6 text-center text-sm text-foreground-muted">
-          No messages waiting in this queue.
+          {t("No messages waiting in this queue.")}
         </Text>
       ) : null}
       {queuedRuns.map(({ run, text, attachments, context, message }, index) => {
@@ -290,7 +290,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     accessibilityLabel={title}
                     accessibilityHint={
                       controls.canEdit
-                        ? "Opens this message in the composer for editing"
+                        ? t("Opens this message in the composer for editing")
                         : (editBlockedReason ?? undefined)
                     }
                     disabled={!controls.canEdit}
@@ -323,7 +323,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     </View>
                     {controls.isEditing ? (
                       <Text className="shrink-0 text-2xs uppercase tracking-wide text-primary">
-                        Editing
+                        {t("Editing")}
                       </Text>
                     ) : null}
                   </Pressable>

@@ -114,7 +114,7 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
   const threadId = props.threadId;
   const { gitStatus, gitOperationLabel, onPull, onRunAction } = props;
 
-  const currentBranchLabel = gitStatus?.refName ?? props.currentBranch ?? "Detached HEAD";
+  const currentBranchLabel = gitStatus?.refName ?? props.currentBranch ?? t("Detached HEAD");
   const busy = gitOperationLabel !== null;
   const isRepo = gitStatus?.isRepo ?? true;
   const hasPrimaryRemote = gitStatus?.hasPrimaryRemote ?? false;
@@ -140,7 +140,7 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
   })();
 
   const quickActionHint = quickAction.disabled
-    ? (quickAction.hint ?? "This action is unavailable.")
+    ? (quickAction.hint ?? t("This action is unavailable."))
     : null;
 
   const quickActionIcon: QuickActionIcon = (() => {
@@ -186,8 +186,8 @@ function useThreadGitControlModel(props: ThreadGitMenuProps) {
     ) {
       if (props.hasThread === false) {
         Dialog.alert(
-          "Choose a feature branch",
-          "Switch branches before publishing changes from this draft.",
+          t("Choose a feature branch"),
+          t("Switch branches before publishing changes from this draft."),
         );
         return;
       }

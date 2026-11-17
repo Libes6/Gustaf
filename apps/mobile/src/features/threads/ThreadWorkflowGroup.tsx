@@ -15,7 +15,7 @@ import { useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 
 import { AppText as Text } from "../../components/ui/AppText";
-import { formatElapsed } from "../../i18n";
+import { t, formatElapsed } from "../../i18n";
 import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
 import { Chip } from "../../components/ui/Chip";
 import { ListRowLayout } from "../../components/ui/ListRowLayout";
@@ -66,7 +66,7 @@ export function ThreadWorkflowGroup(props: {
           <RowPressable
             accessibilityRole="button"
             accessibilityLabel={`${label} workflow, ${statusLabel}`}
-            accessibilityHint={open ? "Collapses the workflow" : "Opens the current phase"}
+            accessibilityHint={open ? t("Collapses the workflow") : t("Opens the current phase")}
             accessibilityState={{ expanded: open !== undefined }}
             disabled={rail.length === 0}
             onPress={() => setSelected(nextWorkflowSelection(rail, selected))}
@@ -122,7 +122,7 @@ export function ThreadWorkflowGroup(props: {
             textRole="footnote"
             className="border-t border-border-subtle px-4 py-3 text-foreground-muted"
           >
-            No agents yet
+            {t("No agents yet")}
           </Text>
         ) : (
           open.members.map((member) => (
@@ -172,7 +172,9 @@ function WorkflowMemberRow(props: {
         ...(metadata.speed === null ? [] : [metadata.speed]),
         ...(error === null ? [] : [error]),
       ].join(", ")}
-      accessibilityHint={canOpen ? "Opens this agent's thread" : "Its thread is not available yet"}
+      accessibilityHint={
+        canOpen ? t("Opens this agent's thread") : t("Its thread is not available yet")
+      }
       disabled={!canOpen}
       onPress={() => threadId !== null && props.onOpen(threadId)}
       className="min-h-11 flex-row gap-3 border-t border-border-subtle px-4 py-3 active:opacity-70"

@@ -29,8 +29,10 @@ import { moveDraftToThread, unbindDraftFromThread } from "./scheduledTaskDraft";
 
 function MissingTaskDraft() {
   return (
-    <SettingsScreen title="Scheduled task">
-      <Text className="p-5 text-base text-foreground-muted">Open a scheduled task form first.</Text>
+    <SettingsScreen title={t("Scheduled task")}>
+      <Text className="p-5 text-base text-foreground-muted">
+        {t("Open a scheduled task form first.")}
+      </Text>
     </SettingsScreen>
   );
 }
@@ -255,7 +257,9 @@ export function ScheduledTaskThreadPickerRouteScreen() {
             : Math.max(insets.bottom, 16) + 16,
         }}
         ListEmptyComponent={
-          <Text className="p-5 text-center text-sm text-foreground-muted">No matching threads</Text>
+          <Text className="p-5 text-center text-sm text-foreground-muted">
+            {t("No matching threads")}
+          </Text>
         }
         renderItem={({ item, index }) => (
           <SelectionRow

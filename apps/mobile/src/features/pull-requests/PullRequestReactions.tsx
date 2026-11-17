@@ -62,7 +62,7 @@ function ReactionPills(props: {
         next.delete(content);
         return { signature: current.signature, values: next };
       });
-      Dialog.alert("Couldn't save the reaction", "Try again in a moment.");
+      Dialog.alert(t("Couldn't save the reaction"), t("Try again in a moment."));
       return;
     }
     props.onChanged();

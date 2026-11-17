@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useIsFocused, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -110,9 +111,9 @@ export function McpAppFullscreenScreen({ route }: McpAppFullscreenScreenProps) {
   return (
     <View className="flex-1 bg-screen">
       <AppBar
-        title={app?.server ?? "App"}
+        title={app?.server ?? t("App")}
         onClose={onClose}
-        closeAccessibilityLabel="Exit full screen"
+        closeAccessibilityLabel={t("Exit full screen")}
       />
       <View
         className="flex-1"
@@ -126,7 +127,9 @@ export function McpAppFullscreenScreen({ route }: McpAppFullscreenScreenProps) {
       >
         {app === undefined ? (
           detail.data === undefined ? null : (
-            <Text className="m-6 text-sm text-foreground-muted">This app cannot be shown.</Text>
+            <Text className="m-6 text-sm text-foreground-muted">
+              {t("This app cannot be shown.")}
+            </Text>
           )
         ) : size.width > 0 ? (
           <ThreadMcpApp

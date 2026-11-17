@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   formatProviderSubagentStatus,
   type ProviderSubagentStatus,
@@ -61,14 +62,14 @@ export function ProviderSubagentBar(props: {
           className="font-sans text-xs text-foreground-secondary"
           style={{ fontVariant: ["tabular-nums"] }}
         >
-          {statusLabel} · Runs on its own
+          {statusLabel} {t("· Runs on its own")}
         </Text>
       </View>
       {props.inspect ? (
-        <Button label="Work" tone="secondary" onPress={() => setInspecting(true)} />
+        <Button label={t("Work")} tone="secondary" onPress={() => setInspecting(true)} />
       ) : null}
       {props.onOpenParent ? (
-        <Button label="Open parent" tone="secondary" onPress={props.onOpenParent} />
+        <Button label={t("Open parent")} tone="secondary" onPress={props.onOpenParent} />
       ) : null}
       {props.inspect && inspecting ? (
         <NativeChildWorkSheet {...props.inspect} onClose={() => setInspecting(false)} />

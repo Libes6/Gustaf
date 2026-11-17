@@ -83,7 +83,8 @@ function WindowRow(props: {
       <View className="flex-row items-baseline justify-between gap-3">
         <Text className="text-sm text-foreground">{window.label}</Text>
         <Text className="text-sm font-t3-medium tabular-nums text-foreground">
-          {remaining}% left
+          {remaining}
+          {t("% left")}
         </Text>
       </View>
       <View
@@ -141,7 +142,7 @@ function AccountInstanceLabel({ value }: { readonly value: string }) {
     <Pressable
       className="shrink active:opacity-60"
       accessibilityRole="button"
-      accessibilityLabel={revealed ? "Hide account label" : "Reveal account label"}
+      accessibilityLabel={revealed ? t("Hide account label") : t("Reveal account label")}
       onPress={() => setRevealed((current) => !current)}
     >
       <Text className="text-xs text-foreground-tertiary" numberOfLines={1}>
@@ -268,8 +269,10 @@ export function ResetCredits(props: {
   const confirm = () => {
     if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     Dialog.alert(
-      "Use a reset credit?",
-      "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+      t("Use a reset credit?"),
+      t(
+        "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+      ),
       [
         { text: "Cancel", style: "cancel" },
         { text: "Use credit", onPress: () => void redeem() },
@@ -299,13 +302,13 @@ export function ResetCredits(props: {
                 : "text-sm font-t3-medium text-foreground"
             }
           >
-            {busy ? "Using…" : "Use reset"}
+            {busy ? t("Using…") : t("Use reset")}
           </Text>
         </Pressable>
       ) : null}
       {!canManageProviders ? (
         <Text className="text-xs text-foreground-tertiary">
-          This connection cannot manage provider accounts.
+          {t("This connection cannot manage provider accounts.")}
         </Text>
       ) : null}
       {status ? <Text className="text-sm text-foreground">{status}</Text> : null}

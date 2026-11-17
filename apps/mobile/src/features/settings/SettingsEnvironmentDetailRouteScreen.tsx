@@ -173,7 +173,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
   }
 
   return (
-    <SettingsScreen title={environment?.environmentLabel ?? "Environment"}>
+    <SettingsScreen title={environment?.environmentLabel ?? t("Environment")}>
       <ScreenScrollView
         contentInsetAdjustmentBehavior="automatic"
         className="flex-1"
@@ -182,7 +182,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
       >
         {!environment ? (
           <Text className="text-base text-foreground-muted">
-            This environment is no longer saved on this device.
+            {t("This environment is no longer saved on this device.")}
           </Text>
         ) : (
           <>
@@ -211,7 +211,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
               />
             ) : !connected ? (
               <Text className="px-2 text-sm text-foreground-muted">
-                Connect this environment to manage it.
+                {t("Connect this environment to manage it.")}
               </Text>
             ) : !allowed ? (
               <Text className="px-2 text-sm text-foreground-muted">
@@ -222,7 +222,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                       rejected:
                         !AsyncResult.isFailure(sessionResult) && session?.authenticated === false,
                     })
-                  : "This connection does not have permission to manage the environment."}
+                  : t("This connection does not have permission to manage the environment.")}
               </Text>
             ) : null}
             {error ? (
@@ -233,7 +233,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
             {notice ? <Text className="px-2 text-sm text-foreground-muted">{notice}</Text> : null}
             {config && !outdated ? (
               <>
-                <SettingsSection title="Gustaf">
+                <SettingsSection title={t("Gustaf")}>
                   <View className="gap-1 p-4">
                     <Text className="text-base text-foreground">
                       {t("Version")}
@@ -241,7 +241,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                     </Text>
                     {managedPolicy ? (
                       <Text className="text-sm text-foreground-muted">
-                        Managed by {managedPolicy.organization}
+                        {t("Managed by")} {managedPolicy.organization}
                       </Text>
                     ) : null}
                     {updatesDenial ? (
@@ -250,8 +250,8 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                     {running ? (
                       <Text className="text-sm text-foreground-muted">
                         {updateState.stage === "resuming"
-                          ? "Restarting and reconnecting…"
-                          : "Downloading update…"}
+                          ? t("Restarting and reconnecting…")
+                          : t("Downloading update…")}
                       </Text>
                     ) : updateState.status === "failed" ? (
                       <Text selectable className="text-sm text-danger-foreground">
@@ -262,7 +262,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                       <Text className="text-sm text-foreground-muted">
                         {checkedRelease.targetVersion
                           ? `Version ${checkedRelease.targetVersion} is available.`
-                          : "You are up to date."}
+                          : t("You are up to date.")}
                       </Text>
                     ) : null}
                     {checkedRelease?.targetVersion &&
@@ -270,8 +270,8 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                     !supportsEnvironmentUpdate(config.environment.capabilities) ? (
                       <Text className="text-sm text-foreground-muted">
                         {capabilities?.serverSelfUpdate === "desktop-managed"
-                          ? "Update the desktop app on this machine."
-                          : "Update and restart Gustaf on this machine."}
+                          ? t("Update the desktop app on this machine.")
+                          : t("Update and restart Gustaf on this machine.")}
                       </Text>
                     ) : null}
                   </View>
@@ -317,7 +317,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                 <SettingsSection title={t("Providers")}>
                   <SettingsActionRow
                     icon="arrow.clockwise"
-                    label="Refresh providers"
+                    label={t("Refresh providers")}
                     disabled={busy || !canRead}
                     loading={pending === "refresh"}
                     onPress={() => {
@@ -351,8 +351,8 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                           </View>
                           <Text className="text-sm text-foreground-muted">
                             {provider.installed
-                              ? (provider.version ?? "Version unknown")
-                              : "Not installed"}
+                              ? (provider.version ?? t("Version unknown"))
+                              : t("Not installed")}
                             {provider.versionAdvisory?.latestVersion
                               ? ` · Latest ${provider.versionAdvisory.latestVersion}`
                               : ""}
@@ -383,7 +383,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                           {provider.versionAdvisory?.status === "behind_latest" &&
                           !provider.versionAdvisory.canUpdate ? (
                             <Text className="text-sm text-foreground-muted">
-                              Update this provider on the environment's machine.
+                              {t("Update this provider on the environment's machine.")}
                             </Text>
                           ) : null}
                         </View>

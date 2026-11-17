@@ -82,7 +82,7 @@ function BrowserPreviewScreen({
   }, [focused, loaded, tabs.length, onClose]);
   const onPictureInPicture = (state: PreviewPictureInPictureState, detail?: string) => {
     setPictureInPicture({ supported: state.supported, active: state.active });
-    if (detail) Dialog.alert("Picture in picture is unavailable", detail);
+    if (detail) Dialog.alert(t("Picture in picture is unavailable"), detail);
   };
   const selectTab = (next: string) => {
     setPictureInPicture(NO_PICTURE_IN_PICTURE);
@@ -93,9 +93,9 @@ function BrowserPreviewScreen({
   return (
     <View className="flex-1 bg-sheet" style={{ paddingBottom: insets.bottom }}>
       <SheetHeader
-        title={tab ? browserTabTitle(tab) : "Browser"}
+        title={tab ? browserTabTitle(tab) : t("Browser")}
         onClose={onClose}
-        accessibilityLabel="Close browser"
+        accessibilityLabel={t("Close browser")}
         actions={
           // Android WebView cannot play video in picture in picture.
           Platform.OS === "ios" &&
@@ -197,7 +197,7 @@ function BrowserAddressBar({
     try {
       onCommand({ type: "navigate", url: normalizePreviewUrl(value) });
     } catch {
-      Dialog.alert("Could not open this address", "Enter an http or https URL.");
+      Dialog.alert(t("Could not open this address"), t("Enter an http or https URL."));
     }
   };
   return (
@@ -221,7 +221,7 @@ function BrowserAddressBar({
         onChangeText={setDraft}
         onBlur={() => setDraft(null)}
         onSubmitEditing={submit}
-        placeholder="Enter a URL"
+        placeholder={t("Enter a URL")}
         placeholderTextColorClassName="accent-placeholder"
         autoCapitalize="none"
         autoCorrect={false}
@@ -233,7 +233,7 @@ function BrowserAddressBar({
       />
       <ControlPill
         icon="arrow.clockwise"
-        accessibilityLabel="Reload page"
+        accessibilityLabel={t("Reload page")}
         disabled={!ready}
         onPress={() => onCommand({ type: "reload" })}
       />

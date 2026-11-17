@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "./Dialog";
 import { requireNativeModule } from "expo";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -126,7 +127,7 @@ function NativeVideoPreview(props: {
       // AVKit gives no retry, so re-mint now; the minted URL may already be unusable.
       if (ready) reauthorize();
       Dialog.alert(
-        "Could not open video",
+        t("Could not open video"),
         ready
           ? "This video couldn't be loaded or played. Check the connection, or touch and hold the video to save or share the original."
           : error instanceof Error

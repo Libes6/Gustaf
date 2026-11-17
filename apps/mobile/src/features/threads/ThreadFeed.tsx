@@ -456,8 +456,10 @@ function AssistantForkButton(props: {
             );
             if (!targetThreadReady) {
               Dialog.alert(
-                "Fork created",
-                "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
+                t("Fork created"),
+                t(
+                  "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
+                ),
               );
               return;
             }
@@ -650,7 +652,7 @@ function MessageAttachmentFile(props: {
   const isPdf = isPdfFile(attachment);
   const fileTypeLabel = isPdf
     ? "PDF"
-    : (attachment.name.match(/\.([a-z0-9]{1,8})$/i)?.[1]?.toUpperCase() ?? "File");
+    : (attachment.name.match(/\.([a-z0-9]{1,8})$/i)?.[1]?.toUpperCase() ?? t("File"));
   const sizeLabel = formatAttachmentSize(attachment.sizeBytes);
   const httpBaseUrl = Option.isSome(preparedConnection)
     ? preparedConnection.value.httpBaseUrl
@@ -676,7 +678,7 @@ function MessageAttachmentFile(props: {
     setOpening(true);
     const finish = (message: string | null) => {
       if (message !== null && !controller.signal.aborted) {
-        Dialog.alert("Could not open attachment", message);
+        Dialog.alert(t("Could not open attachment"), message);
       }
       if (openingRef.current === controller) {
         openingRef.current = null;
@@ -1900,9 +1902,9 @@ function renderFeedEntry(
         <ThreadContextDivider
           label={
             !active
-              ? "Context compaction"
+              ? t("Context compaction")
               : reason === undefined
-                ? "Compacting context"
+                ? t("Compacting context")
                 : IDLE_COMPACTING_LABELS[reason]
           }
           icon="arrow.down.right.and.arrow.up.left"
@@ -2191,7 +2193,7 @@ function renderFeedEntry(
                 </Text>
               ) : null}
               <Text className="font-t3-medium text-xs tabular-nums text-foreground-secondary">
-                {entry.pendingMessage && !entry.acknowledged ? "Pending" : timestampLabel}
+                {entry.pendingMessage && !entry.acknowledged ? t("Pending") : timestampLabel}
               </Text>
               {props.onEditPendingMessage !== null &&
               entry.pendingMessage &&
@@ -2403,7 +2405,10 @@ function UserMessageContent(props: UserMessageContentProps) {
       });
       return;
     }
-    setSelected({ contextId: reference.contextId, label: record?.label ?? "Context unavailable" });
+    setSelected({
+      contextId: reference.contextId,
+      label: record?.label ?? t("Context unavailable"),
+    });
   };
   return (
     <>
@@ -2448,7 +2453,7 @@ function UserMessageContent(props: UserMessageContentProps) {
               )
                 .then(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success))
                 .catch(() => {
-                  Dialog.alert("Could not copy context", "Try copying this context again.");
+                  Dialog.alert(t("Could not copy context"), t("Try copying this context again."));
                 });
             }
           },
@@ -3038,7 +3043,8 @@ export const ThreadFeed = memo(function ThreadFeed({
       if (thread) {
         return {
           title:
-            appAtomRegistry.get(environmentThreadShells.threadShellAtom(thread))?.title ?? "Thread",
+            appAtomRegistry.get(environmentThreadShells.threadShellAtom(thread))?.title ??
+            t("Thread"),
           actions: [
             { id: "open-thread", title: t("Open thread") },
             { id: "copy-thread-link", title: t("Copy link") },

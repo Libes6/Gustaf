@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { RelayEnvironmentStatusResponse } from "@t3tools/contracts/relay";
 import {
   orchestrationProtocolCompatibilityError,
@@ -41,7 +42,7 @@ export function availableCloudEnvironmentPresentation(input: {
 
   if (input.status?.status === "offline") {
     const connectionError =
-      relayOfflineReasonMessage(input.status) ?? input.status.error ?? "Relay is offline.";
+      relayOfflineReasonMessage(input.status) ?? input.status.error ?? t("Relay is offline.");
     return {
       connectionError,
       connectionErrorTraceId: input.status.traceId ?? null,

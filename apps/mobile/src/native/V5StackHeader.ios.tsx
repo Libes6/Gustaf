@@ -346,7 +346,7 @@ export function V5StackHeader(props: {
                 hideWhenScrolling={false}
                 allowToolbarIntegration={searchOptions?.allowToolbarIntegration ?? true}
                 placement={bottomSearch ? "integrated" : (searchOptions?.placement ?? "automatic")}
-                placeholder={mailSearch?.placeholder ?? searchOptions?.placeholder ?? "Search"}
+                placeholder={mailSearch?.placeholder ?? searchOptions?.placeholder ?? t("Search")}
                 onFocus={(event) => {
                   searchOptions?.onFocus?.(event);
                 }}

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { View } from "react-native";
 
 import { RenderErrorBoundary, RenderFailureView } from "../../components/RenderErrorBoundary";
@@ -21,7 +22,7 @@ function PaneContent(props: {
       <RenderErrorBoundary
         resetKeys={props.resetKeys}
         renderFallback={(fallback) => (
-          <RenderFailureView {...fallback} title="The inspector couldn't be displayed" />
+          <RenderFailureView {...fallback} title={t("The inspector couldn't be displayed")} />
         )}
       >
         {props.pane.render()}

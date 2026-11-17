@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { resolveFilesystemReadAccess } from "@t3tools/client-runtime/state/filesystem";
 import { Atom } from "effect/reactivity";
@@ -146,7 +147,7 @@ export function useReviewSections(input: {
       diffPreview.error ??
       activeTurnDiff.error ??
       (selectedSection === null && !fileAccess.isPending && !canReadFiles
-        ? (fileAccess.error ?? "This connection cannot read local diffs.")
+        ? (fileAccess.error ?? t("This connection cannot read local diffs."))
         : null),
     isSelectedSectionPending:
       selectedSection?.kind === "turn" ? activeTurnDiff.isPending : diffPreview.isPending,

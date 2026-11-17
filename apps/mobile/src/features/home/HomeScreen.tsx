@@ -711,7 +711,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 title={emptyState.title}
                 detail={emptyState.detail}
                 actionLabel={
-                  !props.catalogState.hasReadyEnvironment ? "Add environment" : undefined
+                  !props.catalogState.hasReadyEnvironment ? t("Add environment") : undefined
                 }
                 onAction={
                   !props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined
@@ -773,19 +773,19 @@ export function HomeScreen(props: HomeScreenProps) {
     ) : v2ScopedProjectGroup !== null ? (
       <EmptyState
         title={`No threads in ${v2ScopedProjectGroup.title}`}
-        detail="Choose another project or create a new task."
+        detail={t("Choose another project or create a new task.")}
         variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : selectedEnvironmentLabel ? (
       <EmptyState
         title={`No threads in ${selectedEnvironmentLabel}`}
-        detail="Choose another environment or create a new task."
+        detail={t("Choose another environment or create a new task.")}
         variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : (
       <EmptyState
         title={t("No threads yet")}
-        detail="Create a task to start a new coding session."
+        detail={t("Create a task to start a new coding session.")}
         variant={Platform.OS === "android" ? "plain" : undefined}
       />
     );

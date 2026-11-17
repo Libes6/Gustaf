@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import {
   isAtomCommandInterrupted,
   runAtomCommand,
@@ -30,7 +31,7 @@ export function canTurnThreadIntoProject(thread: EnvironmentThreadShell): boolea
 export async function turnThreadIntoProject(thread: EnvironmentThreadShell): Promise<void> {
   const title = "Could not turn thread into a project";
   if (!readEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope)) {
-    Dialog.alert(title, "This connection cannot change threads.");
+    Dialog.alert(title, t("This connection cannot change threads."));
     return;
   }
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

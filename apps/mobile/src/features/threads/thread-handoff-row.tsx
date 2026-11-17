@@ -180,7 +180,7 @@ function HandoffEndpoint(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint="Show provider account"
+      accessibilityHint={t("Show provider account")}
       className="min-h-6 max-w-full flex-row items-center justify-center gap-1.5"
       hitSlop={{ top: 8, bottom: 8 }}
       onPress={() =>

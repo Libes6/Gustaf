@@ -91,7 +91,7 @@ export function AttachmentFileScreen(props: AttachmentFileScreenProps) {
     const message = pendingNativeError.current;
     pendingNativeError.current = null;
     if (nativeViewer === null) {
-      if (message) Dialog.alert("Could not open document", message);
+      if (message) Dialog.alert(t("Could not open document"), message);
       return;
     }
     if (message) {

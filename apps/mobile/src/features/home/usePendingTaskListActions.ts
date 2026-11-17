@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { useCallback } from "react";
 
@@ -40,7 +41,7 @@ export function usePendingTaskListActions(
 
   const confirmDeletePendingTask = useCallback((pendingTask: PendingNewTask) => {
     if (pendingTask.kind === "draft") {
-      Dialog.alert("Discard draft?", `“${pendingTask.title}” will be removed.`, [
+      Dialog.alert(t("Discard draft?"), `“${pendingTask.title}” will be removed.`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Discard",
@@ -61,7 +62,7 @@ export function usePendingTaskListActions(
       return;
     }
     Dialog.alert(
-      "Delete pending task?",
+      t("Delete pending task?"),
       `“${pendingTask.title}” has not been sent yet and will be removed from the outbox.`,
       [
         { text: "Cancel", style: "cancel" },
@@ -90,7 +91,7 @@ export function usePendingTaskListActions(
               .catch((error) => {
                 releaseUnlessEditing();
                 Dialog.alert(
-                  "Could not delete pending task",
+                  t("Could not delete pending task"),
                   error instanceof Error ? error.message : "The pending task could not be removed.",
                 );
               });

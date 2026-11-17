@@ -51,7 +51,7 @@ export function SettingsProviderAccountsRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
         {selectedTargets.length === 0 ? (
-          <Text className="text-foreground-muted">Select a connected environment.</Text>
+          <Text className="text-foreground-muted">{t("Select a connected environment.")}</Text>
         ) : (
           selectedTargets.map((environment) => (
             <SettingsSection key={environment.environmentId} title={environment.label}>
@@ -104,7 +104,7 @@ function EnvironmentProviders({
       ))}
       {accounts.length === 0 ? (
         <Text className="p-4 text-foreground-muted">
-          Configure a provider with in-app sign-in in web or desktop Settings.
+          {t("Configure a provider with in-app sign-in in web or desktop Settings.")}
         </Text>
       ) : null}
       {claudeAccounts.map((provider) => (
@@ -285,7 +285,7 @@ function ProviderAccount({
   }
   function signOut() {
     Dialog.alert(
-      "Sign out?",
+      t("Sign out?"),
       `Running threads sharing this sign-in on ${environment.label} will stop. Thread history is kept.`,
       [
         { text: "Cancel", style: "cancel" },
@@ -382,7 +382,7 @@ function ProviderAccount({
       accessible
       accessibilityRole="button"
       accessibilityLabel={`Sign in to ${name}`}
-      title="Sign in with"
+      title={t("Sign in with")}
       actions={[...methodActions, ...removeActions]}
       onPressAction={({ nativeEvent }) => onMenuAction(nativeEvent.event)}
     >
@@ -395,7 +395,7 @@ function ProviderAccount({
   ) : canSignIn && !signedIn ? (
     <ControlPill
       variant="primary"
-      label={usesCredentials ? "Connect" : "Sign in"}
+      label={usesCredentials ? t("Connect") : t("Sign in")}
       accessibilityLabel={usesCredentials ? `Connect to ${name}` : `Sign in to ${name}`}
       disabled={signInDisabled}
       onPress={() => startSignIn()}
@@ -422,7 +422,7 @@ function ProviderAccount({
         <View className="gap-2 px-4 pb-3">
           {interaction?.type === "deviceCode" ? (
             <Text selectable className="text-foreground">
-              Enter code {interaction.userCode} on the sign-in page.
+              {t("Enter code")} {interaction.userCode} {t("on the sign-in page.")}
             </Text>
           ) : null}
           {interaction?.type === "terminal" ? (
@@ -435,7 +435,7 @@ function ProviderAccount({
               {field("input", "Terminal response", true)}
               <SettingsActionRow
                 icon="arrow.up"
-                label="Send response"
+                label={t("Send response")}
                 disabled={disabled}
                 onPress={() => {
                   void send({ type: "terminal", data: `${values.input ?? ""}\r` }).then((sent) => {
@@ -547,7 +547,7 @@ function ProviderAccountSummary({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={[name, status, revealed ? email : null].filter(Boolean).join(", ")}
-      accessibilityHint={revealed ? "Hides the account email" : "Reveals the account email"}
+      accessibilityHint={revealed ? t("Hides the account email") : t("Reveals the account email")}
       onPress={() => setRevealed((value) => !value)}
       className="min-w-0 shrink grow gap-0.5"
     >

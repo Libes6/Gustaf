@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -138,7 +139,8 @@ function ModelStats(props: { readonly model: EnvironmentSpeechModel; readonly la
             <>
               {languageLabel(code)}{" "}
               <Text className="font-t3-medium text-foreground">{score.grade}</Text> (
-              {score.errorPercent}% error)
+              {score.errorPercent}
+              {t("% error)")}
             </>,
           ],
         ] as const)
@@ -242,7 +244,7 @@ export function VoiceModelRow(props: {
           label={model.name}
           description={
             model.state === "verifying"
-              ? "Verifying download…"
+              ? t("Verifying download…")
               : `${Math.round((progress ?? 0) * 100)}% downloaded · Tap to cancel`
           }
           disabled={!voice.canManage || voice.busy}
@@ -300,7 +302,7 @@ export function VoiceModelSection(props: {
       }
     >
       <ListRow
-        label={active?.model ?? "No model selected"}
+        label={active?.model ?? t("No model selected")}
         description={
           pending
             ? pending.state === "verifying"
@@ -308,7 +310,7 @@ export function VoiceModelSection(props: {
               : `Downloading ${pending.name} · ${Math.round((progress ?? 0) * 100)}%`
             : active
               ? formatBytes(active.size)
-              : "Choose a transcription model to dictate on this environment."
+              : t("Choose a transcription model to dictate on this environment.")
         }
         onPress={() =>
           navigation.navigate("SettingsVoiceModels", { environmentId: props.environmentId })

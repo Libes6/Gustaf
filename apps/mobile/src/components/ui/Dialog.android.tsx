@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { NativeThemeHost } from "./NativeThemeHost.android";
 import {
   AlertDialog,
@@ -154,7 +155,7 @@ function DialogPresentation(props: DialogPresentationProps) {
     props.onConfirm(value);
   };
   const actions = props.alertActions ?? [
-    { text: props.request.cancelText ?? "Cancel", onPress: props.onCancel },
+    { text: props.request.cancelText ?? t("Cancel"), onPress: props.onCancel },
     {
       text: props.request.confirmText,
       style: props.request.destructive ? ("destructive" as const) : ("default" as const),

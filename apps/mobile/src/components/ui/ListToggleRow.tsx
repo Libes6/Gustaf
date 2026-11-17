@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Pressable } from "react-native";
 
 import { AppText } from "./AppText";
@@ -27,7 +28,9 @@ export function ListToggleRow(
             className="rounded-full bg-subtle px-3 py-2 active:opacity-70"
             onPress={() => props.onValueChange(true)}
           >
-            <AppText className="text-sm font-t3-medium text-foreground">Mixed · Set on</AppText>
+            <AppText className="text-sm font-t3-medium text-foreground">
+              {t("Mixed · Set on")}
+            </AppText>
           </Pressable>
         ) : (
           <ThemedSwitch

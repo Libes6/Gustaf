@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { Button } from "./ui/Button";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
@@ -73,7 +74,7 @@ export function ComposerContextAttachment(props: {
     if (AsyncResult.isFailure(result)) {
       const cause = squashAtomCommandFailure(result);
       Dialog.alert(
-        "Could not open attachment",
+        t("Could not open attachment"),
         cause instanceof Error ? cause.message : "Try again.",
       );
     }
@@ -100,12 +101,12 @@ export function ComposerContextAttachment(props: {
       ) : null}
       {error || (!local && asset._tag === "Failure") ? (
         <Text className="text-foreground-muted">
-          {error ?? "Attachment unavailable. Reconnect and try again."}
+          {error ?? t("Attachment unavailable. Reconnect and try again.")}
         </Text>
       ) : null}
       <PresentationSource identifier={shareSourceIdentifier}>
         <Button
-          label={sharing ? "Opening attachment…" : "Open or share attachment"}
+          label={sharing ? t("Opening attachment…") : t("Open or share attachment")}
           tone="secondary"
           disabled={sharing}
           onPress={() => void share()}

@@ -119,7 +119,7 @@ function ConfiguredSettingsRouteScreen() {
     ? "Checking"
     : !isSignedIn
       ? "Sign in"
-      : (user?.primaryEmailAddress?.emailAddress ?? "Signed in");
+      : (user?.primaryEmailAddress?.emailAddress ?? t("Signed in"));
 
   return (
     <SettingsList
@@ -242,7 +242,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
           representative: scopedProjectMembers[0]!,
           members: scopedProjectMembers,
         })
-      : (selectedProject?.label ?? "Unavailable project");
+      : (selectedProject?.label ?? t("Unavailable project"));
   const page = (
     target: SettingsPageTarget,
     icon: SettingsListRow["icon"],

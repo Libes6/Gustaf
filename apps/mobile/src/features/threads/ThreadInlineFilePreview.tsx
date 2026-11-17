@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useIsFocused } from "@react-navigation/native";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { useAudioPlayerStatus } from "expo-audio";
@@ -45,7 +46,7 @@ function FileCardHeader(props: PreviewProps) {
           {props.source.name}
         </Text>
         <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-          Audio
+          {t("Audio")}
           {props.sizeBytes !== undefined ? ` · ${formatAttachmentSize(props.sizeBytes)}` : ""}
         </Text>
       </View>
@@ -188,7 +189,7 @@ function InlineAudio(props: PreviewProps & { readonly resolveUri: () => Promise<
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            playing ? "Pause audio" : error || status.error ? "Retry audio" : "Play audio"
+            playing ? t("Pause audio") : error || status.error ? t("Retry audio") : t("Play audio")
           }
           accessibilityState={{ busy }}
           onPress={toggle}
@@ -210,9 +211,9 @@ function InlineAudio(props: PreviewProps & { readonly resolveUri: () => Promise<
           </View>
           <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {error || status.error
-              ? "Unavailable · tap play to retry"
+              ? t("Unavailable · tap play to retry")
               : busy
-                ? "Loading…"
+                ? t("Loading…")
                 : `${timestamp(status.currentTime)} / ${status.isLoaded ? timestamp(status.duration) : "--:--"}`}
           </Text>
         </View>

@@ -341,7 +341,7 @@ export function PullRequestsScreen(
             <View className="items-center py-5">
               <AppActivityIndicator
                 colorClassName="accent-icon"
-                accessibilityLabel="Loading more pull requests"
+                accessibilityLabel={t("Loading more pull requests")}
               />
             </View>
           ) : result.loadMoreError ? (
@@ -349,7 +349,7 @@ export function PullRequestsScreen(
               <Text className="text-xs text-foreground-muted">{result.loadMoreError}</Text>
               <Button
                 label={t("Try again")}
-                accessibilityLabel="Retry loading more pull requests"
+                accessibilityLabel={t("Retry loading more pull requests")}
                 onPress={() => void result.loadMore(true)}
               />
             </View>
@@ -374,14 +374,14 @@ export function PullRequestsScreen(
               <EmptyState
                 title={
                   result.error
-                    ? "Couldn't load pull requests"
+                    ? t("Couldn't load pull requests")
                     : targets.length && connectedTargets.length === 0
-                      ? "Environment offline"
+                      ? t("Environment offline")
                       : targets.length
                         ? query
-                          ? "No results"
-                          : "No matching pull requests"
-                        : "Connect an environment"
+                          ? t("No results")
+                          : t("No matching pull requests")
+                        : t("Connect an environment")
                 }
                 detail={
                   result.error ??
