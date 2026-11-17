@@ -129,8 +129,8 @@ function McpEnvironmentSettings({
                           ? "inherit"
                           : settings.projectSettingsOverrides[projectIds[0]!]?.mcpServers?.[id]
                                 ?.enabled
-                            ? t("settingsE.mcp.s9")
-                            : t("settingsE.mcp.s10")
+                            ? "on"
+                            : "off"
                       }
                       onChange={(e) => {
                         const enabled =
@@ -140,6 +140,7 @@ function McpEnvironmentSettings({
                             projectIds.map((pid) => [
                               pid,
                               {
+                                ...settings.projectSettingsOverrides[pid],
                                 mcpServers: {
                                   ...settings.projectSettingsOverrides[pid]?.mcpServers,
                                   [id]: enabled,
@@ -204,21 +205,21 @@ function McpEnvironmentSettings({
               key={JSON.stringify([entry.source, entry.sourcePath, entry.projectDir, entry.name])}
               title={entry.name}
               description={
-                <div>
-                  <p>
+                <span className="block">
+                  <span className="block">
                     {entry.source} · {entry.sourcePath}
-                  </p>
-                  <pre className="whitespace-pre-wrap break-all">
+                  </span>
+                  <span className="block whitespace-pre-wrap break-all font-mono">
                     {entry.transport.type === "stdio"
                       ? JSON.stringify([entry.transport.command, ...entry.transport.args])
                       : entry.transport.url}
-                  </pre>
-                  <p>
+                  </span>
+                  <span className="block">
                     {entry.transport.type === "stdio"
                       ? entry.transport.envKeys.join(", ")
                       : entry.transport.headerKeys.join(", ")}
-                  </p>
-                </div>
+                  </span>
+                </span>
               }
               control={
                 <Button
