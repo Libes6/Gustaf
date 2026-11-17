@@ -16,7 +16,9 @@ const NO_HOSTS: ReadonlyArray<string> = [] as const;
 // escapes \\ \" \' and unquoted "\ ", and "#" starting a comment only at
 // the start of a token. Invalid quoting leaves hostname resolution uncertain.
 function parseSshConfigLine(line: string) {
-  const match = /^\s*([^\s=]+)\s*=?\s*(.*)$/u.exec(line);
+  const match = /^[ \t\r]*([^ \t\r=]+)[ \t\r]*=?[ \t\r]*(.*)$/su.exec(
+    line.replace(/[ \t\r\f]+$/u, ""),
+  );
   if (!match) {
     return null;
   }
@@ -44,7 +46,7 @@ function parseSshConfigLine(line: string) {
     } else if (char === '"' || char === "'") {
       quote = char;
       token ??= "";
-    } else if (/\s/u.test(char)) {
+    } else if (/[ \t]/u.test(char)) {
       if (token !== null) {
         args.push(token);
         token = null;
@@ -65,7 +67,7 @@ function parseSshConfigLine(line: string) {
 }
 
 function expandHomePath(input: string, homeDir: string): string {
-  return input.replace(/^~(?=$|\/|\\)/u, homeDir);
+  return input.replace(/^~(?=$|\/|\\)/u, () => homeDir);
 }
 
 const resolveSshConfigIncludePattern = Effect.fnUntraced(function* (
@@ -90,35 +92,51 @@ function escapeRegex(value: string): string {
 
 function globToRegExp(pattern: string): RegExp {
   return new RegExp(
-    `^${escapeRegex(pattern).replace(/\\\*/gu, ".*").replace(/\\\?/gu, ".")}$`,
+    `^${escapeRegex(pattern).replace(/\\\*/gu, "[^]*").replace(/\\\?/gu, ".")}$`,
     "u",
   );
 }
 
-const expandGlob = Effect.fnUntraced(function* (pattern: string) {
+function hasGlobWildcard(value: string): boolean {
+  return value.includes("*") || value.includes("?");
+}
+
+const expandGlob = Effect.fnUntraced(function* (
+  pattern: string,
+): Effect.fn.Return<
+  ReadonlyArray<string>,
+  PlatformError.PlatformError,
+  FileSystem.FileSystem | Path.Path
+> {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  if (!pattern.includes("*") && !pattern.includes("?")) {
+  if (!hasGlobWildcard(pattern)) {
     return (yield* fs.exists(pattern)) ? [pattern] : NO_HOSTS;
   }
 
-  const directory = path.dirname(pattern);
+  const directoryPattern = path.dirname(pattern);
   const basePattern = path.basename(pattern);
-  if (!(yield* fs.exists(directory))) {
-    return NO_HOSTS;
-  }
+  const directoryIsGlob = hasGlobWildcard(directoryPattern);
+  const directories = directoryIsGlob ? yield* expandGlob(directoryPattern) : [directoryPattern];
 
   const matcher = globToRegExp(basePattern);
-  const entries = yield* fs.readDirectory(directory);
   const matchedPaths: string[] = [];
-  for (const entry of entries) {
-    if (entry.startsWith(".") && !basePattern.startsWith(".")) continue;
-    if (!matcher.test(entry)) {
-      continue;
-    }
-    const entryPath = path.join(directory, entry);
-    if (yield* fs.exists(entryPath)) {
-      matchedPaths.push(entryPath);
+  for (const directory of directories) {
+    if (!(yield* fs.exists(directory))) continue;
+    if ((yield* fs.stat(directory)).type !== "Directory") continue;
+    // Like OpenSSH's glob, a wildcard-matched directory we cannot read matches nothing.
+    const entries = directoryIsGlob
+      ? yield* fs.readDirectory(directory).pipe(Effect.orElseSucceed(() => NO_HOSTS))
+      : yield* fs.readDirectory(directory);
+    for (const entry of entries) {
+      if (entry.startsWith(".") && !basePattern.startsWith(".")) continue;
+      if (!matcher.test(entry)) {
+        continue;
+      }
+      const entryPath = path.join(directory, entry);
+      if (yield* fs.exists(entryPath)) {
+        matchedPaths.push(entryPath);
+      }
     }
   }
   return matchedPaths.toSorted();
@@ -213,8 +231,7 @@ const collectSshConfigAliasesFromFile = Effect.fnUntraced(function* (
         );
         if (
           /%|\$\{|\[/u.test(includePattern) ||
-          (includePattern.startsWith("~") && !/^~(?=$|\/|\\)/u.test(includePattern)) ||
-          hasSshPattern(path.dirname(resolvedPattern))
+          (includePattern.startsWith("~") && !/^~(?=$|\/|\\)/u.test(includePattern))
         ) {
           hostNameRules.push({ conditions, hostname: null });
           continue;

@@ -48,6 +48,7 @@ function fixture(
   let tunnels = 0;
   let killed = 0;
   let nextPort = 41_773;
+  const reserved = new Set<number>();
   const commands: Array<ReadonlyArray<string>> = [];
   const requests: Array<{ url: string; authorization: string | undefined }> = [];
   const spawner = ChildProcessSpawner.make((command) =>
@@ -137,8 +138,13 @@ function fixture(
       NetService.NetService.of({
         canListenOnHost: () => Effect.succeed(true),
         isPortAvailableOnLoopback: () => Effect.succeed(true),
-        hasListenerOnHost: () => Effect.succeed(false),
-        reserveLoopbackPort: () => Effect.sync(() => nextPort++),
+        // ssh binds a forward once it connects; here every running tunnel has.
+        hasListenerOnHost: (port) => Effect.succeed(tunnels > killed && reserved.has(port)),
+        reserveLoopbackPort: () =>
+          Effect.sync(() => {
+            reserved.add(nextPort);
+            return nextPort++;
+          }),
         findAvailablePort: (preferred) => Effect.succeed(preferred),
       }),
     ),
