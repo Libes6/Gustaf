@@ -1577,7 +1577,7 @@ function ImportStep({
         >
           {isImporting
             ? t("misc.welcomeWizard.importing")
-            : `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"}`}
+            : t("misc.welcomeWizard.importCount").replace("{count}", String(selected.length))}
         </Button>
       </div>
     </StepShell>

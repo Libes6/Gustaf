@@ -1,31 +1,15 @@
 {
   "totals": {
     "web": {
-      "files": 258,
-      "strings": 929
+      "files": 256,
+      "strings": 798
     },
     "mobile": {
-      "files": 235,
-      "strings": 1414
+      "files": 227,
+      "strings": 1347
     }
   },
   "files": {
-    "apps/web/src/browser/BrowserDeviceToolbar.tsx": [
-      "Browser device preset",
-      "Browser device toolbar",
-      "Close device toolbar",
-      "Dimensions",
-      "Lock aspect ratio",
-      "Lock viewport aspect ratio",
-      "Responsive",
-      "Rotate viewport",
-      "Standard",
-      "Unlock aspect ratio",
-      "Unlock viewport aspect ratio",
-      "Viewport dimensions",
-      "Viewport height",
-      "Viewport width"
-    ],
     "apps/web/src/browser/BrowserViewportResizeHandles.tsx": [
       "Resize browser viewport from bottom edge",
       "Resize browser viewport from bottom-left corner",
@@ -33,33 +17,9 @@
       "Resize browser viewport from left edge",
       "Resize browser viewport from right edge"
     ],
-    "apps/web/src/browser/ServerBrowserSurface.tsx": [
-      "Accept",
-      "Browser connection was refused.",
-      "Browser dialog",
-      "Browser page",
-      "Cancel",
-      "Choose",
-      "Choose files for the page",
-      "Could not send the files to the page",
-      "Dialog response",
-      "Dismiss",
-      "PDF document",
-      "Press Shift+Escape to leave the browser page.",
-      "Reconnect",
-      "Release control",
-      "Take control",
-      "Take control to respond.",
-      "The page asks for",
-      "The page copied text",
-      "Try again",
-      "a file",
-      "file",
-      "files",
-      "files"
-    ],
+    "apps/web/src/browser/ServerBrowserSurface.tsx": ["The page copied text"],
     "apps/web/src/browser/browserViewportActions.ts": ["Unable to resize browser viewport"],
-    "apps/web/src/cloud/useCloudLinkController.ts": ["Could not update T3 Connect"],
+    "apps/web/src/cloud/useCloudLinkController.ts": ["Could not update Gustaf Connect"],
     "apps/web/src/components/AddProjectToMachineDialog.tsx": [
       "HTTPS",
       "SSH",
@@ -307,11 +267,11 @@
     "apps/web/src/components/clerk/ClerkUserProfilePage.tsx": ["Refresh"],
     "apps/web/src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx": [
       "Cancel",
-      "It stays on your T3 Connect account and keeps its host space. Deregister it in",
+      "Gustaf Connect settings",
+      "It stays on your Gustaf Connect account and keeps its host space. Deregister it in",
       "Remove",
       "Remove from this device",
-      "T3 Connect settings",
-      "This doesn't change your T3 Connect account. To deregister it there, use",
+      "This doesn't change your Gustaf Connect account. To deregister it there, use",
       "This forgets its pairing, credentials, and cached threads here.",
       "from this device?",
       "to free it."
@@ -330,7 +290,7 @@
       "to Premier for",
       "tunnels."
     ],
-    "apps/web/src/components/clerk/T3ConnectSidebarSignIn.tsx": ["Sign in to T3 Connect"],
+    "apps/web/src/components/clerk/T3ConnectSidebarSignIn.tsx": ["Sign in to Gustaf Connect"],
     "apps/web/src/components/cloud/CloudEnvironmentConnectList.tsx": [
       "Add",
       "Add",
@@ -339,14 +299,14 @@
       "Client not supported",
       "Connecting…",
       "Could not connect environment",
-      "Could not load T3 Connect environments",
+      "Could not load Gustaf Connect environments",
       "Try again"
     ],
     "apps/web/src/components/cloud/ConnectCliAuthSurface.tsx": [
       "Connecting your terminal",
-      "Redirecting to authorize T3 Connect for your CLI…",
+      "Redirecting to authorize Gustaf Connect for your CLI…",
       "Sign in",
-      "Sign in to continue authorizing T3 Connect for your CLI."
+      "Sign in to continue authorizing Gustaf Connect for your CLI."
     ],
     "apps/web/src/components/composerContextPresentation.tsx": [
       "Annotated preview crop",
@@ -367,16 +327,6 @@
       "Snapshot failed",
       "Snapshot failed",
       "Snapshot taken, but no project is available"
-    ],
-    "apps/web/src/components/desktop/SshPasswordPromptDialog.tsx": [
-      ". Gustaf passes your response to the local SSH process and keeps it in memory to reuse for this host. Gustaf does not write it to disk.",
-      "Cancel",
-      "Continue",
-      "Dismiss",
-      "Enter the password or verification code required by",
-      "Expired",
-      "SSH keys may replace a password, but your server can still require a verification code.",
-      "SSH verification required"
     ],
     "apps/web/src/components/device/DeviceAndroidFoldControls.tsx": ["Android fold controls"],
     "apps/web/src/components/device/DeviceControlsRail.tsx": [
@@ -527,59 +477,7 @@
       "Open in browser",
       "Open original"
     ],
-    "apps/web/src/components/onboarding/WelcomeWizard.tsx": [
-      ", see our",
-      ". On a tailnet, run",
-      ". Open a new terminal to use",
-      ". You can set",
-      "Add to PATH",
-      "Added to",
-      "Choose one or more computers. We’ll set up agents and projects on each.",
-      "Close",
-      "Connect another ChatGPT account",
-      "Connect your computers",
-      "Continue",
-      "Continue",
-      "Could not check projects.",
-      "Do not import projects",
-      "Do not import projects",
-      "Gustaf",
-      "Gustaf",
-      "Gustaf collects anonymous usage data to help us improve it.",
-      "Keep Gustaf running. Select the computers you want to set up above.",
-      "Looking for projects from Claude Code and Codex…",
-      "Looking for projects…",
-      "Need a pairing link?",
-      "No existing Claude Code or Codex projects found.",
-      "Not connected, so setup skips",
-      "Pairing link",
-      "Ready",
-      "Retry",
-      "Retry",
-      "Run",
-      "Run this on each computer you want to connect.",
-      "Select all",
-      "Select none",
-      "Some history was not imported",
-      "Start Gustaf or run",
-      "T3 Connect",
-      "This connection cannot control terminals.",
-      "To read more about how your data is used",
-      "Use",
-      "and how to opt out",
-      "folder",
-      "folders",
-      "from any terminal. Adds one line to",
-      "in this terminal.",
-      "instead.",
-      "it",
-      "of",
-      "privacy policy",
-      "selected",
-      "them",
-      "there before",
-      "up later from Settings."
-    ],
+    "apps/web/src/components/onboarding/WelcomeWizard.tsx": ["Gustaf", "Gustaf", "Gustaf Connect"],
     "apps/web/src/components/permissions/PermissionChecklist.tsx": ["Allow", "Allowed"],
     "apps/web/src/components/preview/PreviewEmptyState.tsx": [
       "Select a live local server to open it in this browser tab.",
@@ -888,12 +786,12 @@
       "Devices",
       "Let agents here work on your other machines, and theirs here. Turn it on for each machine, then link them in",
       "Let the Device panel lease simulators and emulators from your own",
-      "Share a thread with a guest who watches it live in a browser and sends messages you approve. Needs T3 Connect: sign in and link this machine in",
+      "Share a thread with a guest who watches it live and sends messages you approve. Needs Gustaf Connect: sign in and link this machine in",
       "Sharing & access",
       "Simlock",
       "pool, added in"
     ],
-    "apps/web/src/components/settings/LinkMachineSelect.tsx": ["T3 Connect"],
+    "apps/web/src/components/settings/LinkMachineSelect.tsx": ["Gustaf Connect"],
     "apps/web/src/components/settings/ProcessSignalActions.tsx": ["INT", "KILL"],
     "apps/web/src/components/settings/ProjectActionsList.tsx": [
       "on settle",
@@ -941,7 +839,7 @@
       "process",
       "processes"
     ],
-    "apps/web/src/components/settings/SavedEnvironmentRows.tsx": ["Routes", "T3 Connect"],
+    "apps/web/src/components/settings/SavedEnvironmentRows.tsx": ["Gustaf Connect", "Routes"],
     "apps/web/src/components/settings/ScheduledTasksSettings.tsx": [
       "Next run",
       "base64",
@@ -963,48 +861,7 @@
       "Prompt font preview",
       "Terminal font preview"
     ],
-    "apps/web/src/components/settings/SettingsPanels.tsx": [
-      "1 machine still runs",
-      "Connect an environment to choose its text generation model.",
-      "Get help",
-      "Latest",
-      "Leave empty to use \"~/\" when the Add Project browser opens.",
-      "Nightly",
-      "Nightly",
-      "No text generation providers available.",
-      "Review",
-      "Stable",
-      "View diagnostics",
-      "View licenses",
-      "View policy",
-      "add project base directory",
-      "archive confirmation",
-      "auto-settle on merge",
-      "clone into host folders",
-      "compact idle threads",
-      "continue threads after restarts",
-      "default diff file state",
-      "delete confirmation",
-      "diff colors",
-      "diff layout",
-      "diff whitespace changes",
-      "follow-up behavior",
-      "keep computer awake",
-      "proactive panels",
-      "project grouping",
-      "project order",
-      "provider update checks",
-      "quit shortcut behavior",
-      "response streaming",
-      "rich text composer",
-      "send shortcut",
-      "skills in slash menu",
-      "text generation model",
-      "time format",
-      "tool calls in chat",
-      "unpin confirmation",
-      "working section"
-    ],
+    "apps/web/src/components/settings/SettingsPanels.tsx": ["1 machine still runs"],
     "apps/web/src/components/settings/SimlockDeviceHostEditor.tsx": [
       ", or leave it blank to add it later. A blank token uses the machine's",
       "Leases, drives, and streams devices. Create one",
@@ -2254,17 +2111,6 @@
       "Voice input uses the first connected microphone in this list. A wired or Bluetooth microphone is added by name the first time you dictate with it connected; until then it falls under Other. Swipe left on a named microphone to forget it."
     ],
     "apps/mobile/src/features/settings/SettingsWorkspaceLayout.android.tsx": ["Select a setting"],
-    "apps/mobile/src/features/settings/ThreadSettingsSections.tsx": [
-      "Across environments",
-      "Apply auto-settle defaults",
-      "Auto-settle defaults differ",
-      "Fold working and monitoring threads into a Working section. They return to the top of the list when they need you. While this is on, active threads are ordered by time and cannot be moved.",
-      "Inactive days",
-      "Labs",
-      "Let agents on a machine work on your other machines, and theirs on it. Turn it on for each machine. While off, nothing new starts over a link; running tasks finish.",
-      "Start new threads in the last project you used on this device.",
-      "Use last project"
-    ],
     "apps/mobile/src/features/settings/VoiceModelSection.tsx": [
       "% error)",
       "Choose a transcription model to dictate on this environment.",
@@ -2408,13 +2254,6 @@
       "Try again.",
       "Try again."
     ],
-    "apps/mobile/src/features/threads/CustomSnoozeSheet.tsx": [
-      "Cancel custom snooze",
-      "Duration amount",
-      "Duration unit",
-      "Snooze mode",
-      "Snooze until"
-    ],
     "apps/mobile/src/features/threads/DraftThreadHeader.tsx": [
       "Available after the first message",
       "Could not pull",
@@ -2522,15 +2361,6 @@
       "User input needed",
       "question"
     ],
-    "apps/mobile/src/features/threads/ProposedPlanCard.tsx": [
-      "Copy plan",
-      "Could not save plan",
-      "Enter a path relative to the thread's workspace. A file already at that path is replaced.",
-      "Enter a workspace path",
-      "Plan saved to workspace",
-      "Proposed plan",
-      "Save to workspace"
-    ],
     "apps/mobile/src/features/threads/ProviderSubagentBar.tsx": [
       "Open parent",
       "Work",
@@ -2544,7 +2374,6 @@
       "Or type a custom answer",
       "Too many attachments."
     ],
-    "apps/mobile/src/features/threads/SecretRequestCard.tsx": ["Save securely", "Value"],
     "apps/mobile/src/features/threads/ThreadAgentsSheet.tsx": [
       "No agents in this turn.",
       "Opens this agent's thread",
@@ -2562,12 +2391,8 @@
       "Nothing running in the background."
     ],
     "apps/mobile/src/features/threads/ThreadComposer.tsx": [
-      "Choose how to send this message",
-      "Model unavailable. Open model settings.",
       "Pasted text is too large for this message",
       "Remove some text or an attachment, then paste again.",
-      "Stop agent",
-      "Stop agent",
       "This connection cannot control this task. You can still edit your draft.",
       "This provider does not currently report limits.",
       "Usage limits unavailable"
@@ -2582,34 +2407,22 @@
       "Could not edit message",
       "Could not force stop the agent",
       "Could not update thread",
-      "Force stop the agent?",
-      "It has not answered Stop. Force stop ends the turn and kills the agent's processes, unless other working threads share them.",
       "Pi",
       "Send a message to decline and redirect the agent",
       "Send approval feedback without attachments or added context.",
       "Send feedback to decline this request",
-      "The conversation couldn't be displayed",
       "Turn stopped; the agent is still shutting down",
       "Turn stopped; the agent process kept running"
     ],
     "apps/mobile/src/features/threads/ThreadFeed.tsx": [
-      "Ask the agent to inspect the repo, run a command, or continue the active thread.",
       "Compacting context",
       "Context compaction",
-      "Copy message",
-      "Copy message",
       "Could not copy context",
       "Could not open attachment",
-      "Edit pending message",
       "Fork created",
       "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
-      "Load earlier activity",
-      "Load earlier activity",
-      "Loading earlier activity…",
-      "No conversation yet",
       "Pending",
-      "Try copying this context again.",
-      "Use template"
+      "Try copying this context again."
     ],
     "apps/mobile/src/features/threads/ThreadGitControls.tsx": [
       "Choose a feature branch",
@@ -2667,37 +2480,12 @@
       "Thread",
       "Thread unavailable"
     ],
-    "apps/mobile/src/features/threads/ThreadSettingsRows.shared.tsx": ["Hidden", "Legacy"],
-    "apps/mobile/src/features/threads/ThreadSettingsSheet.tsx": [
-      "Cancel thread settings",
-      "Catalog",
-      "Could not refresh models",
-      "Manage hidden models",
-      "Model unavailable",
-      "No available models",
-      "No favorite models",
-      "No matching models",
-      "Reasoning controlled by prompt",
-      "Set up this provider on web or desktop, or select another model.",
-      "Thread settings",
-      "Your prompt contains \"ultrathink\" in the text. Remove it to change this option."
-    ],
     "apps/mobile/src/features/threads/ThreadWorkflowGroup.tsx": [
       "Collapses the workflow",
       "Its thread is not available yet",
       "No agents yet",
       "Opens the current phase",
       "Opens this agent's thread"
-    ],
-    "apps/mobile/src/features/threads/UsageLimitRecoveryCard.tsx": [
-      "Cancel auto-resume",
-      "ChatGPT usage limit reached",
-      "Request copied. Send it to your workspace admin.",
-      "Resume at reset",
-      "Snooze until reset",
-      "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available.",
-      "Wake now",
-      "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
     ],
     "apps/mobile/src/features/threads/floating-working-control.tsx": [
       "Compacting",
@@ -2756,14 +2544,6 @@
     "apps/mobile/src/features/threads/new-task-flow-provider.tsx": ["Could not switch machine"],
     "apps/mobile/src/features/threads/thread-handoff-row.tsx": ["Show provider account"],
     "apps/mobile/src/features/threads/thread-inspector-preview.tsx": ["Close thread"],
-    "apps/mobile/src/features/threads/thread-list-v2-items.tsx": [
-      "Could not snooze thread",
-      "Sends on reconnect",
-      "That snooze time has passed. Choose another time.",
-      "Try copying this thread again.",
-      "Unsent",
-      "Woke"
-    ],
     "apps/mobile/src/features/threads/thread-search-match.tsx": ["Agent:", "You:"],
     "apps/mobile/src/features/threads/thread-subagent-group.tsx": [
       "Opens this agent's thread",

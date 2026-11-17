@@ -1585,7 +1585,7 @@ function ScopedCompactIdleThreadsRow() {
           <SelectTrigger
             size="sm"
             className="w-full sm:w-56"
-            aria-label={t("settingsD.settingsPanels.compactIdleThreads")}
+            aria-label={t("settingsD.settingsPanels.compactIdleThreadsResetLabel")}
           >
             <SelectValue>
               {(value: string | null) =>
@@ -1706,7 +1706,7 @@ export function ThreadsSettingsPanel() {
                 mixedAddProjectBaseDirectory ? t("settingsD.settingsPanels.mixed") : "~/"
               }
               spellCheck={false}
-              aria-label={t("settingsD.settingsPanels.addProjectBaseDirectory")}
+              aria-label={t("settingsD.settingsPanels.addProjectBaseDirectoryResetLabel")}
             />
           }
         />
@@ -1730,7 +1730,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label={t("settingsD.settingsPanels.cloneIntoHostFolders")}
+              aria-label={t("settingsD.settingsPanels.cloneIntoHostFoldersResetLabel")}
             />
           }
         />
@@ -2021,7 +2021,7 @@ export function ThreadsSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-56"
-                  aria-label={t("settingsD.settingsPanels.responseStreaming")}
+                  aria-label={t("settingsD.settingsPanels.responseStreamingResetLabel")}
                 >
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
