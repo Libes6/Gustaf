@@ -3,6 +3,23 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "settingsE." and both languages list the same keys.
 export const settingsEMessages = {
   en: {
+    "settingsE.mcp.empty": "Connect tools and data sources your agents can use.",
+    "settingsE.mcp.deleteConfirm": "Delete MCP server “{name}”?",
+    "settingsE.mcp.jsonHint":
+      "Paste the mcpServers section from an MCP configuration. New servers are added turned off.",
+    "settingsE.mcp.editorHint": "Available to agents on this environment from their next session.",
+    "settingsE.mcp.name": "Name",
+    "settingsE.mcp.secretValue": "Secret value",
+    "settingsE.mcp.advanced": "Advanced settings",
+    "settingsE.mcp.idHint":
+      "Use 1–32 lowercase letters, digits or hyphens, starting with a letter or digit.",
+    "settingsE.mcp.idTaken": "This server ID is already in use.",
+    "settingsE.mcp.duplicateKeys": "Each key must be unique.",
+    "settingsE.mcp.invalidConfig":
+      "Check the address, keys and arguments. Arguments must be a JSON array of strings.",
+    "settingsE.mcp.localDisallowed": "Local MCP servers are unavailable for this connection.",
+    "settingsE.mcp.unreadable": "Could not read: {paths}",
+    "settingsE.mcp.jsonInvalid": "Check the MCP JSON format and server IDs.",
     "settingsE.mcp.s0": "Connect an environment to manage MCP servers.",
     "settingsE.mcp.s1": "MCP servers",
     "settingsE.mcp.s2":
@@ -575,6 +592,24 @@ export const settingsEMessages = {
     "settingsE.useSnapShotShortcutRecorder.chooseShortcut": "Choose shortcut",
   },
   ru: {
+    "settingsE.mcp.empty": "Подключите инструменты и источники данных для ваших агентов.",
+    "settingsE.mcp.deleteConfirm": "Удалить MCP-сервер «{name}»?",
+    "settingsE.mcp.jsonHint":
+      "Вставьте раздел mcpServers из конфигурации MCP. Новые серверы будут добавлены выключенными.",
+    "settingsE.mcp.editorHint":
+      "Агенты этого окружения получат доступ к серверу со следующей сессии.",
+    "settingsE.mcp.name": "Название",
+    "settingsE.mcp.secretValue": "Значение секрета",
+    "settingsE.mcp.advanced": "Дополнительные настройки",
+    "settingsE.mcp.idHint":
+      "От 1 до 32 строчных латинских букв, цифр и дефисов. Начните с буквы или цифры.",
+    "settingsE.mcp.idTaken": "Этот идентификатор сервера уже занят.",
+    "settingsE.mcp.duplicateKeys": "Названия ключей не должны повторяться.",
+    "settingsE.mcp.invalidConfig":
+      "Проверьте адрес, ключи и аргументы. Аргументы должны быть JSON-массивом строк.",
+    "settingsE.mcp.localDisallowed": "Локальные MCP-серверы недоступны для этого подключения.",
+    "settingsE.mcp.unreadable": "Не удалось прочитать: {paths}",
+    "settingsE.mcp.jsonInvalid": "Проверьте формат MCP JSON и идентификаторы серверов.",
     "settingsE.mcp.s0": "Подключите окружение для настройки MCP.",
     "settingsE.mcp.s1": "Серверы MCP",
     "settingsE.mcp.s2":
