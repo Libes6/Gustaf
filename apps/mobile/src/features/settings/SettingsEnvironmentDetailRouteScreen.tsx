@@ -236,8 +236,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                 <SettingsSection title="Gustaf">
                   <View className="gap-1 p-4">
                     <Text className="text-base text-foreground">
-                      {t("Version")}
-                      {version}
+                      {`${t("Version")} ${version}`}
                     </Text>
                     {managedPolicy ? (
                       <Text className="text-sm text-foreground-muted">
