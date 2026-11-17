@@ -70,10 +70,12 @@ mod native {
                     };
                     if let Some(event) = value.get("event") {
                         if valid_event(event) {
-                            if let Some(window) = app.get_webview_window("main") {
+                            if let Some(page) = app.get_webview("main") {
                                 let _ =
-                                    window.eval(format!("window.__gustafSnapShotEvent?.({event})"));
-                                if event["type"] == "ready" {
+                                    page.eval(format!("window.__gustafSnapShotEvent?.({event})"));
+                            }
+                            if event["type"] == "ready" {
+                                if let Some(window) = app.get_window("main") {
                                     let _ = window.show();
                                     let _ = window.unminimize();
                                     let _ = window.set_focus();

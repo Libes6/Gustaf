@@ -27,6 +27,10 @@
       "types": "./src/composerPullRequestMatches.ts",
       "import": "./src/composerPullRequestMatches.ts"
     },
+    "./themeCss": {
+      "types": "./src/themeCss.ts",
+      "import": "./src/themeCss.ts"
+    },
     "./themePalettes": {
       "types": "./src/themePalettes.ts",
       "import": "./src/themePalettes.ts"
@@ -350,6 +354,10 @@
     "./chatList": {
       "types": "./src/chatList.ts",
       "import": "./src/chatList.ts"
+    },
+    "./subscriptions": {
+      "types": "./src/subscriptions.ts",
+      "import": "./src/subscriptions.ts"
     },
     "./nodeRuntime": {
       "types": "./src/nodeRuntime.ts",

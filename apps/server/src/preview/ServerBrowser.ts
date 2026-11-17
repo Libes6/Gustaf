@@ -1,6 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off globalDate:off globalTimers:off - Playwright callbacks run outside the Effect runtime.
 // Screencasts ignore emulated device scale; real 2x keeps captures sharp.
-// --disable-gpu uses cheaper software compositing while preserving SwiftShader WebGL.
 import {
   BUILT_IN_BROWSER_PROFILES,
   DEFAULT_BROWSER_PROFILE_ID,
@@ -500,6 +499,7 @@ const make = Effect.gen(function* () {
   let viewerResizeOrder = 0;
 
   const contexts = new ServerBrowserContexts({
+    platform: host.platform,
     profilesDir: NodePath.join(config.stateDir, "server-browser", "profiles"),
     idleBrowserMs: 5 * 60_000,
     executable: () => runPromise(previewBrowser.executable),

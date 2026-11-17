@@ -6,7 +6,7 @@ import type { ReportStatus } from "../api/types";
 import { Pager } from "../components/pager";
 import { EmptyState, ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
-import { Card } from "../components/ui/card";
+import { Card, CardHeader } from "../components/ui/card";
 import { Label, NativeSelect } from "../components/ui/input";
 import {
   Table,
@@ -18,7 +18,7 @@ import {
 } from "../components/ui/table";
 import { formatDateTime } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 function parseStatus(value: string): ReportStatus | undefined {
   return value === "new" || value === "seen" || value === "closed" ? value : undefined;
@@ -38,23 +38,25 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageTitle>{strings.reports.title}</PageTitle>
-      <div className="mb-4 flex items-center gap-2">
-        <Label htmlFor={statusId} className="sr-only">
-          {strings.reports.statusLabel}
-        </Label>
-        <NativeSelect
-          id={statusId}
-          value={status ?? ""}
-          onChange={(event) => setStatus(parseStatus(event.target.value))}
-        >
-          <option value="">{strings.reports.allStatuses}</option>
-          <option value="new">{strings.reports.statuses.new}</option>
-          <option value="seen">{strings.reports.statuses.seen}</option>
-          <option value="closed">{strings.reports.statuses.closed}</option>
-        </NativeSelect>
-      </div>
+      <PageHeader title={strings.reports.title} />
       <Card className="p-0">
+        <CardHeader>
+          <div className="w-full sm:w-44">
+            <Label htmlFor={statusId} className="sr-only">
+              {strings.reports.statusLabel}
+            </Label>
+            <NativeSelect
+              id={statusId}
+              value={status ?? ""}
+              onChange={(event) => setStatus(parseStatus(event.target.value))}
+            >
+              <option value="">{strings.reports.allStatuses}</option>
+              <option value="new">{strings.reports.statuses.new}</option>
+              <option value="seen">{strings.reports.statuses.seen}</option>
+              <option value="closed">{strings.reports.statuses.closed}</option>
+            </NativeSelect>
+          </div>
+        </CardHeader>
         {result.isPending ? (
           <LoadingState />
         ) : result.isError ? (

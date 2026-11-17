@@ -31,7 +31,7 @@ import {
 } from "../lib/client-config";
 import { formatDateTime } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 const t = strings.announcements;
 const LEVELS: ReadonlyArray<AnnouncementLevel> = ["info", "warning", "critical"];
@@ -72,16 +72,12 @@ export function AnnouncementsPage() {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <PageTitle>{t.title}</PageTitle>
-          <p className="-mt-3 text-sm text-muted-foreground">{t.description}</p>
-        </div>
+      <PageHeader title={t.title} description={t.description}>
         <Button onClick={() => setEditing({ id: null, input: EMPTY_ANNOUNCEMENT })}>
           <PlusIcon aria-hidden />
           {t.new}
         </Button>
-      </div>
+      </PageHeader>
       <Card className="p-0">
         {result.isPending ? (
           <LoadingState />

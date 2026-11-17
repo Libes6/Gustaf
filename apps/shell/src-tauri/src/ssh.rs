@@ -96,7 +96,7 @@ impl Worker {
                     continue;
                 };
                 if let Some(prompt) = value.get("prompt") {
-                    if let Some(window) = app.get_webview_window("main") {
+                    if let Some(window) = app.get_webview("main") {
                         let script = format!("window.__gustafSshPasswordPrompt?.({prompt})");
                         let _ = window.eval(script);
                     }

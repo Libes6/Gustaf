@@ -145,7 +145,7 @@ const INIT_SCRIPT: &str = r#"(() => {
 
   // Same surface the web client expects from Electron's preload. Methods we have
   // not ported yet stay absent; callers use optional chaining. `preview` is omitted
-  // on purpose (in-app browser is a separate project).
+  // on purpose: it is Electron's browser; this shell offers `nativeBrowser` instead.
   const sshPromptListeners = new Set();
   window.__gustafSshPasswordPrompt = (request) => {
     for (const listener of sshPromptListeners) listener(request);
@@ -154,7 +154,53 @@ const INIT_SCRIPT: &str = r#"(() => {
     method, input: input ?? null, locale: document.documentElement?.lang || navigator.language || "en",
   });
 
+  // The user's browser tabs as native web views over the page (native_browser.rs), macOS only.
+  const nativeBrowser = (() => {
+    if (__GUSTAF_PLATFORM__ !== "darwin") return undefined;
+    const stateListeners = new Set();
+    const linkListeners = new Set();
+    window.__gustafNativeBrowserState = (state) => {
+      for (const listener of stateListeners) listener(state);
+    };
+    window.__gustafNativeBrowserOpenLink = (event) => {
+      for (const listener of linkListeners) listener(event);
+    };
+    // A reload leaves the views of the previous page behind; the app recreates the ones it still has.
+    const ready = invoke("native_browser_close_all").catch(console.error);
+    const call = (command, args) => ready.then(() => invoke(command, args));
+    const listen = (listeners) => (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    };
+    return Object.freeze({
+      createTab: (tabId, input) => call("native_browser_create", { input: { ...input, tabId } }),
+      closeTab: (tabId) => call("native_browser_close", { tabId }),
+      present: (tabId, presentation) =>
+        call("native_browser_present", {
+          tabId,
+          rect: presentation?.rect ?? null,
+          cornerRadius: presentation?.cornerRadius ?? 0,
+        }),
+      navigate: (tabId, url) => call("native_browser_navigate", { tabId, url }),
+      goBack: (tabId) => call("native_browser_history", { tabId, delta: -1 }),
+      goForward: (tabId) => call("native_browser_history", { tabId, delta: 1 }),
+      refresh: (tabId) => call("native_browser_reload", { tabId, hard: false }),
+      hardReload: (tabId) => call("native_browser_reload", { tabId, hard: true }),
+      setZoomFactor: (tabId, zoomFactor) => call("native_browser_set_zoom", { tabId, zoomFactor }),
+      setColorScheme: (tabId, colorScheme) =>
+        call("native_browser_set_color_scheme", { tabId, colorScheme }),
+      openDevTools: (tabId) => call("native_browser_open_devtools", { tabId }),
+      clearCookies: (profileId) =>
+        call("native_browser_clear_data", { profileId: profileId ?? null, kind: "cookies" }),
+      clearCache: (profileId) =>
+        call("native_browser_clear_data", { profileId: profileId ?? null, kind: "cache" }),
+      onStateChange: listen(stateListeners),
+      onOpenLink: listen(linkListeners),
+    });
+  })();
+
   window.desktopBridge = {
+    ...(nativeBrowser ? { nativeBrowser } : {}),
     getPathForFile: () => null,
     revealWindow: () => invoke("reveal_window"),
     setNotificationBadge: async () => {},
@@ -360,14 +406,14 @@ pub(crate) fn init_script(
 }
 
 #[tauri::command]
-pub(crate) fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
+pub(crate) fn reveal_window(window: tauri::Window) -> Result<(), String> {
     window.show().map_err(|error| error.to_string())?;
     window.unminimize().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub(crate) fn window_fullscreen_state(window: tauri::WebviewWindow) -> Result<bool, String> {
+pub(crate) fn window_fullscreen_state(window: tauri::Window) -> Result<bool, String> {
     window.is_fullscreen().map_err(|error| error.to_string())
 }
 
@@ -380,10 +426,7 @@ pub(crate) enum WindowTheme {
 }
 
 #[tauri::command]
-pub(crate) fn set_window_theme(
-    window: tauri::WebviewWindow,
-    theme: WindowTheme,
-) -> Result<(), String> {
+pub(crate) fn set_window_theme(window: tauri::Window, theme: WindowTheme) -> Result<(), String> {
     let theme = match theme {
         WindowTheme::Light => Some(tauri::Theme::Light),
         WindowTheme::Dark => Some(tauri::Theme::Dark),
@@ -437,7 +480,7 @@ pub(crate) fn write_client_settings(
 }
 
 #[tauri::command]
-pub(crate) fn drag_window(window: tauri::WebviewWindow, double_click: bool) -> Result<(), String> {
+pub(crate) fn drag_window(window: tauri::Window, double_click: bool) -> Result<(), String> {
     if double_click {
         if window.is_maximized().map_err(|error| error.to_string())? {
             window.unmaximize().map_err(|error| error.to_string())

@@ -173,7 +173,7 @@ function AuthorizedBrowserWebview(props: ComponentProps<typeof HostedBrowserWebv
 }
 
 // Latch after hydration: Electron fixes the partition when the guest attaches.
-function useTabProfileId(profileId: string | undefined): string | undefined {
+export function useTabProfileId(profileId: string | undefined): string | undefined {
   const hydrated = useClientSettingsHydrated();
   const defaultProfileId = useBrowserDefaults().profileId;
   const [fallback, setFallback] = useState<string | undefined>(undefined);

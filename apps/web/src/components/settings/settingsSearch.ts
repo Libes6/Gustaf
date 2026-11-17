@@ -36,6 +36,7 @@ export type SettingsPath =
   | "/settings/connections"
   | "/settings/access"
   | "/settings/secrets"
+  | "/settings/subscriptions"
   | "/settings/maintenance"
   | "/settings/labs"
   | "/settings/account"
@@ -112,6 +113,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/connections": "Environments",
   "/settings/access": "Sharing & access",
   "/settings/secrets": "Secrets",
+  "/settings/subscriptions": "Subscriptions",
   "/settings/maintenance": "Maintenance",
   "/settings/labs": "Labs",
   "/settings/account": "Account",
@@ -161,7 +163,13 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: null,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: [
+      "/settings/subscriptions",
+      "/settings/maintenance",
+      "/settings/labs",
+      "/settings/about",
+      "/settings/archived",
+    ],
   },
 ];
 
@@ -376,6 +384,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "panel-animations",
     title: "Panel animations",
     to: "/settings/appearance",
+  },
+  {
+    id: "chat-wallpaper",
+    title: "Chat wallpaper",
+    to: "/settings/appearance",
+    searchTerms: ["wallpaper scene background обои сцена фон"],
+    targetId: "appearance-wallpaper",
   },
   {
     id: "environment-identification",
@@ -1092,6 +1107,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "browser-native-tabs",
+    title: "Native browser tabs",
+    to: "/settings/browser",
+    macOnly: true,
+    shellAccountOnly: true,
+    searchTerms: ["webkit safari stream screencast performance cpu render tabs"],
+  },
+  {
     id: "browser-auto-show-floating-preview",
     title: "Auto-show floating preview",
     to: "/settings/browser",
@@ -1318,6 +1341,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "subscriptions",
+    title: "Subscriptions",
+    to: "/settings/subscriptions",
+    searchTerms: [
+      "billing payments renewal charge price cost money monthly yearly claude chatgpt cursor spotify telegram",
+    ],
+  },
+  {
     id: "secret-providers",
     title: "Secret providers",
     to: "/settings/secrets",
@@ -1363,6 +1394,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/connections": "connections",
   "/settings/access": "connections",
   "/settings/secrets": null,
+  "/settings/subscriptions": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,

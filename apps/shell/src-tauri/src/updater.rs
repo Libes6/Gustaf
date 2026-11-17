@@ -200,10 +200,7 @@ fn publish(app: &tauri::AppHandle, change: impl FnOnce(&mut UpdateState)) -> Upd
         change(&mut state);
         state.clone()
     };
-    if let (Some(window), Ok(json)) = (
-        app.get_webview_window("main"),
-        serde_json::to_string(&state),
-    ) {
+    if let (Some(window), Ok(json)) = (app.get_webview("main"), serde_json::to_string(&state)) {
         let _ = window.eval(format!("window.__gustafUpdateState?.({json})"));
     }
     state

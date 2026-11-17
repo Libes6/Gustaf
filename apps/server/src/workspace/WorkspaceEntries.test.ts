@@ -413,25 +413,34 @@ it.layer(layerTest, { excludeTestServices: true })("WorkspaceEntries", (it) => {
   });
 
   describe("listIgnoredFiles", () => {
-    it.effect("lists ignored files with sizes and skips wholly ignored folders", () =>
-      Effect.gen(function* () {
-        const cwd = yield* makeTempDir({ git: true });
-        yield* writeTextFile(cwd, ".gitignore", "node_modules/\n.env*\n");
-        yield* writeTextFile(cwd, ".env", "A=1");
-        yield* writeTextFile(cwd, "apps/web/index.ts", "y");
-        yield* git(cwd, ["add", "apps/web/index.ts"]);
-        yield* writeTextFile(cwd, "apps/web/.env.local", "B=22");
-        yield* writeTextFile(cwd, "node_modules/pkg/index.js", "x");
+    it.effect(
+      "lists ignored files with sizes, skipping wholly ignored folders and OS metadata",
+      () =>
+        Effect.gen(function* () {
+          const cwd = yield* makeTempDir({ git: true });
+          yield* writeTextFile(
+            cwd,
+            ".gitignore",
+            "node_modules/\n.env*\n.DS_Store\n._*\nThumbs.db\n",
+          );
+          yield* writeTextFile(cwd, ".env", "A=1");
+          yield* writeTextFile(cwd, "apps/web/index.ts", "y");
+          yield* git(cwd, ["add", "apps/web/index.ts"]);
+          yield* writeTextFile(cwd, "apps/web/.env.local", "B=22");
+          yield* writeTextFile(cwd, "node_modules/pkg/index.js", "x");
+          yield* writeTextFile(cwd, ".DS_Store", "\0");
+          yield* writeTextFile(cwd, "apps/web/._index.ts", "\0");
+          yield* writeTextFile(cwd, "apps/web/Thumbs.db", "\0");
 
-        const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
-        expect(yield* workspaceEntries.listIgnoredFiles({ cwd })).toEqual({
-          files: [
-            { path: ".env", byteLength: 3 },
-            { path: "apps/web/.env.local", byteLength: 4 },
-          ],
-          truncated: false,
-        });
-      }),
+          const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
+          expect(yield* workspaceEntries.listIgnoredFiles({ cwd })).toEqual({
+            files: [
+              { path: ".env", byteLength: 3 },
+              { path: "apps/web/.env.local", byteLength: 4 },
+            ],
+            truncated: false,
+          });
+        }),
     );
   });
 

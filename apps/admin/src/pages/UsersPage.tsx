@@ -2,12 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { useUsers } from "../api/queries";
+import { PageHeader } from "../components/page-header";
 import { Pager } from "../components/pager";
 import { RoleBadge, StatusBadge } from "../components/role-badges";
 import { SearchForm } from "../components/search-form";
 import { EmptyState, ErrorState, LoadingState } from "../components/states";
 import { Badge } from "../components/ui/badge";
-import { Card } from "../components/ui/card";
+import { Card, CardHeader } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -19,7 +20,7 @@ import {
 import { UserAvatar } from "../components/user-avatar";
 import { formatCount, formatDateTime } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle, useMeContext } from "./AppLayout";
+import { useMeContext } from "./AppLayout";
 
 export function UsersPage() {
   const me = useMeContext();
@@ -30,16 +31,16 @@ export function UsersPage() {
 
   return (
     <>
-      <PageTitle>{strings.users.title}</PageTitle>
-      <div className="mb-4 flex">
-        <SearchForm
-          label={strings.users.searchLabel}
-          placeholder={strings.users.searchPlaceholder}
-          defaultValue={query}
-          onSearch={setQuery}
-        />
-      </div>
+      <PageHeader title={strings.users.title} />
       <Card className="p-0">
+        <CardHeader>
+          <SearchForm
+            label={strings.users.searchLabel}
+            placeholder={strings.users.searchPlaceholder}
+            defaultValue={query}
+            onSearch={setQuery}
+          />
+        </CardHeader>
         {result.isPending ? (
           <LoadingState />
         ) : result.isError ? (

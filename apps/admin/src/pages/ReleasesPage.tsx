@@ -13,7 +13,7 @@ import {
 } from "../components/ui/table";
 import { formatBytes, formatCount, formatDateTime, formatRelative } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 import { Stat } from "./OverviewPage";
 
 const PLATFORM_ORDER: ReadonlyArray<Platform> = [
@@ -29,7 +29,7 @@ export function ReleasesPage() {
   const releases = useReleaseStats();
   return (
     <>
-      <PageTitle>{strings.releases.title}</PageTitle>
+      <PageHeader title={strings.releases.title} />
       {releases.isPending ? (
         <LoadingState />
       ) : releases.isError ? (
@@ -106,8 +106,8 @@ function ReleasesContent({
           const metadata = release.assets.filter((asset) => asset.kind === "metadata");
           return (
             <Card key={release.tag} className="p-0">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4 pb-2">
-                <h2 className="font-medium">{release.name ?? release.tag}</h2>
+              <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 border-b px-5 py-3">
+                <CardTitle>{release.name ?? release.tag}</CardTitle>
                 {release.prerelease ? (
                   <Badge variant="warning">{strings.releases.prerelease}</Badge>
                 ) : null}
@@ -120,8 +120,8 @@ function ReleasesContent({
               </div>
               <AssetTable assets={visible} />
               {metadata.length > 0 ? (
-                <details className="border-t px-4 py-2 text-sm">
-                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                <details className="border-t px-5 py-3 text-sm">
+                  <summary className="cursor-pointer rounded-sm text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     {strings.releases.showMetadata}
                   </summary>
                   <AssetTable assets={metadata} />

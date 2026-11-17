@@ -44,7 +44,9 @@ mod tests {
         let urls = capability.remote.expect("remote grant").urls;
         assert_eq!(urls, ["http://127.0.0.1:3773", "http://localhost:3773"]);
         assert!(!capability.local);
-        assert_eq!(capability.windows, ["main"]);
+        // Not the window: the native browser tabs are other web views in it.
+        assert!(capability.windows.is_empty());
+        assert_eq!(capability.webviews, ["main"]);
     }
 
     #[test]

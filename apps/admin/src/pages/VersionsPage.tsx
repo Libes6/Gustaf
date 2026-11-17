@@ -11,7 +11,7 @@ import { Input, Label } from "../components/ui/input";
 import { optional } from "../lib/client-config";
 import { formatDateTime } from "../lib/format";
 import { strings } from "../strings";
-import { PageTitle } from "./AppLayout";
+import { PageHeader } from "../components/page-header";
 
 const t = strings.versions;
 const KINDS: ReadonlyArray<ClientKind> = ["desktop", "mobile"];
@@ -20,8 +20,7 @@ export function VersionsPage() {
   const result = useMinimumVersions();
   return (
     <>
-      <PageTitle>{t.title}</PageTitle>
-      <p className="-mt-3 mb-4 text-sm text-muted-foreground">{t.description}</p>
+      <PageHeader title={t.title} description={t.description} />
       {result.isPending ? (
         <LoadingState />
       ) : result.isError ? (

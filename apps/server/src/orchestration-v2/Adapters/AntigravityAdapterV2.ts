@@ -108,7 +108,11 @@ const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractS
   if (classifyAntigravitySubagentToolCall(toolCall) !== "subagent") {
     return undefined;
   }
-  if (toolCall.title === "Running manage_subagents" || toolCall.title === "Run manage_subagents?") {
+  if (
+    toolCall.title === "manage_subagents" ||
+    toolCall.title === "Running manage_subagents" ||
+    toolCall.title === "Run manage_subagents?"
+  ) {
     return {
       nativeTaskId: toolCall.toolCallId,
       prompt: "Antigravity native subagents",

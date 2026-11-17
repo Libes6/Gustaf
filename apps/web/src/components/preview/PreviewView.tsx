@@ -83,6 +83,7 @@ import { revealInFileExplorerLabel } from "./fileExplorerLabel";
 import { shouldShowPreviewEmptyState } from "./previewEmptyStateLogic";
 import { Badge } from "~/components/ui/badge";
 import { BrowserSurfaceSlot } from "~/browser/BrowserSurfaceSlot";
+import { type DesktopPreviewTabControls, nativeBrowserTabs } from "~/browser/nativeBrowser";
 import { alternatePreviewRuntime, useRendersServerTabNatively } from "~/browser/previewRuntime";
 import { ServerBrowserSurface, type ServerBrowserHandle } from "~/browser/ServerBrowserSurface";
 import { cn } from "~/lib/utils";
@@ -198,6 +199,11 @@ export function PreviewView({
   const nativeServerTab = useRendersServerTabNatively(threadRef.environmentId, snapshot);
   const isServerTab = snapshot?.runtime === "server" && !nativeServerTab;
   const serverOwnsRendering = snapshot?.runtime === "server";
+  // The shell draws native tabs only for its own server; Electron draws any desktop tab.
+  const tabBridge: DesktopPreviewTabControls | null = isServerTab
+    ? previewBridge
+    : (previewBridge ??
+      (threadRef.environmentId === primaryEnvironmentId ? nativeBrowserTabs : null));
   const serverSurfaceRef = useRef<ServerBrowserHandle | null>(null);
   const [serverAspectRatioLocked, setServerAspectRatioLocked] = useState(false);
   const [serverToolbarWidth, setServerToolbarWidth] = useState(0);
@@ -246,8 +252,8 @@ export function PreviewView({
       rememberPreviewUrl(threadRef, resolvedUrl);
       return true;
     }
-    if (runtimeTabId && previewBridge) {
-      await previewBridge.navigate(runtimeTabId, resolvedUrl);
+    if (runtimeTabId && tabBridge) {
+      await tabBridge.navigate(runtimeTabId, resolvedUrl);
       rememberPreviewUrl(threadRef, resolvedUrl);
       return true;
     }
@@ -287,7 +293,7 @@ export function PreviewView({
   const handleOpenServerUrl = async (next: string) => {
     try {
       const resolved =
-        isServerTab || !previewBridge
+        isServerTab || !tabBridge
           ? normalizePreviewUrl(next)
           : resolveDiscoveredServerUrl(threadRef.environmentId, next);
       if (await navigateToResolvedUrl(resolved)) {
@@ -308,7 +314,7 @@ export function PreviewView({
 
   const handleRefresh = () => {
     if (isServerTab) serverSurfaceRef.current?.reload();
-    else if (previewBridge && runtimeTabId) void previewBridge.refresh(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.refresh(runtimeTabId);
   };
 
   const adjustServerTab = async (change: Omit<PreviewAdjustInput, "threadId" | "tabId">) => {
@@ -346,17 +352,17 @@ export function PreviewView({
 
   const handleZoomIn = () => {
     if (serverOwnsRendering) stepServerZoom(1);
-    else if (previewBridge && runtimeTabId) void previewBridge.zoomIn(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.zoomIn(runtimeTabId);
   };
 
   const handleZoomOut = () => {
     if (serverOwnsRendering) stepServerZoom(-1);
-    else if (previewBridge && runtimeTabId) void previewBridge.zoomOut(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.zoomOut(runtimeTabId);
   };
 
   const handleResetZoom = () => {
     if (serverOwnsRendering) stepServerZoom(0);
-    else if (previewBridge && runtimeTabId) void previewBridge.resetZoom(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.resetZoom(runtimeTabId);
   };
 
   const handleToggleDeviceToolbar = () => {
@@ -379,12 +385,12 @@ export function PreviewView({
 
   const handleBack = () => {
     if (isServerTab) serverSurfaceRef.current?.history(-1);
-    else if (previewBridge && runtimeTabId) void previewBridge.goBack(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.goBack(runtimeTabId);
   };
 
   const handleForward = () => {
     if (isServerTab) serverSurfaceRef.current?.history(1);
-    else if (previewBridge && runtimeTabId) void previewBridge.goForward(runtimeTabId);
+    else if (tabBridge && runtimeTabId) void tabBridge.goForward(runtimeTabId);
   };
 
   const handleOpenInBrowser = () => {
@@ -460,26 +466,28 @@ export function PreviewView({
             }
           : {}),
       }
-    : previewBridge
+    : tabBridge
       ? {
-          hardReload: desktopCall(previewBridge.hardReload),
+          hardReload: desktopCall(tabBridge.hardReload),
           setColorScheme: (colorScheme) => {
             if (runtimeTabId)
-              void previewBridge?.setColorScheme(runtimeTabId, colorScheme).catch(() => undefined);
+              void tabBridge.setColorScheme(runtimeTabId, colorScheme).catch(() => undefined);
           },
           zoomIn: handleZoomIn,
           zoomOut: handleZoomOut,
           resetZoom: handleResetZoom,
           clearCookies: () =>
-            void previewBridge
-              ?.clearCookies(threadRef.environmentId, activeProfileId)
+            void tabBridge
+              .clearCookies(threadRef.environmentId, activeProfileId)
               .catch(() => undefined),
           clearCache: () =>
-            void previewBridge
-              ?.clearCache(threadRef.environmentId, activeProfileId)
+            void tabBridge
+              .clearCache(threadRef.environmentId, activeProfileId)
               .catch(() => undefined),
-          openDevTools: desktopCall(previewBridge.openDevTools),
-          toggleNativePictureInPicture: () => handleNativePictureInPicture(),
+          openDevTools: desktopCall(tabBridge.openDevTools),
+          ...(previewBridge
+            ? { toggleNativePictureInPicture: () => handleNativePictureInPicture() }
+            : {}),
         }
       : null;
 
@@ -932,7 +940,7 @@ export function PreviewView({
         captureDisabled={!desktopOverlay || isUnreachable}
         recording={recordingRuntimeTabId !== null}
         onPictureInPicture={
-          tabId && (isServerTab || previewBridge) ? handlePictureInPicture : undefined
+          tabId && (isServerTab || tabBridge) ? handlePictureInPicture : undefined
         }
         pictureInPicture={miniPlayerTabId === tabId}
         pictureInPictureDisabled={
@@ -973,7 +981,10 @@ export function PreviewView({
                   : (desktopOverlay?.colorScheme ?? "system")
               }
               deviceToolbarVisible={viewport._tag !== "fill"}
-              onToggleDeviceToolbar={handleToggleDeviceToolbar}
+              // The shell's native tabs always fill the panel.
+              onToggleDeviceToolbar={
+                serverOwnsRendering || previewBridge ? handleToggleDeviceToolbar : undefined
+              }
               nativePictureInPicture={desktopOverlay?.pictureInPicture ?? false}
             />
           ) : null
@@ -1029,7 +1040,7 @@ export function PreviewView({
             </div>
           </>
         ) : runtimeTabId && snapshot && !showEmptyState ? (
-          previewBridge ? (
+          tabBridge ? (
             <BrowserSurfaceSlot
               key={runtimeTabId}
               tabId={runtimeTabId}

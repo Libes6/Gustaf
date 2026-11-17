@@ -19,6 +19,7 @@
 - [Devices](./user/devices.md)
 - [Control your Mac](./user/computer-use.md)
 - [Usage and limits](./user/usage.md)
+- [Subscriptions](./user/subscriptions.md)
 - [Secrets](./user/secrets.md)
 - [Product usage data](./user/telemetry.md)
 - [Remote access](./user/remote-access.md)

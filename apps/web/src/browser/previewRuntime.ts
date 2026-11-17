@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, PreviewRuntime, PreviewSessionSnapshot } from "@t3tools/contracts";
 
+import { getClientSettings } from "~/hooks/useSettings";
 import { isPreviewSupportedInRuntime } from "~/previewStateStore";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
@@ -9,7 +10,19 @@ import {
   useEnvironmentSupportsServerBrowser,
 } from "~/state/entities";
 
+import { nativeBrowserTabs, usesNativeBrowserTabs } from "./nativeBrowser";
+
 export function previewRuntimeFor(environmentId: EnvironmentId): PreviewRuntime | undefined {
+  if (
+    usesNativeBrowserTabs({
+      available: nativeBrowserTabs !== null,
+      enabled: getClientSettings().browserNativeTabs,
+      environmentId,
+      primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
+    })
+  ) {
+    return "desktop";
+  }
   if (!readEnvironmentSupportsServerBrowser(environmentId)) return undefined;
   if (
     isPreviewSupportedInRuntime() &&
