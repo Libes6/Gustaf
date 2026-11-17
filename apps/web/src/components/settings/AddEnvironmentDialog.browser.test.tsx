@@ -1,3 +1,5 @@
+import { EnvironmentId } from "@t3tools/contracts";
+import { ConnectionBlockedError } from "@t3tools/client-runtime/connection";
 import { Atom, AsyncResult } from "effect/reactivity";
 import * as Cause from "effect/Cause";
 import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
@@ -12,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   connectSshEnvironment: vi.fn<() => Promise<AtomCommandResult<void, Error>>>(async () =>
     AsyncResult.success(undefined),
   ),
+  connectPairing: vi.fn<() => Promise<AtomCommandResult<void, Error>>>(),
   refresh: () => {},
 }));
 
@@ -22,6 +25,7 @@ vi.mock(import("../../state/use-atom-command"), async (original) => ({
 vi.mock(import("~/connection/onboarding"), async (original) => ({
   ...(await original()),
   connectSshEnvironment: mocks.connectSshEnvironment as never,
+  connectPairing: mocks.connectPairing as never,
 }));
 vi.mock(import("~/state/query"), async (original) => ({
   ...(await original()),
@@ -62,6 +66,7 @@ function Owner() {
 
 function setup() {
   mocks.connectSshEnvironment.mockClear();
+  mocks.connectPairing.mockReset();
   return stubGlobal("desktopBridge", {});
 }
 
@@ -95,6 +100,42 @@ describe("AddEnvironmentDialog", () => {
     expect(mocks.connectSshEnvironment).toHaveBeenCalledOnce();
 
     await expectDefaultModeAfterReopen();
+  });
+
+  it("discards a duplicate-address result after the pairing form is dismissed", async () => {
+    using _bridge = setup();
+    const pending = Promise.withResolvers<AtomCommandResult<void, Error>>();
+    mocks.connectPairing.mockReturnValueOnce(pending.promise);
+    await using _screen = await render(<Owner />);
+    await userEvent.click(page.getByRole("button", { name: "Add environment" }));
+    await userEvent.type(page.getByPlaceholder("backend.example.com"), "mac.example.com");
+    await userEvent.type(page.getByPlaceholder("PAIRCODE"), "PAIRCODE");
+    await userEvent.click(
+      page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
+    );
+    await userEvent.keyboard("{Escape}");
+    await expectDefaultModeAfterReopen();
+    pending.resolve(
+      AsyncResult.failure(
+        Cause.fail(
+          new ConnectionBlockedError({
+            reason: "configuration",
+            detail: "Already saved.",
+            alreadySaved: {
+              environmentId: EnvironmentId.make("saved-mac"),
+              address: "https://mac.example.com/",
+            },
+          }),
+        ),
+      ),
+    );
+    await expect
+      .element(page.getByRole("dialog").getByRole("button", { name: "Add environment" }))
+      .toBeEnabled();
+    await expect
+      .element(page.getByRole("button", { name: /Add this address as a route/ }))
+      .not.toBeInTheDocument();
+    await expect.element(page.getByText(/already saved here/)).not.toBeInTheDocument();
   });
 
   it("clears the form after dismissing it on SSH", async () => {

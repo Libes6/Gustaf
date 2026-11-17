@@ -1,5 +1,6 @@
 import type { ClientConnectionMethod, EnvironmentId } from "@t3tools/contracts";
 import type { RelayProtectedError } from "@t3tools/contracts/relay";
+import * as Schema from "effect/Schema";
 import type { ManagedRelayClientError } from "../relay/managedRelay.ts";
 import { dpopFailureMessage, relayProtectedErrorMessage } from "../relay/errorPresentation.ts";
 import type { RemoteEnvironmentAuthError } from "../authorization/remote.ts";
@@ -9,6 +10,13 @@ import {
   type ConnectionAttemptError,
   ConnectionTransientError,
 } from "./model.ts";
+
+const isConnectionBlockedError = Schema.is(ConnectionBlockedError);
+
+/** The saved environment a refused pairing reached; pairing again with its id adds the address as a route. */
+export function alreadySavedEnvironment(error: unknown) {
+  return isConnectionBlockedError(error) ? (error.alreadySaved ?? null) : null;
+}
 
 export function profileMissingError(connectionId: string): ConnectionBlockedError {
   return new ConnectionBlockedError({

@@ -1,3 +1,4 @@
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -11,11 +12,13 @@ import type { ConnectionCatalogEntry, ConnectionRoute } from "./catalog.ts";
 import type {
   ConnectionAttemptError,
   ConnectionAttemptStage,
+  ConnectionRouteResult,
   PreparedConnection,
 } from "./model.ts";
 import { ConnectionTransientError } from "./model.ts";
 import * as ConnectionResolver from "./resolver.ts";
 import {
+  connectionRouteId,
   connectionRoutes,
   routeEntry,
   routeHttpBaseUrl,
@@ -34,6 +37,11 @@ export type ConnectionDriverProgress =
       readonly stage: Exclude<ConnectionAttemptStage, "preparing">;
       readonly prepared: PreparedConnection;
     };
+
+export type ReportRouteResult = (
+  routeId: string,
+  result: ConnectionRouteResult,
+) => Effect.Effect<void>;
 
 export interface EnvironmentConnectionLease {
   readonly prepared: PreparedConnection;
@@ -56,6 +64,7 @@ export class ConnectionDriver extends Context.Service<
     readonly connect: (
       entry: ConnectionCatalogEntry,
       reportProgress: (progress: ConnectionDriverProgress) => Effect.Effect<void>,
+      reportRoute?: ReportRouteResult,
     ) => Effect.Effect<EnvironmentConnectionLease, ConnectionAttemptError, Scope.Scope>;
     readonly preflight: (
       entry: ConnectionCatalogEntry,
@@ -72,6 +81,7 @@ export const connectOverRoutes = Effect.fn("ConnectionDriver.connectOverRoutes")
   connectRoute: (
     route: ConnectionRoute,
   ) => Effect.Effect<EnvironmentConnectionLease, ConnectionAttemptError, R | Scope.Scope>,
+  reportRoute: ReportRouteResult = () => Effect.void,
 ) {
   const routes = usableRoutes(entry);
   const checks =
@@ -94,6 +104,11 @@ export const connectOverRoutes = Effect.fn("ConnectionDriver.connectOverRoutes")
       if (result.failure._tag === "ConnectionTransientError") transient ??= result.failure;
       else blocked ??= result.failure;
     }
+    yield* reportRoute(connectionRouteId(route.target), {
+      outcome: result._tag === "Success" ? "connected" : "failed",
+      at: yield* Clock.currentTimeMillis,
+      detail: result._tag === "Success" ? null : result.failure.detail,
+    });
     return result;
   });
   const silent: Array<{ readonly route: ConnectionRoute; readonly index: number }> = [];
@@ -181,6 +196,7 @@ export const make = Effect.gen(function* () {
   const connect = Effect.fn("ConnectionDriver.connect")(function* (
     entry: ConnectionCatalogEntry,
     reportProgress: (progress: ConnectionDriverProgress) => Effect.Effect<void>,
+    reportRoute?: ReportRouteResult,
   ) {
     const target = entry.target;
     yield* Effect.annotateCurrentSpan({
@@ -214,6 +230,7 @@ export const make = Effect.gen(function* () {
         }
         return { prepared, session } satisfies EnvironmentConnectionLease;
       }),
+      reportRoute,
     );
   });
 

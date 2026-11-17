@@ -146,6 +146,7 @@ export interface EnvironmentSupervisorOptions {
     readonly activeRoute: ConnectionRoute;
     readonly reported: ReadonlyArray<ReportedEndpoint>;
   }) => Effect.Effect<Option.Option<ConnectionCatalogEntry>>;
+  readonly reportRoute?: ConnectionDriver.ReportRouteResult;
 }
 
 function retryDelayMs(failureCount: number, random: number): number {
@@ -472,11 +473,14 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
     lastFailure: ConnectionAttemptError | null,
     synchronizedRoutes: Ref.Ref<number>,
   ) {
-    return yield* driver.connect(yield* attemptEntry, (progress) =>
-      (progress.stage === "synchronizing"
-        ? Ref.update(synchronizedRoutes, (count) => count + 1)
-        : Effect.void
-      ).pipe(Effect.andThen(reportProgress(attempt, generation, lastFailure, progress))),
+    return yield* driver.connect(
+      yield* attemptEntry,
+      (progress) =>
+        (progress.stage === "synchronizing"
+          ? Ref.update(synchronizedRoutes, (count) => count + 1)
+          : Effect.void
+        ).pipe(Effect.andThen(reportProgress(attempt, generation, lastFailure, progress))),
+      options?.reportRoute,
     );
   });
 
@@ -934,6 +938,15 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
       } satisfies AttemptOutcome;
     }
     if (establishment._tag === "TimedOut") {
+      // The driver never saw the route it was opening end, so it is recorded here.
+      const opening = yield* SubscriptionRef.get(prepared);
+      if (Option.isSome(opening) && options?.reportRoute !== undefined) {
+        yield* options.reportRoute(connectionRouteId(opening.value.target), {
+          outcome: "failed",
+          at: yield* Clock.currentTimeMillis,
+          detail: setupTimeoutDetail,
+        });
+      }
       return {
         _tag: "Failure",
         established: false,

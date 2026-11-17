@@ -5,6 +5,7 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   type ConnectionRoute,
   type ConnectionRouteKind,
+  type ConnectionRouteResult,
   connectionRouteAddress,
   connectionRouteId,
   connectionRouteKind,
@@ -62,6 +63,7 @@ export function EnvironmentRoutesSection({
 }) {
   const entry = useAtomValue(environmentCatalog.catalogValueAtom).entries.get(environmentId);
   const prepared = useAtomValue(environmentSession.preparedConnectionValueAtom(environmentId));
+  const results = useAtomValue(environmentCatalog.routeResultsAtom(environmentId));
   const sessionResult = useAtomValue(environmentSession.sessionStateAtom(environmentId));
   const session = AsyncResult.getOrElse(sessionResult, () => null);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -199,6 +201,7 @@ export function EnvironmentRoutesSection({
             position={index + 1}
             count={routes.length}
             inUse={id === activeRouteId}
+            lastResult={results.get(id)}
             editing={editing}
             offset={index === dragFrom ? (drag?.translation ?? 0) : shift}
             lifted={index === dragFrom}
@@ -232,6 +235,7 @@ function RouteRow(props: {
   readonly position: number;
   readonly count: number;
   readonly inUse: boolean;
+  readonly lastResult: ConnectionRouteResult | undefined;
   readonly editing: boolean;
   readonly offset: number;
   readonly lifted: boolean;
@@ -254,6 +258,18 @@ function RouteRow(props: {
       : safetyCode === null
         ? null
         : t("Safety code {code}").replace("{code}", safetyCode);
+  const { lastResult } = props;
+  const lastResultText =
+    lastResult === undefined || props.inUse
+      ? null
+      : `${t(
+          lastResult.outcome === "failed"
+            ? "Last attempt failed at {time}"
+            : "Last connected at {time}",
+        ).replace(
+          "{time}",
+          new Date(lastResult.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        )}${lastResult.detail === null ? "" : `: ${lastResult.detail}`}`;
   const style = useAnimatedStyle(() => ({
     transform: [
       {
@@ -295,6 +311,7 @@ function RouteRow(props: {
           address,
           isLearned(route) ? "Found automatically" : null,
           props.inUse ? "In use" : null,
+          lastResultText,
           `Route ${props.position} of ${props.count}`,
         ]
           .filter((part) => part !== null)
@@ -324,6 +341,19 @@ function RouteRow(props: {
           {address !== null ? (
             <Text numberOfLines={1} className="text-sm text-foreground-muted">
               {isLearned(route) ? `${address} · found automatically` : address}
+            </Text>
+          ) : null}
+          {lastResultText !== null ? (
+            <Text
+              numberOfLines={2}
+              className={cn(
+                "text-sm",
+                lastResult?.outcome === "failed"
+                  ? "text-danger-foreground"
+                  : "text-foreground-muted",
+              )}
+            >
+              {lastResultText}
             </Text>
           ) : null}
         </View>
