@@ -3,6 +3,18 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "misc." and both languages list the same keys.
 export const miscMessages = {
   en: {
+    "misc.browserDeviceToolbar.browserDeviceToolbar": "Browser device toolbar",
+    "misc.browserDeviceToolbar.dimensions": "Dimensions",
+    "misc.browserDeviceToolbar.browserDevicePreset": "Browser device preset",
+    "misc.browserDeviceToolbar.viewportDimensions": "Viewport dimensions",
+    "misc.browserDeviceToolbar.viewportWidth": "Viewport width",
+    "misc.browserDeviceToolbar.viewportHeight": "Viewport height",
+    "misc.browserDeviceToolbar.lockViewportAspectRatio": "Lock viewport aspect ratio",
+    "misc.browserDeviceToolbar.unlockViewportAspectRatio": "Unlock viewport aspect ratio",
+    "misc.browserDeviceToolbar.lockAspectRatio": "Lock aspect ratio",
+    "misc.browserDeviceToolbar.unlockAspectRatio": "Unlock aspect ratio",
+    "misc.browserDeviceToolbar.rotateViewport": "Rotate viewport",
+    "misc.browserDeviceToolbar.closeDeviceToolbar": "Close device toolbar",
     "misc.serverBrowserSurface.asksFiles": "The page asks for files",
     "misc.serverBrowserSurface.asksFile": "The page asks for a file",
     "misc.serverBrowserSurface.chooseFiles": "Choose files",
@@ -1261,6 +1273,20 @@ export const miscMessages = {
     "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
+    "misc.browserDeviceToolbar.browserDeviceToolbar": "Панель устройств браузера",
+    "misc.browserDeviceToolbar.dimensions": "Размеры",
+    "misc.browserDeviceToolbar.browserDevicePreset": "Профиль устройства браузера",
+    "misc.browserDeviceToolbar.viewportDimensions": "Размер области просмотра",
+    "misc.browserDeviceToolbar.viewportWidth": "Ширина области просмотра",
+    "misc.browserDeviceToolbar.viewportHeight": "Высота области просмотра",
+    "misc.browserDeviceToolbar.lockViewportAspectRatio":
+      "Зафиксировать пропорции области просмотра",
+    "misc.browserDeviceToolbar.unlockViewportAspectRatio":
+      "Снять фиксацию пропорций области просмотра",
+    "misc.browserDeviceToolbar.lockAspectRatio": "Зафиксировать пропорции",
+    "misc.browserDeviceToolbar.unlockAspectRatio": "Снять фиксацию пропорций",
+    "misc.browserDeviceToolbar.rotateViewport": "Повернуть область просмотра",
+    "misc.browserDeviceToolbar.closeDeviceToolbar": "Закрыть панель устройств",
     "misc.serverBrowserSurface.asksFiles": "Страница запрашивает файлы",
     "misc.serverBrowserSurface.asksFile": "Страница запрашивает файл",
     "misc.serverBrowserSurface.chooseFiles": "Выбрать файлы",
