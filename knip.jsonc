@@ -20,21 +20,17 @@
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option; native verification and
-      // worktree setup (from t3.json) run directly. electron-builder loads the macOS signer and the Linux afterPack hook by path, and mobile-e2e.ts runs
+      // worktree setup (from t3.json) run directly. mobile-e2e.ts runs
       // agent-device's CLI by path, and mobile-behavior.ts spawns its runner by path.
       "entry": [
         // These fixture scripts are injected into a browser page by path.
         "fixtures/*/*.js",
         "knip-schemas.ts",
-        "linux-after-pack.ts",
         "mobile-behavior/run.ts",
         "mobile-native-client.ts",
         "setup-worktree.ts",
-        "sign-macos.ts",
         "prepare-server-compile-cache.cjs",
-        "smoke-desktop-app.ts",
         "resolve-nightly-release.ts",
-        "verify-windows-desktop-artifact.ts",
       ],
       "ignoreDependencies": ["agent-device", "esbuild"],
       // The `t3` npm package's files: copied into the package, never imported.

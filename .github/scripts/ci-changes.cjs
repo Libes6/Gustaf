@@ -22,8 +22,6 @@ const RUNS_EVERYTHING = [
 const EXTRA_OWNERS = [
   // Vite configs and tsconfigs of these apps import scripts/lib directly.
   [/^scripts\/lib\//, ["@t3tools/desktop", "@t3tools/mobile", "@t3tools/web", "t3"]],
-  // scripts/build-desktop-artifact.ts reads the GNOME extension manifest.
-  [/^apps\/desktop\/gnome-extension\//, ["@t3tools/scripts"]],
   [/^native\/browser-secret\//, ["@t3tools/desktop"]],
   [/^native\/kde-snap-shot\//, ["@t3tools/desktop"]],
   [/^native\/libghostty-vt\//, ["@t3tools/web"]],
@@ -52,8 +50,7 @@ const MOBILE_NATIVE =
   /^apps\/mobile\/.*\.(swift|kt|kts)$|^apps\/mobile\/(\.swiftlint\.yml|detekt\.yml|\.editorconfig|Brewfile)$|^scripts\/mobile-native-static-check\.ts$|^package\.json$|^\.github\/workflows\/ci\.yml$|^\.github\/scripts\/ci-changes\.cjs$|^\.github\/actions\/ci-changes\//;
 
 // Startup, migration, settlement, and sidebar paths that decide whether an upgraded user's
-// threads show after launch. Build runs scripts/smoke-desktop-app.ts for them, so they do not
-// first fail in the release launch check.
+// threads show after launch.
 const DESKTOP_LAUNCH = [
   /^apps\/desktop\/src\/((main|boot|compileCache|serverCompileCache)\.ts$|(app|backend|window)\/)/,
   /^apps\/desktop\/src\/electron\/(ElectronApp|ElectronProtocol|ElectronWindow)\.ts$/,
@@ -63,7 +60,7 @@ const DESKTOP_LAUNCH = [
   /^apps\/server\/src\/persistence\/Migrations/,
   /^apps\/server\/src\/orchestration-v2\/((ThreadSettlementService|ProjectionStore)\.ts$|legacy\/)/,
   /^packages\/contracts\/src\/settings\.ts$/,
-  /^scripts\/(smoke-desktop-app\.ts|fixtures\/desktop-launch\/)/,
+  /^scripts\/fixtures\/desktop-launch\//,
 ];
 
 const OWN_TEST_JOB = new Set(["t3", "@t3tools/web", "@t3tools/monorepo"]);
@@ -114,7 +111,6 @@ function ownersOf(file, packages) {
   // A manifest can change dependencies or versions other packages read.
   if (path.posix.basename(file) === "package.json") return null;
   if (RUNS_EVERYTHING.some((pattern) => pattern.test(file))) return null;
-  // scripts/build-desktop-artifact.test.ts reads the crates' sources.
   if (RUST.test(file)) return ["@t3tools/scripts", ...extra];
 
   const owner = packages

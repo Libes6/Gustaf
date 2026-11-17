@@ -15,7 +15,9 @@ export function missingReleaseAssets(version, files, { manifest = true } = {}) {
   for (const platform of platforms) {
     const names = files[platform] ?? [];
     for (const suffix of required[platform]) {
-      const found = names.some((name) => name.startsWith(`Gustaf-${version}-`) && name.endsWith(suffix));
+      const found = names.some(
+        (name) => name.startsWith(`Gustaf-${version}-`) && name.endsWith(suffix),
+      );
       if (!found) missing.push(`${platform}: *${suffix}`);
     }
   }
@@ -35,14 +37,17 @@ export function listReleaseAssets(directory) {
 
 if (
   process.argv[1] &&
-  NodeFS.realpathSync(process.argv[1]) === NodeFS.realpathSync(NodeURL.fileURLToPath(import.meta.url))
+  NodeFS.realpathSync(process.argv[1]) ===
+    NodeFS.realpathSync(NodeURL.fileURLToPath(import.meta.url))
 ) {
   const [directory, version, mode] = process.argv.slice(2);
   const missing = missingReleaseAssets(version, listReleaseAssets(directory), {
     manifest: mode !== "--no-manifest",
   });
   if (missing.length > 0) {
-    console.error(`Release ${version} is missing required assets:\n${missing.map((m) => `  - ${m}`).join("\n")}`);
+    console.error(
+      `Release ${version} is missing required assets:\n${missing.map((m) => `  - ${m}`).join("\n")}`,
+    );
     process.exit(1);
   }
 }

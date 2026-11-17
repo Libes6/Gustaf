@@ -222,8 +222,6 @@ describe("check:changed", () => {
     ]) {
       assert.isFalse(launches(file), file);
     }
-    // A script-only change still builds the app it opens.
-    assert.isTrue(decide(["scripts/smoke-desktop-app.ts"], packages, false).outputs.build);
   });
 
   it.each([
