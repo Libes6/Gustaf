@@ -1579,6 +1579,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tokio",
  "ureq",
  "windows-sys 0.61.2",
 ]
