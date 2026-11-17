@@ -600,7 +600,7 @@
   "Could not stop control": "Не удалось остановить управление",
   "This thread's agent controls the Mac": "Агент этого треда управляет Mac",
   "The Mac is controlled by": "Mac управляет",
-"Add your prefix to the generated branch name.": "Добавьте свой префикс к сгенерированному имени ветки.",
+  "Add your prefix to the generated branch name.": "Добавьте свой префикс к сгенерированному имени ветки.",
   "Append instructions to the naming prompt.": "Добавьте инструкции к промпту для именования.",
   "Applies to the composer when a hardware keyboard is connected.": "Действует в поле ввода при подключённой физической клавиатуре.",
   "Checking…": "Проверка…",

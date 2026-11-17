@@ -1397,8 +1397,7 @@ export const webCopyMessages = {
     "webCopy.extractingAntigravity": "Распаковка {name}.",
     "webCopy.checkingTheDownloadedRuntime": "Проверка загруженной среды.",
     "webCopy.installed": "Установлено.",
-    "webCopy.theConfiguredAntigravityRuntimeIsUnavailable":
-      "Настроенная среда {name} недоступна.",
+    "webCopy.theConfiguredAntigravityRuntimeIsUnavailable": "Настроенная среда {name} недоступна.",
     "webCopy.theConfiguredAntigravityRuntimeHasNotBeenChecked":
       "Настроенная среда {name} ещё не проверена.",
     "webCopy.sizeMBDownload": "Размер загрузки: {size} МБ.",
