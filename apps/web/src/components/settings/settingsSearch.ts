@@ -37,6 +37,7 @@ export type SettingsPath =
   | "/settings/worktrees"
   | "/settings/connections"
   | "/settings/access"
+  | "/settings/mcp"
   | "/settings/secrets"
   | "/settings/subscriptions"
   | "/settings/maintenance"
@@ -114,6 +115,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/worktrees": "Worktrees",
   "/settings/connections": "Environments",
   "/settings/access": "Sharing & access",
+  "/settings/mcp": "MCP",
   "/settings/secrets": "Secrets",
   "/settings/subscriptions": "Subscriptions",
   "/settings/maintenance": "Maintenance",
@@ -160,6 +162,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     paths: [
       "/settings/connections",
       "/settings/access",
+      "/settings/mcp",
       ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
     ],
   },
@@ -241,6 +244,12 @@ const SOURCE_CONTROL_HOST_TERMS = sourceControlClients.definitions
   .join(" ");
 
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "mcp-servers",
+    title: "MCP servers",
+    to: "/settings/mcp",
+    searchTerms: ["mcp servers import tools stdio http"],
+  },
   {
     id: "ui-language",
     title: "Language",
@@ -1399,6 +1408,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/worktrees": "project-defaults",
   "/settings/connections": "connections",
   "/settings/access": "connections",
+  "/settings/mcp": null,
   "/settings/secrets": null,
   "/settings/subscriptions": null,
   "/settings/scheduled-tasks": null,

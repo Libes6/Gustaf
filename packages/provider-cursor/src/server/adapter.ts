@@ -206,6 +206,20 @@ export function cursorMcpServers(
     return undefined;
   }
   return {
+    ...Object.fromEntries(
+      (session.userServers ?? []).map((server): [string, McpServerConfig] => [
+        server.id,
+        server.type === "stdio"
+          ? {
+              type: "stdio",
+              command: server.command,
+              args: [...server.args],
+              env: { ...server.env },
+              cwd: server.cwd,
+            }
+          : { type: "http", url: server.url, headers: { ...server.headers } },
+      ]),
+    ),
     "t3-code": {
       type: "http",
       url: session.endpoint,

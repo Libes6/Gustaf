@@ -128,6 +128,7 @@ import * as DocumentText from "./provider/DocumentText.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as SubscriptionService from "./subscriptions/SubscriptionService.ts";
+import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
 import * as GuestShareService from "./guest/GuestShareService.ts";
 import {
@@ -1451,6 +1452,7 @@ export const layerWsRpc = (
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
       const subscriptions = yield* SubscriptionService.SubscriptionService;
+      const mcpServerImport = yield* McpServerImport.McpServerImport;
       const secretRequests = yield* SecretRequests.SecretRequests;
       const guestShares = yield* GuestShareService.GuestShareService;
       const pullRequests = yield* PullRequestService.PullRequestService;
@@ -2398,6 +2400,8 @@ export const layerWsRpc = (
           Effect.annotateCurrentSpan({ "subscription.id": input.id }).pipe(
             Effect.andThen(subscriptions.delete(input)),
           ),
+        [WS_METHODS.mcpServersListImportable]: (input) => mcpServerImport.list(input),
+        [WS_METHODS.mcpServersImport]: (input) => mcpServerImport.importServers(input),
         [WS_METHODS.serverProbe]: (_input) => Effect.succeed({}),
         [WS_METHODS.serverGetConfig]: (_input) =>
           loadServerConfig({

@@ -174,6 +174,7 @@ export interface AcpAdapterV2RuntimeInput {
   readonly mcpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly userMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly resumeSessionId?: string;
   readonly interruptPromptOnCancel?: boolean;
@@ -334,6 +335,8 @@ export interface AcpAdapterV2Flavor {
     EffectAcpSchema.InitializeRequest["clientCapabilities"]
   >["_meta"];
   readonly mcpOverHttp?: boolean;
+  /** The agent refuses client stdio MCP servers, so the user's stdio servers are left out. */
+  readonly rejectsStdioMcpServers?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -856,6 +859,8 @@ interface AcpMcpContext {
   readonly servers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  /** Plain stdio or http entries whichever way `t3-code` travels; never via the MCP-over-ACP bridge. */
+  readonly userServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -867,7 +872,7 @@ function acpMcpContext(
   mcpOverHttp: boolean | undefined,
 ): AcpMcpContext {
   if (session === undefined) {
-    return { servers: [], acpServers: [], httpServers: [] };
+    return { servers: [], acpServers: [], httpServers: [], userServers: [] };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -895,6 +900,7 @@ function acpMcpContext(
             },
           ]
         : [],
+    userServers: (session.userServers ?? []).map(acpUserMcpServer),
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -911,11 +917,29 @@ function acpMcpContext(
   };
 }
 
+// ACP stdio entries carry no cwd: the agent starts them in the session cwd.
+function acpUserMcpServer(server: McpProviderSession.McpUserServer): EffectAcpSchema.McpServer {
+  return server.type === "stdio"
+    ? {
+        name: server.id,
+        command: server.command,
+        args: [...server.args],
+        env: Object.entries(server.env).map(([name, value]) => ({ name, value })),
+      }
+    : {
+        type: "http",
+        name: server.id,
+        url: server.url,
+        headers: Object.entries(server.headers).map(([name, value]) => ({ name, value })),
+      };
+}
+
 function acpMcpActivation(context: AcpMcpContext) {
   return {
     mcpServers: context.servers,
     acpMcpServers: context.acpServers,
     httpMcpServers: context.httpServers,
+    userMcpServers: context.userServers,
   };
 }
 
@@ -1755,12 +1779,24 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const host = yield* ProviderHost.ProviderHost;
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const { flavor, selfInvocation: self } = options;
-  const readMcpContext = (threadId: ThreadId | null) =>
-    threadId === null
-      ? Effect.succeed(acpMcpContext(undefined, self, flavor.mcpOverHttp))
-      : mcpSessions
-          .read(threadId)
-          .pipe(Effect.map((session) => acpMcpContext(session, self, flavor.mcpOverHttp)));
+  // Read at every session open, load and fork; the caller's span covers it.
+  const readMcpContext = Effect.fnUntraced(function* (threadId: ThreadId | null) {
+    const context = acpMcpContext(
+      threadId === null ? undefined : yield* mcpSessions.read(threadId),
+      self,
+      flavor.mcpOverHttp,
+    );
+    if (flavor.rejectsStdioMcpServers !== true) return context;
+    const isHttp = (server: EffectAcpSchema.McpServer) =>
+      "type" in server && server.type === "http";
+    const stdio = context.userServers.filter((server) => !isHttp(server));
+    if (stdio.length === 0) return context;
+    yield* Effect.logWarning("ACP agent refuses stdio MCP servers; leaving them out", {
+      driver: flavor.driver,
+      mcpServers: stdio.map((server) => server.name),
+    });
+    return { ...context, userServers: context.userServers.filter(isHttp) };
+  });
   const driver = flavor.driver;
   const continuationRequests = options.continuationRequests;
   const postSettleContinuationEnabled =
@@ -2434,6 +2470,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             mcpServers: mcpContext.servers,
             acpMcpServers: mcpContext.acpServers,
             httpMcpServers: mcpContext.httpServers,
+            userMcpServers: mcpContext.userServers,
             ...(mcpContext.processEnvironment === undefined
               ? {}
               : { processEnvironment: mcpContext.processEnvironment }),

@@ -858,6 +858,10 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       ),
     };
 
+    const isGemini =
+      config.source === "local"
+        ? /^gemini(\.exe|\.cmd)?$/i.test(config.commandPath.split(/[\\/]/).pop() ?? "")
+        : config.agentId === "gemini";
     return {
       instanceId,
       driverKind: DRIVER_KIND,
@@ -870,7 +874,19 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         ...snapshot,
         refresh: snapshot.refresh.pipe(Effect.tap(() => controller.refreshMethods ?? Effect.void)),
       },
-      orchestrationAdapter,
+      orchestrationAdapter: isGemini
+        ? {
+            ...orchestrationAdapter,
+            // Gemini CLI reads `~/.gemini/settings.json`, with GEMINI_CLI_HOME in place of the home.
+            nativeMcpSources: {
+              provider: "gemini",
+              homeDir:
+                processEnvironment.GEMINI_CLI_HOME?.trim() ||
+                processEnvironment.HOME?.trim() ||
+                (yield* HostProcess.HomeDirectory),
+            },
+          }
+        : orchestrationAdapter,
       textGeneration: makeUnsupportedTextGeneration(),
       acpSessionManagement: {
         listSessions: ({ cwd, cursor }) =>

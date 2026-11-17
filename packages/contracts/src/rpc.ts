@@ -399,6 +399,13 @@ import {
   SubscriptionListResult,
   SubscriptionUpsertInput,
 } from "./subscription.ts";
+import {
+  McpImportInput,
+  McpImportResult,
+  McpListImportableInput,
+  McpListImportableResult,
+  McpServerImportError,
+} from "./mcpServer.ts";
 import { SecretRequestAnswerInput, SecretRequestError } from "./secretRequest.ts";
 import {
   ProjectCloneActionInput,
@@ -585,6 +592,9 @@ export const WS_METHODS = {
   subscriptionsList: "subscriptions.list",
   subscriptionsUpsert: "subscriptions.upsert",
   subscriptionsDelete: "subscriptions.delete",
+
+  mcpServersListImportable: "mcpServers.listImportable",
+  mcpServersImport: "mcpServers.import",
 
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
@@ -2103,6 +2113,18 @@ const WsSubscriptionsDeleteRpc = Rpc.make(WS_METHODS.subscriptionsDelete, {
   error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
 });
 
+const WsMcpServersListImportableRpc = Rpc.make(WS_METHODS.mcpServersListImportable, {
+  payload: McpListImportableInput,
+  success: McpListImportableResult,
+  error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
+});
+
+const WsMcpServersImportRpc = Rpc.make(WS_METHODS.mcpServersImport, {
+  payload: McpImportInput,
+  success: McpImportResult,
+  error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
+});
+
 const WsGuestShareCreateRpc = Rpc.make(WS_METHODS.guestShareCreate, {
   payload: GuestShareCreateInput,
   success: GuestShareCreateResult,
@@ -2223,6 +2245,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscriptionsListRpc,
   WsSubscriptionsUpsertRpc,
   WsSubscriptionsDeleteRpc,
+  WsMcpServersListImportableRpc,
+  WsMcpServersImportRpc,
   WsServerReportClientActivityRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,

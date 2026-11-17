@@ -3,6 +3,7 @@ import {
   AuthOrchestrationOperateScope,
   AuthSettingsWriteScope,
   AuthProvidersManageScope,
+  AuthTerminalOperateScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
 import * as Effect from "effect/Effect";
@@ -24,6 +25,7 @@ import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
 import { SettingsSecretValue } from "./settingsSecretValue.ts";
+import { McpServerConfig, McpServerId, ProjectMcpServerOverride } from "./mcpServer.ts";
 import { EnvironmentMachineKind, ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
 import { KeybindingShortcut } from "./keybindings.ts";
 import {
@@ -1191,7 +1193,7 @@ export const ProjectProviderInstanceOverride = Schema.Struct({
 export type ProjectProviderInstanceOverride = typeof ProjectProviderInstanceOverride.Type;
 
 /** Absent keys inherit; null is a value for nullable settings.
- * providerInstances overrides fields per instance; other keys replace the whole setting. */
+ * providerInstances and mcpServers override fields per entry; other keys replace the whole setting. */
 export const ProjectSettingsOverrides = Schema.Struct({
   worktreeCleanup: Schema.optionalKey(WorktreeCleanup),
   defaultModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
@@ -1223,7 +1225,8 @@ export const ProjectSettingsOverrides = Schema.Struct({
   providerInstances: Schema.optionalKey(
     Schema.Record(ProviderInstanceId, ProjectProviderInstanceOverride),
   ),
-} satisfies Record<ProjectScopedServerSettingKey | "providerInstances", unknown>);
+  mcpServers: Schema.optionalKey(Schema.Record(McpServerId, ProjectMcpServerOverride)),
+} satisfies Record<ProjectScopedServerSettingKey | "providerInstances" | "mcpServers", unknown>);
 export type ProjectSettingsOverrides = typeof ProjectSettingsOverrides.Type;
 
 // Whole-entry writers must round-trip unknown keys; keep the type closed to catch misspellings.
@@ -1555,6 +1558,10 @@ export const ServerSettings = Schema.Struct({
   secretProviders: Schema.Record(SecretProviderId, SecretProviderConfig).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
+  /** MCP servers Gustaf adds to every provider session they are enabled for. */
+  mcpServers: Schema.Record(McpServerId, McpServerConfig).pipe(
+    Schema.withDecodingDefault(Effect.succeed({})),
+  ),
 
   usagePriceOverrides: Schema.Record(TrimmedNonEmptyString, UsageModelPriceOverride).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
@@ -1710,6 +1717,7 @@ export const ServerSettingsOperation = Schema.Literals([
   "prepare-directory",
   "write-managed-setting",
   "use-disallowed-provider",
+  "use-disallowed-mcp-server",
 ]);
 export type ServerSettingsOperation = typeof ServerSettingsOperation.Type;
 
@@ -1735,6 +1743,9 @@ export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>
   override get message(): string {
     if (this.operation === "write-managed-setting") {
       return `${this.managedSetting ?? "This setting"} is managed by ${this.managedBy ?? "your organization"} and cannot be changed.`;
+    }
+    if (this.operation === "use-disallowed-mcp-server") {
+      return `${this.managedBy === undefined ? "Your organization's" : `${this.managedBy}'s`} policy does not allow local MCP servers.`;
     }
     if (this.operation === "use-disallowed-provider") {
       return disallowedProviderMessage(
@@ -1937,6 +1948,8 @@ export const ServerSettingsPatch = Schema.Struct({
   secretProviders: Schema.optionalKey(
     Schema.Record(SecretProviderId, Schema.NullOr(SecretProviderConfigWrite)),
   ),
+  // Merge per entry like textGenerators; null removes an entry. Redaction markers keep secrets.
+  mcpServers: Schema.optionalKey(Schema.Record(McpServerId, Schema.NullOr(McpServerConfig))),
 
   usagePriceOverrides: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, Schema.NullOr(UsageModelPriceOverride)),
@@ -1971,9 +1984,18 @@ export function requiredScopesForServerSettingsPatch(
   if (Object.values(patch.secretProviders ?? {}).some((entry) => entry === null)) {
     changesSettings = true;
   }
+  // MCP servers run with the provider's access, and a stdio one runs a command on the host.
+  const mcpServers = Object.values(patch.mcpServers ?? {});
+  if (patch.mcpServers !== undefined) {
+    changesSettings = true;
+    changesProviders = true;
+  }
   return [
     ...(changesSettings || !changesProviders ? [AuthSettingsWriteScope] : []),
     ...(changesProviders ? [AuthProvidersManageScope] : []),
+    ...(mcpServers.some((entry) => entry?.transport.type === "stdio")
+      ? [AuthTerminalOperateScope]
+      : []),
   ];
 }
 

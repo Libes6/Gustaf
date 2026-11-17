@@ -558,6 +558,10 @@
     "./provider-instance-ids": {
       "types": "./src/providerInstanceIds.ts",
       "default": "./src/providerInstanceIds.ts"
+    },
+    "./mcp-server-input": {
+      "types": "./src/mcpServerInput.ts",
+      "default": "./src/mcpServerInput.ts"
     }
   },
   "scripts": {

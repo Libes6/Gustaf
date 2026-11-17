@@ -144,6 +144,8 @@ export interface AcpSessionRuntimeOptions {
   ) => Effect.Effect<void, never>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  /** The user's own servers, sent beside whichever `t3-code` entry the agent supports. */
+  readonly userMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
   readonly protocolLogging?: {
     readonly logIncoming?: boolean;
@@ -1093,6 +1095,7 @@ export interface AcpSessionActivationOptions {
   readonly mcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly userMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
 }
 
 export class AcpSessionRuntime extends Context.Service<
@@ -2133,7 +2136,7 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
     return yield* effect;
   });
 
-  const sessionMcpServers = (
+  const t3McpServers = (
     initializeResult: EffectAcpSchema.InitializeResponse,
     activationOptions?: AcpSessionActivationOptions,
   ): ReadonlyArray<EffectAcpSchema.McpServer> => {
@@ -2148,6 +2151,27 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
     }
     return activationOptions?.mcpServers ?? options.mcpServers ?? [];
   };
+
+  // Per session request; the session-setup span already covers it.
+  const sessionMcpServers = Effect.fnUntraced(function* (
+    initializeResult: EffectAcpSchema.InitializeResponse,
+    activationOptions?: AcpSessionActivationOptions,
+  ) {
+    const userServers = activationOptions?.userMcpServers ?? options.userMcpServers ?? [];
+    const httpSupported = initializeResult.agentCapabilities?.mcpCapabilities?.http === true;
+    const unsupported = userServers.filter(
+      (server) => "type" in server && server.type === "http" && !httpSupported,
+    );
+    if (unsupported.length > 0) {
+      yield* Effect.logWarning("ACP agent does not support HTTP MCP servers; leaving them out", {
+        mcpServers: unsupported.map((server) => server.name),
+      });
+    }
+    return [
+      ...t3McpServers(initializeResult, activationOptions),
+      ...userServers.filter((server) => !unsupported.includes(server)),
+    ];
+  });
 
   const sessionSetupFields = (initializeResult: EffectAcpSchema.InitializeResponse) => {
     const meta = options.sessionMeta?.(initializeResult);
@@ -2225,7 +2249,7 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
             sessionId,
             cwd: options.cwd,
             ...additionalDirectories,
-            mcpServers: sessionMcpServers(initializeResult),
+            mcpServers: yield* sessionMcpServers(initializeResult),
           } satisfies EffectAcpSchema.LoadSessionRequest;
           sessionSetupResult = yield* runLoadSessionWithReplayIdle(loadPayload, initializeResult);
         } else if (initializeResult.agentCapabilities?.sessionCapabilities?.resume != null) {
@@ -2233,7 +2257,7 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
             sessionId,
             cwd: options.cwd,
             ...additionalDirectories,
-            mcpServers: sessionMcpServers(initializeResult),
+            mcpServers: yield* sessionMcpServers(initializeResult),
           } satisfies EffectAcpSchema.ResumeSessionRequest;
           sessionSetupResult = yield* runLoggedRequest(
             "session/resume",
@@ -2249,7 +2273,7 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
       } else {
         const createPayload = {
           cwd: options.cwd,
-          mcpServers: sessionMcpServers(initializeResult),
+          mcpServers: yield* sessionMcpServers(initializeResult),
           ...additionalDirectories,
         } satisfies EffectAcpSchema.NewSessionRequest;
         const created = yield* runLoggedRequest(
@@ -2446,50 +2470,56 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
     configOptionChanges: SubscriptionRef.changes(configOptionsRef),
     loadSession: (sessionId, activationOptions) =>
       start.pipe(
-        Effect.flatMap((started) => {
-          const requestPayload = {
-            sessionId,
-            cwd: options.cwd,
-            ...sessionSetupFields(started.initializeResult),
-            mcpServers: sessionMcpServers(started.initializeResult, activationOptions),
-          } satisfies EffectAcpSchema.LoadSessionRequest;
-          return runLoadSessionWithReplayIdle(requestPayload, started.initializeResult);
-        }),
+        Effect.flatMap(
+          Effect.fnUntraced(function* (started) {
+            const requestPayload = {
+              sessionId,
+              cwd: options.cwd,
+              ...sessionSetupFields(started.initializeResult),
+              mcpServers: yield* sessionMcpServers(started.initializeResult, activationOptions),
+            } satisfies EffectAcpSchema.LoadSessionRequest;
+            return yield* runLoadSessionWithReplayIdle(requestPayload, started.initializeResult);
+          }),
+        ),
         Effect.flatMap((response) => adoptSession(sessionId, response)),
       ),
     resumeSession: (sessionId, activationOptions) =>
       start.pipe(
-        Effect.flatMap((started) => {
-          const requestPayload = {
-            sessionId,
-            cwd: options.cwd,
-            ...sessionSetupFields(started.initializeResult),
-            mcpServers: sessionMcpServers(started.initializeResult, activationOptions),
-          } satisfies EffectAcpSchema.ResumeSessionRequest;
-          return runLoggedRequest(
-            "session/resume",
-            requestPayload,
-            acp.agent.resumeSession(requestPayload),
-          );
-        }),
+        Effect.flatMap(
+          Effect.fnUntraced(function* (started) {
+            const requestPayload = {
+              sessionId,
+              cwd: options.cwd,
+              ...sessionSetupFields(started.initializeResult),
+              mcpServers: yield* sessionMcpServers(started.initializeResult, activationOptions),
+            } satisfies EffectAcpSchema.ResumeSessionRequest;
+            return yield* runLoggedRequest(
+              "session/resume",
+              requestPayload,
+              acp.agent.resumeSession(requestPayload),
+            );
+          }),
+        ),
         Effect.flatMap((response) => adoptSession(sessionId, response)),
       ),
     forkSession: (sessionId, activationOptions, meta) =>
       start.pipe(
-        Effect.flatMap((started) => {
-          const requestPayload = {
-            sessionId,
-            cwd: options.cwd,
-            ...sessionSetupFields(started.initializeResult),
-            mcpServers: sessionMcpServers(started.initializeResult, activationOptions),
-            ...(meta === undefined ? {} : { _meta: meta }),
-          } satisfies EffectAcpSchema.ForkSessionRequest;
-          return runLoggedRequest(
-            "session/fork",
-            requestPayload,
-            acp.agent.forkSession(requestPayload),
-          );
-        }),
+        Effect.flatMap(
+          Effect.fnUntraced(function* (started) {
+            const requestPayload = {
+              sessionId,
+              cwd: options.cwd,
+              ...sessionSetupFields(started.initializeResult),
+              mcpServers: yield* sessionMcpServers(started.initializeResult, activationOptions),
+              ...(meta === undefined ? {} : { _meta: meta }),
+            } satisfies EffectAcpSchema.ForkSessionRequest;
+            return yield* runLoggedRequest(
+              "session/fork",
+              requestPayload,
+              acp.agent.forkSession(requestPayload),
+            );
+          }),
+        ),
         Effect.flatMap((response) => adoptSession(response.sessionId, response)),
       ),
     listSessions: (cursor) => {

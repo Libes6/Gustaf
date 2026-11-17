@@ -270,3 +270,22 @@ On mobile, use **Settings → Source control** to change selected environment de
 Gustaf only pulls when it can fast-forward and the checkout has no changed files, untracked files,
 or local commits. It skips checkouts on another branch or without an upstream. If a checkout has
 local work, resolve it yourself before automatic pulls can resume.
+
+## MCP servers
+
+Add an MCP server once in **Settings → MCP** on web or desktop to give Claude,
+Codex, Cursor, OpenCode and ACP agents access to its tools. You can enter its
+configuration or import it from a native agent config. Review imported commands
+before enabling them. A server a provider already loads from its native config
+is not started a second time.
+
+Enable servers for the whole environment or override their enabled state for a
+project. Mobile Settings lists each environment's servers and lets you switch
+them on or off for that environment; use web or desktop to add or edit them.
+
+Local servers run on the environment's machine. A server on a VPS cannot reach
+apps installed only on your Mac; add those servers to the Mac environment.
+Tool approvals remain each agent's own, and full-access mode does not ask for
+approval.
+
+Pi, OpenCode 1.x and external OpenCode servers are not supported.

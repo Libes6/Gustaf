@@ -15,6 +15,8 @@ import {
   AuthPreviewOperateScope,
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
+  AuthTerminalOperateScope,
+  McpServerId,
   AuthSourceControlWriteScope,
   ThreadId,
   EnvironmentId,
@@ -69,6 +71,34 @@ const setup = Effect.gen(function* () {
 });
 
 describe("command permissions", () => {
+  it.effect("requires all MCP grants and the terminal grant for local imports", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const registry = yield* setup;
+        const permissions = createCommandPermissions(runtime, WS_METHODS.mcpServersImport);
+        const input = (transport: "http" | "stdio") => ({
+          entries: [{ source: "codex", name: "test", id: McpServerId.make("test"), transport }],
+        });
+        for (const scopes of [
+          [AuthSettingsWriteScope],
+          [AuthProvidersManageScope],
+          [AuthSettingsWriteScope, AuthProvidersManageScope],
+          [AuthSettingsWriteScope, AuthProvidersManageScope, AuthTerminalOperateScope],
+        ]) {
+          registry.set(
+            sessions(env),
+            AsyncResult.success({ ...grant(false), scopes, permissions: scopes }),
+          );
+          expect(registry.get(permissions.permissionAtom(env, input("http")))).toBe(
+            scopes.length >= 2,
+          );
+          expect(registry.get(permissions.permissionAtom(env, input("stdio")))).toBe(
+            scopes.length === 3,
+          );
+        }
+      }),
+    ),
+  );
   it.effect.each([WS_METHODS.serverRefreshProviders, WS_METHODS.vcsWorktreeInventory])(
     "requires the destination read grant for %s",
     (method) =>

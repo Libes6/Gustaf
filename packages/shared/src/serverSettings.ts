@@ -266,7 +266,9 @@ function pickOverrideKeys(entry: ProjectSettingsOverrides | undefined, known: bo
   );
 }
 
-// Older clients omit providerInstances during whole-entry replacement; preserve it to avoid wiping overrides.
+// Older clients omit per-entry maps during whole-entry replacement; preserve them to avoid wiping overrides.
+const PER_ENTRY_PROJECT_OVERRIDE_KEYS = ["providerInstances", "mcpServers"] as const;
+
 function mergeProjectSettingsOverridesPatch(
   current: Readonly<Record<string, ProjectSettingsOverrides>>,
   patch: Readonly<Record<string, ProjectSettingsOverrides | null>>,
@@ -277,14 +279,18 @@ function mergeProjectSettingsOverridesPatch(
       next.delete(projectId);
       continue;
     }
-    const storedProviderInstances = current[projectId]?.providerInstances;
+    const stored = current[projectId];
     next.set(projectId, {
       // Preserve downgraded storage, but reject new unknown writes so clients can detect unsupported settings.
-      ...pickOverrideKeys(current[projectId], false),
+      ...pickOverrideKeys(stored, false),
       ...pickOverrideKeys(entry, true),
-      ...(Object.hasOwn(entry, "providerInstances") || storedProviderInstances === undefined
-        ? {}
-        : { providerInstances: storedProviderInstances }),
+      ...Object.fromEntries(
+        PER_ENTRY_PROJECT_OVERRIDE_KEYS.flatMap((key) =>
+          Object.hasOwn(entry, key) || stored?.[key] === undefined
+            ? []
+            : [[key, stored[key]] as const],
+        ),
+      ),
     });
   }
   return Object.fromEntries(next);
@@ -401,6 +407,7 @@ export function applyServerSettingsPatch(
     usageLimitSources: usageLimitSourcesPatch,
     textGenerators: textGeneratorsPatch,
     secretProviders: secretProvidersPatch,
+    mcpServers: mcpServersPatch,
     sourceControlHosts: sourceControlHostsPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
     usageModelAliases: usageModelAliasesPatch,
@@ -622,6 +629,9 @@ export function applyServerSettingsPatch(
       : {}),
     ...(secretProvidersPatch !== undefined
       ? { secretProviders: mergeSettingsEntries(current.secretProviders, secretProvidersPatch) }
+      : {}),
+    ...(mcpServersPatch !== undefined
+      ? { mcpServers: mergeSettingsEntries(current.mcpServers, mcpServersPatch) }
       : {}),
     ...(usagePriceOverridesPatch !== undefined
       ? {

@@ -1756,9 +1756,37 @@ describe("CursorAdapterV2", () => {
       endpoint: "http://127.0.0.1:43123/mcp",
       authorizationHeader: "Bearer secret-cursor-mcp-token",
       browserToolsAvailable: true,
+      userServers: [
+        {
+          type: "stdio",
+          id: "local.tools",
+          command: "node",
+          args: ["server.js"],
+          env: { TOKEN: "user-secret" },
+          cwd: "/workspace/tools",
+        },
+        {
+          type: "http",
+          id: "remote",
+          url: "https://example.com/mcp",
+          headers: { Authorization: "Bearer user-secret" },
+        },
+      ] as const,
     };
 
     assert.deepEqual(cursorMcpServers(mcpSession), {
+      "local.tools": {
+        type: "stdio",
+        command: "node",
+        args: ["server.js"],
+        env: { TOKEN: "user-secret" },
+        cwd: "/workspace/tools",
+      },
+      remote: {
+        type: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer user-secret" },
+      },
       "t3-code": {
         type: "http",
         url: "http://127.0.0.1:43123/mcp",
@@ -1786,6 +1814,7 @@ describe("CursorAdapterV2", () => {
     assert.deepEqual(options.mcpServers, cursorMcpServers(mcpSession));
 
     const logged = JSON.stringify(CursorAgentSdk.loggedCursorAgentOptions(options));
+    assert.notInclude(logged, "user-secret");
     assert.notInclude(logged, "secret-cursor-api-key");
     assert.notInclude(logged, "secret-cursor-mcp-token");
   });

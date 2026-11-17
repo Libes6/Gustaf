@@ -1,5 +1,6 @@
 import {
   DEFAULT_SERVER_SETTINGS,
+  McpServerId,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -553,8 +554,9 @@ describe("serverSettings helpers", () => {
     });
   });
 
-  it("keeps a project's providerInstances override when a patch entry omits the key", () => {
+  it("keeps a project's per-entry overrides when a patch entry omits their keys", () => {
     const instanceId = ProviderInstanceId.make("codex_work");
+    const serverId = McpServerId.make("figma");
     const projectId = ProjectId.make("project-a");
     const current = {
       ...DEFAULT_SERVER_SETTINGS,
@@ -562,6 +564,7 @@ describe("serverSettings helpers", () => {
         [projectId]: {
           newWorktreesStartFromOrigin: true,
           providerInstances: { [instanceId]: { enabled: false } },
+          mcpServers: { [serverId]: { enabled: true } },
         },
       },
     };
@@ -575,6 +578,7 @@ describe("serverSettings helpers", () => {
     expect(patched.projectSettingsOverrides[projectId]).toEqual({
       newWorktreesStartFromOrigin: false,
       providerInstances: { [instanceId]: { enabled: false } },
+      mcpServers: { [serverId]: { enabled: true } },
     });
   });
 

@@ -1427,6 +1427,20 @@ function codexThreadRuntimeParams(input: {
     ...(input.modelSelection === undefined ? {} : { model: input.modelSelection.model }),
     config: {
       ...CODEX_THREAD_CONFIG,
+      // Per-thread JSON-RPC config stays off the app-server's process argv, including secrets.
+      ...Object.fromEntries(
+        (mcpSession?.userServers ?? []).map((server) => [
+          `mcp_servers.${JSON.stringify(server.id)}`,
+          server.type === "stdio"
+            ? {
+                command: server.command,
+                args: [...server.args],
+                env: { ...server.env },
+                cwd: server.cwd,
+              }
+            : { url: server.url, http_headers: { ...server.headers } },
+        ]),
+      ),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
       ...(input.threadId === null
         ? {}
@@ -1569,6 +1583,8 @@ function redactCodexProtocolValue(value: unknown): unknown {
 function isSensitiveCodexProtocolKey(key: string): boolean {
   const normalized = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return (
+    normalized === "env" ||
+    normalized === "httpheaders" ||
     normalized.endsWith("authorization") ||
     normalized.endsWith("apikey") ||
     normalized.endsWith("token") ||

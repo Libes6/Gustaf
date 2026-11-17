@@ -1714,5 +1714,16 @@
   "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Ctrl while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Ctrl при отправке.",
   "Add a route through the relay": "Добавить маршрут через релей",
   "Return inserts a new line. {modifier}-Return sends the message.": "Return вставляет новую строку. {modifier}-Return отправляет сообщение.",
-  "No threads in {title}": "В {title} нет тредов"
+  "No threads in {title}": "В {title} нет тредов",
+  "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.": "Долгое нажатие на кнопку отправки применяет другой вариант для одного сообщения. С аппаратной клавиатурой удерживайте Command при отправке.",
+  "MCP servers": "MCP-серверы",
+  "These switches apply to the whole environment. Add or edit MCP servers on web or desktop.": "Переключатели действуют для всего окружения. Добавляйте и редактируйте MCP-серверы в веб-версии или приложении для компьютера.",
+  "Select a connected environment.": "Выберите подключённое окружение.",
+  "Changing MCP servers requires settings and provider management permissions.": "Для изменения MCP-серверов нужны права на изменение настроек и управление провайдерами.",
+  "Changing local MCP servers also requires terminal access.": "Для изменения локальных MCP-серверов также нужен доступ к терминалу.",
+  "Your organization does not allow local MCP servers.": "Ваша организация запрещает локальные MCP-серверы.",
+  "No MCP servers configured.": "MCP-серверы не настроены.",
+  "Local (stdio)": "Локальный (stdio)",
+  "Remote (HTTP)": "Удалённый (HTTP)",
+  "Managed by your organization": "Управляется вашей организацией"
 }
