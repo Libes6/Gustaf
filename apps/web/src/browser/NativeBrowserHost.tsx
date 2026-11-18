@@ -145,6 +145,7 @@ function NativeBrowserTab({
     let cancelled = false;
     void (async () => {
       const defaults = await resolveBrowserDefaults();
+      if (cancelled) return;
       await tabs.createTab(runtimeTabId, {
         url: initialSrc,
         profileId,

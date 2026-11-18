@@ -48,13 +48,20 @@ export class McpUserServers extends Context.Service<
 
 const WINDOWS_SHIM = /\.(?:cmd|bat)$/i;
 
+function sameValues(left: Record<string, string>, right: Readonly<Record<string, string>>) {
+  return (
+    Object.keys(left).length === Object.keys(right).length &&
+    Object.entries(left).every(([key, value]) => right[key] === value)
+  );
+}
+
 const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const secrets = yield* SecretResolver.SecretResolver;
   const policy = yield* ManagedPolicy.ManagedPolicy;
   const nativeConfigs = yield* NativeMcpConfigs;
 
-  const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
+  const readNativeServers = Effect.fn("McpUserServers.readNativeServers")(function* (
     native: NativeMcpSources,
     cwd: string,
   ) {
@@ -68,16 +75,9 @@ const make = Effect.gen(function* () {
         paths: errors.map((error) => error.sourcePath),
       });
     }
-    const loaded = nativeServersForProvider(native.provider, servers, cwd, {
+    return nativeServersForProvider(native.provider, servers, cwd, {
       includeProjectMcpJson: native.includeProjectMcpJson ?? false,
     }).map((server) => ({ ...server, name: toMcpServerName(server.name) }));
-    return ([id, { transport }]: readonly [McpServerId, McpServerConfig]) =>
-      findNativeDuplicate(
-        transport.type === "stdio"
-          ? { name: id, transport: "stdio", command: transport.command, args: transport.args }
-          : { name: id, transport: "http", url: transport.url },
-        loaded,
-      ) !== undefined;
   });
 
   const resolveForThread = Effect.fn("McpUserServers.resolveForThread")(function* (input: {
@@ -96,15 +96,12 @@ const make = Effect.gen(function* () {
     if (current === undefined) return [];
     const overrides = current.projectSettingsOverrides[input.projectId]?.mcpServers;
     const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
-    let enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
+    const enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
       .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
       .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
     if (enabled.length === 0) return [];
-    if (input.native !== undefined) {
-      const isDuplicate = yield* nativeDuplicateFilter(input.native, input.cwd);
-      enabled = enabled.filter((entry) => !isDuplicate(entry));
-      if (enabled.length === 0) return [];
-    }
+    const nativeServers =
+      input.native === undefined ? [] : yield* readNativeServers(input.native, input.cwd);
 
     const slotsOf = ({ transport }: McpServerConfig) =>
       transport.type === "stdio" ? transport.env : transport.headers;
@@ -146,9 +143,24 @@ const make = Effect.gen(function* () {
       }
       const { transport } = server;
       if (transport.type === "http") {
+        const duplicate = findNativeDuplicate(
+          { name: id, transport: "http", url: transport.url },
+          nativeServers,
+        );
+        if (
+          duplicate?.transport === "http" &&
+          duplicate.bearerTokenEnvVar === undefined &&
+          sameValues(values, duplicate.headers)
+        )
+          continue;
         resolved.push({ type: "http", id, url: transport.url, headers: values });
         continue;
       }
+      const duplicate = findNativeDuplicate(
+        { name: id, transport: "stdio", command: transport.command, args: transport.args },
+        nativeServers,
+      );
+      if (duplicate?.transport === "stdio" && sameValues(values, duplicate.env)) continue;
       // Providers spawn without a login shell, so the server needs the PATH the server hydrated.
       const env =
         hostPathKey === undefined || Object.keys(values).some(isPathKey)

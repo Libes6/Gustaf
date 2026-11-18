@@ -47,7 +47,9 @@ describe("parseSubscriptionDraft", () => {
   it("names every invalid field instead of saving", () => {
     const result = parseSubscriptionDraft(
       {
-        ...emptySubscriptionDraft(""),
+        ...emptySubscriptionDraft("2026-02-29"),
+        cancelled: true,
+        activeUntil: "2026-04-31",
         amount: "-1",
         currency: "dollars",
         periodCount: "0",
@@ -56,6 +58,7 @@ describe("parseSubscriptionDraft", () => {
       undefined,
     );
     expect(result.ok ? [] : [...result.errors].toSorted()).toEqual([
+      "activeUntil",
       "amount",
       "anchorDate",
       "currency",

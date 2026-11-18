@@ -208,7 +208,11 @@ it.effect("points Windows at the npm shim a bare command names", () =>
 
 it.effect("leaves out a server the provider already loads from its own config", () =>
   Effect.gen(function* () {
-    const native = (name: string, args: ReadonlyArray<string>): NativeMcpServer => ({
+    const native = (
+      name: string,
+      args: ReadonlyArray<string>,
+      env: Readonly<Record<string, string>> = {},
+    ): NativeMcpServer => ({
       source: "codex",
       sourcePath: "/home/u/.codex/config.toml",
       name,
@@ -216,28 +220,42 @@ it.effect("leaves out a server the provider already loads from its own config", 
       transport: "stdio",
       command: "npx",
       args,
-      env: {},
+      env,
     });
     const servers = yield* resolve(
       {
         mcpServers: {
           playwright: stdio(true, { args: ["-y", "@playwright/mcp@latest"] }),
           other: stdio(true, { args: ["-y", "server"] }),
+          rotated: http(true, { Authorization: vault("op://rotated") }),
+          unchanged: http(true, { Authorization: vault("op://unchanged") }),
+          "configured-env": stdio(true, { env: { PROFILE: "gustaf" } }),
         },
       },
       {
+        secrets: { "op://rotated": "Bearer new", "op://unchanged": "Bearer same" },
         native: {
           sources: { provider: "codex", homeDir: "/home/u" },
           servers: [
             native("Playwright", ["-y", "@playwright/mcp@latest"]),
             native("other", ["-y", "different"]),
+            native("configured-env", ["-y", "server"], { PROFILE: "native" }),
+            ...(["rotated", "unchanged"] as const).map((name): NativeMcpServer => ({
+              source: "codex",
+              sourcePath: "/home/u/.codex/config.toml",
+              name,
+              enabled: true,
+              transport: "http",
+              url: "https://mcp.example.test/mcp",
+              headers: { Authorization: name === "rotated" ? "Bearer old" : "Bearer same" },
+            })),
           ],
         },
       },
     );
     assert.deepStrictEqual(
       servers.map((server) => server.id),
-      ["other"],
+      ["other", "rotated", "configured-env"],
     );
   }),
 );

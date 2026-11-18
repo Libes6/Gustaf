@@ -324,6 +324,7 @@ const desktopRenders = (tabId: string) => {
 const shownDesktopTabs = new Set<string>();
 const releasedDesktopTabs: Array<string> = [];
 const desktopTurns = new NodeEvents.EventEmitter();
+const desktopZoomChanges: Array<[string, number]> = [];
 const desktopConnections: Array<{ endpoint: string; context: ReturnType<typeof makeContext> }> = [];
 const testThread = {
   threadId: ThreadId.make("browser-test-thread"),
@@ -390,6 +391,8 @@ const dependencies = Layer.mergeAll(
         }),
       ),
     pointer: () => Effect.void,
+    setZoom: ({ tabId }, zoomFactor) =>
+      Effect.sync(() => void desktopZoomChanges.push([tabId, zoomFactor])),
     turn: (threadId, active) => Effect.sync(() => desktopTurns.emit("turn", threadId, active)),
   }),
   PreviewAgentActivity.layer,
@@ -466,6 +469,7 @@ beforeEach(() => {
   desktopReleased = Promise.withResolvers<void>();
   releasedDesktopTabs.length = 0;
   desktopConnections.length = 0;
+  desktopZoomChanges.length = 0;
 });
 
 it("spaces screencast acks so a page repainting nonstop streams at a capped rate", () => {
@@ -1895,6 +1899,45 @@ it.effect(
         ]);
       }),
     ).pipe(Effect.provide(layer)),
+);
+
+it.effect("sends a desktop preview the new zoom level and reset from its snapshot", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { broker } = yield* ready;
+      const manager = yield* Manager.PreviewManager;
+      desktopRendersNext = true;
+      const opened = yield* broker.invoke<PreviewAutomationStatus>({
+        scope,
+        operation: "open",
+        input: { reuseExistingTab: false, show: false },
+      });
+      const tabId = PreviewTabId.make(opened.tabId!);
+      const cdp = desktopConnections[0]!.context.sessions[0]!;
+      const reloads = yield* Queue.unbounded<void>();
+      const send = cdp.send.getMockImplementation()!;
+      cdp.send.mockImplementation(async (method, input) => {
+        if (method === "Page.reload") Queue.offerUnsafe(reloads, undefined);
+        return send(method, input);
+      });
+
+      for (const zoomFactor of [1.5, 1] as const) {
+        yield* manager.adjust({
+          threadId: scope.thread.threadId,
+          tabId,
+          zoomFactor,
+          hardReload: true,
+        });
+        // The reload runs after the resize event applies the zoom.
+        yield* Queue.take(reloads);
+      }
+
+      expect(desktopZoomChanges).toEqual([
+        [tabId, 1.5],
+        [tabId, 1],
+      ]);
+    }),
+  ).pipe(Effect.provide(layer)),
 );
 
 it.effect("a stalled desktop viewer still gets its size, control and reconnect", () =>

@@ -6,6 +6,7 @@ import {
   DesktopBrowserCommand,
   DesktopBrowserEvent,
   type DesktopBrowserCommand as DesktopBrowserCommandType,
+  type PreviewZoomFactor,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
@@ -47,6 +48,7 @@ export class DesktopBrowserChannel extends Context.Service<
     /** Whether a desktop window draws the tab on screen, which no streamed viewer counts. */
     readonly isShown: (key: DesktopTabKey) => boolean;
     readonly endpoint: (key: DesktopTabKey) => Effect.Effect<string, never, Scope.Scope>;
+    readonly setZoom: (key: DesktopTabKey, zoomFactor: PreviewZoomFactor) => Effect.Effect<void>;
     readonly pointer: (
       key: DesktopTabKey,
       pointer: { readonly phase: "move" | "click"; readonly x: number; readonly y: number },
@@ -83,6 +85,9 @@ const make = Effect.gen(function* () {
         return Effect.die("No desktop app is attached to this server.");
       }),
       turn: Effect.fn("DesktopBrowserChannel.turn")(function () {
+        return Effect.void;
+      }),
+      setZoom: Effect.fn("DesktopBrowserChannel.setZoom")(function () {
         return Effect.void;
       }),
       pointer: Effect.fn("DesktopBrowserChannel.pointer")(function () {
@@ -245,6 +250,9 @@ const make = Effect.gen(function* () {
     endpoint,
     turn: Effect.fn("DesktopBrowserChannel.turn")(function (threadId, active) {
       return command({ type: "turn", threadId, active });
+    }),
+    setZoom: Effect.fn("DesktopBrowserChannel.setZoom")(function (key, zoomFactor) {
+      return command({ type: "zoom", ...key, zoomFactor });
     }),
     pointer: Effect.fn("DesktopBrowserChannel.pointer")(function (key, pointer) {
       return command({ type: "pointer", ...key, ...pointer });

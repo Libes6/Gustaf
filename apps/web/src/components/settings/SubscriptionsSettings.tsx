@@ -68,9 +68,10 @@ function formatMoney(language: UiLanguage, amount: number, currency: string) {
 }
 
 function formatDay(language: UiLanguage, date: string) {
-  return new Intl.DateTimeFormat(language, { dateStyle: "medium", timeZone: "UTC" }).format(
-    new Date(`${date}T00:00:00Z`),
-  );
+  const instant = new Date(`${date}T00:00:00Z`);
+  return Number.isFinite(instant.getTime())
+    ? new Intl.DateTimeFormat(language, { dateStyle: "medium", timeZone: "UTC" }).format(instant)
+    : date;
 }
 
 function periodLabel(t: Translate, period: SubscriptionPeriod | null) {
@@ -299,6 +300,7 @@ const ERROR_KEYS = {
   currency: "subscriptions.error.currency",
   periodCount: "subscriptions.error.count",
   anchorDate: "subscriptions.error.date",
+  activeUntil: "subscriptions.error.date",
   reminderDaysBefore: "subscriptions.error.reminder",
 } as const satisfies Record<SubscriptionDraftField, string>;
 
@@ -509,7 +511,9 @@ function SubscriptionDialog({
                     type="date"
                     value={draft.activeUntil}
                     onChange={(event) => update({ activeUntil: event.target.value })}
+                    aria-invalid={errorFor("activeUntil") !== undefined}
                   />,
+                  { error: errorFor("activeUntil") },
                 )
               : null}
             {field(

@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { PreviewZoomFactor } from "./preview.ts";
 
 const TabKey = {
   threadId: TrimmedNonEmptyString,
@@ -20,6 +21,7 @@ export type DesktopBrowserEvent = typeof DesktopBrowserEvent.Type;
 export const DesktopBrowserCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("cdp"), ...TabKey, message: Schema.String }),
   Schema.Struct({ type: Schema.Literal("release"), ...TabKey }),
+  Schema.Struct({ type: Schema.Literal("zoom"), ...TabKey, zoomFactor: PreviewZoomFactor }),
   Schema.Struct({
     type: Schema.Literal("pointer"),
     ...TabKey,

@@ -139,7 +139,8 @@ fn serve(app: &AppHandle, stream: UnixStream) {
             let Ok(command) = serde_json::from_str::<Value>(&line) else {
                 continue;
             };
-            let _ = commands.run_on_main_thread(move || on_command(command));
+            let app = commands.clone();
+            let _ = commands.run_on_main_thread(move || on_command(&app, command));
         }
     });
 }
@@ -218,14 +219,14 @@ fn publish(app: &AppHandle, tab_id: &str) {
         "loading": loading,
         "canGoBack": can_go_back,
         "canGoForward": can_go_forward,
-        "zoomFactor": 1.0,
+        "zoomFactor": host::zoom_factor(tab_id),
     });
     if let Some(page) = app.get_webview("main") {
         let _ = page.eval(format!("window.__gustafNativeBrowserState?.({state})"));
     }
 }
 
-fn on_command(command: Value) {
+fn on_command(app: &AppHandle, command: Value) {
     let server = |command: &Value| ServerTab {
         thread_id: command["threadId"].as_str().unwrap_or_default().to_owned(),
         tab_id: command["tabId"].as_str().unwrap_or_default().to_owned(),
@@ -234,6 +235,17 @@ fn on_command(command: Value) {
         Some("cdp") => {
             if let Some(tab) = shell_tab_of(&server(&command)) {
                 host::from_client(&tab, command["message"].as_str().unwrap_or_default());
+            }
+        }
+        Some("zoom") => {
+            if let (Some(tab), Some(zoom)) = (
+                shell_tab_of(&server(&command)),
+                command["zoomFactor"]
+                    .as_f64()
+                    .filter(|zoom| (0.25..=5.0).contains(zoom)),
+            ) {
+                host::set_zoom(&tab, zoom);
+                publish(app, &tab);
             }
         }
         Some("pointer") => {
