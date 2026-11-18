@@ -22,8 +22,10 @@ export function missingReleaseAssets(version, files, { manifest = true } = {}) {
     }
   }
   if (manifest && !(files.root ?? []).includes("latest.json")) missing.push("latest.json");
+  // stage-release.mjs packs it on the macOS runner, so it arrives with that platform's installers.
   const browserArchive = `gustaf-browser-${version}-darwin-arm64.tar.xz`;
-  if (!(files.root ?? []).includes(browserArchive)) missing.push(browserArchive);
+  if (!(files["darwin-aarch64"] ?? []).includes(browserArchive))
+    missing.push(`darwin-aarch64: ${browserArchive}`);
   return missing;
 }
 

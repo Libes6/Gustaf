@@ -8,6 +8,7 @@ const full = {
     `Gustaf-${v}-macOS-arm64.dmg`,
     `Gustaf-${v}-macOS-arm64.app.tar.gz`,
     `Gustaf-${v}-macOS-arm64.app.tar.gz.sig`,
+    `gustaf-browser-${v}-darwin-arm64.tar.xz`,
   ],
   "windows-x86_64": [
     `Gustaf-${v}-Windows-x64-setup.exe`,
@@ -15,7 +16,7 @@ const full = {
     `Gustaf-${v}-Windows-x64.msi`,
   ],
   "linux-x86_64": [`Gustaf-${v}-Linux-x64.AppImage`, `Gustaf-${v}-Linux-x64.AppImage.sig`],
-  root: ["latest.json", `gustaf-browser-${v}-darwin-arm64.tar.xz`],
+  root: ["latest.json"],
 };
 
 NodeTest.test(
@@ -43,7 +44,7 @@ NodeTest.test("names each missing artifact per platform", () => {
     "windows-x86_64: *-setup.exe",
     "windows-x86_64: *-setup.exe.sig",
     "latest.json",
-    `gustaf-browser-${v}-darwin-arm64.tar.xz`,
+    `darwin-aarch64: gustaf-browser-${v}-darwin-arm64.tar.xz`,
   ]);
   NodeAssert.deepEqual(
     missingReleaseAssets(v, { ...broken, root: [] }, { manifest: false }).includes("latest.json"),
