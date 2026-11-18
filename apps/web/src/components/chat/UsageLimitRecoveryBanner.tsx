@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   type OrchestrationV2LimitRecovery,
   type OrchestrationV2LimitRecoveryUpdate,
@@ -90,7 +92,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
         {recoveryActions}
         {workspaceLimit ? (
           <Button size="xs" variant="ghost" onClick={copyAdminRequest}>
-            Copy request for admin
+            {translate(getUiLanguage(), "webCopy.copyRequestForAdmin")}
           </Button>
         ) : (
           <ChatGptUsageButton size="xs" variant="ghost" />

@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import {
   cancelEnvironmentSpeechModelDownload,
   downloadEnvironmentSpeechModel,
@@ -142,6 +143,7 @@ export function useVoiceTranscriptionDestination() {
 }
 
 export function useEnvironmentSpeechInput(input: HookInput) {
+  const t = useT();
   const navigate = useNavigate();
   const destination = useVoiceTranscriptionDestination();
   const prepared = destination.prepared;
@@ -348,8 +350,8 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       onPostProcessingError: () =>
         toastManager.add({
           type: "warning",
-          title: "Transcript cleanup failed",
-          description: "The original transcript was added.",
+          title: t("webCopy.transcriptCleanupFailed"),
+          description: t("webCopy.theOriginalTranscriptWasAdded"),
         }),
       readDraft,
       commitDraft: (text, selection) => {
@@ -373,7 +375,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       controller.dispose();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [prepared, grantId, cloudProvider, cloudModel]);
+  }, [prepared, grantId, cloudProvider, cloudModel, t]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- probes the chosen environment's speech status once its connection is available
   useEffect(() => {
@@ -506,7 +508,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       setQueuedStart(null);
       toastManager.add({
         type: "error",
-        title: "Could not start voice input",
+        title: t("webCopy.couldNotStartVoiceInput"),
         description: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -520,7 +522,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
     if (!latestStatus.supported) {
       toastManager.add({
         type: "error",
-        title: "Voice input is not available",
+        title: t("webCopy.voiceInputIsNotAvailable"),
         description: latestStatus.reason,
       });
       return;

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 /* oxlint-disable react/no-array-index-key -- Captured table cells have stable positions and may contain identical values. */
 import { ScrollView, View } from "react-native";
 import type { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
@@ -11,7 +12,7 @@ export function DelimitedFilePreview(props: {
     <ScrollView className="flex-1">
       {props.table.truncated ? (
         <FilePreviewNotice>
-          Table limited to the first 100 rows and 30 columns. Source shows the rest.
+          {t("Table limited to the first 100 rows and 30 columns. Source shows the rest.")}
         </FilePreviewNotice>
       ) : null}
       <ScrollView horizontal>

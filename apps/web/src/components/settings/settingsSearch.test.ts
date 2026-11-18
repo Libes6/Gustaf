@@ -366,3 +366,13 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/appearance", "theme")).toBeNull();
   });
 });
+
+it("finds translated settings titles in Russian and English", () => {
+  expect(searchSettings("Балансировка нагрузки", SETTINGS_SEARCH_ITEMS, "ru")[0]).toMatchObject({
+    id: "load-balancing",
+    title: "Балансировка нагрузки",
+  });
+  expect(searchSettings("load balancing", SETTINGS_SEARCH_ITEMS, "ru")[0]?.id).toBe(
+    "load-balancing",
+  );
+});

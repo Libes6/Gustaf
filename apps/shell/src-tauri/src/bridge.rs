@@ -7,6 +7,7 @@
 //! the desktop app) and keeps `window.gustafShell` for shell-only helpers.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 
 /// Runs in the main frame before the page's own code.
@@ -49,10 +50,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     downloadUpdate: () => invoke("update_download"),
     installUpdate: (expectedVersion) =>
       invoke("update_install", { expectedVersion: expectedVersion ?? null }),
-    openExternal: async (url) => {
-      window.open(url, "_blank");
-      return true;
-    },
+    openExternal: (url) => invoke("open_external", { url: String(url) }),
   });
 
   const invokeCli = (command) =>
@@ -78,22 +76,27 @@ const INIT_SCRIPT: &str = r#"(() => {
 
   const fullscreenListeners = new Set();
   let fullscreen = false;
-  window.__gustafFullscreenState = (value) => {
+  const setFullscreen = (value) => {
     if (fullscreen === value) return;
     fullscreen = value;
     for (const listener of fullscreenListeners) listener(value);
   };
   let fullscreenRequest = 0;
+  // A push is newer than any seed answer still in flight, so that answer must not overwrite it.
+  window.__gustafFullscreenState = (value) => {
+    fullscreenRequest++;
+    setFullscreen(value);
+  };
   const refreshFullscreen = async () => {
     const request = ++fullscreenRequest;
     try {
       const value = await invoke("window_fullscreen_state");
-      if (request === fullscreenRequest) window.__gustafFullscreenState(value);
+      if (request === fullscreenRequest) setFullscreen(value);
     } catch (error) {
       console.error(error);
     }
   };
-  window.addEventListener("resize", refreshFullscreen);
+  // The shell pushes later changes (`push_fullscreen`); this only seeds a freshly loaded page.
   refreshFullscreen();
 
   // Migrate the previous, port-specific browser settings only after saving succeeds.
@@ -223,6 +226,7 @@ const INIT_SCRIPT: &str = r#"(() => {
       fullscreenListeners.add(listener);
       return () => fullscreenListeners.delete(listener);
     },
+    // The shell has no app zoom, so the page is always at 1.
     getWindowZoomFactor: () => 1,
     onQuitShortcut: () => () => {},
     discoverSshHosts: () => ssh("discover"),
@@ -304,8 +308,8 @@ const INIT_SCRIPT: &str = r#"(() => {
     pasteAsText: async () => false,
     setTheme: (theme) => invoke("set_window_theme", { theme }),
     openExternal: updater.openExternal,
-    openSystemSettings: async () => false,
-    checkSystemPermission: async () => false,
+    openSystemSettings: (pane) => invoke("open_system_settings", { pane }),
+    checkSystemPermission: (pane) => invoke("check_system_permission", { pane }),
     getWslState: async () => ({
       enabled: false,
       distro: null,
@@ -428,6 +432,93 @@ pub(crate) fn reveal_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub(crate) fn window_fullscreen_state(window: tauri::Window) -> Result<bool, String> {
     window.is_fullscreen().map_err(|error| error.to_string())
+}
+
+/// `SystemSettingsPane` in `packages/contracts/src/ipc.ts`.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SystemSettingsPane {
+    FullDiskAccess,
+}
+
+/// The page asks whether the system took the link, so the answer is the opener's real exit status.
+#[tauri::command]
+pub(crate) async fn open_external(url: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || {
+        url.parse::<tauri::Url>()
+            .is_ok_and(|url| crate::open_external_url_checked(&url))
+    })
+    .await
+    .unwrap_or(false)
+}
+
+#[tauri::command]
+pub(crate) async fn open_system_settings(pane: SystemSettingsPane) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let SystemSettingsPane::FullDiskAccess = pane;
+        tauri::async_runtime::spawn_blocking(|| {
+            std::process::Command::new("open")
+                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+                .spawn()
+                .is_ok_and(|child| crate::opener_succeeded(child, crate::OPENER_GRACE))
+        })
+        .await
+        .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let SystemSettingsPane::FullDiskAccess = pane;
+        false
+    }
+}
+
+/// Files only a process with Full Disk Access can open; the first that opens settles it.
+#[cfg(target_os = "macos")]
+fn full_disk_access_probes() -> Vec<std::io::Result<()>> {
+    let mut probes =
+        vec![std::fs::File::open("/Library/Application Support/com.apple.TCC/TCC.db").map(drop)];
+    if let Some(home) = std::env::var_os("HOME") {
+        probes.push(std::fs::read_dir(Path::new(&home).join("Library/Safari")).map(drop));
+    }
+    probes
+}
+
+fn any_probe_opened(probes: &[std::io::Result<()>]) -> bool {
+    probes.iter().any(Result::is_ok)
+}
+
+/// Only macOS gates files behind a permission; elsewhere there is nothing to grant.
+#[tauri::command]
+pub(crate) fn check_system_permission(pane: SystemSettingsPane) -> bool {
+    let SystemSettingsPane::FullDiskAccess = pane;
+    #[cfg(target_os = "macos")]
+    {
+        any_probe_opened(&full_disk_access_probes())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+/// True when `now` differs from what was last pushed; remembers `now`.
+fn fullscreen_changed(last: &AtomicBool, now: bool) -> bool {
+    last.swap(now, Ordering::SeqCst) != now
+}
+
+/// Tells the page when the window enters or leaves fullscreen, so it need not ask on every resize.
+pub(crate) fn push_fullscreen(app: &tauri::AppHandle) {
+    static LAST: AtomicBool = AtomicBool::new(false);
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(now) = window.is_fullscreen() else {
+        return;
+    };
+    if fullscreen_changed(&LAST, now) {
+        let _ = window.eval(format!("window.__gustafFullscreenState?.({now})"));
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -593,7 +684,95 @@ pub(crate) fn dropped_paths(app: tauri::AppHandle) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{free_destination, init_script, is_handoff_url};
+    use super::{
+        any_probe_opened, free_destination, fullscreen_changed, init_script, is_handoff_url,
+        SystemSettingsPane,
+    };
+    use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn the_permission_is_granted_once_a_protected_file_opens() {
+        let denied = || Err(Error::from(ErrorKind::PermissionDenied));
+        assert!(!any_probe_opened(&[]));
+        assert!(!any_probe_opened(&[
+            denied(),
+            Err(Error::from(ErrorKind::NotFound))
+        ]));
+        assert!(any_probe_opened(&[denied(), Ok(())]));
+    }
+
+    #[test]
+    fn the_page_names_the_pane_the_way_the_contract_does() {
+        let pane: SystemSettingsPane = serde_json::from_str(r#""full-disk-access""#).unwrap();
+        assert!(matches!(pane, SystemSettingsPane::FullDiskAccess));
+        assert!(serde_json::from_str::<SystemSettingsPane>(r#""camera""#).is_err());
+    }
+
+    use std::sync::atomic::AtomicBool;
+
+    #[test]
+    fn the_page_hears_only_fullscreen_changes() {
+        let last = AtomicBool::new(false);
+        assert!(!fullscreen_changed(&last, false));
+        assert!(fullscreen_changed(&last, true));
+        assert!(!fullscreen_changed(&last, true));
+        assert!(fullscreen_changed(&last, false));
+    }
+
+    /// Runs the init script in node with a fake window. The seed query answers `false`
+    /// only after the shell has pushed `true`; returns what the page believes at the end.
+    fn page_fullscreen_after_late_seed_answer() -> String {
+        use std::io::Write;
+        const HARNESS: &str = r#"
+const script = require("fs").readFileSync(0, "utf8");
+let answerSeed;
+const window = {
+  location: { hostname: "localhost" },
+  localStorage: { getItem: () => null, removeItem() {} },
+  __TAURI_INTERNALS__: {
+    invoke: (command) =>
+      command === "window_fullscreen_state"
+        ? new Promise((resolve) => { answerSeed = resolve; })
+        : new Promise(() => {}),
+  },
+};
+window.top = window;
+const document = { addEventListener() {}, documentElement: {} };
+new Function("window", "document", "navigator", script)(window, document, { language: "en" });
+(async () => {
+  window.__gustafFullscreenState(true);
+  answerSeed(false);
+  await new Promise((resolve) => setImmediate(resolve));
+  console.log(window.desktopBridge.getWindowFullscreenState());
+})();
+"#;
+        let mut node = std::process::Command::new("node")
+            .args(["-e", HARNESS])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("node runs the init script");
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
+        node.stdin
+            .take()
+            .unwrap()
+            .write_all(script.as_bytes())
+            .unwrap();
+        let output = node.wait_with_output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    }
+
+    #[test]
+    fn a_late_seed_answer_does_not_undo_a_pushed_fullscreen_change() {
+        assert_eq!(page_fullscreen_after_late_seed_answer(), "true");
+    }
+
+    #[test]
+    fn the_page_no_longer_asks_on_every_resize() {
+        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
+        assert!(!script.contains(r#"addEventListener("resize""#));
+    }
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {

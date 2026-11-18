@@ -21,6 +21,21 @@ import { useT } from "~/useUiLanguage";
 
 const MIN_URL_LIFE_MS = 5 * 60_000;
 
+// The timeline unmounts rows that leave its render zone. A remounted frame starts at the
+// last height its page reported, so the row does not jump while the iframe reloads.
+const MAX_REMEMBERED_HEIGHTS = 200;
+const rememberedHeights = new Map<string, number>();
+const rememberedHeightKey = (attachmentId: string, width: number) =>
+  `${attachmentId}:${Math.round(width)}`;
+function rememberHeight(attachmentId: string, width: number, height: number) {
+  const key = rememberedHeightKey(attachmentId, width);
+  rememberedHeights.delete(key);
+  rememberedHeights.set(key, height);
+  if (rememberedHeights.size > MAX_REMEMBERED_HEIGHTS) {
+    rememberedHeights.delete(rememberedHeights.keys().next().value!);
+  }
+}
+
 export function HtmlRenderFrame(props: {
   readonly environmentId: EnvironmentId;
   readonly htmlRender: HtmlRenderReference;
@@ -37,7 +52,9 @@ export function HtmlRenderFrame(props: {
     });
   };
   // Client fonts can exceed the server-measured height and cause nested scrolling.
-  const [contentHeight, setContentHeight] = useState<number>();
+  const [liveHeight, setLiveHeight] = useState<number>();
+  const contentHeight =
+    liveHeight ?? rememberedHeights.get(rememberedHeightKey(attachmentId, width));
   const height = htmlRenderFrameHeight(props.htmlRender, width, contentHeight);
   const fileName = htmlRenderFileName(title);
   const resource = {
@@ -77,7 +94,10 @@ export function HtmlRenderFrame(props: {
             title={title}
             threadRef={props.threadRef}
             className="block size-full"
-            onContentHeight={setContentHeight}
+            onContentHeight={(reported) => {
+              rememberHeight(attachmentId, width, reported);
+              setLiveHeight(reported);
+            }}
             onFullscreenChange={onFullscreenChange}
           />
           <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
@@ -120,7 +140,7 @@ export function HtmlRenderFrame(props: {
         </>
       ) : failed ? (
         <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          Unable to load {title}
+          {t("webCopy.unableToLoad")} {title}
         </p>
       ) : null}
     </div>

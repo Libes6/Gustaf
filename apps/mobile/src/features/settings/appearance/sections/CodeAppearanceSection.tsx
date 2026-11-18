@@ -22,7 +22,7 @@ export function CodeAppearanceSection() {
   };
 
   return (
-    <SettingsSection title="Code & Diffs">
+    <SettingsSection title={t("Code & Diffs")}>
       <CodeAppearancePreview
         fontSize={appearance.codeFontSize}
         wordBreak={appearance.codeWordBreak}
@@ -31,7 +31,7 @@ export function CodeAppearanceSection() {
       <SettingsSwitchRow
         disabled={!isReady}
         icon="chevron.left.forwardslash.chevron.right"
-        label="Custom font size"
+        label={t("Custom font size")}
         onValueChange={handleToggleCustom}
         value={custom}
       />
@@ -51,7 +51,7 @@ export function CodeAppearanceSection() {
       <SettingsSwitchRow
         disabled={!isReady}
         icon="text.word.spacing"
-        label="Word break"
+        label={t("Word break")}
         onValueChange={setCodeWordBreak}
         value={appearance.codeWordBreak}
       />

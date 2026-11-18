@@ -28,7 +28,7 @@ export function PullRequestOverviewLoading({
   return (
     <View
       className="gap-5"
-      accessibilityLabel="Loading pull request details"
+      accessibilityLabel={t("Loading pull request details")}
       accessibilityState={{ busy: true }}
     >
       <PullRequestStackCard params={params} state={stack} />
@@ -37,12 +37,12 @@ export function PullRequestOverviewLoading({
           compact
           title={
             summary.checksState === "passing"
-              ? "Checks completed"
+              ? t("Checks completed")
               : summary.checksState === "failing"
-                ? "Checks failing"
+                ? t("Checks failing")
                 : summary.checksState === "pending"
-                  ? "Checks running"
-                  : "Checks"
+                  ? t("Checks running")
+                  : t("Checks")
           }
           icon={
             summary.checksState === "passing"
@@ -63,7 +63,7 @@ export function PullRequestOverviewLoading({
         </PullRequestCardRow>
         <PullRequestCardRow
           compact
-          title={review?.accessibleLabel ?? "Reviews"}
+          title={review?.accessibleLabel ?? t("Reviews")}
           icon={review?.icon ?? "bubble.left"}
           tint={review?.tint}
         >
@@ -76,7 +76,7 @@ export function PullRequestOverviewLoading({
               ? `Conflicts with ${summary.baseBranch}`
               : clean
                 ? `No conflicts with ${summary.baseBranch}`
-                : "Branch"
+                : t("Branch")
           }
           icon={
             conflicting ? PullRequestGlyph.conflicting : clean ? "checkmark.circle" : "arrow.branch"

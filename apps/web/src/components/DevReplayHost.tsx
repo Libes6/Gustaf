@@ -134,7 +134,7 @@ export function DevReplayHost() {
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
             <p className="text-sm text-muted-foreground">
-              Needs a project and the Replay (dev) provider, which dev servers start.
+              {t("webCopy.needsAProjectAndTheReplayDevProviderWhichDev")}
             </p>
           ) : (
             <div className="flex flex-col items-start gap-1">

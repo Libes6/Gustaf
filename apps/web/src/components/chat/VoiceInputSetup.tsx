@@ -114,9 +114,10 @@ export function VoiceInputSetup(props: {
                     ) : null}
                   </div>
                   <p className="mt-2 text-muted-foreground">
-                    Download the {Math.round(model.size / 1024 / 1024)} MB model to{" "}
-                    {environment?.label ?? "your transcription environment"}. Microphone audio is
-                    sent there for transcription, as chosen in Voice settings.
+                    {t("webCopy.downloadThe")} {Math.round(model.size / 1024 / 1024)}{" "}
+                    {t("webCopy.mBModelTo")}{" "}
+                    {environment?.label ?? t("chatB.VoiceInputSetup.yourTranscriptionEnvironment")}
+                    {t("webCopy.microphoneAudioIsSentThereForTranscriptionAsChosenIn")}
                   </p>
                   <p className="mt-2 text-muted-foreground">
                     {t("chatB.VoiceInputSetup.sileroNote")}

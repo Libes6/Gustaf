@@ -35,7 +35,8 @@ export function ChatGptUsageSummary({
         </Pressable>
       </View>
       <Text className="text-xs text-foreground-muted">
-        {usage.accounts.join(", ")}. Open ChatGPT with the account you connected.
+        {usage.accounts.join(", ")}
+        {t(". Open ChatGPT with the account you connected.")}
       </Text>
     </View>
   );

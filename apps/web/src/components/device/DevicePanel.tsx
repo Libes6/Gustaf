@@ -240,8 +240,9 @@ export function DevicePanel(props: {
           <DeviceHostUpdates state={state} environmentId={environmentId} />
           {bootingDevices.length > 0 ? (
             <div role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">
-              Starting {bootingDevices.map((device) => device.name).join(", ")}… This can take a
-              minute.
+              {t("settingsB.DeviceSourcesSettings.starting")}{" "}
+              {bootingDevices.map((device) => device.name).join(", ")}
+              {t("webCopy.thisCanTakeAMinute")}
             </div>
           ) : null}
           {operationError ? (
@@ -287,7 +288,7 @@ export function DevicePanel(props: {
             >
               {loadError !== null ? (
                 <Button size="sm" variant="outline" onClick={refreshState}>
-                  Retry
+                  {t("sidebar.SidebarUpdateCapsule.retry")}
                 </Button>
               ) : null}
             </DeviceLoadingView>
@@ -367,8 +368,7 @@ export function DevicePanel(props: {
                 !state.devices.some((device) => device.platform === "android") &&
                 !unavailablePlatforms.some((platform) => platform.platform === "android") ? (
                   <p className="max-w-sm text-xs">
-                    No Android virtual devices found. Create one in Android Studio's Device Manager,
-                    then refresh.
+                    {t("webCopy.noAndroidVirtualDevicesFoundCreateOneInAndroidStudio")}
                   </p>
                 ) : null}
                 {loaded && !hostBusy ? (
@@ -378,7 +378,7 @@ export function DevicePanel(props: {
                     size="sm"
                     onClick={() => void list({ environmentId, input: {} })}
                   >
-                    Refresh devices
+                    {t("webCopy.refreshDevices")}
                   </Button>
                 ) : null}
               </div>
@@ -466,7 +466,7 @@ function DeviceDiscoveryWarning(props: {
             aria-label={`Details for ${props.label}`}
             render={<Button size="micro" variant="ghost" />}
           >
-            Details
+            {t("settingsD.relay.detailsTitle")}
           </PopoverTrigger>
           <PopoverPopup side="bottom" align="end" width="lg" padding="compact">
             <p className="whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">

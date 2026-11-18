@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { offersLinkedEnvironments } from "@t3tools/client-runtime/link-request";
 import { peerLinkHealth } from "@t3tools/client-runtime/state/peerLinks";
 import { useFocusEffect } from "@react-navigation/native";
@@ -51,7 +52,7 @@ export function LinkedEnvironmentsSection(props: {
             health.kind === "expired"
               ? "Expired. Link it again with a new pairing code."
               : health.kind === "unreachable"
-                ? (health.detail ?? "Not answering right now.")
+                ? (health.detail ?? t("Not answering right now."))
                 : health.kind === "failing"
                   ? health.detail
                   : health.expiresInDays !== null

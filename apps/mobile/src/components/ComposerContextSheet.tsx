@@ -204,18 +204,20 @@ export function ComposerContextSheet(props: {
       >
         {terminal ? (
           <Text className="text-sm text-foreground-muted">
-            Lines {terminal.lineStart}–{terminal.lineEnd}
+            {t("Lines")} {terminal.lineStart}–{terminal.lineEnd}
           </Text>
         ) : null}
         {!record ? (
           <Text className="text-foreground">
-            Context unavailable. The reference was copied without its payload. Copy it again from
-            the original message or remove it.
+            {t(
+              "Context unavailable. The reference was copied without its payload. Copy it again from the original message or remove it.",
+            )}
           </Text>
         ) : "payload" in record ? (
           <Text className="text-foreground">
-            This context type is not supported by this version of the app. Its payload will be
-            preserved when sent.
+            {t(
+              "This context type is not supported by this version of the app. Its payload will be preserved when sent.",
+            )}
           </Text>
         ) : (
           <>
@@ -265,10 +267,13 @@ export function ComposerContextSheet(props: {
             {record.kind === "preview-annotation" ? (
               <>
                 <ContextField label={t("Page")} value={record.pageTitle ?? record.pageUrl} />
-                <ContextField label="URL" value={record.pageUrl} />
+                <ContextField label={t("URL")} value={record.pageUrl} />
                 <ContextField label={t("Comment")} value={record.comment} />
-                <ContextField label="Selection" value={record.targetSummary} />
-                <ContextField label="Requested changes" value={record.styleChanges.join("\n")} />
+                <ContextField label={t("Selection")} value={record.targetSummary} />
+                <ContextField
+                  label={t("Requested changes")}
+                  value={record.styleChanges.join("\n")}
+                />
                 {record.elements?.map(
                   (element, index) => (
                     /* oxlint-disable react/no-array-index-key -- Captured DOM elements are a fixed snapshot without persistent element IDs. */ <View
@@ -276,13 +281,13 @@ export function ComposerContextSheet(props: {
                       className="gap-3"
                     >
                       <ContextField
-                        label="Element"
+                        label={t("Element")}
                         value={element.componentName ?? element.tagName}
                       />
-                      <ContextField label="Selector" value={element.selector} code />
+                      <ContextField label={t("Selector")} value={element.selector} code />
                       <ContextSource source={element.source} />
-                      <ContextField label="HTML" value={element.htmlPreview} code />
-                      <ContextField label="Styles" value={element.styles} code />
+                      <ContextField label={t("HTML")} value={element.htmlPreview} code />
+                      <ContextField label={t("Styles")} value={element.styles} code />
                     </View>
                   ) /* oxlint-enable react/no-array-index-key */,
                 )}
@@ -291,11 +296,11 @@ export function ComposerContextSheet(props: {
             {record.kind === "element" ? (
               <>
                 <ContextField label={t("Page")} value={record.pageUrl} />
-                <ContextField label="Element" value={record.componentName ?? record.tagName} />
-                <ContextField label="Selector" value={record.selector} code />
+                <ContextField label={t("Element")} value={record.componentName ?? record.tagName} />
+                <ContextField label={t("Selector")} value={record.selector} code />
                 <ContextSource source={record.source} />
-                <ContextField label="HTML" value={record.htmlPreview} code />
-                <ContextField label="Styles" value={record.styles} code />
+                <ContextField label={t("HTML")} value={record.htmlPreview} code />
+                <ContextField label={t("Styles")} value={record.styles} code />
               </>
             ) : null}
             {record.kind === "image" ? (
@@ -330,14 +335,14 @@ export function ComposerContextSheet(props: {
             ) : null}
             {record.kind === "skill" ? (
               <View className="gap-3">
-                <ContextField label="Skill" value={record.name} />
+                <ContextField label={t("Skill")} value={record.name} />
                 <ContextField
                   label={t("Description")}
-                  value={props.skillDescription ?? "No description is available for this skill."}
+                  value={props.skillDescription ?? t("No description is available for this skill.")}
                 />
                 {props.onOpenSkill ? (
                   <Button
-                    label="View instructions"
+                    label={t("View instructions")}
                     tone="secondary"
                     onPress={props.onOpenSkill}
                     fullWidth
@@ -368,7 +373,7 @@ export function ComposerContextSheet(props: {
             onPress={() => {
               props.onClose();
               void openPullRequest(pullRequestUrl).catch(() =>
-                Dialog.alert(`Could not open ${changeRequestTerm}`, "Try again when connected."),
+                Dialog.alert(`Could not open ${changeRequestTerm}`, t("Try again when connected.")),
               );
             }}
             className="rounded-xl bg-subtle p-4"
@@ -381,7 +386,7 @@ export function ComposerContextSheet(props: {
         ) : null}
         {props.onOpenAttachment ? (
           <Button
-            label="Open attachment"
+            label={t("Open attachment")}
             tone="secondary"
             onPress={props.onOpenAttachment}
             fullWidth

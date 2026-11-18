@@ -359,6 +359,7 @@ export const shellMessages = {
     "shell.projectScripts.editScript": "Edit {name}",
     "shell.projectScripts.failedToImport": "Failed to import action.",
     "shell.projectScripts.fromT3Json": "From t3.json",
+    "shell.projectScripts.fromPackageJson": "From package.json",
     "shell.projectScripts.pairAgainToRun":
       "Pair this client again with permission to run terminal commands.",
     "shell.projectScripts.projectActions": "Project actions",
@@ -861,7 +862,7 @@ export const shellMessages = {
       "Настройте провайдера в разделе «Настройки → Контроль версий».",
     "shell.gitActions.continue": "Продолжить",
     "shell.gitActions.defaultBranch": "Основная ветка",
-    "shell.gitActions.detachedHeadLabel": "(detached HEAD)",
+    "shell.gitActions.detachedHeadLabel": "(HEAD вне ветки)",
     "shell.gitActions.detachedHeadMenu":
       "Detached HEAD: создайте и переключитесь на ветку, чтобы включить отправку и действия с {term}.",
     "shell.gitActions.createUnavailable": "Создание {term} сейчас недоступно.",
@@ -956,6 +957,7 @@ export const shellMessages = {
     "shell.projectScripts.editScript": "Изменить {name}",
     "shell.projectScripts.failedToImport": "Не удалось импортировать действие.",
     "shell.projectScripts.fromT3Json": "Из t3.json",
+    "shell.projectScripts.fromPackageJson": "Из package.json",
     "shell.projectScripts.pairAgainToRun":
       "Выполните сопряжение клиента заново с разрешением на запуск команд терминала.",
     "shell.projectScripts.projectActions": "Действия проекта",

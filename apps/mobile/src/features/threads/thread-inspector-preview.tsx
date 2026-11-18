@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useIsFocused, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { type ReactNode } from "react";
@@ -39,7 +40,11 @@ export function ThreadInspectorHeader(
     );
   }
   return (
-    <SheetHeader title={props.title} onClose={props.onClose} accessibilityLabel="Close thread" />
+    <SheetHeader
+      title={props.title}
+      onClose={props.onClose}
+      accessibilityLabel={t("Close thread")}
+    />
   );
 }
 

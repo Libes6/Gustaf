@@ -300,10 +300,10 @@ function FileViewedToggle({
         {stale ? (
           <Tooltip>
             <TooltipTrigger render={<span className="text-warning-foreground" />}>
-              Changed
+              {t("misc.pullRequestCodeTab.changed")}
             </TooltipTrigger>
             <TooltipPopup side="bottom">
-              This file has been pushed to since you marked it viewed.
+              {t("webCopy.thisFileHasBeenPushedToSinceYouMarkedIt")}
             </TooltipPopup>
           </Tooltip>
         ) : (
@@ -883,7 +883,7 @@ function PullRequestCodeTab({
           <>
             <span>{t("misc.pullRequestCodeTab.restNotLoaded")}</span>
             <Button size="xs" variant="outline" onClick={() => diffQuery.refresh()}>
-              Retry
+              {t("sidebar.SidebarUpdateCapsule.retry")}
             </Button>
           </>
         ) : diffQuery.isPending ? (
@@ -1152,7 +1152,8 @@ function PullRequestCodeTab({
                   onClick={() => setVisibleCommitCount((count) => count + COMMIT_PAGE_SIZE)}
                 >
                   <span className="text-muted-foreground">
-                    Show more ({orderedCommits.length - visibleCommitCount} left)
+                    {t("webCopy.showMore")}
+                    {orderedCommits.length - visibleCommitCount} left)
                   </span>
                 </DropdownMenuItem>
               ) : null}
@@ -1161,12 +1162,14 @@ function PullRequestCodeTab({
         ) : null}
         <PullRequestMetaLine>
           <span className="shrink-0 tabular-nums">
-            {files.length} {files.length === 1 ? "file" : "files"}
+            {files.length} {files.length === 1 ? t("webCopy.file") : t("webCopy.files")}
             {nextCursor === null ? "" : "+"}
           </span>
           {hiddenTestFileCount > 0 ? (
             <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
-              {hiddenTestFileCount} test {hiddenTestFileCount === 1 ? "file" : "files"} hidden
+              {hiddenTestFileCount} {t("webCopy.test")}{" "}
+              {hiddenTestFileCount === 1 ? t("webCopy.file") : t("webCopy.files")}{" "}
+              {t("webCopy.hidden")}
             </Button>
           ) : null}
           {filesViewed.enabled && files.length > 0 ? (
@@ -1175,7 +1178,9 @@ function PullRequestCodeTab({
                 {filePaths.filter(isFileViewed).length} / {files.length}
               </span>
               <span className="truncate">
-                {viewedFilesStore === "environment" ? `viewed in ${APP_BASE_NAME}` : "viewed"}
+                {viewedFilesStore === "environment"
+                  ? `viewed in ${APP_BASE_NAME}`
+                  : t("webCopy.viewed")}
               </span>
               {viewedFilesStore === "environment" ? (
                 <Tooltip>
@@ -1186,9 +1191,7 @@ function PullRequestCodeTab({
                     />
                   </TooltipTrigger>
                   <TooltipPopup side="bottom">
-                    This host keeps no shared record of which files you have read, so these ticks
-                    are kept by this environment. They follow you between the apps connected to it,
-                    but the host's own web UI will not show them.
+                    {t("webCopy.thisHostKeepsNoSharedRecordOfWhichFilesYou")}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -1201,8 +1204,7 @@ function PullRequestCodeTab({
                     />
                   </TooltipTrigger>
                   <TooltipPopup side="bottom">
-                    The boxes below are whatever was last read, and empty if nothing has been read
-                    yet. {filesViewed.error}
+                    {t("webCopy.theBoxesBelowAreWhateverWasLastReadAndEmpty")} {filesViewed.error}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -1215,8 +1217,7 @@ function PullRequestCodeTab({
                     />
                   </TooltipTrigger>
                   <TooltipPopup side="bottom">
-                    This change has more files than the host will report ticks for in one read, so
-                    the count is short and some boxes below start empty.
+                    {t("webCopy.thisChangeHasMoreFilesThanTheHostWillReport")}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -1231,7 +1232,7 @@ function PullRequestCodeTab({
                 />
               </TooltipTrigger>
               <TooltipPopup side="bottom">
-                The host withheld part of this diff: a binary file, or a change too large to inline.
+                {t("webCopy.theHostWithheldPartOfThisDiffABinaryFile")}
               </TooltipPopup>
             </Tooltip>
           ) : null}
@@ -1244,7 +1245,7 @@ function PullRequestCodeTab({
                 />
               </TooltipTrigger>
               <TooltipPopup side="bottom">
-                A comment is anchored to the whole change, so switch to All commits to write one.
+                {t("webCopy.aCommentIsAnchoredToTheWholeChangeSoSwitch")}
               </TooltipPopup>
             </Tooltip>
           ) : null}
@@ -1271,13 +1272,13 @@ function PullRequestCodeTab({
               checked={ignoreWhitespace}
               onCheckedChange={(checked) => changeIgnoreWhitespace(checked)}
             >
-              Hide whitespace changes
+              {t("shell.diffPanel.hideWhitespace")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={wordWrap}
               onCheckedChange={(checked) => setWordWrap(checked)}
             >
-              Wrap lines
+              {t("chatB.MarkdownCodeBlock.wrapLines")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
@@ -1289,10 +1290,10 @@ function PullRequestCodeTab({
               }}
             >
               <DropdownMenuRadioItem value="stacked" closeOnClick>
-                Stacked
+                {t("shell.terminal.stacked")}
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="split" closeOnClick>
-                Split
+                {t("option.diff.split")}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
@@ -1497,7 +1498,9 @@ function PullRequestCodeTab({
   if (items.length === 0 && nextCursor === null) {
     return withToolbar(
       <p className="px-4 py-5 text-sm text-muted-foreground">
-        {commit === null ? `This ${term} has no file changes.` : "This commit has no file changes."}
+        {commit === null
+          ? `This ${term} has no file changes.`
+          : t("webCopy.thisCommitHasNoFileChanges")}
       </p>,
     );
   }
@@ -1532,7 +1535,7 @@ function PullRequestCodeTab({
                 </span>
                 <span className="sr-only">
                   {orphanThreads.length === 1
-                    ? "1 conversation"
+                    ? t("webCopy.1Conversation")
                     : `${orphanThreads.length} conversations`}
                 </span>
               </CollapsibleTrigger>
@@ -1553,7 +1556,9 @@ function PullRequestCodeTab({
                       {threads.map((thread) => (
                         <div key={thread.id}>
                           {thread.line === null ? null : (
-                            <p className="px-3 text-xs text-muted-foreground">Line {thread.line}</p>
+                            <p className="px-3 text-xs text-muted-foreground">
+                              {t("webCopy.line")} {thread.line}
+                            </p>
                           )}
                           {renderThreadCard(thread)}
                         </div>

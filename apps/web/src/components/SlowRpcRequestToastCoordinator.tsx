@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { type SlowRpcAckRequest, subscribeSlowRpcAckRequests } from "../rpc/requestLatencyState";
 import { toastManager } from "./ui/toast";
 
@@ -16,6 +17,7 @@ function describeSlowRequests(requests: ReadonlyArray<SlowRpcAckRequest>): strin
 }
 
 function SlowRequestDetails({ requests }: { requests: ReadonlyArray<SlowRpcAckRequest> }) {
+  const t = useT();
   return (
     <ul className="space-y-2.5 text-xs text-muted-foreground">
       {requests.map((request) => (
@@ -25,7 +27,7 @@ function SlowRequestDetails({ requests }: { requests: ReadonlyArray<SlowRpcAckRe
         >
           <div className="wrap-break-word font-medium text-foreground">{request.tag}</div>
           <div className="mt-0.5 text-3xs opacity-75">
-            Started {new Date(request.startedAt).toLocaleTimeString()}
+            {t("webCopy.started")} {new Date(request.startedAt).toLocaleTimeString()}
           </div>
         </li>
       ))}

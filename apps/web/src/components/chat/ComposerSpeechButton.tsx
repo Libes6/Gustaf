@@ -277,7 +277,7 @@ export function ComposerSpeechRecordingPill(props: {
           onClick={props.onSkipPostProcessing}
           className="shrink-0"
         >
-          Skip
+          {t("webCopy.skip")}
         </Button>
       ) : (
         <Tooltip>

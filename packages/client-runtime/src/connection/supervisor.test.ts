@@ -33,6 +33,7 @@ import {
   PrimaryConnectionTarget,
   RelayConnectionTarget,
   type ConnectionAttemptError,
+  type ConnectionRouteResult,
   type ConnectionTarget,
   type NetworkStatus,
   type PreparedConnection,
@@ -553,6 +554,32 @@ describe("EnvironmentSupervisor", () => {
       });
       expect(yield* Ref.get(harness.prepareCount)).toBe(1);
       expect(yield* Ref.get(harness.sessionCount)).toBe(0);
+    }).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("records the route it was opening when connection setup times out", () =>
+    Effect.gen(function* () {
+      const reported = yield* Ref.make<ReadonlyArray<readonly [string, ConnectionRouteResult]>>([]);
+      const harness = yield* makeHarness({ ready: () => Effect.never });
+      const supervisor = yield* EnvironmentSupervisor.make(TARGET_ENTRY, {
+        initiallyDesired: true,
+        reportRoute: (routeId, result) =>
+          Ref.update(reported, (current) => [...current, [routeId, result] as const]),
+      }).pipe(Effect.provide(harness.dependencies));
+
+      yield* TestClock.adjust("90 seconds");
+      yield* awaitState(supervisor.state, (state) => state.phase === "backoff");
+
+      expect(yield* Ref.get(reported)).toEqual([
+        [
+          connectionRouteId(TARGET_ENTRY.target),
+          {
+            outcome: "failed",
+            at: 90_000,
+            detail: "Test environment did not respond during connection setup.",
+          },
+        ],
+      ]);
     }).pipe(Effect.provide(TestClock.layer())),
   );
 

@@ -163,7 +163,7 @@ function CustomSnoozeDialog() {
                       </Popover>
                     </div>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-time`}>
-                      Time
+                      {t("settingsD.snoozePresetsSettings.time")}
                       <Input
                         nativeInput
                         id={`${id}-time`}
@@ -198,7 +198,7 @@ function CustomSnoozeDialog() {
                       </NumberFieldGroup>
                     </NumberField>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-unit`}>
-                      Unit
+                      {t("settingsD.snoozePresetsSettings.unit")}
                       <Select
                         value={unit}
                         items={{

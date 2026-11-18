@@ -202,11 +202,14 @@ function ProviderLastChecked({ environmentId }: { environmentId: EnvironmentId }
     <span>
       {lastCheckedRelative.suffix ? (
         <>
-          Checked <span className="font-mono tabular-nums">{lastCheckedRelative.value}</span>{" "}
+          {t("settingsB.DiagnosticsSettings.checked")}{" "}
+          <span className="font-mono tabular-nums">{lastCheckedRelative.value}</span>{" "}
           {lastCheckedRelative.suffix}
         </>
       ) : (
-        <>Checked {lastCheckedRelative.value}</>
+        <>
+          {t("settingsB.DiagnosticsSettings.checked")} {lastCheckedRelative.value}
+        </>
       )}
     </span>
   );
@@ -1174,7 +1177,7 @@ export function EnvironmentProviderSettings({
                 className={!canWriteSettings ? "opacity-50" : undefined}
               >
                 <SettingResetButton
-                  label="provider health check interval"
+                  label={t("webCopy.providerHealthCheckInterval")}
                   onClick={() =>
                     updateSettings(
                       backgroundActivityOverrideSettings(
@@ -1198,7 +1201,7 @@ export function EnvironmentProviderSettings({
               )}
             >
               <IntervalSecondsField
-                label="provider health check interval"
+                label={t("webCopy.providerHealthCheckInterval")}
                 value={providerHealthRefreshIntervalSeconds}
                 min={0}
                 step={PROVIDER_HEALTH_INTERVAL_STEP_SECONDS}
@@ -1213,7 +1216,9 @@ export function EnvironmentProviderSettings({
                   )
                 }
               />
-              <span className="text-xs text-muted-foreground">seconds</span>
+              <span className="text-xs text-muted-foreground">
+                {t("settingsA.backgroundActivity.seconds")}
+              </span>
             </div>
           }
         />

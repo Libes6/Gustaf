@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE,
   type OrchestrationV2ProviderFailureClass,
@@ -23,10 +25,14 @@ export function copyAdminRequest() {
     () =>
       toastManager.add({
         type: "success",
-        title: "Request copied",
-        description: "Send it to your workspace admin.",
+        title: translate(getUiLanguage(), "webCopy.requestCopied"),
+        description: translate(getUiLanguage(), "webCopy.sendItToYourWorkspaceAdmin"),
       }),
-    () => toastManager.add({ type: "error", title: "Could not copy the request" }),
+    () =>
+      toastManager.add({
+        type: "error",
+        title: translate(getUiLanguage(), "webCopy.couldNotCopyTheRequest"),
+      }),
   );
 }
 
@@ -100,13 +106,9 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         <AlertDescription>
           {chatGptLimit ? (
             <div className="space-y-1">
-              <p className="font-medium">ChatGPT usage limit reached</p>
+              <p className="font-medium">{t("webCopy.chatGPTUsageLimitReached")}</p>
               {workspaceLimit ? (
-                <p>
-                  {
-                    "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
-                  }
-                </p>
+                <p>{t("webCopy.youVeReachedYourWorkspaceSLimitForUsingYour")}</p>
               ) : null}
             </div>
           ) : errorCode === PROVIDER_MODEL_NOT_IN_SUBSCRIPTION_FAILURE_CODE ? (
@@ -124,7 +126,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
           <AlertAction>
             {workspaceLimit ? (
               <Button variant="default" size="sm" onClick={copyAdminRequest}>
-                Copy request for admin
+                {t("webCopy.copyRequestForAdmin")}
               </Button>
             ) : chatGptLimit ? (
               <ChatGptUsageButton variant="default" size="sm" />

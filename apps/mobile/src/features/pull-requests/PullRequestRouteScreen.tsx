@@ -146,7 +146,7 @@ function usePullRequestActivityRows(params: PullRequestParams, filter: ActivityF
         date: "",
         content: (
           <Text className="py-6 text-sm text-foreground-muted">
-            No activity matches these filters.
+            {t("No activity matches these filters.")}
           </Text>
         ),
       });
@@ -180,7 +180,7 @@ function PullRequestIdentity(props: {
         <PullRequestDiffStats additions={pr.additions ?? 0} deletions={pr.deletions ?? 0} compact />
         {"changedFiles" in pr && pr.changedFiles !== undefined ? (
           <Text className="text-2xs text-foreground-muted">
-            {pr.changedFiles} {pr.changedFiles === 1 ? "file" : "files"}
+            {pr.changedFiles} {pr.changedFiles === 1 ? t("file") : t("files")}
           </Text>
         ) : (
           <View className="h-3 w-12 rounded bg-subtle-strong" />
@@ -192,11 +192,11 @@ function PullRequestIdentity(props: {
       <View className="flex-row items-center gap-2">
         <PullRequestAvatar actor={pr.author ?? null} size={20} />
         <Text className="min-w-0 flex-1 text-xs font-t3-medium" numberOfLines={1}>
-          {pr.author?.login ?? "Unknown author"}
+          {pr.author?.login ?? t("Unknown author")}
         </Text>
         <Text className="shrink text-right text-2xs text-foreground-muted" numberOfLines={1}>
           {t("Updated")}
-          <RelativeTime timestamp={pr.updatedAt} /> ago
+          <RelativeTime timestamp={pr.updatedAt} /> {t("ago")}
         </Text>
       </View>
       <View className="flex-row items-start gap-1.5">
@@ -263,10 +263,10 @@ function PullRequestLabels(props: {
       })}
       {editable ? (
         <Chip
-          label={props.pr.labels.length ? "Edit" : "Add labels"}
+          label={props.pr.labels.length ? t("Edit") : t("Add labels")}
           icon="tag"
           size="small"
-          accessibilityLabel="Edit labels"
+          accessibilityLabel={t("Edit labels")}
           onPress={() => navigation.navigate("PullRequestLabels", props.params)}
         />
       ) : null}
@@ -828,7 +828,7 @@ export function PullRequestFileRouteScreen(props: PullRequestFileRouteProps) {
     <View className="flex-1 bg-screen">
       <AppBar title={title} onBack={() => navigation.goBack()} />
       <View className="flex-1 items-center justify-center">
-        <AppActivityIndicator accessibilityLabel="Loading changes" />
+        <AppActivityIndicator accessibilityLabel={t("Loading changes")} />
       </View>
     </View>
   );
@@ -1093,7 +1093,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
       />
       {route.params.replacingDraftId ? (
         <Text className="px-4 py-2 text-xs text-foreground-muted">
-          Select a current line, then choose “Move draft to this line” from its menu.
+          {t("Select a current line, then choose “Move draft to this line” from its menu.")}
         </Text>
       ) : null}
       {viewed.error ? (
@@ -1105,10 +1105,10 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
           style={{ paddingTop: contentTopInset + 8 }}
         >
           <Text className="min-w-0 flex-1 text-xs text-foreground-muted">
-            The branch changed. Reload before adding line comments.
+            {t("The branch changed. Reload before adding line comments.")}
           </Text>
           <Button
-            label="Reload changes"
+            label={t("Reload changes")}
             onPress={() => {
               result.refresh();
               setDiffHead({ scopeKey, sha: detail.data?.headSha ?? null });
@@ -1210,8 +1210,8 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
             !seekingFile ? (
             <View style={{ paddingTop: contentTopInset }}>
               <EmptyState
-                title="Only test files changed"
-                detail="Test files are hidden from this review."
+                title={t("Only test files changed")}
+                detail={t("Test files are hidden from this review.")}
                 action={
                   <Button label={t("Show test files")} tone="contrast" onPress={filter.showAll} />
                 }
@@ -1220,7 +1220,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
             </View>
           ) : !result.isPending && !result.error && !seekingFile ? (
             <EmptyState
-              title="Diff unavailable"
+              title={t("Diff unavailable")}
               detail={`Open this ${terminology.singular} on its provider to view the changes.`}
               variant="plain"
             />
@@ -1228,12 +1228,16 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
           {result.nextCursor && result.isPending && data.rows.length && !seekingFile ? (
             <View className="flex-row items-center justify-center gap-2 py-2">
               <AppActivityIndicator size="small" />
-              <Text className="text-xs text-foreground-muted">Loading more files…</Text>
+              <Text className="text-xs text-foreground-muted">{t("Loading more files…")}</Text>
             </View>
           ) : null}
           {result.error && result.nextCursor ? (
             <View className="self-center">
-              <Button label="Retry loading remaining files" tone="text" onPress={result.refresh} />
+              <Button
+                label={t("Retry loading remaining files")}
+                tone="text"
+                onPress={result.refresh}
+              />
             </View>
           ) : null}
           {parsed.kind === "files" && parsed.notice ? (

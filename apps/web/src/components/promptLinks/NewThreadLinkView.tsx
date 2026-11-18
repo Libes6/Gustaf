@@ -362,7 +362,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
               setState({ status: "opening" });
             }}
           >
-            Open it again
+            {t("webCopy.openItAgain")}
           </Button>
         </LinkPage>
       );
@@ -381,10 +381,10 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
           description={t("misc.newThreadLinkView.cloneToWork")}
         >
           <Button size="sm" onClick={() => void cloneRepository(state.repository)}>
-            Clone {name}
+            {t("shell.commandPalette.clone")} {name}
           </Button>
           <Button size="sm" variant="outline" onClick={openWithoutProject}>
-            Use without project
+            {t("webCopy.useWithoutProject")}
           </Button>
         </LinkPage>
       );

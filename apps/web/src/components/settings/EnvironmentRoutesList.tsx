@@ -18,6 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   type ConnectionRoute,
+  type ConnectionRouteResult,
   connectionRouteAddress,
   connectionRouteId,
   connectionRouteLabel,
@@ -25,6 +26,7 @@ import {
   isLearned,
   pendingRouteOrder,
 } from "@t3tools/client-runtime/connection";
+import { useAtomValue } from "@effect/atom-react";
 import { GripVerticalIcon, PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -56,13 +58,14 @@ export function EnvironmentRoutesList({
   const byId = new Map(saved.map((route) => [connectionRouteId(route.target), route]));
   const routes = order.flatMap((id) => byId.get(id) ?? []);
 
+  const results = useAtomValue(environmentCatalog.routeResultsAtom(environment.environmentId));
   const prepared = usePreparedConnection(environment.environmentId);
   const activeRouteId =
     prepared._tag === "Some" && environment.connection.phase === "connected"
       ? connectionRouteId(prepared.value.target)
       : null;
   const reorder = useAtomCommand(environmentCatalog.reorderRoutes, "Reorder routes");
-  const removeRoute = useAtomCommand(environmentCatalog.removeRoute, "Remove route");
+  const removeRoute = useAtomCommand(environmentCatalog.removeRoute, t("webCopy.removeRoute"));
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -115,6 +118,7 @@ export function EnvironmentRoutesList({
                 route={route}
                 position={index + 1}
                 inUse={connectionRouteId(route.target) === activeRouteId}
+                lastResult={results.get(connectionRouteId(route.target))}
                 removable={routes.length > 1 && !isLearned(route)}
                 onRemove={() => void confirmRemove(route)}
               />
@@ -136,12 +140,14 @@ function SortableRouteRow({
   route,
   position,
   inUse,
+  lastResult,
   removable,
   onRemove,
 }: {
   readonly route: ConnectionRoute;
   readonly position: number;
   readonly inUse: boolean;
+  readonly lastResult: ConnectionRouteResult | undefined;
   readonly removable: boolean;
   readonly onRemove: () => void;
 }) {
@@ -183,6 +189,27 @@ function SortableRouteRow({
             {isLearned(route)
               ? ` · ${t("settingsB.EnvironmentRoutesList.foundAutomatically")}`
               : ""}
+          </p>
+        ) : null}
+        {lastResult !== undefined && !inUse ? (
+          <p
+            className={cn(
+              "text-2xs break-words",
+              lastResult.outcome === "failed" ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {t(
+              lastResult.outcome === "failed"
+                ? "settingsB.EnvironmentRoutesList.lastFailed"
+                : "settingsB.EnvironmentRoutesList.lastConnected",
+            ).replace(
+              "{time}",
+              new Date(lastResult.at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            )}
+            {lastResult.detail === null ? "" : `: ${lastResult.detail}`}
           </p>
         ) : null}
       </div>

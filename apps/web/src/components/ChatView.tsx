@@ -625,8 +625,8 @@ export default function ChatView(props: ChatViewProps) {
     if (!inserted) {
       toastManager.add({
         type: "warning",
-        title: "The composer is not ready",
-        description: "Try citing the selection after the connection or pending input is resolved.",
+        title: t("chatB.ChatView.replyComposerNotReady"),
+        description: t("webCopy.tryCitingTheSelectionAfterTheConnectionOrPendingInput"),
       });
     }
     return inserted;
@@ -1466,7 +1466,7 @@ export default function ChatView(props: ChatViewProps) {
   const downloadFileAttachment = async (attachment: ChatFileAttachment) => {
     const connection = readPreparedConnection(environmentId);
     if (!connection) {
-      toastManager.add({ type: "error", title: "The environment is not connected." });
+      toastManager.add({ type: "error", title: t("webCopy.theEnvironmentIsNotConnected") });
       return;
     }
 
@@ -1845,8 +1845,8 @@ export default function ChatView(props: ChatViewProps) {
     if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
       toastManager.add({
         type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
+        title: t("misc.fileBrowserPanel.unableAddToChat"),
+        description: t("chatA.chatComposer.composerBusy"),
       });
       return;
     }
@@ -3377,7 +3377,7 @@ export default function ChatView(props: ChatViewProps) {
               {...conversationArea}
               className="relative isolate flex min-h-0 flex-1 flex-col bg-background"
             >
-              <ChatWallpaper working={isWorking} />
+              {embedded ? null : <ChatWallpaper working={isWorking} />}
               <WorkspaceMutationIdContext value={workspaceMutationId}>
                 <ThreadTimeline
                   pendingApprovals={pendingApprovals}

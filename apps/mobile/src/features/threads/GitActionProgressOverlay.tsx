@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { Toast } from "../../components/ui/Toast";
@@ -37,7 +38,7 @@ export function GitActionProgressOverlay(props: {
     >
       <Toast
         singleLine
-        message={progress.label ?? "Source control"}
+        message={progress.label ?? t("Source control")}
         description={progress.description ?? undefined}
         tone={
           progress.phase === "error"

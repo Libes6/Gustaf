@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   codexFeedbackNotice,
   type CodexFeedbackSubmission,
@@ -31,14 +33,14 @@ export function feedbackBannerItem(
               (error: unknown) => {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy thread ID",
+                  title: translate(getUiLanguage(), "webCopy.couldNotCopyThreadID"),
                   description: error instanceof Error ? error.message : "An error occurred.",
                 });
               },
             );
           }}
         >
-          Copy ID
+          {translate(getUiLanguage(), "webCopy.copyID")}
         </Button>
       ) : undefined,
     ...(submission.status !== "uploading"

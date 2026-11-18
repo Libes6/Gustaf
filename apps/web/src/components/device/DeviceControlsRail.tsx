@@ -107,14 +107,14 @@ export function DeviceControlsRail(props: {
                   <MenuItem
                     onClick={() => void controls.act({ type: "setOrientation", value: "portrait" })}
                   >
-                    Portrait
+                    {t("misc.deviceToolsPanel.orientationPortrait")}
                   </MenuItem>
                   <MenuItem
                     onClick={() =>
                       void controls.act({ type: "setOrientation", value: "landscape_left" })
                     }
                   >
-                    Landscape
+                    {t("webCopy.landscape")}
                   </MenuItem>
                 </MenuPopup>
               </Menu>
@@ -226,11 +226,11 @@ export function DeviceControlsRail(props: {
           <MenuPopup side={popupSide} align="end">
             <MenuItem onClick={props.onFloat}>
               <PictureInPicture2 />
-              Float device over chat
+              {t("webCopy.floatDeviceOverChat")}
             </MenuItem>
             <MenuItem onClick={props.onClose}>
               <X />
-              Close device panel
+              {t("webCopy.closeDevicePanel")}
             </MenuItem>
             <MenuSeparator />
             <MenuItem variant="destructive" onClick={props.onPowerOff}>

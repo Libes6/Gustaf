@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
@@ -79,6 +80,7 @@ function threadShowingBrowser(
 }
 
 export function DesktopWebLinkCoordinator() {
+  const t = useT();
   const router = useRouter();
   const primaryEnvironment = usePrimaryEnvironment();
   const openPullRequestsInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
@@ -107,14 +109,18 @@ export function DesktopWebLinkCoordinator() {
 
   const reportFailure = (url: string, description = url) =>
     toastManager.add(
-      stackedThreadToast({ type: "error", title: "Could not open the link", description }),
+      stackedThreadToast({
+        type: "error",
+        title: t("misc.newThreadLinkView.couldNotOpenLink"),
+        description,
+      }),
     );
 
   const reportPairingFailure = (error: unknown) =>
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not add backend",
+        title: t("settingsA.addEnvironment.couldNotAddBackend"),
         description: error instanceof Error ? error.message : "Failed to add backend.",
       }),
     );
@@ -141,8 +147,8 @@ export function DesktopWebLinkCoordinator() {
     pairedUrlsRef.current.add(pairingUrl);
     toastManager.add({
       type: "success",
-      title: "Backend added",
-      description: "The environment is saved and will reconnect on app startup.",
+      title: t("settingsA.addEnvironment.backendAdded"),
+      description: t("settingsA.addEnvironment.backendSaved"),
     });
   };
 

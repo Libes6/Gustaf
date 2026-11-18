@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { Split, Stack } from "react-native-screens";
 
@@ -37,7 +38,7 @@ function PaneScreenContent(props: {
       <RenderErrorBoundary
         resetKeys={props.resetKeys}
         renderFallback={(fallback) => (
-          <RenderFailureView {...fallback} title="The inspector couldn't be displayed" />
+          <RenderFailureView {...fallback} title={t("The inspector couldn't be displayed")} />
         )}
       >
         {props.pane.render()}

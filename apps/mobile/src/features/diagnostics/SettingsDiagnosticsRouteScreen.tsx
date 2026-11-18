@@ -104,23 +104,25 @@ export function SettingsDiagnosticsRouteScreen() {
       >
         {crashReportingAvailable ? <CrashReportsSetting /> : null}
 
-        <SettingsSection title="Startup crashes">
+        <SettingsSection title={t("Startup crashes")}>
           {state.status === "loading" ? (
             <View className="items-center gap-3 px-6 py-8">
               <AppActivityIndicator />
-              <Text className="text-center text-sm text-foreground-muted">Reading crash log…</Text>
+              <Text className="text-center text-sm text-foreground-muted">
+                {t("Reading crash log…")}
+              </Text>
             </View>
           ) : state.status === "unavailable" ? (
             <EmptyState
               icon="exclamationmark.triangle"
-              title="Crash log unavailable"
-              detail="Startup crash records are only kept in store and TestFlight builds."
+              title={t("Crash log unavailable")}
+              detail={t("Startup crash records are only kept in store and TestFlight builds.")}
             />
           ) : records.length === 0 ? (
             <EmptyState
               icon="checkmark.circle"
-              title="No startup crashes"
-              detail="Nothing has taken the app down during launch in the last 7 days."
+              title={t("No startup crashes")}
+              detail={t("Nothing has taken the app down during launch in the last 7 days.")}
             />
           ) : (
             records.map((record, index) => (
@@ -133,15 +135,15 @@ export function SettingsDiagnosticsRouteScreen() {
           <SettingsSection title={t("Actions")}>
             <SettingsActionRow
               icon={copied ? "checkmark" : "doc.on.doc"}
-              label={copied ? "Copied" : "Copy crash report"}
+              label={copied ? t("Copied") : t("Copy crash report")}
               disabled={state.status !== "ready"}
               onPress={() => void copyReport()}
             />
           </SettingsSection>
           <Text className="px-2 text-sm leading-normal text-foreground-muted">
-            Paste the report into a GitHub issue. It contains the app version, the JavaScript error
-            message, and the component stack. Error messages can quote values from the app, so read
-            it over before sharing.
+            {t(
+              "Paste the report into a GitHub issue. It contains the app version, the JavaScript error message, and the component stack. Error messages can quote values from the app, so read it over before sharing.",
+            )}
           </Text>
         </View>
       </ScrollView>
@@ -179,19 +181,19 @@ function CrashReportsSetting() {
 
   return (
     <View className="gap-3">
-      <SettingsSection title="Crash reports">
+      <SettingsSection title={t("Crash reports")}>
         <SettingsSwitchRow
           icon="tray.and.arrow.up"
-          label="Send crash reports"
+          label={t("Send crash reports")}
           disabled={!ready || saving}
           value={enabled}
           onValueChange={change}
         />
       </SettingsSection>
       <Text className="px-2 text-sm leading-normal text-foreground-muted">
-        When the app crashes or hits an error, it sends the error message, the stack trace, the app
-        version, and the device model and OS version to the Gustaf team. Each launch also sends
-        startup timings. Reports carry a random ID for this install.
+        {t(
+          "When the app crashes or hits an error, it sends the error message, the stack trace, the app version, and the device model and OS version to the Gustaf team. Each launch also sends startup timings. Reports carry a random ID for this install.",
+        )}
       </Text>
     </View>
   );

@@ -130,7 +130,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
 
   return (
     <View className="flex-1 bg-sheet">
-      <SheetHeader title="Add Comment" onClose={dismissComposer} />
+      <SheetHeader title={t("Add Comment")} onClose={dismissComposer} />
       <KeyboardAvoidingView automaticOffset behavior="padding" className="flex-1">
         <View
           className="flex-1 px-5"
@@ -141,9 +141,9 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
         >
           {!target ? (
             <View className="rounded-[22px] border border-border bg-card px-4 py-5">
-              <Text className="text-base font-t3-bold text-foreground">No selection</Text>
+              <Text className="text-base font-t3-bold text-foreground">{t("No selection")}</Text>
               <Text className="mt-1 text-sm leading-normal text-foreground-muted">
-                Select a diff line or range first.
+                {t("Select a diff line or range first.")}
               </Text>
             </View>
           ) : (
@@ -218,7 +218,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
                         autoFocus
                         multiline
                         scrollEnabled
-                        placeholder="Leave a comment..."
+                        placeholder={t("Leave a comment...")}
                         textAlignVertical="top"
                         value={commentText}
                         onChangeText={setCommentText}
@@ -250,7 +250,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
         {!isAndroid && target ? (
           <View className="flex-row items-center gap-3 bg-sheet px-5 py-2">
             <ControlPill
-              accessibilityLabel="Add image"
+              accessibilityLabel={t("Add image")}
               icon="plus"
               onPress={() => void handlePickImages()}
             />
@@ -276,7 +276,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
             style={{ paddingBottom: Math.max(insets.bottom, 10) }}
           >
             <ControlPill
-              accessibilityLabel="Add image"
+              accessibilityLabel={t("Add image")}
               icon="plus"
               onPress={() => void handlePickImages()}
             />

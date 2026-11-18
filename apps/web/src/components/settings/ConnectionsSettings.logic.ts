@@ -1,3 +1,5 @@
+import { translate } from "../../i18n";
+import type { UiLanguage } from "@t3tools/contracts/settings";
 import * as DateTime from "effect/DateTime";
 
 import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls";
@@ -62,10 +64,11 @@ export function isQrShareableEndpoint(endpoint: AdvertisedEndpoint): boolean {
  * means unchecked. */
 export function missingTailscaleEndpointDescription(
   state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
+  language: UiLanguage = "en",
 ): string {
   return state && state.mode !== "network-accessible" && !state.tailscaleServeEnabled
-    ? "Turn on Network access to detect Tailscale."
-    : "Start Tailscale to set up HTTPS access through MagicDNS.";
+    ? translate(language, "settingsStatus.tailscaleDetect")
+    : translate(language, "settingsStatus.tailscaleStart");
 }
 
 export function resolveTailscaleServeBaseUrl(
@@ -96,12 +99,18 @@ export function isWslSettingsRowVisible(input: {
  * Once client/server versions match, this passive Version label follows the sidebar update action,
  * including retryable failures. Rechecks retain downloaded-update labels; `state` is null outside desktop.
  */
-export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null): string {
-  if (!state) return "Up to date";
+export function resolveLocalVersionStatusLabel(
+  state: DesktopUpdateState | null,
+  language: UiLanguage = "en",
+): string {
+  if (!state) return translate(language, "settingsStatus.upToDate");
   if (state.status === "downloading") {
     return state.availableVersion
-      ? `Downloading update ${state.availableVersion}`
-      : "Downloading update";
+      ? translate(language, "settingsStatus.downloadingVersion").replace(
+          "{version}",
+          state.availableVersion,
+        )
+      : translate(language, "settingsStatus.downloading");
   }
   const action = resolveDesktopUpdateButtonAction(state);
   if (
@@ -110,14 +119,19 @@ export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null)
     (state.status === "checking" && state.downloadedVersion !== null)
   ) {
     const version = getDesktopUpdateDownloadedVersion(state);
-    return version ? `Update ${version} downloaded` : "Update downloaded";
+    return version
+      ? translate(language, "settingsStatus.downloadedVersion").replace("{version}", version)
+      : translate(language, "settingsStatus.downloaded");
   }
   if (action === "download") {
     return state.availableVersion
-      ? `Update ${state.availableVersion} available`
-      : "Update available";
+      ? translate(language, "settingsStatus.availableVersion").replace(
+          "{version}",
+          state.availableVersion,
+        )
+      : translate(language, "settingsStatus.available");
   }
-  return "Up to date";
+  return translate(language, "settingsStatus.upToDate");
 }
 
 export type QrEndpointOption = {

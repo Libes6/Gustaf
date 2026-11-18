@@ -47,6 +47,7 @@ import {
   OPENCODE_2_STILL_STOPPING,
   OPENCODE_PROVIDER,
   t3McpServerName,
+  userMcpServerName,
 } from "@t3tools/provider-opencode/testing";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { openCode2ReplayRuntime } from "./OpenCode2AdapterV2.testkit.ts";
@@ -91,9 +92,14 @@ const event = (
 const durable = { durable: { aggregateID: SESSION, seq: 1, version: 1 } };
 
 const mcpRules = [
+  { action: "u-*", resource: "*", effect: "deny" },
+  { action: "u-c26f2f1f-*", resource: "*", effect: "allow" },
   { action: "t3-code-*", resource: "*", effect: "deny" },
   { action: "t3-code-thread_opencode2-adapter_*", resource: "*", effect: "allow" },
 ];
+const supervisedMcpRules = mcpRules.map((entry) =>
+  entry.action.startsWith("u-") && entry.effect === "allow" ? { ...entry, effect: "ask" } : entry,
+);
 const t3Rules = [{ action: "*", resource: "*", effect: "allow" }, ...mcpRules];
 const TITLE = "Prime check";
 const sessionInfo = (overrides: Record<string, unknown> = {}) => ({
@@ -165,7 +171,7 @@ const withInstructions = (
         "skill.list",
       ].includes(String(entry.frame.type)),
   );
-  const after = entries.findIndex(
+  const after = entries.findLastIndex(
     (entry, index) =>
       index < first &&
       entry.type === "emit_inbound" &&
@@ -281,7 +287,7 @@ const supervisedRules = [
   { action: "edit", resource: "*", effect: "ask" },
   { action: "external_directory", resource: "*", effect: "ask" },
   ...buildPaths,
-  ...mcpRules,
+  ...supervisedMcpRules,
 ];
 
 const shellAsk = {
@@ -914,7 +920,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         reply("session.update", null),
         out("session.update", {
           sessionID: CHILD,
-          permissions: [...supervisedRules.slice(0, 3), ...mcpRules],
+          permissions: [...supervisedRules.slice(0, 3), ...supervisedMcpRules],
         }),
         reply("session.update", null),
         out("session.prompt", { sessionID: SESSION, text: "<any>" }),
@@ -2228,42 +2234,45 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("keeps 'allow this session' in the session's rules, not OpenCode's saved grants", () =>
-    Effect.gen(function* () {
-      const { runtime, thread } = yield* resumed(
-        [
-          out("session.prompt", { sessionID: SESSION, text: "<any>" }),
-          promptAccepted,
-          shellAskEvent,
-          out("session.update", {
-            sessionID: SESSION,
-            permissions: [
-              ...supervisedRules.slice(0, 3),
-              { action: "shell", resource: "echo *", effect: "allow" },
-              ...supervisedRules.slice(3),
-            ],
-          }),
-          reply("session.update", null),
-          out("permission.reply", {
-            sessionID: SESSION,
-            requestID: shellAsk.data.id,
-            decision: "once",
-          }),
-          reply("permission.reply", null),
-          event("session.execution.succeeded", { sessionID: SESSION }),
-        ],
-        { supervised: true },
-      );
-      const requested = yield* requestOf(runtime).pipe(Effect.forkScoped);
-      const terminal = yield* terminalOf(runtime).pipe(Effect.forkScoped);
-      yield* runtime.startTurn(turnInput(thread, bigPickle, "approval-required"));
-      const request = yield* Fiber.join(requested);
-      yield* runtime.respondToRuntimeRequest({
-        requestId: request!.id,
-        decision: "acceptForSession",
-      });
-      assert.equal((yield* Fiber.join(terminal))?.status, "completed");
-    }).pipe(Effect.scoped),
+  it.effect.each(["shell", "u-c26f2f1f-ce568d5b-loca_tool"])(
+    "keeps 'allow this session' for %s in the session's rules, not OpenCode's saved grants",
+    (action) =>
+      Effect.gen(function* () {
+        const grant = { action, resource: "echo *", effect: "allow" };
+        const permissions =
+          action === "shell"
+            ? [...supervisedRules.slice(0, 3), grant, ...supervisedRules.slice(3)]
+            : [...supervisedRules.slice(0, -2), grant, ...supervisedRules.slice(-2)];
+        const { runtime, thread } = yield* resumed(
+          [
+            out("session.prompt", { sessionID: SESSION, text: "<any>" }),
+            promptAccepted,
+            event("permission.asked", { ...shellAsk.data, action }),
+            out("session.update", {
+              sessionID: SESSION,
+              permissions,
+            }),
+            reply("session.update", null),
+            out("permission.reply", {
+              sessionID: SESSION,
+              requestID: shellAsk.data.id,
+              decision: "once",
+            }),
+            reply("permission.reply", null),
+            event("session.execution.succeeded", { sessionID: SESSION }),
+          ],
+          { supervised: true },
+        );
+        const requested = yield* requestOf(runtime).pipe(Effect.forkScoped);
+        const terminal = yield* terminalOf(runtime).pipe(Effect.forkScoped);
+        yield* runtime.startTurn(turnInput(thread, bigPickle, "approval-required"));
+        const request = yield* Fiber.join(requested);
+        yield* runtime.respondToRuntimeRequest({
+          requestId: request!.id,
+          decision: "acceptForSession",
+        });
+        assert.equal((yield* Fiber.join(terminal))?.status, "completed");
+      }).pipe(Effect.scoped),
   );
 
   it.effect("reads the agents again while a fresh server still lists none", () =>
@@ -2898,6 +2907,22 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         endpoint: "http://127.0.0.1:3773/mcp",
         authorizationHeader: "Bearer thread-credential",
         browserToolsAvailable: false,
+        userServers: [
+          {
+            type: "stdio",
+            id: "local.tools",
+            command: "node",
+            args: ["server.js"],
+            env: { TOKEN: "secret" },
+            cwd: "/tools",
+          },
+          {
+            type: "http",
+            id: "remote",
+            url: "https://example.com/mcp",
+            headers: { Authorization: "secret" },
+          },
+        ],
       });
       yield* Effect.addFinalizer(() => mcpSessions.clear(child));
       const runtime = yield* openCode2ReplayRuntimeWithInstructions([
@@ -2908,6 +2933,8 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           sessionInfo({
             permissions: [
               { action: "*", resource: "*", effect: "allow" },
+              { action: "u-*", resource: "*", effect: "deny" },
+              { action: "u-aa73fa1e-*", resource: "*", effect: "allow" },
               { action: "t3-code-*", resource: "*", effect: "deny" },
               { action: `${server}_*`, resource: "*", effect: "allow" },
             ],
@@ -2925,10 +2952,36 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           },
         }),
         reply("mcp.add", null),
+        out("mcp.add", {
+          server: "u-aa73fa1e-ce568d5b-loca",
+          "location[directory]": WORK,
+          config: {
+            type: "local",
+            command: ["node", "server.js"],
+            environment: { TOKEN: "secret" },
+            cwd: "/tools",
+          },
+        }),
+        reply("mcp.add", null),
+        out("mcp.add", {
+          server: "u-aa73fa1e-b71199eb-remo",
+          "location[directory]": WORK,
+          config: {
+            type: "remote",
+            url: "https://example.com/mcp",
+            headers: { Authorization: "secret" },
+            oauth: false,
+          },
+        }),
+        reply("mcp.add", null),
         out("session.prompt", { sessionID: SESSION, text: "<any>" }),
         promptAccepted,
         event("session.execution.succeeded", { sessionID: SESSION }),
         out("mcp.remove", { server, "location[directory]": WORK }),
+        reply("mcp.remove", null),
+        out("mcp.remove", { server: "u-aa73fa1e-ce568d5b-loca", "location[directory]": WORK }),
+        reply("mcp.remove", null),
+        out("mcp.remove", { server: "u-aa73fa1e-b71199eb-remo", "location[directory]": WORK }),
         reply("mcp.remove", null),
       ]);
       const thread = yield* runtime.resumeThread({
@@ -2960,6 +3013,15 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
       assert.deepEqual(yield* Effect.forEach(ids, t3McpServerName), names);
       assert.equal(names[0], "t3-code-63abb5df2b188bdd");
       assert.equal(yield* t3McpServerName(threadId), "t3-code-thread_opencode2-adapter");
+      const userIds = ["local." + "x".repeat(200), "local." + "x".repeat(200) + "y"];
+      const userNames = yield* Effect.forEach(ids, (thread) =>
+        Effect.forEach(userIds, (id) => userMcpServerName(thread, id)),
+      ).pipe(Effect.map((rows) => rows.flat()));
+      assert.equal(new Set(userNames).size, ids.length * userIds.length);
+      for (const name of userNames) {
+        assert.match(name, /^u-[0-9a-f]{8}-[0-9a-f]{8}-[a-zA-Z0-9_-]{1,4}$/);
+        assert.isAtMost(`${name}_${"t".repeat(39)}`.length, 64);
+      }
     }).pipe(Effect.provide(NodeCrypto.layer)),
   );
 
@@ -4424,6 +4486,8 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           sessionID: FORK,
           permissions: [
             { action: "*", resource: "*", effect: "allow" },
+            { action: "u-*", resource: "*", effect: "deny" },
+            { action: "u-7c81f4ba-*", resource: "*", effect: "allow" },
             { action: "t3-code-*", resource: "*", effect: "deny" },
             { action: "t3-code-thread_opencode2-adapter_fork_*", resource: "*", effect: "allow" },
           ],

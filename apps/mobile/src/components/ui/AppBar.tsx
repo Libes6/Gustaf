@@ -172,7 +172,7 @@ export function AppBar(props: AppBarProps) {
         <Toolbar placement="left">
           <Toolbar.Button
             icon="xmark"
-            accessibilityLabel={props.closeAccessibilityLabel ?? "Close"}
+            accessibilityLabel={props.closeAccessibilityLabel ?? t("Close")}
             onPress={props.onClose}
           />
         </Toolbar>
@@ -258,7 +258,7 @@ export function AppBar(props: AppBarProps) {
           ) : null}
           {closeInspector ? (
             <ScreenHeaderButton
-              accessibilityLabel="Close inspector"
+              accessibilityLabel={t("Close inspector")}
               icon="xmark"
               onPress={closeInspector}
               separateBackground

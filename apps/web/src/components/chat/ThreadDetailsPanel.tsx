@@ -9,7 +9,10 @@ import type {
 } from "@t3tools/contracts";
 
 import type { DraftId } from "../../composerDraftStore";
-import { useT3ProjectFileScripts } from "../../hooks/useT3ProjectFileScripts";
+import {
+  usePackageJsonScripts,
+  useT3ProjectFileScripts,
+} from "../../hooks/useT3ProjectFileScripts";
 import { type EnvMode, type EnvironmentOption } from "../BranchToolbar.logic";
 import { BranchToolbar } from "../BranchToolbar";
 import BaseGitActionsControl from "../GitActionsControl";
@@ -92,6 +95,10 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   const visible = useClientSettings(resolveThreadDetailsVisibility);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const fileScripts = useT3ProjectFileScripts(
+    props.environmentId,
+    props.activeProjectScripts && visible.scripts ? props.gitCwd : null,
+  );
+  const packageScripts = usePackageJsonScripts(
     props.environmentId,
     props.activeProjectScripts && visible.scripts ? props.gitCwd : null,
   );
@@ -203,6 +210,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                         displayMode="panel"
                         scripts={props.activeProjectScripts}
                         fileScripts={fileScripts}
+                        packageScripts={packageScripts}
                         preferredScriptId={props.preferredScriptId}
                         onRunScript={props.onRunProjectScript}
                         onAddScript={props.onAddProjectScript}

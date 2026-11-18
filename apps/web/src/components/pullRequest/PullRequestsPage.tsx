@@ -1208,9 +1208,11 @@ export function PullRequestsPage() {
 
       {listQuery.error && shownCount > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>{listQuery.error} Showing the last pull requests loaded.</span>
+          <span>
+            {listQuery.error} {t("webCopy.showingTheLastPullRequestsLoaded")}
+          </span>
           <Button size="xs" variant="outline" onClick={() => listQuery.refresh()}>
-            Retry
+            {t("sidebar.SidebarUpdateCapsule.retry")}
           </Button>
         </div>
       ) : null}
@@ -1230,7 +1232,7 @@ export function PullRequestsPage() {
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
             >
-              Load more pull requests
+              {t("misc.pullRequestListEmptyState.loadMore")}
             </Button>
           ) : (
             <span>{t("misc.pullRequestsPage.narrowSearch")}</span>

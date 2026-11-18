@@ -259,7 +259,7 @@ export function AttachmentFilePreview(props: {
         const cause = Cause.squash(result.cause);
         toastManager.add({
           type: "error",
-          title: "Could not save file",
+          title: t("webCopy.couldNotSaveFile"),
           description: cause instanceof Error ? cause.message : "Please try again.",
         });
       }
@@ -377,8 +377,8 @@ export function AttachmentFilePreview(props: {
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
       <p className="text-sm font-medium">{t("misc.attachmentFilePreview.noPreview")}</p>
       <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-        Save it to open in an app that supports {props.name.split(".").at(-1) || "this format"}{" "}
-        files.
+        {t("webCopy.saveItToOpenInAnAppThatSupports")}{" "}
+        {props.name.split(".").at(-1) || t("webCopy.thisFormat")} {t("webCopy.filesMore")}
       </p>
     </div>
   );
@@ -494,9 +494,9 @@ export function AttachmentFilePreview(props: {
       </div>
       {content?.truncated ? (
         <FileSurfaceNotice>
-          Preview limited to the first 1 MB
-          {props.sizeBytes > 0 ? ` of a ${props.sizeBytes.toLocaleString()} byte file` : ""}. Save
-          the file to read it in full.
+          {t("webCopy.previewLimitedToTheFirst1MB")}
+          {props.sizeBytes > 0 ? ` of a ${props.sizeBytes.toLocaleString()} byte file` : ""}
+          {t("webCopy.saveTheFileToReadItInFull")}
         </FileSurfaceNotice>
       ) : null}
       {body}

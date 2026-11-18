@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { sessionHasLegacyPermissions } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
@@ -66,7 +67,9 @@ export function installPermissionUpdateNotice(): () => void {
     };
     Dialog.alert(
       `Permissions have changed for ${environment.label}`,
-      "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+      t(
+        "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+      ),
       [{ text: "Got it", onPress: dismiss }],
       { cancelable: false },
     );

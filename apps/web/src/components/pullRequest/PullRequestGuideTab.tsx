@@ -185,10 +185,11 @@ export function PullRequestGuideTab({
 const FAILURE_HINT = "Check the review guide model in Settings → Source control.";
 
 function FailureDetails({ detail }: { detail: string }) {
+  const t = useT();
   return (
     <details className="w-full max-w-lg text-xs text-muted-foreground">
       <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-        Technical details
+        {t("webCopy.technicalDetails")}
       </summary>
       <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
         {detail}

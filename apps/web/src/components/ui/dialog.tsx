@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import { type ComponentProps, createContext, type ReactNode, use, useState } from "react";
@@ -93,6 +94,7 @@ function DialogPopup({
   bottomStickOnMobile?: boolean;
   variant?: "default" | "media";
 }) {
+  const t = useT();
   return (
     <DialogPortal>
       {/* Media opens from inside other overlays (a composer chip, a popover), so it sits above them. */}
@@ -119,7 +121,7 @@ function DialogPopup({
           {children}
           {showCloseButton && (
             <DialogPrimitive.Close
-              aria-label="Close"
+              aria-label={t("shell.smallUi.close")}
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
             >

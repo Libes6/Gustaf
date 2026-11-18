@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ColorValue } from "react-native";
 import { Image } from "expo-image";
 
@@ -9,7 +10,7 @@ export function GustafMark(props: {
   return (
     <Image
       source={require("../../assets/gustaf-icon.png")}
-      accessibilityLabel="Gustaf"
+      accessibilityLabel={t("Gustaf")}
       contentFit="contain"
       style={{ width: props.height, height: props.height }}
     />

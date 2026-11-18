@@ -254,7 +254,7 @@ export function SourceControlAppSignInSettings({
             </Button>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span aria-hidden className="size-1.5 rounded-full bg-warning" />
-              Waiting for approval · code expires at {expiryTime(waiting.expiresAt)}
+              {t("webCopy.waitingForApprovalCodeExpiresAt")} {expiryTime(waiting.expiresAt)}
             </p>
           </div>
         </div>

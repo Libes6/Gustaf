@@ -967,7 +967,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         <span className="block truncate">{label}</span>
                         {file.downloadable === false || pastedText ? (
                           <span className="block text-xs text-muted-foreground tabular-nums">
-                            {file.downloadable === false ? "Sending…" : formatBytes(file.sizeBytes)}
+                            {file.downloadable === false
+                              ? t("chatB.TimelineUserMessageRow.sending")
+                              : formatBytes(file.sizeBytes)}
                           </span>
                         ) : null}
                       </span>

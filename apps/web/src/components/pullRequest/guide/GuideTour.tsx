@@ -106,7 +106,7 @@ export function GuideTour({
           {banner}
           {diff.error !== null ? (
             <p className="text-xs text-muted-foreground">
-              The diff could not be loaded, so excerpts are missing: {diff.error}
+              {t("webCopy.theDiffCouldNotBeLoadedSoExcerptsAreMissing")} {diff.error}
             </p>
           ) : null}
           {stop === null ? (

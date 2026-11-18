@@ -3,9 +3,12 @@ import { useUiLanguage } from "./uiLanguageStore";
 
 // Keep this module free of app imports. See uiLanguageStore.ts.
 
+const englishT = (key: MessageKey) => translate("en", key);
+const russianT = (key: MessageKey) => translate("ru", key);
+
 export function useT() {
   const language = useUiLanguage();
-  return (key: MessageKey) => translate(language, key);
+  return language === "ru" ? russianT : englishT;
 }
 
 export function useSettingsNavLabel() {

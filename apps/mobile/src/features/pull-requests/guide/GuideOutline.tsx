@@ -25,13 +25,15 @@ export function GuideOutline({
     <View>
       <View className="mb-5 flex-row items-center justify-between">
         <View className="flex-row items-baseline gap-2">
-          <Text className="text-base font-t3-semibold">{guide.stops.length} stops</Text>
+          <Text className="text-base font-t3-semibold">
+            {guide.stops.length} {t("stops")}
+          </Text>
           <Text className="text-sm text-foreground-muted">
-            through {files.size} {files.size === 1 ? "file" : "files"}
+            {t("through")} {files.size} {files.size === 1 ? t("file") : t("files")}
           </Text>
         </View>
         <Menu
-          title="Guide options"
+          title={t("Guide options")}
           actions={[
             {
               id: "word-wrap",
@@ -51,7 +53,7 @@ export function GuideOutline({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Guide options"
+            accessibilityLabel={t("Guide options")}
             className="h-11 w-11 items-center justify-center rounded-full active:bg-grouped-card"
           >
             <SymbolView name="ellipsis" size={20} tintColorClassName="accent-icon-muted" />
@@ -90,7 +92,7 @@ export function GuideOutline({
                   <SymbolView name="eye" size={14} tintColorClassName="accent-warning-foreground" />
                 ) : null}
                 <Text className="shrink text-xs text-foreground-muted" numberOfLines={1}>
-                  {filename ?? "Context"}
+                  {filename ?? t("Context")}
                   {paths.length > 1 ? ` +${paths.length - 1}` : ""}
                 </Text>
               </View>
@@ -103,7 +105,12 @@ export function GuideOutline({
       })}
       {guide.stops.length ? (
         <View className="self-end">
-          <Button label="Start tour" tone="text" onPress={() => onOpen(0)} icon="arrow.right" />
+          <Button
+            label={t("Start tour")}
+            tone="text"
+            onPress={() => onOpen(0)}
+            icon="arrow.right"
+          />
         </View>
       ) : null}
     </View>

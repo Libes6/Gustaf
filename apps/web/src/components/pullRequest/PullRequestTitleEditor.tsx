@@ -117,7 +117,7 @@ export function PullRequestTitleEditor({
           disabled={titleSaving}
           onClick={() => setTitleScope(null)}
         >
-          Cancel
+          {t("subscriptions.cancel")}
         </Button>
         <Button
           size="xs"

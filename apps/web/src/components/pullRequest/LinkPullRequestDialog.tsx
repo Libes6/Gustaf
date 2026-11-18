@@ -129,8 +129,7 @@ function LinkPullRequestDialog({
         <DialogHeader>
           <DialogTitle>{t("misc.linkPullRequestDialog.title")}</DialogTitle>
           <DialogDescription>
-            Attach a pull request to this thread by its URL, or by its number for this thread's
-            repository.
+            {t("webCopy.attachAPullRequestToThisThreadByItsURL")}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -165,7 +164,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            {t("subscriptions.cancel")}
           </Button>
           <Button
             type="button"

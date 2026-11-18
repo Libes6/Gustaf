@@ -319,7 +319,7 @@ export function usePullRequestHandoffs({
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: t("misc.pullRequestDetailPanel.askedInThread"),
       description:
         task.prompt.length > 0
           ? "The question is in the composer. Read it over, then send."
@@ -349,7 +349,7 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
+        title: t("misc.pullRequestDetailPanel.couldNotOpenCheckoutThread"),
         description: t("misc.usePullRequestHandoffs.tryAgainFromProject"),
       });
       return;
@@ -382,7 +382,7 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
+        title: t("misc.pullRequestDetailPanel.checkedOutThreadStayed"),
         description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
       });
       return;
@@ -410,8 +410,8 @@ export function usePullRequestHandoffs({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: t("misc.pullRequestDetailPanel.checkoutReady"),
+            description: t("misc.pullRequestDetailPanel.taskInComposer"),
           }
         : offHeadPullRequestCheckoutToast(terminology),
     );

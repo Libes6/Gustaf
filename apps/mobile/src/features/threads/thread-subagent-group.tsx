@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -200,10 +201,10 @@ export function ThreadSubagentGroup(props: {
                 accessibilityRole={target === null ? undefined : "link"}
                 accessibilityHint={
                   target !== null
-                    ? "Opens this agent's thread"
+                    ? t("Opens this agent's thread")
                     : agent.remoteChild !== undefined
                       ? `Runs on ${agent.remoteChild.label}`
-                      : "Provider-managed agent"
+                      : t("Provider-managed agent")
                 }
                 disabled={target === null}
                 onPress={() => {

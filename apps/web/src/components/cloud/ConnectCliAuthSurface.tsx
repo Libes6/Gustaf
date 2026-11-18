@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { useAuth, useClerk } from "@clerk/react";
 import { readConnectAuthorizeRequest } from "@t3tools/shared/connectAuth";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -19,6 +20,7 @@ const invalidLinkMessage = {
 } as const;
 
 export function ConnectCliAuthorizeSurface() {
+  const t = useT();
   const [request] = useState(() => readConnectAuthorizeRequest(new URL(window.location.href)));
   const clerk = useClerk();
   const { isLoaded, isSignedIn } = useAuth();
@@ -70,17 +72,17 @@ export function ConnectCliAuthorizeSurface() {
     <StandalonePage>
       <StandalonePageHeader
         context="Browser authorization"
-        title="Connecting your terminal"
+        title={t("webCopy.connectingYourTerminal")}
         description={
           isSignedIn
-            ? "Redirecting to authorize Gustaf Connect for your CLI…"
-            : "Sign in to continue authorizing Gustaf Connect for your CLI."
+            ? t("webCopy.redirectingToAuthorizeGustafConnectForYourCLI")
+            : t("webCopy.signInToContinueAuthorizingGustafConnectForYourCLI")
         }
       />
       {isLoaded && !isSignedIn ? (
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            Sign in
+            {t("shell.smallUi.signIn")}
           </Button>
         </div>
       ) : null}

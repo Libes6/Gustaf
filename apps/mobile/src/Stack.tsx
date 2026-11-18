@@ -1,3 +1,4 @@
+import { SettingsMcpRouteScreen } from "./features/settings/SettingsMcpRouteScreen";
 import { t } from "./i18n";
 import { isDraftThreadRoute } from "./features/threads/thread-route-state";
 import { ComponentCatalogScreen } from "./features/development/ComponentCatalogScreen";
@@ -283,6 +284,11 @@ const SETTINGS_SCREENS = {
     screen: SettingsVoiceModelsRouteScreen,
     options: SEARCH_SHEET_ROUTE,
   }),
+  SettingsMcp: createNativeStackScreen({
+    screen: SettingsMcpRouteScreen,
+    linking: "settings/mcp",
+    options: settingsPage("MCP servers"),
+  }),
   SettingsFollowUp: createNativeStackScreen({
     screen: SettingsFollowUpRouteScreen,
     linking: "settings/follow-ups",
@@ -461,13 +467,13 @@ function NotFoundScreen() {
       style={[{ flex: 1 }, screenBgStyle]}
     >
       <Text className="text-3xl font-t3-bold text-foreground" selectable>
-        Route not found
+        {t("Route not found")}
       </Text>
       <Pressable
         style={returnHomeButtonStyle}
         onPress={() => navigation.dispatch(StackActions.replace("Home"))}
       >
-        <Text className="text-base font-t3-bold text-primary-foreground">Return home</Text>
+        <Text className="text-base font-t3-bold text-primary-foreground">{t("Return home")}</Text>
       </Pressable>
     </ScrollView>
   );

@@ -53,7 +53,7 @@ function ArchivedThreadsHeader(props: {
   const hasCustomFilter = props.selectedEnvironmentId !== null || props.sortOrder !== "newest";
   return (
     <AppBar
-      title="Archived threads"
+      title={t("Archived threads")}
       onBack={() => navigation.goBack()}
       search={{
         value: props.searchQuery,
@@ -273,7 +273,7 @@ function ArchiveError(props: { readonly message: string; readonly onRetry: () =>
   return (
     <View className="rounded-[20px] border border-danger-border bg-danger p-4">
       <Text className="text-base font-t3-bold text-danger-foreground">
-        Could not load every archive
+        {t("Could not load every archive")}
       </Text>
       <Text className="mt-1 text-sm text-foreground-muted">{props.message}</Text>
       <View className="mt-3">
@@ -381,7 +381,7 @@ export function ArchivedThreadsScreen(props: {
       return (
         <View className="items-center py-16">
           <AppActivityIndicator colorClassName="accent-icon" />
-          <Text className="mt-3 text-sm text-foreground-muted">Loading archive...</Text>
+          <Text className="mt-3 text-sm text-foreground-muted">{t("Loading archive...")}</Text>
         </View>
       );
     }
@@ -390,10 +390,10 @@ export function ArchivedThreadsScreen(props: {
       <EmptyState
         detail={
           isFiltered
-            ? "Try another search or environment."
-            : "Threads you archive will appear here."
+            ? t("Try another search or environment.")
+            : t("Threads you archive will appear here.")
         }
-        title={isFiltered ? "No matching threads" : "No archived threads"}
+        title={isFiltered ? t("No matching threads") : t("No archived threads")}
       />
     );
   }, [isFiltered, isInitialLoad]);

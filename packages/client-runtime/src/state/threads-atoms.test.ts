@@ -25,6 +25,7 @@ import * as EnvironmentRegistry from "../connection/registry.ts";
 import {
   AVAILABLE_CONNECTION_STATE,
   PrimaryConnectionTarget,
+  type ConnectionRouteResult,
   type NetworkStatus,
   type PreparedConnection,
 } from "../connection/model.ts";
@@ -126,6 +127,9 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
       new Map(),
     ),
     networkStatus: yield* SubscriptionRef.make<NetworkStatus>("online"),
+    routeResults: yield* SubscriptionRef.make<
+      ReadonlyMap<EnvironmentId, ReadonlyMap<string, ConnectionRouteResult>>
+    >(new Map()),
     start: Effect.void,
     register: () => Effect.die("Unexpected environment registration"),
     assertKnownAddress: () => Effect.die("Unexpected address check"),

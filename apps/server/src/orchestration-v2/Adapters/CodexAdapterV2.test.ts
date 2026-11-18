@@ -292,7 +292,11 @@ describe("CodexAdapterV2 native protocol logging", () => {
           method: "thread/event",
           params: {
             id: "evt-1",
-            http_headers: { Authorization: "Bearer secret-codex-token" },
+            http_headers: {
+              Authorization: "Bearer secret-codex-token",
+              "X-Custom": "header-value",
+            },
+            env: { CUSTOM: "env-value" },
             usage: { inputTokens: 12, outputTokens: 8, totalTokens: 20 },
           },
         },
@@ -318,7 +322,8 @@ describe("CodexAdapterV2 native protocol logging", () => {
             method: "thread/event",
             params: {
               id: "evt-1",
-              http_headers: { Authorization: "[REDACTED]" },
+              http_headers: "[REDACTED]",
+              env: "[REDACTED]",
               usage: { inputTokens: 12, outputTokens: 8, totalTokens: 20 },
             },
           },
@@ -1253,9 +1258,13 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         transcript,
         beforeEmitInbound === undefined ? {} : { beforeEmitInbound },
       );
+      const processInputs: Array<
+        Parameters<CodexAdapterV2.CodexAppServerClientFactoryShape["open"]>[0]
+      > = [];
       const clientFactory: CodexAdapterV2.CodexAppServerClientFactoryShape = {
         open: (openInput) =>
           Layer.build(CodexReplay.layerReplayWithDriver(driver)).pipe(
+            Effect.tap(() => Effect.sync(() => processInputs.push(openInput))),
             Effect.mapError(
               (cause) =>
                 new ProviderAdapter.ProviderAdapterOpenSessionError({
@@ -1366,6 +1375,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         serverConfig,
         events,
         continuationRequests,
+        processInputs,
         terminalEvents,
         subagentUpdates,
         hasPendingBackgroundWork,
@@ -1605,9 +1615,25 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer secret-codex-token",
         browserToolsAvailable: true,
+        userServers: [
+          {
+            type: "stdio",
+            id: "local.tools",
+            command: "node",
+            args: ["server.js"],
+            env: { TOKEN: "user-secret" },
+            cwd: "/workspace/tools",
+          },
+          {
+            type: "http",
+            id: "remote",
+            url: "https://example.com/mcp",
+            headers: { Authorization: "Bearer user-secret" },
+          },
+        ],
       });
       const requests: Array<unknown> = [];
-      yield* makeCodexReplayHarness(
+      const harness = yield* makeCodexReplayHarness(
         makeCodexReplayTranscript({
           scenario,
           entries: codexReplayPreamble({
@@ -1622,6 +1648,8 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             if (method === "thread/start") requests.push(params);
           }),
       );
+      assert.equal(harness.processInputs.length, 1);
+      assert.notInclude(JSON.stringify(harness.processInputs), "user-secret");
       assert.deepEqual(requests, [
         {
           cwd: "/workspace",
@@ -1631,6 +1659,16 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             mcp_optional_startup_grace_ms: 10_000,
             "features.concurrent_reasoning_summaries": true,
             "shell_environment_policy.set.T3CODE_THREAD_ID": `thread-${scenario}`,
+            ['mcp_servers."local.tools"']: {
+              command: "node",
+              args: ["server.js"],
+              env: { TOKEN: "user-secret" },
+              cwd: "/workspace/tools",
+            },
+            ['mcp_servers."remote"']: {
+              url: "https://example.com/mcp",
+              http_headers: { Authorization: "Bearer user-secret" },
+            },
             "mcp_servers.t3-code": {
               url: "http://127.0.0.1:43123/mcp",
               tool_timeout_sec: 3_900,

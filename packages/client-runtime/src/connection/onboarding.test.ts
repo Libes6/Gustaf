@@ -30,6 +30,7 @@ import {
   ConnectionBlockedError,
   PrimaryConnectionTarget,
 } from "./model.ts";
+import { alreadySavedEnvironment } from "./errors.ts";
 import * as Onboarding from "./onboarding.ts";
 import {
   prepareBearerConnectionUpdate,
@@ -328,6 +329,18 @@ describe("connection onboarding", () => {
       expect(calls.map((call) => call.url)).toEqual([
         "https://attacker.example.test/.well-known/t3/environment",
       ]);
+
+      // The way out: the unspent code adds the address as a route of the saved environment.
+      yield* onboarding.registerPairing({
+        host: "attacker.example.test",
+        pairingCode: "pairing-token",
+        expectedEnvironmentId: alreadySavedEnvironment(error)!.environmentId,
+      });
+      const entries = yield* SubscriptionRef.get(registry.entries);
+      expect(entries.size).toBe(1);
+      expect(connectionRoutes(entries.get(PAIRED_ENVIRONMENT_ID)!).map(routeHttpBaseUrl)).toEqual(
+        expect.arrayContaining(["https://remote.example.test/", "https://attacker.example.test/"]),
+      );
     }).pipe(Effect.provide(layerPairingOnboarding(undefined, calls)));
   });
 

@@ -125,8 +125,8 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
               </span>
               {maxTokens !== null ? (
                 <span className="text-muted-foreground">
-                  {usage.usedTokens.toLocaleString("en-US")} of {maxTokens.toLocaleString("en-US")}{" "}
-                  tokens
+                  {usage.usedTokens.toLocaleString("en-US")} {t("misc.officeViewer.pageOf")}{" "}
+                  {maxTokens.toLocaleString("en-US")} {t("webCopy.tokens")}
                 </span>
               ) : null}
               {threshold !== null && threshold > 0 ? (
@@ -164,11 +164,12 @@ function LimitRow({
       tooltip={
         <>
           <span className="text-foreground">
-            {window.label}: {used}% used
+            {window.label}: {used}
+            {t("webCopy.used")}
           </span>
           {window.resetsAt && resetsAt > now ? (
             <span className="text-muted-foreground">
-              Resets in {formatDuration(resetsAt - now)} ·{" "}
+              {t("webCopy.resetsIn")} {formatDuration(resetsAt - now)} ·{" "}
               {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
             </span>
           ) : null}

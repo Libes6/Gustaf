@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import {
   AuthEnvironmentMaintainScope,
@@ -269,6 +270,7 @@ export function ServerUpdateAction({
   className,
   appearance = "button",
 }: ServerUpdateTarget & UpdateButtonProps) {
+  const t = useT();
   const isDesktopAppUpdate = selfUpdate === "desktop-managed";
   const serverVersion = useServerConfigs().get(environmentId)?.environment.serverVersion;
   const sessionStateAtom = environmentSession.sessionStateAtom(environmentId);
@@ -291,7 +293,7 @@ export function ServerUpdateAction({
     onError: (error) => {
       toastManager.add({
         type: "error",
-        title: "Could not copy update command",
+        title: t("webCopy.couldNotCopyUpdateCommand"),
         description: error.message,
       });
     },
@@ -338,7 +340,7 @@ export function ServerUpdateAction({
   if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
     return (
       <span className="text-muted-foreground text-xs">
-        Update the desktop app on that machine to update this server.
+        {t("webCopy.updateTheDesktopAppOnThatMachineToUpdateThis")}
       </span>
     );
   }

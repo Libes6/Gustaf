@@ -125,7 +125,9 @@ export function PullRequestCheckoutMenu({
             />
           }
         />
-        <TooltipPopup>Check out this {term}</TooltipPopup>
+        <TooltipPopup>
+          {t("webCopy.checkOutThis")} {term}
+        </TooltipPopup>
       </Tooltip>
       <MenuPopup align="end" side="bottom">
         <MenuItem disabled={!canPrepareWorktree} onClick={() => onCheckout("worktree")}>
@@ -133,7 +135,7 @@ export function PullRequestCheckoutMenu({
           <span className="flex min-w-0 flex-col">
             <span>{t("misc.pullRequestDetailActions.inSeparateWorktree")}</span>
             <span className="text-xs text-muted-foreground">
-              Its own folder and thread. Nothing you have open moves.
+              {t("webCopy.itsOwnFolderAndThreadNothingYouHaveOpenMoves")}
             </span>
           </span>
         </MenuItem>
@@ -142,7 +144,7 @@ export function PullRequestCheckoutMenu({
           <span className="flex min-w-0 flex-col">
             <span>{t("misc.pullRequestDetailActions.inThisRepo")}</span>
             <span className="text-xs text-muted-foreground">
-              Switches the branch you are working in.
+              {t("webCopy.switchesTheBranchYouAreWorkingIn")}
             </span>
           </span>
         </MenuItem>
@@ -248,7 +250,8 @@ export function PullRequestPrimaryAction({
             }
           />
           <TooltipPopup side="top">
-            {armedAutoMergeLabel}: the host will merge this on its own once its requirements are met
+            {armedAutoMergeLabel}
+            {t("webCopy.theHostWillMergeThisOnItsOwnOnceIts")}
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -346,7 +349,8 @@ export function PullRequestPrimaryAction({
             }
           />
           <TooltipPopup side="top">
-            {armedAutoMergeLabel}: the host will merge this on its own once its requirements are met
+            {armedAutoMergeLabel}
+            {t("webCopy.theHostWillMergeThisOnItsOwnOnceIts")}
           </TooltipPopup>
         </Tooltip>
       ) : primaryAction === "merge" ? (
@@ -449,10 +453,10 @@ export function PullRequestApproveWorkflowsButton({
               <PlayIcon aria-hidden className="size-3.5" />
               <span className="inline-grid">
                 <span aria-hidden className="invisible col-start-1 row-start-1">
-                  Approve workflows to run
+                  {t("misc.pullRequestDetailActions.approveWorkflows")}
                 </span>
                 <span aria-hidden className="invisible col-start-1 row-start-1">
-                  Confirm approve?
+                  {t("misc.pullRequestDetailActions.confirmApprove")}
                 </span>
                 <span className="col-start-1 row-start-1">
                   {pendingAction === "approve-workflows"

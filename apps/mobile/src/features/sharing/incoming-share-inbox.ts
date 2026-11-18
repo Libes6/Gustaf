@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { SharePayload } from "expo-sharing";
 
 import { SerializedAsyncQueue } from "../../lib/serialized-async-queue";
@@ -103,7 +104,7 @@ export class IncomingShareInbox {
         await this.cleanup(built.cleanup);
         this.clearNativePayloads();
         throw new Error(
-          draft.warnings[0] ?? "The shared content is not supported by the composer.",
+          draft.warnings[0] ?? t("The shared content is not supported by the composer."),
         );
       }
 

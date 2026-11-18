@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { videoMimeType } from "@t3tools/shared/video";
 import { Modal, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -119,13 +120,13 @@ function OpenVideoPreviewModal(props: {
         <MediaPreviewHeader
           title={props.name}
           media={mediaActions}
-          closeAccessibilityLabel="Close video"
+          closeAccessibilityLabel={t("Close video")}
           onClose={props.onRequestClose}
         />
         {playback.uri === null && !playback.unavailable ? (
           <View className="flex-1 items-center justify-center gap-3 px-6">
             <AppActivityIndicator color="#ffffff" />
-            <AppText className="text-sm text-white/80">Loading video...</AppText>
+            <AppText className="text-sm text-white/80">{t("Loading video...")}</AppText>
           </View>
         ) : (
           <MediaVideoPlayer
@@ -146,13 +147,13 @@ function OpenVideoPreviewModal(props: {
         ) : null}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Save or share video"
+          accessibilityLabel={t("Save or share video")}
           disabled={playback.uri === null || mediaActions.sharing}
           onPress={mediaActions.share}
           className="mx-4 my-3 min-h-12 items-center justify-center rounded-xl bg-white/15 px-4"
         >
           <AppText className="font-t3-medium text-base text-white">
-            {mediaActions.sharing ? "Opening share sheet..." : "Save or share video"}
+            {mediaActions.sharing ? t("Opening share sheet...") : t("Save or share video")}
           </AppText>
         </Pressable>
       </View>

@@ -635,9 +635,9 @@ function itemSummary(
         return formatReadToolLabel(path ?? "");
       }
       if (classified === "search") {
-        return formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? "Tool call";
+        return formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? t("Tool call");
       }
-      return toolPresentation?.displayName ?? item.toolName ?? "Tool call";
+      return toolPresentation?.displayName ?? item.toolName ?? t("Tool call");
     }
     case "proposed_plan":
       return "Proposed plan";
@@ -730,28 +730,28 @@ function toWorkLogEntry(
         ...common,
         command: item.input,
         rawCommand: item.input,
-        toolTitle: title ?? "Command",
+        toolTitle: title ?? t("Command"),
         toolData: item,
       };
     case "file_change":
       return {
         ...common,
         changedFiles: item.changes?.map((change) => change.path) ?? [item.fileName],
-        toolTitle: title ?? "File change",
+        toolTitle: title ?? t("File change"),
         toolData: item,
       };
     case "file_search":
       return {
         ...common,
         ...(item.pattern ? { detail: item.pattern } : {}),
-        toolTitle: title ?? "File search",
+        toolTitle: title ?? t("File search"),
         toolData: item,
       };
     case "web_search":
       return {
         ...common,
         ...(item.patterns?.length ? { detail: item.patterns.join(", ") } : {}),
-        toolTitle: title ?? "Web search",
+        toolTitle: title ?? t("Web search"),
         toolData: item,
       };
     case "checkpoint":
@@ -766,7 +766,7 @@ function toWorkLogEntry(
     case "dynamic_tool":
       return {
         ...common,
-        toolTitle: title ?? item.toolName ?? "Tool",
+        toolTitle: title ?? item.toolName ?? t("Tool"),
         toolData: { input: item.input, output: item.output },
       };
     default:

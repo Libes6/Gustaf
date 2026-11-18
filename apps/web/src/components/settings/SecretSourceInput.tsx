@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import {
   SecretReference,
   type EnvironmentId,
@@ -68,6 +69,7 @@ export function SecretSourceSelect(props: {
   readonly disabled?: boolean;
   readonly onValueChange: (provider: SecretProviderId | null) => void;
 }) {
+  const t = useT();
   const { value, sources } = props;
   const known = value === null || sources.some((source) => source.id === value);
   const title =
@@ -94,7 +96,7 @@ export function SecretSourceSelect(props: {
       </SelectTrigger>
       <SelectPopup align="start" alignItemWithTrigger={false}>
         <SelectItem value={STORED_VALUE}>
-          <SourceLabel icon={TypeIcon} label="Value" />
+          <SourceLabel icon={TypeIcon} label={t("webCopy.value")} />
         </SelectItem>
         {sources.map((source) => (
           <SelectItem key={source.id} value={source.id}>
@@ -133,6 +135,7 @@ export function SecretSourceInput({
   children,
   ...rest
 }: SecretSourceInputProps) {
+  const t = useT();
   // A provider picked here applies once a reference for it is committed.
   const [pendingProvider, setPendingProvider] = useState<SecretProviderId | null>(null);
   const [rejectedReference, setRejectedReference] = useState<string | null>(null);
@@ -202,7 +205,8 @@ export function SecretSourceInput({
         />
         {rejectedReference !== null ? (
           <p className="text-2xs text-destructive">
-            {definition?.invalidReferenceMessage ?? "Enter a valid secret reference."}
+            {definition?.invalidReferenceMessage ??
+              t("settingsD.simlockDeviceHostEditor.invalidSecretReference")}
           </p>
         ) : null}
       </div>

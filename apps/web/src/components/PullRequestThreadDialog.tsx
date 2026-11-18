@@ -207,11 +207,11 @@ export function PullRequestThreadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <SourceControlIcon className="me-2 size-4" />
-            Checkout {terminology.singular}
+            {t("webCopy.checkout")} {terminology.singular}
           </DialogTitle>
           <DialogDescription>
-            Resolve a {sourceControlPresentation.providerName} {terminology.singular}, then create
-            the draft thread in the main repo or in a dedicated worktree.
+            {t("webCopy.resolveA")} {sourceControlPresentation.providerName} {terminology.singular}
+            {t("webCopy.thenCreateTheDraftThreadInTheMainRepoOr")}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -248,8 +248,8 @@ export function PullRequestThreadDialog({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-sm">{resolvedPullRequest.title}</p>
                   <p className="truncate text-muted-foreground text-xs">
-                    #{resolvedPullRequest.number} · {resolvedPullRequest.headBranch} to{" "}
-                    {resolvedPullRequest.baseBranch}
+                    #{resolvedPullRequest.number} · {resolvedPullRequest.headBranch}{" "}
+                    {t("webCopy.to")} {resolvedPullRequest.baseBranch}
                   </p>
                 </div>
                 <span className={cn("shrink-0 text-xs capitalize", statusTone)}>
@@ -262,7 +262,7 @@ export function PullRequestThreadDialog({
           {isResolving ? (
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <Spinner size="sm" />
-              Resolving {terminology.singular}...
+              {t("webCopy.resolving")} {terminology.singular}...
             </div>
           ) : null}
 

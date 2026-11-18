@@ -77,7 +77,7 @@ export function WorktreesDirectoryRow() {
       resetAction={
         mixed || settings.worktreesDirectory !== "" ? (
           <SettingResetButton
-            label="worktree location"
+            label={t("webCopy.worktreeLocation")}
             onClick={() => updateSettings({ worktreesDirectory: "" })}
           />
         ) : null
@@ -278,7 +278,7 @@ function CleanupResults({
       })}
       {report.omittedCount > 0 && (
         <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-          {environmentLabel}: {report.omittedCount.toLocaleString()} more results.
+          {environmentLabel}: {report.omittedCount.toLocaleString()} {t("webCopy.moreResults")}
         </p>
       )}
       {report.entries.length === 0 && report.omittedCount === 0 && (
@@ -358,7 +358,18 @@ function CleanupSection() {
             )}${report.counts.failed > 0 ? t("settingsD.storageSettings.countsFailed").replace("{failed}", String(report.counts.failed)) : ""}`
         : "",
       description: report
-        ? `Last run ${formatRelativeTimeLabel(report.finishedAt, nowMs)}. ${formatBytes(report.bytesFreed)} recovered.${report.counts.failed > 0 ? ` ${report.counts.failed} ${report.counts.failed === 1 ? "item" : "items"} couldn't be removed.` : ""}`
+        ? t("settingsStatus.cleanupReport")
+            .replace("{time}", formatRelativeTimeLabel(report.finishedAt, nowMs))
+            .replace("{bytes}", formatBytes(report.bytesFreed))
+            .replace(
+              "{failures}",
+              report.counts.failed > 0
+                ? t("settingsStatus.cleanupFailures").replace(
+                    "{count}",
+                    String(report.counts.failed),
+                  )
+                : "",
+            )
         : query?.failed
           ? t("settingsD.storageSettings.couldNotLoadLastRun")
           : query?.loading

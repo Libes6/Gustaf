@@ -10,7 +10,7 @@
 
 use std::sync::{Mutex, PoisonError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::Manager;
@@ -18,6 +18,8 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 const FIRST_CHECK_DELAY: Duration = Duration::from_secs(15);
 const CHECK_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
+/// Applies to the check only; a download of a large release may take far longer.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 /// Lets the page receive the answer to its install call before the server goes away.
 const INSTALL_DELAY: Duration = Duration::from_millis(300);
 const UNAVAILABLE: &str = "Automatic updates are not available in this build.";
@@ -210,6 +212,46 @@ fn current(app: &tauri::AppHandle) -> UpdateState {
     locked(&app.state::<Updater>().state).clone()
 }
 
+/// A hung request must not leave the state on `checking`, which refuses every later check.
+async fn within<T, E: std::fmt::Display>(
+    limit: Duration,
+    request: impl std::future::Future<Output = Result<T, E>>,
+) -> Result<T, String> {
+    match tokio::time::timeout(limit, request).await {
+        Ok(result) => result.map_err(|error| error.to_string()),
+        Err(_) => Err("The update server did not answer in time.".to_owned()),
+    }
+}
+
+/// `checkedAt` is an ISO 8601 UTC string, as the page parses it with `new Date`.
+fn iso_timestamp(at: SystemTime) -> String {
+    let seconds = at
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    let (days, rest) = (seconds / 86_400, seconds % 86_400);
+    // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm).
+    let shifted = days as i64 + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3_600,
+        rest % 3_600 / 60,
+        rest % 60
+    )
+}
+
 /// False when there was nothing to ask: updates are off, or a check or download is running.
 async fn check(app: &tauri::AppHandle) -> bool {
     let mut begun = false;
@@ -234,10 +276,11 @@ async fn check(app: &tauri::AppHandle) -> bool {
     }
 
     let found = match app.updater() {
-        Ok(updater) => updater.check().await,
-        Err(error) => Err(error),
+        Ok(updater) => within(CHECK_TIMEOUT, async { updater.check().await }).await,
+        Err(error) => Err(error.to_string()),
     };
     let updater = app.state::<Updater>();
+    let checked_at = iso_timestamp(SystemTime::now());
     match found {
         Ok(Some(update)) => {
             let notes = release_notes(&update.version, update.body.as_deref());
@@ -245,6 +288,7 @@ async fn check(app: &tauri::AppHandle) -> bool {
             *locked(&updater.offered) = Some(update);
             publish(app, |state| {
                 state.settle("available");
+                state.checked_at = Some(checked_at);
                 state.available_version = Some(version);
                 state.release_notes = notes;
             });
@@ -253,6 +297,7 @@ async fn check(app: &tauri::AppHandle) -> bool {
             *locked(&updater.offered) = None;
             publish(app, |state| {
                 state.settle("up-to-date");
+                state.checked_at = Some(checked_at);
                 state.available_version = None;
                 state.release_notes = Vec::new();
             });
@@ -262,10 +307,11 @@ async fn check(app: &tauri::AppHandle) -> bool {
             // A release found earlier is still there; being offline must not hide it.
             let still_offered = locked(&updater.offered).is_some();
             publish(app, |state| {
+                state.checked_at = Some(checked_at);
                 if still_offered {
                     state.settle("available");
                 } else {
-                    state.fail("check", error.to_string());
+                    state.fail("check", error);
                 }
             });
         }
@@ -437,7 +483,41 @@ pub fn initialize(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{configured, release_notes, ReleaseNote, UpdateState};
+    use super::{configured, iso_timestamp, release_notes, within, ReleaseNote, UpdateState};
+    use std::time::{Duration, UNIX_EPOCH};
+
+    #[test]
+    fn a_check_that_never_answers_ends_with_a_message() {
+        let hung = within(
+            Duration::from_millis(20),
+            std::future::pending::<Result<(), String>>(),
+        );
+        assert_eq!(
+            tauri::async_runtime::block_on(hung),
+            Err("The update server did not answer in time.".to_owned())
+        );
+        let failed = within(Duration::from_secs(5), async { Err::<(), _>("offline") });
+        assert_eq!(
+            tauri::async_runtime::block_on(failed),
+            Err("offline".to_owned())
+        );
+        let answered = within(Duration::from_secs(5), async { Ok::<_, String>(7) });
+        assert_eq!(tauri::async_runtime::block_on(answered), Ok(7));
+    }
+
+    #[test]
+    fn last_checked_is_an_iso_utc_timestamp() {
+        for (seconds, text) in [
+            (0, "1970-01-01T00:00:00Z"),
+            (951_782_400 + 86_399, "2000-02-29T23:59:59Z"),
+            (1_795_000_000, "2026-11-18T11:06:40Z"),
+        ] {
+            assert_eq!(
+                iso_timestamp(UNIX_EPOCH + Duration::from_secs(seconds)),
+                text
+            );
+        }
+    }
 
     #[test]
     fn only_a_signed_https_feed_enables_updates() {

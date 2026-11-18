@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import type { RefObject } from "react";
 import { anchoredToastManager } from "./toast";
 
@@ -13,7 +15,7 @@ export function showAnchoredCopySuccessToast(ref: RefObject<HTMLButtonElement | 
       anchor: ref.current,
     },
     timeout: ANCHORED_COPY_TOAST_TIMEOUT_MS,
-    title: "Copied!",
+    title: translate(getUiLanguage(), "webCopy.copied"),
   });
 }
 
@@ -24,7 +26,7 @@ export function showAnchoredCopyErrorToast(ref: RefObject<HTMLButtonElement | nu
     positionerProps: {
       anchor: ref.current,
     },
-    title: "Failed to copy",
+    title: translate(getUiLanguage(), "webCopy.failedToCopy"),
     description: error.message,
   });
 }

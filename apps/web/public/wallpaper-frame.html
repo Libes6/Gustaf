@@ -5,7 +5,7 @@
     <!-- Scenes are third-party code: no network, and the embedding iframe is sandboxed to an opaque origin. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'"
+      content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'; worker-src blob:; connect-src 'none'"
     />
     <meta name="color-scheme" content="light dark" />
     <style>

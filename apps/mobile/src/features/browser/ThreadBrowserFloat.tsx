@@ -102,7 +102,7 @@ function FloatingBrowserPlayer(props: {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Open browser, ${browserTabTitle(props.tab)}`}
-        accessibilityHint="Opens the browser tab full screen"
+        accessibilityHint={t("Opens the browser tab full screen")}
         onPress={props.onOpen}
         className="flex-1"
       >

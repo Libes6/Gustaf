@@ -107,7 +107,10 @@ function TimelineBody({
 }
 
 function ActorName({ actor }: { actor: PullRequestActor | null }) {
-  return <span className="font-semibold text-foreground">{actor?.login ?? "ghost"}</span>;
+  const t = useT();
+  return (
+    <span className="font-semibold text-foreground">{actor?.login ?? t("webCopy.ghost")}</span>
+  );
 }
 
 function TimelineMarker({
@@ -361,6 +364,7 @@ function ConversationGroup({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const actors = uniqueConversationActors(events);
   const first = events[0];
@@ -384,10 +388,12 @@ function ConversationGroup({
           >
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold">
-                {events.length.toLocaleString()} {events.length === 1 ? "comment" : "comments"}
+                {events.length.toLocaleString()}{" "}
+                {events.length === 1 ? t("webCopy.comment") : t("webCopy.comments")}
               </span>
               <span className="block truncate text-3xs text-muted-foreground">
-                {actors.length.toLocaleString()} {actors.length === 1 ? "author" : "authors"} ·{" "}
+                {actors.length.toLocaleString()}{" "}
+                {actors.length === 1 ? t("webCopy.author") : t("webCopy.authors")} ·{" "}
                 <RelativeTime timestamp={first.at} />
               </span>
             </span>
@@ -463,7 +469,7 @@ function ReviewThreadEvent({
         {thread.isResolved ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground">
             <CircleCheckIcon aria-hidden className="size-3" />
-            Resolved
+            {t("misc.pullRequestSummaryTab.resolved")}
           </span>
         ) : null}
         {dismissed ? (
@@ -476,11 +482,12 @@ function ReviewThreadEvent({
         ) : null}
         {expanded ? null : (
           <span className="shrink-0">
-            · {event.actor?.login ?? "ghost"}
+            · {event.actor?.login ?? t("webCopy.ghost")}
             {replyCount > 0 ? (
               <>
                 {" "}
-                · {replyCount.toLocaleString()} {replyCount === 1 ? "reply" : "replies"}
+                · {replyCount.toLocaleString()}{" "}
+                {replyCount === 1 ? t("webCopy.reply") : t("webCopy.replies")}
               </>
             ) : null}
           </span>
@@ -619,6 +626,7 @@ function ReviewVerdictEvent({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
+  const t = useT();
   return (
     <div className="group relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]">
       <ActorTimelineMarker
@@ -644,7 +652,9 @@ function ReviewVerdictEvent({
                 }
               >
                 {pullRequestReviewOutcomeLabel(outcome)}
-                {stale ? <span className="sr-only">, before the latest commits</span> : null}
+                {stale ? (
+                  <span className="sr-only">{t("webCopy.beforeTheLatestCommits")}</span>
+                ) : null}
               </TooltipTrigger>
               <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome)}</TooltipPopup>
             </Tooltip>

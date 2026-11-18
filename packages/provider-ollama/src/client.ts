@@ -6,5 +6,6 @@ import { OllamaSettings } from "./settings.ts";
 export const ollamaClient = defineProviderClient({
   driverKind: ProviderDriverKind.make("ollama"),
   label: "Ollama",
+  chatOnly: true,
   settingsSchema: OllamaSettings,
 });

@@ -122,13 +122,13 @@ export function BrowserTabMenu({
 
   const run = async (change: Omit<PreviewAdjustInput, "threadId" | "tabId">) => {
     const result = await adjust({ environmentId, input: { ...target, ...change } });
-    if (result._tag === "Failure") Dialog.alert("Could not change this browser tab");
+    if (result._tag === "Failure") Dialog.alert(t("Could not change this browser tab"));
   };
 
   const onAction = (id: string) => {
     if (id === "close") {
       void close({ environmentId, input: target }).then((result) => {
-        if (result._tag === "Failure") Dialog.alert("Could not close this browser tab");
+        if (result._tag === "Failure") Dialog.alert(t("Could not close this browser tab"));
       });
       return;
     }
@@ -149,7 +149,7 @@ export function BrowserTabMenu({
       if (!option) return;
       void resize({ environmentId, input: { ...target, viewport: option.setting } }).then(
         (result) => {
-          if (result._tag === "Failure") Dialog.alert("Could not change the viewport");
+          if (result._tag === "Failure") Dialog.alert(t("Could not change the viewport"));
         },
       );
     }
@@ -161,12 +161,12 @@ export function BrowserTabMenu({
       // the other state's actions.
       key={streaming ? "streaming" : "idle"}
       accessible
-      accessibilityLabel="Browser tab options"
+      accessibilityLabel={t("Browser tab options")}
       accessibilityRole="button"
       actions={streaming ? actions : [closeAction]}
       onPressAction={({ nativeEvent }) => onAction(nativeEvent.event)}
     >
-      <ControlPill icon="ellipsis" accessibilityLabel="Browser tab options" />
+      <ControlPill icon="ellipsis" accessibilityLabel={t("Browser tab options")} />
     </Menu>
   );
 }

@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import {
   codexFeedbackNotice,
@@ -27,7 +28,7 @@ export function ComposerFeedback({
           </Text>
           {submission.status !== "uploading" ? (
             <Pressable
-              accessibilityLabel="Dismiss feedback notice"
+              accessibilityLabel={t("Dismiss feedback notice")}
               accessibilityRole="button"
               hitSlop={12}
               onPress={onDismiss}
@@ -49,7 +50,7 @@ export function ComposerFeedback({
         ) : null}
         {submission.status === "sent" ? (
           <Button
-            label="Copy ID"
+            label={t("Copy ID")}
             tone="text"
             onPress={() =>
               copyTextWithHaptic(submission.feedbackId, { target: "Codex feedback thread ID" })

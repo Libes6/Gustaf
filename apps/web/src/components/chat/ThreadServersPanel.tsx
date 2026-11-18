@@ -166,7 +166,8 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                   </span>
                 </TooltipTrigger>
                 <TooltipPopup side="left">
-                  Open in the browser panel. {externalClickLabel} for your browser.
+                  {t("webCopy.openInTheBrowserPanel")} {externalClickLabel}{" "}
+                  {t("webCopy.forYourBrowser")}
                 </TooltipPopup>
               </Tooltip>
               {stoppable ? (
@@ -220,7 +221,9 @@ function ThreadServersList(props: ThreadServersPanelProps) {
             className="size-4 shrink-0"
             icon={hiddenCount > 0 ? ChevronDown : ChevronUp}
           />
-          {hiddenCount > 0 ? `Show ${Math.min(hiddenCount, SERVER_PAGE_COUNT)} more` : "Show less"}
+          {hiddenCount > 0
+            ? `Show ${Math.min(hiddenCount, SERVER_PAGE_COUNT)} more`
+            : t("settingsB.ExpandableText.showLess")}
         </ThreadDetailsControl>
       ) : null}
     </ThreadDetailsSection>

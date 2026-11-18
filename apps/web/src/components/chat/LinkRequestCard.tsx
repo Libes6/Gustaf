@@ -395,8 +395,8 @@ function LinkRequestDialog(props: {
                     />
                     {target.kind === "machine" ? (
                       <span className="block text-xs text-muted-foreground">
-                        This app has no address for {target.label} that another machine can reach.
-                        Enter its https or Tailscale address.
+                        {t("webCopy.thisAppHasNoAddressFor")} {target.label}{" "}
+                        {t("webCopy.thatAnotherMachineCanReachEnterItsHttpsOrTailscale")}
                       </span>
                     ) : null}
                   </label>
@@ -424,8 +424,8 @@ function LinkRequestDialog(props: {
                           spellCheck={false}
                         />
                         <span className="block text-xs text-muted-foreground">
-                          Create a link on {targetName}: Settings → Connections → Create link, then
-                          paste its code here.
+                          {t("webCopy.createALinkOn")} {targetName}
+                          {t("webCopy.settingsConnectionsCreateLinkThenPasteItsCodeHere")}
                         </span>
                       </label>
                     )}
@@ -436,8 +436,8 @@ function LinkRequestDialog(props: {
             )}
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
-                This environment is already linked to {targetName}. The agent can use that link as
-                it is; change its access in Settings → Connections.
+                {t("webCopy.thisEnvironmentIsAlreadyLinkedTo")} {targetName}
+                {t("webCopy.theAgentCanUseThatLinkAsItIsChange")}
               </p>
             ) : null}
             {error !== null ? (
@@ -458,11 +458,11 @@ function LinkRequestDialog(props: {
                 setError(null);
               }}
             >
-              Back
+              {t("sidebar.SidebarUtilityMenu.back")}
             </Button>
           ) : (
             <Button variant="outline" type="button" disabled={busy} onClick={close}>
-              Cancel
+              {t("subscriptions.cancel")}
             </Button>
           )}
           <Button

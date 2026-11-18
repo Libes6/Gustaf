@@ -247,7 +247,7 @@ export function PullRequestActionsMenu({
         />
         <MenuItem disabled={refreshing} onClick={() => void refreshFromHost()}>
           <RefreshIcon size="sm" refreshing={refreshing} />
-          Refresh
+          {t("settingsE.textGeneratorsSettings.refresh")}
         </MenuItem>
         <MenuItem disabled={handoff !== null} onClick={askAboutPullRequest}>
           <MessageCircleQuestionIcon className="mt-1 size-3.5 shrink-0 self-start" />
@@ -273,7 +273,7 @@ export function PullRequestActionsMenu({
                 : `Explain this ${terminology.shortLabel}`}
             </span>
             <span className="text-xs text-muted-foreground">
-              A walk through the diff and what to read closely.
+              {t("webCopy.aWalkThroughTheDiffAndWhatToReadClosely")}
             </span>
           </span>
         </MenuItem>
@@ -316,12 +316,11 @@ export function PullRequestActionsMenu({
               <span className="flex max-w-xs flex-col gap-0.5">
                 <span>{t("misc.pullRequestActionsMenu.allowMaintainerEdits")}</span>
                 <span id={maintainerEditsHintId} className="text-xs text-muted-foreground">
-                  Maintainers can push to this branch. If your fork has workflows, this can also
-                  give access to its secrets.
+                  {t("webCopy.maintainersCanPushToThisBranchIfYourForkHas")}
                 </span>
                 {maintainerEditsSaving ? (
                   <span role="status" className="text-xs text-muted-foreground">
-                    Saving…
+                    {t("shell.scriptEditor.saving")}
                   </span>
                 ) : null}
               </span>
@@ -366,7 +365,7 @@ export function PullRequestActionsMenu({
             {autoMergeArmed && can("disable-auto-merge") ? (
               <MenuItem disabled={actionPending} onClick={() => void perform("disable-auto-merge")}>
                 <PullRequestGlyph.merged className="size-3.5" />
-                Disable auto-merge
+                {t("webCopy.disableAutoMerge")}
               </MenuItem>
             ) : showsAutoMerge ? (
               <MenuItem
@@ -426,7 +425,7 @@ export function PullRequestActionsMenu({
         </MenuItem>
         <MenuItem onClick={() => copyReference(detail.url, `${terminology.shortLabel} link`)}>
           <LinkIcon className="size-3.5" />
-          Copy link
+          {t("settingsA.authorizedClients.copyLink")}
           <MenuShortcut>
             {shortcutLabelForCommand(keybindings, "thread.copyReference")}
           </MenuShortcut>
@@ -435,7 +434,7 @@ export function PullRequestActionsMenu({
           onClick={() => copyReference(`#${reference.number}`, `${terminology.shortLabel} number`)}
         >
           <CopyIcon className="size-3.5" />
-          Copy {terminology.shortLabel} number
+          {t("sidebar.threadMenu.copy")} {terminology.shortLabel} {t("webCopy.number")}
           <MenuShortcut>
             {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
           </MenuShortcut>
@@ -446,14 +445,18 @@ export function PullRequestActionsMenu({
             <MenuItem
               closeOnClick={inlineConfirm.isArmed("close")}
               aria-label={
-                inlineConfirm.isArmed("close") ? "Confirm close?" : `Close ${terminology.singular}`
+                inlineConfirm.isArmed("close")
+                  ? t("misc.pullRequestCommentForm.confirmClose")
+                  : `Close ${terminology.singular}`
               }
               variant="destructive"
               disabled={actionPending}
               {...inlineConfirm.props("close", () => void perform("close"))}
             >
               <PullRequestGlyph.closed className="size-3.5" />
-              {inlineConfirm.isArmed("close") ? "Confirm close?" : `Close ${terminology.singular}`}
+              {inlineConfirm.isArmed("close")
+                ? t("misc.pullRequestCommentForm.confirmClose")
+                : `Close ${terminology.singular}`}
             </MenuItem>
           </>
         ) : detail.state === "closed" && can("reopen") ? (
@@ -461,7 +464,7 @@ export function PullRequestActionsMenu({
             <MenuSeparator />
             <MenuItem disabled={actionPending} onClick={() => void perform("reopen")}>
               <PullRequestGlyph.reopen className="size-3.5" />
-              Reopen {terminology.singular}
+              {t("webCopy.reopen")} {terminology.singular}
             </MenuItem>
           </>
         ) : detail.state === "merged" && can("revert") ? (

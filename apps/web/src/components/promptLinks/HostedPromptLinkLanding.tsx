@@ -176,10 +176,11 @@ function HostedPromptLinkLanding({
       <StandalonePageHeader title={title} description={description} />
       {prompt !== null && prompt.hiddenCharacters > 0 ? (
         <Alert className="mt-5" variant="error">
-          <AlertTitle>This prompt had hidden characters, it may be malicious</AlertTitle>
+          <AlertTitle>{t("webCopy.thisPromptHadHiddenCharactersItMayBeMalicious")}</AlertTitle>
           <AlertDescription>
-            Gustaf removed {prompt.hiddenCharacters} hidden character
-            {prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.
+            {t("webCopy.gustafRemoved")} {prompt.hiddenCharacters} {t("webCopy.hiddenCharacter")}
+            {prompt.hiddenCharacters === 1 ? "" : "s"}
+            {t("webCopy.readThePromptBeforeYouSendIt")}
           </AlertDescription>
         </Alert>
       ) : null}

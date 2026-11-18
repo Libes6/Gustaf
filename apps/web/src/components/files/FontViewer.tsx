@@ -73,7 +73,7 @@ export default function FontViewer(props: { readonly src: string; readonly name:
       >
         <p className="text-sm font-medium">{t("misc.fontViewer.noPreview")}</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-          {error} Save it to open in another app.
+          {error} {t("webCopy.saveItToOpenInAnotherApp")}
         </p>
       </div>
     );

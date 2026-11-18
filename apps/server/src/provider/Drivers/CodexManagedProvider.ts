@@ -12,6 +12,7 @@ import * as Option from "effect/Option";
 import { ChildProcessSpawner } from "effect/process";
 import { makeCodexTextGeneration } from "../../textGeneration/CodexTextGeneration.ts";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { chatGptModels } from "../CodexChatGptModels.ts";
 import { makeCodexManagedRuntime } from "../CodexManagedRuntime.ts";
 import { ProviderDriverError } from "../Errors.ts";
@@ -298,7 +299,14 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
     accentColor,
     enabled,
     snapshot,
-    orchestrationAdapter,
+    orchestrationAdapter: {
+      ...orchestrationAdapter,
+      nativeMcpSources: {
+        provider: "codex",
+        homeDir: yield* HostProcess.HomeDirectory,
+        codexHome: runtime.homePath,
+      },
+    },
     textGeneration,
     auth: runtime.auth.controller,
     snapshotForCwd: (cwd: string) =>

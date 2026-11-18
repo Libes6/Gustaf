@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../uiLanguageStore";
 import {
   lazy,
   Suspense,
@@ -109,6 +110,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/worktrees": FolderTreeIcon,
   "/settings/connections": ServerIcon,
   "/settings/access": ShieldCheckIcon,
+  "/settings/mcp": KeyRoundIcon,
   "/settings/secrets": KeyRoundIcon,
   "/settings/subscriptions": CreditCardIcon,
   "/settings/maintenance": WrenchIcon,
@@ -158,7 +160,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
-  const results = searchSettings(query, searchableItems);
+  const language = useUiLanguage();
+  const results = searchSettings(query, searchableItems, language);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
   const maxResultIndex = Math.max(results.length - 1, 0);

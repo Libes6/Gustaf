@@ -119,7 +119,7 @@ function ConfiguredSettingsRouteScreen() {
     ? "Checking"
     : !isSignedIn
       ? "Sign in"
-      : (user?.primaryEmailAddress?.emailAddress ?? "Signed in");
+      : (user?.primaryEmailAddress?.emailAddress ?? t("Signed in"));
 
   return (
     <SettingsList
@@ -242,7 +242,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
           representative: scopedProjectMembers[0]!,
           members: scopedProjectMembers,
         })
-      : (selectedProject?.label ?? "Unavailable project");
+      : (selectedProject?.label ?? t("Unavailable project"));
   const page = (
     target: SettingsPageTarget,
     icon: SettingsListRow["icon"],
@@ -268,6 +268,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
     {
       title: t("Agents"),
       rows: [
+        serverPage("SettingsMcp", "server.rack", "MCP servers"),
         serverPage("SettingsProviderAccounts", "person.crop.circle", "Providers"),
         serverPage("SettingsThreads", "text.bubble", "Threads"),
         page("SettingsScheduledTasks", "clock", "Scheduled tasks"),

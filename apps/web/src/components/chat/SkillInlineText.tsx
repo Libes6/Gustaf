@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
 import type { EnvironmentId, ScopedThreadRef, ServerProviderSkill } from "@t3tools/contracts";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
@@ -123,6 +124,7 @@ export function SkillChipPopover(props: {
   copyMarkdown?: string | undefined;
   onViewInstructions: (() => void) | undefined;
 }) {
+  const t = useT();
   return (
     <ContextChipPopover
       kind="skill"
@@ -133,10 +135,10 @@ export function SkillChipPopover(props: {
     >
       <div className="space-y-3 p-2 text-sm">
         <p className="font-medium">{props.label}</p>
-        <p>{props.description || "No description is available for this skill."}</p>
+        <p>{props.description || t("webCopy.noDescriptionIsAvailableForThisSkill")}</p>
         {props.onViewInstructions ? (
           <Button variant="outline" size="sm" onClick={props.onViewInstructions}>
-            View instructions
+            {t("webCopy.viewInstructions")}
           </Button>
         ) : null}
       </div>

@@ -342,7 +342,7 @@ function ZipArchiveProgress(props: {
       </Text>
       <Progress
         value={props.totalBytes > 0 ? props.receivedBytes / props.totalBytes : undefined}
-        label="ZIP download progress"
+        label={t("ZIP download progress")}
       />
       <Text className="text-sm text-foreground-muted">
         {`Downloading the ZIP so its files can be listed.${timeLeft ? ` ${timeLeft} on this connection.` : ""}`}
@@ -370,7 +370,7 @@ function ZipArchiveFailure(props: {
             ) : null}
             <Button
               tone={props.failure.retry ? "secondary" : "primary"}
-              label="Save ZIP"
+              label={t("Save ZIP")}
               onPress={props.onSave}
             />
           </View>
@@ -417,7 +417,7 @@ function ZipArchiveList(props: {
             <View className="h-[38px] flex-row items-center gap-2 rounded-[10px] bg-subtle px-3">
               <SymbolView name="magnifyingglass" size={15} tintColorClassName="accent-icon-muted" />
               <TextInput
-                accessibilityLabel="Filter files in ZIP"
+                accessibilityLabel={t("Filter files in ZIP")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder={`Filter ${fileCount} ${fileCount === 1 ? "file" : "files"}`}
@@ -430,7 +430,7 @@ function ZipArchiveList(props: {
               {query ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Clear filter"
+                  accessibilityLabel={t("Clear filter")}
                   hitSlop={10}
                   onPress={() => setQuery("")}
                 >
@@ -457,11 +457,15 @@ function ZipArchiveList(props: {
             <EmptyState
               variant="plain"
               title={`No files match “${query.trim()}”`}
-              detail="The filter checks file names and folder paths."
-              action={<Button label="Clear filter" onPress={() => setQuery("")} />}
+              detail={t("The filter checks file names and folder paths.")}
+              action={<Button label={t("Clear filter")} onPress={() => setQuery("")} />}
             />
           ) : (
-            <EmptyState variant="plain" title="This ZIP is empty" detail="It has no files." />
+            <EmptyState
+              variant="plain"
+              title={t("This ZIP is empty")}
+              detail={t("It has no files.")}
+            />
           )
         }
       />
@@ -519,7 +523,7 @@ export function ZipArchiveView(props: {
         <View className="flex-1" style={{ paddingTop: headerInset }}>
           {state.status === "loading" ? (
             props.isLocal || state.receivedBytes === 0 ? (
-              <FilePreviewLoading message="Opening ZIP..." />
+              <FilePreviewLoading message={t("Opening ZIP...")} />
             ) : (
               <ZipArchiveProgress
                 receivedBytes={state.receivedBytes}
@@ -668,7 +672,7 @@ function ZipEntryView(props: {
         if (controller.signal.aborted) return;
         setBusy(null);
         if (kind === "attach")
-          Dialog.alert("Added to chat", `${entry.name} is attached to your message.`);
+          Dialog.alert(t("Added to chat"), `${entry.name} is attached to your message.`);
       },
       (cause: unknown) => {
         if (controller.signal.aborted) return;
@@ -775,9 +779,9 @@ function ZipEntryView(props: {
         // Closing the viewer stays here so Save and Add to chat remain reachable.
         <View className="flex-1 items-center justify-center bg-sheet px-6">
           <EmptyState
-            title={viewerError ? "No preview for this file" : entry.name}
-            detail={viewerError ?? "Open it in the file viewer, save it, or add it to chat."}
-            actionLabel="Open in file viewer"
+            title={viewerError ? t("No preview for this file") : entry.name}
+            detail={viewerError ?? t("Open it in the file viewer, save it, or add it to chat.")}
+            actionLabel={t("Open in file viewer")}
             onAction={openViewer}
           />
         </View>

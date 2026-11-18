@@ -115,7 +115,7 @@ function LoadedMediaVideo(props: {
           <AppText className="text-center text-sm text-white/80">{t("Video unavailable")}</AppText>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Retry video"
+            accessibilityLabel={t("Retry video")}
             onPress={() => setAttempt((value) => value + 1)}
             className="min-h-11 justify-center px-4"
           >
@@ -124,7 +124,7 @@ function LoadedMediaVideo(props: {
         </View>
       ) : loadState === "pending" || status === "loading" ? (
         <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
-          <AppActivityIndicator color="#ffffff" accessibilityLabel="Loading video" />
+          <AppActivityIndicator color="#ffffff" accessibilityLabel={t("Loading video")} />
         </View>
       ) : null}
     </View>
@@ -204,7 +204,7 @@ function MediaVideoPlayerContent(props: MediaVideoPlayerProps) {
             accessibilityRole="button"
             accessibilityLabel={`Play ${props.name}`}
             accessibilityHint={
-              mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
+              mediaActions.actions.length > 0 ? t("Touch and hold for media actions") : undefined
             }
             accessibilityState={{ disabled: props.uri === null || props.unavailable === true }}
             // Stays pressable so the long-press menu still opens on a failed or unsigned tile.
@@ -226,7 +226,7 @@ function MediaVideoPlayerContent(props: MediaVideoPlayerProps) {
             {props.unavailable ? (
               <AppText className="text-sm text-white/80">{t("Video unavailable")}</AppText>
             ) : props.uri === null ? (
-              <AppActivityIndicator color="#ffffff" accessibilityLabel="Loading video" />
+              <AppActivityIndicator color="#ffffff" accessibilityLabel={t("Loading video")} />
             ) : (
               <View className="size-12 items-center justify-center rounded-full bg-black/60">
                 <SymbolView name="play" size={28} tintColor="#ffffff" type="monochrome" />

@@ -221,7 +221,8 @@ export function PullRequestDetailGhost({
               updated={
                 seed ? (
                   <span>
-                    updated <RelativeTime timestamp={seed.updatedAt} />
+                    {t("settingsE.themeSettings.themeVerbUpdated")}{" "}
+                    <RelativeTime timestamp={seed.updatedAt} />
                   </span>
                 ) : (
                   <GhostBar className="h-3 w-16" />
@@ -310,7 +311,7 @@ export function PullRequestDetailGhost({
             <div className="grid min-h-7 min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs sm:min-h-6">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <UsersIcon aria-hidden className="size-3.5" />
-                Reviewers
+                {t("misc.pullRequestSummaryTab.reviewers")}
               </span>
               <span className="flex min-w-0 items-center gap-1.5 text-foreground">
                 <GhostBar className="h-3 w-10" />
@@ -327,7 +328,7 @@ export function PullRequestDetailGhost({
             <div className="grid min-h-7 min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs sm:min-h-6">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <TagIcon aria-hidden className="size-3.5" />
-                Labels
+                {t("misc.pullRequestSummaryTab.labels")}
               </span>
               <span className="flex min-w-0 flex-wrap items-center gap-1 text-foreground">
                 {entry?.labels ? (

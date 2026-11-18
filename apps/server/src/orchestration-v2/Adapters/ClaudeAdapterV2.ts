@@ -2028,9 +2028,20 @@ export function claudeMcpQueryOverrides(input: {
   const mcpAllowedTools = input.readOnlySandbox
     ? CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS
     : [CLAUDE_T3_MCP_TOOL_WILDCARD];
+  // User servers go through Claude's own permission flow, so they stay out of allowedTools.
+  const userServers = (session.userServers ?? []).map(
+    (server): [string, NonNullable<ClaudeQueryOptions["mcpServers"]>[string]] => [
+      server.id,
+      server.type === "stdio"
+        ? { type: "stdio", command: server.command, args: [...server.args], env: { ...server.env } }
+        : { type: "http", url: server.url, headers: { ...server.headers } },
+    ],
+  );
   return {
     allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
     mcpServers: {
+      // Listed first so `t3-code` always wins a name clash.
+      ...Object.fromEntries(userServers),
       "t3-code": {
         type: "http",
         url: session.endpoint,
@@ -4898,6 +4909,17 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   const customHome =
     adapterOptions.settings.homePath.trim().length > 0 ||
     adapterOptions.environment.CLAUDE_CONFIG_DIR !== hostEnvironment.CLAUDE_CONFIG_DIR;
+  // A custom home leaves out user settings, and with them the servers in its `.claude.json`.
+  // Claude keeps `.claude.json` in CLAUDE_CONFIG_DIR when set, else in the home directory.
+  const nativeMcpSources: McpProviderSession.NativeMcpSources | undefined = customHome
+    ? undefined
+    : {
+        provider: "claudeAgent",
+        homeDir: hostEnvironment.CLAUDE_CONFIG_DIR?.trim()
+          ? homePath
+          : yield* HostProcess.HomeDirectory,
+        includeProjectMcpJson: true,
+      };
   const announcedBypassDowngrades = new Set<ThreadId>();
   const readBypassSettings = (filePath: string) =>
     fileSystem.readFileString(filePath).pipe(
@@ -5099,6 +5121,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: adapterOptions.instanceId,
     driver: CLAUDE_PROVIDER,
+    ...(nativeMcpSources === undefined ? {} : { nativeMcpSources }),
     getCapabilities: Effect.fn("ClaudeAdapterV2.getCapabilities")(function () {
       return Effect.succeed(ClaudeProviderCapabilitiesV2);
     }),

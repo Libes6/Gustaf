@@ -121,12 +121,11 @@ function GuestLinksRow() {
       managed={settings.guestSharingEnabled ? undefined : connectDenial}
       description={
         <>
-          Share a thread with a guest who watches it live and sends messages you approve. Needs
-          Gustaf Connect: sign in and link this machine in{" "}
+          {t("webCopy.shareAThreadWithAGuestWhoWatchesItLive")}{" "}
           <Link to="/settings/access" className="underline underline-offset-2">
-            Sharing & access
+            {t("settings.nav.access")}
           </Link>
-          . Turning it off stops every guest link.
+          {t("webCopy.turningItOffStopsEveryGuestLink")}
         </>
       }
       control={
@@ -152,12 +151,11 @@ function LinkedEnvironmentsRow() {
       settingKeys={["linkedEnvironmentsEnabled"]}
       description={
         <>
-          Let agents here work on your other machines, and theirs here. Turn it on for each machine,
-          then link them in{" "}
+          {t("webCopy.letAgentsHereWorkOnYourOtherMachinesAndTheirs")}{" "}
           <Link to="/settings/connections" className="underline underline-offset-2">
-            Connections
+            {t("settings.group.connections")}
           </Link>
-          . While off, nothing new starts over a link; running tasks finish.
+          {t("webCopy.whileOffNothingNewStartsOverALinkRunningTasks")}
         </>
       }
       control={
@@ -209,7 +207,7 @@ function SimlockHostsRow() {
       settingKeys={["simlockDeviceHostsEnabled"]}
       description={
         <>
-          Let the Device panel lease simulators and emulators from your own{" "}
+          {t("webCopy.letTheDevicePanelLeaseSimulatorsAndEmulatorsFromYour")}{" "}
           <a
             href="https://incubator.callstack.com/simlock/"
             target="_blank"
@@ -218,11 +216,11 @@ function SimlockHostsRow() {
           >
             Simlock
           </a>{" "}
-          pool, added in{" "}
+          {t("webCopy.poolAddedIn")}{" "}
           <Link to="/settings/devices" className="underline underline-offset-2">
-            Devices
+            {t("settingsD.account.devices")}
           </Link>
-          . An alpha that may change or break. Gustaf never installs Simlock.
+          {t("webCopy.anAlphaThatMayChangeOrBreakGustafNeverInstalls")}
         </>
       }
       control={

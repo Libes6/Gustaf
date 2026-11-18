@@ -81,6 +81,8 @@ export const ManagedPolicyLimits = Schema.Struct({
   /** Can only turn product analytics off, never force it on. */
   telemetry: Schema.optionalKey(Schema.Boolean),
   browserCookieImport: Schema.optionalKey(Schema.Boolean),
+  /** `false` keeps MCP servers that run a command on this machine out of sessions; HTTP ones stay. */
+  localMcpServers: Schema.optionalKey(Schema.Boolean),
   providers: Schema.optionalKey(ManagedProviderLimits),
   updates: Schema.optionalKey(ManagedUpdatesPolicy),
 });
@@ -95,6 +97,7 @@ export const ManagedPolicySummaryLimits = Schema.Struct({
   webhookTasks: Schema.optionalKey(Schema.Boolean),
   telemetry: Schema.optionalKey(Schema.Boolean),
   browserCookieImport: Schema.optionalKey(Schema.Boolean),
+  localMcpServers: Schema.optionalKey(Schema.Boolean),
   providers: Schema.optionalKey(
     Schema.Struct({
       /** Absent means every driver is allowed. */
@@ -209,6 +212,7 @@ const CAPABILITY_LABELS = {
   connect: "T3 Connect",
   webhookTasks: "webhook tasks",
   browserCookieImport: "importing browser cookies",
+  localMcpServers: "local MCP servers",
 } as const;
 
 /** Why a capability is unavailable on an environment with `summary`, or undefined when allowed. */

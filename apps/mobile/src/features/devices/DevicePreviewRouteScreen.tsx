@@ -145,7 +145,7 @@ export function DevicePreviewScreen({
       },
     }).finally(() => setShuttingDown(false));
     if (result._tag === "Failure") {
-      Dialog.alert("Could not shut down device", String(Cause.squash(result.cause)));
+      Dialog.alert(t("Could not shut down device"), String(Cause.squash(result.cause)));
     }
   };
 
@@ -181,7 +181,7 @@ export function DevicePreviewScreen({
       icon: "info.circle",
       onPress: () =>
         Dialog.alert(
-          "Device tool versions",
+          t("Device tool versions"),
           deviceToolUpdateOwnership +
             "\n\n" +
             deviceToolUpdatePolicy(
@@ -271,7 +271,7 @@ export function DevicePreviewScreen({
       {embedded ? (
         <>
           <AppBar
-            title={preview?.name ?? "Devices"}
+            title={preview?.name ?? t("Devices")}
             actions={[
               {
                 accessibilityLabel: "Maximize device",
@@ -329,16 +329,16 @@ export function DevicePreviewScreen({
         >
           {inputConnected ? (
             <Pressable
-              accessibilityLabel="Hide device controls"
+              accessibilityLabel={t("Hide device controls")}
               className="absolute inset-0 bg-black/30"
               onPress={() => setControlsVisible(false)}
             />
           ) : null}
           <View className="px-3" style={{ paddingTop: Math.max(insets.top, 12) }}>
             <GlassSurface className="flex-row items-center gap-1 p-1">
-              <SheetCloseButton accessibilityLabel="Close device preview" onClose={onClose} />
+              <SheetCloseButton accessibilityLabel={t("Close device preview")} onClose={onClose} />
               <AppText numberOfLines={1} className="flex-1 text-center font-t3-medium text-base">
-                {preview?.name ?? "Devices"}
+                {preview?.name ?? t("Devices")}
               </AppText>
               <ControlPill
                 accessibilityLabel={t("Home")}
@@ -360,9 +360,9 @@ export function DevicePreviewScreen({
           }}
         >
           <GlassSurface className="flex-row items-center gap-1 p-1">
-            <SheetCloseButton accessibilityLabel="Close device preview" onClose={onClose} />
+            <SheetCloseButton accessibilityLabel={t("Close device preview")} onClose={onClose} />
             <ControlPill
-              accessibilityLabel="Show device controls"
+              accessibilityLabel={t("Show device controls")}
               icon="chevron.down"
               onPress={() => setControlsVisible(true)}
             />
@@ -378,13 +378,13 @@ function DeviceOptionsMenu({ items }: { readonly items: ReadonlyArray<AppBarMenu
     <Menu
       actions={menuActionsFromAppBarItems(items)}
       isAnchoredToRight
-      title="Device options"
+      title={t("Device options")}
       onPressAction={({ nativeEvent }) => {
         const action = findAppBarMenuItem(items, nativeEvent.event);
         if (action && !action.disabled) action.onPress();
       }}
     >
-      <ControlPill icon="ellipsis" accessibilityLabel="Device options" />
+      <ControlPill icon="ellipsis" accessibilityLabel={t("Device options")} />
     </Menu>
   );
 }
@@ -437,7 +437,9 @@ function OpenDevicePreview({
       ) : (
         <>
           <AppActivityIndicator color={themeVariables["--color-icon"]} />
-          <AppText className="text-sm text-foreground-muted">Connecting to device...</AppText>
+          <AppText className="text-sm text-foreground-muted">
+            {t("Connecting to device...")}
+          </AppText>
         </>
       )}
     </View>

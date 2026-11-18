@@ -753,9 +753,9 @@ function PlatformIcon(props: {
                       ? ([["Connected", connected]] as const)
                       : ([
                           ["Available", availableOn],
-                          ["Not available", unavailableOn],
+                          [t("webCopy.notAvailable"), unavailableOn],
                         ] as const)),
-                    ["Not added", notAdded],
+                    [t("webCopy.notAdded"), notAdded],
                   ] as const
                 ).map(([heading, environments]) =>
                   environments.length > 0 ? (

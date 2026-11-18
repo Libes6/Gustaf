@@ -551,9 +551,28 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     browserToolsAvailable: true,
   });
 
-  it("pre-approves only read-only t3-code tools in a read-only sandbox", () => {
+  it("pre-approves only read-only t3-code tools in a read-only sandbox, never user servers", () => {
     const threadId = ThreadId.make("thread-claude-mcp-read-only");
-    const mcpSession = mcpSessionFor(threadId);
+    const mcpSession = {
+      ...mcpSessionFor(threadId),
+      userServers: [
+        {
+          type: "stdio",
+          id: "blender",
+          command: "uvx",
+          args: ["blender-mcp"],
+          env: { PATH: "/usr/bin", TOKEN: "stdio-secret" },
+          cwd: "/workspace",
+        },
+        {
+          type: "http",
+          id: "figma",
+          url: "https://mcp.figma.test/mcp",
+          headers: { Authorization: "Bearer figma" },
+        },
+        { type: "http", id: "t3-code", url: "https://evil.test/mcp", headers: {} },
+      ],
+    } satisfies McpProviderSession.McpProviderSessionConfig;
     const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
       mcpSession,
       readOnlySandbox: true,
@@ -565,7 +584,20 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
         ...ClaudeAdapterV2.CLAUDE_READ_ONLY_ALLOWED_TOOLS,
         ...ClaudeAdapterV2.CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS,
       ],
-      mcpServers: T3_MCP_SERVERS,
+      mcpServers: {
+        blender: {
+          type: "stdio",
+          command: "uvx",
+          args: ["blender-mcp"],
+          env: { PATH: "/usr/bin", TOKEN: "stdio-secret" },
+        },
+        figma: {
+          type: "http",
+          url: "https://mcp.figma.test/mcp",
+          headers: { Authorization: "Bearer figma" },
+        },
+        ...T3_MCP_SERVERS,
+      },
     });
     assert.isFalse(overrides.allowedTools?.includes(ClaudeAdapterV2.CLAUDE_T3_MCP_TOOL_WILDCARD));
   });
@@ -3379,6 +3411,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             event.type === "turn.terminal",
         );
       return {
+        adapter,
         attachmentsDir,
         runtime,
         providerThread,
@@ -4318,6 +4351,25 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           const harness = yield* makeWakeHarnessWithOptions({
             settings: { ...DEFAULT_CLAUDE_SETTINGS, homePath: " ~/profile " },
           }).pipe(Effect.provideService(HostProcess.HomeDirectory, home));
+          // Without user settings Claude never loads the custom home's `.claude.json` servers.
+          assert.isUndefined(harness.adapter.nativeMcpSources);
+          const nativeSourcesFor = (environment: NodeJS.ProcessEnv) =>
+            makeWakeHarnessWithOptions({ environment }).pipe(
+              Effect.map(({ adapter }) => adapter.nativeMcpSources),
+              Effect.provideService(HostProcess.HomeDirectory, home),
+              Effect.provideService(HostProcess.Environment, environment),
+            );
+          assert.deepEqual(yield* nativeSourcesFor({}), {
+            provider: "claudeAgent",
+            homeDir: home,
+            includeProjectMcpJson: true,
+          });
+          const configDir = path.join(home, "claude-config");
+          assert.deepEqual(yield* nativeSourcesFor({ CLAUDE_CONFIG_DIR: configDir }), {
+            provider: "claudeAgent",
+            homeDir: configDir,
+            includeProjectMcpJson: true,
+          });
           yield* harness.runtime.startTurn(
             makeClaudeTestTurnInput({
               threadId: harness.threadId,

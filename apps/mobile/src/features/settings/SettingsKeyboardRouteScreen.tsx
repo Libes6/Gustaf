@@ -25,12 +25,15 @@ const ENTER_BEHAVIOR_OPTIONS: ReadonlyArray<{
   {
     behavior: "send",
     label: t("Send message"),
-    description: "Return sends the message. Shift-Return inserts a new line.",
+    description: t("Return sends the message. Shift-Return inserts a new line."),
   },
   {
     behavior: "newline",
-    label: "Insert new line",
-    description: `Return inserts a new line. ${SEND_MODIFIER}-Return sends the message.`,
+    label: t("Insert new line"),
+    description: t("Return inserts a new line. {modifier}-Return sends the message.").replace(
+      "{modifier}",
+      SEND_MODIFIER,
+    ),
   },
 ];
 
@@ -44,7 +47,7 @@ export function SettingsKeyboardRouteScreen() {
     : null;
 
   return (
-    <SettingsScreen title="Keyboard">
+    <SettingsScreen title={t("Keyboard")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -52,7 +55,7 @@ export function SettingsKeyboardRouteScreen() {
         contentContainerClassName="gap-3 px-5 pt-4"
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
-        <SettingsSection title="Return key">
+        <SettingsSection title={t("Return key")}>
           {ENTER_BEHAVIOR_OPTIONS.map((option, index) => (
             <SettingsChoiceRow
               key={option.behavior}
@@ -66,7 +69,7 @@ export function SettingsKeyboardRouteScreen() {
           ))}
         </SettingsSection>
         <Text className="px-2 text-sm text-foreground-muted">
-          Applies to the composer when a hardware keyboard is connected.
+          {t("Applies to the composer when a hardware keyboard is connected.")}
         </Text>
       </ScrollView>
     </SettingsScreen>

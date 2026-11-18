@@ -244,8 +244,9 @@ export function ArchivedThreadsPanel() {
                   description={
                     <span className={hasMultipleEnvironments ? "block truncate" : undefined}>
                       {hasMultipleEnvironments ? `${thread.environmentLabel} · ` : null}
-                      Archived <RelativeTime timestamp={thread.archivedAt ?? thread.createdAt} />
-                      {" \u00b7 Created "}
+                      {t("settingsD.settingsScopeSentence.archived")}{" "}
+                      <RelativeTime timestamp={thread.archivedAt ?? thread.createdAt} />
+                      {t("webCopy.created")}
                       <RelativeTime timestamp={thread.createdAt} />
                     </span>
                   }

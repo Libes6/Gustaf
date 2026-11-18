@@ -138,6 +138,13 @@ export class ConnectionBlockedError extends Schema.TaggedError<ConnectionBlocked
 
 export type ConnectionAttemptError = ConnectionTransientError | ConnectionBlockedError;
 
+/** How the last attempt over one saved route ended, so a route list can show which one fails. */
+export interface ConnectionRouteResult {
+  readonly outcome: "connected" | "failed";
+  readonly at: number;
+  readonly detail: string | null;
+}
+
 export const DPOP_ACCESS_TOKEN_REFRESH_SKEW_MS = 60_000;
 
 export type PreparedHttpAuthorization =

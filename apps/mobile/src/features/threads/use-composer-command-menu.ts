@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import type {
   EnvironmentId,
@@ -552,7 +553,10 @@ export function useComposerCommandMenu({
       const existing = getComposerDraftSnapshot(ownerKey).context?.records ?? [];
       const alreadyAttached = existing.some((entry) => entry.contextId === record.contextId);
       if (!alreadyAttached && existing.length >= COMPOSER_CONTEXT_MAX_RECORDS) {
-        Dialog.alert("Too many context items", "Remove some context from the draft and try again.");
+        Dialog.alert(
+          t("Too many context items"),
+          t("Remove some context from the draft and try again."),
+        );
         return;
       }
       const result = replaceTextRange(
@@ -584,7 +588,10 @@ export function useComposerCommandMenu({
       const existing = getComposerDraftSnapshot(ownerKey).context?.records ?? [];
       const alreadyAttached = existing.some((entry) => entry.contextId === record.contextId);
       if (!alreadyAttached && existing.length >= COMPOSER_CONTEXT_MAX_RECORDS) {
-        Dialog.alert("Too many context items", "Remove some context from the draft and try again.");
+        Dialog.alert(
+          t("Too many context items"),
+          t("Remove some context from the draft and try again."),
+        );
         return;
       }
       const result = replaceTextRange(
@@ -616,7 +623,10 @@ export function useComposerCommandMenu({
         (getComposerDraftSnapshot(ownerKey).context?.records.length ?? 0) >=
         COMPOSER_CONTEXT_MAX_RECORDS
       ) {
-        Dialog.alert("Too many context items", "Remove some context from the draft and try again.");
+        Dialog.alert(
+          t("Too many context items"),
+          t("Remove some context from the draft and try again."),
+        );
         return;
       }
       const result = replaceTextRange(

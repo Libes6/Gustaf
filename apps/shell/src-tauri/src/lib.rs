@@ -281,9 +281,41 @@ fn is_external_browser_url(url: &tauri::Url) -> bool {
     url.scheme() == "http" || url.scheme() == "https"
 }
 
-pub(crate) fn open_external_url(url: &tauri::Url) {
+/// Starts the system opener for the link without waiting for it; false when it was refused or
+/// could not start. Callers that need to know whether the opener succeeded use `open_external_url_checked`.
+pub(crate) fn open_external_url(url: &tauri::Url) -> bool {
+    let Some(mut child) = spawn_opener(url) else {
+        return false;
+    };
+    // Reaps the opener so it does not linger as a zombie.
+    thread::spawn(move || child.wait());
+    true
+}
+
+/// How long a successful opener may stay running (xdg-open waits for a freshly started browser)
+/// before the page is told it worked.
+pub(crate) const OPENER_GRACE: Duration = Duration::from_secs(2);
+
+/// True when the opener exited 0 or is still running after the grace period. Blocks up to that
+/// period, so run it off the UI thread.
+pub(crate) fn open_external_url_checked(url: &tauri::Url) -> bool {
+    spawn_opener(url).is_some_and(|child| opener_succeeded(child, OPENER_GRACE))
+}
+
+pub(crate) fn opener_succeeded(mut child: std::process::Child, grace: Duration) -> bool {
+    let (done, finished) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = done.send(child.wait());
+    });
+    match finished.recv_timeout(grace) {
+        Ok(status) => status.is_ok_and(|status| status.success()),
+        Err(_) => true,
+    }
+}
+
+fn spawn_opener(url: &tauri::Url) -> Option<std::process::Child> {
     if !is_external_browser_url(url) && !bridge::is_handoff_url(url) {
-        return;
+        return None;
     }
     let mut command = if cfg!(target_os = "macos") {
         Command::new("open")
@@ -309,7 +341,7 @@ pub(crate) fn open_external_url(url: &tauri::Url) {
         command
     };
     command.arg(url.as_str());
-    let _ = command.spawn();
+    command.spawn().ok()
 }
 
 /// The AppImage's AppRun points PATH, libraries and GTK modules into its mount; the browser
@@ -483,6 +515,9 @@ pub fn run() {
             connection_storage::write_connection_catalog,
             bridge::reveal_window,
             bridge::window_fullscreen_state,
+            bridge::open_external,
+            bridge::open_system_settings,
+            bridge::check_system_permission,
             bridge::set_window_theme,
             bridge::read_client_settings,
             bridge::write_client_settings,
@@ -662,6 +697,11 @@ pub fn run() {
                 api.prevent_close();
                 exit_guard::request_quit(app);
             }
+            RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Resized(_),
+                ..
+            } if label == "main" => bridge::push_fullscreen(app),
             RunEvent::Exit => {
                 #[cfg(all(target_os = "macos", feature = "cef-browser"))]
                 cef::stop();
@@ -675,7 +715,11 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{appimage_env_changes, is_external_browser_url, pairing_url_from_line};
+    use super::{
+        appimage_env_changes, is_external_browser_url, opener_succeeded, pairing_url_from_line,
+    };
+    #[cfg(unix)]
+    use std::{process::Command, time::Duration};
 
     #[test]
     fn links_opened_from_an_appimage_drop_its_mount_paths() {
@@ -696,6 +740,21 @@ mod tests {
                 ("LD_LIBRARY_PATH".to_owned(), None),
             ]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_opener_counts_as_working_unless_it_fails() {
+        let opener = |script: &str| {
+            Command::new("sh")
+                .args(["-c", script])
+                .spawn()
+                .expect("sh starts")
+        };
+        let grace = Duration::from_millis(300);
+        assert!(opener_succeeded(opener("exit 0"), grace));
+        assert!(!opener_succeeded(opener("exit 3"), grace));
+        assert!(opener_succeeded(opener("sleep 2"), grace));
     }
 
     #[test]

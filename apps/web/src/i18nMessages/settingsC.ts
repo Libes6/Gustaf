@@ -16,7 +16,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.catGpu": "GPU",
     "settingsC.resourceTelemetry.catElectronUtility": "Electron utility",
     "settingsC.resourceTelemetry.catMonitor": "Monitor",
-    "settingsC.resourceTelemetry.catT3": "T3 process",
+    "settingsC.resourceTelemetry.catT3": "Gustaf process",
     "settingsC.resourceTelemetry.ioStorage": "Storage bytes",
     "settingsC.resourceTelemetry.ioLogical": "Logical bytes",
     "settingsC.resourceTelemetry.ioAll": "All I/O bytes",
@@ -55,7 +55,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.resourceMonitor": "Resource monitor",
     "settingsC.resourceTelemetry.refreshTelemetry": "Refresh resource telemetry",
     "settingsC.resourceTelemetry.refreshSnapshot": "Refresh telemetry snapshot",
-    "settingsC.resourceTelemetry.footprint": "T3 system footprint",
+    "settingsC.resourceTelemetry.footprint": "Gustaf system footprint",
     "settingsC.resourceTelemetry.footprintDesc":
       "Live native counters for the server, providers, terminals, desktop processes, and the monitor itself.",
     "settingsC.resourceTelemetry.samplingEvery": "Sampling every",
@@ -109,7 +109,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.instrumented": "Instrumented application I/O",
     "settingsC.resourceTelemetry.logicalBytes": "Logical bytes by operation",
     "settingsC.resourceTelemetry.instrumentedDesc":
-      "Native counters identify which process is reading or writing. These application-level counters identify known T3 operations so process spikes can be correlated with specific persistence and logging paths.",
+      "Native counters identify which process is reading or writing. These application-level counters identify known Gustaf operations so process spikes can be correlated with specific persistence and logging paths.",
     "settingsC.resourceTelemetry.hostCollection": "Host & collection",
     "settingsC.resourceTelemetry.waitingProcessMonitor": "Waiting for the native process monitor.",
     "settingsC.resourceTelemetry.noRetainedSamples": "No retained process samples in this window.",
@@ -399,7 +399,7 @@ export const settingsCMessages = {
     "settingsC.providerInstanceCard.enableAria": "Enable {name}",
     "settingsC.providerInstanceCard.deleteInstanceAria": "Delete instance {id}",
     "settingsC.providerInstanceCard.continueAuth": "Continue authentication",
-    "settingsC.providerInstanceCard.ollamaChatOnly": "Chat only: no terminal, files or MCP tools",
+    "settingsC.providerInstanceCard.chatOnlyNote": "Chat only: no tools, files or MCP",
     "settingsC.providerInstanceCard.driver": "Driver",
     "settingsC.providerInstanceCard.status": "Status",
     "settingsC.providerInstanceCard.displayName": "Display name",
@@ -630,7 +630,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.catGpu": "GPU",
     "settingsC.resourceTelemetry.catElectronUtility": "Electron, вспомогательный процесс",
     "settingsC.resourceTelemetry.catMonitor": "Монитор",
-    "settingsC.resourceTelemetry.catT3": "Процесс T3",
+    "settingsC.resourceTelemetry.catT3": "Процесс Gustaf",
     "settingsC.resourceTelemetry.ioStorage": "Байты хранилища",
     "settingsC.resourceTelemetry.ioLogical": "Логические байты",
     "settingsC.resourceTelemetry.ioAll": "Все байты I/O",
@@ -670,7 +670,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.resourceMonitor": "Монитор ресурсов",
     "settingsC.resourceTelemetry.refreshTelemetry": "Обновить телеметрию ресурсов",
     "settingsC.resourceTelemetry.refreshSnapshot": "Обновить снимок телеметрии",
-    "settingsC.resourceTelemetry.footprint": "Нагрузка системы T3",
+    "settingsC.resourceTelemetry.footprint": "Нагрузка системы Gustaf",
     "settingsC.resourceTelemetry.footprintDesc":
       "Живые нативные счётчики сервера, провайдеров, терминалов, процессов десктопа и самого монитора.",
     "settingsC.resourceTelemetry.samplingEvery": "Интервал опроса:",
@@ -714,7 +714,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.processScan": "Сканирование процессов",
     "settingsC.resourceTelemetry.scanRetained": "{retained}/{scanned} сохранено",
     "settingsC.resourceTelemetry.inaccessible": "Нет доступа",
-    "settingsC.resourceTelemetry.sidecar": "Sidecar",
+    "settingsC.resourceTelemetry.sidecar": "Вспомогательный процесс",
     "settingsC.resourceTelemetry.restarts": "Перезапуски",
     "settingsC.resourceTelemetry.waitingHealth": "Ожидание данных о состоянии сбора.",
     "settingsC.resourceTelemetry.retryMonitor": "Повторить монитор",
@@ -724,7 +724,7 @@ export const settingsCMessages = {
     "settingsC.resourceTelemetry.instrumented": "Операции I/O приложения",
     "settingsC.resourceTelemetry.logicalBytes": "Логические байты по операциям",
     "settingsC.resourceTelemetry.instrumentedDesc":
-      "Нативные счётчики показывают, какой процесс читает или пишет данные. Счётчики уровня приложения определяют известные операции T3, чтобы всплески процессов можно было связать с конкретными путями сохранения и логирования.",
+      "Нативные счётчики показывают, какой процесс читает или пишет данные. Счётчики уровня приложения определяют известные операции Gustaf, чтобы всплески процессов можно было связать с конкретными путями сохранения и логирования.",
     "settingsC.resourceTelemetry.hostCollection": "Хост и сбор данных",
     "settingsC.resourceTelemetry.waitingProcessMonitor": "Ожидание нативного монитора процессов.",
     "settingsC.resourceTelemetry.noRetainedSamples":
@@ -778,7 +778,7 @@ export const settingsCMessages = {
     "settingsC.secretProviderDialog.description":
       "Переменные провайдеров в {environment} могут читать из него значения по имени. Значения читаются через op CLI на этом сервере при запуске провайдера.",
     "settingsC.secretProviderDialog.name": "Имя",
-    "settingsC.secretProviderDialog.namePlaceholder": "Personal",
+    "settingsC.secretProviderDialog.namePlaceholder": "Личный",
     "settingsC.secretProviderDialog.account": "Аккаунт",
     "settingsC.secretProviderDialog.accountHint":
       "Краткое имя аккаунта, адрес входа без https:// или ID из op account list.",
@@ -1024,8 +1024,7 @@ export const settingsCMessages = {
     "settingsC.providerInstanceCard.enableAria": "Включить {name}",
     "settingsC.providerInstanceCard.deleteInstanceAria": "Удалить экземпляр {id}",
     "settingsC.providerInstanceCard.continueAuth": "Продолжить аутентификацию",
-    "settingsC.providerInstanceCard.ollamaChatOnly":
-      "Только чат: без терминала, файлов и MCP-инструментов",
+    "settingsC.providerInstanceCard.chatOnlyNote": "Только чат: без инструментов, файлов и MCP",
     "settingsC.providerInstanceCard.driver": "Драйвер",
     "settingsC.providerInstanceCard.status": "Статус",
     "settingsC.providerInstanceCard.displayName": "Отображаемое имя",

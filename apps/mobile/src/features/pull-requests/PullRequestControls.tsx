@@ -161,7 +161,7 @@ export function PullRequestActionToolbar(props: {
           <View className="flex-row items-center gap-2">
             {showAgentControls ? (
               <Menu
-                title="AI helpers"
+                title={t("AI helpers")}
                 actions={agentActions.map((action) => agent.menuAction(action.task))}
                 onPressAction={({ nativeEvent }) => agent.select(nativeEvent.event)}
               >
@@ -189,7 +189,11 @@ export function PullRequestActionToolbar(props: {
                 )}
               </View>
             ) : null}
-            <IconButton icon="file.diff" accessibilityLabel="Changed files" onPress={openFiles} />
+            <IconButton
+              icon="file.diff"
+              accessibilityLabel={t("Changed files")}
+              onPress={openFiles}
+            />
           </View>
         </Toolbar>
       </View>
@@ -239,7 +243,7 @@ export function PullRequestActionToolbar(props: {
     <Toolbar.Menu
       identifier="pull-request-agent"
       icon="sparkles"
-      title="AI helpers"
+      title={t("AI helpers")}
       accessibilityLabel={`${shortLabel} agent actions`}
       disabled={agent.disabled}
       separateBackground
@@ -266,7 +270,7 @@ export function PullRequestActionToolbar(props: {
     <Toolbar.Button
       identifier="workspace-trailing-action"
       icon={{ type: "image", source: require("../../../assets/icons/file-diff.png") }}
-      accessibilityLabel="Changed files"
+      accessibilityLabel={t("Changed files")}
       onPress={openFiles}
       separateBackground
     />

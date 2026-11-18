@@ -154,9 +154,12 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
             <ComposerBanner.Row render={<li />}>
               <ComposerBanner.Icon />
               <ComposerBanner.Content className="text-muted-foreground">
-                Nothing stashed yet.
+                {t("webCopy.nothingStashedYet")}
                 {stashShortcutLabel
-                  ? ` Press ${stashShortcutLabel} with a prompt in the composer to stash it.`
+                  ? t("settingsStatus.composerStashShortcut").replace(
+                      "{shortcut}",
+                      stashShortcutLabel,
+                    )
                   : null}
               </ComposerBanner.Content>
             </ComposerBanner.Row>
@@ -197,13 +200,13 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
                 <ComposerBanner.Actions>
                   {entry.pendingImageCount ? (
                     <span className="shrink-0 text-muted-foreground">
-                      saving {entry.pendingImageCount} image
+                      {t("webCopy.saving")} {entry.pendingImageCount} {t("webCopy.image")}
                       {entry.pendingImageCount === 1 ? "" : "s"}…
                     </span>
                   ) : missingImageCount(entry) > 0 ? (
                     <span className="shrink-0 text-warning-foreground">
-                      {missingImageCount(entry)} image
-                      {missingImageCount(entry) === 1 ? "" : "s"} dropped
+                      {missingImageCount(entry)} {t("webCopy.image")}
+                      {missingImageCount(entry) === 1 ? "" : "s"} {t("webCopy.dropped")}
                     </span>
                   ) : null}
                   {entry.attachments.length > 0 ? (

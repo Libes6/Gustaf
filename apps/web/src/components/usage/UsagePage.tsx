@@ -676,9 +676,9 @@ function UsageOverview({
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <span>
                 <span className={figureClass(loadingPartial)}>
-                  {formatCount(merged.sessions)} sessions
+                  {formatCount(merged.sessions)} {t("webCopy.sessions")}
                 </span>
-                {metric === "cost" && " · API estimate"}
+                {metric === "cost" && t("webCopy.aPIEstimate")}
               </span>
               {metric === "cost" && merged.costQuality.unpricedShare > 0 && (
                 <Popover>
@@ -690,8 +690,8 @@ function UsageOverview({
                     <InfoIcon className="size-3" aria-hidden />
                   </PopoverTrigger>
                   <PopoverPopup side="top" tooltipStyle>
-                    API estimate excludes {formatPercent(merged.costQuality.unpricedShare)} unpriced
-                    records.
+                    {t("webCopy.aPIEstimateExcludes")}{" "}
+                    {formatPercent(merged.costQuality.unpricedShare)} {t("webCopy.unpricedRecords")}
                   </PopoverPopup>
                 </Popover>
               )}
@@ -895,7 +895,7 @@ function UsageOverview({
               {breakdownModels.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-muted-foreground">
-                    No activity in this window.
+                    {t("webCopy.noActivityInThisWindow")}
                   </td>
                 </tr>
               ) : (
@@ -990,7 +990,7 @@ function UsageOverview({
                       colSpan={activeProviders.length + 3}
                       className="py-6 text-center text-muted-foreground"
                     >
-                      No activity in this window.
+                      {t("webCopy.noActivityInThisWindow")}
                     </td>
                   </tr>
                 ) : (
@@ -1094,6 +1094,7 @@ function UsageCoverageNotice({
   readonly duplicateSources: readonly string[];
   readonly contractMismatches: MergedUsage["contractMismatches"];
 }) {
+  const t = useT();
   const failed = environments.filter((environment) => environment.error !== null);
   const mismatchByEnvironment = new Map(
     contractMismatches.map((mismatch) => [mismatch.environmentId, mismatch]),
@@ -1120,7 +1121,7 @@ function UsageCoverageNotice({
       ))}
       {duplicateSources.length > 0 ? (
         <span>
-          Counted once across environments sharing a transcript directory:{" "}
+          {t("webCopy.countedOnceAcrossEnvironmentsSharingATranscriptDirectory")}{" "}
           {duplicateSources.join(", ")}
         </span>
       ) : null}
@@ -1186,7 +1187,7 @@ function UsageEnvironmentFilter({
           closeOnClick={false}
           onCheckedChange={(checked) => onSelectionChange(checked ? null : new Set())}
         >
-          All environments
+          {t("settingsD.settingsScopeSentence.allEnvironments")}
         </MenuCheckboxItem>
         <MenuSeparator />
         {environments.map((environment) => {
@@ -1247,7 +1248,7 @@ function UsageEnvironmentFilter({
         ) : null}
         {showUsageStatus && isPartial ? (
           <p className="px-2 py-2 text-xs text-muted-foreground">
-            Totals are partial while selected environments scan.
+            {t("webCopy.totalsArePartialWhileSelectedEnvironmentsScan")}
           </p>
         ) : null}
         {showUsageStatus ? (
@@ -1260,7 +1261,7 @@ function UsageEnvironmentFilter({
         <MenuSeparator />
         <MenuItem onClick={onOpenModelPrices}>
           <SlidersHorizontalIcon aria-hidden />
-          Model prices
+          {t("webCopy.modelPrices")}
         </MenuItem>
       </MenuPopup>
     </Menu>
@@ -1300,7 +1301,7 @@ function UsageProviderFilter({
           closeOnClick={false}
           onCheckedChange={(checked) => onChange(checked ? [] : PROVIDER_ORDER)}
         >
-          All providers
+          {t("misc.usagePage.allProviders")}
         </MenuCheckboxItem>
         <MenuSeparator />
         {PROVIDER_ORDER.map((provider) => (

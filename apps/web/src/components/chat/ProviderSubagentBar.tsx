@@ -72,7 +72,7 @@ export function ProviderSubagentBar(props: {
       {props.onOpenParent ? (
         <Button size="sm" variant="ghost" onClick={props.onOpenParent}>
           <ArrowUpLeftIcon />
-          <span className="@max-[320px]/composer-surface:sr-only">Open parent</span>
+          <span className="@max-[320px]/composer-surface:sr-only">{t("webCopy.openParent")}</span>
         </Button>
       ) : null}
     </div>

@@ -55,6 +55,8 @@ export const settingsBMessages = {
     "settingsB.EnvironmentRoutesList.addRoute": "Add route",
     "settingsB.EnvironmentRoutesList.inUse": "In use",
     "settingsB.EnvironmentRoutesList.foundAutomatically": "found automatically",
+    "settingsB.EnvironmentRoutesList.lastConnected": "Last connected at {time}",
+    "settingsB.EnvironmentRoutesList.lastFailed": "Last attempt failed at {time}",
     "settingsB.EnvironmentRoutesList.reorderAria": "Reorder {label}, position {position}",
     "settingsB.EnvironmentRoutesList.removeAria": "Remove {label} route",
     "settingsB.EnvironmentRoutesList.removeRoute": "Remove route",
@@ -99,7 +101,7 @@ export const settingsBMessages = {
     "settingsB.LabsSettingsPanel.suggestPromptAria": "Suggest next prompt",
     "settingsB.LabsSettingsPanel.simlockAria": "Simlock device hosts",
     "settingsB.LabsSettingsPanel.fastCheckoutDescription":
-      "On a Mac, clone new worktrees from a checkout cached in the T3 home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
+      "On a Mac, clone new worktrees from a checkout cached in the Gustaf home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
     "settingsB.LabsSettingsPanel.fastCheckoutAria": "Fast worktree checkout",
     "settingsB.LinkedEnvironmentsSettings.loadFailed": "Could not load linked environments",
     "settingsB.LinkedEnvironmentsSettings.loading": "Loading linked environments…",
@@ -315,7 +317,7 @@ export const settingsBMessages = {
     "settingsB.DiagnosticsSettings.signalFailed": "Could not send {signal}",
     "settingsB.DiagnosticsSettings.processExited": "Process already exited",
     "settingsB.DiagnosticsSettings.processExitedDescription":
-      "The process is not a child of the T3 Server. It might already have exited.",
+      "The process is not a child of the Gustaf server. It might already have exited.",
     "settingsB.DiagnosticsSettings.connectEnvironment":
       "Connect an environment to see diagnostics.",
     "settingsB.DiagnosticsSettings.checkingAccess": "Checking diagnostics access…",
@@ -331,7 +333,7 @@ export const settingsBMessages = {
     "settingsB.DiagnosticsSettings.resourceHistory": "Resource History",
     "settingsB.DiagnosticsSettings.refreshResources": "Refresh resource history",
     "settingsB.DiagnosticsSettings.cpuTimeTooltip":
-      "Approximate active CPU time for the T3 server root process and its descendants during the selected window. It grows only while sampled processes use CPU and older samples leave as the window moves.",
+      "Approximate active CPU time for the Gustaf server root process and its descendants during the selected window. It grows only while sampled processes use CPU and older samples leave as the window moves.",
     "settingsB.DiagnosticsSettings.samples": "Samples",
     "settingsB.DiagnosticsSettings.samplesTooltip":
       "In-memory process samples retained by the server. The server samples only while diagnostics is open, and this resets when the server restarts.",
@@ -589,6 +591,8 @@ export const settingsBMessages = {
     "settingsB.EnvironmentRoutesList.addRoute": "Добавить маршрут",
     "settingsB.EnvironmentRoutesList.inUse": "Используется",
     "settingsB.EnvironmentRoutesList.foundAutomatically": "найден автоматически",
+    "settingsB.EnvironmentRoutesList.lastConnected": "Последнее подключение в {time}",
+    "settingsB.EnvironmentRoutesList.lastFailed": "Последняя попытка в {time} не удалась",
     "settingsB.EnvironmentRoutesList.reorderAria": "Изменить порядок: {label}, позиция {position}",
     "settingsB.EnvironmentRoutesList.removeAria": "Удалить маршрут {label}",
     "settingsB.EnvironmentRoutesList.removeRoute": "Удалить маршрут",
@@ -633,7 +637,7 @@ export const settingsBMessages = {
     "settingsB.LabsSettingsPanel.suggestPromptAria": "Предлагать следующий запрос",
     "settingsB.LabsSettingsPanel.simlockAria": "Хосты устройств Simlock",
     "settingsB.LabsSettingsPanel.fastCheckoutDescription":
-      "На Mac новые worktree клонируются из копии checkout, кэшированной в домашней папке T3, а не записываются файл за файлом. Если это невозможно, используется обычный checkout Git. Выключение удаляет кэш.",
+      "На Mac новые worktree клонируются из копии checkout, кэшированной в домашней папке Gustaf, а не записываются файл за файлом. Если это невозможно, используется обычный checkout Git. Выключение удаляет кэш.",
     "settingsB.LabsSettingsPanel.fastCheckoutAria": "Быстрый checkout worktree",
     "settingsB.LinkedEnvironmentsSettings.loadFailed": "Не удалось загрузить связанные окружения",
     "settingsB.LinkedEnvironmentsSettings.loading": "Загрузка связанных окружений…",
@@ -851,7 +855,7 @@ export const settingsBMessages = {
     "settingsB.DiagnosticsSettings.signalFailed": "Не удалось отправить {signal}",
     "settingsB.DiagnosticsSettings.processExited": "Процесс уже завершён",
     "settingsB.DiagnosticsSettings.processExitedDescription":
-      "Процесс не является дочерним для сервера T3. Возможно, он уже завершился.",
+      "Процесс не является дочерним для сервера Gustaf. Возможно, он уже завершился.",
     "settingsB.DiagnosticsSettings.connectEnvironment":
       "Подключите окружение, чтобы увидеть диагностику.",
     "settingsB.DiagnosticsSettings.checkingAccess": "Проверяем доступ к диагностике…",
@@ -867,7 +871,7 @@ export const settingsBMessages = {
     "settingsB.DiagnosticsSettings.resourceHistory": "История ресурсов",
     "settingsB.DiagnosticsSettings.refreshResources": "Обновить историю ресурсов",
     "settingsB.DiagnosticsSettings.cpuTimeTooltip":
-      "Примерное активное время CPU корневого процесса сервера T3 и его потомков за выбранный период. Растёт только пока выбранные процессы используют CPU, а старые выборки уходят по мере сдвига окна.",
+      "Примерное активное время CPU корневого процесса сервера Gustaf и его потомков за выбранный период. Растёт только пока выбранные процессы используют CPU, а старые выборки уходят по мере сдвига окна.",
     "settingsB.DiagnosticsSettings.samples": "Выборки",
     "settingsB.DiagnosticsSettings.samplesTooltip":
       "Выборки процессов в памяти, которые хранит сервер. Сервер собирает их только пока открыта диагностика, и при перезапуске сервера они сбрасываются.",

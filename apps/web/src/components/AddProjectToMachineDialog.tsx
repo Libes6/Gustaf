@@ -259,7 +259,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 </span>
                 <span>
                   {selectedFiles.size === 0
-                    ? "no files"
+                    ? t("webCopy.noFiles")
                     : `+ ${selectedFiles.size} ${selectedFiles.size === 1 ? "file" : "files"}`}
                 </span>
               </div>
@@ -348,7 +348,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   {copyable.length > 0 ? (
                     <>
                       <span className="text-muted-foreground text-xs">
-                        {selectedFiles.size} of {files.length}
+                        {selectedFiles.size} {t("misc.officeViewer.pageOf")} {files.length}
                         {selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}
                       </span>
                       <Button

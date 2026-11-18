@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { isAttachmentOnlyBootstrapPrompt } from "@t3tools/shared/composerContextReferences";
 import {
@@ -70,12 +72,15 @@ export function composerPromptLink(input: {
 export async function copyPromptLink(link: string): Promise<void> {
   try {
     if (!(await writeTextToClipboard(link))) return;
-    toastManager.add({ type: "success", title: "Prompt link copied" });
+    toastManager.add({
+      type: "success",
+      title: translate(getUiLanguage(), "webCopy.promptLinkCopied"),
+    });
   } catch (error) {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not copy the prompt link",
+        title: translate(getUiLanguage(), "webCopy.couldNotCopyThePromptLink"),
         description: error instanceof Error ? error.message : "An error occurred.",
       }),
     );

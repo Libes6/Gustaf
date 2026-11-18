@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as Dialog from "./Dialog";
 import { requireNativeModule } from "expo";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
@@ -44,7 +45,11 @@ function NativeFilePreview(props: FilePreviewViewerProps) {
   const onRequestClose = useEffectEvent(props.onRequestClose);
   const onOpenError = useEffectEvent((error: unknown) => {
     if (props.onOpenError) props.onOpenError(error);
-    else Dialog.alert("Could not open preview", "The file could not be loaded. Please try again.");
+    else
+      Dialog.alert(
+        t("Could not open preview"),
+        t("The file could not be loaded. Please try again."),
+      );
   });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- presents the native file preview and dismisses it on cleanup
@@ -57,7 +62,7 @@ function NativeFilePreview(props: FilePreviewViewerProps) {
       delivered.current = images.map((image) => image.uri);
       presentation = NativeControls.presentFiles(
         images.map((image) => image.uri ?? null),
-        images.map((image) => image.name ?? "Preview"),
+        images.map((image) => image.name ?? t("Preview")),
         selectedIndex,
         images.map((image) => image.sourceIdentifier ?? ""),
         identifier,
@@ -66,7 +71,7 @@ function NativeFilePreview(props: FilePreviewViewerProps) {
       const { uri, name, sourceIdentifier } = presented;
       presentation = NativeControls.presentFile(
         uri,
-        name ?? "Preview",
+        name ?? t("Preview"),
         sourceIdentifier ?? "",
         identifier,
       );

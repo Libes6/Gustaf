@@ -17,7 +17,7 @@ export function ComposerQueuedEditBanner(props: {
     <View className="flex-row items-center gap-2 px-4 pb-2">
       <SymbolView name="pencil" size={12} tintColorClassName="accent-foreground-muted" />
       <Text className="min-w-0 flex-1 text-xs text-foreground-muted" numberOfLines={1}>
-        Editing queued message
+        {t("Editing queued message")}
       </Text>
       <Button
         label={t("Cancel")}

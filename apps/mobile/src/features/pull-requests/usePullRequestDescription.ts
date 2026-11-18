@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import {
   descriptionDraftInForce,
@@ -42,7 +43,7 @@ export function usePullRequestDescription(
     if (AsyncResult.isFailure(response)) {
       const cause = squashAtomCommandFailure(response);
       Dialog.alert(
-        "Could not save the description",
+        t("Could not save the description"),
         cause instanceof Error ? cause.message : "Try again.",
       );
     }

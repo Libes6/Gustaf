@@ -51,7 +51,7 @@ export function ThreadBackgroundWorkSheet({ route }: StaticScreenProps<Backgroun
     >
       {presentation === null ? (
         <Text className="pt-6 text-center text-sm text-foreground-muted">
-          Nothing running in the background.
+          {t("Nothing running in the background.")}
         </Text>
       ) : (
         presentation.items.map((item) => (

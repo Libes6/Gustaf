@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { HStack, ProgressView, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import {
   accessibilityElement,
@@ -138,7 +139,7 @@ function SubscriptionUsage(
                 ? `${tightest.remaining}% left`
                 : period !== "auto" && !stale && provider.windows.length > 0
                   ? "N/A"
-                  : "Open T3"}
+                  : t("Open T3")}
             </Text>
           </HStack>
           {tightest ? (
@@ -212,7 +213,8 @@ function SubscriptionUsage(
                   ),
                 ]}
               >
-                {window.remaining}% left
+                {window.remaining}
+                {t("% left")}
               </Text>
             </HStack>
             <ProgressView value={window.remaining / 100} modifiers={barModifiers} />
@@ -231,7 +233,7 @@ function SubscriptionUsage(
           >
             {(period === "auto" ? (provider.totalWindows ?? windows.length) : windows.length) -
               limit}{" "}
-            more in T3
+            {t("more in T3")}
           </Text>
         ) : null}
       </VStack>
@@ -253,7 +255,7 @@ function SubscriptionUsage(
     >
       {providers.length === 0 ? (
         <Text modifiers={[font({ textStyle: "caption" }), foregroundStyle(secondary)]}>
-          No subscription limits available.
+          {t("No subscription limits available.")}
         </Text>
       ) : compact ? (
         <VStack alignment="leading" spacing={accessory || dense ? 4 : 8}>
@@ -271,7 +273,7 @@ function SubscriptionUsage(
         >
           {props.checkedAt
             ? `As of ${new Date(props.checkedAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}`
-            : "Tap to connect in T3"}
+            : t("Tap to connect in T3")}
         </Text>
       ) : null}
     </VStack>

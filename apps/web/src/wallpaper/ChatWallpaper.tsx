@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useStableCallback } from "../hooks/useStableCallback";
 import { useT } from "../useUiLanguage";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { useWallpaperLibrary, wallpaperSceneId, type WallpaperOption } from "./wallpaperLibrary";
+import { createWallpaperWatchdog } from "./wallpaperWatchdog";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -45,29 +47,49 @@ function WallpaperFrame(props: { readonly wallpaper: WallpaperOption; readonly w
   const [ready, setReady] = useState(false);
   const t = useT();
   const failedTitle = t("wallpaper.sceneFailed");
+  const stalledMessage = t("wallpaper.stalled");
   const activeId = active.id;
   const sky = active.sky;
 
+  const notifyFailure = useStableCallback((message?: string) => {
+    toastManager.add(
+      stackedThreadToast({ type: "error", title: failedTitle, description: message }),
+    );
+  });
+  const onStall = useStableCallback(() => {
+    frameRef.current?.contentWindow?.postMessage({ type: "wallpaper:stop" }, "*");
+    notifyFailure(stalledMessage);
+  });
+
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- listens for errors from the sandboxed scene
   useEffect(() => {
+    const watchdog = createWallpaperWatchdog(onStall);
+    const onVisibility = () => {
+      if (document.hidden || !document.hasFocus()) watchdog.stop();
+    };
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return;
       if (typeof event.data !== "object" || event.data === null) return;
+      if (event.data.type === "wallpaper:watch") {
+        if (event.data.active && !document.hidden && document.hasFocus()) watchdog.start();
+        else watchdog.stop();
+      }
+      if (event.data.type === "wallpaper:frame") watchdog.frame();
       if (event.data.type === "wallpaper:error") {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: failedTitle,
-            description: typeof event.data.message === "string" ? event.data.message : undefined,
-          }),
-        );
+        watchdog.stop();
+        notifyFailure(typeof event.data.message === "string" ? event.data.message : undefined);
       }
     };
     window.addEventListener("message", onMessage);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onVisibility);
     return () => {
+      watchdog.stop();
       window.removeEventListener("message", onMessage);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onVisibility);
     };
-  }, [failedTitle]);
+  }, [notifyFailure, onStall]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- posts the scene to the sandboxed frame's window
   useEffect(() => {

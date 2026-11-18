@@ -258,7 +258,7 @@ export function ComposerAttachmentMediaRow({
                     }
                   />
                   <TooltipPopup side="top">
-                    Draft attachment could not be saved locally and may be lost on navigation.
+                    {t("webCopy.draftAttachmentCouldNotBeSavedLocallyAndMayBe")}
                   </TooltipPopup>
                 </Tooltip>
               )}

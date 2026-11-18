@@ -12,35 +12,6 @@ The install scripts, `gustaf update`, desktop-managed SSH hosts and the npm laun
 - The archive's version is the app's: the bundle job runs `apps/shell/scripts/stamp-version.mjs` before building, which writes the `tauri.conf.json` version into `apps/server` and `apps/web` `package.json`. The checked-in versions stay at T3's 0.1.7, so local builds report 0.1.7. The orchestration protocol version is separate and unchanged.
 - The release job refuses to publish unless it has exactly three archives named for the tag's version.
 
-## Pull request macOS previews
-
-Labeling a PR `preview:mac` publishes a signed, notarized Apple Silicon DMG with T3 Connect enabled
-to the rolling `desktop-preview` prerelease, and works for fork PRs. The label is a one-shot request
-for the commit it is applied to: the trusted workflow removes it once the build is in hand, and later
-pushes do not build until a maintainer applies it again. Every signed preview is therefore a
-per-commit maintainer decision, which matters because the result carries the Developer ID signature.
-Vouching a contributor lets their labeled commits be signed; it is not a standing grant. The build is
-split so the Developer ID certificate never shares a job with PR code:
-
-- `.github/workflows/desktop-macos-preview.yml` runs on `pull_request` with no secrets and builds
-  only the JS bundle from the PR.
-- `.github/workflows/desktop-macos-preview-publish.yml` runs on `workflow_run` from `main`. It
-  refuses unless the PR is open, still labeled, its head is the built commit, and the author is a
-  bot, a collaborator, or listed in `.github/VOUCHED.td` (read from the default branch, so a PR cannot vouch
-  for itself). It then packages and signs the bundle through `release-desktop.yml` checked out at
-  `main`, so packaging, native helpers, and the Electron/desktop dependencies come from `main`, not
-  the PR. Only the version and the public T3 Connect identifiers in `.env.example` are read from the
-  PR commit, as data, so the signed app's passkey entitlement matches the bundle. A PR that changes
-  packaging needs a separate packaging validation.
-
-Before handing the bundle to the signing runner, the trusted workflow validates its ZIP entries
-and accepts only regular files under `server/dist` and `desktop/dist-electron`, plus the directory
-entries that lead to those roots. The artifact cannot
-overwrite packaging code or installed dependencies. The bundle is copied into the app, never executed,
-on the signing runner. The
-`pull_request_target` cleanup job in the publish workflow removes the download when the PR closes, or
-when the label is removed by hand before a build consumed it, and never checks out PR code.
-
 ## Gustaf Android release APK
 
 Every `vX.Y.Z` release gets a signed production APK (`io.github.libes6.gustaf`, arm64-v8a and

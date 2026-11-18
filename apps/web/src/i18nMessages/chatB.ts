@@ -355,7 +355,7 @@ export const chatBMessages = {
     "chatB.ModelPickerContent.setUpProvider": "Set up {name}",
     "chatB.ModelPickerContent.openProviderSetup": "Open provider setup",
     "chatB.ModelPickerContent.providerSettings": "Provider settings",
-    "chatB.ModelPickerContent.ollamaChatOnly": "Chat only: no terminal, files or MCP tools",
+    "chatB.ModelPickerContent.chatOnlyNote": "Chat only: no tools, files or MCP",
     "chatB.ModelPickerContent.favorites": "Favorites",
     "chatB.ModelPickerContent.modelAnnounce": "Model: {name}",
     "chatB.ModelPickerContent.searchModelsPlaceholder": "Search models...",
@@ -1110,8 +1110,7 @@ export const chatBMessages = {
     "chatB.ModelPickerContent.setUpProvider": "Настроить {name}",
     "chatB.ModelPickerContent.openProviderSetup": "Открыть настройку провайдера",
     "chatB.ModelPickerContent.providerSettings": "Настройки провайдера",
-    "chatB.ModelPickerContent.ollamaChatOnly":
-      "Только чат: без терминала, файлов и MCP-инструментов",
+    "chatB.ModelPickerContent.chatOnlyNote": "Только чат: без инструментов, файлов и MCP",
     "chatB.ModelPickerContent.favorites": "Избранное",
     "chatB.ModelPickerContent.modelAnnounce": "Модель: {name}",
     "chatB.ModelPickerContent.searchModelsPlaceholder": "Поиск моделей...",

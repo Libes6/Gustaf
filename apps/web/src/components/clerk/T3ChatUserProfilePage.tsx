@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import { T3CHAT_PLAN_TUNNEL_LIMITS, type RelayT3ChatLink } from "@t3tools/contracts/relay";
 import { MessageSquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -13,25 +15,41 @@ import {
 import { useT3ChatLink } from "./useT3ChatLink";
 import { useT } from "../../useUiLanguage";
 
-const upgradeLink = (
-  <a className="underline" href={T3CHAT_SUBSCRIPTION_URL} target="_blank" rel="noopener noreferrer">
-    Upgrade on T3 Chat
-  </a>
-);
+function UpgradeLink() {
+  const t = useT();
+  return (
+    <a
+      className="underline"
+      href={T3CHAT_SUBSCRIPTION_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {t("webCopy.upgradeOnT3Chat")}
+    </a>
+  );
+}
 
 function planLabel(link: RelayT3ChatLink): ReactNode {
   switch (link.plan) {
     case "premier":
-      return `Premier · up to ${T3CHAT_PLAN_TUNNEL_LIMITS.premier} tunnels`;
+      return translate(getUiLanguage(), "webCopy.premierUpToCountTunnels").replace(
+        "{count}",
+        String(T3CHAT_PLAN_TUNNEL_LIMITS.premier),
+      );
     case "pro":
       return (
         <>
-          Pro · up to {T3CHAT_PLAN_TUNNEL_LIMITS.pro} tunnels. {upgradeLink} to Premier for{" "}
-          {T3CHAT_PLAN_TUNNEL_LIMITS.premier}.
+          {translate(getUiLanguage(), "webCopy.proUpTo")} {T3CHAT_PLAN_TUNNEL_LIMITS.pro}{" "}
+          {translate(getUiLanguage(), "webCopy.tunnels")} <UpgradeLink />{" "}
+          {translate(getUiLanguage(), "webCopy.toPremierFor")} {T3CHAT_PLAN_TUNNEL_LIMITS.premier}.
         </>
       );
     case "free":
-      return <>{upgradeLink} for more tunnels</>;
+      return (
+        <>
+          <UpgradeLink /> {translate(getUiLanguage(), "webCopy.forMoreTunnels")}
+        </>
+      );
   }
 }
 
@@ -80,7 +98,7 @@ export function T3ChatUserProfilePage() {
                     planLabel(link)
                   ) : linkUrl ? (
                     <>
-                      Confirm on{" "}
+                      {t("misc.t3ConnectUserProfilePage.confirmOnT3Chat")}{" "}
                       <a
                         className="underline"
                         href={linkUrl}
@@ -89,7 +107,7 @@ export function T3ChatUserProfilePage() {
                       >
                         t3.chat
                       </a>
-                      , then select Refresh.
+                      {t("misc.t3ConnectUserProfilePage.thenSelectRefresh")}
                     </>
                   ) : (
                     "You confirm the link on t3.chat."
@@ -103,11 +121,13 @@ export function T3ChatUserProfilePage() {
                   disabled={pending !== null}
                   onClick={() => void handleUnlink()}
                 >
-                  {pending === "unlink" ? "Unlinking…" : "Unlink"}
+                  {pending === "unlink" ? t("webCopy.unlinking") : t("webCopy.unlink")}
                 </Button>
               ) : (
                 <Button size="sm" disabled={pending !== null} onClick={() => void handleLink()}>
-                  {pending === "link" ? "Opening…" : "Link T3 Chat"}
+                  {pending === "link"
+                    ? t("misc.t3ConnectUserProfilePage.opening")
+                    : t("misc.tunnelUsage.linkT3Chat")}
                 </Button>
               )}
             </div>

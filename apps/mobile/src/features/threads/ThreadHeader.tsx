@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { AppBar } from "../../components/ui/AppBar";
 import { ScreenHeaderButton } from "../../components/ui/ScreenHeaderButton";
 import type { AppBarAction, AppBarMenu } from "../../components/ui/AppBar.types";
@@ -63,7 +64,7 @@ export function ThreadHeader(props: {
       trailing={
         props.fileInspectorSupported && props.hasThreadCwd ? (
           <ScreenHeaderButton
-            accessibilityLabel={inspectorVisible ? "Hide inspector" : "Show inspector"}
+            accessibilityLabel={inspectorVisible ? t("Hide inspector") : t("Show inspector")}
             icon="sidebar.right"
             selected={inspectorVisible}
             onPress={props.onToggleInspector}

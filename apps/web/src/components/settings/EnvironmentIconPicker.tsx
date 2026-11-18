@@ -1,3 +1,5 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
 import {
   AuthSettingsWriteScope,
   ENVIRONMENT_MACHINE_KINDS,
@@ -26,10 +28,13 @@ export function resolveEnvironmentIconPickerLock(input: {
   readonly operateAccess: "granted" | "denied" | "pending";
 }): string | null {
   if (input.serverConfig === null) {
-    return "Connect to this environment to change its icon.";
+    return translate(getUiLanguage(), "webCopy.connectToThisEnvironmentToChangeItsIcon");
   }
   if (input.operateAccess !== "granted") {
-    return "Your session on this environment cannot change its settings.";
+    return translate(
+      getUiLanguage(),
+      "webCopy.yourSessionOnThisEnvironmentCannotChangeItsSettings",
+    );
   }
   return null;
 }

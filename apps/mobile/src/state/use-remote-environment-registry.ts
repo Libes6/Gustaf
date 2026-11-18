@@ -1,11 +1,11 @@
+import { t } from "../i18n";
 import * as Dialog from "../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import { ConnectionBlockedError } from "@t3tools/client-runtime/connection";
+import { alreadySavedEnvironment } from "@t3tools/client-runtime/connection";
 import { Discovery } from "@t3tools/client-runtime/relay";
 import type { EnvironmentId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
-import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 
@@ -53,8 +53,6 @@ export interface PairingOutcome {
   readonly alreadySaved?: { readonly environmentId: EnvironmentId; readonly address: string };
 }
 
-const isConnectionBlockedError = Schema.is(ConnectionBlockedError);
-
 /** Pairs with the environment behind a pairing link and saves it. */
 export async function pairEnvironment(
   pairingUrl: string,
@@ -78,12 +76,11 @@ export async function pairEnvironment(
     "reason" in error &&
     error.reason === "unsupported"
   ) {
-    Dialog.alert("Client not supported", message);
+    Dialog.alert(t("Client not supported"), message);
     return { ok: false, error: null };
   }
-  if (isConnectionBlockedError(error) && error.alreadySaved !== undefined) {
-    return { ok: false, error: message, alreadySaved: error.alreadySaved };
-  }
+  const alreadySaved = alreadySavedEnvironment(error);
+  if (alreadySaved !== null) return { ok: false, error: message, alreadySaved };
   return { ok: false, error: message };
 }
 
@@ -208,7 +205,7 @@ export function useRemoteConnections() {
         onPress: () => navigation.navigate("SettingsAuth"),
       };
       Dialog.alert(
-        "Remove from this device?",
+        t("Remove from this device?"),
         `Forget ${environment.environmentLabel} and its cached threads on this device.\n\n${RELAY_REMOVAL_ACCOUNT_NOTE[registration]}`,
         registration === "unregistered" || !hasCloudPublicConfig()
           ? [{ text: "Cancel", style: "cancel" }, remove]
@@ -217,7 +214,7 @@ export function useRemoteConnections() {
       return;
     }
     Dialog.alert(
-      "Remove from this device?",
+      t("Remove from this device?"),
       `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,
       [{ text: "Cancel", style: "cancel" }, remove],
     );

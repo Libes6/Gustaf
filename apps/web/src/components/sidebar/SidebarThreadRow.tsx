@@ -305,7 +305,7 @@ function SidebarThreadTooltip({
           <div className="flex min-w-0 items-start gap-2 text-warning">
             <CircleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
             <div className="min-w-0 flex-1 wrap-break-word">
-              You're currently checked out on another branch.
+              {t("webCopy.youReCurrentlyCheckedOutOnAnotherBranch")}
             </div>
           </div>
         ) : null}
@@ -335,7 +335,7 @@ function SidebarThreadTooltip({
           <div className="flex min-w-0 items-center gap-2">
             <ArrowRightLeftIcon className="size-3 shrink-0 stroke-muted-foreground" />
             <div className="min-w-0 truncate text-foreground/75">
-              Handed off from {previousProviderNames.join(", ")}
+              {t("webCopy.handedOffFrom")} {previousProviderNames.join(", ")}
             </div>
           </div>
         ) : null}
@@ -1254,7 +1254,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {multiline ? null : terminalStatusIcon}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
-                  Regenerating title
+                  {t("webCopy.regeneratingTitle")}
                 </span>
               ) : null}
               {sortable?.isDragging ? (
@@ -1290,7 +1290,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                               className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-warning-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
                               <AlarmClockIcon aria-hidden className="size-3" />
-                              <span role="status">Woke</span>
+                              <span role="status">{t("webCopy.woke")}</span>
                             </button>
                           }
                         />
@@ -1570,7 +1570,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                             }
                           >
                             <CheckIcon className="size-3.5" />
-                            Settle
+                            {t("sidebar.SidebarThreadRow.dropSettle")}
                           </TooltipTrigger>
                           <TooltipPopup>{t("sidebar.SidebarThreadRow.settleThread")}</TooltipPopup>
                         </Tooltip>
@@ -1586,7 +1586,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {title}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
-                  Regenerating title
+                  {t("webCopy.regeneratingTitle")}
                 </span>
               ) : null}
               {titleLineIcons}

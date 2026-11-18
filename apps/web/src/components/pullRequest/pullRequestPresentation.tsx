@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   PullRequestActor,
@@ -436,6 +437,7 @@ export function PullRequestActorLabel({
   tooltip?: boolean;
   profileUrl?: string | null;
 }) {
+  const t = useT();
   const login = actor?.login ?? "ghost";
   const label = (
     <span className={cn("flex min-w-0 items-baseline", variant === "label" && "gap-1.5")}>
@@ -472,7 +474,7 @@ export function PullRequestActorLabel({
       </TooltipTrigger>
       <TooltipPopup side="top">
         {actor?.name && actor.name !== login ? `${actor.name} (@${login})` : login}
-        {profileUrl ? " · Open profile" : ""}
+        {profileUrl ? t("webCopy.openProfile") : ""}
       </TooltipPopup>
     </Tooltip>
   );

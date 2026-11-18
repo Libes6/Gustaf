@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import type { EnvironmentId, RuntimeMode } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 
@@ -22,6 +23,7 @@ export function ComposerContextPermissions(props: {
   supportedRuntimeModes: ReadonlyArray<RuntimeMode> | undefined;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const t = useT();
   const shortcutLabel = shortcutLabelForCommand(
     useAtomValue(primaryServerKeybindingsAtom),
     "composer.mode",
@@ -53,7 +55,10 @@ export function ComposerContextPermissions(props: {
           <Icon aria-hidden="true" className="size-3" />
           <ComposerContextLabel>{label}</ComposerContextLabel>
         </TooltipTrigger>
-        <TooltipPopup>Permissions{shortcutLabel ? ` · ${shortcutLabel}` : null}</TooltipPopup>
+        <TooltipPopup>
+          {t("settingsD.savedEnvironmentRows.permissions")}
+          {shortcutLabel ? ` · ${shortcutLabel}` : null}
+        </TooltipPopup>
       </Tooltip>
       <MenuPopup side="top" align="end" {...composerMenuProps}>
         <ComposerPermissionsSection

@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { pipe } from "effect/Function";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
@@ -75,6 +76,7 @@ function PendingSecretRequestForm(props: {
   readonly environmentId: EnvironmentId;
   readonly item: SecretRequestItem;
 }) {
+  const t = useT();
   const { item } = props;
   const inputId = useId();
   const errorId = useId();
@@ -160,7 +162,7 @@ function PendingSecretRequestForm(props: {
             size="sm"
             render={<a href={link.href} target="_blank" rel="noopener noreferrer" />}
           >
-            Open {link.host}
+            {t("misc.pullRequestReviewAnnotation.open")} {link.host}
             <ExternalLinkIcon aria-hidden />
           </Button>
           {/* A link found in the reason is already shown there. */}
@@ -223,7 +225,7 @@ function PendingSecretRequestForm(props: {
           )}
         </div>
         <Button type="submit" disabled={submitting || draft.trim().length === 0}>
-          Save securely
+          {t("webCopy.saveSecurely")}
         </Button>
       </div>
       {error !== null ? (
@@ -246,7 +248,7 @@ function PendingSecretRequestForm(props: {
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
-          Decline
+          {t("chatA.linkRequestCard.decline")}
         </Button>
       </div>
     </form>

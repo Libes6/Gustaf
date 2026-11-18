@@ -192,7 +192,7 @@ export function WelcomeWizard({
         if (importWarning) {
           toastManager.add({
             type: "warning",
-            title: "Some history was not imported",
+            title: t("webCopy.someHistoryWasNotImported"),
             description: importWarning,
             timeout: 0,
           });
@@ -345,10 +345,10 @@ function ConnectionStep({
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        Connect your computers
+        {t("webCopy.connectYourComputers")}
       </h1>
       <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        Choose one or more computers. We’ll set up agents and projects on each.
+        {t("webCopy.chooseOneOrMoreComputersWeLlSetUpAgents")}
       </p>
       {directEnvironments.length > 0 ? (
         <fieldset className="mt-5 space-y-2">
@@ -439,22 +439,25 @@ function ConnectionStep({
       </div>
       {skippedLabels.length > 0 ? (
         <p className="mt-4 text-xs text-muted-foreground">
-          Not connected, so setup skips {skippedLabels.join(", ")}. You can set{" "}
-          {skippedLabels.length === 1 ? "it" : "them"} up later from Settings.
+          {t("webCopy.notConnectedSoSetupSkips")} {skippedLabels.join(", ")}
+          {t("webCopy.youCanSet")}{" "}
+          {skippedLabels.length === 1 ? t("webCopy.it") : t("webCopy.them")}{" "}
+          {t("webCopy.upLaterFromSettings")}
         </p>
       ) : null}
       <div className="mt-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
-          {telemetryOff ?? "Gustaf collects anonymous usage data to help us improve it."} To read
-          more about how your data is used{telemetryOff === undefined ? " and how to opt out" : ""},
-          see our{" "}
+          {telemetryOff ?? t("webCopy.gustafCollectsAnonymousUsageDataToHelpUsImproveIt")}{" "}
+          {t("webCopy.toReadMoreAboutHowYourDataIsUsed")}
+          {telemetryOff === undefined ? t("webCopy.andHowToOptOut") : ""}
+          {t("webCopy.seeOur")}{" "}
           <a
             className="underline underline-offset-2 hover:text-foreground"
             href={PRIVACY_POLICY_URL}
             target="_blank"
             rel="noreferrer noopener"
           >
-            privacy policy
+            {t("webCopy.privacyPolicy")}
           </a>
           .
         </p>
@@ -465,7 +468,7 @@ function ConnectionStep({
           disabled={!ready || isPairing}
           onClick={onContinue}
         >
-          Continue
+          {t("shell.gitActions.continue")}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -543,11 +546,11 @@ function ConnectAccountOption({
               ) : null}
             </div>
             <p className="text-sm text-muted-foreground">
-              Run this on each computer you want to connect.
+              {t("webCopy.runThisOnEachComputerYouWantToConnect")}
             </p>
             <InstallT3Commands command="gustaf connect" className="mt-3" />
             <p className="mt-3 text-xs text-muted-foreground">
-              Keep Gustaf running. Select the computers you want to set up above.
+              {t("webCopy.keepGustafRunningSelectTheComputersYouWantToSet")}
             </p>
           </div>
         </CollapsiblePanel>
@@ -606,7 +609,7 @@ function PairingForm({
       >
         <div>
           <label className="block text-sm text-muted-foreground" htmlFor="onboarding-pairing-url">
-            Pairing link
+            {t("settingsA.authorizedClients.pairingLink")}
           </label>
           <Input
             id="onboarding-pairing-url"
@@ -646,7 +649,7 @@ function PairingForm({
               className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronRightIcon className="size-3.5 group-data-panel-open:rotate-90" />
-              Need a pairing link?
+              {t("webCopy.needAPairingLink")}
             </CollapsibleTrigger>
             <Button type="submit" disabled={isPairing || pairingUrl.trim().length === 0}>
               {isPairing ? t("misc.welcomeWizard.pairing") : t("misc.welcomeWizard.pair")}
@@ -658,9 +661,10 @@ function PairingForm({
             </p>
             <InstallT3Commands command="gustaf pair" className="mt-2" />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Start Gustaf or run <code className="font-mono">gustaf serve</code> there before{" "}
-              <code className="font-mono">gustaf pair</code>. On a tailnet, run{" "}
-              <code className="font-mono">gustaf pair --tailscale</code> instead.
+              {t("webCopy.startGustafOrRun")} <code className="font-mono">gustaf serve</code>{" "}
+              {t("webCopy.thereBefore")} <code className="font-mono">gustaf pair</code>
+              {t("webCopy.onATailnetRun")}{" "}
+              <code className="font-mono">gustaf pair --tailscale</code> {t("webCopy.instead")}
             </p>
           </CollapsiblePanel>
         </Collapsible>
@@ -712,7 +716,7 @@ function AgentsStep({
       <CliPathSetup />
       <div className="mt-6 flex justify-end">
         <Button autoFocus onClick={onContinue}>
-          Continue
+          {t("shell.gitActions.continue")}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -727,6 +731,7 @@ function ConnectedAgentsStep({
   readonly environmentId: EnvironmentId;
   readonly machineLabel: string;
 }) {
+  const t = useT();
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,
@@ -781,7 +786,7 @@ function ConnectedAgentsStep({
       <h2 className="mb-2 text-sm font-medium">{machineLabel}</h2>
       {!canOperateTerminal ? (
         <p className="mb-2 text-sm text-muted-foreground">
-          This connection cannot control terminals.
+          {t("misc.welcomeWizard.cannotControlTerminals")}
         </p>
       ) : null}
       <div className="space-y-1.5">
@@ -865,7 +870,7 @@ function ConnectedAgentsStep({
       ) ? (
         <div className="mt-3">
           <Button size="xs" variant="ghost-muted" onClick={() => setAddingAccount(true)}>
-            Connect another ChatGPT account
+            {t("webCopy.connectAnotherChatGPTAccount")}
           </Button>
         </div>
       ) : null}
@@ -1015,7 +1020,7 @@ function AgentCard({
         {providerState === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            Ready
+            {t("settingsA.codexSetup.ready")}
           </span>
         ) : providerState === "checking" ? (
           <span className="text-xs text-muted-foreground">{t("misc.welcomeWizard.checking")}</span>
@@ -1151,8 +1156,8 @@ function AgentInstallTerminal({
             t("misc.welcomeWizard.cannotControlTerminals")
           ) : setupState === "writeFailed" ? (
             <>
-              Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
-              terminal.
+              {t("webCopy.run")} <code className="rounded bg-muted px-1 font-mono">{command}</code>{" "}
+              {t("webCopy.inThisTerminal")}
             </>
           ) : setupState === "ready" ? (
             t("misc.welcomeWizard.reviewCommand")
@@ -1174,11 +1179,11 @@ function AgentInstallTerminal({
                 }
               }}
             >
-              Retry
+              {t("sidebar.SidebarUpdateCapsule.retry")}
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            Close
+            {t("shell.smallUi.close")}
           </Button>
         </div>
       </div>
@@ -1460,12 +1465,12 @@ function ImportStep({
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner size="lg" tone="muted" />
           <p className="text-center text-sm text-muted-foreground">
-            Looking for projects from Claude Code and Codex…
+            {t("webCopy.lookingForProjectsFromClaudeCodeAndCodex")}
           </p>
         </div>
         <div className="flex justify-end">
           <Button variant="ghost-muted" onClick={() => void onDone()}>
-            Do not import projects
+            {t("webCopy.doNotImportProjects")}
           </Button>
         </div>
       </div>
@@ -1480,7 +1485,8 @@ function ImportStep({
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span role="status">
-            {selected.length} of {candidates.length} selected
+            {selected.length} {t("misc.officeViewer.pageOf")} {candidates.length}{" "}
+            {t("webCopy.selected")}
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -1489,7 +1495,7 @@ function ImportStep({
               disabled={isImporting || selected.length === candidates.length}
               onClick={() => setSelectedKeys(new Set(candidates.map((item) => item.key)))}
             >
-              Select all
+              {t("shell.terminal.selectAll")}
             </Button>
             <Button
               variant="ghost"
@@ -1497,7 +1503,7 @@ function ImportStep({
               disabled={isImporting || selected.length === 0}
               onClick={() => setSelectedKeys(new Set())}
             >
-              Select none
+              {t("webCopy.selectNone")}
             </Button>
           </div>
         </div>
@@ -1523,21 +1529,23 @@ function ImportStep({
                 {scan.isPending && scan.data === null ? (
                   <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                     <Spinner size="md" />
-                    Looking for projects…
+                    {t("webCopy.lookingForProjects")}
                   </div>
                 ) : scan.error !== null ? (
                   <div
                     role="alert"
                     className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
                   >
-                    <span>Could not check projects. {scan.error}</span>
+                    <span>
+                      {t("webCopy.couldNotCheckProjects")} {scan.error}
+                    </span>
                     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-                      Retry
+                      {t("sidebar.SidebarUpdateCapsule.retry")}
                     </Button>
                   </div>
                 ) : scanCandidates.length === 0 ? (
                   <p className="py-2 text-sm text-muted-foreground">
-                    No existing Claude Code or Codex projects found.
+                    {t("webCopy.noExistingClaudeCodeOrCodexProjectsFound")}
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
@@ -1560,7 +1568,7 @@ function ImportStep({
       ) : null}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         <Button variant="ghost-muted" disabled={isImporting} onClick={finishAfterImport}>
-          Do not import projects
+          {t("webCopy.doNotImportProjects")}
         </Button>
         <Button
           autoFocus
@@ -1569,7 +1577,7 @@ function ImportStep({
         >
           {isImporting
             ? t("misc.welcomeWizard.importing")
-            : `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"}`}
+            : t("misc.welcomeWizard.importCount").replace("{count}", String(selected.length))}
         </Button>
       </div>
     </StepShell>
@@ -1631,7 +1639,7 @@ function ImportCandidateList({
                 {t("misc.welcomeWizard.otherFolders")}
               </span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                {other.length} {other.length === 1 ? "folder" : "folders"}
+                {other.length} {other.length === 1 ? t("webCopy.folder") : t("webCopy.folders")}
               </span>
             </CollapsibleTrigger>
           </div>
@@ -1815,6 +1823,7 @@ function ImportRowMeta({
 
 /** The desktop app links `gustaf` on a fresh install; this puts its folder on PATH when it is not. */
 function CliPathSetup() {
+  const t = useT();
   const { state, busy, run } = useDesktopCliCommand();
   const setup = state?.pathSetup;
   if (!setup) return null;
@@ -1823,19 +1832,19 @@ function CliPathSetup() {
       <p className="text-sm text-muted-foreground">
         {setup.added ? (
           <>
-            Added to {setup.file}. Open a new terminal to use{" "}
-            <code className="font-mono">gustaf</code>.
+            {t("webCopy.addedTo")} {setup.file}
+            {t("webCopy.openANewTerminalToUse")} <code className="font-mono">gustaf</code>.
           </>
         ) : (
           <>
-            Use <code className="font-mono">gustaf</code> from any terminal. Adds one line to{" "}
-            {setup.file}.
+            {t("settingsE.voiceSettingsPanel.use")} <code className="font-mono">gustaf</code>{" "}
+            {t("webCopy.fromAnyTerminalAddsOneLineTo")} {setup.file}.
           </>
         )}
       </p>
       {setup.added ? null : (
         <Button size="sm" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
-          Add to PATH
+          {t("settingsA.cliCommand.addToPath")}
         </Button>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import {
   type EnvironmentId,
   type ProjectId,
@@ -27,6 +28,7 @@ export function useThreadLinkedPullRequest(input: {
   readonly threadBranch: string | null;
   readonly gitStatus: VcsStatusResult | null;
 }) {
+  const t = useT();
   const { serverThreadRef, persisted, projectId, projectRepository, threadBranch, gitStatus } =
     input;
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -89,12 +91,12 @@ export function useThreadLinkedPullRequest(input: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to update the thread pull request",
+          title: t("webCopy.unableToUpdateTheThreadPullRequest"),
           description: error instanceof Error ? error.message : "An error occurred.",
         }),
       );
     });
-  }, [persisted, replacement, serverThreadRef, updateThreadMetadata]);
+  }, [persisted, replacement, serverThreadRef, updateThreadMetadata, t]);
 
   const linked = replacement ?? persisted;
   return {

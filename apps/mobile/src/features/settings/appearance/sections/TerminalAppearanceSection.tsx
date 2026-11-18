@@ -28,7 +28,7 @@ export function TerminalAppearanceSection() {
       <SettingsSwitchRow
         disabled={!isReady}
         icon="terminal"
-        label="Custom font size"
+        label={t("Custom font size")}
         onValueChange={handleToggleCustom}
         value={custom}
       />

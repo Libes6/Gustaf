@@ -1,3 +1,7 @@
+import { keybindingMessages } from "./i18nMessages/keybindings";
+import { settingsStatusMessages } from "./i18nMessages/settingsStatus";
+import { settingsSearchMessages } from "./i18nMessages/settingsSearch";
+import { webCopyMessages } from "./i18nMessages/webCopy";
 import type { UiLanguage } from "@t3tools/contracts/settings";
 
 import { sidebarMessages } from "./i18nMessages/sidebar";
@@ -249,7 +253,7 @@ const baseMessages = {
     "settings.nav.secrets": "Секреты",
     "settings.nav.subscriptions": "Подписки",
     "settings.nav.maintenance": "Обслуживание",
-    "settings.nav.labs": "Labs",
+    "settings.nav.labs": "Лаборатория",
     "settings.nav.account": "Аккаунт",
     "settings.nav.about": "О программе",
     "settings.nav.archived": "Архив",
@@ -441,7 +445,11 @@ const baseMessages = {
 
 const messages = {
   en: {
+    ...settingsSearchMessages.en,
     ...baseMessages.en,
+    ...keybindingMessages.en,
+    ...settingsStatusMessages.en,
+    ...webCopyMessages.en,
     ...sidebarMessages.en,
     ...chatAMessages.en,
     ...chatBMessages.en,
@@ -456,7 +464,11 @@ const messages = {
     ...subscriptionsMessages.en,
   },
   ru: {
+    ...settingsSearchMessages.ru,
     ...baseMessages.ru,
+    ...keybindingMessages.ru,
+    ...settingsStatusMessages.ru,
+    ...webCopyMessages.ru,
     ...sidebarMessages.ru,
     ...chatAMessages.ru,
     ...chatBMessages.ru,
@@ -530,6 +542,14 @@ export function settingCopy(
   if (!(titleKey in messages.en)) return null;
   return {
     title: translate(language, titleKey as MessageKey),
-    description: translate(language, `setting.${id}.description` as MessageKey),
+    description:
+      `setting.${id}.description` in messages.en
+        ? translate(language, `setting.${id}.description` as MessageKey)
+        : "",
   };
+}
+
+export function keybindingLabel(language: UiLanguage, command: string): string | null {
+  const key = `keybinding.${command}`;
+  return key in messages.en ? translate(language, key as MessageKey) : null;
 }

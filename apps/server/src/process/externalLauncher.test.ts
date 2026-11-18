@@ -22,6 +22,7 @@ import { resolveEditorCommand } from "@t3tools/shared/editor";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as ExternalLauncher from "./externalLauncher.ts";
+import { stripAppImageRuntimeEnv } from "./appImageEnv.ts";
 
 // Windows drive letters break mocked POSIX PATH splitting; these tests also require /bin/sh stubs.
 const windowsHost = HostProcess.Platform.defaultValue() === "win32";
@@ -95,16 +96,43 @@ const layerTest = (input: {
   );
 };
 
+it("strips AppRun mount segments from arbitrary environment values without changing the input", () => {
+  const appDir = "/tmp/.mount_Gustafabc123";
+  const env = {
+    APPIMAGE: "/home/user/Gustaf.AppImage",
+    APPDIR: `${appDir}/`,
+    ARGV0: "/home/user/Gustaf.AppImage",
+    OWD: "/home/user",
+    PATH: `${appDir}/usr/bin:/usr/bin`,
+    LD_LIBRARY_PATH: `${appDir}//usr/lib:/usr/lib`,
+    GTK_EXE_PREFIX: `${appDir}//usr`,
+    GIO_MODULE_DIR: `${appDir}//usr/lib/gio/modules`,
+    GDK_PIXBUF_MODULE_FILE: `${appDir}//usr/lib/gdk-pixbuf-2.0/loaders.cache`,
+    CUSTOM_MODULES: `/opt/modules:${appDir}/modules`,
+    SIMILAR_PREFIX: `${appDir}-other/modules`,
+    DISPLAY: ":0",
+  };
+  assert.deepEqual(stripAppImageRuntimeEnv(env), {
+    PATH: "/usr/bin",
+    LD_LIBRARY_PATH: "/usr/lib",
+    CUSTOM_MODULES: "/opt/modules",
+    SIMILAR_PREFIX: `${appDir}-other/modules`,
+    DISPLAY: ":0",
+  });
+  assert.equal(env.APPDIR, `${appDir}/`);
+});
+
 it.effect.skipIf(windowsHost)(
-  "launched browsers and editors inherit neither ELECTRON_RUN_AS_NODE nor the AppImage mount",
+  "launches and their probes inherit neither ELECTRON_RUN_AS_NODE nor the AppImage mount",
   () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const binDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-editors-" });
-      const codePath = path.join(binDir, "code");
-      yield* fileSystem.writeFileString(codePath, "#!/bin/sh\n");
-      yield* fileSystem.chmod(codePath, 0o755);
+      for (const name of ["code", "xdg-open", "xdg-mime", "gdbus"]) {
+        yield* fileSystem.writeFileString(path.join(binDir, name), "#!/bin/sh\n");
+        yield* fileSystem.chmod(path.join(binDir, name), 0o755);
+      }
 
       const appDir = "/tmp/.mount_Gustafabc123";
       const spawned: ChildProcess.StandardCommand[] = [];
@@ -112,22 +140,39 @@ it.effect.skipIf(windowsHost)(
         const launcher = yield* ExternalLauncher.ExternalLauncher;
         yield* launcher.launchBrowser("https://example.com");
         yield* launcher.launchEditor({ editor: "vscode", cwd: "/workspace" });
+        yield* launcher.launchEditor({
+          editor: "file-manager",
+          cwd: "/workspace/a.ts",
+          reveal: true,
+        });
       }).pipe(
         Effect.provide(
           layerTest({
             platform: "linux",
             env: { PATH: binDir, DISPLAY: ":0" },
             onSpawn: (command) => spawned.push(command),
+            spawnResult: (command) =>
+              command.command === "xdg-mime" ? { stdout: "org.kde.dolphin.desktop\n" } : undefined,
           }),
         ),
+        // What AppRun and linuxdeploy's GTK hook export, including their doubled slashes.
         Effect.provideService(HostProcess.Environment, {
           PATH: `${appDir}/usr/bin:${binDir}`,
           DISPLAY: ":0",
           ELECTRON_RUN_AS_NODE: "1",
           APPIMAGE: "/home/user/Gustaf.AppImage",
           APPDIR: appDir,
+          ARGV0: "/home/user/Gustaf.AppImage",
+          OWD: "/home/user",
           LD_LIBRARY_PATH: `${appDir}/usr/lib`,
-          GDK_PIXBUF_MODULE_FILE: `${appDir}/usr/lib/gdk-pixbuf-2.0/loaders.cache`,
+          XDG_DATA_DIRS: `${appDir}/usr/share/:/usr/local/share:/usr/share`,
+          GTK_DATA_PREFIX: appDir,
+          GTK_EXE_PREFIX: `${appDir}//usr`,
+          GTK_PATH: `${appDir}//usr/lib/gtk-3.0`,
+          GTK_IM_MODULE_FILE: `${appDir}//usr/lib/gtk-3.0/3.0.0/immodules.cache`,
+          GDK_PIXBUF_MODULE_FILE: `${appDir}//usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache`,
+          GIO_MODULE_DIR: `${appDir}//usr/lib/gio/modules`,
+          GSETTINGS_SCHEMA_DIR: `${appDir}//usr/share/glib-2.0/schemas`,
         }),
       );
 
@@ -137,11 +182,87 @@ it.effect.skipIf(windowsHost)(
           env: command.options.env,
           extendEnv: command.options.extendEnv,
         })),
-        ["xdg-open", "code"].map((command) => ({
+        ["xdg-open", "code", "xdg-mime", "gdbus"].map((command) => ({
           command,
-          env: { PATH: binDir, DISPLAY: ":0" },
+          env: { PATH: binDir, DISPLAY: ":0", XDG_DATA_DIRS: "/usr/local/share:/usr/share" },
           extendEnv: false,
         })),
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect.skipIf(windowsHost)(
+  "a launch whose opener exits with an error fails, one still running counts as started",
+  () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const binDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-editors-" });
+      for (const name of ["phpstorm", "explorer.EXE"]) {
+        yield* fileSystem.writeFileString(path.join(binDir, name), "#!/bin/sh\n");
+        yield* fileSystem.chmod(path.join(binDir, name), 0o755);
+      }
+
+      const launch = (
+        platform: NodeJS.Platform,
+        result: MockSpawnResult,
+        run: (
+          launcher: ExternalLauncher.ExternalLauncher["Service"],
+        ) => Effect.Effect<void, ExternalLauncher.ExternalLauncherError>,
+      ) =>
+        Effect.gen(function* () {
+          let unrefs = 0;
+          const fiber = yield* Effect.gen(function* () {
+            return yield* run(yield* ExternalLauncher.ExternalLauncher);
+          }).pipe(
+            Effect.provide(
+              layerTest({
+                platform,
+                env: { PATH: binDir, PATHEXT: ".EXE", DISPLAY: ":0" },
+                onUnref: () => (unrefs += 1),
+                spawnResult: () => result,
+              }),
+            ),
+            Effect.provideService(HostProcess.Environment, { PATH: binDir, DISPLAY: ":0" }),
+            Effect.exit,
+            Effect.forkChild,
+          );
+          yield* TestClock.adjust("5 seconds");
+          const exit = yield* Fiber.join(fiber);
+          return { tag: Exit.isFailure(exit) ? Cause.squash(exit.cause) : "started", unrefs };
+        });
+
+      const openBrowser = (launcher: ExternalLauncher.ExternalLauncher["Service"]) =>
+        launcher.launchBrowser("https://example.com");
+      const openPhpStorm = (launcher: ExternalLauncher.ExternalLauncher["Service"]) =>
+        launcher.launchEditor({ editor: "phpstorm", cwd: "/workspace" });
+
+      const browserFailure = yield* launch("linux", { exitCode: 4 }, openBrowser);
+      assert.instanceOf(browserFailure.tag, ExternalLauncher.ExternalLauncherBrowserSpawnError);
+      const spawnFailure = yield* launch(
+        "linux",
+        {
+          spawnError: PlatformError.systemError({
+            _tag: "NotFound",
+            module: "ChildProcess",
+            method: "spawn",
+          }),
+        },
+        openBrowser,
+      );
+      assert.instanceOf(spawnFailure.tag, ExternalLauncher.ExternalLauncherBrowserSpawnError);
+      const editorFailure = yield* launch("linux", { exitCode: 1 }, openPhpStorm);
+      assert.instanceOf(editorFailure.tag, ExternalLauncher.ExternalLauncherEditorSpawnError);
+      assert.deepEqual(yield* launch("linux", { stall: true }, openPhpStorm), {
+        tag: "started",
+        unrefs: 1,
+      });
+      // Explorer exits 1 even after it opened the folder.
+      assert.deepEqual(
+        yield* launch("win32", { exitCode: 1 }, (launcher) =>
+          launcher.launchEditor({ editor: "file-manager", cwd: "C:\\workspace" }),
+        ),
+        { tag: "started", unrefs: 1 },
       );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
@@ -175,8 +296,17 @@ it.effect.skipIf(windowsHost)(
                   command.command === "busctl" ? sessionManager : undefined,
               }),
             ),
-            Effect.provideService(HostProcess.Environment, { PATH: binDir }),
+            Effect.provideService(HostProcess.Environment, {
+              PATH: binDir,
+              APPDIR: "/tmp/.mount_Gustafabc123",
+              APPIMAGE: "/home/user/Gustaf.AppImage",
+              GIO_MODULE_DIR: "/tmp/.mount_Gustafabc123//usr/lib/gio/modules",
+              ELECTRON_RUN_AS_NODE: "1",
+            }),
           );
+          const probe = spawned.find((command) => command.command === "busctl");
+          assert.deepEqual(probe?.options.env, { PATH: binDir });
+          assert.equal(probe?.options.extendEnv, false);
           // Only editors borrow the session display; a browser must not open on that screen.
           assert.deepEqual(spawned.find((command) => command.command === "xdg-open")?.options.env, {
             PATH: binDir,

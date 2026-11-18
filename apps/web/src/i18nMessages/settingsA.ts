@@ -175,7 +175,7 @@ export const settingsAMessages = {
     "settingsA.codexSetup.havingTrouble": "Having trouble signing in?",
     "settingsA.codexSetup.tryInBrowser": "Try sign-in in your browser",
     "settingsA.codexSetup.otherWays": "Other ways to connect",
-    "settingsA.codexSetup.useDesktopReturn": "Use T3 desktop for automatic return",
+    "settingsA.codexSetup.useDesktopReturn": "Use Gustaf desktop for automatic return",
     "settingsA.codexSetup.useDifferentAccount": "Use a different account",
     "settingsA.codexSetup.changeAccount": "Change account",
     "settingsA.codexSetup.disconnect": "Disconnect",
@@ -294,7 +294,7 @@ export const settingsAMessages = {
     "settingsA.acpSession.couldNotDisable": "Could not disable ACP provider",
     "settingsA.acpSession.couldNotLogOut": "Could not log out of ACP agent",
     "settingsA.acpSession.nativeSessions": "Native sessions",
-    "settingsA.acpSession.resumeDescription": "Resume agent-owned conversations as T3 threads.",
+    "settingsA.acpSession.resumeDescription": "Resume agent-owned conversations as Gustaf threads.",
     "settingsA.acpSession.addProjectFirst": "Add a project before importing sessions.",
     "settingsA.acpSession.loggingOut": "Logging out",
     "settingsA.acpSession.logOut": "Log out",
@@ -335,6 +335,9 @@ export const settingsAMessages = {
     "settingsA.addEnvironment.backendSaved":
       "The environment is saved and will reconnect on app startup.",
     "settingsA.addEnvironment.couldNotAddRoute": "Could not add the route.",
+    "settingsA.addEnvironment.alreadySaved":
+      "{name} is already saved here. This address can be added to it as another route.",
+    "settingsA.addEnvironment.addAsRouteTo": "Add this address as a route to {name}",
     "settingsA.addEnvironment.fallbackRoute":
       "{label} falls back to Gustaf Connect when its other routes are unreachable.",
     "settingsA.addEnvironment.host": "Host",
@@ -930,7 +933,8 @@ export const settingsAMessages = {
     "settingsA.codexSetup.havingTrouble": "Не получается войти?",
     "settingsA.codexSetup.tryInBrowser": "Попробовать войти в браузере",
     "settingsA.codexSetup.otherWays": "Другие способы подключения",
-    "settingsA.codexSetup.useDesktopReturn": "Используйте десктоп T3 для автоматического возврата",
+    "settingsA.codexSetup.useDesktopReturn":
+      "Используйте десктоп Gustaf для автоматического возврата",
     "settingsA.codexSetup.useDifferentAccount": "Использовать другой аккаунт",
     "settingsA.codexSetup.changeAccount": "Сменить аккаунт",
     "settingsA.codexSetup.disconnect": "Отключить",
@@ -1054,7 +1058,7 @@ export const settingsAMessages = {
     "settingsA.acpSession.couldNotDisable": "Не удалось отключить провайдера ACP",
     "settingsA.acpSession.couldNotLogOut": "Не удалось выйти из агента ACP",
     "settingsA.acpSession.nativeSessions": "Нативные сессии",
-    "settingsA.acpSession.resumeDescription": "Продолжайте диалоги агента как треды T3.",
+    "settingsA.acpSession.resumeDescription": "Продолжайте диалоги агента как треды Gustaf.",
     "settingsA.acpSession.addProjectFirst": "Сначала добавьте проект, чтобы импортировать сессии.",
     "settingsA.acpSession.loggingOut": "Выход",
     "settingsA.acpSession.logOut": "Выйти",
@@ -1097,6 +1101,9 @@ export const settingsAMessages = {
     "settingsA.addEnvironment.backendSaved":
       "Окружение сохранено и будет переподключаться при запуске приложения.",
     "settingsA.addEnvironment.couldNotAddRoute": "Не удалось добавить маршрут.",
+    "settingsA.addEnvironment.alreadySaved":
+      "«{name}» уже сохранено здесь. Этот адрес можно добавить к нему как ещё один маршрут.",
+    "settingsA.addEnvironment.addAsRouteTo": "Добавить этот адрес как маршрут к «{name}»",
     "settingsA.addEnvironment.fallbackRoute":
       "{label} переключается на Gustaf Connect, когда остальные маршруты недоступны.",
     "settingsA.addEnvironment.host": "Хост",

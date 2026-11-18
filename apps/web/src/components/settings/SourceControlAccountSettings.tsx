@@ -88,9 +88,9 @@ export function SourceControlAccountSettings({
   if (groups.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        Sign in with{" "}
-        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code> on
-        the server host, then rescan to choose accounts here.
+        {t("webCopy.signInWith")}{" "}
+        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code>{" "}
+        {t("webCopy.onTheServerHostThenRescanToChooseAccountsHere")}
       </p>
     );
   }
@@ -99,8 +99,9 @@ export function SourceControlAccountSettings({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-          Choose which <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code> login
-          each {label} host uses, or turn a host off.
+          {t("webCopy.chooseWhich")}{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code>{" "}
+          {t("webCopy.loginEach")} {label} {t("webCopy.hostUsesOrTurnAHostOff")}
         </p>
         <Button
           size="icon-xs"

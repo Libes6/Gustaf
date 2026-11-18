@@ -63,6 +63,7 @@ import {
   seedRowsDraft,
 } from "./ProviderSettingsForm";
 import { ProviderModelsSection } from "./ProviderModelsSection";
+import { providerClients } from "./providerDriverMeta";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
@@ -1120,12 +1121,11 @@ export function ProviderInstanceCard({
     </Popover>
   ) : null;
 
-  const chatOnlyNote =
-    instance.driver === "ollama" ? (
-      <span className="mt-0.5 block text-xs leading-normal text-muted-foreground/80">
-        {t("settingsC.providerInstanceCard.ollamaChatOnly")}
-      </span>
-    ) : null;
+  const chatOnlyNote = providerClients.get(instance.driver)?.chatOnly ? (
+    <span className="mt-0.5 block text-xs leading-normal text-muted-foreground/80">
+      {t("settingsC.providerInstanceCard.chatOnlyNote")}
+    </span>
+  ) : null;
 
   if (mode === "list") {
     return (
@@ -1310,8 +1310,9 @@ export function ProviderInstanceCard({
       title={t("settingsC.providerInstanceCard.driver")}
       description={
         <span>
-          This instance uses <code className="text-foreground">{String(instance.driver)}</code>,
-          which is not available in this build. Its configuration is preserved.
+          {t("webCopy.thisInstanceUses")}{" "}
+          <code className="text-foreground">{String(instance.driver)}</code>
+          {t("webCopy.whichIsNotAvailableInThisBuildItsConfigurationIs")}
         </span>
       }
     />

@@ -219,11 +219,11 @@ export default function LargeTextViewer(props: {
         role="status"
       >
         {Math.max(0, meta.count - (props.delimiter && meta.count ? 1 : 0)).toLocaleString()}{" "}
-        {props.delimiter ? "rows" : "lines"}
+        {props.delimiter ? t("webCopy.rowsMore") : t("webCopy.lines")}
         {props.delimiter ? ` · ${meta.count ? meta.columns.toLocaleString() : 0} columns` : ""}
         {meta.complete && meta.sizeBytes !== undefined
           ? ` · ${meta.sizeBytes === 0 ? "0 bytes" : formatAttachmentSize(meta.sizeBytes)}`
-          : " · Indexing…"}
+          : t("webCopy.indexing")}
       </div>
       {!meta.complete ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
@@ -232,7 +232,7 @@ export default function LargeTextViewer(props: {
       ) : null}
       {meta.columns === 1024 ? (
         <FileSurfaceNotice>
-          Showing the first 1,024 columns. Source and Save retain every column.
+          {t("webCopy.showingTheFirst1024ColumnsSourceAndSaveRetain")}
         </FileSurfaceNotice>
       ) : null}
       {meta.count > 0 ? (
@@ -254,7 +254,7 @@ export default function LargeTextViewer(props: {
         />
       ) : (
         <div className="flex flex-1 items-center justify-center p-6 text-xs text-muted-foreground">
-          This file is empty.
+          {t("webCopy.thisFileIsEmpty")}
         </div>
       )}
     </div>

@@ -609,7 +609,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
         <WizardPanel>
           <div className={cn("space-y-2", publishWizardStep !== 0 && "hidden")}>
             <span id="publish-provider-cards-label" className="text-xs font-medium text-foreground">
-              Provider
+              {t("subscriptions.field.provider")}
             </span>
             <RadioGroup
               value={publishProvider}
@@ -645,7 +645,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                                 openSourceControlSettings();
                               }}
                             >
-                              Setup Required
+                              {t("shell.commandPalette.setupRequired")}
                             </Button>
                           }
                         />
@@ -1948,7 +1948,7 @@ export default function GitActionsControl({
               onClick={() => continuePendingDefaultBranchAction(true)}
               disabled={!canChangeThreadBranch || featureBranchUnavailableReason !== null}
             >
-              Check out feature branch & continue
+              {t("webCopy.checkOutFeatureBranchContinue")}
             </Button>
           </DialogFooter>
         </DialogPopup>

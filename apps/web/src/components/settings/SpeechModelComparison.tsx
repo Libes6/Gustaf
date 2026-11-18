@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import type { EnvironmentSpeechModel } from "@t3tools/contracts";
 import { CheckIcon } from "lucide-react";
 
@@ -80,6 +81,7 @@ export function ModelBenchmarks({
   /** Plain facts, such as language count and size, shown after the scores. */
   facts: readonly string[];
 }) {
+  const t = useT();
   const data = model.benchmark;
   const visible = !data
     ? []
@@ -98,7 +100,8 @@ export function ModelBenchmarks({
             {score ? (
               <>
                 <strong className="font-medium text-foreground">{score.grade}</strong> (
-                {score.errorPercent}% error)
+                {score.errorPercent}
+                {t("webCopy.error")}
               </>
             ) : (
               "not benchmarked"
@@ -108,7 +111,7 @@ export function ModelBenchmarks({
       })}
       {data ? (
         <span>
-          Speed:{" "}
+          {t("webCopy.speed")}{" "}
           {data.secondsPer30s === null ? (
             "not benchmarked"
           ) : (

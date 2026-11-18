@@ -1,3 +1,6 @@
+import { translate } from "~/i18n";
+import { getUiLanguage } from "~/uiLanguageStore";
+import { useUiLanguage } from "../../uiLanguageStore";
 import { SessionPermissions } from "./SessionPermissions";
 import { ChevronRightIcon, EllipsisIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
@@ -150,10 +153,11 @@ const BACKEND_VALUE_WSL_OFF = "backend:wsl-off";
 
 // Subscribes on its own so desktop download progress does not re-render the page.
 function LocalVersionStatusLabel() {
+  const language = useUiLanguage();
   const updateState = useDesktopUpdateState();
   return (
     <span className="text-xs text-muted-foreground">
-      {resolveLocalVersionStatusLabel(updateState)}
+      {resolveLocalVersionStatusLabel(updateState, language)}
     </span>
   );
 }
@@ -257,6 +261,7 @@ function ConnectionsSettingsContent({
   readonly accessEnvironmentId: EnvironmentId | null;
   readonly accessEnvironmentPicker?: ReactNode;
 }) {
+  const language = useUiLanguage();
   const t = useT();
   const desktopBridge = window.desktopBridge;
   const { environments } = useEnvironments();
@@ -657,7 +662,10 @@ function ConnectionsSettingsContent({
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: result.value === 1 ? "Revoked 1 other client" : `Revoked ${result.value} clients`,
+        title:
+          result.value === 1
+            ? translate(getUiLanguage(), "webCopy.revoked1OtherClient")
+            : t("webCopy.revokedCountClients").replace("{count}", String(result.value)),
         description: t("settingsA.connectionsSettings.otherClientsRevokedDescription"),
       });
     } else if (!isAtomCommandInterrupted(result)) {
@@ -808,12 +816,15 @@ function ConnectionsSettingsContent({
     });
     if (settled._tag === "Failure") {
       const error = Cause.squash(settled.cause);
-      const message = error instanceof Error ? error.message : "Failed to update WSL backend.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : translate(getUiLanguage(), "webCopy.failedToUpdateWSLBackend");
       setDesktopWslMutationError(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not change WSL backend",
+          title: t("webCopy.couldNotChangeWSLBackend"),
           description: message,
         }),
       );
@@ -1048,7 +1059,7 @@ function ConnectionsSettingsContent({
           ? tailscaleHttpsEndpoint.status === "available"
             ? tailscaleHttpsEndpoint.httpBaseUrl
             : t("settingsA.connectionsSettings.tailscaleServeDescription")
-          : missingTailscaleEndpointDescription(desktopServerExposureState)
+          : missingTailscaleEndpointDescription(desktopServerExposureState, language)
       }
       control={
         tailscaleHttpsEndpoint ? (

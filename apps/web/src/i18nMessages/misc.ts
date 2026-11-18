@@ -3,6 +3,74 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "misc." and both languages list the same keys.
 export const miscMessages = {
   en: {
+    "misc.browserDeviceToolbar.browserDeviceToolbar": "Browser device toolbar",
+    "misc.browserDeviceToolbar.dimensions": "Dimensions",
+    "misc.browserDeviceToolbar.browserDevicePreset": "Browser device preset",
+    "misc.browserDeviceToolbar.viewportDimensions": "Viewport dimensions",
+    "misc.browserDeviceToolbar.viewportWidth": "Viewport width",
+    "misc.browserDeviceToolbar.viewportHeight": "Viewport height",
+    "misc.browserDeviceToolbar.lockViewportAspectRatio": "Lock viewport aspect ratio",
+    "misc.browserDeviceToolbar.unlockViewportAspectRatio": "Unlock viewport aspect ratio",
+    "misc.browserDeviceToolbar.lockAspectRatio": "Lock aspect ratio",
+    "misc.browserDeviceToolbar.unlockAspectRatio": "Unlock aspect ratio",
+    "misc.browserDeviceToolbar.rotateViewport": "Rotate viewport",
+    "misc.browserDeviceToolbar.closeDeviceToolbar": "Close device toolbar",
+    "misc.serverBrowserSurface.asksFiles": "The page asks for files",
+    "misc.serverBrowserSurface.asksFile": "The page asks for a file",
+    "misc.serverBrowserSurface.chooseFiles": "Choose files",
+    "misc.serverBrowserSurface.chooseFile": "Choose file",
+    "misc.serverBrowserSurface.couldNotSendTheFilesToThePage":
+      "Could not send the files to the page",
+    "misc.serverBrowserSurface.releaseControl": "Release control",
+    "misc.serverBrowserSurface.takeControl": "Take control",
+    "misc.serverBrowserSurface.pdfDocument": "PDF document",
+    "misc.serverBrowserSurface.browserPage": "Browser page",
+    "misc.serverBrowserSurface.pressShiftescapeToLeaveTheBrowserPage":
+      "Press Shift+Escape to leave the browser page.",
+    "misc.serverBrowserSurface.chooseFilesForThePage": "Choose files for the page",
+    "misc.serverBrowserSurface.browserDialog": "Browser dialog",
+    "misc.serverBrowserSurface.dialogResponse": "Dialog response",
+    "misc.serverBrowserSurface.accept": "Accept",
+    "misc.serverBrowserSurface.takeControlToRespond": "Take control to respond.",
+    "misc.serverBrowserSurface.browserConnectionWasRefused": "Browser connection was refused.",
+    "misc.welcomeWizard.skippedComputers":
+      "Not connected, so setup skips {computers}. You can set them up later from Settings.",
+    "misc.welcomeWizard.telemetryNotice":
+      "Gustaf collects anonymous usage data to help us improve it.",
+    "misc.welcomeWizard.privacyWithOptOut":
+      "To learn how your data is used and how to opt out, see our",
+    "misc.welcomeWizard.privacyDetails": "To learn how your data is used, see our",
+    "misc.welcomeWizard.selectedCount": "{selected} of {total} selected",
+    "misc.welcomeWizard.folderCount": "Folders: {count}",
+    "misc.welcomeWizard.pathAdded": "Added to {file}. Open a new terminal to use",
+    "misc.welcomeWizard.useCli": "Use",
+    "misc.welcomeWizard.cliFromTerminal": "from any terminal. Adds one line to",
+    "misc.welcomeWizard.importCount": "Import projects: {count}",
+    "misc.welcomeWizard.connectYourComputers": "Connect your computers",
+    "misc.welcomeWizard.chooseOneOrMoreComputersWellSetUpAgentsAndProjectsOnEach":
+      "Choose one or more computers. We’ll set up agents and projects on each.",
+    "misc.welcomeWizard.privacyPolicy": "privacy policy",
+    "misc.welcomeWizard.runThisOnEachComputerYouWantToConnect":
+      "Run this on each computer you want to connect.",
+    "misc.welcomeWizard.keepGustafRunningSelectTheComputersYouWantToSetUpAbove":
+      "Keep Gustaf running. Select the computers you want to set up above.",
+    "misc.welcomeWizard.needAPairingLink": "Need a pairing link?",
+    "misc.welcomeWizard.startGustafOrRun": "Start Gustaf or run",
+    "misc.welcomeWizard.thereBefore": "there before",
+    "misc.welcomeWizard.onATailnetRun": ". On a tailnet, run",
+    "misc.welcomeWizard.instead": "instead.",
+    "misc.welcomeWizard.connectAnotherChatgptAccount": "Connect another ChatGPT account",
+    "misc.welcomeWizard.run": "Run",
+    "misc.welcomeWizard.inThisTerminal": "in this terminal.",
+    "misc.welcomeWizard.lookingForProjectsFromClaudeCodeAndCodex":
+      "Looking for projects from Claude Code and Codex…",
+    "misc.welcomeWizard.doNotImportProjects": "Do not import projects",
+    "misc.welcomeWizard.selectNone": "Select none",
+    "misc.welcomeWizard.lookingForProjects": "Looking for projects…",
+    "misc.welcomeWizard.couldNotCheckProjects": "Could not check projects.",
+    "misc.welcomeWizard.noExistingClaudeCodeOrCodexProjectsFound":
+      "No existing Claude Code or Codex projects found.",
+    "misc.welcomeWizard.someHistoryWasNotImported": "Some history was not imported",
     "themeCss.language": "CSS",
     "themeCss.position": "Ln {line}, Col {column}",
     "themeCss.externalIgnored": "Rules that load external files will be ignored.",
@@ -32,6 +100,8 @@ export const miscMessages = {
     "wallpaper.importFailed":
       "Could not import the scene. Check the file or download it and import it locally.",
     "wallpaper.sceneFailed": "Wallpaper could not run",
+    "wallpaper.stalled":
+      "Wallpaper stopped responding and was stopped. Choose another scene or turn wallpapers off in Appearance settings.",
     "wallpaper.change": "Change chat wallpaper",
     "misc.attachmentFilePreview.attachment": "Attachment",
     "misc.attachmentFilePreview.close": "Close",
@@ -1205,6 +1275,76 @@ export const miscMessages = {
     "misc.clientConfig.announcements": "Announcements",
   },
   ru: {
+    "misc.browserDeviceToolbar.browserDeviceToolbar": "Панель устройств браузера",
+    "misc.browserDeviceToolbar.dimensions": "Размеры",
+    "misc.browserDeviceToolbar.browserDevicePreset": "Профиль устройства браузера",
+    "misc.browserDeviceToolbar.viewportDimensions": "Размер области просмотра",
+    "misc.browserDeviceToolbar.viewportWidth": "Ширина области просмотра",
+    "misc.browserDeviceToolbar.viewportHeight": "Высота области просмотра",
+    "misc.browserDeviceToolbar.lockViewportAspectRatio":
+      "Зафиксировать пропорции области просмотра",
+    "misc.browserDeviceToolbar.unlockViewportAspectRatio":
+      "Снять фиксацию пропорций области просмотра",
+    "misc.browserDeviceToolbar.lockAspectRatio": "Зафиксировать пропорции",
+    "misc.browserDeviceToolbar.unlockAspectRatio": "Снять фиксацию пропорций",
+    "misc.browserDeviceToolbar.rotateViewport": "Повернуть область просмотра",
+    "misc.browserDeviceToolbar.closeDeviceToolbar": "Закрыть панель устройств",
+    "misc.serverBrowserSurface.asksFiles": "Страница запрашивает файлы",
+    "misc.serverBrowserSurface.asksFile": "Страница запрашивает файл",
+    "misc.serverBrowserSurface.chooseFiles": "Выбрать файлы",
+    "misc.serverBrowserSurface.chooseFile": "Выбрать файл",
+    "misc.serverBrowserSurface.couldNotSendTheFilesToThePage":
+      "Не удалось отправить файлы на страницу",
+    "misc.serverBrowserSurface.releaseControl": "Передать управление",
+    "misc.serverBrowserSurface.takeControl": "Взять управление",
+    "misc.serverBrowserSurface.pdfDocument": "Документ PDF",
+    "misc.serverBrowserSurface.browserPage": "Страница браузера",
+    "misc.serverBrowserSurface.pressShiftescapeToLeaveTheBrowserPage":
+      "Нажмите Shift+Escape, чтобы выйти со страницы браузера.",
+    "misc.serverBrowserSurface.chooseFilesForThePage": "Выберите файлы для страницы",
+    "misc.serverBrowserSurface.browserDialog": "Диалог браузера",
+    "misc.serverBrowserSurface.dialogResponse": "Ответ в диалоге",
+    "misc.serverBrowserSurface.accept": "Принять",
+    "misc.serverBrowserSurface.takeControlToRespond": "Возьмите управление, чтобы ответить.",
+    "misc.serverBrowserSurface.browserConnectionWasRefused": "Подключение к браузеру отклонено.",
+    "misc.welcomeWizard.skippedComputers":
+      "Нет подключения к {computers}, настройка пропущена. Настройте их позже в настройках.",
+    "misc.welcomeWizard.telemetryNotice":
+      "Gustaf собирает анонимные данные об использовании для улучшения приложения.",
+    "misc.welcomeWizard.privacyWithOptOut":
+      "Подробнее об использовании данных и отказе от сбора читайте в",
+    "misc.welcomeWizard.privacyDetails": "Подробнее об использовании данных читайте в",
+    "misc.welcomeWizard.selectedCount": "Выбрано: {selected} из {total}",
+    "misc.welcomeWizard.folderCount": "Папок: {count}",
+    "misc.welcomeWizard.pathAdded": "Добавлено в {file}. Откройте новый терминал для запуска",
+    "misc.welcomeWizard.useCli": "Запускайте",
+    "misc.welcomeWizard.cliFromTerminal": "из любого терминала. Добавит одну строку в",
+    "misc.welcomeWizard.importCount": "Импортировать проекты: {count}",
+    "misc.welcomeWizard.connectYourComputers": "Подключите компьютеры",
+    "misc.welcomeWizard.chooseOneOrMoreComputersWellSetUpAgentsAndProjectsOnEach":
+      "Выберите компьютеры. Мы настроим агенты и проекты на каждом.",
+    "misc.welcomeWizard.privacyPolicy": "политике конфиденциальности",
+    "misc.welcomeWizard.runThisOnEachComputerYouWantToConnect":
+      "Выполните команду на каждом компьютере, который хотите подключить.",
+    "misc.welcomeWizard.keepGustafRunningSelectTheComputersYouWantToSetUpAbove":
+      "Оставьте Gustaf запущенным. Выберите компьютеры для настройки выше.",
+    "misc.welcomeWizard.needAPairingLink": "Нужна ссылка для подключения?",
+    "misc.welcomeWizard.startGustafOrRun": "Запустите Gustaf или выполните",
+    "misc.welcomeWizard.thereBefore": "на том компьютере перед",
+    "misc.welcomeWizard.onATailnetRun": ". В сети Tailscale выполните",
+    "misc.welcomeWizard.instead": "вместо этого.",
+    "misc.welcomeWizard.connectAnotherChatgptAccount": "Подключить ещё один аккаунт ChatGPT",
+    "misc.welcomeWizard.run": "Выполните",
+    "misc.welcomeWizard.inThisTerminal": "в этом терминале.",
+    "misc.welcomeWizard.lookingForProjectsFromClaudeCodeAndCodex":
+      "Ищем проекты Claude Code и Codex…",
+    "misc.welcomeWizard.doNotImportProjects": "Не импортировать проекты",
+    "misc.welcomeWizard.selectNone": "Снять выбор",
+    "misc.welcomeWizard.lookingForProjects": "Ищем проекты…",
+    "misc.welcomeWizard.couldNotCheckProjects": "Не удалось проверить проекты.",
+    "misc.welcomeWizard.noExistingClaudeCodeOrCodexProjectsFound":
+      "Проекты Claude Code и Codex не найдены.",
+    "misc.welcomeWizard.someHistoryWasNotImported": "Часть истории не импортирована",
     "themeCss.language": "CSS",
     "themeCss.position": "Стр. {line}, столб. {column}",
     "themeCss.externalIgnored": "Правила загрузки внешних файлов будут проигнорированы.",
@@ -1234,6 +1374,8 @@ export const miscMessages = {
     "wallpaper.importFailed":
       "Не удалось импортировать сцену. Проверьте файл или скачайте его и импортируйте с диска.",
     "wallpaper.sceneFailed": "Не удалось запустить обои",
+    "wallpaper.stalled":
+      "Обои перестали отвечать и были остановлены. Выберите другую сцену или выключите обои в настройках внешнего вида.",
     "wallpaper.change": "Сменить обои чата",
     "misc.attachmentFilePreview.attachment": "Вложение",
     "misc.attachmentFilePreview.close": "Закрыть",

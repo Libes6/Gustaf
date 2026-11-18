@@ -1,3 +1,5 @@
+import { settingCopy, translateSettingsNav, keybindingLabel, translate } from "../../i18n";
+import type { UiLanguage } from "@t3tools/contracts/settings";
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron, isSecretsFeatureEnabled } from "~/env";
 import { hasShellAccount } from "~/shellAccount";
@@ -35,6 +37,7 @@ export type SettingsPath =
   | "/settings/worktrees"
   | "/settings/connections"
   | "/settings/access"
+  | "/settings/mcp"
   | "/settings/secrets"
   | "/settings/subscriptions"
   | "/settings/maintenance"
@@ -112,6 +115,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/worktrees": "Worktrees",
   "/settings/connections": "Environments",
   "/settings/access": "Sharing & access",
+  "/settings/mcp": "MCP",
   "/settings/secrets": "Secrets",
   "/settings/subscriptions": "Subscriptions",
   "/settings/maintenance": "Maintenance",
@@ -158,6 +162,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     paths: [
       "/settings/connections",
       "/settings/access",
+      "/settings/mcp",
       ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
     ],
   },
@@ -200,6 +205,7 @@ export function sourceControlHostSettingsSearchId(kind: string) {
 /** Each host's own settings: its accounts and token, or the fields of its settings form. */
 export function sourceControlHostSearchItems(
   definitions: ReadonlyArray<SourceControlDefinition>,
+  language: UiLanguage = "en",
 ): ReadonlyArray<
   SettingsSearchItem & { readonly id: ReturnType<typeof sourceControlHostSettingsSearchId> }
 > {
@@ -211,8 +217,11 @@ export function sourceControlHostSearchItems(
       {
         id: sourceControlHostSettingsSearchId(definition.kind),
         title: credentials
-          ? `${definition.label} accounts and token`
-          : `${definition.label} credentials`,
+          ? translate(language, "settingsStatus.hostAccounts").replace("{host}", definition.label)
+          : translate(language, "settingsStatus.hostCredentials").replace(
+              "{host}",
+              definition.label,
+            ),
         to: "/settings/source-control" as const,
         searchTerms: [
           credentials
@@ -235,6 +244,12 @@ const SOURCE_CONTROL_HOST_TERMS = sourceControlClients.definitions
   .join(" ");
 
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "mcp-servers",
+    title: "MCP servers",
+    to: "/settings/mcp",
+    searchTerms: ["mcp servers import tools stdio http"],
+  },
   {
     id: "ui-language",
     title: "Language",
@@ -1393,6 +1408,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/worktrees": "project-defaults",
   "/settings/connections": "connections",
   "/settings/access": "connections",
+  "/settings/mcp": null,
   "/settings/secrets": null,
   "/settings/subscriptions": null,
   "/settings/scheduled-tasks": null,
@@ -1434,14 +1450,14 @@ export function movedSettingsPath(pathname: string, hash: string): SettingsPath 
   return to === pathname ? null : to;
 }
 
-export function getSettingsSearchTargetScope(targetId: string) {
+export function getSettingsSearchTargetScope(targetId: string, language: UiLanguage = "en") {
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const item =
     items.find((candidate) => candidate.id === targetId) ??
     items.find((candidate) => candidate.targetId === targetId);
   return item
     ? {
-        title: item.title,
+        title: settingCopy(language, item.id)?.title ?? item.title,
         scope: item.scope ?? SETTINGS_CATEGORY_SCOPES[item.to],
         ...(item.requiresThreadAutoSettlement ? { requiresThreadAutoSettlement: true } : {}),
       }
@@ -1549,17 +1565,37 @@ export function settingsForThisPlatform(
 export function searchSettings(
   query: string,
   items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS,
+  language: UiLanguage = "en",
 ): ReadonlyArray<SettingsSearchItem> {
   const normalizedQuery = normalizeSearchText(query);
   if (normalizedQuery.length === 0) return [];
   const queryTokens = normalizedQuery.split(" ");
+  const hostTitles = new Map(
+    sourceControlHostSearchItems(sourceControlClients.definitions, language).map((item) => [
+      item.id,
+      item.title,
+    ]),
+  );
 
   return settingsForThisPlatform(items)
+    .map((item) => ({
+      ...item,
+      title:
+        settingCopy(language, item.id)?.title ??
+        (item.id.startsWith("keybinding-")
+          ? keybindingLabel(language, item.id.slice("keybinding-".length))
+          : null) ??
+        hostTitles.get(item.id as ReturnType<typeof sourceControlHostSettingsSearchId>) ??
+        item.title,
+      searchTerms: [item.title, ...(item.searchTerms ?? [])],
+    }))
     .flatMap((item, index) => {
       const title = normalizeSearchText(item.title);
       const fields = [
         title,
-        normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
+        normalizeSearchText(
+          translateSettingsNav(language, item.to, SETTINGS_SECTION_LABELS[item.to]),
+        ),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];

@@ -74,8 +74,8 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
     <PullRequestSearchSheet
       title={t("Labels")}
       placeholder={t("Search labels")}
-      closeAccessibilityLabel="Close labels"
-      clearAccessibilityLabel="Clear label search"
+      closeAccessibilityLabel={t("Close labels")}
+      clearAccessibilityLabel={t("Clear label search")}
       query={query}
       onQueryChange={setQuery}
     >
@@ -126,10 +126,10 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
                 <EmptyState
                   title={
                     result.error
-                      ? "Couldn't load labels"
+                      ? t("Couldn't load labels")
                       : needle
-                        ? "No matching labels"
-                        : "This repository has no labels"
+                        ? t("No matching labels")
+                        : t("This repository has no labels")
                   }
                   detail={
                     result.error ??
@@ -146,8 +146,9 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
           ListFooterComponent={
             result.data?.truncated ? (
               <Text className="py-4 text-xs text-foreground-muted">
-                This repository has more labels than are listed here. Apply the rest on the
-                provider.
+                {t(
+                  "This repository has more labels than are listed here. Apply the rest on the provider.",
+                )}
               </Text>
             ) : undefined
           }

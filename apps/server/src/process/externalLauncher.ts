@@ -56,6 +56,7 @@ interface ProcessLaunch {
   readonly command: string;
   readonly args: ReadonlyArray<string>;
   readonly options: ChildProcess.CommandOptions;
+  readonly ignoreExitCode?: boolean;
 }
 
 interface TargetPathAndPosition {
@@ -119,6 +120,14 @@ const CommandLookupEnvConfig = Config.all({
   XDG_DATA_HOME: Config.String("XDG_DATA_HOME").pipe(Config.option),
   "ProgramFiles(x86)": Config.String("ProgramFiles(x86)").pipe(Config.option),
 }).pipe(Config.map(compactEnv));
+
+// Inherited ELECTRON_RUN_AS_NODE would make Electron apps opened by this launcher run as Node and exit.
+const childProcessEnvOptions = Effect.fn("externalLauncher.childProcessEnvOptions")(function* (
+  overrides: NodeJS.ProcessEnv = {},
+) {
+  const { ELECTRON_RUN_AS_NODE: _runAsNode, ...env } = yield* HostProcess.Environment;
+  return { env: stripAppImageRuntimeEnv({ ...env, ...overrides }), extendEnv: false } as const;
+});
 
 const readBrowserLaunchEnv = BrowserLaunchEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
 const readCommandLookupEnv = CommandLookupEnvConfig.pipe(Effect.orElseSucceed(() => ({})));
@@ -266,6 +275,7 @@ const hasUsableLinuxDirectoryHandler = Effect.fn("externalLauncher.hasUsableLinu
     return yield* spawner
       .spawn(
         ChildProcess.make("xdg-mime", ["query", "default", "inode/directory"], {
+          ...(yield* childProcessEnvOptions()),
           stdin: "ignore",
           stderr: "ignore",
         }),
@@ -630,6 +640,7 @@ const tryRevealLinuxItem = Effect.fn("externalLauncher.tryRevealLinuxItem")(
           "",
         ],
         {
+          ...(yield* childProcessEnvOptions()),
           stdin: "ignore",
           stdout: "ignore",
           stderr: "ignore",
@@ -696,7 +707,7 @@ const readGraphicalSessionEnv = Effect.fn("externalLauncher.readGraphicalSession
           "org.freedesktop.systemd1.Manager",
           "Environment",
         ],
-        { stdin: "ignore", stderr: "ignore" },
+        { ...(yield* childProcessEnvOptions()), stdin: "ignore", stderr: "ignore" },
       ),
     );
     const { data } = yield* decodeManagerEnvironment(output);
@@ -714,22 +725,34 @@ const readGraphicalSessionEnv = Effect.fn("externalLauncher.readGraphicalSession
   Effect.orElseSucceed((): NodeJS.ProcessEnv => ({})),
 );
 
+// Catch early opener failures without waiting for a long-running editor to close.
+const LAUNCH_EARLY_EXIT_WINDOW = "1 second";
+
 const launchAndUnref = Effect.fn("externalLauncher.launchAndUnref")(function* (
   launch: ProcessLaunch,
   onError: (cause: unknown) => ExternalLauncherError,
 ): Effect.fn.Return<void, ExternalLauncherError, ChildProcessSpawner.ChildProcessSpawner> {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  // Inherited ELECTRON_RUN_AS_NODE would make Electron apps opened by this launcher run as Node and exit.
-  const { ELECTRON_RUN_AS_NODE: _runAsNode, ...env } = yield* HostProcess.Environment;
   const command = ChildProcess.make(launch.command, launch.args, {
     ...launch.options,
-    env: stripAppImageRuntimeEnv({ ...env, ...launch.options.env }),
-    extendEnv: false,
+    ...(yield* childProcessEnvOptions(launch.options.env)),
   });
 
   yield* spawner.spawn(command).pipe(
-    Effect.flatMap((handle) => handle.unref),
-    Effect.asVoid,
+    // Unref first: a referenced detached child that exits 0 has its process group killed on release.
+    Effect.tap((handle) => handle.unref),
+    Effect.flatMap((handle) =>
+      launch.ignoreExitCode
+        ? Effect.void
+        : handle.exitCode.pipe(
+            Effect.timeoutOption(LAUNCH_EARLY_EXIT_WINDOW),
+            Effect.flatMap((exitCode) =>
+              Option.isSome(exitCode) && exitCode.value !== 0
+                ? Effect.fail(new Error(`${launch.command} exited with code ${exitCode.value}`))
+                : Effect.void,
+            ),
+          ),
+    ),
     Effect.scoped,
     Effect.mapError(onError),
   );
@@ -774,6 +797,8 @@ const launchEditorProcess = Effect.fn("externalLauncher.launchEditorProcess")(fu
     {
       command: spawnCommand.command,
       args: spawnCommand.args,
+      // Explorer exits 1 even after it opened the folder.
+      ignoreExitCode: /^explorer(\.exe)?$/i.test(launch.command),
       options: {
         detached: launch.detached ?? true,
         shell: spawnCommand.shell,

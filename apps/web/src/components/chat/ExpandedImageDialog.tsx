@@ -186,7 +186,9 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           if (event.target === event.currentTarget) close();
         }}
       >
-        <DialogTitle className="sr-only">Expanded {mediaLabel} preview</DialogTitle>
+        <DialogTitle className="sr-only">
+          {t("option.diff.expanded")} {mediaLabel} {t("webCopy.preview")}
+        </DialogTitle>
         <Button
           type="button"
           ref={closeButtonRef}

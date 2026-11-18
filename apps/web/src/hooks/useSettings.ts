@@ -1,3 +1,4 @@
+import { useT } from "~/useUiLanguage";
 import { useRef, useSyncExternalStore, use } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
@@ -426,6 +427,7 @@ export async function prepareModelPreferencesPatch(
 }
 
 export function useUpdateEnvironmentModelPreferences(environmentId: EnvironmentId | null) {
+  const t = useT();
   const settings = useAtomValue(
     environmentId ? serverEnvironment.settingsValueAtom(environmentId) : noEnvironmentSettingsAtom,
   );
@@ -438,8 +440,8 @@ export function useUpdateEnvironmentModelPreferences(environmentId: EnvironmentI
     } catch {
       toastManager.add({
         type: "error",
-        title: "Model preferences not saved",
-        description: "Could not load saved model preferences. Try again.",
+        title: t("webCopy.modelPreferencesNotSaved"),
+        description: t("webCopy.couldNotLoadSavedModelPreferencesTryAgain"),
       });
       return;
     }
@@ -449,6 +451,7 @@ export function useUpdateEnvironmentModelPreferences(environmentId: EnvironmentI
 
 /** Send the desired state so two clients adding a favorite do not cancel each other. */
 export function useToggleEnvironmentModelFavorite(environmentId: EnvironmentId | null) {
+  const t = useT();
   const registry = use(RegistryContext);
   const pendingFavorites = useRef(
     new Map<string, { favorite: boolean; settings: ServerSettings; pending: boolean }>(),
@@ -465,8 +468,8 @@ export function useToggleEnvironmentModelFavorite(environmentId: EnvironmentId |
       } catch {
         toastManager.add({
           type: "error",
-          title: "Favorites not saved",
-          description: "Could not load saved model preferences. Try again.",
+          title: t("webCopy.favoritesNotSaved"),
+          description: t("webCopy.couldNotLoadSavedModelPreferencesTryAgain"),
         });
         return;
       }
@@ -575,6 +578,7 @@ function useSharedSettingsSyncTargetIds(includePending = false): ReadonlyArray<E
 }
 
 function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
+  const t = useT();
   useEnvironmentScope(environmentId, AuthSettingsWriteScope);
   const persist = useAtomCommand(serverEnvironment.updateSettings, {
     label: "server settings update",
@@ -594,7 +598,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Setting not saved",
+        title: t("settingsE.useScopedSettings.notSaved"),
         description: `Could not save on ${label}: ${error instanceof Error ? error.message : "The save failed. Try reconnecting and saving again."}`,
       });
     }
@@ -616,7 +620,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       options?.onFailed?.();
       toastManager.add({
         type: "warning",
-        title: "Setting not saved",
+        title: t("settingsE.useScopedSettings.notSaved"),
         description: `This connection lacks permission to change settings on ${environments.find((target) => target.environmentId === environmentId)?.label ?? "the selected environment"}.`,
       });
     }
@@ -627,7 +631,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
         options?.onFailed?.();
         return toastManager.add({
           type: "warning",
-          title: "Setting not saved",
+          title: t("settingsE.useScopedSettings.notSaved"),
           description,
         });
       };

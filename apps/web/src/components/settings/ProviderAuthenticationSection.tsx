@@ -182,7 +182,7 @@ export function ProviderAuthenticationSection({
       description={
         signedIn && !active && provider.auth.email?.trim() ? (
           <span>
-            Signed in as{" "}
+            {t("settingsD.sourceControlAppSignIn.signedInAs")}{" "}
             <RedactedSensitiveText
               key={provider.auth.email}
               value={provider.auth.email}
@@ -362,16 +362,18 @@ export function ProviderAuthenticationSection({
         <>
           {interaction?.type === "deviceCode" ? (
             <p className="py-2 text-sm text-muted-foreground">
-              Enter code{" "}
+              {t("webCopy.enterCode")}{" "}
               <code className="select-all font-mono text-foreground">{interaction.userCode}</code>{" "}
-              in your browser.
+              {t("webCopy.inYourBrowser")}
             </p>
           ) : null}
           {interaction?.type === "terminal" ? (
             <div className="py-2">
               <Suspense
                 fallback={
-                  <p className="text-xs text-muted-foreground">Loading sign-in terminal…</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("webCopy.loadingSignInTerminal")}
+                  </p>
                 }
               >
                 <ProviderAuthTerminal

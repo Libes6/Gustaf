@@ -1,3 +1,4 @@
+import { getUiLanguage } from "../../uiLanguageStore";
 import { useEnvironmentScope } from "../../state/session";
 import { useEnvironmentsWithScope, readEnvironmentScope } from "../../state/session";
 import {
@@ -247,6 +248,7 @@ function UnknownWhenVariableWarning({
   identifiers: ReadonlyArray<string>;
   focusable?: boolean;
 }) {
+  const t = useT();
   if (identifiers.length === 0) return null;
   const label =
     identifiers.length === 1
@@ -255,8 +257,7 @@ function UnknownWhenVariableWarning({
 
   return (
     <WarningTooltipIcon label={label} focusable={focusable} className="size-4.5">
-      Gustaf does not recognize this condition yet. It can still be saved, but it may not match
-      unless the runtime provides it.
+      {t("webCopy.gustafDoesNotRecognizeThisConditionYetItCanStill")}
     </WarningTooltipIcon>
   );
 }
@@ -376,7 +377,7 @@ function WhenExpressionNodeEditor({
           size="compact"
           className="min-w-10"
         >
-          Not
+          {t("settingsB.KeybindingsSettings.not")}
         </Toggle>
         <WhenVariableSelect
           value={condition.identifier}
@@ -520,7 +521,7 @@ function WhenExpressionNodeEditor({
         </Button>
         <Button type="button" variant="outline" size="compact" onClick={addGroup}>
           <PlusIcon className="size-3.5" />
-          Group
+          {t("settingsB.KeybindingsSettings.group")}
         </Button>
         {onRemove ? (
           <WhenExpressionRemoveButton
@@ -669,18 +670,18 @@ function WhenExpressionBuilder({
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="compact" onClick={addRootCondition}>
                 <PlusIcon className="size-3.5" />
-                Condition
+                {t("settingsB.KeybindingsSettings.condition")}
               </Button>
               <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
                 <PlusIcon className="size-3.5" />
-                Group
+                {t("settingsB.KeybindingsSettings.group")}
               </Button>
             </div>
           </div>
         )}
         {parseError ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-xs">
-            Fix the expression above to continue editing visually.
+            {t("webCopy.fixTheExpressionAboveToContinueEditingVisually")}
           </div>
         ) : null}
       </div>
@@ -841,7 +842,7 @@ function KeybindingKeyControl({
           ref={pillRef}
           type="button"
           onClick={() => setDraft({ isRecording: true })}
-          aria-label={`Edit shortcut for ${commandLabel(row.command)}: ${formatShortcutLabel(row.binding.shortcut)}`}
+          aria-label={`Edit shortcut for ${commandLabel(row.command, getUiLanguage())}: ${formatShortcutLabel(row.binding.shortcut)}`}
           className={cn(
             "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/24",
             pillClassName,
@@ -853,7 +854,7 @@ function KeybindingKeyControl({
         <Input
           data-keybinding-capture=""
           autoFocus={isRecording}
-          aria-label={`Keybinding for ${commandLabel(row.command)}`}
+          aria-label={`Keybinding for ${commandLabel(row.command, getUiLanguage())}`}
           value={isRecording ? "" : keyDraft}
           placeholder={
             isRecording
@@ -934,6 +935,7 @@ function KeybindingRowMenu({
   onReset: (row: KeybindingRow) => void;
   onRemove: (row: KeybindingRow) => void;
 }) {
+  const t = useT();
   const canReset = row.source === "Custom" && row.defaultKey !== null;
   const canRemove = row.source !== "Default";
   if (!canReset && !canRemove) return null;
@@ -947,7 +949,7 @@ function KeybindingRowMenu({
             variant="ghost-muted"
             size="icon-sm"
             disabled={isSaving}
-            aria-label={`Actions for ${commandLabel(row.command)}`}
+            aria-label={`Actions for ${commandLabel(row.command, getUiLanguage())}`}
           />
         }
       >
@@ -956,12 +958,12 @@ function KeybindingRowMenu({
       <MenuPopup align="end">
         {canReset ? (
           <MenuItem disabled={isSaving} onClick={() => onReset(row)}>
-            Reset to default
+            {t("chatB.ThreadDetailsItemsMenu.resetToDefault")}
           </MenuItem>
         ) : null}
         {canRemove ? (
           <MenuItem variant="destructive" disabled={isSaving} onClick={() => onRemove(row)}>
-            Remove
+            {t("settingsE.textGeneratorsSettings.remove")}
           </MenuItem>
         ) : null}
       </MenuPopup>
@@ -985,7 +987,7 @@ function KeybindingRowTitle({ row }: { row: KeybindingRow }) {
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="flex items-center gap-2" />}>
-        {commandLabel(row.command)}
+        {commandLabel(row.command, getUiLanguage())}
         <KeybindingSourceBadge source={row.source} />
       </TooltipTrigger>
       <TooltipPopup side="top">{row.command}</TooltipPopup>
@@ -1009,7 +1011,7 @@ function KeybindingRowWhen({
         {t("settingsB.KeybindingsSettings.when")}
       </span>
       <WhenClauseControl
-        label={commandLabel(row.command)}
+        label={commandLabel(row.command, getUiLanguage())}
         expression={editor.whenDraftExpression}
         value={editor.whenDraft}
         variables={variables}
@@ -1085,7 +1087,9 @@ function useNewKeybindingDraft({
     key: keyDraft,
     when: whenDraftExpression,
   });
-  const commandLabelText = commandDraft ? commandLabel(commandDraft) : "new keybinding";
+  const commandLabelText = commandDraft
+    ? commandLabel(commandDraft, getUiLanguage())
+    : "new keybinding";
   const canSave = Boolean(commandDraft) && keyDraft.trim().length > 0 && isWhenDraftValid;
 
   const save = () => {
@@ -1162,7 +1166,7 @@ function NewKeybindingCommandSelect({
       <SelectContent alignItemWithTrigger={false} matchTriggerWidth={false} className="max-h-72">
         {commandOptions.map((command) => (
           <SelectItem key={command} value={command} className="w-full">
-            <span className="truncate">{commandLabel(command)}</span>
+            <span className="truncate">{commandLabel(command, getUiLanguage())}</span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -1179,13 +1183,18 @@ function NewKeybindingKeyInput({
   autoFocus?: boolean;
   className?: string | undefined;
 }) {
+  const t = useT();
   return (
     <Input
       data-keybinding-capture=""
       autoFocus={autoFocus}
       aria-label={`Keybinding for ${draft.commandLabelText}`}
       value={draft.isRecording ? "" : draft.keyDraft}
-      placeholder={draft.isRecording ? "Press shortcut" : "Unassigned"}
+      placeholder={
+        draft.isRecording
+          ? t("shell.scriptEditor.pressShortcut")
+          : t("settingsB.KeybindingsSettings.unassigned")
+      }
       size="sm"
       font="mono"
       className={className}
@@ -1525,7 +1534,7 @@ export function KeybindingsSettingsPanel() {
             onClick={() => setIsAddingBinding(true)}
           >
             <PlusIcon aria-hidden className="size-4" />
-            Add keybinding
+            {t("webCopy.addKeybinding")}
           </Button>
           <Tooltip>
             <TooltipTrigger
@@ -1580,7 +1589,7 @@ export function KeybindingsSettingsPanel() {
         ) : (
           <SettingsGroup>
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-              No keybindings match your search.
+              {t("webCopy.noKeybindingsMatchYourSearch")}
             </div>
           </SettingsGroup>
         )}

@@ -32,8 +32,8 @@ export function ThreadListFilters(props: {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10, gap: 8 }}
     >
       <ListFilterMenu
-        label={selectedEnvironment?.label ?? "All environments"}
-        accessibilityLabel="Filter threads by environment"
+        label={selectedEnvironment?.label ?? t("All environments")}
+        accessibilityLabel={t("Filter threads by environment")}
         active={selectedEnvironment !== undefined}
         actions={[
           {
@@ -61,7 +61,7 @@ export function ThreadListFilters(props: {
         }}
       />
       <ListFilterMenu
-        label={selectedProject?.label ?? "All projects"}
+        label={selectedProject?.label ?? t("All projects")}
         accessibilityLabel={t("Filter threads by project")}
         active={selectedProject !== undefined}
         actions={[
@@ -89,7 +89,7 @@ export function ThreadListFilters(props: {
       {props.selectedEnvironmentId !== null || props.selectedProjectKey !== null ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Reset thread filters"
+          accessibilityLabel={t("Reset thread filters")}
           className="h-8 w-8 items-center justify-center"
           onPress={() => {
             props.onEnvironmentChange(null);

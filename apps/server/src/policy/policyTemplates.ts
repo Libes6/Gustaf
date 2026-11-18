@@ -120,6 +120,12 @@ const policies = (): ReadonlyArray<Policy> => [
     toggle: "BrowserCookieImport",
   },
   {
+    id: "LocalMcpServers",
+    title: "Allow local MCP servers",
+    help: "Disabled stops users from turning on MCP servers that run a command on this machine, and keeps saved ones out of agent sessions. MCP servers reached over HTTP are still allowed.",
+    toggle: "LocalMcpServers",
+  },
+  {
     id: "Telemetry",
     title: "Allow usage data",
     help: "Disabled stops Gustaf from sending product usage data and relay connection traces. Enabled cannot turn them on for a user who turned them off.",

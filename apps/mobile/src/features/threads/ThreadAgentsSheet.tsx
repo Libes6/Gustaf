@@ -96,7 +96,7 @@ export function ThreadAgentsSheet({ route }: StaticScreenProps<AgentsTarget>) {
     >
       {subagents.length === 0 ? (
         <Text className="pt-6 text-center text-sm text-foreground-muted">
-          No agents in this turn.
+          {t("No agents in this turn.")}
         </Text>
       ) : (
         subagents.map((subagent) => {
@@ -164,7 +164,7 @@ function AgentRow(props: {
         className="min-w-0 flex-1"
         accessibilityHint={
           subagent.remoteChild === undefined
-            ? "Provider-managed agent. Its work appears in the transcript."
+            ? t("Provider-managed agent. Its work appears in the transcript.")
             : `Runs on ${subagent.remoteChild.label}. Connect to it to open its thread.`
         }
       >
@@ -173,7 +173,7 @@ function AgentRow(props: {
     ) : (
       <Pressable
         accessibilityRole="link"
-        accessibilityHint="Opens this agent's thread"
+        accessibilityHint={t("Opens this agent's thread")}
         onPress={() => props.onOpen(target)}
         className="min-w-0 flex-1 active:opacity-70"
       >

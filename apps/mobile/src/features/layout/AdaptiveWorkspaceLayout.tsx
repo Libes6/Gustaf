@@ -1084,7 +1084,7 @@ function AdaptiveWorkspaceLayoutContent(
                 renderFallback={(fallback) => (
                   <RenderFailureView
                     {...fallback}
-                    title="The sidebar couldn't be displayed"
+                    title={t("The sidebar couldn't be displayed")}
                     exit={{ label: t("Open settings"), onPress: handleOpenSettings }}
                   />
                 )}
@@ -1211,7 +1211,7 @@ function AdaptiveWorkspaceLayoutContent(
           style={[{ zIndex: 1 }, scrimAnimatedStyle]}
         >
           <Pressable
-            accessibilityLabel="Hide sidebar"
+            accessibilityLabel={t("Hide sidebar")}
             className="flex-1"
             onPress={() => setPrimarySidebarVisible(false)}
           />

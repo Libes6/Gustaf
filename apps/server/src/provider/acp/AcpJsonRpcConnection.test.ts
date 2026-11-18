@@ -463,41 +463,63 @@ describe("AcpSessionRuntime", () => {
     expect(AcpSessionRuntime.selectAcpAgentAuthMethod(methods, "missing")).toBeUndefined();
   });
 
-  it.effect("prefers MCP-over-ACP only when the agent advertises that transport", () => {
-    const requestEvents: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];
-    return Effect.gen(function* () {
-      const runtime = yield* AcpSessionRuntime.AcpSessionRuntime;
-      yield* runtime.start();
+  const userStdioServer = {
+    name: "blender",
+    command: "uvx",
+    args: ["blender-mcp"],
+    env: [{ name: "TOKEN", value: "stdio-secret" }],
+  };
+  const userHttpServer = {
+    type: "http" as const,
+    name: "figma",
+    url: "https://mcp.figma.test/mcp",
+    headers: [{ name: "Authorization", value: "Bearer figma" }],
+  };
+  it.effect.each([
+    { env: { T3_ACP_MCP_ACP: "1" }, userServers: [userStdioServer] },
+    {
+      env: { T3_ACP_MCP_ACP: "1", T3_ACP_MCP_HTTP: "1" },
+      userServers: [userStdioServer, userHttpServer],
+    },
+  ])(
+    "prefers MCP-over-ACP only when advertised and sends user servers beside it ($env)",
+    ({ env, userServers }) => {
+      const requestEvents: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];
+      return Effect.gen(function* () {
+        const runtime = yield* AcpSessionRuntime.AcpSessionRuntime;
+        yield* runtime.start();
 
-      const created = requestEvents.find(
-        (event) => event.method === "session/new" && event.status === "started",
+        const created = requestEvents.find(
+          (event) => event.method === "session/new" && event.status === "started",
+        );
+        expect(created?.payload).toMatchObject({
+          mcpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }, ...userServers],
+        });
+      }).pipe(
+        Effect.provide(
+          AcpSessionRuntime.layer({
+            spawn: {
+              command: mockAgentCommand,
+              args: mockAgentArgs,
+              env,
+            },
+            cwd: process.cwd(),
+            clientInfo: { name: "t3-test", version: "0.0.0" },
+            authMethodId: "test",
+            mcpServers: [{ type: "stdio", name: "t3-code", command: "/usr/bin/node", args: [] }],
+            acpMcpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
+            userMcpServers: [userStdioServer, userHttpServer],
+            requestLogger: (event) =>
+              Effect.sync(() => {
+                requestEvents.push(event);
+              }),
+          }),
+        ),
+        Effect.scoped,
+        Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
       );
-      expect(created?.payload).toMatchObject({
-        mcpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
-      });
-    }).pipe(
-      Effect.provide(
-        AcpSessionRuntime.layer({
-          spawn: {
-            command: mockAgentCommand,
-            args: mockAgentArgs,
-            env: { T3_ACP_MCP_ACP: "1" },
-          },
-          cwd: process.cwd(),
-          clientInfo: { name: "t3-test", version: "0.0.0" },
-          authMethodId: "test",
-          mcpServers: [{ type: "stdio", name: "t3-code", command: "/usr/bin/node", args: [] }],
-          acpMcpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
-          requestLogger: (event) =>
-            Effect.sync(() => {
-              requestEvents.push(event);
-            }),
-        }),
-      ),
-      Effect.scoped,
-      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-    );
-  });
+    },
+  );
 
   it.effect("supports v2 session deletion and secret-safe provider management", () => {
     const requestEvents: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];

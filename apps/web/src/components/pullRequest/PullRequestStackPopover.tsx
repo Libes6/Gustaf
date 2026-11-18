@@ -63,6 +63,7 @@ export function PullRequestStackPopover({
   membership: PullRequestStackMembership;
   onSelect: (reference: PullRequestRef) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <Menu open={open} onOpenChange={setOpen}>
@@ -88,7 +89,10 @@ export function PullRequestStackPopover({
           }
         />
         <TooltipPopup>
-          View stack #{membership.number}, layer {membership.position} of {membership.size}
+          {t("webCopy.viewStack")}
+          {membership.number}
+          {t("webCopy.layer")} {membership.position} {t("misc.officeViewer.pageOf")}{" "}
+          {membership.size}
         </TooltipPopup>
       </Tooltip>
       <MenuPopup

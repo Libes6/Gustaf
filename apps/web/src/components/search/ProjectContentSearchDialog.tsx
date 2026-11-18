@@ -96,7 +96,7 @@ function EmptyContentSearchDialog() {
       value=""
     >
       <p className="m-auto px-6 text-center text-muted-foreground text-sm">
-        Open a project to search its files.
+        {t("misc.projectFilePicker.openProjectHint")}
       </p>
     </CommandPaletteContent>
   );
@@ -234,7 +234,7 @@ function OpenContentSearchDialog(props: {
         <div className="flex h-9 shrink-0 items-center border-b px-3 text-xs text-muted-foreground">
           {search.isPending ? (
             <span className="flex items-center gap-2">
-              <Spinner size="sm" /> Searching…
+              <Spinner size="sm" /> {t("misc.pdfViewer.searching")}
             </span>
           ) : search.error ? (
             <span className="text-destructive">{search.error}</span>
