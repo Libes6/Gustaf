@@ -44,12 +44,28 @@ export class TraceFileReadError extends Schema.TaggedError<TraceFileReadError>()
   }
 }
 
+/** The span a client records when its UI crashes; see `apps/web/src/observability/clientCrash.ts`. */
+export const CLIENT_CRASH_SPAN_NAME = "client.crash";
+
+export interface ClientCrash {
+  readonly endedAt: DateTime.Utc;
+  readonly kind: string;
+  readonly route: string | null;
+  readonly message: string;
+  readonly stack: string | null;
+  readonly surface: string | null;
+  readonly appVersion: string | null;
+}
+
 export class TraceDiagnostics extends Context.Service<
   TraceDiagnostics,
   {
     readonly read: (
       options: TraceDiagnosticsOptions,
     ) => Effect.Effect<ServerTraceDiagnosticsResult>;
+    readonly readClientCrashes: (
+      options: TraceDiagnosticsOptions & { readonly limit: number },
+    ) => Effect.Effect<ReadonlyArray<ClientCrash>>;
   }
 >()("t3/diagnostics/TraceDiagnostics") {}
 
@@ -373,6 +389,51 @@ export function makeTraceDiagnosticsAggregator(
   return { addLine, finish };
 }
 
+const newestCrashFirst = (left: ClientCrash, right: ClientCrash) =>
+  DateTime.toEpochMillis(right.endedAt) - DateTime.toEpochMillis(left.endedAt);
+
+export function makeClientCrashCollector(limit: number) {
+  const crashes: ClientCrash[] = [];
+  const addLine = (line: string) => {
+    // Most lines are other spans; skip them before parsing.
+    if (!line.includes(CLIENT_CRASH_SPAN_NAME)) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (!isRecordObject(parsed) || parsed.name !== CLIENT_CRASH_SPAN_NAME) return;
+    const endedAt = unixNanoToDateTime(parsed.endTimeUnixNano);
+    if (!endedAt) return;
+    const attributes = isRecordObject(parsed.attributes) ? parsed.attributes : {};
+    const resource = isRecordObject(parsed.resourceAttributes) ? parsed.resourceAttributes : {};
+    const status = isRecordObject(parsed.status) ? parsed.status : {};
+    const exception = Array.isArray(parsed.events)
+      ? parsed.events.filter(isTraceEvent).find((event) => event.name === "exception")
+      : undefined;
+    const exceptionAttributes = exception ? readEventAttributes(exception) : {};
+    insertBounded(
+      crashes,
+      {
+        endedAt,
+        kind: toStringValue(attributes["crash.kind"]) ?? "unknown",
+        route: toStringValue(attributes["crash.route"]),
+        message:
+          toStringValue(exceptionAttributes["exception.message"]) ??
+          toStringValue(status.message) ??
+          "Unknown error",
+        stack: toStringValue(exceptionAttributes["exception.stacktrace"]),
+        surface: toStringValue(resource["t3code.client.surface"]),
+        appVersion: toStringValue(resource["service.version"]),
+      },
+      limit,
+      newestCrashFirst,
+    );
+  };
+  return { addLine, finish: (): ReadonlyArray<ClientCrash> => crashes };
+}
+
 /** Succeeds with false if the file is absent. */
 export function streamTraceFileLines(
   fileSystem: FileSystem.FileSystem,
@@ -459,7 +520,26 @@ export const make = Effect.gen(function* () {
     },
   );
 
-  return TraceDiagnostics.of({ read });
+  const readClientCrashes: TraceDiagnostics["Service"]["readClientCrashes"] = Effect.fn(
+    "TraceDiagnostics.readClientCrashes",
+  )(function* (options) {
+    const collector = makeClientCrashCollector(options.limit);
+    yield* Effect.forEach(
+      toRotatedTracePaths(options.traceFilePath, options.maxFiles),
+      (path) =>
+        streamTraceFileLines(fileSystem, path, collector.addLine).pipe(
+          Effect.catch((cause) =>
+            Effect.logWarning("Failed to read local trace file.").pipe(
+              Effect.annotateLogs({ traceFilePath: cause.traceFilePath, causeTag: cause.causeTag }),
+            ),
+          ),
+        ),
+      { concurrency: 1, discard: true },
+    );
+    return collector.finish();
+  });
+
+  return TraceDiagnostics.of({ read, readClientCrashes });
 });
 
 export const layer = Layer.effect(TraceDiagnostics, make);

@@ -47,6 +47,7 @@ export interface ServerDerivedPaths {
   readonly browserArtifactsDir: string;
   readonly logsDir: string;
   readonly serverTracePath: string;
+  readonly clientCrashLogPath: string;
   readonly providerLogsDir: string;
   readonly providerEventLogPath: string;
   readonly terminalLogsDir: string;
@@ -166,6 +167,7 @@ export const deriveServerPaths = Effect.fn(function* (
     browserArtifactsDir: join(stateDir, "browser-artifacts"),
     logsDir,
     serverTracePath: join(logsDir, "server.trace.ndjson"),
+    clientCrashLogPath: join(logsDir, "client-crashes.ndjson"),
     providerLogsDir,
     providerEventLogPath: join(providerLogsDir, "events.log"),
     terminalLogsDir: join(logsDir, "terminals"),
