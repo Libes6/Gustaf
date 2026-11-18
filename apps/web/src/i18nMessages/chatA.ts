@@ -102,10 +102,7 @@ export const chatAMessages = {
     "chatA.composerPendingUserInputPanel.hideQuestion": "Hide the question and its options",
     "chatA.composerPendingUserInputPanel.showQuestion": "Show the question and its options",
     "chatA.composerPendingUserInputPanel.dismissQuestion": "Dismiss question without answering",
-    "chatA.chatOverlayHosts.uncommittedChanges":
-      "You have uncommitted changes. They'll carry over to the other branch, or block the switch if they conflict.",
     "chatA.chatOverlayHosts.cancel": "Cancel",
-    "chatA.chatOverlayHosts.switchBranch": "Switch branch",
     "chatA.chatOverlayHosts.editFromHere": "Edit from here?",
     "chatA.chatOverlayHosts.rewindDescription":
       "Rewind chat to before this message. Your prompt and attachments return to the composer. “Revert files too” also undoes your own edits.",
@@ -371,10 +368,7 @@ export const chatAMessages = {
     "chatA.composerPendingUserInputPanel.hideQuestion": "Скрыть вопрос и варианты ответа",
     "chatA.composerPendingUserInputPanel.showQuestion": "Показать вопрос и варианты ответа",
     "chatA.composerPendingUserInputPanel.dismissQuestion": "Закрыть вопрос без ответа",
-    "chatA.chatOverlayHosts.uncommittedChanges":
-      "У вас есть незакоммиченные изменения. Они перейдут в другую ветку или заблокируют переключение, если будут конфликтовать.",
     "chatA.chatOverlayHosts.cancel": "Отмена",
-    "chatA.chatOverlayHosts.switchBranch": "Переключить ветку",
     "chatA.chatOverlayHosts.editFromHere": "Редактировать отсюда?",
     "chatA.chatOverlayHosts.rewindDescription":
       "Откатить чат до этого сообщения. Ваш промпт и вложения вернутся в композер. «Откатить файлы тоже» также отменит ваши правки.",

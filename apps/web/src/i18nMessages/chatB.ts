@@ -271,9 +271,6 @@ export const chatBMessages = {
     "chatB.ThreadActivityBanners.stop": "Stop",
     "chatB.useThreadLifecycle.failedUnsettle": "Failed to un-settle thread",
     "chatB.useThreadLifecycle.failedWake": "Failed to wake thread",
-    "chatB.useThreadLifecycle.failedSwitchCheckout": "Failed to switch checkout",
-    "chatB.useThreadLifecycle.checkoutSwitchedNotUpdated":
-      "Checkout switched, but the thread could not be updated",
     "chatB.useThreadLifecycle.failedStopBackgroundWork": "Failed to stop background work.",
     "chatB.useThreadLifecycle.noLongerAvailable": "This thread is no longer available",
     "chatB.useThreadLifecycle.errorOccurred": "An error occurred.",
@@ -1024,9 +1021,6 @@ export const chatBMessages = {
     "chatB.ThreadActivityBanners.stop": "Остановить",
     "chatB.useThreadLifecycle.failedUnsettle": "Не удалось вернуть тред в работу",
     "chatB.useThreadLifecycle.failedWake": "Не удалось разбудить тред",
-    "chatB.useThreadLifecycle.failedSwitchCheckout": "Не удалось переключить ветку",
-    "chatB.useThreadLifecycle.checkoutSwitchedNotUpdated":
-      "Ветка переключена, но тред не удалось обновить",
     "chatB.useThreadLifecycle.failedStopBackgroundWork": "Не удалось остановить фоновую работу.",
     "chatB.useThreadLifecycle.noLongerAvailable": "Этот тред больше не доступен",
     "chatB.useThreadLifecycle.errorOccurred": "Произошла ошибка.",

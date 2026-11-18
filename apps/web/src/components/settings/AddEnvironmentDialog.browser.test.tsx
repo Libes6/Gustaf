@@ -104,8 +104,12 @@ describe("AddEnvironmentDialog", () => {
 
   it("discards a duplicate-address result after the pairing form is dismissed", async () => {
     using _bridge = setup();
-    const pending = Promise.withResolvers<AtomCommandResult<void, Error>>();
-    mocks.connectPairing.mockReturnValueOnce(pending.promise);
+    let resolvePending!: (result: AtomCommandResult<void, Error>) => void;
+    mocks.connectPairing.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePending = resolve;
+      }),
+    );
     await using _screen = await render(<Owner />);
     await userEvent.click(page.getByRole("button", { name: "Add environment" }));
     await userEvent.type(page.getByPlaceholder("backend.example.com"), "mac.example.com");
@@ -115,7 +119,7 @@ describe("AddEnvironmentDialog", () => {
     );
     await userEvent.keyboard("{Escape}");
     await expectDefaultModeAfterReopen();
-    pending.resolve(
+    resolvePending(
       AsyncResult.failure(
         Cause.fail(
           new ConnectionBlockedError({
