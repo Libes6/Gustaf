@@ -903,7 +903,12 @@ export function buildTiptapContent(
     });
     openQuote = null;
   };
-  for (const entry of entries) {
+  const isProseLine = (entry: (typeof entries)[number] | undefined, empty: boolean) =>
+    entry !== undefined &&
+    "line" in entry &&
+    !entry.line.list &&
+    (entry.line.inline.length === 0) === empty;
+  for (const [entryIndex, entry] of entries.entries()) {
     if ("quote" in entry) {
       flushLists();
       if (openQuote && openQuote.prefix !== entry.quote.prefix) flushQuote();
@@ -911,7 +916,21 @@ export function buildTiptapContent(
       openQuote.content.push(entry.quote.inline);
       continue;
     }
+    // The serializer separates a quote or list from the prose after it with one blank line; it is not an empty paragraph.
+    // After a list it precedes any empty paragraphs the user left, so those survive.
+    let proseIndex = entryIndex + 1;
+    if (openQuote === null && rootLists.length > 0 && isProseLine(entry, true)) {
+      while (isProseLine(entries[proseIndex], true)) proseIndex += 1;
+    }
+    const blockSeparator =
+      (openQuote !== null || rootLists.length > 0) &&
+      isProseLine(entry, true) &&
+      isProseLine(entries[proseIndex], false);
     flushQuote();
+    if (blockSeparator) {
+      flushLists();
+      continue;
+    }
     if ("code" in entry) {
       flushLists();
       blocks.push(entry.code);
@@ -1051,8 +1070,17 @@ function pushBreakRun(acc: RichAccumulator, position?: number): void {
   acc.md += 1;
 }
 
-// Separate prose from quotes to avoid lazy continuation; an empty paragraph already separates them.
-function needsBlankLineAfterQuote(previous: ProseMirrorNode, block: ProseMirrorNode): boolean {
+// A blank line keeps prose out of a quote or list (lazy continuation); an empty paragraph already separates them.
+function needsBlankLineBetween(blocks: readonly ProseMirrorNode[], index: number): boolean {
+  const previous = blocks[index - 1]!;
+  const block = blocks[index]!;
+  const isEmptyParagraph = (node: ProseMirrorNode | undefined) =>
+    node?.type.name === "paragraph" && node.content.size === 0;
+  if (LIST_NODE_NAMES.has(previous.type.name)) {
+    let next = index;
+    while (isEmptyParagraph(blocks[next])) next += 1;
+    return blocks[next]?.type.name === "paragraph";
+  }
   return (
     previous.type.name === "blockquote" && block.type.name === "paragraph" && block.content.size > 0
   );
@@ -1502,7 +1530,7 @@ function serializeDoc(doc: ProseMirrorNode): RichDocMap {
   let pmBlockStart = 0;
   blocks.forEach((block, blockIndex) => {
     if (blockIndex > 0 && !isTrailingLineAfterRule(doc, blockIndex)) pushBreakRun(acc);
-    if (blockIndex > 0 && needsBlankLineAfterQuote(blocks[blockIndex - 1]!, block)) {
+    if (blockIndex > 0 && needsBlankLineBetween(blocks, blockIndex)) {
       pushBlankLineRun(acc, pmBlockStart + 1);
     }
     if (LIST_NODE_NAMES.has(block.type.name)) {
