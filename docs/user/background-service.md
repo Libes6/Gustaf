@@ -1,6 +1,6 @@
 # Running Gustaf in the background
 
-On Linux and macOS, Gustaf can run as a service for your user so you do not need
+On Linux, macOS, and Windows, Gustaf can run in the background for your user so you do not need
 to keep a terminal open.
 
 ## Manage the service
@@ -77,7 +77,8 @@ starts again; switching the server version alone keeps the current values.
 For a service installed before env-file support, run `gustaf service install` once
 with an up-to-date CLI.
 A missing file is ignored; other read failures stop service startup.
-If the file contains credentials, restrict access to that file with `chmod 600`
+If the file contains credentials, restrict access to your Windows account with
+file permissions, or on Linux/macOS use `chmod 600`
 (for the default T3 home, `chmod 600 ~/.t3/service.env`).
 
 ## Platform support
@@ -91,13 +92,25 @@ Mac logged in and awake for unattended remote access. Installing over SSH while
 nobody is logged in at the Mac's screen can fail at the final start step; the
 service is still installed and will start at the next login.
 
-Windows background services are not supported. To keep a Windows host available,
-leave the desktop app running with its local environment enabled, or keep
-`gustaf serve` running in a terminal. Minimize the desktop app rather than
-closing its last window, which stops its local server. The desktop app does not
-start itself at Windows sign-in.
+On Windows, install the command line with the [PowerShell installer](./install.md#command-line),
+then run `gustaf up --lan` (or `--no-lan`) in a normal, non-administrator PowerShell
+window. Quit the desktop app's local server or a manually started server first.
+The installer-owned `gustaf.cmd` is required; a desktop launcher or standalone
+copy of the executable cannot install the task.
+
+Gustaf registers a per-user Windows Scheduled Task that starts at sign-in,
+runs without a visible terminal, and restarts after failures. After a reboot,
+sign in to start the server; keep that user signed in and the computer awake
+for remote access. No administrator account or saved password is required.
+`gustaf status` reports the task state; `ready` means installed but stopped,
+and `disabled` means automatic startup is off. Run `gustaf service install`
+to repair it. `gustaf service uninstall` stops and removes the task.
+
+The task follows the stable installer shim, so `gustaf update` and subsequent
+PowerShell installer runs keep startup on the installed version. Run service
+management and updates in a separate terminal on the host. Updating from a remote client is not available for Windows hosts.
+Service paths containing `%`, `!`, double quotes, or newlines are not supported.
 For network access, see [Windows firewall and cloud hosts](./remote-access.md#windows-firewall-and-cloud-hosts).
-Opening a firewall port does not install a service or make the server start after reboot.
 
 ## Keep the server responsive when agents use all memory
 

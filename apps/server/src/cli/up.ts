@@ -65,6 +65,7 @@ const formatSetup = (setup: Setup) => {
           ? `installed · t3@${service.installedVersion ?? packageJson.version}`
           : "not installed",
     ],
+    ...(service.taskState === undefined ? [] : [["Scheduled task", service.taskState] as const]),
     [
       "Local network",
       setup.host !== undefined
@@ -318,6 +319,7 @@ const setupJson = (setup: Setup) =>
     {
       service: {
         supported: setup.service.supported,
+        ...(setup.service.taskState === undefined ? {} : { taskState: setup.service.taskState }),
         installed: setup.service.installed,
         installedVersion: setup.service.installedVersion ?? null,
         otherBaseDir: setup.service.otherBaseDir ?? null,

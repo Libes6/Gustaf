@@ -348,6 +348,25 @@ const belongsToBootService = Effect.fn("cli.update.belongs_to_boot_service")(fun
       );
     return /__service-launcher/.test(command);
   }
+  if (platform === "win32") {
+    const result = yield* runner
+      .run({
+        command: "powershell.exe",
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `$child = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($child) { (Get-CimInstance Win32_Process -Filter "ProcessId=$($child.ParentProcessId)").CommandLine }`,
+        ],
+        timeout: Duration.seconds(5),
+      })
+      .pipe(Effect.option);
+    return (
+      Option.isSome(result) &&
+      result.value.code === 0 &&
+      /__windows-service/.test(result.value.stdout)
+    );
+  }
   return false;
 });
 
