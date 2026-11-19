@@ -165,7 +165,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
                   code: "invalid_request",
                   message: `${error.message} No thread was created. Pass a branch, tag, or commit that exists there${
                     strategy.startFromOrigin === true
-                      ? "; the project has no usable remote to fetch it from."
+                      ? "; the remote used for this base does not have it either."
                       : ", or set startFromOrigin:true if it exists only on a remote."
                   }`,
                 }),
