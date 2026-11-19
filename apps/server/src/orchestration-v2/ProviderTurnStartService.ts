@@ -63,6 +63,8 @@ import {
   restartCancelledBackgroundWorkNote,
 } from "./RestartBackgroundNote.ts";
 
+const LEFTOVER_WORKTREE_ENTRIES = new Set(["node_modules", ".next"]);
+
 export class ProviderTurnStartError extends Schema.TaggedError<ProviderTurnStartError>()(
   "ProviderTurnStartError",
   {
@@ -187,6 +189,28 @@ export const layer: Layer.Layer<
         return null;
       },
     );
+
+    // Only folders holding nothing but leftovers are cleared, never user files.
+    const isLeftoverFolder = (worktreePath: string) =>
+      fileSystem.exists(path.join(worktreePath, ".git")).pipe(
+        Effect.flatMap((hasGit) =>
+          hasGit
+            ? Effect.succeed(false)
+            : fileSystem.readDirectory(worktreePath).pipe(
+                Effect.flatMap((entries) =>
+                  Effect.forEach(entries, (entry) =>
+                    LEFTOVER_WORKTREE_ENTRIES.has(entry)
+                      ? fileSystem
+                          .stat(path.join(worktreePath, entry))
+                          .pipe(Effect.map((info) => info.type === "Directory"))
+                      : Effect.succeed(false),
+                  ),
+                ),
+                Effect.map((leftovers) => leftovers.every(Boolean)),
+              ),
+        ),
+        Effect.orElseSucceed(() => false),
+      );
 
     const recreateMissingWorktree = Effect.fn("ProviderTurnStartService.recreateMissingWorktree")(
       function* (input: {
@@ -638,7 +662,8 @@ export const layer: Layer.Layer<
         const exists = yield* fileSystem
           .exists(worktreePath)
           .pipe(Effect.orElseSucceed(() => true));
-        if (!exists && (yield* isManagedWorktreePath(worktreePath))) {
+        const leftover = exists && (yield* isLeftoverFolder(worktreePath));
+        if ((!exists || leftover) && (yield* isManagedWorktreePath(worktreePath))) {
           const project = yield* projects.getById(projection.thread.projectId).pipe(
             Effect.map(Option.getOrUndefined),
             Effect.orElseSucceed(() => undefined),
@@ -650,11 +675,14 @@ export const layer: Layer.Layer<
               branch,
             });
             const recreateResult = yield* Effect.result(
-              recreateMissingWorktree({
-                cwd: project.workspaceRoot,
-                worktreePath,
-                branch,
-              }).pipe(
+              (leftover ? fileSystem.remove(worktreePath, { recursive: true }) : Effect.void).pipe(
+                Effect.andThen(
+                  recreateMissingWorktree({
+                    cwd: project.workspaceRoot,
+                    worktreePath,
+                    branch,
+                  }),
+                ),
                 Effect.mapError((cause) =>
                   cause._tag === "WorktreeRecreateNoBaseError"
                     ? cause
