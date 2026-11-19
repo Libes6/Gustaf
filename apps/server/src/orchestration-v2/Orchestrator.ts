@@ -110,6 +110,8 @@ import {
   goalCommandStopsActiveRun,
   isActiveRun,
   isNativeMaintenanceCommand,
+  providerSwitchWaitsForTurn,
+  providerTurnCapabilities,
   resolveMessageDispatchIntent,
 } from "./CommandPolicy.ts";
 import { CommandReceiptStoreV2, type CommandReceiptV2 } from "./CommandReceiptStore.ts";
@@ -6375,6 +6377,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           !(yield* stopReachedRun(command, command.threadId, active.id))
         ) {
           dispatchMode = { type: "steer_active", targetRunId: active.id };
+        }
+      }
+    }
+    // A steer that switches provider needs a new turn. A provider that cannot restart its
+    // turn for new input takes it after the turn, like a provider that cannot steer at all.
+    // An explicit steer that Stop reached still fails below.
+    if (dispatchMode.type === "steer_active" && command.modelSelection !== undefined) {
+      const targetRunId = dispatchMode.targetRunId;
+      const target = projection.runs.find((run) => run.id === targetRunId);
+      if (
+        target !== undefined &&
+        isActiveRun(target) &&
+        target.providerInstanceId !== command.modelSelection.instanceId &&
+        !(yield* stopReachedRun(command, command.threadId, target.id))
+      ) {
+        // Before the provider session starts, the adapter's capabilities stand in for its own.
+        const turns =
+          providerTurnCapabilities(projection, target) ??
+          (yield* providerAdapters.get(target.providerInstanceId).pipe(
+            Effect.flatMap((adapter) => adapter.getCapabilities()),
+            mapDispatchError(command),
+          )).turns;
+        if (providerSwitchWaitsForTurn(turns)) {
+          dispatchMode = { type: "queue_after_active" };
         }
       }
     }
