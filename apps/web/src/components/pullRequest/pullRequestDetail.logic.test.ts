@@ -1013,6 +1013,16 @@ describe("adding a remark to the chat", () => {
     expect(context?.text).toBe("octocat: Why not reuse the existing parser?");
   });
 
+  it("keeps a review summary longer than a fix finding's bound whole", () => {
+    const summary = `No critical issues. ${"One misplaced doc comment inline. ".repeat(80)}End.`;
+    const context = buildPullRequestCommentContext(pullRequest, {
+      kind: "comment",
+      comment: remark("c1", summary),
+    });
+
+    expect(context?.text).toBe(`octocat: ${summary.trim()}`);
+  });
+
   it("keeps every added remark when a later hand-off lands", () => {
     const added = ["c1", "c2"].flatMap(
       (id) =>
@@ -1105,7 +1115,7 @@ describe("adding a remark to the chat", () => {
   });
 
   it("keeps remarks from two repositories apart when their host ids match", () => {
-    const other = { number: 42, url: "https://github.com/octocat/fork/pull/42" };
+    const other = { ...pullRequest, url: "https://github.com/octocat/fork/pull/42" };
     const ids = [pullRequest, other].map(
       (target) =>
         buildPullRequestCommentContext(target, { kind: "comment", comment: remark("c1", "why?") })
