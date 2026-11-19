@@ -717,6 +717,31 @@ it.effect("idle compaction filters keep the latest run, live work and the newest
       .join("\n");
     assert.notInclude(runPlan, "orchestration_v2_projection_runs_thread_ordinal_idx");
     assert.match(runPlan, /SEARCH orchestration_v2_projection_runs USING INDEX \w*status\w*/);
+    // The newest runs by ordinal, whatever their status, plus older runs the statuses match.
+    for (const [filter, expected] of [
+      [{ latestRunLimit: 2 }, [4, 5]],
+      [{ latestRunLimit: 2, runStatuses: ["rolled_back"] as const }, [1, 4, 5]],
+    ] as const) {
+      const traced = traceSqlStatements();
+      const recent = yield* store
+        .getThreadRecords(threadId, ["runs"], filter)
+        .pipe(Effect.withTracer(traced.tracer));
+      assert.deepEqual(
+        recent.runs.map((run) => run.ordinal),
+        [...expected],
+      );
+      const recentQuery = traced.statements.find((statement) =>
+        statement.includes("FROM orchestration_v2_projection_runs"),
+      );
+      assert.isDefined(recentQuery);
+      // Fetches the chosen runs by key instead of walking every run of the thread.
+      assert.match(
+        (yield* sql.unsafe<{ readonly detail: string }>(`EXPLAIN QUERY PLAN ${recentQuery}`))
+          .map((row) => row.detail)
+          .join("\n"),
+        /^SEARCH orchestration_v2_projection_runs USING INDEX \w+ \(run_id=\?\)/,
+      );
+    }
     // An id filter reads by primary key, not every row of the thread.
     const byId = traceSqlStatements();
     const found = yield* store
@@ -5468,6 +5493,28 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
           silent ? hidden : visible,
         ]);
 
+        // A follow-up removed before it started stays latest unless a visible run outlives it.
+        const removedRunId = RunId.make(`run:projection-shell-silent:${key}:removed`);
+        yield* projectionStore.apply({
+          id: EventId.make(`event:projection-shell-silent:${key}:removed`),
+          type: "run.updated",
+          threadId,
+          occurredAt: now,
+          payload: {
+            ...(yield* projectionStore.getThreadProjection(threadId)).runs[0]!,
+            id: removedRunId,
+            ordinal: 2,
+            userMessageId: MessageId.make(`message:projection-shell-silent:${key}:removed`),
+            status: "cancelled",
+            startedAt: null,
+            completedAt: now,
+          },
+        });
+        assert.deepStrictEqual(
+          (yield* presented).map((shell) => shell.latestRunId),
+          silent ? [removedRunId, removedRunId] : [runId, runId],
+        );
+
         // A run that fails outright, e.g. on a provider error, needs the user too.
         const running = (yield* projectionStore.getThreadProjection(threadId)).runs[0]!;
         const setRunStatus = (status: "failed" | "running") =>
@@ -5706,8 +5753,26 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             value == null ? null : DateTime.toEpochMillis(value);
           assert.equal(timestamp(sqlShell.activityRunStartedAt), expected);
           assert.equal(timestamp(memoryShell.activityRunStartedAt), expected);
-          assert.equal(sqlShell.latestRunId, "run:clock:newer");
+          // A queued message steered or removed before it started never ran, so the run that did presents.
+          for (const shell of [sqlShell, memoryShell]) {
+            assert.equal(shell.latestRunId, status === "cancelled" ? runId : "run:clock:newer");
+          }
         }
+      }
+      // Removing a message after the earlier run ended leaves the cancelled run as the latest.
+      yield* projectionStore.apply({
+        id: EventId.make("event:clock:ended-before-cancel"),
+        type: "run.updated",
+        threadId,
+        occurredAt: later,
+        payload: { ...run, status: "completed", startedAt: now, completedAt: now },
+      });
+      const endedBeforeCancelProjection = yield* projectionStore.getThreadProjection(threadId);
+      for (const shell of [
+        (yield* projectionStore.getShellSnapshot()).threads.find((row) => row.id === threadId)!,
+        ProjectionStore.threadShellFromProjection(endedBeforeCancelProjection),
+      ]) {
+        assert.equal(shell.latestRunId, "run:clock:newer");
       }
 
       yield* projectionStore.apply({
