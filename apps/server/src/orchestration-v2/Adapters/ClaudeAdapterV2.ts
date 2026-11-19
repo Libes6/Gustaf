@@ -2743,6 +2743,37 @@ const reserveClaudePdfBudget = (
       }).pipe(Effect.andThen(persist)),
   );
 
+// MCP app notes are app-written, so they go as quoted user input like Codex's untrusted context.
+// A slash command runs only when it opens a plain-text prompt; its note waits for the next turn.
+// Returns `message` itself when it adds nothing.
+const withClaudeAppContext = (
+  message: SDKUserMessage,
+  appContext: NonNullable<ProviderAdapter.ProviderAdapterV2TurnInput["appContext"]>,
+  reservation: Effect.Success<ReturnType<typeof reserveClaudePdfBudget>>,
+): SDKUserMessage => {
+  const content = message.message.content;
+  if (appContext.length === 0 || (typeof content === "string" && content.startsWith("/"))) {
+    return message;
+  }
+  const contextBlocks = appContext.map((entry) => ({
+    type: "text" as const,
+    text: `<external_${entry.key}>${entry.text}</external_${entry.key}>`,
+  }));
+  const bytes = Buffer.byteLength(encodeClaudeJson(contextBlocks));
+  reservation.budget.pending.bytes += bytes;
+  reservation.bytes += bytes;
+  return {
+    ...message,
+    message: {
+      ...message.message,
+      content: [
+        ...contextBlocks,
+        ...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content),
+      ],
+    },
+  };
+};
+
 const makeClaudeUserMessageWithAttachments = Effect.fnUntraced(function* (input: {
   readonly text: string;
   readonly attachments: ReadonlyArray<ChatAttachment>;
@@ -4655,6 +4686,8 @@ interface ActiveClaudeTurnContext {
   readonly subagentsByToolUseId: Map<string, ActiveClaudeSubagent>;
   readonly promptUuid: string | null;
   promptEcho: "pending" | "confirmed";
+  // MCP app notes this turn's prompt carries, recorded as delivered only if the turn completes.
+  appContextOffered?: ReadonlyMap<string, string> | undefined;
   promptStarted: boolean;
   nativeWakeStarted: boolean;
   gatedFramesBeforeEcho: number;
@@ -5479,6 +5512,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         // Sessions Claude Code reported gone on resume; resumeThread fails them into a fresh session.
         const missingNativeThreads = new Set<string>();
         const pdfBudgets = new Map<string, ReturnType<typeof makeClaudeAttachmentBudget>>();
+        // MCP app notes already in each native session's history, by key. Cleared when it compacts.
+        const deliveredAppContext = new Map<string, ReadonlyMap<string, string>>();
         const latestPlanByKind = yield* Ref.make(new Map<string, OrchestrationV2PlanArtifact>());
         // Claude 5 task tools edit one list per native session, across turns.
         const taskListsByNativeThread = yield* Ref.make(
@@ -8427,6 +8462,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             );
           }
           input.context.pendingSteers.clear();
+          if (input.status === "completed" && input.context.appContextOffered !== undefined) {
+            deliveredAppContext.set(input.context.nativeThreadId, input.context.appContextOffered);
+          }
           if (input.context.compaction?.status === "running") {
             const reason = input.result?.subtype === "success" ? input.result.result.trim() : "";
             yield* emitProviderEvent({
@@ -9962,6 +10000,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               budget.compacting = null;
               yield* persistAttachmentBudget(context.nativeThreadId);
             }
+            deliveredAppContext.delete(context.nativeThreadId);
+            context.appContextOffered = undefined;
             if (context.streamUsage !== null) context.streamUsage.usage = null;
             const postTokens = message.compact_metadata.post_tokens;
             const afterTokenCount =
@@ -11976,6 +12016,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               pdfBudgets.get(nativeThreadId)!,
               persistAttachmentBudget(nativeThreadId),
             );
+            const appContext = turnInput.appContext ?? [];
+            const delivered = deliveredAppContext.get(nativeThreadId);
+            let appContextSent = false;
             const userMessage =
               promptUuid === null
                 ? null
@@ -11992,6 +12035,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     skills: yield* userInvocableSkills(turnInput.runtimePolicy.cwd),
                     uuid: promptUuid,
                   }).pipe(
+                    Effect.map((message) => {
+                      const withContext = withClaudeAppContext(
+                        message,
+                        appContext.filter((entry) => delivered?.get(entry.key) !== entry.text),
+                        pdfReservation,
+                      );
+                      appContextSent = withContext !== message;
+                      return withContext;
+                    }),
                     Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
                     Effect.provideService(Path.Path, path),
                   );
@@ -12127,20 +12179,22 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 }),
               });
             });
+            let offerCommitted = false;
+            const commitOffer = () => {
+              if (offerCommitted) return;
+              offerCommitted = true;
+              pdfReservation.commit();
+              if (appContextSent)
+                context.appContextOffered = new Map(
+                  appContext.map((entry) => [entry.key, entry.text]),
+                );
+            };
             if (userMessage !== null) {
               yield* attachTurn;
               yield* startUserTurnForWakeReports(nativeThreadId);
               yield* Effect.uninterruptibleMask((restore) =>
-                restore(
-                  querySession.query.offer(userMessage, () => {
-                    pdfReservation.commit();
-                  }),
-                ).pipe(
-                  Effect.tap(() =>
-                    Effect.sync(() => {
-                      pdfReservation.commit();
-                    }),
-                  ),
+                restore(querySession.query.offer(userMessage, commitOffer)).pipe(
+                  Effect.tap(() => Effect.sync(commitOffer)),
                 ),
               );
               return;
@@ -13086,6 +13140,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
 
               const nativeThreadId = yield* getNativeThreadId(rollbackInput.providerThread);
               yield* closeLiveQueryForNativeThread(nativeThreadId);
+              // The rewound history may no longer hold the turns that carried app notes.
+              deliveredAppContext.delete(nativeThreadId);
               const now = yield* DateTime.now;
               const resumeSessionAt = yield* resolveClaudeRollbackResumeSessionAt(rollbackInput);
 
