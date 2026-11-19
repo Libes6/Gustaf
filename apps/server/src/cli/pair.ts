@@ -42,6 +42,7 @@ import {
   buildPairingUrl,
   formatHostForUrl,
   isLoopbackHost,
+  LOOPBACK_ACCESS_HINT,
   isWildcardHost,
   renderTerminalQrCode,
   resolveHeadlessConnectionString,
@@ -531,9 +532,7 @@ export const pairCommand = Command.make("pair", {
       } else {
         pairingBaseUrl = resolveDirectPairingBaseUrl(target.state);
         if (isLoopbackHost(new URL(pairingBaseUrl).hostname)) {
-          notes.push(
-            "This URL is only reachable from this machine. To reach it from your other devices, run `gustaf up`, or re-run with --tailscale.",
-          );
+          notes.push(LOOPBACK_ACCESS_HINT);
         } else if (target.state.privateNetworkOnly) {
           notes.push(
             "This URL works only from this machine's local network. From elsewhere, re-run with --tailscale or use T3 Connect.",

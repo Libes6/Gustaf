@@ -187,9 +187,16 @@ export const renderTerminalQrCode = (value: string, margin = 2): string => {
   return rows.join("\n");
 };
 
+export const LOOPBACK_ACCESS_HINT =
+  "This URL is only reachable from this machine. For another device, restart with `gustaf serve --lan` and use the host's network address, run `gustaf pair --tailscale`, or use the Gustaf relay.\n" +
+  "Этот адрес работает только на этом компьютере. Для другого устройства перезапустите `gustaf serve --lan` и используйте сетевой адрес хоста, выполните `gustaf pair --tailscale` или используйте Gustaf relay.";
+
 export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string =>
   [
     "Gustaf server is ready.",
+    ...(isLoopbackHost(new URL(accessInfo.connectionString).hostname)
+      ? [LOOPBACK_ACCESS_HINT]
+      : []),
     `Connection string: ${accessInfo.connectionString}`,
     `Token: ${accessInfo.token}`,
     `Pairing URL: ${accessInfo.pairingUrl}`,
