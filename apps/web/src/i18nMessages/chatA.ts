@@ -66,6 +66,7 @@ export const chatAMessages = {
     "chatA.chatComposer.chooseOptionAbove": "Choose an option above",
     "chatA.chatComposer.typeOwnAnswer":
       "Type your own answer, or leave this blank to use the selected option",
+    "chatA.chatComposer.typeAnswer": "Type your answer",
     "chatA.chatComposer.chooseProjectAbove": "Choose a project above to start a thread",
     "chatA.chatComposer.liveTranscription": "Live transcription",
     "chatA.assistantCitationCommentEditor.commentLabel": "Comment on selected text",
@@ -102,10 +103,7 @@ export const chatAMessages = {
     "chatA.composerPendingUserInputPanel.hideQuestion": "Hide the question and its options",
     "chatA.composerPendingUserInputPanel.showQuestion": "Show the question and its options",
     "chatA.composerPendingUserInputPanel.dismissQuestion": "Dismiss question without answering",
-    "chatA.chatOverlayHosts.uncommittedChanges":
-      "You have uncommitted changes. They'll carry over to the other branch, or block the switch if they conflict.",
     "chatA.chatOverlayHosts.cancel": "Cancel",
-    "chatA.chatOverlayHosts.switchBranch": "Switch branch",
     "chatA.chatOverlayHosts.editFromHere": "Edit from here?",
     "chatA.chatOverlayHosts.rewindDescription":
       "Rewind chat to before this message. Your prompt and attachments return to the composer. “Revert files too” also undoes your own edits.",
@@ -244,6 +242,9 @@ export const chatAMessages = {
     "chatA.composerPrimaryActions.submitAnswer": "Submit answer",
     "chatA.composerPrimaryActions.stopGeneration": "Stop generation",
     "chatA.composerPrimaryActions.interrupt": "Interrupt",
+    "chatA.composerPrimaryActions.stopping": "Stopping",
+    "chatA.composerPrimaryActions.stoppingTooltip": "Stopping…",
+    "chatA.composerPrimaryActions.stopped": "Stopped",
     "chatA.composerPrimaryActions.previousQuestion": "Previous question",
     "chatA.composerPrimaryActions.previous": "Previous",
     "chatA.composerPrimaryActions.resumeThread": "Resume thread",
@@ -335,6 +336,7 @@ export const chatAMessages = {
     "chatA.chatComposer.chooseOptionAbove": "Выберите вариант выше",
     "chatA.chatComposer.typeOwnAnswer":
       "Введите свой ответ или оставьте поле пустым, чтобы использовать выбранный вариант",
+    "chatA.chatComposer.typeAnswer": "Введите ответ",
     "chatA.chatComposer.chooseProjectAbove": "Выберите проект выше, чтобы начать тред",
     "chatA.chatComposer.liveTranscription": "Текст распознавания в реальном времени",
     "chatA.assistantCitationCommentEditor.commentLabel": "Комментарий к выделенному тексту",
@@ -371,10 +373,7 @@ export const chatAMessages = {
     "chatA.composerPendingUserInputPanel.hideQuestion": "Скрыть вопрос и варианты ответа",
     "chatA.composerPendingUserInputPanel.showQuestion": "Показать вопрос и варианты ответа",
     "chatA.composerPendingUserInputPanel.dismissQuestion": "Закрыть вопрос без ответа",
-    "chatA.chatOverlayHosts.uncommittedChanges":
-      "У вас есть незакоммиченные изменения. Они перейдут в другую ветку или заблокируют переключение, если будут конфликтовать.",
     "chatA.chatOverlayHosts.cancel": "Отмена",
-    "chatA.chatOverlayHosts.switchBranch": "Переключить ветку",
     "chatA.chatOverlayHosts.editFromHere": "Редактировать отсюда?",
     "chatA.chatOverlayHosts.rewindDescription":
       "Откатить чат до этого сообщения. Ваш промпт и вложения вернутся в композер. «Откатить файлы тоже» также отменит ваши правки.",
@@ -514,6 +513,9 @@ export const chatAMessages = {
     "chatA.composerPrimaryActions.submitAnswer": "Отправить ответ",
     "chatA.composerPrimaryActions.stopGeneration": "Остановить генерацию",
     "chatA.composerPrimaryActions.interrupt": "Прервать",
+    "chatA.composerPrimaryActions.stopping": "Останавливаю",
+    "chatA.composerPrimaryActions.stoppingTooltip": "Останавливаю…",
+    "chatA.composerPrimaryActions.stopped": "Остановлено",
     "chatA.composerPrimaryActions.previousQuestion": "Предыдущий вопрос",
     "chatA.composerPrimaryActions.previous": "Назад",
     "chatA.composerPrimaryActions.resumeThread": "Продолжить тред",

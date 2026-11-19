@@ -34,6 +34,7 @@ import {
 } from "@t3tools/client-runtime/state/pending-user-input";
 import {
   carryDisplacedCustomAnswerIntoPrompt,
+  withdrawDisplacedCustomAnswerFromPrompt,
   derivePendingUserInputProgress,
   projectPendingUserInputAnswer,
   threadContextsReferencedByAnswer,
@@ -84,6 +85,7 @@ function makePendingCustomAnswerSetter(input: {
   readonly activePendingUserInput: PendingUserInput | null;
   readonly activePendingRequestKey: string;
   readonly writePrompt: (prompt: string) => void;
+  readonly withdrawRestoredAnswer: (questionId: string, value: string) => void;
   readonly setPendingUserInputAnswersByRequestId: (
     update: SetStateAction<Record<string, Record<string, PendingUserInputDraftAnswer>>>,
   ) => void;
@@ -98,6 +100,7 @@ function makePendingCustomAnswerSetter(input: {
       return;
     }
     input.writePrompt(value);
+    input.withdrawRestoredAnswer(questionId, value);
     input.setPendingUserInputAnswersByRequestId((existing) => ({
       ...existing,
       [activePendingRequestKey]: {
@@ -146,6 +149,15 @@ export function usePendingThreadRequests(input: {
     reportFailure: false,
   });
   const userInputResponsesInFlight = useRef(new Set<string>());
+  // In the order the text went into the thread draft, which is how a copy is found again.
+  const displacedAnswers = useRef<
+    Array<{ readonly draft: string; readonly key: string; readonly text: string }>
+  >([]);
+  // This hook outlives a thread switch, and each thread has its own draft.
+  const displacedDraftKey =
+    typeof composerDraftTarget === "string"
+      ? composerDraftTarget
+      : `${composerDraftTarget.environmentId}:${composerDraftTarget.threadId}`;
   const [respondingRequestIds, setRespondingRequestIds] = useState<RuntimeRequestId[]>([]);
   const [respondingUserInputRequestIds, setRespondingUserInputRequestIds] = useState<
     RuntimeRequestId[]
@@ -410,6 +422,11 @@ export function usePendingThreadRequests(input: {
     const nextPrompt = carryDisplacedCustomAnswerIntoPrompt(currentPrompt, displacedAnswer);
     if (nextPrompt !== currentPrompt) {
       setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+      displacedAnswers.current.push({
+        draft: displacedDraftKey,
+        key: `${activePendingRequestKey}:${questionId}`,
+        text: displacedAnswer ?? "",
+      });
       toastManager.add({
         type: "info",
         title: t("chatB.usePendingThreadRequests.typedTextSetAside"),
@@ -465,10 +482,37 @@ export function usePendingThreadRequests(input: {
   const writePrompt = useStableCallback((prompt: string) => {
     promptRef.current = prompt;
   });
+  // Undo can put set-aside text back into the answer; left in the draft too, it is sent twice.
+  const withdrawRestoredAnswer = useStableCallback((questionId: string, value: string) => {
+    const key = `${activePendingRequestKey}:${questionId}`;
+    const entries = displacedAnswers.current;
+    const index = entries.findLastIndex(
+      (entry) =>
+        entry.draft === displacedDraftKey &&
+        entry.key === key &&
+        entry.text.trim() === value.trim(),
+    );
+    const displaced = entries[index];
+    if (displaced === undefined) return;
+    const later = entries
+      .slice(index + 1)
+      .filter((entry) => entry.draft === displaced.draft)
+      .map((entry) => entry.text);
+    displacedAnswers.current = entries.filter((entry) => entry !== displaced);
+    const currentPrompt =
+      useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)?.prompt ?? "";
+    const nextPrompt = withdrawDisplacedCustomAnswerFromPrompt(
+      currentPrompt,
+      displaced.text,
+      later,
+    );
+    if (nextPrompt !== currentPrompt) setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+  });
   const onChangeActivePendingUserInputCustomAnswer = makePendingCustomAnswerSetter({
     activePendingUserInput,
     activePendingRequestKey,
     writePrompt,
+    withdrawRestoredAnswer,
     setPendingUserInputAnswersByRequestId,
   });
 

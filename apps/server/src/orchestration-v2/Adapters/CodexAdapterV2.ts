@@ -158,6 +158,8 @@ import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter"
 
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 const CODEX_CAPACITY_MAX_RETRIES = 5;
+// Codex can announce a retry and never resume. Recovered retries resume model output within ~75s.
+const CODEX_PROVIDER_RETRY_STALL_TIMEOUT = "10 minutes";
 export const CODEX_DRIVER_KIND = CODEX_PROVIDER;
 export const CODEX_DEFAULT_INSTANCE_ID = defaultInstanceIdForDriver(CODEX_DRIVER_KIND);
 
@@ -232,6 +234,8 @@ const decodeCodexBackgroundTerminalTerminateResponse = Schema.decodeUnknownEffec
 const decodeCodexBackgroundTerminalsListResponse = Schema.decodeUnknownEffect(
   CodexBackgroundTerminalsListResponse,
 );
+// Initialize normally answers in under a second; leave room for a slow first launch.
+const CODEX_INITIALIZE_TIMEOUT = "30 seconds";
 const CodexThreadSampleResponse = Schema.Struct({ text: Schema.NullOr(Schema.String) });
 const decodeCodexThreadSampleResponse = Schema.decodeUnknownEffect(CodexThreadSampleResponse);
 export const CODEX_PROMPT_SUGGESTION_PROMPT =
@@ -1140,6 +1144,17 @@ function codexExhaustionHttpStatus(errorInfo: CodexErrorInfo | null | undefined)
     : null;
 }
 
+function codexErrorHttpStatus(errorInfo: CodexErrorInfo | null | undefined): number | null {
+  const detail =
+    typeof errorInfo === "object" && errorInfo !== null ? Object.values(errorInfo)[0] : undefined;
+  return typeof detail === "object" &&
+    detail !== null &&
+    "httpStatusCode" in detail &&
+    typeof detail.httpStatusCode === "number"
+    ? detail.httpStatusCode
+    : null;
+}
+
 function codexUsageLimitError(
   code: string | null,
   errorInfo: CodexErrorInfo | null | undefined,
@@ -1819,7 +1834,15 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }),
           ),
         );
+        const events = yield* Queue.unbounded<
+          ProviderAdapter.ProviderAdapterV2Event,
+          ProviderAdapter.ProviderAdapterEventStreamError
+        >();
         const initialized = yield* Ref.make(false);
+        // After a timeout the session is retiring; waiters must not re-send to the hung app-server.
+        const initializeTimeout = yield* Ref.make<
+          ProviderAdapter.ProviderAdapterEventStreamError | undefined
+        >(undefined);
         // Codex rejects a second initialize on the shared app-server.
         const initializePermit = yield* Semaphore.make(1);
         const ensureInitialized = initializePermit.withPermit(
@@ -1828,6 +1851,8 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             if (alreadyInitialized) {
               return;
             }
+            const timedOut = yield* Ref.get(initializeTimeout);
+            if (timedOut !== undefined) return yield* timedOut;
 
             const userAgent = yield* client
               .request("initialize", {
@@ -1842,6 +1867,23 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     error.code === -32600 && error.errorMessage === "Already initialized"
                       ? Effect.succeed(null)
                       : Effect.fail(error),
+                }),
+                // A hung app-server never answers, and every thread on this shared
+                // session waits behind the permit. Failing the event stream retires
+                // the session, so the next turn spawns a fresh app-server.
+                Effect.timeoutOrElse({
+                  duration: CODEX_INITIALIZE_TIMEOUT,
+                  orElse: () => {
+                    const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+                      driver: CODEX_PROVIDER,
+                      providerSessionId: input.providerSessionId,
+                      cause: `Codex app-server did not answer initialize within ${CODEX_INITIALIZE_TIMEOUT}.`,
+                    });
+                    return Ref.set(initializeTimeout, error).pipe(
+                      Effect.andThen(Queue.fail(events, error)),
+                      Effect.andThen(Effect.fail(error)),
+                    );
+                  },
                 }),
               );
             const version = userAgent && /\/(\S+)/u.exec(userAgent)?.[1];
@@ -1872,10 +1914,6 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           model: input.modelSelection.model,
           now,
         });
-        const events = yield* Queue.unbounded<
-          ProviderAdapter.ProviderAdapterV2Event,
-          ProviderAdapter.ProviderAdapterEventStreamError
-        >();
         // Drain final notifications before the session manager retires the dead process.
         // Queue.fail lets readers take items already buffered before they see the failure.
         yield* client.awaitTermination.pipe(
@@ -4825,6 +4863,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               updated.set(context.providerTurnId, state);
               return updated;
             });
+            yield* failStalledProviderRetry(context, state, payload.error.codexErrorInfo).pipe(
+              Effect.delay(CODEX_PROVIDER_RETRY_STALL_TIMEOUT),
+              Effect.forkIn(scope, { startImmediately: true }),
+            );
             yield* emitProviderEvent({
               type: "turn_item.updated",
               driver: CODEX_PROVIDER,
@@ -6185,6 +6227,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           readonly failureMessage?: string;
           readonly failureErrorInfo?: CodexErrorInfo;
           readonly continueRun?: boolean;
+          readonly stalledRetry?: {
+            readonly state: ActiveCodexProviderRetry;
+            readonly failure: NonNullable<ActiveCodexTurnContext["latestProviderFailure"]>;
+          };
         }) =>
           // Capacity continuation already holds the permit across finalization and restart.
           (input.continueRun ? Function.identity : turnTerminalizationPermit.withPermits(1))(
@@ -6192,6 +6238,16 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               const current = (yield* Ref.get(activeTurns)).get(input.nativeTurnId);
               if (current !== input.context) {
                 return false;
+              }
+              if (input.stalledRetry !== undefined) {
+                // Checked under the permit so item/started cannot clear the retry mid-finalize.
+                const retries = yield* Ref.get(providerRetries);
+                if (
+                  retries.get(input.context.providerTurnId) !== input.stalledRetry.state ||
+                  (yield* Ref.get(interruptingNativeTurns)).has(input.nativeTurnId)
+                )
+                  return false;
+                input.context.latestProviderFailure ??= input.stalledRetry.failure;
               }
               input.context.fileChangeKindsByItem.clear();
               const providerRetry = yield* Ref.modify(providerRetries, (current) => {
@@ -6510,6 +6566,48 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return true;
             }),
           );
+
+        // A retry that ends on 429 is the same exhaustion responseTooManyFailedAttempts reports.
+        const failStalledProviderRetry = Effect.fn("CodexAdapterV2.failStalledProviderRetry")(
+          function* (
+            context: ActiveCodexTurnContext,
+            state: ActiveCodexProviderRetry,
+            errorInfo: CodexErrorInfo | null | undefined,
+          ) {
+            const finalized = yield* finalizeCodexTurn({
+              context,
+              nativeTurnId: context.nativeTurnId,
+              status: "failed",
+              completedAt: yield* DateTime.now,
+              stalledRetry: {
+                state,
+                failure: {
+                  nativeMessage: state.nativeMessage,
+                  nativeCode: state.nativeCode,
+                  failure: {
+                    ...state.failure,
+                    retryable: false,
+                    ...(codexErrorHttpStatus(errorInfo) === 429 ? { class: "usage_limit" } : {}),
+                  },
+                },
+              },
+            });
+            if (!finalized) return;
+            const nativeThreadId = yield* getNativeThreadId(context.providerThread);
+            yield* client
+              .request("turn/interrupt", { threadId: nativeThreadId, turnId: context.nativeTurnId })
+              .pipe(
+                Effect.timeout("10 seconds"),
+                Effect.catch((cause) =>
+                  Effect.logWarning("orchestration-v2.codex-stalled-retry-interrupt-failed", {
+                    nativeThreadId,
+                    nativeTurnId: context.nativeTurnId,
+                    cause,
+                  }),
+                ),
+              );
+          },
+        );
 
         // Codex can end an overloaded turn without retry advice. Continue its
         // persisted history with empty input instead of resending the user message.

@@ -90,6 +90,57 @@ describe("TraceDiagnostics", () => {
     assert.equal(diagnostics.latestFailures[0]?.cause, "Browser request failed");
   });
 
+  it("collects client crashes newest first with their stack, route, and client", () => {
+    const crash = (index: number, message: string) =>
+      JSON.stringify({
+        type: "otlp-span",
+        name: TraceDiagnostics.CLIENT_CRASH_SPAN_NAME,
+        traceId: `trace-${index}`,
+        spanId: `span-${index}`,
+        startTimeUnixNano: ns(index * 100),
+        endTimeUnixNano: ns(index * 100 + 1),
+        durationMs: 1,
+        attributes: { "crash.kind": "render", "crash.route": `/env/thread-${index}` },
+        resourceAttributes: { "t3code.client.surface": "desktop", "service.version": "0.18.0" },
+        status: { code: "2", message },
+        events: [
+          {
+            name: "exception",
+            timeUnixNano: ns(index * 100 + 1),
+            attributes: {
+              "exception.message": message,
+              "exception.stacktrace": `ReferenceError: ${message}\n    at Banner (chat.js:6:2309)`,
+            },
+          },
+        ],
+      });
+    const collector = TraceDiagnostics.makeClientCrashCollector(2);
+    [
+      crash(1, "first"),
+      record({
+        name: "client.crashed.elsewhere",
+        traceId: "t",
+        spanId: "s",
+        startMs: 900,
+        durationMs: 1,
+      }),
+      "not json client.crash",
+      crash(3, "third"),
+      crash(2, "second"),
+    ].forEach(collector.addLine);
+
+    const crashes = collector.finish();
+    assert.deepEqual(
+      crashes.map((entry) => entry.message),
+      ["third", "second"],
+    );
+    assert.equal(crashes[0]?.route, "/env/thread-3");
+    assert.equal(crashes[0]?.kind, "render");
+    assert.equal(crashes[0]?.surface, "desktop");
+    assert.equal(crashes[0]?.appVersion, "0.18.0");
+    assert.match(crashes[0]?.stack ?? "", /at Banner \(chat\.js:6:2309\)/);
+  });
+
   it.effect("aggregates failures, slow spans, log levels, and parse errors", () =>
     Effect.sync(() => {
       const diagnostics = aggregateLines([

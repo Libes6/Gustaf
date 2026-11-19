@@ -40,6 +40,7 @@ import {
   resolveThreadListV2SnoozeMenuSelection,
   resolveThreadListV2SwipeActions,
   resolveThreadListV2SnoozePresets,
+  resolveThreadListV2RowStatus,
   resolveThreadListV2Status,
   resolveThreadListV2WokeAt,
   sortThreadsForListV2,
@@ -175,6 +176,22 @@ describe("resolveThreadListV2Status", () => {
     );
   });
 
+  it("settles a failure the user opened to ready in the row, keeping the raw status", () => {
+    const failed = presentThreadShell(
+      environmentId,
+      makeRawThreadShell({
+        status: "failed",
+        latestRunId: RunId.make("run-failed"),
+        latestRunCompletedAt: DateTime.makeUnsafe("2026-06-01T23:59:00.000Z"),
+        lastVisitedAt: DateTime.makeUnsafe(NOW),
+      }),
+    );
+
+    expect(resolveThreadListV2Status(failed)).toBe("failed");
+    expect(resolveThreadListV2RowStatus(failed)).toBe("ready");
+    expect(resolveThreadListV2RowStatus({ ...failed, lastVisitedAt: null })).toBe("failed");
+  });
+
   it("shows a waiting guest message as Request, after the agent's own requests", () => {
     const thread = presentThreadShell(
       environmentId,
@@ -207,6 +224,23 @@ describe("resolveThreadListV2Status", () => {
 
       expect(resolveThreadListV2Status(thread)).toBe(status);
       expect(threadHasUnseenCompletion(thread)).toBe(true);
+    },
+  );
+
+  it.each(["interrupted", "cancelled"] as const)(
+    "does not present a %s run as an unseen completion",
+    (status) => {
+      const thread = presentThreadShell(
+        environmentId,
+        makeRawThreadShell({
+          latestRunId: RunId.make("run-stopped"),
+          status,
+          latestRunCompletedAt: DateTime.makeUnsafe(NOW),
+          lastVisitedAt: DateTime.makeUnsafe("2026-06-01T23:59:00.000Z"),
+        }),
+      );
+
+      expect(threadHasUnseenCompletion(thread)).toBe(false);
     },
   );
 });

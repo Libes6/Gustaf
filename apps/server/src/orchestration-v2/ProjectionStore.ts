@@ -1135,7 +1135,7 @@ const encodeMessagePayload = Schema.encodeEffect(
 const encodePlanPayload = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2PlanArtifactSchema),
 );
-const encodeTurnItemPayload = Schema.encodeEffect(
+export const encodeTurnItemPayload = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2TurnItemJsonSchema),
 );
 // The codec every *Json payload schema uses for timestamps, so index columns match payload_json.
@@ -4331,6 +4331,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 SELECT subagents.thread_id FROM pending_provider_threads
                 CROSS JOIN orchestration_v2_projection_subagents AS subagents
                   ON subagents.provider_thread_id = pending_provider_threads.provider_thread_id
+                -- A delegated task's provider thread belongs to its child thread.
+                WHERE subagents.origin = 'provider_native'
                 UNION
                 SELECT subagents.child_thread_id FROM orchestration_v2_projection_subagents AS subagents
                 WHERE subagents.child_thread_id IS NOT NULL
@@ -4848,6 +4850,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   UNION
                   SELECT provider_thread_id FROM orchestration_v2_projection_subagents
                   WHERE thread_id = ${threadId} AND provider_thread_id IS NOT NULL
+                    AND origin = 'provider_native'
                 )
                 AND (
                   provider_thread.status = 'active'

@@ -15,6 +15,7 @@ import {
 } from "./ChatView.logic";
 import { usePullRequestDraftThread } from "./chat/usePullRequestDraftThread";
 import { useComposerSelection } from "./chat/useComposerSelection";
+import { useComposerFocus } from "./chat/useComposerFocus";
 import { useProjectCloneBanner } from "./chat/useProjectCloneBanner";
 import { useAttachmentPreviewHandoff } from "./chat/useAttachmentPreviewHandoff";
 import {
@@ -186,7 +187,6 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { shortcutLabelForCommand } from "../keybindings";
 import { cn } from "~/lib/utils";
-import { isModelPickerOpen } from "../modelPickerVisibility";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { toastManager } from "./ui/toast";
 import { projectScriptIdFromCommand } from "~/projectScripts";
@@ -264,9 +264,7 @@ import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
-  BranchRestoreConfirmHost,
   DeviceSetupDialogHost,
-  openBranchRestoreConfirm,
   PullRequestThreadDialogHost,
   RevertConfirmHost,
 } from "./chat/ChatOverlayHosts";
@@ -332,7 +330,6 @@ import {
 import {
   buildLocalDraftThread,
   deriveCommittedServerUserMessageIds,
-  dismissBranchMismatchForSession,
   shouldRenderPreviewMiniPlayer,
   deriveLockedProvider,
   resolveFileAttachmentUrl,
@@ -357,7 +354,7 @@ import { ThreadVisitWatermark } from "./chat/ThreadVisitWatermark";
 import { ChatTerminalDrawers } from "./chat/ChatTerminalDrawers";
 import { ChatRightPanel } from "./chat/ChatRightPanel";
 import { useDraftEnvironmentRouting } from "./chat/useDraftEnvironmentRouting";
-import { branchMismatchBannerItem, extensionStatusBannerItem } from "./chat/ThreadActivityBanners";
+import { extensionStatusBannerItem } from "./chat/ThreadActivityBanners";
 import { ThreadNow } from "./chat/ThreadNow";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { useDelayedStatus } from "../hooks/useDelayedStatus";
@@ -1799,10 +1796,8 @@ export default function ChatView(props: ChatViewProps) {
     sendInFlightRef,
   });
 
-  const focusComposer = () => {
-    composerRef.current?.focusAtEnd();
-  };
-  const focusComposerStable = useStableCallback(focusComposer);
+  const { focusComposer: focusComposerStable, scheduleComposerFocus: scheduleComposerFocusStable } =
+    useComposerFocus(composerRef);
   const canInterruptRunningThread =
     canOperateThread && deriveCanInterruptRunningThread(activeThread !== undefined, activeRuntime);
   const onInterrupt = async () => {
@@ -1829,13 +1824,6 @@ export default function ChatView(props: ChatViewProps) {
     () => (embedded ? undefined : subscribeSnapShotComposerFocus(focusComposerStable)),
     [embedded, focusComposerStable],
   );
-  const scheduleComposerFocus = () => {
-    window.requestAnimationFrame(() => {
-      // The model picker stays open through its own changes, so it keeps focus.
-      if (!isModelPickerOpen()) focusComposer();
-    });
-  };
-  const scheduleComposerFocusStable = useStableCallback(scheduleComposerFocus);
   const insertArtifactTemplate = (template: CodexArtifactTemplate) => {
     const composer = composerRef.current;
     if (!composer) return;
@@ -1850,7 +1838,7 @@ export default function ChatView(props: ChatViewProps) {
       });
       return;
     }
-    scheduleComposerFocus();
+    scheduleComposerFocusStable();
   };
   const insertArtifactTemplateStable = useStableCallback(insertArtifactTemplate);
   const sendAppMessage = async (text: string) => {
@@ -2385,18 +2373,12 @@ export default function ChatView(props: ChatViewProps) {
   const pullRequestSurfaceAvailable = supportsPullRequests && pullRequestPanelTarget !== null;
   const {
     acknowledgeActiveThreadWoke,
-    activeBranchMismatchKey,
     attentionNow,
     workNow,
     childInputNow,
     goalNow,
-    handleSwitchCheckoutToThread,
-    handleSwitchCheckoutToThreadStable,
-    isRestoringThreadBranch,
     onOpenRelatedThreadStable,
     sendStandaloneCommand,
-    setBranchMismatchDismissTick,
-    showBranchMismatchBanner,
     threadStatusLine,
     shortcuts: threadLifecycleShortcuts,
   } = useThreadLifecycle({
@@ -2413,7 +2395,6 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadShell,
     activeLatestRun,
     limitRecoveryHoldsSnooze,
-    activeProjectCwd,
     serverConfig,
     runtimeMode,
     isWorking,
@@ -2422,10 +2403,8 @@ export default function ChatView(props: ChatViewProps) {
     activePendingApproval,
     activePendingUserInput,
     localCheckoutBranchMismatch,
-    gitStatusQuery,
     nowMinute,
     composerRef,
-    composerDraftTarget,
     sendInFlightRef,
     setOptimisticUserMessages,
     setThreadError,
@@ -2510,15 +2489,6 @@ export default function ChatView(props: ChatViewProps) {
   const toggleKeepFullHistory = () => setKeepFullHistory(routeThreadKey, !keepFullHistory);
   const toggleKeepFullHistoryStable = useStableCallback(toggleKeepFullHistory);
   const armFreshSessionStable = useStableCallback(() => armFreshSession(routeThreadKey));
-  const handleRestoreThreadBranch = () => {
-    if (!canWriteSourceControl) return;
-    if (gitStatusQuery.data?.hasWorkingTreeChanges) {
-      if (activeThreadKey !== null) openBranchRestoreConfirm(activeThreadKey);
-      return;
-    }
-    void handleSwitchCheckoutToThread();
-  };
-  const handleRestoreThreadBranchStable = useStableCallback(handleRestoreThreadBranch);
   const feedbackBannerItems = feedbackSubmissions.flatMap((submission) => {
     const item = feedbackBannerItem(submission, () => {
       setFeedbackSubmissionsByThreadKey((current) => ({
@@ -2609,18 +2579,6 @@ export default function ChatView(props: ChatViewProps) {
       freshSessionAvailable && freshSessionArmed && activePendingApproval === null
         ? [freshSessionBannerItem(() => disarmFreshSession(routeThreadKey))]
         : [];
-    if (!localCheckoutBranchMismatch || !showBranchMismatchBanner || !activeBranchMismatchKey) {
-      return [
-        ...feedbackBannerItems,
-        ...fallbackItems,
-        ...limitRecoveryItems,
-        ...extensionStatusItems,
-        ...usageLimitsItems,
-        ...projectCloneItems,
-        ...freshSessionItems,
-        ...systemComposerBannerItems,
-      ];
-    }
     return [
       ...feedbackBannerItems,
       ...fallbackItems,
@@ -2630,17 +2588,6 @@ export default function ChatView(props: ChatViewProps) {
       ...projectCloneItems,
       ...freshSessionItems,
       ...systemComposerBannerItems,
-      branchMismatchBannerItem({
-        mismatchKey: activeBranchMismatchKey,
-        mismatch: localCheckoutBranchMismatch,
-        restoreDisabled: !canWriteSourceControl || isRestoringThreadBranch,
-        restoring: isRestoringThreadBranch,
-        onRestore: handleRestoreThreadBranchStable,
-        onDismiss: () => {
-          dismissBranchMismatchForSession(activeBranchMismatchKey);
-          setBranchMismatchDismissTick((tick) => tick + 1);
-        },
-      }),
     ];
   })() as ComposerBannerStackItem[];
 
@@ -2677,7 +2624,7 @@ export default function ChatView(props: ChatViewProps) {
       document.activeElement?.getAttribute("data-testid") === "composer-editor" &&
       isInSideChatPane(document.activeElement) === embedded,
     draftThreadRoute: routeKind === "draft",
-    turnRunning: phase === "running",
+    turnRunning: phase === "running" || phase === "connecting",
     composerRequiresModifier: composerRequiresModifier(settings.sendShortcut, promptRef.current),
     isWeb: !isElectron,
     isDesktop: isElectron,
@@ -2855,7 +2802,7 @@ export default function ChatView(props: ChatViewProps) {
     canOverrideServerThreadEnvMode,
     setPendingServerThreadEnvModeEntry,
     setPendingServerThreadStartFromOriginByThreadId,
-    scheduleComposerFocus,
+    scheduleComposerFocus: scheduleComposerFocusStable,
   });
   const { onResume, isResuming } = useComposerResume({
     environmentId,
@@ -3824,13 +3771,6 @@ export default function ChatView(props: ChatViewProps) {
 
             {embedded ? null : (
               <>
-                <BranchRestoreConfirmHost
-                  threadKey={activeThreadKey}
-                  threadBranch={localCheckoutBranchMismatch?.threadBranch ?? ""}
-                  canWriteSourceControl={canWriteSourceControl}
-                  onConfirm={handleSwitchCheckoutToThreadStable}
-                />
-
                 <ThreadDetailsPanel
                   anchor={threadPanelPopoverAnchorRef}
                   handle={threadPanelPopoverHandle}

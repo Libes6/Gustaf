@@ -4,7 +4,6 @@ export const settingsStatusMessages = {
       " Press {shortcut} with a prompt in the composer to stash it.",
     "settingsStatus.attachInterruptedFile": "Attach the interrupted file again or remove it",
     "settingsStatus.attachInterruptedFiles": "Attach the interrupted files again or remove them",
-    "settingsStatus.dismissBranchNotice": "Dismiss branch change notice",
 
     "settingsStatus.hostAccounts": "{host} accounts and token",
     "settingsStatus.hostCredentials": "{host} credentials",
@@ -25,7 +24,6 @@ export const settingsStatusMessages = {
       " Нажмите {shortcut}, чтобы отложить запрос из редактора.",
     "settingsStatus.attachInterruptedFile": "Прикрепите прерванный файл заново или удалите его",
     "settingsStatus.attachInterruptedFiles": "Прикрепите прерванные файлы заново или удалите их",
-    "settingsStatus.dismissBranchNotice": "Скрыть уведомление о смене ветки",
 
     "settingsStatus.hostAccounts": "Аккаунты и токен {host}",
     "settingsStatus.hostCredentials": "Учётные данные {host}",

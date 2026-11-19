@@ -1,7 +1,13 @@
 import { assert, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { CommandId, ProjectId, ThreadId, VcsProcessSpawnError } from "@t3tools/contracts";
+import {
+  CommandId,
+  ProjectId,
+  ThreadId,
+  VcsProcessSpawnError,
+  VcsProcessTimeoutError,
+} from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -11,6 +17,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
+import { ChildProcessSpawner } from "effect/process";
 import * as Scope from "effect/Scope";
 
 import * as ServerConfig from "../config.ts";
@@ -54,7 +61,7 @@ const layerRealGit = GitVcsDriver.layer.pipe(Layer.provide(VcsProcess.layer));
 
 interface HarnessOptions {
   readonly vcsProcess?: Layer.Layer<VcsProcess.VcsProcess>;
-  readonly git?: Layer.Layer<GitVcsDriver.GitVcsDriver>;
+  readonly git?: typeof layerRealGit;
   readonly projects?: (
     real: ProjectService.ProjectService["Service"],
   ) => ProjectService.ProjectService["Service"];
@@ -153,6 +160,44 @@ it.effect("offers a Scratch folder when Git is not installed", () =>
             }),
           ),
       }),
+    },
+  ),
+);
+
+it.effect("offers the Scratch folder once a Git check that timed out is asked again", () =>
+  withScratch(
+    ({ baseDir }) =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const scratch = yield* ManagedProjectFolders.ManagedProjectFolders;
+        assert.isTrue(Option.isNone(yield* scratch.scratchRoot));
+        assert.equal(yield* requireRoot, path.resolve(baseDir, "scratch"));
+      }),
+    {
+      vcsProcess: Layer.effect(
+        VcsProcess.VcsProcess,
+        Effect.map(VcsProcess.make, (real) => {
+          let timedOut = false;
+          return VcsProcess.VcsProcess.of({
+            run: (input) =>
+              Effect.suspend(() => {
+                if (timedOut) return real.run(input);
+                timedOut = true;
+                return Effect.fail(
+                  new VcsProcessTimeoutError({
+                    operation: input.operation,
+                    command: input.command,
+                    cwd: input.cwd,
+                    timeoutMs: 5_000,
+                  }),
+                );
+              }),
+          });
+        }),
+      ).pipe(
+        Layer.provide(ProcessRunner.layer),
+        Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+      ),
     },
   ),
 );
@@ -431,6 +476,41 @@ it.effect("keeps a named project and reports why when Git cannot commit", () =>
         assert.isTrue(yield* fileSystem.exists(path.join(result.workspaceRoot, ".git")));
       }),
     ),
+  ),
+);
+
+it.effect("says Git is not installed when a named project cannot start Git", () =>
+  withScratch(
+    () =>
+      Effect.gen(function* () {
+        const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
+
+        const failure = yield* Effect.flip(folders.createNamedProject({ name: "T3Code Test" }));
+
+        assert.strictEqual(
+          failure.message,
+          "Git isn't installed on this machine. Install Git to create a project.",
+        );
+      }),
+    {
+      git: GitVcsDriver.layer.pipe(
+        Layer.provide(
+          Layer.succeed(
+            ChildProcessSpawner.ChildProcessSpawner,
+            ChildProcessSpawner.make(() =>
+              Effect.fail(
+                PlatformError.systemError({
+                  _tag: "NotFound",
+                  module: "ChildProcess",
+                  method: "spawn",
+                  syscall: "spawn git",
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    },
   ),
 );
 

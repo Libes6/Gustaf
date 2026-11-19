@@ -82,10 +82,9 @@ it.each([
     } as EnvironmentThreadShell,
   ];
   await using screen = await render(
-    <RestoreBranchHarness
+    <LifecycleHarness
       thread={parent}
       currentRouteThreadKeyRef={{ current: parent.routeThreadKey }}
-      refreshGitStatus={() => undefined}
       focusComposer={() => undefined}
     />,
     { router: "/environment:test/parent" },
@@ -98,10 +97,9 @@ it.each([
   );
 });
 
-function RestoreBranchHarness(props: {
+function LifecycleHarness(props: {
   readonly thread: ThreadInput;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
-  readonly refreshGitStatus: () => void;
   readonly focusComposer: () => void;
 }) {
   const lifecycle = useThreadLifecycle({
@@ -113,7 +111,6 @@ function RestoreBranchHarness(props: {
     activeThreadShell: null,
     limitRecoveryHoldsSnooze: false,
     activeLatestRun: null as never,
-    activeProjectCwd: "/repo",
     serverConfig: null,
     runtimeMode: "full-access" as never,
     isWorking: false,
@@ -121,10 +118,8 @@ function RestoreBranchHarness(props: {
     turnItems: [],
     activePendingApproval: null as never,
     activePendingUserInput: null as never,
-    gitStatusQuery: { refresh: props.refreshGitStatus },
     nowMinute: "",
     composerRef: { current: { focusAtEnd: props.focusComposer } } as never,
-    composerDraftTarget: { kind: "thread", ref: props.thread.activeThreadRef } as never,
     sendInFlightRef: { current: false },
     setOptimisticUserMessages: () => undefined,
     setThreadError: () => undefined,
@@ -139,93 +134,9 @@ function RestoreBranchHarness(props: {
       {lifecycle.childInputNow?.description}
       {lifecycle.childInputNow?.actions}
       {lifecycle.workNow?.actions}
-      <button
-        type="button"
-        disabled={lifecycle.isRestoringThreadBranch}
-        onClick={lifecycle.handleSwitchCheckoutToThreadStable}
-      >
-        {lifecycle.isRestoringThreadBranch ? "Restoring..." : "Restore branch"}
-      </button>
     </>
   );
 }
-
-it.each(["a", "b", "navigation"] as const)(
-  "isolates restore completion and queued focus for %s",
-  async (scenario) => {
-    const first = scenario === "b" ? "b" : "a";
-    setup();
-    const completions: Array<(result: unknown) => void> = [];
-    const switchRef = vi.fn(() => new Promise<unknown>((resolve) => completions.push(resolve)));
-    state.switchRef = switchRef;
-    const threadA = threadInput("thread:a", "feature-a");
-    const threadB = threadInput("thread:b", "feature-b");
-    const currentRouteThreadKeyRef = { current: threadA.routeThreadKey };
-    const refreshGitStatus = vi.fn();
-    const focusComposer = vi.fn();
-    const harness = (thread: ThreadInput) => (
-      <RestoreBranchHarness
-        thread={thread}
-        currentRouteThreadKeyRef={currentRouteThreadKeyRef}
-        refreshGitStatus={refreshGitStatus}
-        focusComposer={focusComposer}
-      />
-    );
-    await using screen = await render(harness(threadA));
-    const focusFrames: FrameRequestCallback[] = [];
-    using _frame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
-      focusFrames.push(callback);
-      return 0;
-    });
-
-    await page.getByRole("button", { name: "Restore branch" }).click();
-    await expect.element(page.getByRole("button", { name: "Restoring..." })).toBeDisabled();
-
-    // ChatView stays mounted across server threads, so the hook sees thread B in place.
-    currentRouteThreadKeyRef.current = threadB.routeThreadKey;
-    await screen.rerender(harness(threadB));
-    await expect.element(page.getByRole("button", { name: "Restore branch" })).toBeEnabled();
-    await page.getByRole("button", { name: "Restore branch" }).click();
-    expect(switchRef).toHaveBeenLastCalledWith(
-      expect.objectContaining({ input: { cwd: "/repo", refName: "feature-b" } }),
-    );
-
-    // Back on thread A, its own restore is still pending, so it can't start a second one.
-    currentRouteThreadKeyRef.current = threadA.routeThreadKey;
-    await screen.rerender(harness(threadA));
-    await expect.element(page.getByRole("button", { name: "Restoring..." })).toBeDisabled();
-    currentRouteThreadKeyRef.current = threadB.routeThreadKey;
-    await screen.rerender(harness(threadB));
-
-    const completed = first === "a" ? threadA : threadB;
-    const pending = first === "a" ? threadB : threadA;
-    currentRouteThreadKeyRef.current = pending.routeThreadKey;
-    await screen.rerender(harness(pending));
-    completions[first === "a" ? 0 : 1]!({
-      _tag: "Success",
-      value: { refName: completed.localCheckoutBranchMismatch.threadBranch },
-    });
-    await vi.waitFor(() => expect(refreshGitStatus).toHaveBeenCalledOnce());
-    expect(focusComposer).not.toHaveBeenCalled();
-    await expect.element(page.getByRole("button", { name: "Restoring..." })).toBeDisabled();
-    expect(switchRef).toHaveBeenCalledTimes(2);
-
-    completions[first === "a" ? 1 : 0]!({
-      _tag: "Success",
-      value: { refName: pending.localCheckoutBranchMismatch.threadBranch },
-    });
-    await expect.element(page.getByRole("button", { name: "Restore branch" })).toBeEnabled();
-    expect(refreshGitStatus).toHaveBeenCalledTimes(2);
-    expect(focusComposer).not.toHaveBeenCalled();
-    expect(focusFrames).toHaveLength(1);
-    if (scenario === "navigation") {
-      currentRouteThreadKeyRef.current = completed.routeThreadKey;
-      await screen.rerender(harness(completed));
-    }
-    focusFrames[0]!(0);
-    expect(focusComposer).toHaveBeenCalledTimes(scenario === "navigation" ? 0 : 1);
-  },
-);
 
 it.each(["Success", "Failure"] as const)(
   "keeps background stop requests per thread after %s",
@@ -237,10 +148,9 @@ it.each(["Success", "Failure"] as const)(
     const threadB = threadInput("thread:b", "feature-b");
     const currentRouteThreadKeyRef = { current: threadA.routeThreadKey };
     const harness = (thread: ThreadInput) => (
-      <RestoreBranchHarness
+      <LifecycleHarness
         thread={thread}
         currentRouteThreadKeyRef={currentRouteThreadKeyRef}
-        refreshGitStatus={() => undefined}
         focusComposer={() => undefined}
       />
     );

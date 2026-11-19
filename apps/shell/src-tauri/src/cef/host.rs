@@ -97,10 +97,14 @@ thread_local! {
     static CONTEXTS: RefCell<HashMap<String, RequestContext>> = RefCell::default();
 }
 
-/// A profile's folder under Chromium's root, named so any profile id is a safe file name.
-fn profile_dir(profile: &str) -> Option<PathBuf> {
+/// Chrome-style CEF only opens a profile whose folder sits directly in `root_cache_path`;
+/// a deeper one fails with "Cannot create profile" and the tab stops answering.
+const PROFILE_DIR_PREFIX: &str = "gustaf-profile-";
+
+/// A profile's folder name in Chromium's root, a safe file name for any profile id.
+fn profile_folder_name(profile: &str) -> String {
     use std::fmt::Write;
-    let mut name = String::new();
+    let mut name = PROFILE_DIR_PREFIX.to_owned();
     for byte in profile.bytes() {
         if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
             name.push(byte as char);
@@ -108,7 +112,11 @@ fn profile_dir(profile: &str) -> Option<PathBuf> {
             let _ = write!(name, "%{byte:02X}");
         }
     }
-    Some(PROFILE_ROOT.get()?.join("profiles").join(name))
+    name
+}
+
+fn profile_dir(profile: &str) -> Option<PathBuf> {
+    Some(PROFILE_ROOT.get()?.join(profile_folder_name(profile)))
 }
 
 fn new_context(cache_path: Option<&std::path::Path>) -> Option<RequestContext> {
@@ -139,13 +147,15 @@ pub fn clear_cookies(profile: Option<&str>) {
     let profiles: Vec<String> = match profile {
         Some(profile) => vec![profile.to_owned()],
         None => {
-            let root = PROFILE_ROOT.get().map(|root| root.join("profiles"));
             let mut names: Vec<String> =
                 CONTEXTS.with(|contexts| contexts.borrow().keys().cloned().collect());
             // Profiles without an open tab this run still keep cookies on disk.
-            if let Some(entries) = root.and_then(|root| std::fs::read_dir(root).ok()) {
+            if let Some(entries) = PROFILE_ROOT.get().and_then(|root| std::fs::read_dir(root).ok()) {
                 for entry in entries.flatten() {
-                    names.push(decode_profile_name(&entry.file_name().to_string_lossy()));
+                    let file_name = entry.file_name().to_string_lossy().into_owned();
+                    if let Some(name) = file_name.strip_prefix(PROFILE_DIR_PREFIX) {
+                        names.push(decode_profile_name(name));
+                    }
                 }
             }
             names.sort();
@@ -862,6 +872,13 @@ pub fn is_open(tab_id: &str) -> bool {
 }
 
 pub fn close_tab(tab_id: &str) {
+    // A browser that never finishes closing must not stay drawn over the app.
+    if let Some(view) = view_of(tab_id) {
+        // SAFETY: CEF's browser view, alive while its browser is, on the main thread.
+        unsafe {
+            let _: () = msg_send![view, setHidden: true];
+        }
+    }
     match browser_of(tab_id).and_then(|browser| browser.host()) {
         Some(host) => host.close_browser(1),
         // Not created yet: forget it so the creation callback finds nothing to attach.
@@ -928,4 +945,22 @@ pub fn stop() {
     }
     SHUT_DOWN.store(true, Ordering::SeqCst);
     shutdown();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn profile_folders_sit_directly_in_the_chromium_root() {
+        for profile in ["default", "work account", "a/b", "../x", "профиль"] {
+            let name = profile_folder_name(profile);
+            let path = std::path::Path::new("/root").join(&name);
+            assert_eq!(path.parent(), Some(std::path::Path::new("/root")), "{profile}");
+            assert_eq!(
+                decode_profile_name(name.strip_prefix(PROFILE_DIR_PREFIX).unwrap()),
+                profile
+            );
+        }
+    }
 }
