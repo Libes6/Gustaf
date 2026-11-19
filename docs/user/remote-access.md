@@ -49,7 +49,7 @@ then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
 For a command-line host, run `gustaf up`. It asks whether to allow the local
-network and, on Linux and macOS, runs Gustaf as a
+network and runs Gustaf as a
 [background service](./background-service.md). Run it again to change your
 choice, and `gustaf status` to see it. To skip the question, run:
 
@@ -60,9 +60,9 @@ gustaf up --lan
 `--no-lan` turns it off, and `--yes` keeps the current setting. Without a
 terminal, a needed restart runs without asking and stops running agent turns,
 and a machine with nothing set up needs `--lan`, `--no-lan`, or `--yes`.
-`gustaf status --json` prints the settings for scripts. The background service is
-not available on Windows, so there `gustaf up` prints the `gustaf serve` command to keep
-running in a terminal.
+`gustaf status --json` prints the settings for scripts. On Windows, use the PowerShell installer first and run `gustaf up` from its
+`gustaf` command. The scheduled task starts at each sign-in, including after a
+reboot. Keep the host signed in and awake.
 
 For a server in a terminal, run `gustaf serve --lan`. Either way, Gustaf then
 accepts connections from your local network and tailnet, so a pairing code is
@@ -87,7 +87,7 @@ For a Linux laptop reaching a Windows cloud VM, prefer Tailscale and
 provider's inbound rules, and restrict those rules to your laptop's IP. Use HTTPS
 through a reverse proxy for public access. Plain HTTP pairing exposes credentials
 on the network. See [background service](./background-service.md) for platform
-availability; Windows currently still requires a running desktop app or terminal.
+availability; on Windows, `gustaf up` keeps the server running after sign-in.
 
 If adding an environment times out, check the bind address, host firewall and
 cloud inbound rules first. An address without a scheme uses HTTP for IP addresses
