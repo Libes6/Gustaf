@@ -410,6 +410,12 @@ wrap_life_span_handler! {
             }
         }
 
+        // Unhandled, CEF answers a closing browser by calling performClose on its parent window,
+        // which is the main window and so raises the quit dialog. The tab is not the window.
+        fn do_close(&self, _browser: Option<&mut Browser>) -> ::std::os::raw::c_int {
+            1
+        }
+
         fn on_before_close(&self, _browser: Option<&mut Browser>) {
             hide_pointer(&self.tab_id);
             TABS.with(|tabs| tabs.borrow_mut().remove(&self.tab_id));
