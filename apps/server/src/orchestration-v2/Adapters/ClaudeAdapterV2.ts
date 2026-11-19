@@ -8670,8 +8670,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               Effect.gen(function* () {
                 const nativeThreadId =
                   input.context.input.providerThread.nativeThreadRef?.nativeId ?? null;
+                const liveQuery = yield* Ref.get(queryContext);
+                const processKeepsTasks =
+                  input.status === "failed" &&
+                  liveQuery !== null &&
+                  !liveQuery.stopping &&
+                  liveQuery.lastTurn === input.context;
                 if (nativeThreadId !== null) {
-                  if (input.status !== "completed") {
+                  if (input.status !== "completed" && !processKeepsTasks) {
                     yield* clearPendingBackgroundTasksForNativeThread(nativeThreadId);
                     yield* clearNativeThreadTaskIdSet(
                       wakeEligibleBackgroundTasksByNativeThread,
@@ -8705,7 +8711,6 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   nativeThreadId === null ? undefined : goalsByNativeThread.get(nativeThreadId);
                 const goalChecked = goalCheckedTurns.delete(input.context.providerTurnId);
                 const terminalReason = input.result?.terminal_reason;
-                const liveQuery = yield* Ref.get(queryContext);
                 if (
                   nativeThreadId !== null &&
                   goal?.status === "active" &&
