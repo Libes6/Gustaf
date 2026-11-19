@@ -3938,6 +3938,24 @@ describe("CodexAdapterV2 post-settle continuation", () => {
               },
             },
             {
+              type: "emit_inbound",
+              afterMs: 5 * 60 * 1000,
+              label: "error/retry-2",
+              frame: {
+                method: "error",
+                params: {
+                  threadId: nativeThreadId,
+                  turnId: nativeTurnId,
+                  willRetry: true,
+                  error: {
+                    message: "Reconnecting... 2/5",
+                    additionalDetails: "exceeded retry limit, last status: 429 Too Many Requests",
+                    codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: 429 } },
+                  },
+                },
+              },
+            },
+            {
               type: "expect_outbound",
               label: "turn/interrupt",
               frame: {
@@ -3995,7 +4013,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           terminal.failure.message,
           "exceeded retry limit, last status: 429 Too Many Requests",
         );
-        assert.equal(terminal.retry?.attempt, 1);
+        assert.equal(terminal.retry?.attempt, 2);
         assert.equal(terminal.threadDisposition, "reusable");
       }).pipe(
         Effect.provide(
