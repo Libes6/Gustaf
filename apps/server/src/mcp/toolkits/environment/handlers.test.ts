@@ -1,3 +1,4 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import {
   DEFAULT_SERVER_SETTINGS,
@@ -6,6 +7,7 @@ import {
   ThreadId,
   type OrchestrationV2ThreadShell,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -13,6 +15,8 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
+import { ServerConfig } from "../../../config.ts";
+import * as TraceDiagnostics from "../../../diagnostics/TraceDiagnostics.ts";
 import * as Environment from "../../../environment/ServerEnvironment.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import * as ThreadManagement from "../../../orchestration-v2/ThreadManagementService.ts";
@@ -94,4 +98,99 @@ it.effect("refuses a preferences update when the caller's turn ends while it wai
       ),
     );
   }),
+);
+
+it.effect("returns client crashes once, apart from the server failures", () =>
+  Effect.gen(function* () {
+    const toolkit = yield* EnvironmentToolkit;
+    const result = yield* toolkit
+      .handle("t3_environment_errors_read", {})
+      .pipe(Stream.unwrap, Stream.runCollect);
+    expect(result.at(-1)?.result).toEqual({
+      clientCrashes: [
+        {
+          at: "2026-11-18T16:32:40.000Z",
+          kind: "route",
+          route: "/environment/thread",
+          message: "t is not defined",
+          stack: "ReferenceError: t is not defined\n    at branchMismatchBannerItem",
+          surface: "desktop",
+          appVersion: "0.18.0",
+        },
+      ],
+      serverFailures: [
+        {
+          name: "PreviewToolkit.invoke",
+          cause: "Preview automation timed out",
+          count: 2,
+          lastSeenAt: "2026-11-18T16:00:00.000Z",
+        },
+      ],
+    });
+  }).pipe(
+    Effect.provide(
+      McpToolAccess.HandlersLayer.layer(EnvironmentHandlers.layer).pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(
+            Layer.succeed(McpInvocationContext.McpInvocationContext, {
+              environmentId,
+              requestNamespace: "provider:errors",
+              thread: undefined,
+              client: undefined,
+              capabilities: new Set(["orchestration" as const]),
+              issuedAt: 0,
+            }),
+            Layer.mock(ThreadManagement.ThreadManagementService)({}),
+            Layer.mock(Environment.ServerEnvironment)({
+              getDescriptor: Effect.succeed({
+                environmentId,
+                label: "Test",
+                platform: { os: "linux", arch: "x64" },
+                serverVersion: "0.0.0",
+                capabilities: { repositoryIdentity: false },
+              }),
+            }),
+            ServerConfig.layerTest(process.cwd(), { prefix: "t3-environment-errors-" }).pipe(
+              Layer.provide(NodeServices.layer),
+            ),
+            Layer.mock(TraceDiagnostics.TraceDiagnostics)({
+              readClientCrashes: () =>
+                Effect.succeed([
+                  {
+                    endedAt: DateTime.makeUnsafe("2026-11-18T16:32:40.000Z"),
+                    kind: "route",
+                    route: "/environment/thread",
+                    message: "t is not defined",
+                    stack: "ReferenceError: t is not defined\n    at branchMismatchBannerItem",
+                    surface: "desktop",
+                    appVersion: "0.18.0",
+                  },
+                ]),
+              read: () =>
+                Effect.succeed({
+                  commonFailures: [
+                    {
+                      name: TraceDiagnostics.CLIENT_CRASH_SPAN_NAME,
+                      cause: "t is not defined",
+                      count: 1,
+                      lastSeenAt: DateTime.makeUnsafe("2026-11-18T16:32:40.000Z"),
+                      traceId: "trace-crash",
+                      spanId: "span-crash",
+                    },
+                    {
+                      name: "PreviewToolkit.invoke",
+                      cause: "Preview automation timed out",
+                      count: 2,
+                      lastSeenAt: DateTime.makeUnsafe("2026-11-18T16:00:00.000Z"),
+                      traceId: "trace-preview",
+                      spanId: "span-preview",
+                    },
+                  ],
+                } as never),
+            }),
+          ),
+        ),
+      ),
+    ),
+  ),
 );

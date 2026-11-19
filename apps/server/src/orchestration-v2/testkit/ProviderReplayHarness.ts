@@ -154,6 +154,7 @@ export function makeReplayServerConfig(
       logsDir,
       serverLogPath: path.join(logsDir, "server.log"),
       serverTracePath: path.join(logsDir, "server.trace.ndjson"),
+      clientCrashLogPath: path.join(logsDir, "client-crashes.ndjson"),
       providerLogsDir,
       providerEventLogPath: path.join(providerLogsDir, "events.log"),
       terminalLogsDir,
@@ -501,6 +502,7 @@ export function layerWithRegistry<Error>(
         getThreadProjection: orchestrator.getThreadProjection,
         recoverDelegatedTask: orchestrator.recoverDelegatedTask,
         delegatedTaskResultPending: orchestrator.delegatedTaskResultPending,
+        streamStoredEventsFrom: orchestrator.streamStoredEventsFrom,
       });
     }),
   ).pipe(Layer.provide(layerOrchestratorProvided));

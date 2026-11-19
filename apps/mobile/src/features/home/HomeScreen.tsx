@@ -770,6 +770,14 @@ export function HomeScreen(props: HomeScreenProps) {
         detail={`Looking for "${props.searchQuery}" in messages.`}
         variant={Platform.OS === "android" ? "plain" : undefined}
       />
+    ) : hasSearchQuery && threadSearch.failed ? (
+      <EmptyState
+        title={t("Search failed")}
+        detail={t(
+          'Couldn\'t search messages for "{query}". Change the search to try again.',
+        ).replace("{query}", props.searchQuery)}
+        variant={Platform.OS === "android" ? "plain" : undefined}
+      />
     ) : hasSearchQuery ? (
       <EmptyState
         title={t("No results")}

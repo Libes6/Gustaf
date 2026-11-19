@@ -132,56 +132,6 @@ export function DeviceSetupDialogHost(props: {
   );
 }
 
-const branchRestoreConfirmAtom = makeThreadOverlayAtom<true>("branch-restore-confirm");
-
-export function openBranchRestoreConfirm(threadKey: string): void {
-  appAtomRegistry.set(branchRestoreConfirmAtom, { threadKey, value: true });
-}
-
-export function BranchRestoreConfirmHost(props: {
-  readonly threadKey: string | null;
-  readonly threadBranch: string;
-  readonly canWriteSourceControl: boolean;
-  readonly onConfirm: () => void;
-}) {
-  const t = useT();
-  const open = useThreadOverlay(branchRestoreConfirmAtom, props.threadKey) !== null;
-  return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) closeThreadOverlay(branchRestoreConfirmAtom);
-      }}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {t("webCopy.switchTo")} <code className="font-medium">{props.threadBranch}</code>?
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("chatA.chatOverlayHosts.uncommittedChanges")}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>
-            {t("chatA.chatOverlayHosts.cancel")}
-          </AlertDialogClose>
-          <Button
-            variant="default"
-            disabled={!props.canWriteSourceControl}
-            onClick={() => {
-              closeThreadOverlay(branchRestoreConfirmAtom);
-              props.onConfirm();
-            }}
-          >
-            {t("chatA.chatOverlayHosts.switchBranch")}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
-  );
-}
-
 interface PendingRevert {
   readonly turnCount: number;
   readonly messageId: MessageId;

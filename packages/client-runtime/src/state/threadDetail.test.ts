@@ -4,6 +4,7 @@ import {
   MessageId,
   RunId,
   TurnItemId,
+  type OrchestrationV2ConversationMessage,
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
@@ -46,9 +47,29 @@ const assistant: OrchestrationV2TurnItem = {
   streaming: true,
 };
 
-function withItem(item: OrchestrationV2TurnItem, updatedAt = v2Now) {
+const assistantMessage: OrchestrationV2ConversationMessage = {
+  createdBy: "agent",
+  creationSource: "provider",
+  id: MessageId.make("message-assistant"),
+  threadId: v2ThreadId,
+  runId: RunId.make("run-1"),
+  nodeId: null,
+  role: "assistant",
+  text: "Hel",
+  attachments: [],
+  streaming: true,
+  createdAt: v2Now,
+  updatedAt: v2Now,
+};
+
+function withItem(
+  item: OrchestrationV2TurnItem,
+  updatedAt = v2Now,
+  message: OrchestrationV2ConversationMessage = assistantMessage,
+) {
   return {
     ...v2Projection,
+    messages: [message],
     turnItems: [item],
     visibleTurnItems: [
       {
@@ -67,13 +88,19 @@ describe("sameThreadStructure", () => {
   const before = withItem(assistant);
 
   it("holds through streamed text", () => {
-    const next = withItem({ ...assistant, text: "Hello", updatedAt: later }, later);
+    const next = withItem({ ...assistant, text: "Hello", updatedAt: later }, later, {
+      ...assistantMessage,
+      text: "Hello",
+      updatedAt: later,
+    });
     expect(sameThreadStructure(before, next)).toBe(true);
   });
 
   it("sees the item finish streaming", () => {
     const next = withItem({ ...assistant, text: "Hello", streaming: false, status: "completed" });
     expect(sameThreadStructure(before, next)).toBe(false);
+    const message = { ...assistantMessage, text: "Hello", streaming: false };
+    expect(sameThreadStructure(before, withItem(assistant, v2Now, message))).toBe(false);
   });
 
   it("sees a new item", () => {

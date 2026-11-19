@@ -97,6 +97,15 @@ export function isLiveSubagentTurnItem(item: OrchestrationV2TurnItem): boolean {
   return item.type === "subagent" && isOrchestrationV2WorkActive(item.status);
 }
 
+export function waitingOnSubagentsLabel(
+  count: number,
+  translate: (text: string) => string = (text) => text,
+): string {
+  return count === 1
+    ? translate("Waiting on a subagent")
+    : translate("Waiting on {count} subagents").replace("{count}", String(count));
+}
+
 export interface SubagentWorkflowGroup {
   readonly workflow: RuntimeSubagent;
   readonly phases: ReadonlyArray<{

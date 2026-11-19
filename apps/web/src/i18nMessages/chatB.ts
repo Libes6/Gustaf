@@ -10,6 +10,9 @@ export const chatBMessages = {
     "chatB.useComposerSend.environmentUnavailableDescription":
       "Reconnecting to the environment. Try again once it is connected.",
     "chatB.useComposerSend.sideChatNotStartedTitle": "Side chat not started",
+    "chatB.useComposerSend.queuedSideChatTitle": "Queued message not updated",
+    "chatB.useComposerSend.queuedSideChatDescription":
+      "A queued message can't move to a side chat. Remove /side or /btw to save it.",
     "chatB.useComposerSend.sideChatTextOnlyTitle": "Side chats take text only",
     "chatB.useComposerSend.sideChatTextOnlyDescription":
       "Remove the attachments and context, then send it again.",
@@ -271,9 +274,6 @@ export const chatBMessages = {
     "chatB.ThreadActivityBanners.stop": "Stop",
     "chatB.useThreadLifecycle.failedUnsettle": "Failed to un-settle thread",
     "chatB.useThreadLifecycle.failedWake": "Failed to wake thread",
-    "chatB.useThreadLifecycle.failedSwitchCheckout": "Failed to switch checkout",
-    "chatB.useThreadLifecycle.checkoutSwitchedNotUpdated":
-      "Checkout switched, but the thread could not be updated",
     "chatB.useThreadLifecycle.failedStopBackgroundWork": "Failed to stop background work.",
     "chatB.useThreadLifecycle.noLongerAvailable": "This thread is no longer available",
     "chatB.useThreadLifecycle.errorOccurred": "An error occurred.",
@@ -550,6 +550,8 @@ export const chatBMessages = {
       "Background setup is still running: {name}. Show setup progress.",
     "chatB.TimelineWorkGroupRows.compacting": "Compacting…",
     "chatB.TimelineWorkGroupRows.thinking": "Thinking",
+    "chatB.TimelineWorkGroupRows.waitingOnSubagent": "Waiting on a subagent",
+    "chatB.TimelineWorkGroupRows.waitingOnSubagents": "Waiting on {count} subagents",
     "chatB.TimelineWorkGroupRows.thought": "Thought",
     "chatB.TimelineWorkGroupRows.toolCallFailed": "Tool call failed",
     "chatB.V2ItemInspector.outputUnavailable": "Output is no longer available.",
@@ -758,6 +760,9 @@ export const chatBMessages = {
     "chatB.useComposerSend.environmentUnavailableDescription":
       "Идёт переподключение к окружению. Повторите, когда подключение восстановится.",
     "chatB.useComposerSend.sideChatNotStartedTitle": "Боковой чат не запущен",
+    "chatB.useComposerSend.queuedSideChatTitle": "Сообщение в очереди не обновлено",
+    "chatB.useComposerSend.queuedSideChatDescription":
+      "Сообщение из очереди нельзя перенести в боковой чат. Уберите /side или /btw, чтобы сохранить его.",
     "chatB.useComposerSend.sideChatTextOnlyTitle": "Боковые чаты принимают только текст",
     "chatB.useComposerSend.sideChatTextOnlyDescription":
       "Удалите вложения и контекст, затем отправьте снова.",
@@ -1024,9 +1029,6 @@ export const chatBMessages = {
     "chatB.ThreadActivityBanners.stop": "Остановить",
     "chatB.useThreadLifecycle.failedUnsettle": "Не удалось вернуть тред в работу",
     "chatB.useThreadLifecycle.failedWake": "Не удалось разбудить тред",
-    "chatB.useThreadLifecycle.failedSwitchCheckout": "Не удалось переключить ветку",
-    "chatB.useThreadLifecycle.checkoutSwitchedNotUpdated":
-      "Ветка переключена, но тред не удалось обновить",
     "chatB.useThreadLifecycle.failedStopBackgroundWork": "Не удалось остановить фоновую работу.",
     "chatB.useThreadLifecycle.noLongerAvailable": "Этот тред больше не доступен",
     "chatB.useThreadLifecycle.errorOccurred": "Произошла ошибка.",
@@ -1305,6 +1307,8 @@ export const chatBMessages = {
       "Фоновая настройка ещё идёт: {name}. Показать ход настройки.",
     "chatB.TimelineWorkGroupRows.compacting": "Сжатие…",
     "chatB.TimelineWorkGroupRows.thinking": "Размышление",
+    "chatB.TimelineWorkGroupRows.waitingOnSubagent": "Ожидание субагента",
+    "chatB.TimelineWorkGroupRows.waitingOnSubagents": "Ожидание субагентов: {count}",
     "chatB.TimelineWorkGroupRows.thought": "Размышлял",
     "chatB.TimelineWorkGroupRows.toolCallFailed": "Вызов инструмента не удался",
     "chatB.V2ItemInspector.outputUnavailable": "Вывод больше не доступен.",
