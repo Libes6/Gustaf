@@ -502,6 +502,7 @@ export function layerWithRegistry<Error>(
         getThreadProjection: orchestrator.getThreadProjection,
         recoverDelegatedTask: orchestrator.recoverDelegatedTask,
         delegatedTaskResultPending: orchestrator.delegatedTaskResultPending,
+        streamStoredEventsFrom: orchestrator.streamStoredEventsFrom,
       });
     }),
   ).pipe(Layer.provide(layerOrchestratorProvided));
