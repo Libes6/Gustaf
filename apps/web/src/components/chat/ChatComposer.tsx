@@ -2140,7 +2140,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           sendEvent,
           dispatchMode ??
             resolveComposerDispatchMode({
-              running: phase === "running",
+              running: phase === "running" || phase === "connecting",
               alternateModifier: false,
               activeTurnDefault: followUpBehavior,
               canSteer: !isCompacting,
@@ -2171,7 +2171,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         keybindings,
         isSoftwareKeyboardOpen,
         isDraftThread: routeKind === "draft",
-        isRunning: phase === "running",
+        isRunning: phase === "running" || phase === "connecting",
         sendShortcut: settings.sendShortcut,
         prompt: promptRef.current,
       });
@@ -2181,7 +2181,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       submitComposer(
         undefined,
         resolveComposerDispatchMode({
-          running: phase === "running",
+          running: phase === "running" || phase === "connecting",
           alternateModifier: intent === "alternate",
           canSteer: !isCompacting,
           activeTurnDefault: followUpBehavior,
@@ -2195,7 +2195,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     submitComposer(
       event,
       resolveComposerDispatchMode({
-        running: phase === "running",
+        running: phase === "running" || phase === "connecting",
         alternateModifier: event.metaKey || event.ctrlKey,
         activeTurnDefault: followUpBehavior,
         canSteer: !isCompacting,
@@ -2207,7 +2207,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     submitComposer(
       undefined,
       resolveComposerDispatchMode({
-        running: phase === "running",
+        running: phase === "running" || phase === "connecting",
         alternateModifier: false,
         activeTurnDefault: followUpBehavior,
         canSteer: !isCompacting,
@@ -3652,11 +3652,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     {composerControls}
                   </div>
                   <ComposerFooterPrimaryActions
+                    // Stop state belongs to one thread; the composer stays mounted across threads.
+                    key={`${environmentId}:${activeThreadId ?? "new"}`}
                     compact={isComposerPrimaryActionsCompact}
                     canOperateThread={canOperateThread}
                     pendingAction={pendingPrimaryAction}
-                    isRunning={phase === "running"}
+                    isRunning={phase === "running" || phase === "connecting"}
                     canInterrupt={canInterrupt}
+                    runId={activeThread?.runtime?.activeRunId ?? null}
                     followUpBehavior={followUpBehavior}
                     canSteer={!isCompacting}
                     alternateShortcutLabel={shortcutLabelForCommand(

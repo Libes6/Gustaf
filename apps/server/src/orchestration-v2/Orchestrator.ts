@@ -88,7 +88,9 @@ import {
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as Exit from "effect/Exit";
+import * as FiberSet from "effect/FiberSet";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Layer from "effect/Layer";
@@ -4964,6 +4966,33 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     });
   });
 
+  const ensureSteeringMessage = Effect.fn("Orchestrator.ensureSteeringMessage")(function* (
+    command: Extract<
+      OrchestrationV2Command,
+      { readonly type: "message.dispatch" | "queued-message.promote-to-steer" }
+    >,
+    message: Pick<OrchestrationV2ConversationMessage, "text" | "attachments" | "context">,
+  ) {
+    if (isNativeMaintenanceCommand(message)) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause:
+          message.text.trim().toLowerCase() === "/compact"
+            ? "Context compaction must run as a separate turn. Queue it or wait for the active turn to finish."
+            : "Signing out must run as a separate turn. Queue it or wait for the active turn to finish.",
+      });
+    }
+    if (parseGoalCommand(message) !== null) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause:
+          "Goal commands must run as a separate turn. Queue it or wait for the active turn to finish.",
+      });
+    }
+  });
+
   const dispatchSteerIntoRun = Effect.fn("Orchestrator.dispatchSteerIntoRun")(function* (input: {
     readonly command: Extract<
       OrchestrationV2Command,
@@ -5007,24 +5036,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Target run ${input.targetRunId} was not found.`,
       });
     }
-    if (isNativeMaintenanceCommand(input)) {
-      return yield* new OrchestratorDispatchError({
-        commandId: input.command.commandId,
-        commandType: input.command.type,
-        cause:
-          input.text.trim().toLowerCase() === "/compact"
-            ? "Context compaction must run as a separate turn. Queue it or wait for the active turn to finish."
-            : "Signing out must run as a separate turn. Queue it or wait for the active turn to finish.",
-      });
-    }
-    if (parseGoalCommand(input) !== null) {
-      return yield* new OrchestratorDispatchError({
-        commandId: input.command.commandId,
-        commandType: input.command.type,
-        cause:
-          "Goal commands must run as a separate turn. Queue it or wait for the active turn to finish.",
-      });
-    }
+    yield* ensureSteeringMessage(input.command, input);
     const targetMessage = input.projection.messages.find(
       (message) => message.id === targetRun.userMessageId,
     );
@@ -6154,6 +6166,36 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             payload: { ...sourcePlan, status: "completed" },
           });
 
+    let steerWhenReadyRunId: RunId | undefined;
+    if (dispatchMode.type === "steer_active") {
+      const targetRunId = dispatchMode.targetRunId;
+      const target = projection.runs.find((run) => run.id === targetRunId);
+      if (
+        (target?.status === "preparing" ||
+          target?.status === "starting" ||
+          (target?.status === "running" &&
+            !projection.providerTurns.some(
+              (turn) => turn.runAttemptId === target.activeAttemptId && turn.status === "running",
+            ))) &&
+        !(yield* stopReachedRun(command, command.threadId, target.id))
+      ) {
+        const adapter = yield* providerAdapters
+          .get(target.providerInstanceId)
+          .pipe(mapDispatchError(command));
+        const capabilities = yield* adapter.getCapabilities().pipe(mapDispatchError(command));
+        yield* commandPolicy
+          .decideSteeringExecution({
+            commandId: command.commandId,
+            threadId: command.threadId,
+            providerInstanceId: target.providerInstanceId,
+            capabilities,
+          })
+          .pipe(mapDispatchError(command));
+        yield* ensureSteeringMessage(command, command);
+        steerWhenReadyRunId = target.id;
+        dispatchMode = { type: "queue_after_active" };
+      }
+    }
     if (dispatchMode.type === "steer_active" || dispatchMode.type === "restart_active") {
       yield* dispatchSteerIntoRun({
         command,
@@ -6353,6 +6395,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         rootNodeId,
         activeAttemptId: attemptId,
         status: "queued",
+        ...(steerWhenReadyRunId === undefined ? {} : { steerWhenReadyRunId }),
         ...(worktreeMissingRun !== undefined ||
         (heldRunsToRelease.length === 0 && queueIsHeld && !wakeSkipsHold)
           ? { queueHeld: true }
@@ -9979,6 +10022,39 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         reason: "Stopped to apply /goal",
         now,
       });
+    }
+    if (
+      (target?.status === "preparing" ||
+        target?.status === "starting" ||
+        (target?.status === "running" &&
+          !projection.providerTurns.some(
+            (turn) => turn.runAttemptId === target.activeAttemptId && turn.status === "running",
+          ))) &&
+      !(yield* stopReachedRun(command, command.threadId, target.id))
+    ) {
+      yield* ensureSteeringMessage(command, queuedMessage);
+      const adapter = yield* providerAdapters
+        .get(target.providerInstanceId)
+        .pipe(mapDispatchError(command));
+      const capabilities = yield* adapter.getCapabilities().pipe(mapDispatchError(command));
+      yield* commandPolicy
+        .decideSteeringExecution({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          providerInstanceId: target.providerInstanceId,
+          capabilities,
+        })
+        .pipe(mapDispatchError(command));
+      yield* emitEvent({
+        type: "run.updated",
+        threadId: command.threadId,
+        runId: queuedRun.id,
+        nodeId: queuedRootNode.id,
+        providerInstanceId: queuedRun.providerInstanceId,
+        occurredAt: now,
+        payload: { ...queuedRun, steerWhenReadyRunId: target.id },
+      });
+      return;
     }
     yield* emitEvent({
       type: "run.updated",
@@ -14212,6 +14288,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       ),
   );
 
+  // One thread's reactions run in event order; a reaction waiting on one thread's lock must
+  // not hold up another thread's.
+  const threadReactions = yield* FiberSet.make<void>();
+  const threadReactionTails = new Map<ThreadId, Deferred.Deferred<void>>();
+  const reactInThreadOrder = Effect.fnUntraced(function* <R>(
+    threadId: ThreadId,
+    reaction: Effect.Effect<void, never, R>,
+  ) {
+    const done = yield* Deferred.make<void>();
+    const previous = threadReactionTails.get(threadId);
+    threadReactionTails.set(threadId, done);
+    yield* (
+      previous === undefined ? reaction : Effect.andThen(Deferred.await(previous), reaction)
+    ).pipe(
+      Effect.ensuring(
+        Effect.suspend(() => {
+          if (threadReactionTails.get(threadId) === done) threadReactionTails.delete(threadId);
+          return Deferred.succeed(done, undefined);
+        }),
+      ),
+      FiberSet.run(threadReactions),
+    );
+  });
+
   // Projections already contain historical terminals; replaying them delays startup queue promotion with database size.
   const terminalEventsAfterSequence = yield* eventSink.latestSequence().pipe(Effect.orDie);
   // Filter run updates before buffering so blocked queue promotion does not retain unrelated tool bodies.
@@ -14231,7 +14331,67 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             stored.event.payload.status === "cancelled" ||
             stored.event.payload.status === "rolled_back"),
       ),
-      Stream.runForEach(handleRunUpdate),
+      Stream.runForEach((stored) =>
+        reactInThreadOrder(stored.event.threadId, handleRunUpdate(stored)),
+      ),
+      Effect.forkScoped,
+    );
+
+  yield* eventSink
+    .stream({ afterSequence: terminalEventsAfterSequence, eventType: "provider-turn.updated" })
+    .pipe(
+      Stream.filter(
+        (stored) =>
+          stored.event.type === "provider-turn.updated" &&
+          stored.event.payload.status === "running",
+      ),
+      Stream.runForEach(
+        Effect.fn("Orchestrator.deliverDeferredSteers")(
+          function* (stored) {
+            if (stored.event.type !== "provider-turn.updated") return;
+            const threadId = stored.event.threadId;
+            const turn = stored.event.payload;
+            const projection = yield* projectionStore.getThreadRecords(threadId, ["runs"]);
+            const run = projection.runs.find(
+              (candidate) =>
+                candidate.activeAttemptId === turn.runAttemptId && candidate.status === "running",
+            );
+            if (run === undefined) return;
+            const pending = projection.runs
+              .filter(
+                (queued) => queued.status === "queued" && queued.steerWhenReadyRunId === run.id,
+              )
+              .toSorted(
+                (left, right) =>
+                  (left.queuePosition ?? left.ordinal) - (right.queuePosition ?? right.ordinal),
+              );
+            for (const queued of pending) {
+              yield* dispatchWithReceiptEffect({
+                type: "queued-message.promote-to-steer",
+                commandId: CommandId.make(
+                  `command:deferred-steer:${queued.id}:${run.id}:${turn.runAttemptId}`,
+                ),
+                threadId,
+                queuedRunId: queued.id,
+                targetRunId: run.id,
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("Failed to deliver a deferred steer", {
+                    threadId,
+                    runId: queued.id,
+                    cause,
+                  }),
+                ),
+              );
+            }
+          },
+          (effect, stored) => threadDispatch.withLock(stored.event.threadId, effect),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Failed to deliver deferred steering", { cause }),
+          ),
+          (effect, stored) => reactInThreadOrder(stored.event.threadId, effect),
+        ),
+      ),
       Effect.forkScoped,
     );
 
@@ -14259,18 +14419,21 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   ).pipe(
     Stream.filter(settlesChildWork),
     Stream.runForEach((stored) =>
-      Effect.gen(function* () {
-        const childThreadId = stored.event.threadId;
-        const parentThreadId = yield* appOwnedSubagentParentThreadId(childThreadId);
-        if (parentThreadId === undefined) return;
-        yield* threadDispatch.withLock(parentThreadId, finalizeAppOwnedSubagent(childThreadId));
-      }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning("Failed to finalize a delegated child after its work settled", {
-            threadId: stored.event.threadId,
-            sequence: stored.sequence,
-            cause,
-          }),
+      reactInThreadOrder(
+        stored.event.threadId,
+        Effect.gen(function* () {
+          const childThreadId = stored.event.threadId;
+          const parentThreadId = yield* appOwnedSubagentParentThreadId(childThreadId);
+          if (parentThreadId === undefined) return;
+          yield* threadDispatch.withLock(parentThreadId, finalizeAppOwnedSubagent(childThreadId));
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Failed to finalize a delegated child after its work settled", {
+              threadId: stored.event.threadId,
+              sequence: stored.sequence,
+              cause,
+            }),
+          ),
         ),
       ),
     ),
