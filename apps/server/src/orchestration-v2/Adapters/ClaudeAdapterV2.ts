@@ -96,6 +96,7 @@ import {
   TrimmedNonEmptyString,
   defaultInstanceIdForDriver,
   isCompactionCommandMessage,
+  type MessageId,
   type ModelSelection,
   type OrchestrationV2ConversationMessage,
   type OrchestrationV2ExecutionNode,
@@ -218,6 +219,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import {
   makeProviderFailure,
   makeProviderRetryTurnItem,
+  PROVIDER_RETRY_BUDGET_MS,
 } from "@t3tools/provider-core/server/failure";
 import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import { providerMessageTextWithAttachmentPaths } from "@t3tools/provider-core/server/attachmentPrompt";
@@ -361,6 +363,8 @@ const CLAUDE_DESCENDANT_POLL = "1 second";
 // Claude Code's refusal of bypassPermissions as root, which it explains only on stderr.
 const CLAUDE_ROOT_REFUSAL =
   "--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons";
+// Claude Code's answer to a --resume whose session store is gone, as a result error and on stderr.
+const CLAUDE_CONVERSATION_NOT_FOUND = "No conversation found with session ID:";
 
 const CLAUDE_GROUP_WATCH_SCRIPT = [
   "{ trap '' TERM; read -r _ <&3; kill -TERM 0; sleep 5; kill -KILL 0; } </dev/null >/dev/null 2>&1 &",
@@ -669,6 +673,17 @@ export class ClaudeCodeRootRefusalError extends Schema.TaggedError<ClaudeCodeRoo
   }
 }
 
+export class ClaudeConversationNotFoundError extends Schema.TaggedError<ClaudeConversationNotFoundError>()(
+  "ClaudeConversationNotFoundError",
+  {
+    cause: Schema.Defect(),
+  },
+) {
+  override get message(): string {
+    return "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.";
+  }
+}
+
 class ClaudeMcpRegistrationTimeoutError extends Schema.TaggedError<ClaudeMcpRegistrationTimeoutError>()(
   "ClaudeMcpRegistrationTimeoutError",
   { phase: Schema.Literals(["initialize", "setMcpServers"]) },
@@ -761,6 +776,14 @@ export interface ClaudeAgentSdkSubagentLookupInput {
 }
 
 const isClaudeAgentSdkQueryRunnerError = Schema.is(ClaudeAgentSdkQueryRunnerError);
+
+const isClaudeConversationNotFound = (cause: Cause.Cause<ClaudeAgentSdkQueryRunnerError>) => {
+  const error = Cause.squash(cause);
+  return (
+    isClaudeAgentSdkQueryRunnerError(error) &&
+    Predicate.isTagged(error.cause, "ClaudeConversationNotFoundError")
+  );
+};
 const isClaudeMcpRegistrationTimeoutError = Schema.is(ClaudeMcpRegistrationTimeoutError);
 const isProviderAdapterRuntimeRequestResponseError = Schema.is(
   ProviderAdapter.ProviderAdapterRuntimeRequestResponseError,
@@ -1341,6 +1364,7 @@ export const layerQueryRunner: Layer.Layer<
           let stderrTail = "";
           let stderrClosed: Promise<void> = Promise.resolve();
           let answered = false;
+          let conversationMissing = false;
           const appendStderr = (text: string) => {
             if (answered) return;
             stderrTail = (stderrTail + text).slice(-CLAUDE_STDERR_TAIL_LENGTH);
@@ -1517,15 +1541,27 @@ export const layerQueryRunner: Layer.Layer<
                     }
                     const refusedRoot = !answered && stderrTail.includes(CLAUDE_ROOT_REFUSAL);
                     return yield* queryRunnerError(
-                      refusedRoot ? new ClaudeCodeRootRefusalError({ cause }) : cause,
+                      refusedRoot
+                        ? new ClaudeCodeRootRefusalError({ cause })
+                        : conversationMissing ||
+                            (!answered && stderrTail.includes(CLAUDE_CONVERSATION_NOT_FOUND))
+                          ? new ClaudeConversationNotFoundError({ cause })
+                          : cause,
                       "fromAsyncIterable",
                     );
                   }),
                 ),
               ),
-              Stream.tap(() =>
+              Stream.tap((message) =>
                 Effect.sync(() => {
                   answered = true;
+                  if (
+                    message.type === "result" &&
+                    message.subtype !== "success" &&
+                    message.errors.some((error) => error.startsWith(CLAUDE_CONVERSATION_NOT_FOUND))
+                  ) {
+                    conversationMissing = true;
+                  }
                 }),
               ),
               Stream.tap((message) =>
@@ -4254,10 +4290,13 @@ function claudePromptLifecycle(
 function isClaudeResultForOtherTurn(input: {
   readonly message: SDKResultMessage;
   readonly promptUuid: string;
+  readonly steerUuids: ReadonlySet<string>;
   readonly promptEchoMode: ClaudeLiveQueryContext["promptEchoMode"];
 }): boolean {
   const echoed = claudeEchoedPromptUuids(input.message);
-  if (echoed.length > 0) return !echoed.includes(input.promptUuid);
+  if (echoed.length > 0) {
+    return !echoed.some((uuid) => uuid === input.promptUuid || input.steerUuids.has(uuid));
+  }
   return (
     input.promptEchoMode !== "unknown" &&
     input.message.origin !== undefined &&
@@ -4546,6 +4585,9 @@ function formatClaudeUsageLimitWait(waitMs: number): string {
 }
 
 interface ActiveClaudeTurnContext {
+  retryBudgetFailure?: OrchestrationV2ProviderFailure;
+  stalledFailure?: OrchestrationV2ProviderFailure;
+  unansweredRequestSince?: DateTime.Utc | undefined;
   readonly queryPolicy: ClaudeRuntimeQueryPolicy;
   readonly input: ProviderAdapter.ProviderAdapterV2TurnInput;
   readonly autoCompactWindow: string;
@@ -4617,6 +4659,11 @@ interface ActiveClaudeTurnContext {
   nativeWakeStarted: boolean;
   gatedFramesBeforeEcho: number;
   readonly heldRootFrames: Array<SDKMessage>;
+  // Steers Claude has not started or echoed yet, by prompt uuid. Claude holds
+  // a steer behind a running foreground tool call without saying so.
+  readonly pendingSteers: Map<string, MessageId>;
+  // Claude may settle a turn with a result that echoes only a steer's uuid.
+  readonly steerUuids: Set<string>;
 }
 
 interface ActiveClaudeProviderRetry {
@@ -4645,6 +4692,7 @@ interface ActiveClaudeSubagent {
 }
 
 interface ClaudeLiveQueryContext {
+  exitCause?: Cause.Cause<ClaudeAgentSdkQueryRunnerError>;
   readonly queryPolicy: ClaudeRuntimeQueryPolicy;
   readonly nativeThreadId: string;
   readonly settingsCwd: string | null;
@@ -5426,6 +5474,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           );
         });
         const openedNativeThreads = yield* Ref.make(new Set<string>());
+        // Sessions Claude Code reported gone on resume; resumeThread fails them into a fresh session.
+        const missingNativeThreads = new Set<string>();
         const pdfBudgets = new Map<string, ReturnType<typeof makeClaudeAttachmentBudget>>();
         const latestPlanByKind = yield* Ref.make(new Map<string, OrchestrationV2PlanArtifact>());
         // Claude 5 task tools edit one list per native session, across turns.
@@ -5785,6 +5835,50 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             }),
           }).pipe(Effect.withSpan("ClaudeAdapterV2.completeProviderRetry"));
         });
+
+        // A hung request can take many minutes per attempt, so the budget spans the
+        // whole retry window rather than counting attempts.
+        const failExpiredProviderRetry = Effect.fn("ClaudeAdapterV2.failExpiredProviderRetry")(
+          function* (context: ActiveClaudeTurnContext, startedAt: DateTime.Utc) {
+            const isCurrentRetry = Effect.gen(function* () {
+              const retry = (yield* Ref.get(providerRetries)).get(context.providerTurnId);
+              return retry?.startedAt === startedAt && (yield* Ref.get(activeTurn)) === context
+                ? retry
+                : undefined;
+            });
+            const retry = yield* isCurrentRetry;
+            // A user Stop already in flight keeps its interrupted outcome.
+            if (
+              retry === undefined ||
+              (yield* Ref.get(interruptedTurns)).has(context.providerTurnId)
+            )
+              return;
+            context.retryBudgetFailure = { ...retry.failure, retryable: false };
+            const liveQuery = yield* Ref.get(queryContext);
+            yield* interruptTurn({
+              providerThread: context.input.providerThread,
+              providerTurnId: context.providerTurnId,
+            }).pipe(
+              Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
+              Effect.catch((cause) =>
+                Effect.logWarning("orchestration-v2.claude-retry-budget-stop-failed", { cause }),
+              ),
+            );
+            if (liveQuery === null || (yield* isCurrentRetry) === undefined) return;
+            // The CLI did not confirm the stop; settle the turn without it.
+            const ownedLiveQuery = yield* Ref.modify(queryContext, (current) =>
+              current?.query === liveQuery.query ? [true, null] : [false, current],
+            );
+            if (!ownedLiveQuery) return;
+            liveQuery.stopping = true;
+            yield* liveQuery.query.close.pipe(
+              Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
+              Effect.ignore,
+            );
+            yield* finalizeActiveTurnAfterQueryExit(liveQuery);
+            yield* Deferred.succeed(liveQuery.closed, undefined);
+          },
+        );
 
         const rememberProviderThread =
           /* Provider events include streaming deltas; avoid a span for each update. */
@@ -8236,6 +8330,71 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           subagentToolCalls.clear();
         });
 
+        const emitSteerStatus = Effect.fn("ClaudeAdapterV2.emitSteerStatus")(function* (
+          context: ActiveClaudeTurnContext,
+          messageId: MessageId,
+          status: "pending" | "completed" | "cancelled",
+        ) {
+          const nativeItemId = `steer:${messageId}`;
+          const now = yield* DateTime.now;
+          const message =
+            status === "pending"
+              ? "Claude steer is waiting for acceptance."
+              : status === "completed"
+                ? "Claude steer accepted."
+                : "Claude steer cancelled.";
+          yield* emitProviderEvent({
+            type: "turn_item.updated",
+            driver: CLAUDE_PROVIDER,
+            turnItem: {
+              id: idAllocator.derive.turnItemFromProviderItem({
+                driver: CLAUDE_PROVIDER,
+                nativeItemId,
+              }),
+              threadId: context.input.threadId,
+              runId: context.input.runId,
+              nodeId: context.input.rootNodeId,
+              providerThreadId: context.input.providerThread.id,
+              providerTurnId: context.providerTurnId,
+              nativeItemRef: {
+                driver: CLAUDE_PROVIDER,
+                nativeId: nativeItemId,
+                strength: "strong",
+              },
+              parentItemId: null,
+              ordinal: yield* resolveItemOrdinal(context, nativeItemId),
+              type: "system_notice",
+              status: status === "pending" ? "running" : status,
+              title: message,
+              message,
+              startedAt: now,
+              completedAt: status === "pending" ? null : now,
+              updatedAt: now,
+            },
+          });
+        });
+
+        const markSteersAccepted = Effect.fnUntraced(function* (
+          context: ActiveClaudeTurnContext,
+          message: SDKMessage,
+        ) {
+          // Completed alone is not proof of acceptance: Claude also completes
+          // prompts it never started.
+          const lifecycle = claudePromptLifecycle(message);
+          const accepted =
+            lifecycle === null
+              ? claudeEchoedPromptUuids(message)
+              : lifecycle.state === "started"
+                ? [lifecycle.uuid]
+                : [];
+          for (const uuid of accepted) {
+            const messageId = context.pendingSteers.get(uuid);
+            if (messageId === undefined) continue;
+            context.pendingSteers.delete(uuid);
+            yield* emitSteerStatus(context, messageId, "completed");
+          }
+        });
+
         const finalizeActiveTurn = Effect.fnUntraced(function* (input: {
           readonly context: ActiveClaudeTurnContext;
           readonly status: Extract<
@@ -8247,7 +8406,18 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly threadDisposition?: "reusable" | "broken";
           readonly result?: SDKResultMessage;
         }) {
+          const failure = input.context.stalledFailure ?? input.context.retryBudgetFailure;
+          if (failure !== undefined) input = { ...input, status: "failed", failure };
           yield* reasoningDeltas.flushTurn(input.context.nativeTurnId);
+          // A turn that completes has taken in every steer; one that stops drops them unread.
+          for (const messageId of input.context.pendingSteers.values()) {
+            yield* emitSteerStatus(
+              input.context,
+              messageId,
+              input.status === "completed" ? "completed" : "cancelled",
+            );
+          }
+          input.context.pendingSteers.clear();
           if (input.context.compaction?.status === "running") {
             const reason = input.result?.subtype === "success" ? input.result.result.trim() : "";
             yield* emitProviderEvent({
@@ -9887,12 +10057,20 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 updatedAt,
               }),
             });
+            if (previous === undefined) {
+              yield* failExpiredProviderRetry(context, state.startedAt).pipe(
+                Effect.delay(PROVIDER_RETRY_BUDGET_MS),
+                Effect.forkIn(sessionScope),
+              );
+            }
             return;
           }
 
           if (message.type === "assistant" && input.replayed !== true) {
-            const now = yield* DateTime.now;
-            yield* completeProviderRetry(context, now);
+            if (message.message.model !== "<synthetic>") {
+              const now = yield* DateTime.now;
+              yield* completeProviderRetry(context, now);
+            }
             // CLI-generated <synthetic> frames report zero usage, not context usage.
             if (
               message.parent_tool_use_id === null &&
@@ -10670,6 +10848,42 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
         });
 
+        const failUnansweredRequest = Effect.fn("ClaudeAdapterV2.failUnansweredRequest")(function* (
+          context: ActiveClaudeTurnContext,
+          since: DateTime.Utc,
+        ) {
+          if (
+            (yield* Ref.get(activeTurn)) !== context ||
+            context.unansweredRequestSince !== since ||
+            (yield* Ref.get(interruptedTurns)).has(context.providerTurnId)
+          )
+            return;
+          context.stalledFailure = makeProviderFailure({
+            class: "transport_error",
+            code: "claude_request_unanswered",
+            message:
+              "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.",
+            retryable: false,
+          });
+          const liveQuery = yield* Ref.get(queryContext);
+          yield* interruptTurn({
+            providerThread: context.input.providerThread,
+            providerTurnId: context.providerTurnId,
+          }).pipe(Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS), Effect.ignore);
+          if (liveQuery === null || (yield* Ref.get(activeTurn)) !== context) return;
+          const owned = yield* Ref.modify(queryContext, (current) =>
+            current?.query === liveQuery.query ? [true, null] : [false, current],
+          );
+          if (!owned) return;
+          liveQuery.stopping = true;
+          yield* liveQuery.query.close.pipe(
+            Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
+            Effect.ignore,
+          );
+          yield* finalizeActiveTurnAfterQueryExit(liveQuery);
+          yield* Deferred.succeed(liveQuery.closed, undefined);
+        });
+
         const handleSdkMessage = Effect.fnUntraced(function* (input: {
           readonly query: ClaudeAgentSdkQuerySession;
           readonly message: SDKMessage;
@@ -10677,6 +10891,32 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           const message = input.message;
           const context = yield* Ref.get(activeTurn);
           const liveQuery = yield* Ref.get(queryContext);
+          if (context !== null && liveQuery?.query === input.query) {
+            const lifecycle = claudePromptLifecycle(message);
+            if (
+              (message.type === "system" &&
+                message.subtype === "status" &&
+                message.status === "requesting") ||
+              (lifecycle?.state === "started" && lifecycle.uuid === context.promptUuid)
+            ) {
+              const since = yield* DateTime.now;
+              context.unansweredRequestSince = since;
+              yield* failUnansweredRequest(context, since).pipe(
+                Effect.delay("10 minutes"),
+                Effect.forkIn(sessionScope),
+              );
+            } else if (
+              Reflect.get(message, "parent_tool_use_id") == null &&
+              !(
+                message.type === "system" &&
+                message.subtype.startsWith("task_") &&
+                !(message.subtype === "task_started" && (message.spawn_depth ?? 1) <= 1)
+              )
+            ) {
+              context.unansweredRequestSince = undefined;
+            }
+          }
+
           // The API answering again is recovery; a long text or tool input block emits nothing
           // else. Judged here, in arrival order: held and buffered frames are handled later.
           if (
@@ -10686,6 +10926,13 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             message.event.type === "message_start"
           ) {
             yield* completeProviderRetry(context, yield* DateTime.now);
+          }
+          if (
+            context !== null &&
+            context.pendingSteers.size > 0 &&
+            liveQuery?.query === input.query
+          ) {
+            yield* markSteersAccepted(context, message);
           }
           if (
             context?.promptUuid === null &&
@@ -10760,6 +11007,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             isClaudeResultForOtherTurn({
               message,
               promptUuid: context.promptUuid,
+              steerUuids: context.steerUuids,
               promptEchoMode: liveQuery.promptEchoMode,
             })
           ) {
@@ -11622,6 +11870,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             Effect.exit,
             Effect.flatMap(
               Effect.fnUntraced(function* (exit: ClaudeQueryStreamExit) {
+                if (exit._tag === "Failure") {
+                  context.exitCause = exit.cause;
+                  if (isClaudeConversationNotFound(exit.cause)) {
+                    missingNativeThreads.add(context.nativeThreadId);
+                  }
+                }
                 const heldContext = yield* Ref.get(activeTurn);
                 if (
                   (yield* Ref.get(queryContext))?.query === querySession &&
@@ -11781,6 +12035,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               nativeWakeStarted: false,
               gatedFramesBeforeEcho: 0,
               heldRootFrames: [],
+              pendingSteers: new Map(),
+              steerUuids: new Set(),
             };
             const attachTurn = Effect.gen(function* () {
               // Set before claiming: a query that exits after the claim finalizes this turn; one that exits before it fails the start.
@@ -11797,6 +12053,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 return yield* new ProviderAdapter.ProviderAdapterProtocolError({
                   driver: CLAUDE_PROVIDER,
                   detail: "Claude provider query ended before the turn could start.",
+                  ...(querySession.exitCause === undefined
+                    ? {}
+                    : { cause: Cause.squash(querySession.exitCause) }),
                 });
               }
               if (
@@ -12159,6 +12418,18 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 detail: `Claude provider turn ${turnInput.providerTurnId} is not the active turn.`,
               });
             }
+            // Claude echoes this uuid once it accepts the steer.
+            const steerUuid = yield* random.uuidV4().pipe(
+              Effect.filterOrFail(isClaudePromptUuid),
+              Effect.mapError(
+                (cause) =>
+                  new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: CLAUDE_PROVIDER,
+                    detail: "Failed to allocate a Claude prompt uuid.",
+                    payload: cause,
+                  }),
+              ),
+            );
             const pdfReservation = yield* reserveClaudePdfBudget(
               pdfBudgets.get(existing.nativeThreadId) ??
                 makeClaudeAttachmentBudget({
@@ -12190,6 +12461,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ),
               attachments: turnInput.message.attachments,
               priority: "now",
+              uuid: steerUuid,
               attachmentsDir,
               fileSystem,
               pdfReservation,
@@ -12219,6 +12491,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               next.add(turnInput.providerTurnId);
               return next;
             });
+            // Register before offering: Claude can start the steer and end the turn before offer returns.
+            const messageId = turnInput.message.messageId;
+            currentTurn.steerUuids.add(steerUuid);
+            currentTurn.pendingSteers.set(steerUuid, messageId);
+            yield* emitSteerStatus(currentTurn, messageId, "pending");
             yield* Effect.uninterruptibleMask((restore) =>
               restore(
                 existing.query.offer(userMessage, () => {
@@ -12230,6 +12507,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     pdfReservation.commit();
                   }),
                 ),
+              ),
+            ).pipe(
+              Effect.onError(() =>
+                currentTurn.pendingSteers.delete(steerUuid)
+                  ? emitSteerStatus(currentTurn, messageId, "completed")
+                  : Effect.void,
               ),
             );
           },
@@ -12429,6 +12712,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 // A live process holds the conversation even before saving it.
                 (yield* Ref.get(queryContext))?.nativeThreadId !== nativeThreadId
               ) {
+                if (missingNativeThreads.has(nativeThreadId)) {
+                  return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: CLAUDE_PROVIDER,
+                    detail: `Claude Code has no conversation ${nativeThreadId} to resume.`,
+                  });
+                }
                 // An unreadable transcript leaves the resume to the CLI.
                 const transcript = yield* claudeTranscriptState(nativeThreadId).pipe(
                   Effect.orElseSucceed(() => "missing" as const),

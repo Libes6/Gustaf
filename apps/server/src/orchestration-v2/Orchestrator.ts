@@ -882,6 +882,106 @@ function usageLimitHoldsQueue(
   );
 }
 
+function pullRequestSnapshotEndsWatch(
+  snapshot: ThreadPullRequestLink["snapshot"],
+  watchStartedAt: ThreadPullRequestWatch["startedAt"],
+): boolean {
+  return (
+    snapshot?.state === "merged" ||
+    // A restarted watch can see a closed snapshot from before the PR reopened.
+    (snapshot?.state === "closed" &&
+      DateTime.isGreaterThanOrEqualTo(
+        DateTime.makeUnsafe(snapshot.syncedAt),
+        DateTime.makeUnsafe(watchStartedAt),
+      ))
+  );
+}
+
+function isStalePullRequestWatchWake(
+  projection: Pick<OrchestrationV2ThreadProjection, "thread" | "messages">,
+  run: OrchestrationV2Run,
+): boolean {
+  const source = projection.messages.find((message) => message.id === run.userMessageId)
+    ?.notification?.source;
+  if (source?.kind !== "monitor" || source.pullRequest === undefined) return false;
+  const stamp = source.pullRequest;
+  const link = threadPullRequestsOf(projection.thread).find(
+    (candidate) =>
+      candidate.source !== "stack-dismissed" && threadPullRequestKeysEqual(candidate, stamp),
+  );
+  if (link === undefined) return true;
+  if (stamp.watchEnded === true) {
+    // The final notice outlives its watch, but a replacement watch supersedes it.
+    const latestWatch = link.watch ?? link.endedWatch;
+    return latestWatch?.startedAt !== stamp.watchStartedAt;
+  }
+  if (link.watch === undefined) {
+    // A watch the server ended with a final notice still owes the wakes it queued before it.
+    const endedWithNotice = projection.messages.some((message) => {
+      const ending = message.notification?.source;
+      return (
+        ending?.kind === "monitor" &&
+        ending.pullRequest?.watchEnded === true &&
+        ending.pullRequest.watchStartedAt === stamp.watchStartedAt &&
+        threadPullRequestKeysEqual(ending.pullRequest, stamp)
+      );
+    });
+    return (
+      !endedWithNotice ||
+      link.endedWatch?.startedAt !== stamp.watchStartedAt ||
+      pullRequestSnapshotEndsWatch(link.snapshot, stamp.watchStartedAt)
+    );
+  }
+  return (
+    link.watch.startedAt !== stamp.watchStartedAt ||
+    (stamp.headSha !== null && link.watch.headSha !== stamp.headSha) ||
+    pullRequestSnapshotEndsWatch(link.snapshot, link.watch.startedAt)
+  );
+}
+
+function queuedRunCancellationEvents(
+  projection: Pick<OrchestrationV2ThreadProjection, "nodes" | "attempts">,
+  run: OrchestrationV2Run,
+  now: DateTime.Utc,
+): ReadonlyArray<Omit<OrchestrationV2DomainEvent, "id">> {
+  const rootNode = projection.nodes.find((node) => node.id === run.rootNodeId);
+  const attempt = projection.attempts.find((candidate) => candidate.id === run.activeAttemptId);
+  const events: Array<Omit<OrchestrationV2DomainEvent, "id">> = [
+    {
+      type: "run.updated",
+      threadId: run.threadId,
+      runId: run.id,
+      ...(run.rootNodeId === null ? {} : { nodeId: run.rootNodeId }),
+      providerInstanceId: run.providerInstanceId,
+      occurredAt: now,
+      payload: { ...run, status: "cancelled", queuePosition: null, completedAt: now },
+    },
+  ];
+  if (attempt !== undefined && rootNode !== undefined) {
+    events.push({
+      type: "run-attempt.updated",
+      threadId: run.threadId,
+      runId: run.id,
+      nodeId: rootNode.id,
+      providerInstanceId: run.providerInstanceId,
+      occurredAt: now,
+      payload: { ...attempt, status: "cancelled", completedAt: now },
+    });
+  }
+  if (rootNode !== undefined) {
+    events.push({
+      type: "node.updated",
+      threadId: run.threadId,
+      runId: run.id,
+      nodeId: rootNode.id,
+      providerInstanceId: run.providerInstanceId,
+      occurredAt: now,
+      payload: { ...rootNode, status: "cancelled", completedAt: now },
+    });
+  }
+  return events;
+}
+
 function latestStableRun(
   projection: Pick<OrchestrationV2ThreadProjection, "runs">,
 ): OrchestrationV2Run | null {
@@ -1595,60 +1695,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       readonly run: OrchestrationV2Run;
       readonly now: DateTime.Utc;
     }) {
-      const rootNode =
-        input.run.rootNodeId === null
-          ? undefined
-          : input.projection.nodes.find((candidate) => candidate.id === input.run.rootNodeId);
-      const attempt =
-        input.run.activeAttemptId === null
-          ? undefined
-          : input.projection.attempts.find(
-              (candidate) => candidate.id === input.run.activeAttemptId,
-            );
       const emitEvent = emit(input.events, input.command);
-      yield* emitEvent({
-        type: "run.updated",
-        threadId: input.run.threadId,
-        runId: input.run.id,
-        ...(input.run.rootNodeId === null ? {} : { nodeId: input.run.rootNodeId }),
-        providerInstanceId: input.run.providerInstanceId,
-        occurredAt: input.now,
-        payload: {
-          ...input.run,
-          status: "cancelled",
-          queuePosition: null,
-          completedAt: input.now,
-        },
-      });
-      if (attempt !== undefined && rootNode !== undefined) {
-        yield* emitEvent({
-          type: "run-attempt.updated",
-          threadId: input.run.threadId,
-          runId: input.run.id,
-          nodeId: rootNode.id,
-          providerInstanceId: input.run.providerInstanceId,
-          occurredAt: input.now,
-          payload: {
-            ...attempt,
-            status: "cancelled",
-            completedAt: input.now,
-          },
-        });
-      }
-      if (rootNode !== undefined) {
-        yield* emitEvent({
-          type: "node.updated",
-          threadId: input.run.threadId,
-          runId: input.run.id,
-          nodeId: rootNode.id,
-          providerInstanceId: input.run.providerInstanceId,
-          occurredAt: input.now,
-          payload: {
-            ...rootNode,
-            status: "cancelled",
-            completedAt: input.now,
-          },
-        });
+      for (const event of queuedRunCancellationEvents(input.projection, input.run, input.now)) {
+        yield* emitEvent(event);
       }
     },
   );
@@ -1764,7 +1813,86 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     ]);
   });
 
-  const startNextQueuedRun = Effect.fn("Orchestrator.startNextQueuedRun")(
+  const isStaleQuestionWake = Effect.fn("Orchestrator.isStaleQuestionWake")(function* (
+    projection: Pick<OrchestrationV2ThreadProjection, "thread" | "subagents">,
+    messageId: MessageId,
+    notification: OrchestrationV2ThreadProjection["messages"][number]["notification"],
+  ) {
+    if (notification?.source.kind !== "delegated_task" || notification.outcome !== "updated")
+      return false;
+    const source = notification.source;
+    const threadId = projection.thread.id;
+    const task =
+      projection.subagents.find((candidate) => source.taskIds.includes(candidate.id)) ??
+      // Command projections omit settled tasks whose result was already handed over.
+      (yield* projectionStore
+        .getThreadRecords(threadId, ["subagents"], { subagentIds: source.taskIds })
+        .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause }))))
+        .subagents[0];
+    // An unknown task gives no evidence the question is obsolete.
+    if (task === undefined) return false;
+    const childThreadId = task.childThreadId;
+    if (
+      childThreadId === null ||
+      ["completed", "failed", "cancelled", "interrupted"].includes(task.status)
+    )
+      return true;
+    const child = yield* projectionStore
+      .getThreadRecords(childThreadId, ["runtimeRequests"])
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: childThreadId, cause }),
+        ),
+      );
+    return !child.runtimeRequests.some(
+      (request) =>
+        request.kind === "user_input" &&
+        request.status === "pending" &&
+        messageId === `message:delegated-task-question:${threadId}:${request.id}`,
+    );
+  });
+
+  const cancelStaleQuestionWakes = Effect.fn("Orchestrator.cancelStaleQuestionWakes")(function* (
+    projection: OrchestrationV2ThreadProjection,
+  ) {
+    const events = yield* Ref.make<Array<OrchestrationV2DomainEvent>>([]);
+    for (const run of projection.runs) {
+      if (run.status !== "queued") continue;
+      const message = projection.messages.find((candidate) => candidate.id === run.userMessageId);
+      if (
+        message === undefined ||
+        !(yield* isStaleQuestionWake(projection, message.id, message.notification).pipe(
+          // A child thread read must not fail the parent's unrelated next queued run.
+          Effect.catchTags({
+            OrchestratorProjectionError: (cause) =>
+              Effect.logWarning("Failed to check a queued task question wake", {
+                runId: run.id,
+                cause,
+              }).pipe(Effect.as(false)),
+          }),
+        ))
+      )
+        continue;
+      yield* emitQueuedRunCancellation({
+        command: {
+          type: "queued-run.cancel",
+          commandId: CommandId.make(`command:system:stale-question:${run.id}`),
+          threadId: projection.thread.id,
+          runId: run.id,
+        },
+        events,
+        projection,
+        run,
+        now: yield* DateTime.now,
+      });
+    }
+    const cancellations = yield* Ref.get(events);
+    if (cancellations.length === 0) return false;
+    yield* writeSystemEvents(cancellations);
+    return true;
+  });
+
+  const startNextQueuedRunOnce = Effect.fn("Orchestrator.startNextQueuedRun")(
     function* (
       threadId: ThreadId,
       options?: {
@@ -1774,7 +1902,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       },
     ) {
       if (!(yield* projectionStore.canStartQueuedRun(threadId))) return;
-      const projection = yield* readCommandProjection(threadId);
+      let projection = yield* readCommandProjection(threadId);
       if (
         projection.thread.archivedAt !== null ||
         projection.thread.deletedAt !== null ||
@@ -1783,12 +1911,25 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return;
       }
 
-      const storedQueuedRun =
+      if (yield* cancelStaleQuestionWakes(projection)) {
+        projection = yield* readCommandProjection(threadId);
+      }
+      let storedQueuedRun =
         options?.queuedRunId === undefined
           ? nextQueuedRun(projection)
           : projection.runs.find(
               (run) => run.id === options.queuedRunId && run.status === "queued",
             );
+      while (
+        storedQueuedRun !== undefined &&
+        isStalePullRequestWatchWake(projection, storedQueuedRun)
+      ) {
+        yield* writeSystemEvents(
+          queuedRunCancellationEvents(projection, storedQueuedRun, yield* DateTime.now),
+        );
+        projection = yield* readCommandProjection(threadId);
+        storedQueuedRun = nextQueuedRun(projection);
+      }
       if (storedQueuedRun === undefined) {
         return;
       }
@@ -1834,17 +1975,29 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         projectOverride !== undefined
           ? !projectOverride
           : machineInstance !== undefined && !resolveProviderInstanceEnabled(machineInstance);
-      if (
-        worktreeMissing ||
-        instanceDisabledForProject ||
-        (failureClass !== undefined &&
-          failureClass !== "validation_error" &&
-          failedRun?.providerInstanceId === queuedRun.providerInstanceId)
-      ) {
+      const providerFailed =
+        failureClass !== undefined &&
+        failureClass !== "validation_error" &&
+        failedRun?.providerInstanceId === queuedRun.providerInstanceId;
+      if (worktreeMissing || instanceDisabledForProject || providerFailed) {
+        // A buffered wake prompts nothing: it replays output the CLI already produced.
+        const wakes =
+          worktreeMissing || instanceDisabledForProject
+            ? []
+            : queuedRunsInDeliveryOrder(projection).filter((run) => {
+                const message = projection.messages.find(
+                  (candidate) => candidate.id === run.userMessageId,
+                );
+                return (
+                  run.queueHeld !== true &&
+                  message !== undefined &&
+                  isBufferedProviderNotification(message)
+                );
+              });
         const now = yield* DateTime.now;
         yield* writeSystemEvents(
           projection.runs
-            .filter((run) => run.status === "queued")
+            .filter((run) => run.status === "queued" && !wakes.some((wake) => wake.id === run.id))
             .map((run) => ({
               type: "run.updated" as const,
               threadId,
@@ -1854,7 +2007,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               payload: { ...run, queueHeld: true },
             })),
         );
-        return;
+        return wakes.length > 0;
       }
       // Move queued ordinals after runs that started while they waited to preserve transcript and checkpoint order.
       // Started runs have prompts; cancelled queued messages do not.
@@ -2552,6 +2705,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       ),
   );
 
+  // A provider failure hold leaves buffered wakes unheld, so a second pass starts the first one.
+  const startNextQueuedRun = (...args: Parameters<typeof startNextQueuedRunOnce>) =>
+    startNextQueuedRunOnce(...args).pipe(
+      Effect.flatMap((wakeLeftUnheld) =>
+        wakeLeftUnheld === true ? startNextQueuedRunOnce(args[0]) : Effect.void,
+      ),
+    );
+
   // Under load a resumed provider can time out before taking the prompt; the restart still owes the turn.
   const retryContinuationStart = Effect.fn("Orchestrator.retryContinuationStart")(function* (
     threadId: ThreadId,
@@ -3208,6 +3369,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
       yield* dispatchThreadMutation(command, events, effects);
       if (command.wake === undefined) return;
+      // An idle thread dispatches immediately, bypassing queued-wake validation.
+      if (
+        command.wake.notification.source.kind === "monitor" &&
+        command.watch !== null &&
+        pullRequestSnapshotEndsWatch(link.snapshot, command.startedAt)
+      ) {
+        return;
+      }
       yield* dispatchMessage(
         {
           type: "message.dispatch",
@@ -3215,7 +3384,24 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           threadId: command.threadId,
           messageId: command.wake.messageId,
           text: command.wake.text,
-          notification: command.wake.notification,
+          notification: {
+            ...command.wake.notification,
+            source:
+              command.wake.notification.source.kind === "monitor"
+                ? {
+                    kind: "monitor",
+                    pullRequest: {
+                      ...key,
+                      watchStartedAt: command.startedAt,
+                      headSha:
+                        command.wake.includesRemarks === true
+                          ? null
+                          : (command.watch?.headSha ?? null),
+                      ...(command.watch === null ? { watchEnded: true } : {}),
+                    },
+                  }
+                : command.wake.notification.source,
+          },
           attachments: [],
           dispatchMode: { type: "queue_after_active" },
           createdBy: "agent",
@@ -5761,6 +5947,18 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
   ) {
     let projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    if (yield* isStaleQuestionWake(projection, command.messageId, command.notification)) {
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        occurredAt: yield* DateTime.now,
+        payload: projection.thread,
+      });
+      return;
+    }
     if (command.manualContinuationOfRunId !== undefined) {
       const source = projection.runs.find((run) => run.id === command.manualContinuationOfRunId);
       const limited = latestRootProviderFailure(source ?? null, projection.turnItems);
@@ -14392,7 +14590,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           !String(stored.commandId).startsWith("command:runtime-reconcile:") &&
           ((stored.event.payload.delegatedTaskId !== undefined &&
             (stored.event.payload.status === "queued" ||
-              stored.event.payload.status === "starting")) ||
+              stored.event.payload.status === "starting" ||
+              stored.event.payload.status === "waiting")) ||
             stored.event.payload.status === "completed" ||
             stored.event.payload.status === "interrupted" ||
             stored.event.payload.status === "failed" ||

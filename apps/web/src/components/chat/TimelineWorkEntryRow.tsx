@@ -227,7 +227,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? `${t("chatB.TimelineWorkEntryRow.usageLimitReached")}${resetTime ? ` ${t("chatB.TimelineWorkEntryRow.retryAfter").replace("{time}", resetTime)}` : ""}`
       : notInSubscription
         ? t("chatB.TimelineWorkEntryRow.modelNotInSubscription")
-        : workEntry.label;
+        : translateProviderMessage(language, workEntry.label);
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
@@ -305,7 +305,11 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? workEntry.toolLifecycleStatus === "inProgress"
         ? t("chatB.TimelineWorkEntryRow.thinking")
         : t("chatB.TimelineWorkEntryRow.thought")
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
+      : questionHeading ||
+        translateProviderMessage(
+          language,
+          displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot),
+        );
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)

@@ -2318,6 +2318,101 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     ),
   );
 
+  it.effect.each(["before", "during"] as const)(
+    "surfaces a user MCP server that fails to start %s the turn",
+    (timing) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const nativeThreadId = "mcp-startup-failed-thread";
+          const nativeTurnId = "mcp-startup-failed-turn";
+          const startupError =
+            "MCP client for `example_mcp` failed to start: MCP startup failed: handshaking with MCP server failed";
+          const startup: Array<CodexReplay.CodexAppServerReplayEntry> = [
+            {
+              type: "emit_inbound",
+              label: "mcp-starting",
+              frame: {
+                method: "mcpServer/startupStatus/updated",
+                params: {
+                  threadId: nativeThreadId,
+                  name: "example_mcp",
+                  status: "starting",
+                  error: null,
+                  failureReason: null,
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              label: "mcp-failed",
+              frame: {
+                method: "mcpServer/startupStatus/updated",
+                params: {
+                  threadId: nativeThreadId,
+                  name: "example_mcp",
+                  status: "failed",
+                  error: startupError,
+                  failureReason: null,
+                },
+              },
+            },
+          ];
+          const preamble = codexReplayPreamble({
+            nativeThreadId,
+            nativeTurnId,
+            prompt: "use example_mcp",
+          });
+          const turnStart = preamble.findIndex(
+            (entry) => entry.type === "expect_outbound" && entry.label === "turn/start",
+          );
+          const transcript = makeCodexReplayTranscript({
+            scenario: "codex-mcp-startup-failed",
+            entries: [
+              ...(timing === "before"
+                ? [...preamble.slice(0, turnStart), ...startup, ...preamble.slice(turnStart)]
+                : [...preamble, ...startup]),
+              {
+                type: "emit_inbound",
+                label: "complete",
+                frame: {
+                  method: "turn/completed",
+                  params: {
+                    threadId: nativeThreadId,
+                    turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                  },
+                },
+              },
+            ],
+          });
+          const harness = yield* makeCodexReplayHarness(transcript);
+          yield* harness.runtime.startTurn(
+            makeCodexTestTurnInput({
+              threadId: harness.threadId,
+              providerThread: harness.providerThread,
+              now: yield* DateTime.now,
+              attemptId: RunAttemptId.make("mcp-startup-failed-attempt"),
+              text: "use example_mcp",
+            }),
+          );
+          yield* harness.firstTerminal;
+          const surfaced = harness.events.filter((event) => {
+            const serialized = JSON.stringify(event);
+            return serialized.includes("example_mcp") && serialized.includes("failed to start");
+          });
+          assert.isNotEmpty(surfaced);
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              IdAllocator.layer,
+              McpProviderSessions.layer,
+              NodeServices.layer,
+              NodeCrypto.layer,
+            ),
+          ),
+        ),
+      ),
+  );
+
   it.effect("stops asking for commands the user allowed for the session", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -3938,6 +4033,24 @@ describe("CodexAdapterV2 post-settle continuation", () => {
               },
             },
             {
+              type: "emit_inbound",
+              afterMs: 5 * 60 * 1000,
+              label: "error/retry-2",
+              frame: {
+                method: "error",
+                params: {
+                  threadId: nativeThreadId,
+                  turnId: nativeTurnId,
+                  willRetry: true,
+                  error: {
+                    message: "Reconnecting... 2/5",
+                    additionalDetails: "exceeded retry limit, last status: 429 Too Many Requests",
+                    codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: 429 } },
+                  },
+                },
+              },
+            },
+            {
               type: "expect_outbound",
               label: "turn/interrupt",
               frame: {
@@ -3995,7 +4108,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           terminal.failure.message,
           "exceeded retry limit, last status: 429 Too Many Requests",
         );
-        assert.equal(terminal.retry?.attempt, 1);
+        assert.equal(terminal.retry?.attempt, 2);
         assert.equal(terminal.threadDisposition, "reusable");
       }).pipe(
         Effect.provide(
@@ -9209,6 +9322,187 @@ describe("CodexAdapterV2 post-settle continuation", () => {
 
       assert.equal(forkedProviderThread.nativeThreadRef?.nativeId, forkThreadId);
       assert.equal(forkedProviderThread.forkedFrom?.providerTurnId, firstTurn.id);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
+        ),
+      ),
+    ),
+  );
+
+  it.effect.each([
+    "Codex completes it later",
+    "its thread is unloaded",
+    "Codex completes it after the session's Stop deadline",
+    "Codex completes it after a second Stop fails",
+  ] as const)("keeps a turn open after an unconfirmed Stop until %s", (ending) =>
+    Effect.gen(function* () {
+      const nativeThreadId = "unconfirmed-stop-thread";
+      const nativeTurnId = "unconfirmed-stop-turn";
+      const usage = {
+        totalTokens: 15,
+        inputTokens: 10,
+        cachedInputTokens: 2,
+        outputTokens: 5,
+        reasoningOutputTokens: 1,
+      };
+      const pastDeadline = ending === "Codex completes it after the session's Stop deadline";
+      const harness = yield* makeCodexReplayHarness(
+        makeCodexReplayTranscript({
+          scenario: `unconfirmed-stop-${ending.length}`,
+          entries: [
+            ...codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt: "work" }),
+            {
+              type: "expect_outbound",
+              label: "turn/interrupt",
+              frame: {
+                id: 4,
+                method: "turn/interrupt",
+                params: { threadId: nativeThreadId, turnId: nativeTurnId },
+              },
+            },
+            {
+              type: "emit_inbound",
+              label: "still working",
+              frame: {
+                method: "thread/tokenUsage/updated",
+                params: {
+                  threadId: nativeThreadId,
+                  turnId: nativeTurnId,
+                  tokenUsage: { total: usage, last: usage, modelContextWindow: 200_000 },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              label: "turn/interrupt",
+              // A slow acknowledgement leaves the adapter's own wait running past the deadline.
+              ...(pastDeadline ? { afterMs: 6_000 } : {}),
+              frame: { id: 4, result: {} },
+            },
+            ...(ending === "its thread is unloaded"
+              ? ([
+                  {
+                    type: "expect_outbound",
+                    label: "thread/unsubscribe",
+                    frame: {
+                      id: 5,
+                      method: "thread/unsubscribe",
+                      params: { threadId: nativeThreadId },
+                    },
+                  },
+                  {
+                    type: "emit_inbound",
+                    label: "thread/unsubscribe",
+                    frame: { id: 5, result: { status: "unsubscribed" } },
+                  },
+                ] satisfies Array<CodexReplay.CodexAppServerReplayEntry>)
+              : ([
+                  ...(ending === "Codex completes it after a second Stop fails"
+                    ? ([
+                        {
+                          type: "expect_outbound",
+                          label: "turn/interrupt/second",
+                          frame: {
+                            id: 5,
+                            method: "turn/interrupt",
+                            params: { threadId: nativeThreadId, turnId: nativeTurnId },
+                          },
+                        },
+                        {
+                          type: "emit_inbound",
+                          label: "turn/interrupt/second",
+                          frame: { id: 5, error: { code: -32603, message: "internal error" } },
+                        },
+                      ] satisfies Array<CodexReplay.CodexAppServerReplayEntry>)
+                    : []),
+                  {
+                    type: "emit_inbound",
+                    label: "turn/completed",
+                    afterMs: 20_000,
+                    frame: {
+                      method: "turn/completed",
+                      params: {
+                        threadId: nativeThreadId,
+                        turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                      },
+                    },
+                  },
+                ] satisfies Array<CodexReplay.CodexAppServerReplayEntry>)),
+          ],
+        }),
+      );
+      yield* harness.runtime.startTurn(
+        makeCodexTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now: yield* DateTime.now,
+          attemptId: RunAttemptId.make("attempt-unconfirmed-stop"),
+          text: "work",
+        }),
+      );
+      const stopping = yield* harness.runtime
+        .interruptTurn({
+          providerThread: harness.providerThread,
+          providerTurnId: (yield* IdAllocator.IdAllocatorV2).derive.providerTurn({
+            driver: CodexAdapterV2.CODEX_DRIVER_KIND,
+            nativeTurnId,
+          }),
+        })
+        .pipe(
+          // The session manager bounds every Stop the same way.
+          Effect.timeoutOrElse({
+            duration: "15 seconds",
+            orElse: () => Effect.fail({ _tag: "SessionStopDeadline" } as const),
+          }),
+          Effect.result,
+          Effect.forkScoped,
+        );
+      // Codex received the interrupt and kept reporting work on the turn.
+      yield* harness.until(() =>
+        harness.events.some(
+          (event) =>
+            event.type === "provider_turn.updated" &&
+            event.providerTurn.tokenUsage?.usedTokens === usage.totalTokens,
+        ),
+      );
+      yield* TestClock.adjust(pastDeadline ? "15 seconds" : "10 seconds");
+
+      const stopped = yield* Fiber.join(stopping);
+      assert.equal(
+        stopped._tag === "Failure" ? stopped.failure._tag : "confirmed",
+        pastDeadline ? "SessionStopDeadline" : "ProviderAdapterInterruptTimeoutError",
+      );
+      assert.deepEqual(harness.terminalEvents(), []);
+
+      if (ending === "Codex completes it after a second Stop fails") {
+        const second = yield* harness.runtime
+          .interruptTurn({
+            providerThread: harness.providerThread,
+            providerTurnId: (yield* IdAllocator.IdAllocatorV2).derive.providerTurn({
+              driver: CodexAdapterV2.CODEX_DRIVER_KIND,
+              nativeTurnId,
+            }),
+          })
+          .pipe(Effect.result);
+        assert.equal(second._tag, "Failure");
+        assert.deepEqual(harness.terminalEvents(), []);
+      }
+      if (ending === "its thread is unloaded") {
+        yield* harness.runtime.unloadThread!({ providerThread: harness.providerThread });
+      } else {
+        yield* TestClock.adjust("20 seconds");
+      }
+      yield* harness.awaitTerminal(1);
+      assert.deepEqual(
+        harness.terminalEvents().map((event) => event.status),
+        ["interrupted"],
+      );
     }).pipe(
       Effect.scoped,
       Effect.provide(

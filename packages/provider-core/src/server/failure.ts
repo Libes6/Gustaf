@@ -112,10 +112,12 @@ function curatedCauseMessages(cause: unknown): {
         case "ClaudeSettingsLaunchArgError":
         case "ClaudeMcpRegistrationTimeoutError":
         case "ClaudeCodeRootRefusalError":
+        case "ClaudeConversationNotFoundError":
         case "CursorModelUnavailableError":
         case "CodexGoalObjectiveTooLongError":
         case "ProviderSetupError":
         case "ProviderAdapterThreadInUseError":
+        case "ProviderCompactionUnsupportedError":
           return { known: stringField(cause, "message"), category: categoryMessage() };
         case "CodexAppServerRequestError": {
           // Only Codex's fixed-shape goal validation text is actionable and
@@ -319,6 +321,13 @@ export function makeProviderFailureTurnItem(input: {
     ...(input.retry === undefined ? {} : { retry: input.retry }),
   };
 }
+
+/**
+ * Longest a turn may stay in provider retries before the adapter stops it as
+ * failed. Codex waits for the network without limit and a hung Claude request
+ * can take many minutes per attempt, so counting attempts alone never ends them.
+ */
+export const PROVIDER_RETRY_BUDGET_MS = 10 * 60 * 1000;
 
 export function makeProviderRetryTurnItem(input: {
   readonly driver: ProviderDriverKind;
