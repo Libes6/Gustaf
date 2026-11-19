@@ -18,6 +18,7 @@ import * as ServerConfig from "../../config.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import {
+  ClaudeAgentSdkQueryRunner,
   createClaudeAdapterV2,
   type ClaudeAdapterV2DriverEnv,
 } from "../../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
@@ -58,6 +59,9 @@ import {
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { makeClaudeMaintenanceResolution } from "./ClaudeMaintenance.ts";
 import { managedClaudeExecutablePath } from "../ClaudeInstallation.ts";
+import { type ClaudeMcpConnectorError, makeClaudeMcpConnectors } from "./ClaudeMcpConnectors.ts";
+import { resolveClaudeSdkExecutablePath } from "./ClaudeExecutable.ts";
+import { makeClaudeEnvironment } from "./ClaudeHome.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
@@ -184,6 +188,27 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           }),
       ),
     );
+    const queryRunner = yield* ClaudeAgentSdkQueryRunner;
+    const connectorEnvironment = yield* makeClaudeEnvironment(effectiveConfig, processEnv).pipe(
+      Effect.provideService(Path.Path, path),
+    );
+    const connectors = makeClaudeMcpConnectors({
+      executablePath: yield* resolveClaudeSdkExecutablePath(
+        effectiveConfig.binaryPath,
+        connectorEnvironment,
+      ),
+      environment: connectorEnvironment,
+      defaultCwd: stateDir,
+      reconnectOpenSessions: queryRunner.reconnectMcpServer,
+    });
+    const connectorError = (cause: ClaudeMcpConnectorError) =>
+      new ProviderDriverError({ driver: DRIVER_KIND, instanceId, detail: cause.detail, cause });
+    const mcpConnectors: NonNullable<ProviderInstance["mcpConnectors"]> = {
+      list: (cwd) => connectors.list(cwd).pipe(Effect.mapError(connectorError)),
+      authorize: (request) => connectors.authorize(request).pipe(Effect.mapError(connectorError)),
+      submitCallback: (request) =>
+        connectors.submitCallback(request).pipe(Effect.mapError(connectorError)),
+    };
     const textGeneration = yield* makeClaudeTextGeneration(
       effectiveConfig,
       processEnv,
@@ -401,6 +426,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       orchestrationAdapter,
       textGeneration,
       consumeResetCredit,
+      mcpConnectors,
     } satisfies ProviderInstance;
   }),
 };

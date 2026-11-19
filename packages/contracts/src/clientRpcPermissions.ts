@@ -75,6 +75,10 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // Both need settings:write too, and importing a stdio server terminal:operate; see below.
   [WS_METHODS.mcpServersListImportable]: AuthProvidersManageScope,
   [WS_METHODS.mcpServersImport]: AuthProvidersManageScope,
+  // Listing starts the provider's configured MCP servers; signing in stores provider credentials.
+  [WS_METHODS.mcpConnectorsList]: AuthProvidersManageScope,
+  [WS_METHODS.mcpConnectorsAuthorize]: AuthProvidersManageScope,
+  [WS_METHODS.mcpConnectorsSubmitCallback]: AuthProvidersManageScope,
   [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: AuthOrchestrationOperateScope,
   // Force stop kills agent processes, as Stop on a terminal does.
   [ORCHESTRATION_V2_WS_METHODS.forceStopThread]: AuthOrchestrationOperateScope,

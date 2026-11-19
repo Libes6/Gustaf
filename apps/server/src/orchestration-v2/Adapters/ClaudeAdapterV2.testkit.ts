@@ -943,6 +943,7 @@ function replayQueryRunnerService(
     forkSession: (input) => replay(() => queryRunner.forkSession(input)),
     subagentLaunchToolUseId: (input) => replay(() => queryRunner.subagentLaunchToolUseId(input)),
     assertComplete: replay(() => queryRunner.assertComplete()),
+    reconnectMcpServer: () => Effect.void,
   });
 }
 
