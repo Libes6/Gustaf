@@ -8,34 +8,57 @@ Closing the desktop app's last window stops its local server.
 
 ## Gustaf relay
 
-Reach the computer from the Android app on any network, including while either device is on a VPN.
-Sign in with GitHub. Traffic is end-to-end encrypted: the relay sees which of your devices are
-connected and how much they send, not prompts, files, or tool output.
+Reach the computer from the Android app or from the desktop app on another computer, on any
+network, including while either device is on a VPN. Sign in with GitHub. Traffic is end-to-end
+encrypted: the relay sees which of your devices are connected and how much they send, not prompts,
+files, or tool output. All devices must use the same Gustaf account.
 
-1. On the computer, open **Settings → Account**, choose **Sign in with GitHub**, and register this
-   computer.
-2. On the phone, sign in under **Settings → Account** and register the phone.
-3. On the computer, open **Settings → Sharing & access** and, under **Any network (Gustaf relay)**,
-   choose **Connect a phone**.
-4. On the phone, open **Add route** and scan the code.
-5. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
+Turn the relay on for the computer you want to reach:
 
-The code works once, for five minutes. Later connections use the phone's saved key. If the codes
-differ, choose **Reject**. Revoke a phone under **Details** in the same section. If the phone can
+- **Desktop app:** open **Settings → Account**, choose **Sign in with GitHub**, and register this
+  computer.
+- **`gustaf serve` without the desktop app:** run `gustaf relay login` on that computer and sign in
+  in the browser that opens. The browser must run on the same computer; over SSH, forward the port
+  shown in the sign-in address first. A running server connects right away, otherwise on its next
+  start. `gustaf relay logout` turns it off again.
+
+Pair a phone:
+
+1. On the phone, sign in under **Settings → Account** and register the phone.
+2. On the computer, open **Settings → Sharing & access** and, under **Any network (Gustaf relay)**,
+   choose **Connect a device**.
+3. On the phone, open **Add route** and scan the code.
+4. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
+
+Pair the desktop app on another computer:
+
+1. Register that computer under **Settings → Account** in its desktop app.
+2. On the computer you want to reach, choose **Connect a device** as above and **Copy link**.
+3. In the other desktop app, open **Settings → Environments → Add environment**, choose
+   **Gustaf relay**, paste the link and add it.
+4. Choose **Allow device** on the first computer when the other one shows the same safety code.
+
+The code works once, for five minutes. Later connections use the device's saved key. If the codes
+differ, choose **Reject**. Revoke a device under **Details** in the same section. If the device can
 also reach the computer on the local network or Tailscale, add that address as another route. The
 app uses a direct route when one answers.
 
+The browser version of Gustaf cannot use the relay. In the desktop app over the relay, images,
+videos and embedded previews that load straight from the other computer do not show; file
+previews and downloads work.
+
 ## Relay troubleshooting
 
-Remote access stays off until this computer is registered to your account.
+Remote access stays off until this computer is registered to your account, or until
+`gustaf relay login` ran on a computer without the desktop app.
 
-The scan code expires after five minutes and after one use. Choose **Connect a phone** again for a
+The code expires after five minutes and after one use. Choose **Connect a device** again for a
 new one.
 
-Compare the safety code on the phone with **Details** on the computer. Matching codes mean the
-relay is not sitting between the two devices.
+Compare the safety code on the other device with **Details** on the computer. Matching codes mean
+the relay is not sitting between the two devices.
 
-A phone you revoked cannot open the tunnel until you pair it again from this computer.
+A device you revoked cannot open the tunnel until you pair it again from this computer.
 
 When this account has used its monthly relay allowance, new relay connections are refused until
 the next month. Use a direct route instead. Open connections are left to finish.

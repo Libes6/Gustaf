@@ -124,7 +124,14 @@ const INIT_SCRIPT: &str = r#"(() => {
     return result;
   };
 
-  // The cloud account lives in the shell; the page only ever sees state, never a token.
+  // The cloud account lives in the shell; the page sees state, never the session token. Only the
+  // relay client gets this computer's device token, to reach other computers through the relay.
+  const relayClient = Object.freeze({
+    credential: () => invoke("relay_client_credential"),
+    getItem: (key) => invoke("relay_client_storage_get", { key: String(key) }),
+    setItem: (key, value) =>
+      invoke("relay_client_storage_set", { key: String(key), value: String(value) }),
+  });
   const account = Object.freeze({
     getState: () => invoke("account_state"),
     signIn: () => invoke("account_sign_in"),
@@ -135,6 +142,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
     reportProblem: ({ message, attachLogs }) =>
       invoke("account_report_problem", { message, attachLogs }),
+    relayClient,
   });
 
   window.gustafShell = Object.freeze({

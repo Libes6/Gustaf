@@ -151,6 +151,10 @@
       "types": "./src/relay/index.ts",
       "default": "./src/relay/index.ts"
     },
+    "./gustaf-relay": {
+      "types": "./src/gustafRelay/index.ts",
+      "default": "./src/gustafRelay/index.ts"
+    },
     "./state/relayHost": {
       "types": "./src/state/relayHost.ts",
       "default": "./src/state/relayHost.ts"

@@ -41,7 +41,7 @@ import {
 import { splitEnvironmentSections } from "./environmentSections";
 import { leaveSettingsPage } from "../settings/settings-navigation";
 import { workspaceHasColumns } from "../layout/workspace/workspace-selection-store";
-import { connectRelayPairing } from "./relayRoute";
+import { connectRelayPairing } from "@t3tools/client-runtime/gustaf-relay";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;

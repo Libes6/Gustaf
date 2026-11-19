@@ -24,6 +24,17 @@ export interface ShellAccountDevice {
   readonly current: boolean;
 }
 
+/** This computer as a Gustaf relay client: its device credential and two durable entries. */
+export interface ShellRelayClient {
+  readonly credential: () => Promise<{
+    readonly deviceId: string;
+    readonly deviceToken: string;
+    readonly deviceName: string;
+  }>;
+  readonly getItem: (key: string) => Promise<string | null>;
+  readonly setItem: (key: string, value: string) => Promise<void>;
+}
+
 export interface ShellAccount {
   readonly getState: () => Promise<ShellAccountState>;
   /** Resolves once the browser sign-in finishes, fails, times out or is cancelled. */
@@ -38,6 +49,8 @@ export interface ShellAccount {
     readonly message: string;
     readonly attachLogs: boolean;
   }) => Promise<void>;
+  /** Absent in shells older than the desktop relay client. */
+  readonly relayClient?: ShellRelayClient;
 }
 
 export function shellAccount(): ShellAccount | undefined {
