@@ -1,6 +1,7 @@
 import type { EnvironmentId, RelayHostStatus } from "@t3tools/contracts";
 import { useEffect, useState } from "react";
 
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { shellAccount } from "../../shellAccount";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { relayHostEnvironment } from "../../state/relayHost";
@@ -22,13 +23,11 @@ const CONNECTION_LABELS: Record<RelayHostStatus["connection"], MessageKey> = {
   unauthorized: "settingsD.relay.unauthorized",
 };
 
-/** Reaching this computer from a phone on another network, through the Gustaf relay. */
+/** Reaching this computer from a phone or another computer on any network, through the Gustaf relay. */
 export function RelayHostSettingsSection() {
   const environmentId = usePrimaryEnvironmentId();
-  // The device credential comes from the shell's account; other clients cannot turn the relay on.
-  return shellAccount() && environmentId ? (
-    <RelayHostSettings environmentId={environmentId} />
-  ) : null;
+  // The section hides itself when this client may not read the relay state.
+  return environmentId ? <RelayHostSettings environmentId={environmentId} /> : null;
 }
 
 function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) {
@@ -40,6 +39,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
   const [status, setStatus] = useState<RelayHostStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- The relay state lives on the server; approvals arrive while the QR code is shown.
   useEffect(() => {
@@ -81,6 +81,22 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
 
   if (!status) return null;
   const online = status.connection === "online";
+  // The desktop app signs in under Account; a `gustaf serve` computer signs in from its terminal.
+  if (status.connection === "disabled" && shellAccount() === undefined) {
+    return (
+      <SettingsSection id="relay-section" title={t("settingsD.relay.title")}>
+        <SettingsRow
+          title={
+            <span className="flex items-center gap-2">
+              {t("settingsD.relay.anyNetwork")}
+              <Badge variant="secondary">{t(CONNECTION_LABELS.disabled)}</Badge>
+            </span>
+          }
+          description={t("settingsD.relay.disabledCliDescription")}
+        />
+      </SettingsSection>
+    );
+  }
 
   return (
     <SettingsSection id="relay-section" title={t("settingsD.relay.title")}>
@@ -120,6 +136,25 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
                 title={t("settingsD.relay.scanTitle")}
               />
             </div>
+          }
+        />
+      ) : null}
+      {status.offer ? (
+        <SettingsRow
+          title={t("settingsD.relay.pairingLink")}
+          description={
+            <code className="block break-all font-mono text-2xs select-all">
+              {status.offer.link}
+            </code>
+          }
+          control={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => status.offer && copyToClipboard(status.offer.link, undefined)}
+            >
+              {isCopied ? t("settingsD.relay.linkCopied") : t("settingsD.relay.copyLink")}
+            </Button>
           }
         />
       ) : null}
