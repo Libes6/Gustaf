@@ -607,9 +607,8 @@ export function useComposerSend(input: ComposerSendInput) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "Queued message not updated",
-            description:
-              "A queued message can't move to a side chat. Remove /side or /btw to save it.",
+            title: t("chatB.useComposerSend.queuedSideChatTitle"),
+            description: t("chatB.useComposerSend.queuedSideChatDescription"),
           }),
         );
         return;

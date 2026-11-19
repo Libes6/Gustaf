@@ -4,6 +4,7 @@ import {
   MessageId,
   RunId,
   TurnItemId,
+  type OrchestrationV2ConversationMessage,
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";

@@ -10,6 +10,9 @@ export const chatBMessages = {
     "chatB.useComposerSend.environmentUnavailableDescription":
       "Reconnecting to the environment. Try again once it is connected.",
     "chatB.useComposerSend.sideChatNotStartedTitle": "Side chat not started",
+    "chatB.useComposerSend.queuedSideChatTitle": "Queued message not updated",
+    "chatB.useComposerSend.queuedSideChatDescription":
+      "A queued message can't move to a side chat. Remove /side or /btw to save it.",
     "chatB.useComposerSend.sideChatTextOnlyTitle": "Side chats take text only",
     "chatB.useComposerSend.sideChatTextOnlyDescription":
       "Remove the attachments and context, then send it again.",
@@ -757,6 +760,9 @@ export const chatBMessages = {
     "chatB.useComposerSend.environmentUnavailableDescription":
       "Идёт переподключение к окружению. Повторите, когда подключение восстановится.",
     "chatB.useComposerSend.sideChatNotStartedTitle": "Боковой чат не запущен",
+    "chatB.useComposerSend.queuedSideChatTitle": "Сообщение в очереди не обновлено",
+    "chatB.useComposerSend.queuedSideChatDescription":
+      "Сообщение из очереди нельзя перенести в боковой чат. Уберите /side или /btw, чтобы сохранить его.",
     "chatB.useComposerSend.sideChatTextOnlyTitle": "Боковые чаты принимают только текст",
     "chatB.useComposerSend.sideChatTextOnlyDescription":
       "Удалите вложения и контекст, затем отправьте снова.",
