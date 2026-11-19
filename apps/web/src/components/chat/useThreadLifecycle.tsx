@@ -1,22 +1,13 @@
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type { Dispatch } from "react";
-import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
-import {
-  isThreadWokeUnseen,
-  branchMismatchKey,
-  isBranchMismatchDismissedForSession,
-  shouldShowBranchMismatchBanner,
-  chatActionErrorMessage,
-  makeThreadErrorSetter,
-} from "../ChatView.logic";
+import { isThreadWokeUnseen, makeThreadErrorSetter } from "../ChatView.logic";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { useDeadlinePassed, useNowAfter } from "../../hooks/useDeadline";
 import type { usePendingThreadRequests } from "./usePendingThreadRequests";
 import {
   AuthOrchestrationOperateScope,
-  AuthSourceControlWriteScope,
   type EnvironmentId,
   type ScopedThreadRef,
   type ThreadId,
@@ -52,10 +43,7 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { useT } from "../../useUiLanguage";
 import { newMessageId } from "~/lib/utils";
 import { buildThreadRouteParams } from "../../threadRoutes";
-import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
-import { useEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "../../state/threads";
-import { vcsEnvironment } from "../../state/vcs";
 import { useChildThreadInputs, readThreadShell, waitForThreadShell } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { environmentShell } from "../../state/shell";
@@ -63,7 +51,6 @@ import { ThreadStatusLine } from "./ThreadStatusLine";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { readEnvironmentScope } from "../../state/session";
-import { useAtomCommand } from "../../state/use-atom-command";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import {
   backgroundWorkNowItem,
@@ -102,7 +89,6 @@ interface ThreadLifecycleInput {
   /** The usage-limit recovery banner shows this snooze and its Wake now. */
   readonly limitRecoveryHoldsSnooze: boolean;
   readonly activeLatestRun: EnvironmentThreadShell["latestRun"];
-  readonly activeProjectCwd: string | null;
   readonly serverConfig: EnvironmentServerConfig | null;
   readonly runtimeMode: RuntimeMode;
   readonly isWorking: boolean;
@@ -114,10 +100,8 @@ interface ThreadLifecycleInput {
     readonly threadBranch: string;
     readonly currentBranch: string;
   } | null;
-  readonly gitStatusQuery: { readonly refresh: () => void };
   readonly nowMinute: string;
   readonly composerRef: ComposerHandleRef;
-  readonly composerDraftTarget: ComposerThreadTarget;
   readonly sendInFlightRef: { current: boolean };
   readonly setOptimisticUserMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   readonly setThreadError: ReturnType<typeof makeThreadErrorSetter>;
@@ -155,7 +139,6 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     activeThreadShell,
     activeLatestRun,
     limitRecoveryHoldsSnooze,
-    activeProjectCwd,
     serverConfig,
     runtimeMode,
     isWorking,
@@ -164,10 +147,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     activePendingApproval,
     activePendingUserInput,
     localCheckoutBranchMismatch,
-    gitStatusQuery,
     nowMinute,
     composerRef,
-    composerDraftTarget,
     sendInFlightRef,
     setOptimisticUserMessages,
     setThreadError,
@@ -180,8 +161,6 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const navigate = useNavigate();
   const router = useRouter();
   const { settleThread, pinThread, confirmAndUnpinThread } = useThreadActions();
-  const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
-  const switchGitRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
@@ -306,110 +285,6 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     setUnsnoozingThreadKey((current) => (current === threadKey ? null : current));
   };
   const handleUnsnoozeActiveThreadStable = useStableCallback(handleUnsnoozeActiveThread);
-  const [restoringBranchThreadKeys, setRestoringBranchThreadKeys] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const isRestoringThreadBranch =
-    activeThreadKey !== null && restoringBranchThreadKeys.has(activeThreadKey);
-  const [revealedBranchMismatchKey, setRevealedBranchMismatchKey] = useState<string | null>(null);
-  const [, setBranchMismatchDismissTick] = useState(0);
-  const composerHasDraftContent = useComposerDraftStore((store) =>
-    composerDraftHasUserContent(store.getComposerDraft(composerDraftTarget)),
-  );
-  const activeBranchMismatchKey = branchMismatchKey(
-    activeThread?.id ?? null,
-    localCheckoutBranchMismatch,
-  );
-  const showBranchMismatchBanner = shouldShowBranchMismatchBanner({
-    hasMismatch: localCheckoutBranchMismatch !== null,
-    isDismissed: isBranchMismatchDismissedForSession(activeBranchMismatchKey),
-    composerHasContent: composerHasDraftContent,
-    wasShownForCurrentMismatch:
-      revealedBranchMismatchKey !== null && revealedBranchMismatchKey === activeBranchMismatchKey,
-  });
-  const nextRevealedBranchMismatchKey = showBranchMismatchBanner
-    ? activeBranchMismatchKey
-    : revealedBranchMismatchKey !== activeBranchMismatchKey
-      ? null
-      : revealedBranchMismatchKey;
-  if (nextRevealedBranchMismatchKey !== revealedBranchMismatchKey) {
-    setRevealedBranchMismatchKey(nextRevealedBranchMismatchKey);
-  }
-  const handleSwitchCheckoutToThread = async () => {
-    if (!canWriteSourceControl) return;
-    if (
-      !activeProjectCwd ||
-      !activeThread ||
-      !localCheckoutBranchMismatch ||
-      isRestoringThreadBranch
-    ) {
-      return;
-    }
-    const threadKey = scopedThreadKey(scopeThreadRef(environmentId, activeThread.id));
-    const finishRestore = () =>
-      setRestoringBranchThreadKeys((current) => {
-        const next = new Set(current);
-        next.delete(threadKey);
-        return next;
-      });
-    setRestoringBranchThreadKeys((current) => new Set(current).add(threadKey));
-    const checkoutResult = await switchGitRef({
-      environmentId,
-      input: {
-        cwd: activeProjectCwd,
-        refName: localCheckoutBranchMismatch.threadBranch,
-      },
-    });
-    if (checkoutResult._tag === "Failure") {
-      finishRestore();
-      if (!isAtomCommandInterrupted(checkoutResult)) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: t("chatB.useThreadLifecycle.failedSwitchCheckout"),
-            description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
-          }),
-        );
-      }
-      return;
-    }
-
-    if (!readEnvironmentScope(environmentId, AuthSourceControlWriteScope)) {
-      finishRestore();
-      return;
-    }
-    const nextBranch = checkoutResult.value.refName ?? localCheckoutBranchMismatch.threadBranch;
-    if (nextBranch !== activeThread.branch) {
-      const updateResult = await updateThreadMetadata({
-        environmentId,
-        input: { threadId: activeThread.id, branch: nextBranch, worktreePath: null },
-      });
-      if (updateResult._tag === "Failure") {
-        finishRestore();
-        if (!isAtomCommandInterrupted(updateResult)) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: t("chatB.useThreadLifecycle.checkoutSwitchedNotUpdated"),
-              description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
-            }),
-          );
-        }
-        gitStatusQuery.refresh();
-        return;
-      }
-    }
-    gitStatusQuery.refresh();
-    finishRestore();
-    if (currentRouteThreadKeyRef.current === routeThreadKey) {
-      window.requestAnimationFrame(() => {
-        if (currentRouteThreadKeyRef.current === routeThreadKey) composerRef.current?.focusAtEnd();
-      });
-    }
-  };
-  const handleSwitchCheckoutToThreadStable = useStableCallback(() => {
-    void handleSwitchCheckoutToThread();
-  });
   // The interrupt path also accepts a completed run while its provider still
   // has background work.
   const activeBackgroundTasks = !isWorking && activeThread ? pendingBackgroundTasks : [];
@@ -729,20 +604,14 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   return {
     shortcuts,
     acknowledgeActiveThreadWoke,
-    activeBranchMismatchKey,
     // A Stop that went unanswered needs the user; one in progress is the thread's work.
     attentionNow: runStop?.state === "unresponsive" ? runStopNow : childInputNow,
     workNow: runStop?.state === "stopping" ? runStopNow : backgroundWorkNow,
     childInputNow,
     goalNow,
-    handleSwitchCheckoutToThread,
-    handleSwitchCheckoutToThreadStable,
-    isRestoringThreadBranch,
     onOpenRelatedThread,
     onOpenRelatedThreadStable,
     sendStandaloneCommand,
-    setBranchMismatchDismissTick,
-    showBranchMismatchBanner,
     threadStatusLine,
   };
 }

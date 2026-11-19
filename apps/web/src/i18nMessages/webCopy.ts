@@ -169,10 +169,6 @@ export const webCopyMessages = {
       "Structured accessibility elements were included, but they have no readable names or values.",
     "webCopy.theAppOrCaptureBackendDidNotProvideVerifiedAccessibility":
       "The app or capture backend did not provide verified accessibility data.",
-    "webCopy.branchChangedFrom": "Branch changed from",
-    "webCopy.thisThreadLastRanOn": "This thread last ran on",
-    "webCopy.sendingWillContinueOn": ". Sending will continue on",
-    "webCopy.restoreBranch": "Restore branch",
     "webCopy.next": "· next",
     "webCopy.couldNotLoadAutomations": "Could not load automations:",
     "webCopy.thisMerges": "This merges #",
@@ -980,10 +976,6 @@ export const webCopyMessages = {
       "Элементы доступности включены, но у них нет читаемых имён или значений.",
     "webCopy.theAppOrCaptureBackendDidNotProvideVerifiedAccessibility":
       "Приложение или служба захвата не предоставили проверенные данные доступности.",
-    "webCopy.branchChangedFrom": "Ветка изменена с",
-    "webCopy.thisThreadLastRanOn": "Последний запуск этого диалога был на",
-    "webCopy.sendingWillContinueOn": ". После отправки работа продолжится на",
-    "webCopy.restoreBranch": "Восстановить ветку",
     "webCopy.next": "· далее",
     "webCopy.couldNotLoadAutomations": "Не удалось загрузить автоматизации:",
     "webCopy.thisMerges": "Будет выполнено слияние #",

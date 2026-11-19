@@ -1,4 +1,3 @@
-import { getUiLanguage } from "~/uiLanguageStore";
 import type {
   EnvironmentId,
   OrchestrationV2PendingBackgroundTask,
@@ -19,7 +18,6 @@ import * as DateTime from "effect/DateTime";
 import {
   CircleDashedIcon,
   CircleStopIcon,
-  GitBranchIcon,
   MessageCircleIcon,
   ShieldQuestionIcon,
   TargetIcon,
@@ -29,8 +27,7 @@ import {
 import { Fragment } from "react";
 import { tickTextContent } from "~/lib/tickTextContent";
 import { BackgroundWorkDetails } from "./BackgroundWorkDetails";
-import { Button, InlineButton } from "../ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { InlineButton } from "../ui/button";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import type { ThreadNowItem } from "./ThreadNow";
 import { translate, type MessageKey } from "~/i18n";
@@ -295,49 +292,5 @@ export function backgroundWorkNowItem(input: {
         </InlineButton>
       </>
     ),
-  };
-}
-
-/** The local checkout moved off the branch this thread last ran on. */
-export function branchMismatchBannerItem(input: {
-  readonly mismatchKey: string;
-  readonly mismatch: { readonly threadBranch: string; readonly currentBranch: string };
-  readonly restoreDisabled: boolean;
-  readonly restoring: boolean;
-  readonly onRestore: () => void;
-  readonly onDismiss: () => void;
-}): ComposerBannerStackItem {
-  const { mismatch } = input;
-  return {
-    id: `branch-mismatch:${input.mismatchKey}`,
-    variant: "info",
-    icon: <GitBranchIcon />,
-    title: (
-      <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-normal text-muted-foreground">
-          {translate(getUiLanguage(), "webCopy.branchChangedFrom")}
-        </span>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <code className="min-w-0 truncate font-medium text-foreground">
-                {mismatch.threadBranch}
-              </code>
-            }
-          />
-          <TooltipPopup side="top">
-            {translate(getUiLanguage(), "webCopy.thisThreadLastRanOn")} {mismatch.threadBranch}
-            {translate(getUiLanguage(), "webCopy.sendingWillContinueOn")} {mismatch.currentBranch}.
-          </TooltipPopup>
-        </Tooltip>
-      </span>
-    ),
-    actions: (
-      <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
-        {input.restoring ? "Restoring..." : translate(getUiLanguage(), "webCopy.restoreBranch")}
-      </Button>
-    ),
-    dismissLabel: t("settingsStatus.dismissBranchNotice"),
-    onDismiss: input.onDismiss,
   };
 }
