@@ -1,4 +1,6 @@
 {
+  "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.": "Истекло время запуска Claude. Повторите ход; если ошибка повторяется, проверьте Claude и журналы сервера.",
+  "The MCP call was stopped.": "Вызов MCP остановлен.",
   "Update the desktop app on this machine.": "Обновите настольное приложение на этом компьютере.",
   "Settings": "Настройки",
   "Choose project": "Выбрать проект",

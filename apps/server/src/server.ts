@@ -169,6 +169,7 @@ import {
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as EnvironmentAuthPolicy from "./auth/EnvironmentAuthPolicy.ts";
 import * as CloudManagedEndpointRuntime from "./cloud/ManagedEndpointRuntime.ts";
+import * as RelayClientLedger from "./cloud/RelayClientLedger.ts";
 import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
@@ -540,6 +541,14 @@ const layerCloudManagedEndpointRuntime = Layer.mergeAll(
   CloudManagedEndpointRuntime.layer.pipe(
     Layer.provide(ServerSecretStore.layer),
     Layer.provide(layerRelayClient),
+    Layer.provide(
+      Layer.unwrap(
+        Effect.gen(function* () {
+          const config = yield* ServerConfig.ServerConfig;
+          return RelayClientLedger.layer({ stateDir: config.stateDir });
+        }),
+      ),
+    ),
   ),
 );
 

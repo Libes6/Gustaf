@@ -3,6 +3,9 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "chatB." and both languages list the same keys.
 export const chatBMessages = {
   en: {
+    "chatB.provider.claudeBootTimeout":
+      "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.",
+    "chatB.provider.mcpCallStopped": "The MCP call was stopped.",
     "chatB.useComposerSend.annotationAttachedTitle": "Annotation attached to draft",
     "chatB.useComposerSend.annotationAttachedDescription":
       "Sending is unavailable right now. Finish the current action, then send.",
@@ -753,6 +756,9 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.appAccessRequest": "App access request",
   },
   ru: {
+    "chatB.provider.claudeBootTimeout":
+      "Истекло время запуска Claude. Повторите ход; если ошибка повторяется, проверьте Claude и журналы сервера.",
+    "chatB.provider.mcpCallStopped": "Вызов MCP остановлен.",
     "chatB.useComposerSend.annotationAttachedTitle": "Аннотация прикреплена к черновику",
     "chatB.useComposerSend.annotationAttachedDescription":
       "Сейчас отправка недоступна. Завершите текущее действие и отправьте сообщение.",

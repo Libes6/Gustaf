@@ -1,3 +1,4 @@
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import type {
   OrchestrationV2ThreadLinkMetadata,
   GuestShareId,
@@ -88,9 +89,7 @@ import {
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Deferred from "effect/Deferred";
 import * as Exit from "effect/Exit";
-import * as FiberSet from "effect/FiberSet";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Layer from "effect/Layer";
@@ -5859,6 +5858,33 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         });
         return;
       }
+    }
+
+    // The service checked idleness before this command; a run or a delegated result that landed
+    // since makes the thread busy, and that turn refreshes the cache anyway.
+    if (
+      command.idleCompaction === "beforeCacheExpires" &&
+      projection.runs.some(
+        (run) =>
+          run.status === "queued" ||
+          isActiveRun(run) ||
+          (run.delegatedCompletion?.disposition === "open" &&
+            run.delegatedCompletion.delivery !== null &&
+            !projection.messages.some(
+              (message) => message.id === run.delegatedCompletion?.delivery?.messageId,
+            )),
+      )
+    ) {
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        occurredAt: yield* DateTime.now,
+        payload: projection.thread,
+      });
+      return;
     }
 
     if (projection.thread.lastVisitedAt === null && !isNativeMaintenanceCommand(command)) {
@@ -14352,27 +14378,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
   // One thread's reactions run in event order; a reaction waiting on one thread's lock must
   // not hold up another thread's.
-  const threadReactions = yield* FiberSet.make<void>();
-  const threadReactionTails = new Map<ThreadId, Deferred.Deferred<void>>();
-  const reactInThreadOrder = Effect.fnUntraced(function* <R>(
-    threadId: ThreadId,
-    reaction: Effect.Effect<void, never, R>,
-  ) {
-    const done = yield* Deferred.make<void>();
-    const previous = threadReactionTails.get(threadId);
-    threadReactionTails.set(threadId, done);
-    yield* (
-      previous === undefined ? reaction : Effect.andThen(Deferred.await(previous), reaction)
-    ).pipe(
-      Effect.ensuring(
-        Effect.suspend(() => {
-          if (threadReactionTails.get(threadId) === done) threadReactionTails.delete(threadId);
-          return Deferred.succeed(done, undefined);
-        }),
-      ),
-      FiberSet.run(threadReactions),
-    );
-  });
+  const threadReactions = yield* KeyedLock.makeRunner<ThreadId>();
 
   // Projections already contain historical terminals; replaying them delays startup queue promotion with database size.
   const terminalEventsAfterSequence = yield* eventSink.latestSequence().pipe(Effect.orDie);
@@ -14394,7 +14400,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             stored.event.payload.status === "rolled_back"),
       ),
       Stream.runForEach((stored) =>
-        reactInThreadOrder(stored.event.threadId, handleRunUpdate(stored)),
+        threadReactions.run(stored.event.threadId, handleRunUpdate(stored)),
       ),
       Effect.forkScoped,
     );
@@ -14453,7 +14459,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           Effect.catchCause((cause) =>
             Effect.logWarning("Failed to deliver deferred steering", { cause }),
           ),
-          (effect, stored) => reactInThreadOrder(stored.event.threadId, effect),
+          (effect, stored) => threadReactions.run(stored.event.threadId, effect),
         ),
       ),
       Effect.forkScoped,
@@ -14483,7 +14489,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   ).pipe(
     Stream.filter(settlesChildWork),
     Stream.runForEach((stored) =>
-      reactInThreadOrder(
+      threadReactions.run(
         stored.event.threadId,
         Effect.gen(function* () {
           const childThreadId = stored.event.threadId;
