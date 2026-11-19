@@ -27,7 +27,7 @@ import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
 import * as HostPowerMonitor from "./background/HostPowerMonitor.ts";
 import * as KeepAwake from "./background/KeepAwake.ts";
 import * as ServerConfig from "./config.ts";
-import { withUntracedRequests } from "./http.ts";
+import { withRootRequestSpans, withUntracedRequests } from "./http.ts";
 import * as ServerHttp from "./http.ts";
 import {
   guardHttpResponseWriteErrors,
@@ -77,6 +77,7 @@ import { BUILT_IN_SOURCE_CONTROL_DRIVER_LIST } from "./sourceControl/sourceContr
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import * as SecretResolver from "./secrets/SecretResolver.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
+import * as McpConnectors from "./mcpServers/McpConnectors.ts";
 import * as McpUserServers from "./mcpServers/McpUserServers.ts";
 import * as NativeMcpConfigs from "./mcpServers/import/NativeMcpConfigs.ts";
 import * as ProviderInstanceRegistryHydration from "./provider/ProviderInstanceRegistryHydration.ts";
@@ -169,6 +170,7 @@ import {
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as EnvironmentAuthPolicy from "./auth/EnvironmentAuthPolicy.ts";
 import * as CloudManagedEndpointRuntime from "./cloud/ManagedEndpointRuntime.ts";
+import * as RelayClientLedger from "./cloud/RelayClientLedger.ts";
 import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
@@ -540,6 +542,14 @@ const layerCloudManagedEndpointRuntime = Layer.mergeAll(
   CloudManagedEndpointRuntime.layer.pipe(
     Layer.provide(ServerSecretStore.layer),
     Layer.provide(layerRelayClient),
+    Layer.provide(
+      Layer.unwrap(
+        Effect.gen(function* () {
+          const config = yield* ServerConfig.ServerConfig;
+          return RelayClientLedger.layer({ stateDir: config.stateDir });
+        }),
+      ),
+    ),
   ),
 );
 
@@ -698,7 +708,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
   Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
   Layer.provideMerge(
-    Layer.merge(McpUserServers.layer, McpServerImport.layer).pipe(
+    Layer.mergeAll(McpUserServers.layer, McpServerImport.layer, McpConnectors.layer).pipe(
       Layer.provide(NativeMcpConfigs.layer),
     ),
   ),
@@ -1030,6 +1040,7 @@ const layerMakeServer = Layer.unwrap(
       routerConfig: HTTP_ROUTER_CONFIG,
     }).pipe(
       withUntracedRequests,
+      withRootRequestSpans,
       Layer.tap(() => Deferred.succeed(routesReady, undefined).pipe(Effect.orDie)),
     );
     const layerServerApplication = Layer.mergeAll(

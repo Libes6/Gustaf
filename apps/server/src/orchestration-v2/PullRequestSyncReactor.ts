@@ -10,6 +10,7 @@ import {
   type ThreadPullRequestStack,
 } from "@t3tools/contracts";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import {
   threadPullRequestKeyOf,
   normalizeThreadPullRequestKey,
@@ -677,6 +678,19 @@ export const make = Effect.gen(function* () {
     "PullRequestSyncReactor.start",
   )(function* () {
     const events = engine.streamDomainEvents;
+    // Linking and reopening dispatch under the thread's lock, so a busy thread delays only its
+    // own reactions. Refreshes queue with them, so each thread's reactions keep event order.
+    const threadReactions = yield* KeyedLock.makeRunner<ThreadId>();
+    const inThreadOrder = <E>(threadId: ThreadId, reaction: Effect.Effect<void, E>) =>
+      threadReactions.run(
+        threadId,
+        // The reactions log their own failures, so this sees only defects and shutdown.
+        Effect.catchCause(reaction, (cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.interrupt
+            : Effect.logWarning("pull request sync reaction failed", { threadId, cause }),
+        ),
+      );
     const stateChanges = Stream.merge(
       yield* pullRequests.subscribeStateChanges,
       yield* git.subscribePullRequestStateChanges,
@@ -706,17 +720,22 @@ export const make = Effect.gen(function* () {
           case "turn-item.updated": {
             const item = event.payload;
             if (item.type !== "command_execution") return Effect.void;
+            const active = isOrchestrationV2WorkActive(item.status);
+            if (active) return Effect.void;
             const linked = linkCreatedChangeRequests(event.threadId, item);
-            if (!isChangeRequestCloseCommand(item.input)) return linked;
+            if (!isChangeRequestCloseCommand(item.input)) {
+              return inThreadOrder(event.threadId, linked);
+            }
             const ended = closeCommands.get(event.threadId) ?? new Set<string>();
             closeCommands.set(event.threadId, ended);
-            if (isOrchestrationV2WorkActive(item.status) || ended.has(item.id)) return linked;
+            if (ended.has(item.id)) return inThreadOrder(event.threadId, linked);
             ended.add(item.id);
-            return Effect.andThen(linked, refreshUnmergedLinks(event.threadId));
+            const reaction = Effect.andThen(linked, refreshUnmergedLinks(event.threadId));
+            return inThreadOrder(event.threadId, reaction);
           }
           case "run.updated":
             return isTerminalRunStatus(event.payload.status) && closeCommands.delete(event.threadId)
-              ? refreshUnmergedLinks(event.threadId)
+              ? inThreadOrder(event.threadId, refreshUnmergedLinks(event.threadId))
               : Effect.void;
           default:
             return Effect.void;

@@ -1,6 +1,6 @@
 # Gustaf relay
 
-A phone reaches the Gustaf server on the user's computer from any network through our cloud API
+A phone or the desktop app reaches the Gustaf server on the user's computer from any network through our cloud API
 (`apps/api`, `api.libes6.ru`). The relay forwards ciphertext: the phone and the computer run an
 end-to-end encrypted Noise session through it. Direct routes (LAN, Tailscale) keep working; the relay
 needs nothing installed and works over any VPN, which matters because Android allows one VPN at a
@@ -22,13 +22,27 @@ Cloudflare for scale; with tens or hundreds of users, carrying the bytes ourselv
   [`RelayHostEngine.ts`](../../apps/server/src/relay/RelayHostEngine.ts)): the Node server, not the
   Rust shell, owns the connection, because the server is the one process every install has and the
   tunnel replays requests against it. The desktop shell keeps the device token in its encrypted
-  account file and hands it to `PUT /api/relay-host/credential`; the page never sees it.
+  account file and hands it to `PUT /api/relay-host/credential`. Without the shell,
+  `gustaf relay login` ([`RelayAccount.ts`](../../apps/server/src/relay/RelayAccount.ts)) runs the
+  same loopback PKCE sign-in, registers the computer, signs the session out and hands the device
+  token to the running server through that endpoint with a one-minute relay-scoped session, or
+  writes it to the secret store for the next start.
 - **Client** ([`relayTunnelClient.ts`](../../packages/shared/src/relayTunnelClient.ts)): one tunnel
-  per computer with `fetch` and `WebSocket` look-alikes. On mobile the runtime's HTTP client and
-  WebSocket layer route `https://<host-device-id>.relay.gustaf.invalid` through it, so the
-  connection supervisor, auth, routes and RPC need no relay-specific code. Features that call
-  `fetch` or `new WebSocket` themselves go through the same pool. That origin is a `relay` route,
-  ranked behind every direct one, so a phone at home uses the LAN.
+  per computer with `fetch` and `WebSocket` look-alikes. The key, paired computers and pool live in
+  [`@t3tools/client-runtime/gustaf-relay`](../../packages/client-runtime/src/gustafRelay/relayClient.ts)
+  with storage, credential and randomness injected (keychain and `expo-crypto` on the phone, the
+  shell on desktop). The runtime's HTTP client and WebSocket layer route
+  `https://<host-device-id>.relay.gustaf.invalid` through it, so the connection supervisor, auth,
+  routes and RPC need no relay-specific code. Features that call `fetch` or `new WebSocket`
+  themselves go through the same pool. That origin is a `relay` route, ranked behind every direct
+  one, so a phone at home uses the LAN.
+- **Desktop client**: the page itself runs the tunnel and holds this computer's device token, which
+  the shell hands over (`relay_client_credential`) along with two entries in its encrypted account
+  file for the Noise key and paired computers. A Rust-side socket would be a second tunnel
+  implementation, and the page already holds a full session to its own server; the token alone
+  opens nothing without an approved key. The browser web client has no device credential and no
+  relay route. On desktop the global `fetch` is wrapped too, so file previews work, but URLs the
+  web view loads itself (`<img>`, `<video>`, iframes, favicons) do not reach the tunnel.
 
 ## Crypto
 
@@ -40,12 +54,13 @@ pattern. The prologue binds the two device ids the relay vouched for. WebSocket 
 so the implicit Noise nonce is the replay and reorder protection; there is no rekey (64-bit nonces).
 
 Static keys never leave the devices: the computer's in the server secret store, the phone's in the
-keychain. The phone accepts only the host key from the QR code, so the relay cannot sit in the middle
+keychain, a desktop client's in the shell's encrypted account file. The phone accepts only the host key from the QR code, so the relay cannot sit in the middle
 of the first handshake.
 
 ## Pairing
 
-1. Settings → Sharing & access → Connect a phone shows `gustaf://relay-pair?…`: relay origin, host
+1. Settings → Sharing & access → Connect a device shows `gustaf://relay-pair?…` as a QR code and a
+   copyable link: relay origin, host
    device id, host static key, a one-time secret (5 minutes, burned on first use) and the name.
 2. The phone handshakes through the relay and sends its name and the secret in the third message.
 3. The computer lists it under "Allow …?" with a safety code; nothing reaches the local server before
@@ -93,6 +108,5 @@ Encryption does not help against a compromised device or a malicious app update.
 
 ## Open
 
-- A host without the desktop shell (the `gustaf` command) has no way to receive the device credential.
 - Independent security review (a second model and a human) and a load test with realistic sessions.
 - Scale-out beyond one API process needs shared presence.

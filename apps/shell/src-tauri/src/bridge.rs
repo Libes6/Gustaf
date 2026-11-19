@@ -13,9 +13,10 @@ use tauri::Manager;
 /// Runs in the main frame before the page's own code.
 const INIT_SCRIPT: &str = r#"(() => {
   if (window.top !== window || window.gustafShell) return;
-  // The script runs on every page the window loads. Only the local server's page may
-  // get the bridge: it carries the token that signs this window in.
-  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) return;
+  // The script runs on every page the window loads. Only the page of the server the shell
+  // started may get the bridge: it carries the token that signs this window in. Another
+  // local port (an app an agent runs) is a different origin and gets nothing.
+  if (window.location.origin !== __GUSTAF_APP_ORIGIN__) return;
   const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
 
   // WKWebView does not implement Electron's -webkit-app-region CSS.
@@ -123,7 +124,14 @@ const INIT_SCRIPT: &str = r#"(() => {
     return result;
   };
 
-  // The cloud account lives in the shell; the page only ever sees state, never a token.
+  // The cloud account lives in the shell; the page sees state, never the session token. Only the
+  // relay client gets this computer's device token, to reach other computers through the relay.
+  const relayClient = Object.freeze({
+    credential: () => invoke("relay_client_credential"),
+    getItem: (key) => invoke("relay_client_storage_get", { key: String(key) }),
+    setItem: (key, value) =>
+      invoke("relay_client_storage_set", { key: String(key), value: String(value) }),
+  });
   const account = Object.freeze({
     getState: () => invoke("account_state"),
     signIn: () => invoke("account_sign_in"),
@@ -134,6 +142,7 @@ const INIT_SCRIPT: &str = r#"(() => {
     revokeDevice: (deviceId) => invoke("account_revoke_device", { deviceId }),
     reportProblem: ({ message, attachLogs }) =>
       invoke("account_report_problem", { message, attachLogs }),
+    relayClient,
   });
 
   window.gustafShell = Object.freeze({
@@ -407,15 +416,18 @@ const INIT_SCRIPT: &str = r#"(() => {
 "#;
 
 pub(crate) fn init_script(
+    app_origin: &str,
     version: &str,
     bootstraps_json: &serde_json::Value,
     platform: &str,
     renders_server_tabs: bool,
 ) -> String {
+    let app_origin = serde_json::to_string(app_origin).unwrap_or_else(|_| "null".to_owned());
     let version = serde_json::to_string(version).unwrap_or_else(|_| "null".to_owned());
     let bootstraps = serde_json::to_string(bootstraps_json).unwrap_or_else(|_| "[]".to_owned());
     let platform = serde_json::to_string(platform).unwrap_or_else(|_| "\"darwin\"".to_owned());
     INIT_SCRIPT
+        .replace("__GUSTAF_APP_ORIGIN__", &app_origin)
         .replace("__GUSTAF_VERSION__", &version)
         .replace("__GUSTAF_BOOTSTRAPS__", &bootstraps)
         .replace("__GUSTAF_PLATFORM__", &platform)
@@ -710,6 +722,55 @@ mod tests {
 
     use std::sync::atomic::AtomicBool;
 
+    const ORIGIN: &str = "http://127.0.0.1:3773";
+
+    /// Runs the init script in node as a page at `origin`; true when it got the bridge.
+    fn bridge_installed_at(origin: &str) -> bool {
+        use std::io::Write;
+        const HARNESS: &str = r#"
+const script = require("fs").readFileSync(0, "utf8");
+const window = {
+  location: { origin: process.argv[1] },
+  localStorage: { getItem: () => null, removeItem() {} },
+  __TAURI_INTERNALS__: { invoke: () => new Promise(() => {}) },
+};
+window.top = window;
+const document = { addEventListener() {}, documentElement: {} };
+new Function("window", "document", "navigator", script)(window, document, { language: "en" });
+console.log(window.desktopBridge !== undefined || window.gustafShell !== undefined);
+"#;
+        let mut node = std::process::Command::new("node")
+            .args(["-e", HARNESS, origin])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("node runs the init script");
+        let bootstraps = serde_json::json!([{ "bootstrapToken": "tok" }]);
+        let script = init_script(ORIGIN, "0.8.4", &bootstraps, "darwin", false);
+        node.stdin
+            .take()
+            .unwrap()
+            .write_all(script.as_bytes())
+            .unwrap();
+        let output = node.wait_with_output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim() == "true"
+    }
+
+    #[test]
+    fn only_the_servers_own_origin_gets_the_bridge() {
+        assert!(bridge_installed_at(ORIGIN));
+        for origin in [
+            "http://127.0.0.1:3000",
+            "http://localhost:3773",
+            "http://[::1]:3773",
+            "https://127.0.0.1:3773",
+            "null",
+        ] {
+            assert!(!bridge_installed_at(origin), "{origin}");
+        }
+    }
+
     #[test]
     fn the_page_hears_only_fullscreen_changes() {
         let last = AtomicBool::new(false);
@@ -727,7 +788,7 @@ mod tests {
 const script = require("fs").readFileSync(0, "utf8");
 let answerSeed;
 const window = {
-  location: { hostname: "localhost" },
+  location: { origin: "http://127.0.0.1:3773" },
   localStorage: { getItem: () => null, removeItem() {} },
   __TAURI_INTERNALS__: {
     invoke: (command) =>
@@ -752,7 +813,7 @@ new Function("window", "document", "navigator", script)(window, document, { lang
             .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("node runs the init script");
-        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
+        let script = init_script(ORIGIN, "0.8.4", &serde_json::json!([]), "darwin", false);
         node.stdin
             .take()
             .unwrap()
@@ -770,13 +831,19 @@ new Function("window", "document", "navigator", script)(window, document, { lang
 
     #[test]
     fn the_page_no_longer_asks_on_every_resize() {
-        let script = init_script("0.8.4", &serde_json::json!([]), "darwin", false);
+        let script = init_script(ORIGIN, "0.8.4", &serde_json::json!([]), "darwin", false);
         assert!(!script.contains(r#"addEventListener("resize""#));
     }
 
     #[test]
     fn the_page_is_told_the_app_version_as_a_string() {
-        let script = init_script("0.8.3\"; alert(1); \"", &serde_json::json!([]), "darwin", false);
+        let script = init_script(
+            ORIGIN,
+            "0.8.3\"; alert(1); \"",
+            &serde_json::json!([]),
+            "darwin",
+            false,
+        );
         assert!(script.contains(r#"version: "0.8.3\"; alert(1); \"","#));
         assert!(!script.contains("__GUSTAF_VERSION__"));
     }
@@ -784,6 +851,7 @@ new Function("window", "document", "navigator", script)(window, document, { lang
     #[test]
     fn installs_desktop_bridge_without_preview() {
         let script = init_script(
+            ORIGIN,
             "0.8.4",
             &serde_json::json!([{
                 "id": "primary",

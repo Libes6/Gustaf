@@ -171,6 +171,7 @@ it("readThread preserves caller access errors and prefers activity-run status ov
             input.threadId === parentThreadId
               ? Effect.succeed(projection)
               : Effect.die(`unexpected thread ${input.threadId}`),
+          getRunCount: () => Effect.succeed(projection.runs.length),
         } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
         ServerSettings.layerTest(),
         Layer.mock(ProviderRegistry.ProviderRegistry)({
@@ -255,6 +256,7 @@ it("readThread pages cut-off text without splitting an emoji across pages", asyn
             }),
           getThreadRecords: () => Effect.succeed(projection),
           getProjectThreadRecords: () => Effect.succeed(projection),
+          getRunCount: () => Effect.succeed(projection.runs.length),
           getThreadShell: () =>
             Effect.succeed(projection.thread as unknown as OrchestrationV2ThreadShell),
         } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
@@ -504,6 +506,7 @@ it("readThread and sendToThread reach threads in other projects", async () => {
               totalItems: 1,
               hasMore: false,
             }),
+          getRunCount: (threadId) => Effect.succeed(foreignProjection(threadId).runs.length),
           getProjectThreadRecords: (input) =>
             input.threadId === foreignThreadId && input.projectId === foreignProjectId
               ? Effect.succeed(foreignProjection(input.threadId))

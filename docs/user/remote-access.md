@@ -8,34 +8,57 @@ Closing the desktop app's last window stops its local server.
 
 ## Gustaf relay
 
-Reach the computer from the Android app on any network, including while either device is on a VPN.
-Sign in with GitHub. Traffic is end-to-end encrypted: the relay sees which of your devices are
-connected and how much they send, not prompts, files, or tool output.
+Reach the computer from the Android app or from the desktop app on another computer, on any
+network, including while either device is on a VPN. Sign in with GitHub. Traffic is end-to-end
+encrypted: the relay sees which of your devices are connected and how much they send, not prompts,
+files, or tool output. All devices must use the same Gustaf account.
 
-1. On the computer, open **Settings → Account**, choose **Sign in with GitHub**, and register this
-   computer.
-2. On the phone, sign in under **Settings → Account** and register the phone.
-3. On the computer, open **Settings → Sharing & access** and, under **Any network (Gustaf relay)**,
-   choose **Connect a phone**.
-4. On the phone, open **Add route** and scan the code.
-5. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
+Turn the relay on for the computer you want to reach:
 
-The code works once, for five minutes. Later connections use the phone's saved key. If the codes
-differ, choose **Reject**. Revoke a phone under **Details** in the same section. If the phone can
+- **Desktop app:** open **Settings → Account**, choose **Sign in with GitHub**, and register this
+  computer.
+- **`gustaf serve` without the desktop app:** run `gustaf relay login` on that computer and sign in
+  in the browser that opens. The browser must run on the same computer; over SSH, forward the port
+  shown in the sign-in address first. A running server connects right away, otherwise on its next
+  start. `gustaf relay logout` turns it off again.
+
+Pair a phone:
+
+1. On the phone, sign in under **Settings → Account** and register the phone.
+2. On the computer, open **Settings → Sharing & access** and, under **Any network (Gustaf relay)**,
+   choose **Connect a device**.
+3. On the phone, open **Add route** and scan the code.
+4. On the computer, choose **Allow device** and compare the safety code with the one on the phone.
+
+Pair the desktop app on another computer:
+
+1. Register that computer under **Settings → Account** in its desktop app.
+2. On the computer you want to reach, choose **Connect a device** as above and **Copy link**.
+3. In the other desktop app, open **Settings → Environments → Add environment**, choose
+   **Gustaf relay**, paste the link and add it.
+4. Choose **Allow device** on the first computer when the other one shows the same safety code.
+
+The code works once, for five minutes. Later connections use the device's saved key. If the codes
+differ, choose **Reject**. Revoke a device under **Details** in the same section. If the device can
 also reach the computer on the local network or Tailscale, add that address as another route. The
 app uses a direct route when one answers.
 
+The browser version of Gustaf cannot use the relay. In the desktop app over the relay, images,
+videos and embedded previews that load straight from the other computer do not show; file
+previews and downloads work.
+
 ## Relay troubleshooting
 
-Remote access stays off until this computer is registered to your account.
+Remote access stays off until this computer is registered to your account, or until
+`gustaf relay login` ran on a computer without the desktop app.
 
-The scan code expires after five minutes and after one use. Choose **Connect a phone** again for a
+The code expires after five minutes and after one use. Choose **Connect a device** again for a
 new one.
 
-Compare the safety code on the phone with **Details** on the computer. Matching codes mean the
-relay is not sitting between the two devices.
+Compare the safety code on the other device with **Details** on the computer. Matching codes mean
+the relay is not sitting between the two devices.
 
-A phone you revoked cannot open the tunnel until you pair it again from this computer.
+A device you revoked cannot open the tunnel until you pair it again from this computer.
 
 When this account has used its monthly relay allowance, new relay connections are refused until
 the next month. Use a direct route instead. Open connections are left to finish.
@@ -49,7 +72,7 @@ then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
 For a command-line host, run `gustaf up`. It asks whether to allow the local
-network and, on Linux and macOS, runs Gustaf as a
+network and runs Gustaf as a
 [background service](./background-service.md). Run it again to change your
 choice, and `gustaf status` to see it. To skip the question, run:
 
@@ -60,13 +83,45 @@ gustaf up --lan
 `--no-lan` turns it off, and `--yes` keeps the current setting. Without a
 terminal, a needed restart runs without asking and stops running agent turns,
 and a machine with nothing set up needs `--lan`, `--no-lan`, or `--yes`.
-`gustaf status --json` prints the settings for scripts. The background service is
-not available on Windows, so there `gustaf up` prints the `gustaf serve` command to keep
-running in a terminal.
+`gustaf status --json` prints the settings for scripts. On Windows, use the PowerShell installer first and run `gustaf up` from its
+`gustaf` command. The scheduled task starts at each sign-in, including after a
+reboot. Keep the host signed in and awake.
 
 For a server in a terminal, run `gustaf serve --lan`. Either way, Gustaf then
 accepts connections from your local network and tailnet, so a pairing code is
 all that keeps other devices on them out.
+
+### Windows firewall and cloud hosts
+
+On Windows, `gustaf serve --lan` prints a command to allow its actual listening
+port. To apply it, open PowerShell as administrator and run, replacing `<port>`:
+
+```powershell
+New-NetFirewallRule -DisplayName "Gustaf" -Direction Inbound -Protocol TCP -LocalPort <port> -Action Allow
+```
+
+Gustaf does not change the firewall automatically. Remove the rule when no longer
+needed with `Remove-NetFirewallRule -DisplayName "Gustaf"`.
+
+`--lan` accepts private network and tailnet clients; it rejects public source IPs.
+For a Linux laptop reaching a Windows cloud VM, prefer Tailscale and
+`gustaf pair --tailscale`. For direct public access, bind explicitly with
+`gustaf serve --host 0.0.0.0`, allow the port in Windows Firewall and the cloud
+provider's inbound rules, and restrict those rules to your laptop's IP. Use HTTPS
+through a reverse proxy for public access. Plain HTTP pairing exposes credentials
+on the network. See [background service](./background-service.md) for platform
+availability; on Windows, `gustaf up` keeps the server running after sign-in.
+
+If adding an environment times out, check the bind address, host firewall and
+cloud inbound rules first. An address without a scheme uses HTTP for IP addresses
+and local `host:port` names; public domain names keep HTTPS. You can always enter
+`http://` or `https://` explicitly.
+
+На Windows команда `gustaf serve --lan` печатает правило для фактического порта.
+Откройте PowerShell от администратора и выполните его, только если хотите открыть
+сетевой доступ. Для облачной VM проверьте также входящие правила у провайдера.
+`--lan` отклоняет публичные IP клиентов: используйте Tailscale или явно задайте
+`--host 0.0.0.0`, ограничив доступ в firewall и настроив HTTPS.
 
 If a server is already running, generate a fresh link without restarting it:
 

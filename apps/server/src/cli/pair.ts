@@ -42,6 +42,7 @@ import {
   buildPairingUrl,
   formatHostForUrl,
   isLoopbackHost,
+  LOOPBACK_ACCESS_HINT,
   isWildcardHost,
   renderTerminalQrCode,
   resolveHeadlessConnectionString,
@@ -236,14 +237,14 @@ const probeEnvironmentDescriptor: (
   Effect.catch((outcome) => Effect.succeed(outcome)),
 );
 
-interface DiscoveredPairTarget {
+export interface DiscoveredPairTarget {
   readonly baseDir: string;
   readonly variant: PairStateVariant;
   readonly state: PersistedServerRuntimeState;
   readonly descriptor: ExecutionEnvironmentDescriptor;
 }
 
-const discoverPairTarget = Effect.fn("pair.discoverPairTarget")(function* (
+export const discoverPairTarget = Effect.fn("pair.discoverPairTarget")(function* (
   explicitBaseDir: string | undefined,
 ) {
   const bases: Array<string> = [];
@@ -306,7 +307,7 @@ const discoverPairTarget = Effect.fn("pair.discoverPairTarget")(function* (
 });
 
 /** Use the discovered state directory, independent of ambient config variables. */
-const makePairServerConfig = Effect.fn(function* (input: {
+export const makePairServerConfig = Effect.fn(function* (input: {
   readonly target: DiscoveredPairTarget;
   readonly logLevel: ServerConfig.ServerConfig["Service"]["logLevel"];
 }) {
@@ -531,9 +532,7 @@ export const pairCommand = Command.make("pair", {
       } else {
         pairingBaseUrl = resolveDirectPairingBaseUrl(target.state);
         if (isLoopbackHost(new URL(pairingBaseUrl).hostname)) {
-          notes.push(
-            "This URL is only reachable from this machine. To reach it from your other devices, run `gustaf up`, or re-run with --tailscale.",
-          );
+          notes.push(LOOPBACK_ACCESS_HINT);
         } else if (target.state.privateNetworkOnly) {
           notes.push(
             "This URL works only from this machine's local network. From elsewhere, re-run with --tailscale or use T3 Connect.",

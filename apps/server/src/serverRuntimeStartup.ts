@@ -1,3 +1,4 @@
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
   CommandId,
   DEFAULT_MODEL,
@@ -620,7 +621,12 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
           const accessInfo = yield* issueHeadlessServeAccessInfo();
           yield* runStartupPhase(
             "headless.output",
-            Console.log(formatHeadlessServeOutput(accessInfo)),
+            Console.log(
+              formatHeadlessServeOutput(accessInfo, {
+                platform: yield* HostProcess.Platform,
+                lan: serverConfig.privateNetworkOnly === true,
+              }),
+            ),
           );
         } else {
           yield* Effect.logDebug("startup phase: browser open check");

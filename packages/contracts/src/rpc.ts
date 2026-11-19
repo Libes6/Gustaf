@@ -400,6 +400,12 @@ import {
   SubscriptionUpsertInput,
 } from "./subscription.ts";
 import {
+  McpConnectorAuthorizeInput,
+  McpConnectorAuthorizeResult,
+  McpConnectorError,
+  McpConnectorSubmitCallbackInput,
+  McpConnectorsListInput,
+  McpConnectorsListResult,
   McpImportInput,
   McpImportResult,
   McpListImportableInput,
@@ -595,6 +601,9 @@ export const WS_METHODS = {
 
   mcpServersListImportable: "mcpServers.listImportable",
   mcpServersImport: "mcpServers.import",
+  mcpConnectorsList: "mcpConnectors.list",
+  mcpConnectorsAuthorize: "mcpConnectors.authorize",
+  mcpConnectorsSubmitCallback: "mcpConnectors.submitCallback",
 
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
@@ -2125,6 +2134,25 @@ const WsMcpServersImportRpc = Rpc.make(WS_METHODS.mcpServersImport, {
   error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
 });
 
+const McpConnectorRpcError = Schema.Union([McpConnectorError, EnvironmentAuthorizationError]);
+
+const WsMcpConnectorsListRpc = Rpc.make(WS_METHODS.mcpConnectorsList, {
+  payload: McpConnectorsListInput,
+  success: McpConnectorsListResult,
+  error: McpConnectorRpcError,
+});
+
+const WsMcpConnectorsAuthorizeRpc = Rpc.make(WS_METHODS.mcpConnectorsAuthorize, {
+  payload: McpConnectorAuthorizeInput,
+  success: McpConnectorAuthorizeResult,
+  error: McpConnectorRpcError,
+});
+
+const WsMcpConnectorsSubmitCallbackRpc = Rpc.make(WS_METHODS.mcpConnectorsSubmitCallback, {
+  payload: McpConnectorSubmitCallbackInput,
+  error: McpConnectorRpcError,
+});
+
 const WsGuestShareCreateRpc = Rpc.make(WS_METHODS.guestShareCreate, {
   payload: GuestShareCreateInput,
   success: GuestShareCreateResult,
@@ -2247,6 +2275,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscriptionsDeleteRpc,
   WsMcpServersListImportableRpc,
   WsMcpServersImportRpc,
+  WsMcpConnectorsListRpc,
+  WsMcpConnectorsAuthorizeRpc,
+  WsMcpConnectorsSubmitCallbackRpc,
   WsServerReportClientActivityRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,

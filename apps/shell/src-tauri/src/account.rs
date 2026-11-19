@@ -5,6 +5,7 @@
 //! PKCE hand-off through the system browser to a one-shot loopback listener (RFC 8252),
 //! then keeps the token in the encrypted store and answers the page with state only.
 
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -42,6 +43,9 @@ pub(crate) struct AccountStore {
 struct StoredAccount {
     session: Option<StoredSession>,
     device: Option<StoredDevice>,
+    /// The page's relay client: its Noise key and the computers it paired with.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    relay_client: BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -308,7 +312,7 @@ fn save(
     entry: &keyring::Entry,
     account: &StoredAccount,
 ) -> Result<(), String> {
-    if account.session.is_none() && account.device.is_none() {
+    if account.session.is_none() && account.device.is_none() && account.relay_client.is_empty() {
         return match std::fs::remove_file(path) {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.to_string()),
             _ => Ok(()),
@@ -419,6 +423,7 @@ pub(crate) async fn account_sign_in(app: tauri::AppHandle) -> Result<AccountStat
                 .is_some_and(|device| device.user_id != grant.user.id)
             {
                 account.device = None;
+                account.relay_client.clear();
             }
             account.session = Some(StoredSession {
                 token: grant.token,
@@ -595,6 +600,82 @@ pub(crate) async fn account_revoke_device(
             sync_relay_credential(&app);
         }
         Ok(state)
+    })
+    .await
+}
+
+// --- Relay client ---
+//
+// The desktop app reaches other computers through the Gustaf relay from the page itself, which
+// holds this computer's device credential while it does (docs/internals/relay.md). A Rust-side
+// socket would mean a second tunnel implementation; the page is already trusted with the server.
+
+const RELAY_CLIENT_KEYS: [&str; 2] = ["gustaf.relay.phone-key", "gustaf.relay.hosts"];
+const RELAY_CLIENT_VALUE_LIMIT: usize = 64 * 1024;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RelayClientCredential {
+    device_id: String,
+    device_token: String,
+    /// What the other computer shows beside "Allow …?".
+    device_name: String,
+}
+
+fn relay_client_credential_of(account: &StoredAccount) -> Result<RelayClientCredential, String> {
+    account
+        .device
+        .as_ref()
+        .map(|device| RelayClientCredential {
+            device_id: device.id.clone(),
+            device_token: device.token.clone(),
+            device_name: computer_name(),
+        })
+        .ok_or_else(|| {
+            "Sign in and register this computer under Settings → Account to use the Gustaf relay."
+                .to_owned()
+        })
+}
+
+fn check_relay_client_key(key: &str) -> Result<(), String> {
+    if RELAY_CLIENT_KEYS.contains(&key) {
+        Ok(())
+    } else {
+        Err("Unknown relay client entry".to_owned())
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn relay_client_credential(
+    app: tauri::AppHandle,
+) -> Result<RelayClientCredential, String> {
+    off_main_thread(move || read_account(&app, relay_client_credential_of)?).await
+}
+
+#[tauri::command]
+pub(crate) async fn relay_client_storage_get(
+    app: tauri::AppHandle,
+    key: String,
+) -> Result<Option<String>, String> {
+    check_relay_client_key(&key)?;
+    off_main_thread(move || read_account(&app, |account| account.relay_client.get(&key).cloned()))
+        .await
+}
+
+#[tauri::command]
+pub(crate) async fn relay_client_storage_set(
+    app: tauri::AppHandle,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    check_relay_client_key(&key)?;
+    if value.len() > RELAY_CLIENT_VALUE_LIMIT {
+        return Err("The relay client entry is too large".to_owned());
+    }
+    off_main_thread(move || {
+        change_account(&app, |account| {
+            account.relay_client.insert(key, value);
+        })
     })
     .await
 }
@@ -776,10 +857,15 @@ mod tests {
                 token: "gdt_secret-device-token".to_owned(),
                 user_id: "u1".to_owned(),
             }),
+            relay_client: BTreeMap::from([(
+                "gustaf.relay.phone-key".to_owned(),
+                "secret-relay-key".to_owned(),
+            )]),
         };
         save(&path, &entry, &account).unwrap();
         let raw = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
         assert!(!raw.contains("secret-session-token") && !raw.contains("secret-device-token"));
+        assert!(!raw.contains("secret-relay-key"));
         let loaded = load(&path, &entry).unwrap();
         assert_eq!(
             loaded.session.as_ref().unwrap().token,
@@ -789,6 +875,14 @@ mod tests {
             loaded.device.as_ref().unwrap().token,
             "gdt_secret-device-token"
         );
+        assert_eq!(
+            loaded.relay_client["gustaf.relay.phone-key"],
+            "secret-relay-key"
+        );
+        let credential =
+            serde_json::to_value(relay_client_credential_of(&loaded).unwrap()).unwrap();
+        assert_eq!(credential["deviceId"], "d1");
+        assert_eq!(credential["deviceToken"], "gdt_secret-device-token");
         let state = serde_json::to_value(loaded.state()).unwrap();
         assert!(!state.to_string().contains("secret"));
         assert_eq!(state["signedIn"], true);
@@ -797,6 +891,17 @@ mod tests {
         assert!(!path.exists());
         assert!(load(&path, &entry).unwrap().session.is_none());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_relay_client_needs_a_registered_computer_and_known_entries() {
+        assert!(relay_client_credential_of(&StoredAccount::default()).is_err());
+        for key in RELAY_CLIENT_KEYS {
+            assert!(check_relay_client_key(key).is_ok());
+        }
+        for key in ["", "session", "gustaf.relay.other"] {
+            assert!(check_relay_client_key(key).is_err(), "{key}");
+        }
     }
 
     #[test]

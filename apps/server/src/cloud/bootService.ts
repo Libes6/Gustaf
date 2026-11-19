@@ -428,7 +428,7 @@ export class BootServiceUnsupportedError extends Schema.TaggedError<BootServiceU
   { platform: Schema.String },
 ) {
   override get message(): string {
-    return `Background setup supports Linux with systemd and macOS with launchd; this machine reports '${this.platform}'.`;
+    return `Background setup supports Linux with systemd, macOS with launchd, and Windows Task Scheduler; this machine reports '${this.platform}'.`;
   }
 }
 
@@ -549,6 +549,7 @@ export interface BootServiceStatus {
   readonly installed: boolean;
   readonly current: boolean;
   readonly installedVersion?: string;
+  readonly taskState?: string;
   readonly installedBaseDir?: string;
   /** Set when the installed unit serves a different T3 home than this CLI. */
   readonly otherBaseDir?: string;
@@ -612,6 +613,12 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   const path = yield* Path.Path;
   const runner = yield* ProcessRunner.ProcessRunner;
   const host = input.host ?? { execPath: hostExecPath };
+  if (platform === "win32") {
+    const { makeWindowsBootService } = yield* Effect.promise(
+      () => import("./windowsBootService.ts"),
+    );
+    return yield* makeWindowsBootService({ ...input, execPath: host.execPath });
+  }
   const runtimePaths = pinnedRuntimePaths(path, input.baseDir, input.cliVersion, platform);
   const versionsDir = pinnedRuntimeVersionsDir(path, input.baseDir);
   const xmlSafeInstallerDirectories = installerPath.split(":").filter(

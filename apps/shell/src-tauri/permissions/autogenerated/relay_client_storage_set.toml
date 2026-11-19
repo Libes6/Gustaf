@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-relay-client-storage-set"
+description = "Enables the relay_client_storage_set command without any pre-configured scope."
+commands.allow = ["relay_client_storage_set"]
+
+[[permission]]
+identifier = "deny-relay-client-storage-set"
+description = "Denies the relay_client_storage_set command without any pre-configured scope."
+commands.deny = ["relay_client_storage_set"]

@@ -3,16 +3,18 @@ import * as NodeFS from "node:fs";
 import * as NodeTest from "node:test";
 import * as NodeVM from "node:vm";
 
+const SERVER_ORIGIN = "http://127.0.0.1:3773";
 const source = NodeFS.readFileSync(new URL("../src-tauri/src/bridge.rs", import.meta.url), "utf8");
 const script = source
   .split('const INIT_SCRIPT: &str = r#"')[1]
   .split('"#;')[0]
+  .replaceAll("__GUSTAF_APP_ORIGIN__", JSON.stringify(SERVER_ORIGIN))
   .replaceAll("__GUSTAF_VERSION__", '"test"')
   .replaceAll("__GUSTAF_BOOTSTRAPS__", "[]")
   .replaceAll("__GUSTAF_PLATFORM__", '"darwin"')
   .replaceAll("__GUSTAF_RENDERS_SERVER_TABS__", "true");
 
-function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
+function load(invoke, stored = new Map(), origin = SERVER_ORIGIN) {
   const events = new Map();
   const window = {
     __TAURI_INTERNALS__: {
@@ -29,7 +31,7 @@ function load(invoke, stored = new Map(), hostname = "127.0.0.1") {
       removeItem: (key) => stored.delete(key),
     },
     addEventListener: (name, listener) => events.set(name, listener),
-    location: { hostname },
+    location: { origin, hostname: origin.startsWith("http") ? new URL(origin).hostname : "" },
   };
   window.top = window;
   NodeVM.runInNewContext(script, {
@@ -174,15 +176,22 @@ NodeTest.test("a save queued during migration wins over the older catalog", asyn
   NodeAssert.equal(stored.has("gustaf.connectionCatalog"), false);
 });
 
-NodeTest.test("a page that is not the local server gets no bridge and no token", () => {
-  for (const hostname of ["example.com", "127.0.0.1.example.com", "192.168.1.20", ""]) {
-    const { window } = load(() => null, new Map(), hostname);
-    NodeAssert.equal(window.desktopBridge, undefined, hostname);
-    NodeAssert.equal(window.gustafShell, undefined, hostname);
+NodeTest.test("only the started server's own origin gets the bridge and the token", () => {
+  for (const origin of [
+    "https://example.com",
+    "http://127.0.0.1.example.com:3773",
+    "http://192.168.1.20:3773",
+    "http://127.0.0.1:3000",
+    "http://localhost:3773",
+    "http://[::1]:3773",
+    "https://127.0.0.1:3773",
+    "null",
+  ]) {
+    const { window } = load(() => null, new Map(), origin);
+    NodeAssert.equal(window.desktopBridge, undefined, origin);
+    NodeAssert.equal(window.gustafShell, undefined, origin);
   }
-  for (const hostname of ["localhost", "127.0.0.1", "[::1]"]) {
-    NodeAssert.notEqual(load(() => null, new Map(), hostname).bridge, undefined, hostname);
-  }
+  NodeAssert.notEqual(load(() => null).bridge, undefined);
 });
 
 // The page subscribes to these while it starts and does not check that they exist.
@@ -278,3 +287,21 @@ NodeTest.test(
     NodeAssert.ok(calls.every(([name, args]) => name === "ssh_request" && args.locale === "ru"));
   },
 );
+
+NodeTest.test("the relay client reads its credential and entries through the shell", async () => {
+  const calls = [];
+  const { window } = load((name, args) => {
+    calls.push([name, args]);
+    return name === "relay_client_storage_get" ? "stored" : null;
+  });
+  const relayClient = window.gustafShell.account.relayClient;
+  await relayClient.credential();
+  NodeAssert.equal(await relayClient.getItem("gustaf.relay.hosts"), "stored");
+  await relayClient.setItem("gustaf.relay.phone-key", "key");
+  // Arguments come from the script's own realm.
+  NodeAssert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    ["relay_client_credential", null],
+    ["relay_client_storage_get", { key: "gustaf.relay.hosts" }],
+    ["relay_client_storage_set", { key: "gustaf.relay.phone-key", value: "key" }],
+  ]);
+});

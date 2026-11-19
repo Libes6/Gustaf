@@ -35,11 +35,21 @@ import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
+import { McpConnectorsSection } from "./McpConnectorsSection";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
 const isMcpId = Schema.is(McpServerId);
 const decodeMcpId = Schema.decodeSync(McpServerId);
 const decodeMcpConfig = Schema.decodeUnknownSync(McpServerConfig);
+
+// React Compiler skips components that throw inside try, so parsing stays out here.
+function parsePastedServers(paste: string) {
+  try {
+    return parseMcpServerJson(paste);
+  } catch {
+    return undefined;
+  }
+}
 
 export function McpSettings() {
   const t = useT();
@@ -258,6 +268,7 @@ function McpEnvironmentSettings({
           ),
         )}
       </SettingsSection>
+      <McpConnectorsSection environmentId={environmentId} projectDir={projectDir} />
       {imports !== null && (
         <Dialog
           open
@@ -400,25 +411,18 @@ function McpEnvironmentSettings({
               <Button
                 disabled={busy || !paste.trim()}
                 onClick={async () => {
-                  let configs;
-                  try {
-                    configs = parseMcpServerJson(paste);
-                    if (Object.keys(configs).some((id) => Object.hasOwn(settings.mcpServers, id)))
-                      throw new Error(t("settingsE.mcp.idTaken"));
-                    if (
-                      !localAllowed &&
-                      Object.values(configs).some((c) => c.transport.type === "stdio")
-                    )
-                      throw new Error(t("settingsE.mcp.localDisallowed"));
-                  } catch (e) {
-                    setError(
-                      e instanceof Error &&
-                        [t("settingsE.mcp.idTaken"), t("settingsE.mcp.localDisallowed")].includes(
-                          e.message,
-                        )
-                        ? e.message
-                        : t("settingsE.mcp.jsonInvalid"),
-                    );
+                  const configs = parsePastedServers(paste);
+                  const problem =
+                    configs === undefined
+                      ? "settingsE.mcp.jsonInvalid"
+                      : Object.keys(configs).some((id) => Object.hasOwn(settings.mcpServers, id))
+                        ? "settingsE.mcp.idTaken"
+                        : !localAllowed &&
+                            Object.values(configs).some((c) => c.transport.type === "stdio")
+                          ? "settingsE.mcp.localDisallowed"
+                          : undefined;
+                  if (configs === undefined || problem !== undefined) {
+                    setError(t(problem ?? "settingsE.mcp.jsonInvalid"));
                     return;
                   }
                   if (await save({ mcpServers: configs })) setPaste(null);

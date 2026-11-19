@@ -1278,6 +1278,22 @@ export const layer: Layer.Layer<
           const childSubagents = yield* Ref.get(activeChildSubagents);
           return childSubagents.size === 0;
         });
+        // Claude background Bash has no turn-item projection. Use only the
+        // thread-scoped probe: session-wide pending work (siblings, wake
+        // buffers, session subagents) must not pin this root subscription.
+        let rootSnapshotPendingWork = false;
+        const threadHasPendingBackgroundWork = Effect.gen(function* () {
+          // The live probe reads adapter state, which can be ahead of the events consumed here.
+          if (rootSnapshotPendingWork) {
+            return true;
+          }
+          if (input.session.hasPendingBackgroundWorkForThread === undefined) {
+            return false;
+          }
+          return yield* input.session
+            .hasPendingBackgroundWorkForThread(yield* Ref.get(latestProviderThread))
+            .pipe(Effect.catchCause(() => Effect.succeed(false)));
+        });
         const shouldStopProviderEventIngestion = Effect.gen(function* () {
           if (!(yield* agentTurnsSettled)) {
             return false;
@@ -1288,7 +1304,12 @@ export const layer: Layer.Layer<
             terminal.status !== "completed" &&
             !childTurnsContinue(terminal)
           ) {
-            return true;
+            // A failed turn can leave background work running in a live provider process.
+            return (
+              terminal.status !== "failed" ||
+              (yield* Ref.get(providerThreadOwnerLost)) ||
+              !(yield* threadHasPendingBackgroundWork)
+            );
           }
           // Newly owned items depend on adapters emitting a non-terminal event before the root
           // terminal. Owner loss (a newer run claimed lastRunOrdinal) must not close this stream
@@ -1301,19 +1322,7 @@ export const layer: Layer.Layer<
           if (yield* Ref.get(providerThreadOwnerLost)) {
             return true;
           }
-          // Claude background Bash has no turn-item projection. Use only the
-          // thread-scoped probe: session-wide pending work (siblings, wake
-          // buffers, session subagents) must not pin this root subscription.
-          const latestProviderThreadSnapshot = yield* Ref.get(latestProviderThread);
-          if (input.session.hasPendingBackgroundWorkForThread !== undefined) {
-            const hasPendingWork = yield* input.session
-              .hasPendingBackgroundWorkForThread(latestProviderThreadSnapshot)
-              .pipe(Effect.catchCause(() => Effect.succeed(false)));
-            if (hasPendingWork) {
-              return false;
-            }
-          }
-          return true;
+          return !(yield* threadHasPendingBackgroundWork);
         });
         const filterAssistantEvent = makeAssistantStreamingFilter(responseStreamingMode);
         // Held text writes nothing, so its item would take a position only
@@ -1489,6 +1498,9 @@ export const layer: Layer.Layer<
           if (event.type === "provider_thread.updated") {
             if (event.providerThread.id === input.providerThread.id && storedEventCount > 0) {
               yield* Ref.set(latestProviderThread, event.providerThread);
+              rootSnapshotPendingWork =
+                event.pendingBackgroundWork === true ||
+                (event.providerThread.pendingBackgroundTasks?.length ?? 0) > 0;
             }
           }
           if (
@@ -1677,21 +1689,10 @@ export const layer: Layer.Layer<
           }),
         );
         yield* touchMcpCredential;
-        const appContext = (yield* mcpAppModelContext
-          .forThread(input.run.threadId)
-          .pipe(
-            Effect.catch((cause) =>
-              Effect.logWarning("Failed to read MCP app model context.", { cause }).pipe(
-                Effect.as([]),
-              ),
-            ),
-          )).map((entry) => ({
-          // The item id alone is unique and needs no escaping; server and
-          // tool names are free text that would break the tag Codex wraps
-          // the context in.
-          key: `mcp_app_${entry.itemId.replace(/[^\w.-]/g, "_")}`,
-          text: entry.text,
-        }));
+        const appContext = yield* McpAppModelContext.forProvider(
+          mcpAppModelContext,
+          input.run.threadId,
+        );
         const turnInput = {
           appThread: input.appThread,
           threadId: input.run.threadId,
@@ -1736,7 +1737,10 @@ export const layer: Layer.Layer<
                 threadId: input.run.threadId,
                 providerThreadId: input.providerThread.id,
                 runId: input.run.id,
-                cause: "This provider does not support context compaction.",
+                cause: new ProviderAdapter.ProviderCompactionUnsupportedError({
+                  driver: input.session.driver,
+                  providerThreadId: input.providerThread.id,
+                }),
               }),
             ))
           : input.session.startTurn(turnInput);

@@ -2,6 +2,7 @@ import { type DesktopWslState, EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   applyWslEnableSelection,
+  parseManualDesktopSshTarget,
   resolveAccessEnvironmentId,
   resolveTailscaleServeBaseUrl,
   selectQrEndpointOption,
@@ -40,6 +41,14 @@ describe("togglePairingScopeSelection", () => {
     },
   ] as const)("$label", ({ current, scope, checked, expected }) => {
     expect(togglePairingScopeSelection(current, scope, checked)).toEqual(expected);
+  });
+});
+
+describe("parseManualDesktopSshTarget", () => {
+  it.each(["22.5", "1e3", "2222garbage"])("rejects explicit port %j", (port) => {
+    expect(() => parseManualDesktopSshTarget({ host: "devbox", username: "", port })).toThrow(
+      "SSH port must be between 1 and 65535.",
+    );
   });
 });
 

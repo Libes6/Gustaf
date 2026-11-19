@@ -3,6 +3,22 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "chatB." and both languages list the same keys.
 export const chatBMessages = {
   en: {
+    "chatB.provider.compactUnsupported":
+      "This provider does not support /compact. Start a new thread to continue with a fresh context.",
+    "chatB.provider.mcpStartupFailed": "MCP server {name} failed to start",
+    "chatB.provider.startFailedTitle": "Turn failed to start",
+    "chatB.provider.steerCancelled": "Claude steer cancelled.",
+    "chatB.provider.steerAccepted": "Claude steer accepted.",
+    "chatB.provider.steerPending": "Claude steer is waiting for acceptance.",
+    "chatB.provider.conversationGone":
+      "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.",
+    "chatB.provider.startFailed":
+      "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
+    "chatB.provider.claudeUnanswered":
+      "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.",
+    "chatB.provider.claudeBootTimeout":
+      "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.",
+    "chatB.provider.mcpCallStopped": "The MCP call was stopped.",
     "chatB.useComposerSend.annotationAttachedTitle": "Annotation attached to draft",
     "chatB.useComposerSend.annotationAttachedDescription":
       "Sending is unavailable right now. Finish the current action, then send.",
@@ -753,6 +769,22 @@ export const chatBMessages = {
     "chatB.TimelinePendingApprovalRow.appAccessRequest": "App access request",
   },
   ru: {
+    "chatB.provider.compactUnsupported":
+      "Этот провайдер не поддерживает /compact. Создайте новый чат, чтобы продолжить с чистым контекстом.",
+    "chatB.provider.mcpStartupFailed": "Не удалось запустить MCP-сервер {name}",
+    "chatB.provider.startFailedTitle": "Не удалось запустить ход",
+    "chatB.provider.steerCancelled": "Уточнение для Claude отменено.",
+    "chatB.provider.steerAccepted": "Claude принял уточнение.",
+    "chatB.provider.steerPending": "Claude ожидает принятия уточнения.",
+    "chatB.provider.conversationGone":
+      "Claude Code не нашёл сохранённую беседу. Отправьте сообщение ещё раз, чтобы продолжить в новой сессии Claude с историей этого чата.",
+    "chatB.provider.startFailed":
+      "Не удалось запустить ход. Отправьте сообщение ещё раз; если ошибка повторяется, проверьте логи сервера.",
+    "chatB.provider.claudeUnanswered":
+      "Claude не прислал ответ за 10 минут. API или промежуточный шлюз не отвечает.",
+    "chatB.provider.claudeBootTimeout":
+      "Истекло время запуска Claude. Повторите ход; если ошибка повторяется, проверьте Claude и журналы сервера.",
+    "chatB.provider.mcpCallStopped": "Вызов MCP остановлен.",
     "chatB.useComposerSend.annotationAttachedTitle": "Аннотация прикреплена к черновику",
     "chatB.useComposerSend.annotationAttachedDescription":
       "Сейчас отправка недоступна. Завершите текущее действие и отправьте сообщение.",

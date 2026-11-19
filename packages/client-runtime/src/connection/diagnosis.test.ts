@@ -1,3 +1,4 @@
+import { EnvironmentAuthInvalidError } from "@t3tools/contracts";
 import {
   RelayEnvironmentEndpointUnavailableError,
   type RelayProtectedError,
@@ -14,7 +15,7 @@ import {
   type SupervisorConnectionState,
 } from "./model.ts";
 import { ManagedRelayRequestFailedError } from "../relay/managedRelay.ts";
-import { RemoteEnvironmentAuthFetchError } from "../rpc/http.ts";
+import { RemoteEnvironmentAuthTimeoutError, RemoteEnvironmentAuthFetchError } from "../rpc/http.ts";
 
 const backoff = (lastFailure: ConnectionAttemptError): SupervisorConnectionState => ({
   ...AVAILABLE_CONNECTION_STATE,
@@ -146,12 +147,40 @@ describe("presentConnectionDiagnosis", () => {
     );
   });
 
+  it("tells a host that refused this device's login to sign in again, not to start Gustaf", () => {
+    const failure = mapRemoteEnvironmentError(
+      new EnvironmentAuthInvalidError({
+        code: "auth_invalid",
+        reason: "invalid_credential",
+        traceId: "trace-1",
+      }),
+    );
+    const steps = diagnose(backoff(failure), "direct")?.steps.join(" ");
+    expect(steps).not.toContain("Make sure Gustaf is running");
+    expect(steps).toMatch(/pair|sign in/i);
+  });
+
   it("does not report hops as working when the failure names none", () => {
     const failure = new ConnectionBlockedError({
       reason: "authentication",
       detail: "Your cloud sign-in changed. Sign in again to authorize the environment.",
     });
     expect(results(backoff(failure))).not.toContainEqual(expect.stringMatching(/:ok$/));
+  });
+
+  it("explains direct endpoint timeouts without changing relay diagnosis", () => {
+    const error = new RemoteEnvironmentAuthTimeoutError({
+      requestUrl: "http://203.0.113.7:3773",
+      timeoutMs: 10_000,
+    });
+    const direct = diagnose(backoff(mapRemoteEnvironmentError(error)), "direct");
+    expect(direct?.steps.join(" ")).toContain("--lan");
+    expect(direct?.steps.join(" ")).toContain("firewall");
+    expect(direct?.steps.join(" ")).toContain("cloud provider");
+    expect(direct?.moreInfoUrl).toContain("docs/user/remote-access.md");
+    expect(
+      diagnose(backoff(mapRemoteEnvironmentError(error, "relay")))?.steps.join(" "),
+    ).not.toContain("--lan");
   });
 
   it("explains that local network addresses only work on the host's network", () => {

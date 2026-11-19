@@ -154,7 +154,7 @@ function formatServiceStatus(
   protection?: ServiceProtection.ServiceProtectionState,
 ): string {
   if (!status.supported) {
-    return "Gustaf service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd";
+    return "Gustaf service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd, Windows Task Scheduler";
   }
   if (!status.installed) {
     return "Gustaf service\n  Status: not installed\n  Next: Run `gustaf service install`.";
@@ -189,6 +189,7 @@ function formatServiceStatus(
   return [
     "Gustaf service",
     `  Status: ${status.current ? `installed · t3@${installedVersion}` : "needs an update or repair"}`,
+    ...(status.taskState === undefined ? [] : [`  Task: ${status.taskState}`]),
     `  Unit: ${status.unitPath}`,
     `  Logs: ${status.logPath}`,
     ...formatProtection(protection),

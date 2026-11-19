@@ -553,3 +553,28 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
   const key = `keybinding.${command}`;
   return key in messages.en ? translate(language, key as MessageKey) : null;
 }
+
+export function translateProviderMessage(language: UiLanguage, message: string): string {
+  const mcpStartup = /^MCP server (.+) failed to start\.?$/.exec(message);
+  if (mcpStartup)
+    return translate(language, "chatB.provider.mcpStartupFailed").replace("{name}", mcpStartup[1]!);
+  const knownMessages = {
+    "This provider does not support /compact. Start a new thread to continue with a fresh context.":
+      "chatB.provider.compactUnsupported",
+    "Turn failed to start": "chatB.provider.startFailedTitle",
+    "Claude steer cancelled.": "chatB.provider.steerCancelled",
+    "Claude steer accepted.": "chatB.provider.steerAccepted",
+    "Claude steer is waiting for acceptance.": "chatB.provider.steerPending",
+    "Claude Code could not find this conversation to resume. Send the message again to continue in a new Claude session with this thread's history.":
+      "chatB.provider.conversationGone",
+    "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.":
+      "chatB.provider.startFailed",
+    "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.":
+      "chatB.provider.claudeUnanswered",
+    "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.":
+      "chatB.provider.claudeBootTimeout",
+    "The MCP call was stopped.": "chatB.provider.mcpCallStopped",
+  } as const satisfies Record<string, MessageKey>;
+  const key = knownMessages[message as keyof typeof knownMessages];
+  return key ? translate(language, key) : message;
+}

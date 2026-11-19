@@ -359,15 +359,21 @@ function providerThreadRuntimeKey(
 }
 
 function providerThreadLoadKey(input: {
+  readonly runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime;
   readonly providerThread: Parameters<
     ProviderAdapter.ProviderAdapterV2SessionRuntime["resumeThread"]
   >[0]["providerThread"];
   readonly modelSelection?: ModelSelection;
   readonly runtimePolicy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
 }): string {
+  const modelSelection =
+    input.modelSelection === undefined
+      ? undefined
+      : (input.runtime.normalizeThreadLoadModelSelection?.(input.modelSelection) ??
+        input.modelSelection);
   return JSON.stringify({
     providerThread: providerThreadRuntimeKey(input.providerThread),
-    modelSelection: input.modelSelection ?? null,
+    modelSelection: modelSelection ?? null,
     runtimePolicy: input.runtimePolicy ?? null,
   });
 }
@@ -1561,6 +1567,25 @@ export const layerWithOptions = (
           ),
         );
 
+      const forgetProviderThreadLoaded = (input: {
+        readonly providerSessionId: ProviderSessionId;
+        readonly threadId: ThreadId;
+        readonly runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime;
+      }) =>
+        Ref.update(sessions, (current) => {
+          const key = sessionKey(input.providerSessionId);
+          const entry = current.get(key);
+          if (
+            entry?.runtime !== input.runtime ||
+            !entry.loadedProviderThreadKeyByThread.has(input.threadId)
+          ) {
+            return current;
+          }
+          const loadedProviderThreadKeyByThread = new Map(entry.loadedProviderThreadKeyByThread);
+          loadedProviderThreadKeyByThread.delete(input.threadId);
+          return new Map(current).set(key, { ...entry, loadedProviderThreadKeyByThread });
+        });
+
       /** Pass the setting read before a native load; cache hits keep the earlier record. */
       const markProviderThreadLoaded = (input: {
         readonly providerSessionId: ProviderSessionId;
@@ -2165,6 +2190,7 @@ export const layerWithOptions = (
                   providerSessionId,
                   threadId: input.threadId,
                   providerThreadKey: providerThreadLoadKey({
+                    runtime,
                     providerThread,
                     modelSelection: input.modelSelection,
                     runtimePolicy: input.runtimePolicy,
@@ -2180,6 +2206,7 @@ export const layerWithOptions = (
               return runtime.resumeThread(input);
             }
             const providerThreadKey = providerThreadLoadKey({
+              runtime,
               providerThread: input.providerThread,
               ...(input.modelSelection === undefined
                 ? {}
@@ -2224,6 +2251,7 @@ export const layerWithOptions = (
                   providerSessionId,
                   threadId,
                   providerThreadKey: providerThreadLoadKey({
+                    runtime,
                     providerThread,
                     ...(input.modelSelection === undefined
                       ? {}
@@ -2253,6 +2281,7 @@ export const layerWithOptions = (
                   providerSessionId,
                   threadId: input.targetThreadId,
                   providerThreadKey: providerThreadLoadKey({
+                    runtime,
                     providerThread,
                     ...(input.modelSelection === undefined
                       ? {}
@@ -2319,6 +2348,16 @@ export const layerWithOptions = (
                       ? observeActivity(
                           providerSessionId,
                           markIdle(providerSessionId, input.providerThread.id, input.runOrdinal),
+                        ).pipe(
+                          // A failed start can leave its native thread gone (Claude rejecting a
+                          // resume), so the next start must ask the adapter to resume it again.
+                          Effect.andThen(
+                            forgetProviderThreadLoaded({
+                              providerSessionId,
+                              threadId: input.threadId,
+                              runtime,
+                            }),
+                          ),
                         )
                       : Effect.void,
                 ),

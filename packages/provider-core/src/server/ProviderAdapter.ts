@@ -262,6 +262,21 @@ export class ProviderAdapterThreadInUseError extends Schema.TaggedError<Provider
   }
 }
 
+/**
+ * The user sent `/compact` to a driver whose session has no native compaction.
+ */
+export class ProviderCompactionUnsupportedError extends Schema.TaggedError<ProviderCompactionUnsupportedError>()(
+  "ProviderCompactionUnsupportedError",
+  {
+    driver: ProviderDriverKind,
+    providerThreadId: ProviderThreadId,
+  },
+) {
+  override get message(): string {
+    return "This provider does not support /compact. Start a new thread to continue with a fresh context.";
+  }
+}
+
 export class ProviderAdapterEnsureThreadError extends Schema.TaggedError<ProviderAdapterEnsureThreadError>()(
   "ProviderAdapterEnsureThreadError",
   {
@@ -511,6 +526,8 @@ export interface ProviderAdapterV2SteerInput {
   readonly message: ProviderAdapterV2TurnMessage;
   /** The selection sent with the message when it differs from the running turn's. */
   readonly modelSelection?: ModelSelection;
+  /** The thread's MCP app notes; the adapter sends those the agent has not seen yet. */
+  readonly appContext?: ProviderAdapterV2TurnInput["appContext"];
 }
 
 export interface ProviderAdapterV2InterruptInput {
@@ -644,6 +661,8 @@ export interface ProviderAdapterV2SessionRuntime {
     cwd?: string | null,
   ) => number | undefined;
   readonly canReuseContextUsage?: (previous: ModelSelection, next: ModelSelection) => boolean;
+  /** Excludes turn-scoped options from native thread load matching. */
+  readonly normalizeThreadLoadModelSelection?: (selection: ModelSelection) => ModelSelection;
   readonly ensureThread: (
     input: ProviderAdapterV2EnsureThreadInput,
   ) => Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapterV2Error>;
@@ -652,6 +671,8 @@ export interface ProviderAdapterV2SessionRuntime {
     readonly threadId?: ThreadId;
     readonly modelSelection?: ModelSelection;
     readonly runtimePolicy?: ProviderAdapterV2RuntimePolicy;
+    /** The native session is the only copy of the thread's imported history: fail when it is gone. */
+    readonly importedNativeSession?: boolean;
   }) => Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapterV2Error>;
   /** False means the native protocol explicitly does not support history injection. */
   readonly injectHistory?: (

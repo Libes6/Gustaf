@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { ProviderInstanceEnvironmentVariableName } from "./providerInstance.ts";
+import { ProviderInstanceEnvironmentVariableName, ProviderInstanceId } from "./providerInstance.ts";
 import { SettingsSecretValue } from "./settingsSecretValue.ts";
 
 /** Providers see this id as the server's name; `t3-code*` and `ext` are names Gustaf passes itself. */
@@ -180,5 +180,63 @@ export class McpServerImportError extends Schema.TaggedError<McpServerImportErro
       case "settings":
         return "The MCP servers could not be saved.";
     }
+  }
+}
+
+/** An MCP server a provider loads from its own config or account, such as a claude.ai connector. */
+export const McpConnector = Schema.Struct({
+  name: Schema.String,
+  status: Schema.Literals(["connected", "needs-auth", "failed", "pending", "disabled"]),
+  /** `claudeai` is a claude.ai connector, signed in on claude.ai; `oauth` signs in through the provider. */
+  auth: Schema.Literals(["claudeai", "oauth", "none"]),
+  /** Where the provider found it, such as `user`, `project` or `claudeai`. */
+  source: Schema.optionalKey(Schema.String),
+  /** A sign-in started here is waiting for its browser callback. */
+  authorizing: Schema.Boolean,
+});
+export type McpConnector = typeof McpConnector.Type;
+
+export const McpConnectorsListInput = Schema.Struct({
+  instanceId: ProviderInstanceId,
+  /** Includes the project's own servers, such as Claude's `.mcp.json`. */
+  projectDir: Schema.optionalKey(TrimmedNonEmptyString),
+});
+export type McpConnectorsListInput = typeof McpConnectorsListInput.Type;
+
+export const McpConnectorsListResult = Schema.Struct({
+  connectors: Schema.Array(McpConnector),
+});
+export type McpConnectorsListResult = typeof McpConnectorsListResult.Type;
+
+export const McpConnectorAuthorizeInput = Schema.Struct({
+  ...McpConnectorsListInput.fields,
+  name: TrimmedNonEmptyString,
+});
+export type McpConnectorAuthorizeInput = typeof McpConnectorAuthorizeInput.Type;
+
+export const McpConnectorAuthorizeResult = Schema.Struct({
+  /** Absent when the provider signed in without asking the user. */
+  authUrl: Schema.optionalKey(Schema.String),
+  /**
+   * The provider waits for the browser to return to its loopback address. A browser on another
+   * device cannot reach it, so the client offers to paste the address it landed on.
+   */
+  callbackExpected: Schema.Boolean,
+});
+export type McpConnectorAuthorizeResult = typeof McpConnectorAuthorizeResult.Type;
+
+export const McpConnectorSubmitCallbackInput = Schema.Struct({
+  instanceId: ProviderInstanceId,
+  name: TrimmedNonEmptyString,
+  callbackUrl: TrimmedNonEmptyString,
+});
+export type McpConnectorSubmitCallbackInput = typeof McpConnectorSubmitCallbackInput.Type;
+
+export class McpConnectorError extends Schema.TaggedError<McpConnectorError>()(
+  "McpConnectorError",
+  { detail: Schema.String },
+) {
+  override get message(): string {
+    return this.detail;
   }
 }

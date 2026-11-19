@@ -10,8 +10,10 @@ import {
   type OrchestrationV2CheckpointScope,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ExecutionNode,
+  type OrchestrationV2PendingBackgroundTask,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2ProviderTurn,
+  type OrchestrationV2StoredEvent,
   type OrchestrationV2Run,
   type OrchestrationV2RunAttempt,
   type OrchestrationV2Subagent,
@@ -2015,15 +2017,17 @@ it.effect("keeps ingesting a failed root's background item when its work continu
   }),
 );
 
-it.effect("does not pin ingestion on background items when the root turn is interrupted", () =>
-  Effect.gen(function* () {
-    const observed = yield* runBackgroundItemScenario("bg-interrupted", (ids) => [
-      backgroundTurnItemEvent(ids, "command_execution", "running", 1),
-      rootTerminalEvent(ids, "interrupted"),
-      backgroundTurnItemEvent(ids, "command_execution", "completed", 2),
-    ]);
-    assert.deepEqual(observed, ["turn_item:running", "root-finalized"]);
-  }),
+it.effect.each(["interrupted", "failed"] as const)(
+  "does not pin ingestion on background items when the root turn is %s",
+  (status) =>
+    Effect.gen(function* () {
+      const observed = yield* runBackgroundItemScenario(`bg-${status}`, (ids) => [
+        backgroundTurnItemEvent(ids, "command_execution", "running", 1),
+        rootTerminalEvent(ids, status),
+        backgroundTurnItemEvent(ids, "command_execution", "completed", 2),
+      ]);
+      assert.deepEqual(observed, ["turn_item:running", "root-finalized"]);
+    }),
 );
 
 it.effect("seeds inherited background items before their next update", () =>
@@ -2727,6 +2731,20 @@ it.effect("records a provider's input rejection at turn start in the terminal er
   }),
 );
 
+it.effect("tells the user why /compact failed on a provider without compaction", () =>
+  Effect.gen(function* () {
+    const { written } = yield* captureRootRunTermination({
+      key: "start-failure:compact-unsupported",
+      shouldFinalizeRun: () => Effect.succeed(true),
+      events: () => Stream.never,
+      afterStart: (closed) => Deferred.succeed(closed, undefined),
+      messageText: "/compact",
+    });
+    const error = written.find((item) => item.type === "error");
+    assert.include(error?.failure.message ?? "", "does not support /compact");
+  }),
+);
+
 it.effect.each(["failure", "defect", "interrupt-failure", "ownership-lost"] as const)(
   "stops the live provider and background work before settling an ingestion %s",
   (failureMode) =>
@@ -3134,6 +3152,57 @@ it.effect("keeps completed runs completed when pull request refresh fails", () =
   }),
 );
 
+it.effect.each(["completed", "failed"] as const)(
+  "persists a background-task roster clear that arrives after a %s turn",
+  (status) =>
+    Effect.gen(function* () {
+      const pending = yield* Ref.make(true);
+      const ingested = yield* Ref.make<Array<ProviderAdapter.ProviderAdapterV2Event>>([]);
+      yield* captureRootRunTermination({
+        key: `roster-clear-${status}`,
+        shouldFinalizeRun: () => Effect.succeed(true),
+        hasPendingBackgroundWorkForThread: () => Ref.get(pending),
+        events: (ids) => {
+          const runningBuild: OrchestrationV2PendingBackgroundTask = {
+            taskId: "running-build",
+            kind: "command",
+          };
+          const roster = (hasTask: boolean): ProviderAdapter.ProviderAdapterV2Event => {
+            const pendingBackgroundTasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask> =
+              hasTask ? [runningBuild] : [];
+            return {
+              type: "provider_thread.updated",
+              driver,
+              providerThread: {
+                id: ids.providerThreadId,
+                driver,
+                appThreadId: ids.threadId,
+                pendingBackgroundTasks,
+              } as OrchestrationV2ProviderThread,
+            };
+          };
+          return Stream.fromIterable([roster(true), rootTerminalEvent(ids, status), roster(false)]);
+        },
+        // The adapter clears its live roster before ingestion reaches the queued clear.
+        beforeTerminalWrite: () => Ref.set(pending, false).pipe(Effect.as(true)),
+        ingestNormalized: (input) =>
+          Ref.update(ingested, (all) => [...all, input.event]).pipe(
+            Effect.as(
+              input.event.type === "provider_thread.updated"
+                ? [{} as OrchestrationV2StoredEvent]
+                : [],
+            ),
+          ),
+      });
+      const rosters = (yield* Ref.get(ingested)).flatMap((event) =>
+        event.type === "provider_thread.updated"
+          ? [event.providerThread.pendingBackgroundTasks]
+          : [],
+      );
+      assert.deepEqual(rosters.at(-1), [], "an ended task must leave the persisted roster");
+    }),
+);
+
 function captureRootRunTermination(input: {
   readonly key: string;
   readonly shouldFinalizeRun: () => Effect.Effect<boolean, ProjectionStore.ProjectionStoreV2Error>;
@@ -3150,6 +3219,7 @@ function captureRootRunTermination(input: {
   >;
   readonly startTurn?: ProviderAdapter.ProviderAdapterV2SessionRuntime["startTurn"];
   readonly interruptTurn?: ProviderAdapter.ProviderAdapterV2SessionRuntime["interruptTurn"];
+  readonly messageText?: string;
   readonly initialProviderTurnId?: ProviderTurnId | null;
   readonly onStartFailure?: (
     error: RunExecutionService.RunExecutionServiceV2Error,
@@ -3261,6 +3331,7 @@ function captureRootRunTermination(input: {
         appThread: rootAppThread(ids.threadId),
         providerSessionId: ProviderSessionId.make(`session:${input.key}`),
         session: {
+          driver,
           events: Stream.empty,
           subscribeEvents: Effect.succeed({
             events:
@@ -3337,7 +3408,7 @@ function captureRootRunTermination(input: {
             }),
         message: {
           messageId: MessageId.make(`message:${input.key}`),
-          text: "interrupt projection",
+          text: input.messageText ?? "interrupt projection",
           attachments: [],
           createdBy: "user",
           creationSource: "web",

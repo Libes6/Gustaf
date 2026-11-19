@@ -135,7 +135,8 @@ async function startAsShell(browser, pairingUrl) {
     },
   ];
   await page.addInitScript(
-    INIT_SCRIPT.replaceAll("__GUSTAF_VERSION__", '"0.0.0"')
+    INIT_SCRIPT.replaceAll("__GUSTAF_APP_ORIGIN__", JSON.stringify(url.origin))
+      .replaceAll("__GUSTAF_VERSION__", '"0.0.0"')
       .replaceAll("__GUSTAF_BOOTSTRAPS__", JSON.stringify(bootstraps))
       .replaceAll("__GUSTAF_PLATFORM__", '"darwin"')
       .replaceAll("__GUSTAF_RENDERS_SERVER_TABS__", "false"),

@@ -7,6 +7,9 @@ describe("composer rich text markdown", () => {
     for (const text of [
       "plain text",
       "snake_case",
+      "ملفٌ_اول و ملفٌ_ثاني",
+      "файл_один и файл_два",
+      "𐐀_𐐁_𐐂 and 𠀀_𠀁_𠀂",
       "unmatched **",
       "** spaced **",
       "\\*literal\\*",
@@ -48,6 +51,14 @@ describe("composer rich text markdown", () => {
     const alternate = "__".repeat(5_000);
     expect(parseInlineMarkdown("**~~" + alternate + "text" + alternate + "~~**")).toEqual([
       { text: alternate + "text" + alternate, marks: ["bold", "strike"] },
+    ]);
+  });
+
+  it("keeps underscores inside non-Latin words literal", () => {
+    expect(parseInlineMarkdown("файл_один_два")).toEqual([{ text: "файл_один_два", marks: [] }]);
+    expect(parseInlineMarkdown("_файл_ now")).toEqual([
+      { text: "файл", marks: ["italic"] },
+      { text: " now", marks: [] },
     ]);
   });
 

@@ -678,7 +678,7 @@ function itemPreview(item: OrchestrationV2TurnItem): string | null {
     case "system_notice":
       return item.message || null;
     case "error":
-      return item.failure.message;
+      return t(item.failure.message);
     case "compaction":
     case "handoff":
       return item.summary ?? null;

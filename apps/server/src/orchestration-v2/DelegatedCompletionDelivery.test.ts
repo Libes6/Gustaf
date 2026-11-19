@@ -755,6 +755,67 @@ it.layer(layerTest)("delegated completion delivery repairs", (it) => {
   );
 
   it.effect.each([
+    { name: "no result is waiting", delivery: "none", compacts: true },
+    { name: "a result is waiting to be sent", delivery: "pending", compacts: false },
+    { name: "a result was just sent", delivery: "sent", compacts: false },
+  ] as const)("compacts before the cache expires only when $name", ({ delivery, compacts }) =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make(`thread:idle-compaction-delivery-${delivery}`);
+      const runId = RunId.make(`run:idle-compaction-delivery-${delivery}`);
+      const taskId = NodeId.make(`node:idle-compaction-delivery-${delivery}-task`);
+
+      yield* seedParentWithTerminalTask({
+        threadId,
+        projectId: ProjectId.make(`project:idle-compaction-delivery-${delivery}`),
+        runId,
+        rootNodeId: NodeId.make(`node:idle-compaction-delivery-${delivery}-root`),
+        taskId,
+        deliveryState: delivery === "none" ? "delivered" : "claimed",
+        completionWake: "always",
+        parentRunStatus: "completed",
+        ...(delivery === "none" ? {} : { deliveryTaskIds: [taskId] }),
+        now,
+      });
+      if (delivery === "sent") {
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make(`command:idle-compaction-delivery-${delivery}`),
+          threadId,
+          messageId: MessageId.make(`message:delegated-delivery:${threadId}`),
+          text: `Delegated task ${taskId} reached a terminal state.`,
+          attachments: [],
+          dispatchMode: { type: "queue_after_active" },
+          createdBy: "agent",
+          creationSource: "server",
+          delegatedCompletion: { parentRunId: runId, generation: 1, taskIds: [taskId] },
+        });
+      }
+
+      const compactionId = MessageId.make(`idle-compact:${threadId}:${runId}`);
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make(`server:idle-compact:${threadId}:${runId}`),
+        threadId,
+        messageId: compactionId,
+        text: "/compact",
+        attachments: [],
+        createdBy: "agent",
+        creationSource: "server",
+        idleCompaction: "beforeCacheExpires",
+        dispatchMode: { type: "start_immediately" },
+      });
+
+      const projection = yield* orchestrator.getThreadProjection(threadId);
+      assert.equal(
+        projection.messages.some((message) => message.id === compactionId),
+        compacts,
+      );
+    }),
+  );
+
+  it.effect.each([
     {
       name: "oversized UTF-8 result",
       first: "界".repeat(6_000),
@@ -2093,6 +2154,27 @@ it.layer(Layer.merge(layerTest, ProviderContinuationRequests.layer))(
         const resumed = yield* orchestrator.getThreadProjection(parentThreadId);
         assert.equal(resumed.subagents.find((row) => row.id === task.id)?.status, "running");
         assert.isNull(resumed.subagents.find((row) => row.id === task.id)?.result);
+
+        const started = (yield* orchestrator.getThreadProjection(child.childThreadId)).runs.find(
+          (run) => run.id === queued.id,
+        )!;
+        const waitingSequence = yield* eventSink.latestSequence();
+        yield* eventSink.write({
+          events: [
+            {
+              id: EventId.make("event:held-followup-waiting"),
+              type: "run.updated",
+              threadId: child.childThreadId,
+              runId: started.id,
+              occurredAt: now,
+              payload: { ...started, status: "waiting" },
+            },
+          ],
+        });
+        yield* waitForStatus(waitingSequence, "waiting");
+        const waiting = yield* orchestrator.getThreadProjection(parentThreadId);
+        assert.equal(waiting.subagents.find((row) => row.id === task.id)?.status, "waiting");
+        assert.equal(waiting.nodes.find((row) => row.id === task.id)?.status, "waiting");
       }),
     );
 
@@ -3205,6 +3287,80 @@ it.layer(layerTest)("delegated tasks across a server restart", (it) => {
       assert.equal(task?.status, "interrupted");
       assert.equal(task?.result, "Child task ended with status interrupted.");
       assert.equal(task?.completionDelivery?.state, "claimed");
+    }),
+  );
+
+  it.effect("delivers the child's report when a run queued behind it ends without text", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make("thread:silent-queued-parent");
+      const projectId = ProjectId.make("project:silent-queued-parent");
+      const runId = RunId.make("run:silent-queued-parent");
+      const rootNodeId = NodeId.make("node:silent-queued-parent-root");
+      yield* seedParentWithTerminalTask({
+        threadId,
+        projectId,
+        runId,
+        rootNodeId,
+        taskId: NodeId.make("node:silent-queued-parent-settled"),
+        deliveryState: "delivered",
+        now,
+      });
+      const child = yield* seedRestartCancelledChild({
+        parentThreadId: threadId,
+        projectId,
+        parentRunId: runId,
+        rootNodeId,
+        name: "silent-queued-child",
+        completionWake: "always",
+        continuationPending: false,
+        runStatus: "completed",
+        now,
+      });
+      yield* eventSink.write({
+        commandId: CommandId.make("command:silent-queued-child:queued"),
+        events: [
+          {
+            id: EventId.make("event:silent-queued-child:report"),
+            type: "message.updated",
+            threadId: child.childThreadId,
+            runId: child.childRunId,
+            occurredAt: now,
+            payload: {
+              id: MessageId.make("message:silent-queued-child:report"),
+              threadId: child.childThreadId,
+              runId: child.childRunId,
+              nodeId: null,
+              role: "assistant",
+              text: "REPORT-OK",
+              attachments: [],
+              streaming: false,
+              createdBy: "agent",
+              creationSource: "server",
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          runEvent({
+            threadId: child.childThreadId,
+            runId: RunId.make("run:silent-queued-child:2"),
+            ordinal: 2,
+            status: "completed",
+            now,
+          }),
+        ],
+      });
+      yield* orchestrator.recoverDelegatedTask(
+        child.childThreadId,
+        RunId.make("run:silent-queued-child:2"),
+      );
+      const task = (yield* orchestrator.getThreadProjection(threadId)).subagents.find(
+        (row) => row.id === child.taskId,
+      );
+      assert.equal(task?.status, "completed");
+      assert.equal(task?.result, "REPORT-OK");
     }),
   );
 
