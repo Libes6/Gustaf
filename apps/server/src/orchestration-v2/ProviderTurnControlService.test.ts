@@ -1,8 +1,11 @@
+import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
 import { assert, it } from "@effect/vitest";
 import {
+  MessageId,
   type ModelSelection,
   NodeId,
   type OrchestrationV2ProviderThread,
+  type OrchestrationV2Run,
   type OrchestrationV2ThreadProjection,
   ProjectId,
   ProviderDriverKind,
@@ -120,6 +123,35 @@ function makeProjection(input: {
     visibleTurnItems: [],
     updatedAt: input.now,
   };
+}
+
+function layerProjectionStore(
+  getProviderControlContext: ProjectionStore.ProjectionStoreV2["Service"]["getProviderControlContext"],
+) {
+  return Layer.mock(ProjectionStore.ProjectionStoreV2)({ getProviderControlContext });
+}
+
+function layerSessions(
+  liveSessionId: ProviderSessionId,
+  runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime,
+) {
+  return Layer.succeed(
+    ProviderSessionManager.ProviderSessionManagerV2,
+    ProviderSessionManager.ProviderSessionManagerV2.of({
+      shutdown: Effect.void,
+      open: () => Effect.die("unused open"),
+      get: (providerSessionId) =>
+        Effect.succeed(providerSessionId === liveSessionId ? Option.some(runtime) : Option.none()),
+      isLive: (providerSessionId) => Effect.succeed(providerSessionId === liveSessionId),
+      close: () => Effect.void,
+      closeInstance: () => Effect.void,
+      release: () => Effect.void,
+      detach: () => Effect.void,
+      otherWorkingThreads: () => Effect.succeed([]),
+      releaseUnlessBusy: () => Effect.succeed(true),
+      subscribePromptSuggestion: () => Stream.empty,
+    }),
+  );
 }
 
 it.effect(
@@ -302,7 +334,9 @@ it.effect(
         }),
       );
       const layerControl = ProviderTurnControlService.layer.pipe(
-        Layer.provide(Layer.merge(layerProjection, layerSessionManager)),
+        Layer.provide(
+          Layer.mergeAll(layerProjection, layerSessionManager, McpAppModelContext.layerEmpty),
+        ),
       );
 
       const [ordinaryInterrupt, unrelatedRestart] = yield* Effect.gen(function* () {
@@ -350,4 +384,84 @@ it.effect(
       assert.equal(interrupted?.id, providerThreadId);
       assert.equal(interrupted?.nativeThreadRef?.nativeId, "native-thread:restart-session");
     }),
+);
+
+it.effect("steers a running turn with the thread's MCP app model context", () =>
+  Effect.gen(function* () {
+    const now = yield* DateTime.now;
+    const threadId = ThreadId.make("thread:steer-app-context");
+    const sessionId = ProviderSessionId.make("provider-session:steer-app-context");
+    const providerTurnId = ProviderTurnId.make("provider-turn:steer-app-context");
+    const attemptId = RunAttemptId.make("run-attempt:steer-app-context");
+    const providerThread = {
+      id: ProviderThreadId.make("provider-thread:steer-app-context"),
+      driver,
+      providerInstanceId,
+      providerSessionId: sessionId,
+    } as OrchestrationV2ProviderThread;
+    const projection = makeProjection({ now, threadId, providerThread, providerTurnId, attemptId });
+    const steered: Array<ProviderAdapter.ProviderAdapterV2SteerInput> = [];
+    const runtime = {
+      instanceId: providerInstanceId,
+      driver,
+      providerSessionId: sessionId,
+      steerTurn: (input: ProviderAdapter.ProviderAdapterV2SteerInput) =>
+        Effect.sync(() => void steered.push(input)),
+    } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime;
+    const layerControl = ProviderTurnControlService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          layerProjectionStore(() =>
+            Effect.succeed({
+              providerThread,
+              providerTurn: projection.providerTurns[0],
+              attempt: projection.attempts[0],
+              message: {
+                id: MessageId.make("message:steer-app-context"),
+                text: "What did the app report?",
+                attachments: [],
+                createdBy: "user",
+                creationSource: "web",
+              } as unknown as NonNullable<
+                ProjectionStore.ProjectionProviderControlContext["message"]
+              >,
+              run: {
+                id: RunId.make("run:steer-app-context"),
+                status: "running",
+                activeAttemptId: attemptId,
+              } as OrchestrationV2Run,
+            }),
+          ),
+          layerSessions(sessionId, runtime),
+          Layer.mock(McpAppModelContext.McpAppModelContext)({
+            forThread: () =>
+              Effect.succeed([
+                {
+                  itemId: "turn-item:call-1",
+                  server: "tools",
+                  tool: "picker",
+                  text: "Pressed: blue",
+                },
+              ]),
+          }),
+        ),
+      ),
+    );
+
+    yield* Effect.gen(function* () {
+      const control = yield* ProviderTurnControlService.ProviderTurnControlServiceV2;
+      yield* control.steer({
+        threadId,
+        providerSessionId: sessionId,
+        providerThreadId: providerThread.id,
+        providerTurnId,
+        messageId: MessageId.make("message:steer-app-context"),
+      });
+    }).pipe(Effect.provide(layerControl));
+
+    assert.equal(steered.length, 1);
+    assert.deepEqual("appContext" in steered[0]! ? steered[0].appContext : undefined, [
+      { key: "mcp_app_turn-item_call-1", text: "Pressed: blue" },
+    ]);
+  }),
 );
