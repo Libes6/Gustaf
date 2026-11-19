@@ -3,6 +3,8 @@ import type { UiLanguage } from "@t3tools/contracts/settings";
 // Interface strings for one area of the app. Keys start with "settingsA." and both languages list the same keys.
 export const settingsAMessages = {
   en: {
+    "settingsA.addEnvironment.directTimeout":
+      "The server did not answer in time. On the host, use `gustaf serve --lan` for a private network, or an explicit --host for public access. Check Windows Firewall and the cloud provider’s inbound port rules. Remote access guide: https://github.com/Libes6/Gustaf/blob/dev/docs/user/remote-access.md",
     "settingsA.connectionsSettings.showingAccessFor": "Showing access for",
     "settingsA.connectionsSettings.environmentLabel": "Environment",
     "settingsA.connectionsSettings.offline": "Offline",
@@ -757,6 +759,8 @@ export const settingsAMessages = {
     "settingsA.chatGptUsage.manageUsage": "Manage usage",
   },
   ru: {
+    "settingsA.addEnvironment.directTimeout":
+      "Сервер не ответил вовремя. На хосте используйте `gustaf serve --lan` для частной сети или явно задайте --host для публичного доступа. Проверьте Windows Firewall и входящие порты у облачного провайдера. Руководство: https://github.com/Libes6/Gustaf/blob/dev/docs/user/remote-access.md",
     "settingsA.connectionsSettings.showingAccessFor": "Доступ для",
     "settingsA.connectionsSettings.environmentLabel": "Окружение",
     "settingsA.connectionsSettings.offline": "Не в сети",

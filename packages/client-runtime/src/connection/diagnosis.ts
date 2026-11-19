@@ -366,6 +366,13 @@ export function presentConnectionDiagnosis(
     failure?.reason === "network" ||
     failure?.reason === "timeout" ||
     failure?.reason === "transport";
+  const directTimeout = !relayPath && failure?.reason === "timeout";
+  const timeoutSteps = directTimeout
+    ? [
+        "On the host, start Gustaf with `gustaf serve --lan` for a private network, or an explicit --host for public access. Check the host firewall and the cloud provider's inbound port rules. See the remote access guide.",
+        "На хосте запустите `gustaf serve --lan` для частной сети или задайте --host для публичного доступа. Проверьте firewall хоста и входящие порты у облачного провайдера. См. руководство по удалённому доступу.",
+      ]
+    : [];
   const lanUnreachable = input.lanOnly === true && !relayPath && unreachable;
   const suggestRelayRoute = lanUnreachable && input.relayPairing === true;
   const lanSteps = lanUnreachable
@@ -379,12 +386,14 @@ export function presentConnectionDiagnosis(
   return {
     headline: headline(host, located, failure),
     hops,
-    steps: [...lanSteps, ...steps(host, located, failure)],
+    steps: [...lanSteps, ...timeoutSteps, ...steps(host, located, failure)],
     facts,
     moreInfoUrl:
       relayPath || located.cause === "session_pending"
         ? t3ConnectTroubleshootingUrl(helpSection(located, failure))
-        : null,
+        : directTimeout
+          ? "https://github.com/Libes6/Gustaf/blob/dev/docs/user/remote-access.md"
+          : null,
     suggestRelayRoute,
   };
 }
