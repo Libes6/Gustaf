@@ -23,6 +23,14 @@ Only turns that finish while the computer is registered are counted; earlier his
 uploaded. `T3CODE_TELEMETRY_ENABLED=false` and the managed policy's telemetry switch also stop
 these reports.
 
+## Local crash log
+
+When the interface crashes or throws an unhandled error, Gustaf records the error, its stack and
+the page it was on in the server's local logs (`userdata/logs/client-crashes.ndjson`). The log
+stays on that machine unless you set up your own trace export. To investigate a crash, ask an agent
+in a thread on that machine; it reads recent crashes and failing operations with the
+`t3_environment_errors_read` tool. Error text can quote a value the app was handling.
+
 ## Relay connection diagnostics
 
 Gustaf can send relay connection traces to diagnose connectivity. These are
