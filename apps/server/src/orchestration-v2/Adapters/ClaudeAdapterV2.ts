@@ -752,6 +752,8 @@ export interface ClaudeAgentSdkQueryRunnerShape {
     input: ClaudeAgentSdkSubagentLookupInput,
   ) => Effect.Effect<string | null, ClaudeAgentSdkQueryRunnerError>;
   readonly assertComplete: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
+  /** Re-dials `server` in every open Claude process where it is not connected, after a sign-in. */
+  readonly reconnectMcpServer: (server: string) => Effect.Effect<void>;
 }
 
 export class ClaudeAgentSdkQueryRunner extends Context.Service<
@@ -1304,8 +1306,28 @@ export const layerQueryRunner: Layer.Layer<
       );
       return { refresh: refresh(true).pipe(Effect.asVoid), stop };
     };
+    const openQueries = new Set<ClaudeQuery>();
 
     return ClaudeAgentSdkQueryRunner.of({
+      reconnectMcpServer: Effect.fn("ClaudeAgentSdkQueryRunner.reconnectMcpServer")(function* (
+        server: string,
+      ) {
+        yield* Effect.forEach(
+          [...openQueries],
+          (queryRuntime) =>
+            Effect.tryPromise({
+              try: async () => {
+                const statuses = await queryRuntime.mcpServerStatus();
+                const status = statuses.find((entry) => entry.name === server)?.status;
+                if (status !== undefined && status !== "connected" && status !== "disabled") {
+                  await queryRuntime.reconnectMcpServer(server);
+                }
+              },
+              catch: (cause) => queryRunnerError(cause, "reconnectMcpServer"),
+            }).pipe(Effect.timeout("30 seconds"), Effect.ignore),
+          { concurrency: 4, discard: true },
+        );
+      }),
       allocateSessionId: random.uuidV4(),
       open: Effect.fn("ClaudeAgentSdkQueryRunner.open")(
         function* (input: ClaudeAgentSdkQueryOpenInput) {
@@ -1526,6 +1548,9 @@ export const layerQueryRunner: Layer.Layer<
             ),
           );
 
+          openQueries.add(queryRuntime);
+          void processExit?.then(() => openQueries.delete(queryRuntime));
+
           return {
             messages: Stream.fromAsyncIterable(
               claudeQueryMessages(queryRuntime),
@@ -1715,6 +1740,7 @@ export const layerQueryRunner: Layer.Layer<
             // A job started since the last poll is recorded before the CLI is told to exit.
             close: Effect.suspend(() => (processExited ? Effect.void : refreshDescendants)).pipe(
               Effect.andThen(Queue.shutdown(promptQueue)),
+              Effect.tap(() => Effect.sync(() => openQueries.delete(queryRuntime))),
               Effect.andThen(closeClaudeQuery(queryRuntime)),
               Effect.tap(() =>
                 logProtocolEvent({
@@ -1915,6 +1941,10 @@ function parseClaudeInteger(text: string): number {
 
 // Claude Code defers MCP tools behind ToolSearch, so the agent only finds
 // t3_background_wait when the system prompt says when to reach for it.
+// Claude Code tells agents to sign in with /mcp or claude.ai, neither of which a Gustaf user sees.
+const CLAUDE_MCP_SIGN_IN_INSTRUCTIONS =
+  "When an MCP server needs authentication, tell the user to sign in to it in Gustaf: Settings > MCP > Claude Code connectors > Sign in. Open threads reconnect after that.";
+
 const CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS = `
 
 ### Background work you wait on
@@ -2069,6 +2099,7 @@ export function makeClaudeQueryOptions(input: {
       preset: "claude_code" as const,
       append: [
         buildRuntimeInstructions({ harness: "Claude Code" }) +
+          `\n\n${CLAUDE_MCP_SIGN_IN_INSTRUCTIONS}` +
           (input.mcpServers === undefined
             ? ""
             : T3_CODE_ORCHESTRATION_INSTRUCTIONS +

@@ -1213,6 +1213,18 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "mcp:import",
       tag: WS_METHODS.mcpServersImport,
     }),
+    mcpListConnectors: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:mcp-connectors",
+      tag: WS_METHODS.mcpConnectorsList,
+    }),
+    authorizeMcpConnector: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:connector-authorize",
+      tag: WS_METHODS.mcpConnectorsAuthorize,
+    }),
+    submitMcpConnectorCallback: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:connector-callback",
+      tag: WS_METHODS.mcpConnectorsSubmitCallback,
+    }),
     runStorageCleanup: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:run-storage-cleanup",
       tag: WS_METHODS.serverRunStorageCleanup,

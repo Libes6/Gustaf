@@ -61,6 +61,7 @@ import * as CodexInstallation from "./provider/CodexInstallation.ts";
 import * as DeviceService from "./device/DeviceService.ts";
 import * as ComputerUseService from "./computerUse/ComputerUseService.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
+import * as McpConnectors from "./mcpServers/McpConnectors.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as DirectEndpoints from "./environment/DirectEndpoints.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
@@ -796,6 +797,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(HostResources.HostResources)({}),
   Layer.mock(McpAppRequests.McpAppRequests)({}),
   Layer.mock(McpServerImport.McpServerImport)({}),
+  Layer.mock(McpConnectors.McpConnectors)({}),
   Layer.mock(ModelManifest.ModelManifest)({}),
   Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({}),
   Layer.mock(Orchestrator.OrchestratorV2)({}),

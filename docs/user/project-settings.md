@@ -289,3 +289,15 @@ Tool approvals remain each agent's own, and full-access mode does not ask for
 approval.
 
 Pi, OpenCode 1.x and external OpenCode servers are not supported.
+
+### Signing in to Claude Code connectors
+
+Claude Code also loads servers by itself: claude.ai connectors such as Figma, and
+servers from its own config. When an agent says one needs authentication, open
+**Settings → MCP → Claude Code connectors** on web or desktop, select **Check**,
+then **Sign in** next to the server. A claude.ai connector opens its claude.ai
+page; select **Check again** when you are done there. Other servers open their
+own sign-in page. If the browser runs on another device than the environment, the
+page it lands on after signing in cannot load: copy that page's address into the
+field Gustaf shows and select **Finish**. Open threads reconnect to the server
+after you sign in. Checking briefly starts each of Claude Code's servers.

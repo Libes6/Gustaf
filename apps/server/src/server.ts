@@ -77,6 +77,7 @@ import { BUILT_IN_SOURCE_CONTROL_DRIVER_LIST } from "./sourceControl/sourceContr
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import * as SecretResolver from "./secrets/SecretResolver.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
+import * as McpConnectors from "./mcpServers/McpConnectors.ts";
 import * as McpUserServers from "./mcpServers/McpUserServers.ts";
 import * as NativeMcpConfigs from "./mcpServers/import/NativeMcpConfigs.ts";
 import * as ProviderInstanceRegistryHydration from "./provider/ProviderInstanceRegistryHydration.ts";
@@ -707,7 +708,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
   Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
   Layer.provideMerge(
-    Layer.merge(McpUserServers.layer, McpServerImport.layer).pipe(
+    Layer.mergeAll(McpUserServers.layer, McpServerImport.layer, McpConnectors.layer).pipe(
       Layer.provide(NativeMcpConfigs.layer),
     ),
   ),

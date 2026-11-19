@@ -1,5 +1,7 @@
 // Context tags are runtime singletons; drivers need multiple instances.
 import type {
+  McpConnector,
+  McpConnectorAuthorizeResult,
   ProviderConsumeResetCreditOutcome,
   AcpRegistryListSessionsResult,
   AcpRegistryListProvidersResult,
@@ -49,6 +51,20 @@ export interface ProviderInstance {
     ProviderConsumeResetCreditOutcome,
     ProviderDriverError
   >;
+  /** MCP servers the provider loads from its own config or account, and their sign-in. */
+  readonly mcpConnectors?: {
+    readonly list: (
+      cwd: string | undefined,
+    ) => Effect.Effect<ReadonlyArray<McpConnector>, ProviderDriverError>;
+    readonly authorize: (input: {
+      readonly name: string;
+      readonly cwd: string | undefined;
+    }) => Effect.Effect<McpConnectorAuthorizeResult, ProviderDriverError>;
+    readonly submitCallback: (input: {
+      readonly name: string;
+      readonly callbackUrl: string;
+    }) => Effect.Effect<void, ProviderDriverError>;
+  };
   readonly orchestrationAdapter: ProviderAdapter.ProviderAdapterV2["Service"];
   readonly textGeneration: ProviderTextGeneration;
   readonly auth?: ProviderAuthController;
