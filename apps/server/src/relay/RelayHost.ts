@@ -114,6 +114,23 @@ export const readCloudCredential = (secrets: ServerSecretStore.ServerSecretStore
 const decodeDevices = (text: string) => decodeStoredDevices(parseJson(text));
 const encodeJson = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 
+/** For `gustaf relay login` while no server runs; a running one takes it through `setCredential`. */
+export const writeCloudCredential = (
+  secrets: ServerSecretStore.ServerSecretStore["Service"],
+  input: RelayHostCredentialInput,
+) => {
+  const relayUrl = readRelayUrl(input.relayUrl);
+  if (!relayUrl) return Effect.fail(new RelayHostError({ reason: "invalid_relay_url" }));
+  return secrets
+    .set(CREDENTIAL_SECRET, encodeJson({ relayUrl, deviceId: input.deviceId, token: input.token }))
+    .pipe(Effect.mapError((cause) => new RelayHostError({ reason: "storage", cause })));
+};
+
+export const clearCloudCredential = (secrets: ServerSecretStore.ServerSecretStore["Service"]) =>
+  secrets
+    .remove(CREDENTIAL_SECRET)
+    .pipe(Effect.mapError((cause) => new RelayHostError({ reason: "storage", cause })));
+
 export function readRelayUrl(value: string): string | null {
   try {
     const url = new URL(value);
