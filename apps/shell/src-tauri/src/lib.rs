@@ -18,6 +18,7 @@ mod server_process;
 mod shell_settings;
 mod snap_shot;
 mod ssh;
+mod start_failure;
 mod updater;
 
 use std::collections::VecDeque;
@@ -28,7 +29,6 @@ use std::thread;
 use std::time::Duration;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use local_env::{build_local_environment, LocalEnvironmentState};
 use server_process::Server;
@@ -225,56 +225,6 @@ fn start_server(
         return Err("The server did not report a local address.".to_owned());
     }
     Ok((server, url))
-}
-
-/// Without a window there is nothing else to show the reason in; leaving silently looked like a crash.
-/// Signed in, the user can send exactly the text shown here as a problem report.
-fn report_start_failure(app: &tauri::AppHandle, reason: &str) {
-    eprintln!("Gustaf could not start: {reason}");
-    let handle = app.clone();
-    let text = format!("Gustaf could not start.\n\n{reason}");
-    // The account check reads the keyring, which can block; the dialog shows from any thread.
-    thread::spawn(move || {
-        if !account::has_session(&handle) {
-            let exit = handle.clone();
-            handle
-                .dialog()
-                .message(text)
-                .title("Gustaf")
-                .kind(MessageDialogKind::Error)
-                .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
-                .show(move |_| exit.exit(1));
-            return;
-        }
-        let exit = handle.clone();
-        handle
-            .dialog()
-            .message(format!(
-                "{text}\n\nYou can send this message to the Gustaf team as a problem report."
-            ))
-            .title("Gustaf")
-            .kind(MessageDialogKind::Error)
-            .buttons(MessageDialogButtons::OkCancelCustom(
-                "Send report and quit".to_owned(),
-                "Quit".to_owned(),
-            ))
-            .show(move |send| {
-                if !send {
-                    exit.exit(1);
-                    return;
-                }
-                let outcome = match account::send_problem_report(&exit, &text, None) {
-                    Ok(()) => "The report was sent. Thank you.".to_owned(),
-                    Err(error) => format!("The report could not be sent: {error}"),
-                };
-                let quit = exit.clone();
-                exit.dialog()
-                    .message(outcome)
-                    .title("Gustaf")
-                    .buttons(MessageDialogButtons::OkCustom("Quit".to_owned()))
-                    .show(move |_| quit.exit(1));
-            });
-    });
 }
 
 fn is_external_browser_url(url: &tauri::Url) -> bool {
@@ -586,14 +536,14 @@ pub fn run() {
             let (server, pairing_url) = match start_server(app, &settings, &server_env) {
                 Ok(started) => started,
                 Err(reason) => {
-                    report_start_failure(app.handle(), &reason);
+                    start_failure::report(app.handle(), &reason);
                     return Ok(());
                 }
             };
             let local = match build_local_environment(&pairing_url) {
                 Ok(local) => local,
                 Err(error) => {
-                    report_start_failure(
+                    start_failure::report(
                         app.handle(),
                         &format!("The server started, but signing in to it failed: {error}"),
                     );
@@ -609,14 +559,14 @@ pub fn run() {
             }]);
             let app_url = local.app_url.clone();
             let Some(port) = app_url.port() else {
-                report_start_failure(
+                start_failure::report(
                     app.handle(),
                     "The server reported an address without a port.",
                 );
                 return Ok(());
             };
             if let Err(error) = app.add_capability(ipc_scope::server_capability(port)) {
-                report_start_failure(
+                start_failure::report(
                     app.handle(),
                     &format!("The window could not be given access to the shell: {error}"),
                 );
