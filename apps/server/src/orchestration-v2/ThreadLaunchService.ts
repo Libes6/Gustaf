@@ -1,3 +1,4 @@
+import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -179,6 +180,7 @@ export class ThreadLaunchService extends Context.Service<
     readonly checkWorktreeBase: (
       input: Pick<ThreadLaunchInput, "projectId" | "workspaceStrategy">,
     ) => Effect.Effect<void, ThreadLaunchBaseRefError>;
+    readonly isNonGitProject: (projectId: ProjectId) => Effect.Effect<boolean>;
     readonly retryPreparation: (
       input: ThreadLaunchPreparationInput,
     ) => Effect.Effect<
@@ -207,6 +209,7 @@ const make = Effect.gen(function* () {
   const cloneTracker = yield* ProjectCloneTracker.ProjectCloneTracker;
   const terminals = yield* TerminalManager.TerminalManager;
   const git = yield* GitWorkflow.GitWorkflowService;
+  const checkpointStore = yield* CheckpointStore.CheckpointStore;
   const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
@@ -292,6 +295,20 @@ const make = Effect.gen(function* () {
         workspaceRoot: unresolved.workspaceRoot,
         baseRef,
       });
+  });
+
+  const isNonGitProject: ThreadLaunchService["Service"]["isNonGitProject"] = Effect.fn(
+    "ThreadLaunchService.isNonGitProject",
+  )(function* (projectId) {
+    const project = yield* projects
+      .getById(projectId)
+      .pipe(Effect.orElseSucceed(() => Option.none()));
+    if (Option.isNone(project)) return false;
+    // Unlike `git.repositoryRoot`, this fails on a repository Git cannot read, which is not "no repository".
+    return yield* checkpointStore.isGitRepository(project.value.workspaceRoot).pipe(
+      Effect.map((isRepository) => !isRepository),
+      Effect.orElseSucceed(() => false),
+    );
   });
 
   const prepareInBackground = Effect.fn("ThreadLaunchService.prepareInBackground")(function* (
@@ -1167,7 +1184,13 @@ const make = Effect.gen(function* () {
     );
   });
 
-  return ThreadLaunchService.of({ launch, checkWorktreeBase, retryPreparation, prepareRun });
+  return ThreadLaunchService.of({
+    launch,
+    checkWorktreeBase,
+    isNonGitProject,
+    retryPreparation,
+    prepareRun,
+  });
 });
 
 export const layer = Layer.effect(ThreadLaunchService, make);
