@@ -3325,33 +3325,34 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           <ComposerBannerStack items={usageLimitsItems} detached />
         </div>
       ) : null}
+      {showComposerTopDrawer ? (
+        <ComposerBanner.Root
+          detached
+          data-chat-composer-top-drawer="true"
+          variant="info"
+          className="mb-2"
+        >
+          <ComposerPendingUserInputPanel
+            pendingUserInputs={pendingUserInputs}
+            cwd={gitCwd ?? undefined}
+            threadRef={routeThreadRef}
+            disabled={!canOperateThread}
+            respondingRequestIds={
+              activePendingIsResponding && activePendingUserInput
+                ? [...respondingRequestIds, activePendingUserInput.requestId]
+                : respondingRequestIds
+            }
+            answers={activePendingDraftAnswers}
+            questionIndex={activePendingQuestionIndex}
+            onToggleOption={onSelectActivePendingUserInputOption}
+            onAdvance={onAdvanceActivePendingUserInput}
+            onDismiss={onDismissActivePendingUserInput}
+          />
+        </ComposerBanner.Root>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={attachedShelfItems} />
-          {showComposerTopDrawer ? (
-            <ComposerBanner.Attachment>
-              <ComposerBanner.Root data-chat-composer-top-drawer="true" variant="info">
-                {pendingUserInputs.length > 0 ? (
-                  <ComposerPendingUserInputPanel
-                    pendingUserInputs={pendingUserInputs}
-                    cwd={gitCwd ?? undefined}
-                    threadRef={routeThreadRef}
-                    disabled={!canOperateThread}
-                    respondingRequestIds={
-                      activePendingIsResponding && activePendingUserInput
-                        ? [...respondingRequestIds, activePendingUserInput.requestId]
-                        : respondingRequestIds
-                    }
-                    answers={activePendingDraftAnswers}
-                    questionIndex={activePendingQuestionIndex}
-                    onToggleOption={onSelectActivePendingUserInputOption}
-                    onAdvance={onAdvanceActivePendingUserInput}
-                    onDismiss={onDismissActivePendingUserInput}
-                  />
-                ) : null}
-              </ComposerBanner.Root>
-            </ComposerBanner.Attachment>
-          ) : null}
         </ComposerBanner.Column>
         <ComposerStashBadge
           count={stashQueue.length}
