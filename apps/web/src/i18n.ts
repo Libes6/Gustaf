@@ -556,6 +556,8 @@ export function keybindingLabel(language: UiLanguage, command: string): string |
 
 export function translateProviderMessage(language: UiLanguage, message: string): string {
   const knownMessages = {
+    "Claude sent nothing for 10 minutes. The API or a gateway in front of it is not responding.":
+      "chatB.provider.claudeUnanswered",
     "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs.":
       "chatB.provider.claudeBootTimeout",
     "The MCP call was stopped.": "chatB.provider.mcpCallStopped",
