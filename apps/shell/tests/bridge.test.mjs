@@ -287,3 +287,21 @@ NodeTest.test(
     NodeAssert.ok(calls.every(([name, args]) => name === "ssh_request" && args.locale === "ru"));
   },
 );
+
+NodeTest.test("the relay client reads its credential and entries through the shell", async () => {
+  const calls = [];
+  const { window } = load((name, args) => {
+    calls.push([name, args]);
+    return name === "relay_client_storage_get" ? "stored" : null;
+  });
+  const relayClient = window.gustafShell.account.relayClient;
+  await relayClient.credential();
+  NodeAssert.equal(await relayClient.getItem("gustaf.relay.hosts"), "stored");
+  await relayClient.setItem("gustaf.relay.phone-key", "key");
+  // Arguments come from the script's own realm.
+  NodeAssert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    ["relay_client_credential", null],
+    ["relay_client_storage_get", { key: "gustaf.relay.hosts" }],
+    ["relay_client_storage_set", { key: "gustaf.relay.phone-key", value: "key" }],
+  ]);
+});
