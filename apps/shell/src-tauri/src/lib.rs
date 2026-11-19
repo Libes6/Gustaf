@@ -645,6 +645,7 @@ pub fn run() {
                 // The composer handles drops itself, so the web view has to receive them.
                 .disable_drag_drop_handler()
                 .initialization_script(bridge::init_script(
+                    &app_url.origin().ascii_serialization(),
                     &app.package_info().version.to_string(),
                     &bootstraps,
                     platform,
