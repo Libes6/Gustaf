@@ -1,7 +1,7 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
-import { connectRelayPairing } from "./relayRoute";
+import { connectRelayPairing } from "./relayRoute.ts";
 
 const LINK = "https://laptop.relay.gustaf.invalid/pair#token=CODE";
 const SAVED = "env-laptop" as EnvironmentId;

@@ -163,7 +163,7 @@ async function pairRelayLink(relayLink: string) {
   try {
     const [{ pairOverRelay }, { connectRelayPairing }] = await Promise.all([
       import("../relay/relayTunnels"),
-      import("./relayRoute"),
+      import("@t3tools/client-runtime/gustaf-relay"),
     ]);
     const pairingUrl = await pairOverRelay(relayLink, (safetyCode) => {
       if (!stillThisLink()) return;
