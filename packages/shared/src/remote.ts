@@ -84,9 +84,15 @@ const normalizeRemoteBaseUrl = (
   }
 
   const withoutLeadingSlashes = trimmed.replace(/^\/+/, "");
+  const authority = withoutLeadingSlashes.split(/[/?#]/, 1)[0] ?? "";
+  const plainHttpAddress =
+    authority.startsWith("[") ||
+    /^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$/.test(authority) ||
+    /^localhost(?::\d+)?$/i.test(authority) ||
+    /^[^.:]+:\d+$/.test(authority);
   const normalizedInput = /^[a-zA-Z][a-zA-Z\d+-]*:\/\//.test(withoutLeadingSlashes)
     ? withoutLeadingSlashes
-    : `https://${withoutLeadingSlashes}`;
+    : `${plainHttpAddress ? "http" : "https"}://${withoutLeadingSlashes}`;
   let url: URL;
   try {
     url = new URL(normalizedInput);
