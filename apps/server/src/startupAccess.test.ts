@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import {
   acceptsPrivateNetworkConnection,
+  formatHeadlessServeOutput,
   resolveHeadlessConnectionString,
 } from "./startupAccess.ts";
 
@@ -73,4 +74,24 @@ describe("acceptsPrivateNetworkConnection", () => {
     expect(accepts("169.254.10.1", "169.254.10.2")).toBe(false);
     expect(accepts(undefined, "192.168.1.31")).toBe(false);
   });
+});
+
+it.each([
+  ["win32", true, true],
+  ["win32", false, false],
+  ["linux", true, false],
+])("offers a firewall rule only for Windows LAN hosts (%s, %s)", (platform, lan, expected) => {
+  const output = formatHeadlessServeOutput(
+    {
+      connectionString: "http://192.168.1.2:49152",
+      pairingUrl: "http://192.168.1.2:49152/pair#token=CODE",
+      token: "CODE",
+    },
+    { platform, lan },
+  );
+  expect(
+    output.includes(
+      'New-NetFirewallRule -DisplayName "Gustaf" -Direction Inbound -Protocol TCP -LocalPort 49152 -Action Allow',
+    ),
+  ).toBe(expected);
 });

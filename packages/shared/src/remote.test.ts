@@ -99,6 +99,18 @@ describe("remote", () => {
     });
   });
 
+  it.each([
+    ["203.0.113.7", "http://203.0.113.7/"],
+    ["192.168.1.2:3773", "http://192.168.1.2:3773/"],
+    ["server:3773", "http://server:3773/"],
+    ["localhost", "http://localhost/"],
+    ["[::1]:3773", "http://[::1]:3773/"],
+    ["[2001:db8::1]", "http://[2001:db8::1]/"],
+    ["https://192.168.1.2:3773", "https://192.168.1.2:3773/"],
+  ])("defaults a bare address %s to HTTP", (host, expected) => {
+    expect(resolveRemotePairingTarget({ host, pairingCode: "code" }).httpBaseUrl).toBe(expected);
+  });
+
   it("preserves host ports when normalizing a bare host input", () => {
     expect(
       resolveRemotePairingTarget({

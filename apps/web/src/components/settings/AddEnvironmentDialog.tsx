@@ -8,6 +8,7 @@ import {
 } from "@t3tools/contracts";
 import {
   alreadySavedEnvironment,
+  ConnectionTransientError,
   RelayConnectionRegistration,
   RelayConnectionTarget,
 } from "@t3tools/client-runtime/connection";
@@ -17,6 +18,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import { cn } from "../../lib/utils";
 import { formatDesktopSshTarget } from "./EnvironmentRow";
@@ -69,6 +71,8 @@ import {
 import { useT } from "../../useUiLanguage";
 
 const EMPTY_DISCOVERED_SSH_HOSTS: ReadonlyArray<DesktopDiscoveredSshHost> = [];
+
+const isConnectionTransientError = Schema.is(ConnectionTransientError);
 
 export function AddEnvironmentDialog({
   open,
@@ -269,7 +273,11 @@ export function AddEnvironmentDialog({
           return;
         }
         const message =
-          error instanceof Error ? error.message : t("settingsA.addEnvironment.failedAddBackend");
+          isConnectionTransientError(error) && error.reason === "timeout" && error.via === "direct"
+            ? t("settingsA.addEnvironment.directTimeout")
+            : error instanceof Error
+              ? error.message
+              : t("settingsA.addEnvironment.failedAddBackend");
         onErrorChange(message);
         toastManager.add(
           stackedThreadToast({
