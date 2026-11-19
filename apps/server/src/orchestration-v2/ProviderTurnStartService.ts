@@ -1398,6 +1398,15 @@ export const layer: Layer.Layer<
             handoff.delivery?.nativeThreadId === providerThread.nativeThreadRef?.nativeId &&
             handoff.delivery?.status === "pending",
         );
+        // Dispatch prepares no import handoff for a session import: its history is in the native session.
+        const importedNativeSession =
+          projection.thread.historyOrigin === "v1_import" &&
+          !projection.providerTurns.some((turn) => turn.providerThreadId === providerThread.id) &&
+          !projection.contextHandoffs.some(
+            (handoff) =>
+              handoff.toProviderThreadId === providerThread.id &&
+              handoff.strategy === "manual_context",
+          );
         const resumed = yield* Effect.result(
           uncertainDelivery
             ? Effect.fail(
@@ -1414,6 +1423,7 @@ export const layer: Layer.Layer<
                 threadId: projection.thread.id,
                 modelSelection: run.modelSelection,
                 runtimePolicy: resolvedRuntimePolicy,
+                importedNativeSession,
               }),
         );
         if (resumed._tag === "Success") {
