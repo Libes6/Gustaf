@@ -191,13 +191,23 @@ export const LOOPBACK_ACCESS_HINT =
   "This URL is only reachable from this machine. For another device, restart with `gustaf serve --lan` and use the host's network address, run `gustaf pair --tailscale`, or use the Gustaf relay.\n" +
   "Этот адрес работает только на этом компьютере. Для другого устройства перезапустите `gustaf serve --lan` и используйте сетевой адрес хоста, выполните `gustaf pair --tailscale` или используйте Gustaf relay.";
 
-export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string =>
+export const formatHeadlessServeOutput = (
+  accessInfo: HeadlessServeAccessInfo,
+  options?: { readonly platform: string; readonly lan: boolean },
+): string =>
   [
     "Gustaf server is ready.",
     ...(isLoopbackHost(new URL(accessInfo.connectionString).hostname)
       ? [LOOPBACK_ACCESS_HINT]
       : []),
     `Connection string: ${accessInfo.connectionString}`,
+    ...(options?.platform === "win32" && options.lan
+      ? [
+          "To allow this port, run in an elevated PowerShell (only if you want network access):",
+          "Чтобы открыть порт, выполните в PowerShell от администратора (если нужен сетевой доступ):",
+          `New-NetFirewallRule -DisplayName "Gustaf" -Direction Inbound -Protocol TCP -LocalPort ${new URL(accessInfo.connectionString).port || "80"} -Action Allow`,
+        ]
+      : []),
     `Token: ${accessInfo.token}`,
     `Pairing URL: ${accessInfo.pairingUrl}`,
     `App link: ${buildPairingAppLink(accessInfo.pairingUrl)}`,

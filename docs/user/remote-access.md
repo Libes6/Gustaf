@@ -68,6 +68,38 @@ For a server in a terminal, run `gustaf serve --lan`. Either way, Gustaf then
 accepts connections from your local network and tailnet, so a pairing code is
 all that keeps other devices on them out.
 
+### Windows firewall and cloud hosts
+
+On Windows, `gustaf serve --lan` prints a command to allow its actual listening
+port. To apply it, open PowerShell as administrator and run, replacing `<port>`:
+
+```powershell
+New-NetFirewallRule -DisplayName "Gustaf" -Direction Inbound -Protocol TCP -LocalPort <port> -Action Allow
+```
+
+Gustaf does not change the firewall automatically. Remove the rule when no longer
+needed with `Remove-NetFirewallRule -DisplayName "Gustaf"`.
+
+`--lan` accepts private network and tailnet clients; it rejects public source IPs.
+For a Linux laptop reaching a Windows cloud VM, prefer Tailscale and
+`gustaf pair --tailscale`. For direct public access, bind explicitly with
+`gustaf serve --host 0.0.0.0`, allow the port in Windows Firewall and the cloud
+provider's inbound rules, and restrict those rules to your laptop's IP. Use HTTPS
+through a reverse proxy for public access. Plain HTTP pairing exposes credentials
+on the network. See [background service](./background-service.md) for platform
+availability; Windows currently still requires a running desktop app or terminal.
+
+If adding an environment times out, check the bind address, host firewall and
+cloud inbound rules first. An address without a scheme uses HTTP for IP addresses
+and local `host:port` names; public domain names keep HTTPS. You can always enter
+`http://` or `https://` explicitly.
+
+На Windows команда `gustaf serve --lan` печатает правило для фактического порта.
+Откройте PowerShell от администратора и выполните его, только если хотите открыть
+сетевой доступ. Для облачной VM проверьте также входящие правила у провайдера.
+`--lan` отклоняет публичные IP клиентов: используйте Tailscale или явно задайте
+`--host 0.0.0.0`, ограничив доступ в firewall и настроив HTTPS.
+
 If a server is already running, generate a fresh link without restarting it:
 
 ```bash
