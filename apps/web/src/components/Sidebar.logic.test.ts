@@ -14,6 +14,7 @@ import {
   orderItemsByPreferredIds,
   pinOrderKeyBetween,
   resolveSidebarSweepKeys,
+  resolveSidebarRowStatus,
   resolveSidebarThreadStatus,
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
@@ -309,6 +310,58 @@ describe("resolveSidebarThreadStatus", () => {
         runtime: { ...runtime, status: "idle" as const, lastError: "persisted" },
       }),
     ).toBe("waiting");
+  });
+
+  it("does not show a stopped run as an unseen completion", () => {
+    for (const status of ["interrupted", "cancelled"] as const) {
+      const stopped = {
+        hasActionableProposedPlan: false,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+        interactionMode: "default" as const,
+        runtime: {
+          status,
+          activeRunId: null,
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          providerName: "Codex",
+          lastError: null,
+          updatedAt: "2026-03-09T10:05:00.000Z",
+        },
+        latestRun: { ...makeLatestRun(), status },
+        lastVisitedAt: "2026-03-09T10:01:00.000Z",
+      };
+      expect(hasUnseenCompletion(stopped)).toBe(false);
+      expect(resolveThreadStatusPill({ thread: stopped })).toBeNull();
+    }
+  });
+});
+
+describe("resolveSidebarRowStatus", () => {
+  const failedRuntime = {
+    status: "failed" as const,
+    activeRunId: null,
+    providerInstanceId: ProviderInstanceId.make("codex"),
+    providerName: "Codex",
+    lastError: "Provider turn failed.",
+    updatedAt: "2026-03-09T10:05:00.000Z",
+  };
+  const failed = {
+    hasActionableProposedPlan: false,
+    hasPendingApprovals: false,
+    hasPendingUserInput: false,
+    interactionMode: "default" as const,
+    runtime: failedRuntime,
+    latestRun: { ...makeLatestRun(), status: "failed" as const },
+  };
+
+  it("settles a failure the user opened to ready, without showing Done", () => {
+    expect(resolveSidebarRowStatus({ ...failed, lastVisitedAt: undefined })).toBe("failed");
+
+    const opened = { ...failed, lastVisitedAt: "2026-03-09T10:06:00.000Z" };
+    expect(resolveSidebarRowStatus(opened)).toBe("ready");
+    expect(hasUnseenCompletion(opened)).toBe(false);
+    // A runtime failure without a failed run has no date, so a visit cannot settle it.
+    expect(resolveSidebarRowStatus({ ...opened, latestRun: null })).toBe("failed");
   });
 });
 
@@ -640,7 +693,28 @@ describe("getFallbackThreadIdAfterDelete", () => {
       { snoozedUntil: "2099-01-01T00:00:00.000Z", snoozedAt: "2026-03-09T10:06:00.000Z" },
     ],
     ["settled", { settledOverride: "settled", settledAt: "2026-03-09T10:06:00.000Z" }],
-  ] as const)("skips a %s thread parked on its shelf", (_state, parked) => {
+    [
+      "side chat",
+      {
+        lineage: {
+          rootThreadId: ThreadId.make("thread-visible"),
+          parentThreadId: ThreadId.make("thread-visible"),
+          relationshipToParent: "fork",
+          sideChat: true,
+        },
+      },
+    ],
+    [
+      "subagent",
+      {
+        lineage: {
+          rootThreadId: ThreadId.make("thread-visible"),
+          parentThreadId: ThreadId.make("thread-visible"),
+          relationshipToParent: "subagent",
+        },
+      },
+    ],
+  ] as const)("skips a %s thread the sidebar does not list", (_state, parked) => {
     const fallbackThreadId = getFallbackThreadIdAfterDelete({
       threads: [
         makeThread({
@@ -1460,6 +1534,7 @@ describe("resolveSidebarRouteReveal", () => {
       resolveSidebarRouteReveal({
         reveal: { observedKey: "environment-test:other", pendingKey: null },
         routeKey: hiddenKey,
+        routeKeyInPlace: false,
         isSearching: false,
         scopedProjectKeys,
         delegatedUnderParent: new Set(),
@@ -1474,6 +1549,7 @@ describe("resolveSidebarRouteReveal", () => {
       resolveSidebarRouteReveal({
         reveal: { observedKey: hiddenKey, pendingKey: null },
         routeKey: hiddenKey,
+        routeKeyInPlace: false,
         isSearching: false,
         scopedProjectKeys,
         delegatedUnderParent: new Set(),
@@ -1490,6 +1566,7 @@ describe("resolveSidebarRouteReveal", () => {
       resolveSidebarRouteReveal({
         reveal,
         routeKey,
+        routeKeyInPlace: false,
         isSearching: false,
         scopedProjectKeys,
         delegatedUnderParent: new Set(),
@@ -1504,6 +1581,7 @@ describe("resolveSidebarRouteReveal", () => {
       resolveSidebarRouteReveal({
         reveal: { observedKey: hiddenKey, pendingKey: hiddenKey },
         routeKey: hiddenKey,
+        routeKeyInPlace: false,
         isSearching: true,
         scopedProjectKeys,
         delegatedUnderParent: new Set(),

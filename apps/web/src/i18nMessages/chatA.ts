@@ -66,6 +66,7 @@ export const chatAMessages = {
     "chatA.chatComposer.chooseOptionAbove": "Choose an option above",
     "chatA.chatComposer.typeOwnAnswer":
       "Type your own answer, or leave this blank to use the selected option",
+    "chatA.chatComposer.typeAnswer": "Type your answer",
     "chatA.chatComposer.chooseProjectAbove": "Choose a project above to start a thread",
     "chatA.chatComposer.liveTranscription": "Live transcription",
     "chatA.assistantCitationCommentEditor.commentLabel": "Comment on selected text",
@@ -335,6 +336,7 @@ export const chatAMessages = {
     "chatA.chatComposer.chooseOptionAbove": "Выберите вариант выше",
     "chatA.chatComposer.typeOwnAnswer":
       "Введите свой ответ или оставьте поле пустым, чтобы использовать выбранный вариант",
+    "chatA.chatComposer.typeAnswer": "Введите ответ",
     "chatA.chatComposer.chooseProjectAbove": "Выберите проект выше, чтобы начать тред",
     "chatA.chatComposer.liveTranscription": "Текст распознавания в реальном времени",
     "chatA.assistantCitationCommentEditor.commentLabel": "Комментарий к выделенному тексту",

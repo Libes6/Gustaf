@@ -376,7 +376,16 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   const live = ctx.pendingApprovals.size === 0;
   const activity = (
     <LiveActivityRow
-      label={liveAnswerPreview ?? t("chatB.TimelineWorkGroupRows.thinking")}
+      label={
+        row.waitingOnSubagents === undefined
+          ? (liveAnswerPreview ?? t("chatB.TimelineWorkGroupRows.thinking"))
+          : row.waitingOnSubagents === 1
+            ? t("chatB.TimelineWorkGroupRows.waitingOnSubagent")
+            : t("chatB.TimelineWorkGroupRows.waitingOnSubagents").replace(
+                "{count}",
+                String(row.waitingOnSubagents),
+              )
+      }
       iconName="brain"
       active={live}
       shimmer={live}
