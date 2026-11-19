@@ -927,10 +927,21 @@ export const settingsDMessages = {
     "settingsD.relay.connectPhone": "Connect a device",
     "settingsD.relay.scanTitle": "Scan with the Gustaf app",
     "settingsD.relay.scanDescription":
-      "Scan this code in Gustaf on your phone, or paste the link under Connections → Add environment → Gustaf relay in the desktop app on another computer. It works once, for five minutes.",
+      "Scan this code in Gustaf on your phone, or paste the link in the desktop app on another computer under Settings → Environments → Add environment → Gustaf relay. It works once, for five minutes.",
     "settingsD.relay.pairingLink": "Pairing link",
     "settingsD.relay.copyLink": "Copy link",
     "settingsD.relay.linkCopied": "Copied",
+    "settingsD.relay.pairTitle": "Gustaf relay",
+    "settingsD.relay.pairDescription": "Reach a computer on any network with its relay link.",
+    "settingsD.relay.pairHint":
+      "On the other computer open Settings → Sharing & access, choose Connect a device and copy the link.",
+    "settingsD.relay.invalidLink":
+      "This is not a Gustaf relay link. Copy it from Settings → Sharing & access on the other computer.",
+    "settingsD.relay.pairConnecting": "Connecting to the computer through the Gustaf relay…",
+    "settingsD.relay.pairWaiting":
+      "Allow this computer on the other one to finish pairing. It shows the same safety code: {code}",
+    "settingsD.relay.pairFailed": "Pairing over the relay failed.",
+    "settingsD.relay.paired": "Paired through the Gustaf relay.",
     "settingsD.relay.allowTitle": "Allow “{name}”?",
     "settingsD.relay.safetyCode": "Safety code {code}",
     "settingsD.relay.allow": "Allow device",
@@ -1892,10 +1903,21 @@ export const settingsDMessages = {
     "settingsD.relay.connectPhone": "Подключить устройство",
     "settingsD.relay.scanTitle": "Отсканируйте в приложении Gustaf",
     "settingsD.relay.scanDescription":
-      "Отсканируйте код в Gustaf на телефоне или вставьте ссылку в приложении для компьютера на другом компьютере: «Подключения» → «Добавить окружение» → «Релей Gustaf». Код одноразовый и действует пять минут.",
+      "Отсканируйте код в Gustaf на телефоне или вставьте ссылку в приложении для компьютера на другом компьютере: «Настройки» → «Окружения» → «Добавить окружение» → «Релей Gustaf». Код одноразовый и действует пять минут.",
     "settingsD.relay.pairingLink": "Ссылка для подключения",
     "settingsD.relay.copyLink": "Скопировать ссылку",
     "settingsD.relay.linkCopied": "Скопировано",
+    "settingsD.relay.pairTitle": "Релей Gustaf",
+    "settingsD.relay.pairDescription": "Доступ к компьютеру из любой сети по ссылке релея.",
+    "settingsD.relay.pairHint":
+      "На другом компьютере откройте «Настройки» → «Общий доступ», нажмите «Подключить устройство» и скопируйте ссылку.",
+    "settingsD.relay.invalidLink":
+      "Это не ссылка релея Gustaf. Скопируйте её на другом компьютере в «Настройки» → «Общий доступ».",
+    "settingsD.relay.pairConnecting": "Подключение к компьютеру через релей Gustaf…",
+    "settingsD.relay.pairWaiting":
+      "Разрешите этот компьютер на другом, чтобы завершить подключение. Там показан тот же код безопасности: {code}",
+    "settingsD.relay.pairFailed": "Не удалось подключиться через релей.",
+    "settingsD.relay.paired": "Подключено через релей Gustaf.",
     "settingsD.relay.allowTitle": "Разрешить «{name}»?",
     "settingsD.relay.safetyCode": "Код безопасности {code}",
     "settingsD.relay.allow": "Разрешить устройство",
