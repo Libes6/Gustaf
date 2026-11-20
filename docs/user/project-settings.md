@@ -310,8 +310,8 @@ and sends it to every agent, renewing it before it expires; a header named
 `Authorization` that you set yourself takes its place. If the browser runs on
 another device than the environment, the page it lands on cannot load: copy that
 page's address into the field Gustaf shows and select **Finish**. Threads started
-before signing in get the server in their next session. **Sign out** removes the
-sign-in. Gustaf can sign in only where the server lets apps register themselves
+before signing in get the server in their next session. **Sign out**, or removing
+the server, deletes the sign-in. Gustaf can sign in only where the server lets apps register themselves
 (OAuth dynamic client registration); otherwise add its token as a header.
 
 ### Signing in to Claude Code connectors

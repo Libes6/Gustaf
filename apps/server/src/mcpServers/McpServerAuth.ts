@@ -17,6 +17,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/http/HttpClientResponse";
@@ -27,6 +28,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { base64UrlEncode, loopbackBindAddress } from "../auth/utils.ts";
 import * as ServerConfig from "../config.ts";
+import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 /** The environment's own route the authorization server sends the browser back to. */
@@ -538,6 +540,39 @@ const make = Effect.gen(function* () {
       logins.set(id, null);
       bump(id);
     },
+  );
+
+  // Whatever removes a server from settings (a client, an agent, a pasted file) drops its sign-in.
+  const changes = yield* settings.subscribeChanges;
+  let knownIds = new Set(
+    Object.keys(
+      yield* settings.getSettings.pipe(
+        Effect.map((current) => current.mcpServers),
+        Effect.orElseSucceed(() => ({})),
+      ),
+    ) as Array<McpServerId>,
+  );
+  yield* forkParked(
+    Stream.runForEach(changes, (next) => {
+      const nextIds = new Set(Object.keys(next.mcpServers) as Array<McpServerId>);
+      const removed = [...knownIds].filter((id) => !nextIds.has(id));
+      knownIds = nextIds;
+      return Effect.forEach(
+        removed,
+        (id) => {
+          for (const [state, entry] of pending) if (entry.id === id) pending.delete(state);
+          return signOut({ id }).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Removed MCP server's sign-in could not be deleted", {
+                mcpServerId: id,
+                detail: error.detail,
+              }),
+            ),
+          );
+        },
+        { discard: true },
+      );
+    }),
   );
 
   return McpServerAuth.of({

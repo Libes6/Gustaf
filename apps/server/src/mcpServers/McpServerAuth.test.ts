@@ -5,10 +5,13 @@ import * as NodePlatformCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { McpServerId, ServerSettings as ServerSettingsSchema } from "@t3tools/contracts";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
@@ -101,20 +104,26 @@ const fakeAuthorizationServer = () => {
   };
 };
 
-const setup = () => {
+const jamSettings = decodeSettings({
+  mcpServers: { jam: { enabled: true, transport: { type: "http", url: serverUrl } } },
+});
+
+const setup = (
+  settingsLayer: Layer.Layer<ServerSettings.ServerSettingsService> = ServerSettings.layerTest(
+    jamSettings,
+  ).pipe(Layer.orDie),
+  onRemove: (name: string) => Effect.Effect<void> = () => Effect.void,
+) => {
   const secrets = new Map<string, Uint8Array>();
   const fake = fakeAuthorizationServer();
   const layer = McpServerAuth.layer.pipe(
     Layer.provide([
-      ServerSettings.layerTest(
-        decodeSettings({
-          mcpServers: { jam: { enabled: true, transport: { type: "http", url: serverUrl } } },
-        }),
-      ),
+      settingsLayer,
       Layer.mock(ServerSecretStore.ServerSecretStore)({
         get: (name) => Effect.sync(() => Option.fromUndefinedOr(secrets.get(name))),
         set: (name, value) => Effect.sync(() => void secrets.set(name, value)),
-        remove: (name) => Effect.sync(() => void secrets.delete(name)),
+        remove: (name) =>
+          Effect.sync(() => void secrets.delete(name)).pipe(Effect.andThen(onRemove(name))),
       }),
       Layer.effect(
         ServerConfig.ServerConfig,
@@ -207,3 +216,30 @@ it.effect("signing out deletes the stored token", () => {
     assert.strictEqual(yield* auth.revision(id), 2);
   }).pipe(Effect.provide(layer));
 });
+
+it.effect("removing a server from settings deletes its sign-in", () =>
+  Effect.gen(function* () {
+    const changes = yield* Queue.unbounded<ServerSettingsSchema>();
+    const removed = yield* Deferred.make<string>();
+    const { secrets, fake, layer } = setup(
+      Layer.mock(ServerSettings.ServerSettingsService)({
+        getSettings: Effect.succeed(jamSettings),
+        subscribeChanges: Effect.succeed(Stream.fromQueue(changes)),
+      }),
+      (name) => Deferred.succeed(removed, name).pipe(Effect.asVoid),
+    );
+    yield* Effect.gen(function* () {
+      const auth = yield* McpServerAuth.McpServerAuth;
+      const authUrl = new URL((yield* auth.signIn({ id })).authUrl);
+      fake.setChallenge(authUrl.searchParams.get("code_challenge"));
+      yield* auth.completeSignIn({
+        callbackUrl: `${redirectUri}?code=code-1&state=${authUrl.searchParams.get("state")}`,
+      });
+      const [secretName] = [...secrets.keys()];
+
+      yield* Queue.offer(changes, { ...jamSettings, mcpServers: {} });
+      assert.strictEqual(yield* Deferred.await(removed), secretName);
+      assert.strictEqual(secrets.size, 0);
+    }).pipe(Effect.provide(layer));
+  }),
+);
