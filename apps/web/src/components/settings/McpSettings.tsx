@@ -290,6 +290,10 @@ function McpEnvironmentSettings({
         <McpStatusLine dot="bg-muted-foreground/40" text={t("settingsE.mcp.status.checking")} />
       );
     }
+    const offCount = settings.mcpServers[id]?.disabledTools?.length ?? 0;
+    const off = offCount
+      ? t("settingsE.mcp.tools.offCount").replace("{count}", String(offCount))
+      : "";
     switch (status.status) {
       case "connected": {
         const tools = String(status.tools?.length ?? 0);
@@ -297,24 +301,27 @@ function McpEnvironmentSettings({
           <McpStatusLine
             dot="bg-success"
             text={
-              status.resourceCount
+              (status.resourceCount
                 ? t("settingsE.mcp.status.toolsAndResources")
                     .replace("{tools}", tools)
                     .replace("{resources}", String(status.resourceCount))
-                : t("settingsE.mcp.status.tools").replace("{tools}", tools)
+                : t("settingsE.mcp.status.tools").replace("{tools}", tools)) + off
             }
           />
         );
       }
       case "needs-auth":
         return (
-          <McpStatusLine dot="bg-warning" text={t("settingsE.mcp.connectors.status.needs-auth")} />
+          <McpStatusLine
+            dot="bg-warning"
+            text={t("settingsE.mcp.connectors.status.needs-auth") + off}
+          />
         );
       case "failed":
         return (
           <McpStatusLine
             dot="bg-destructive"
-            text={status.error ?? t("settingsE.mcp.connectors.status.failed")}
+            text={(status.error ?? t("settingsE.mcp.connectors.status.failed")) + off}
           />
         );
       case "pending":
@@ -322,7 +329,7 @@ function McpEnvironmentSettings({
         return (
           <McpStatusLine
             dot="bg-muted-foreground/40"
-            text={t(`settingsE.mcp.connectors.status.${status.status}`)}
+            text={t(`settingsE.mcp.connectors.status.${status.status}`) + off}
           />
         );
     }
@@ -492,7 +499,8 @@ function McpEnvironmentSettings({
                     </Select>
                   ) : (
                     <>
-                      {currentStatus(id)?.status === "connected" && (
+                      {(currentStatus(id)?.status === "connected" ||
+                        (config.disabledTools?.length ?? 0) > 0) && (
                         <Button
                           size="xs"
                           variant="outline"
@@ -772,6 +780,8 @@ function McpToolsDialog({
   const t = useT();
   // Switches answer at once; each change is saved in the background.
   const [off, setOff] = useState<readonly string[]>(config.disabledTools ?? []);
+  // Without the server's list, the tools switched off when the dialog opened can still be switched back.
+  const [offAtOpen] = useState(off);
   // Picking "Custom" keeps the group's switches as they are until one changes.
   const [customGroups, setCustomGroups] = useState<ReadonlySet<string>>(new Set());
   const tools = status?.status === "connected" ? (status.tools ?? []) : undefined;
@@ -830,20 +840,23 @@ function McpToolsDialog({
             </SelectPopup>
           </Select>
         </div>
-        {groupNames.map((name) => (
-          <label
-            key={name}
-            className="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm"
-          >
-            <span className="min-w-0 break-all font-mono text-xs">{name}</span>
-            <Switch
-              checked={!off.includes(name)}
-              disabled={disabled}
-              onCheckedChange={(enabled) => apply(setMcpToolsEnabled(off, [name], enabled))}
-            />
-          </label>
-        ))}
+        {groupNames.map(toolSwitch)}
       </section>
+    );
+  }
+  function toolSwitch(name: string) {
+    return (
+      <label
+        key={name}
+        className="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm"
+      >
+        <span className="min-w-0 break-all font-mono text-xs">{name}</span>
+        <Switch
+          checked={!off.includes(name)}
+          disabled={disabled}
+          onCheckedChange={(enabled) => apply(setMcpToolsEnabled(off, [name], enabled))}
+        />
+      </label>
     );
   }
   return (
@@ -878,6 +891,12 @@ function McpToolsDialog({
             )}
             {tools !== undefined && names.length === 0 && (
               <p className="text-sm text-muted-foreground">{t("settingsE.mcp.tools.none")}</p>
+            )}
+            {tools === undefined && offAtOpen.length > 0 && (
+              <section className="grid gap-1 rounded-lg border p-2">
+                <h3 className="px-1 text-sm font-medium">{t("settingsE.mcp.tools.switchedOff")}</h3>
+                {offAtOpen.map(toolSwitch)}
+              </section>
             )}
             {group("reads", reads)}
             {group("writes", writes)}

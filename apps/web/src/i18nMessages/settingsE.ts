@@ -68,8 +68,10 @@ export const settingsEMessages = {
     "settingsE.mcp.tools.title": "{name} tools",
     "settingsE.mcp.tools.count": "{enabled} of {total} enabled",
     "settingsE.mcp.tools.unknown":
-      "The server is not connected, so its tools are unknown. Switched-off tools stay off.",
+      "The server is not connected, so its tools are unknown. Switched-off tools stay off until you switch them back on here.",
     "settingsE.mcp.tools.none": "This server has no tools.",
+    "settingsE.mcp.tools.switchedOff": "Switched off",
+    "settingsE.mcp.tools.offCount": " ({count} off)",
     "settingsE.mcp.tools.reads": "Reads",
     "settingsE.mcp.tools.writes": "Writes",
     "settingsE.mcp.tools.allowAll": "Allow all",
@@ -724,8 +726,10 @@ export const settingsEMessages = {
     "settingsE.mcp.tools.title": "Инструменты {name}",
     "settingsE.mcp.tools.count": "Включено {enabled} из {total}",
     "settingsE.mcp.tools.unknown":
-      "Сервер не подключён, поэтому список инструментов неизвестен. Выключенные инструменты остаются выключенными.",
+      "Сервер не подключён, поэтому список инструментов неизвестен. Выключенные инструменты остаются выключенными, пока вы не включите их здесь.",
     "settingsE.mcp.tools.none": "У этого сервера нет инструментов.",
+    "settingsE.mcp.tools.switchedOff": "Выключены",
+    "settingsE.mcp.tools.offCount": " ({count} выкл.)",
     "settingsE.mcp.tools.reads": "Чтение",
     "settingsE.mcp.tools.writes": "Запись",
     "settingsE.mcp.tools.allowAll": "Разрешить все",
