@@ -60,6 +60,20 @@ export const settingsEMessages = {
     "settingsE.mcp.status.tools": "Tools: {tools}",
     "settingsE.mcp.status.toolsAndResources": "Tools: {tools}, resources: {resources}",
     "settingsE.mcp.status.listFailed": "Could not check the MCP servers.",
+    "settingsE.mcp.tools.open": "Tools",
+    "settingsE.mcp.tools.title": "{name} tools",
+    "settingsE.mcp.tools.count": "{enabled} of {total} enabled",
+    "settingsE.mcp.tools.unknown":
+      "The server is not connected, so its tools are unknown. Switched-off tools stay off.",
+    "settingsE.mcp.tools.none": "This server has no tools.",
+    "settingsE.mcp.tools.reads": "Reads",
+    "settingsE.mcp.tools.writes": "Writes",
+    "settingsE.mcp.tools.allowAll": "Allow all",
+    "settingsE.mcp.tools.allowNone": "Don't allow",
+    "settingsE.mcp.tools.custom": "Custom",
+    "settingsE.mcp.tools.unsupported":
+      "{names} cannot switch off single tools and will get all of them.",
+    "settingsE.mcp.tools.done": "Done",
     "settingsE.mcp.signIn.start": "Sign in",
     "settingsE.mcp.signIn.signOut": "Sign out",
     "settingsE.mcp.signIn.pasteHint":
@@ -695,6 +709,20 @@ export const settingsEMessages = {
     "settingsE.mcp.status.tools": "Инструментов: {tools}",
     "settingsE.mcp.status.toolsAndResources": "Инструментов: {tools}, ресурсов: {resources}",
     "settingsE.mcp.status.listFailed": "Не удалось проверить серверы MCP.",
+    "settingsE.mcp.tools.open": "Инструменты",
+    "settingsE.mcp.tools.title": "Инструменты {name}",
+    "settingsE.mcp.tools.count": "Включено {enabled} из {total}",
+    "settingsE.mcp.tools.unknown":
+      "Сервер не подключён, поэтому список инструментов неизвестен. Выключенные инструменты остаются выключенными.",
+    "settingsE.mcp.tools.none": "У этого сервера нет инструментов.",
+    "settingsE.mcp.tools.reads": "Чтение",
+    "settingsE.mcp.tools.writes": "Запись",
+    "settingsE.mcp.tools.allowAll": "Разрешить все",
+    "settingsE.mcp.tools.allowNone": "Запретить все",
+    "settingsE.mcp.tools.custom": "Выборочно",
+    "settingsE.mcp.tools.unsupported":
+      "{names}: выключение отдельных инструментов не поддерживается, эти агенты получат все инструменты.",
+    "settingsE.mcp.tools.done": "Готово",
     "settingsE.mcp.signIn.start": "Войти",
     "settingsE.mcp.signIn.signOut": "Выйти",
     "settingsE.mcp.signIn.pasteHint":

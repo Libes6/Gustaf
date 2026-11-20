@@ -90,10 +90,15 @@ const withSecrets = Effect.fnUntraced(function* (
     values[key] = secret;
   }
   const { transport } = server;
+  const disabledTools =
+    server.disabledTools === undefined || server.disabledTools.length === 0
+      ? {}
+      : { disabledTools: server.disabledTools };
   if (transport.type === "http") {
     return {
       type: "http",
       id,
+      ...disabledTools,
       url: transport.url,
       headers: bearer === undefined ? values : { ...values, Authorization: `Bearer ${bearer}` },
     };
@@ -119,6 +124,7 @@ const withSecrets = Effect.fnUntraced(function* (
   return {
     type: "stdio",
     id,
+    ...disabledTools,
     // Node and most provider runtimes cannot spawn npm's `.cmd` shims by their bare name.
     command: pinned !== command || WINDOWS_SHIM.test(executable) ? executable : command,
     args: transport.args,

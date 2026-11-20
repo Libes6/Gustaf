@@ -151,33 +151,39 @@ it.effect("gives a server only to the providers it is limited to", () =>
   }),
 );
 
-it.effect("runs stdio servers in the thread's directory unless pinned, with the host PATH", () =>
-  Effect.gen(function* () {
-    const { servers } = yield* resolve({
-      mcpServers: {
-        thread: stdio(true, { env: { API_URL: "https://api.test" } }),
-        pinned: stdio(true, { cwd: "/opt/tools", env: { PATH: "/custom/bin" } }),
-      },
-    });
-    assert.deepEqual(servers, [
-      {
-        type: "stdio",
-        id: McpServerId.make("thread"),
-        command: "npx",
-        args: ["-y", "server"],
-        env: { PATH: "/opt/homebrew/bin:/usr/bin", API_URL: "https://api.test" },
-        cwd: threadCwd,
-      },
-      {
-        type: "stdio",
-        id: McpServerId.make("pinned"),
-        command: "npx",
-        args: ["-y", "server"],
-        env: { PATH: "/custom/bin" },
-        cwd: "/opt/tools",
-      },
-    ]);
-  }),
+it.effect(
+  "runs stdio servers in the thread's directory unless pinned, with the host PATH and disabled tools",
+  () =>
+    Effect.gen(function* () {
+      const { servers } = yield* resolve({
+        mcpServers: {
+          thread: stdio(true, { env: { API_URL: "https://api.test" } }),
+          pinned: {
+            ...stdio(true, { cwd: "/opt/tools", env: { PATH: "/custom/bin" } }),
+            disabledTools: ["delete_scene"],
+          },
+        },
+      });
+      assert.deepEqual(servers, [
+        {
+          type: "stdio",
+          id: McpServerId.make("thread"),
+          command: "npx",
+          args: ["-y", "server"],
+          env: { PATH: "/opt/homebrew/bin:/usr/bin", API_URL: "https://api.test" },
+          cwd: threadCwd,
+        },
+        {
+          type: "stdio",
+          id: McpServerId.make("pinned"),
+          disabledTools: ["delete_scene"],
+          command: "npx",
+          args: ["-y", "server"],
+          env: { PATH: "/custom/bin" },
+          cwd: "/opt/tools",
+        },
+      ]);
+    }),
 );
 
 it.effect(

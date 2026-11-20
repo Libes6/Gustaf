@@ -1811,6 +1811,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             id: "remote",
             url: "https://example.com/mcp",
             headers: { Authorization: "Bearer user-secret" },
+            disabledTools: ["delete_file"],
           },
         ],
       });
@@ -1850,6 +1851,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             ['mcp_servers."remote"']: {
               url: "https://example.com/mcp",
               http_headers: { Authorization: "Bearer user-secret" },
+              disabled_tools: ["delete_file"],
             },
             "mcp_servers.t3-code": {
               url: "http://127.0.0.1:43123/mcp",

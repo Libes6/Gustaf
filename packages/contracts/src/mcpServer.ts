@@ -73,8 +73,16 @@ export const McpServerConfig = Schema.Struct({
   transport: McpServerTransport,
   /** Driver kinds whose sessions get this server; absent means every provider. */
   providers: Schema.optionalKey(Schema.Array(ProviderDriverKind)),
+  /** Tool names providers must not offer; tools the server adds later stay on. */
+  disabledTools: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type McpServerConfig = typeof McpServerConfig.Type;
+
+/** Drivers whose sessions honor `disabledTools`; the others get every tool of the server. */
+export const MCP_TOOL_FILTER_DRIVERS: ReadonlyArray<ProviderDriverKind> = [
+  ProviderDriverKind.make("claudeAgent"),
+  ProviderDriverKind.make("codex"),
+];
 
 /** A project's switch for one server; absent inherits the server's own `enabled`. */
 export const ProjectMcpServerOverride = Schema.Struct({

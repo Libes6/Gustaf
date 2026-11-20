@@ -43,6 +43,15 @@ import { Switch } from "../ui/switch";
 import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { McpConnectorsSection } from "./McpConnectorsSection";
+import {
+  groupMcpTools,
+  mcpStatusKey,
+  mcpToolFilterUnsupported,
+  mcpToolGroupMode,
+  setMcpToolsEnabled,
+  withDisabledTools,
+  type McpToolGroupMode,
+} from "./McpSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
 const isMcpId = Schema.is(McpServerId);
@@ -105,7 +114,9 @@ function McpEnvironmentSettings({
   >(new Map());
   const [refreshing, setRefreshing] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
-  const serversKey = JSON.stringify(settings.mcpServers);
+  const serversKey = JSON.stringify(
+    Object.entries(settings.mcpServers).map(([id, config]) => [id, mcpStatusKey(config)]),
+  );
   const hasServers = Object.keys(settings.mcpServers).length > 0;
   function applyCheck(
     configs: typeof settings.mcpServers,
@@ -116,7 +127,7 @@ function McpEnvironmentSettings({
     setChecked((previous) => {
       const next = new Map(previous);
       for (const status of result.value.servers) {
-        next.set(status.id, { status, config: JSON.stringify(configs[status.id]) });
+        next.set(status.id, { status, config: mcpStatusKey(configs[status.id]) });
       }
       return next;
     });
@@ -197,7 +208,7 @@ function McpEnvironmentSettings({
   }, [awaitingId]);
   function currentStatus(id: McpServerId) {
     const entry = checked.get(id);
-    return entry?.config === JSON.stringify(settings.mcpServers[id]) ? entry.status : undefined;
+    return entry?.config === mcpStatusKey(settings.mcpServers[id]) ? entry.status : undefined;
   }
   function signInControl(id: McpServerId) {
     const status = currentStatus(id);
@@ -273,6 +284,10 @@ function McpEnvironmentSettings({
   const [editing, setEditing] = useState<{ id: string; config?: McpServerConfig } | null>(null);
   const [paste, setPaste] = useState<string | null>(null);
   const [imports, setImports] = useState<readonly McpImportableServer[] | null>(null);
+  const [toolsFor, setToolsFor] = useState<McpServerId | null>(null);
+  const installedDrivers = (useEnvironmentProviders().get(environmentId) ?? [])
+    .filter((provider) => provider.installed)
+    .map((provider) => provider.driver);
   const localAllowed = canLocal && policy?.limits?.localMcpServers !== false;
   async function save(patch: ServerSettingsPatch) {
     setBusy(true);
@@ -429,6 +444,16 @@ function McpEnvironmentSettings({
                     </Select>
                   ) : (
                     <>
+                      {currentStatus(id)?.status === "connected" && (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={!canEdit}
+                          onClick={() => setToolsFor(id)}
+                        >
+                          {t("settingsE.mcp.tools.open")}
+                        </Button>
+                      )}
                       <Switch
                         aria-label={`Enable ${id}`}
                         checked={config.enabled}
@@ -500,6 +525,23 @@ function McpEnvironmentSettings({
         )}
       </SettingsSection>
       <McpConnectorsSection environmentId={environmentId} projectDir={projectDir} />
+      {toolsFor !== null && settings.mcpServers[toolsFor] !== undefined && (
+        <McpToolsDialog
+          key={toolsFor}
+          id={toolsFor}
+          config={settings.mcpServers[toolsFor]}
+          status={currentStatus(toolsFor)}
+          unsupported={mcpToolFilterUnsupported(
+            settings.mcpServers[toolsFor].providers,
+            installedDrivers,
+          )}
+          disabled={!canEdit}
+          refreshing={refreshing}
+          onSave={(config) => save({ mcpServers: { [toolsFor]: config } })}
+          onRefresh={() => refreshStatuses([toolsFor])}
+          onClose={() => setToolsFor(null)}
+        />
+      )}
       {imports !== null && (
         <Dialog
           open
@@ -673,6 +715,148 @@ function McpEnvironmentSettings({
         </Dialog>
       )}
     </SettingsPageContainer>
+  );
+}
+
+function McpToolsDialog({
+  id,
+  config,
+  status,
+  unsupported,
+  disabled,
+  refreshing,
+  onSave,
+  onRefresh,
+  onClose,
+}: {
+  id: McpServerId;
+  config: McpServerConfig;
+  status: McpServerStatus | undefined;
+  unsupported: readonly ProviderDriverKind[];
+  disabled: boolean;
+  refreshing: boolean;
+  onSave: (config: McpServerConfig) => Promise<boolean>;
+  onRefresh: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  // Switches answer at once; each change is saved in the background.
+  const [off, setOff] = useState<readonly string[]>(config.disabledTools ?? []);
+  // Picking "Custom" keeps the group's switches as they are until one changes.
+  const [customGroups, setCustomGroups] = useState<ReadonlySet<string>>(new Set());
+  const tools = status?.status === "connected" ? (status.tools ?? []) : undefined;
+  const { reads, writes } = groupMcpTools(tools ?? []);
+  const names = [...reads, ...writes];
+  const enabledCount = names.filter((name) => !off.includes(name)).length;
+  function apply(next: readonly string[]) {
+    setOff(next);
+    void onSave(withDisabledTools(config, next));
+  }
+  const modeLabels: Record<McpToolGroupMode, string> = {
+    all: t("settingsE.mcp.tools.allowAll"),
+    none: t("settingsE.mcp.tools.allowNone"),
+    custom: t("settingsE.mcp.tools.custom"),
+  };
+  const modeItems = (Object.keys(modeLabels) as McpToolGroupMode[]).map((value) => ({
+    value,
+    label: modeLabels[value],
+  }));
+  function group(key: "reads" | "writes", groupNames: readonly string[]) {
+    if (groupNames.length === 0) return null;
+    const mode = customGroups.has(key) ? "custom" : mcpToolGroupMode(groupNames, off);
+    const title = t(`settingsE.mcp.tools.${key}`);
+    return (
+      <section className="grid gap-1 rounded-lg border p-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <h3 className="text-sm font-medium">{title}</h3>
+          <Select
+            items={modeItems}
+            value={mode}
+            disabled={disabled}
+            onValueChange={(value) => {
+              if (value === null) return;
+              setCustomGroups((previous) => {
+                const next = new Set(previous);
+                if (value === "custom") next.add(key);
+                else next.delete(key);
+                return next;
+              });
+              if (value !== "custom") apply(setMcpToolsEnabled(off, groupNames, value === "all"));
+            }}
+          >
+            <SelectTrigger size="xs" className="w-auto" aria-label={title}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {modeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+        {groupNames.map((name) => (
+          <label
+            key={name}
+            className="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm"
+          >
+            <span className="min-w-0 break-all font-mono text-xs">{name}</span>
+            <Switch
+              checked={!off.includes(name)}
+              disabled={disabled}
+              onCheckedChange={(enabled) => apply(setMcpToolsEnabled(off, [name], enabled))}
+            />
+          </label>
+        ))}
+      </section>
+    );
+  }
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPopup className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {t("settingsE.mcp.tools.title").replace("{name}", config.name ?? id)}
+          </DialogTitle>
+          <DialogDescription>
+            {tools === undefined
+              ? t("settingsE.mcp.tools.unknown")
+              : t("settingsE.mcp.tools.count")
+                  .replace("{enabled}", String(enabledCount))
+                  .replace("{total}", String(names.length))}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
+          <div className="grid gap-3">
+            {unsupported.length > 0 && (
+              <p role="note" className="text-sm text-muted-foreground">
+                {t("settingsE.mcp.tools.unsupported").replace(
+                  "{names}",
+                  unsupported.map(driverName).join(", "),
+                )}
+              </p>
+            )}
+            {tools !== undefined && names.length === 0 && (
+              <p className="text-sm text-muted-foreground">{t("settingsE.mcp.tools.none")}</p>
+            )}
+            {group("reads", reads)}
+            {group("writes", writes)}
+          </div>
+        </DialogPanel>
+        <DialogFooter className="sm:justify-between">
+          <Button variant="ghost" disabled={refreshing} onClick={onRefresh}>
+            {t("settingsE.mcp.status.refresh")}
+          </Button>
+          <Button onClick={onClose}>{t("settingsE.mcp.tools.done")}</Button>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }
 

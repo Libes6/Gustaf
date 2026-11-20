@@ -292,6 +292,12 @@ needs a sign-in. An Antigravity thread names the servers Gustaf sent it and thos
 it refused over a server fails with that server's name and marks the server as
 failed here until you select **Refresh**.
 
+To switch off single tools of a connected server, select **Tools** next to it.
+Tools are grouped into reads and writes by what the server declares, and a tool
+the server adds later starts switched on. Only Claude and Codex hide switched-off
+tools; other agents still get every tool, and the window names them. Running
+threads may keep the old list until their next session.
+
 Enable servers for the whole environment or override their enabled state for a
 project. Mobile Settings lists each environment's servers and lets you switch
 them on or off for that environment; use web or desktop to add or edit them.
