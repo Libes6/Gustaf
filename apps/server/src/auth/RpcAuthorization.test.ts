@@ -476,13 +476,18 @@ it.effect("denies manual cleanup before the handler without settings permission"
   }).pipe(Effect.scoped),
 );
 
-it.effect("guards MCP import with the grants that editing MCP servers needs", () =>
+it.effect("guards MCP import and server checks with the grants they need", () =>
   Effect.gen(function* () {
-    type McpTag = typeof WS_METHODS.mcpServersListImportable | typeof WS_METHODS.mcpServersImport;
+    type McpTag =
+      | typeof WS_METHODS.mcpServersListImportable
+      | typeof WS_METHODS.mcpServersImport
+      | typeof WS_METHODS.mcpServersStatus;
     const group = WsRpcGroup.omit(
       ...[...WsRpcGroup.requests.keys()].filter(
         (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, McpTag> =>
-          tag !== WS_METHODS.mcpServersListImportable && tag !== WS_METHODS.mcpServersImport,
+          tag !== WS_METHODS.mcpServersListImportable &&
+          tag !== WS_METHODS.mcpServersImport &&
+          tag !== WS_METHODS.mcpServersStatus,
       ),
     );
     let handled = 0;
@@ -502,6 +507,12 @@ it.effect("guards MCP import with the grants that editing MCP servers needs", ()
                 return { imported: [] };
               }),
             ),
+            group.toLayerHandler(WS_METHODS.mcpServersStatus, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { servers: [] };
+              }),
+            ),
             RpcAuthorization.layer(scopes),
           ),
         ),
@@ -518,7 +529,13 @@ it.effect("guards MCP import with the grants that editing MCP servers needs", ()
       yield* providersOnly[WS_METHODS.mcpServersListImportable]({}).pipe(Effect.flip),
     ).toMatchObject({ requiredPermission: AuthSettingsWriteScope });
 
+    yield* providersOnly[WS_METHODS.mcpServersStatus]({});
+    expect(handled).toBe(1);
+
     const settingsOnly = yield* call([AuthSettingsWriteScope]);
+    expect(yield* settingsOnly[WS_METHODS.mcpServersStatus]({}).pipe(Effect.flip)).toMatchObject({
+      requiredPermission: AuthProvidersManageScope,
+    });
     expect(
       yield* settingsOnly[WS_METHODS.mcpServersImport]({ entries: [entry("http")] }).pipe(
         Effect.flip,
@@ -528,12 +545,12 @@ it.effect("guards MCP import with the grants that editing MCP servers needs", ()
     const settingsAndProviders = yield* call([AuthSettingsWriteScope, AuthProvidersManageScope]);
     yield* settingsAndProviders[WS_METHODS.mcpServersListImportable]({});
     yield* settingsAndProviders[WS_METHODS.mcpServersImport]({ entries: [entry("http")] });
-    expect(handled).toBe(2);
+    expect(handled).toBe(3);
     expect(
       yield* settingsAndProviders[WS_METHODS.mcpServersImport]({
         entries: [entry("http"), entry("stdio")],
       }).pipe(Effect.flip),
     ).toMatchObject({ requiredPermission: AuthTerminalOperateScope });
-    expect(handled).toBe(2);
+    expect(handled).toBe(3);
   }).pipe(Effect.scoped),
 );

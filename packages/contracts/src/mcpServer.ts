@@ -183,10 +183,19 @@ export class McpServerImportError extends Schema.TaggedError<McpServerImportErro
   }
 }
 
+export const McpConnectorStatus = Schema.Literals([
+  "connected",
+  "needs-auth",
+  "failed",
+  "pending",
+  "disabled",
+]);
+export type McpConnectorStatus = typeof McpConnectorStatus.Type;
+
 /** An MCP server a provider loads from its own config or account, such as a claude.ai connector. */
 export const McpConnector = Schema.Struct({
   name: Schema.String,
-  status: Schema.Literals(["connected", "needs-auth", "failed", "pending", "disabled"]),
+  status: McpConnectorStatus,
   /** `claudeai` is a claude.ai connector, signed in on claude.ai; `oauth` signs in through the provider. */
   auth: Schema.Literals(["claudeai", "oauth", "none"]),
   /** Where the provider found it, such as `user`, `project` or `claudeai`. */
@@ -238,5 +247,44 @@ export class McpConnectorError extends Schema.TaggedError<McpConnectorError>()(
 ) {
   override get message(): string {
     return this.detail;
+  }
+}
+
+export const McpServerStatusListInput = Schema.Struct({
+  /** Checks these servers again instead of answering from the environment's cache. */
+  refresh: Schema.optionalKey(Schema.Array(McpServerId)),
+});
+export type McpServerStatusListInput = typeof McpServerStatusListInput.Type;
+
+export const McpServerToolSummary = Schema.Struct({
+  name: Schema.String,
+  /** The tool's `annotations.readOnlyHint`, when it declares one. */
+  readOnly: Schema.optionalKey(Schema.Boolean),
+});
+export type McpServerToolSummary = typeof McpServerToolSummary.Type;
+
+/** What starting or reaching one of the user's MCP servers here showed. */
+export const McpServerStatus = Schema.Struct({
+  id: McpServerId,
+  status: McpConnectorStatus,
+  /** Set when connected. */
+  tools: Schema.optionalKey(Schema.Array(McpServerToolSummary)),
+  resourceCount: Schema.optionalKey(Schema.Number),
+  /** Why it failed: the server's first stderr lines, or the error. */
+  error: Schema.optionalKey(Schema.String),
+});
+export type McpServerStatus = typeof McpServerStatus.Type;
+
+export const McpServerStatusListResult = Schema.Struct({
+  servers: Schema.Array(McpServerStatus),
+});
+export type McpServerStatusListResult = typeof McpServerStatusListResult.Type;
+
+export class McpServerStatusError extends Schema.TaggedError<McpServerStatusError>()(
+  "McpServerStatusError",
+  { cause: Schema.optional(Schema.Defect()) },
+) {
+  override get message(): string {
+    return "The MCP servers could not be read.";
   }
 }

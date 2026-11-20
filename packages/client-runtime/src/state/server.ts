@@ -1213,6 +1213,10 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "mcp:import",
       tag: WS_METHODS.mcpServersImport,
     }),
+    mcpServerStatus: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:mcp-status",
+      tag: WS_METHODS.mcpServersStatus,
+    }),
     mcpListConnectors: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:mcp-connectors",
       tag: WS_METHODS.mcpConnectorsList,

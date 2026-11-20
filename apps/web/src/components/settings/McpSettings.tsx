@@ -4,13 +4,14 @@ import {
   McpServerId,
   type EnvironmentId,
   type McpImportableServer,
+  type McpServerStatus,
   type ProjectId,
   type ServerSettingsPatch,
 } from "@t3tools/contracts";
 import { parseMcpServerJson } from "@t3tools/client-runtime/mcp-server-input";
 import * as Schema from "effect/Schema";
 import { useT } from "../../useUiLanguage";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { ChevronDownIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { ensureLocalApi } from "../../localApi";
 import { Label } from "../ui/label";
@@ -26,6 +27,7 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collapsible";
+import { ConnectionStatusDot } from "../ConnectionStatusDot";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -87,6 +89,99 @@ function McpEnvironmentSettings({
   const update = useAtomCommand(serverEnvironment.updateSettings);
   const list = useAtomCommand(serverEnvironment.mcpListImportable);
   const importServers = useAtomCommand(serverEnvironment.importMcpServers);
+  const canCheck = useAtomValue(serverEnvironment.mcpServerStatus.permissionAtom(environmentId));
+  const checkServers = useAtomCommand(serverEnvironment.mcpServerStatus, { reportFailure: false });
+  // Each answer with the config it was asked for, so an edited server shows as checking.
+  const [checked, setChecked] = useState<
+    ReadonlyMap<string, { status: McpServerStatus; config: string }>
+  >(new Map());
+  const [refreshing, setRefreshing] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
+  const serversKey = JSON.stringify(settings.mcpServers);
+  const hasServers = Object.keys(settings.mcpServers).length > 0;
+  function applyCheck(
+    configs: typeof settings.mcpServers,
+    result: Awaited<ReturnType<typeof checkServers>>,
+  ) {
+    setCheckFailed(result._tag !== "Success");
+    if (result._tag !== "Success") return;
+    setChecked((previous) => {
+      const next = new Map(previous);
+      for (const status of result.value.servers) {
+        next.set(status.id, { status, config: JSON.stringify(configs[status.id]) });
+      }
+      return next;
+    });
+  }
+  const checkCurrent = useEffectEvent((isCurrent: () => boolean) => {
+    const configs = settings.mcpServers;
+    void checkServers({ environmentId, input: {} }).then((result) => {
+      if (isCurrent()) applyCheck(configs, result);
+    });
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Checking starts servers on the environment; it runs when the section opens and when a server's config changes.
+  useEffect(() => {
+    if (!canCheck || !hasServers) return;
+    let current = true;
+    checkCurrent(() => current);
+    return () => {
+      current = false;
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A server's config changing is what asks for a new check.
+  }, [canCheck, environmentId, hasServers, serversKey]);
+  async function refreshStatuses(ids: readonly McpServerId[]) {
+    setRefreshing(true);
+    const result = await checkServers({ environmentId, input: { refresh: ids } });
+    setRefreshing(false);
+    applyCheck(settings.mcpServers, result);
+  }
+  function statusLine(id: McpServerId) {
+    if (!canCheck) return undefined;
+    const entry = checked.get(id);
+    const status =
+      entry?.config === JSON.stringify(settings.mcpServers[id]) ? entry.status : undefined;
+    if (status === undefined) {
+      return checkFailed && !refreshing ? undefined : (
+        <McpStatusLine dot="bg-muted-foreground/40" text={t("settingsE.mcp.status.checking")} />
+      );
+    }
+    switch (status.status) {
+      case "connected": {
+        const tools = String(status.tools?.length ?? 0);
+        return (
+          <McpStatusLine
+            dot="bg-success"
+            text={
+              status.resourceCount
+                ? t("settingsE.mcp.status.toolsAndResources")
+                    .replace("{tools}", tools)
+                    .replace("{resources}", String(status.resourceCount))
+                : t("settingsE.mcp.status.tools").replace("{tools}", tools)
+            }
+          />
+        );
+      }
+      case "needs-auth":
+        return (
+          <McpStatusLine dot="bg-warning" text={t("settingsE.mcp.connectors.status.needs-auth")} />
+        );
+      case "failed":
+        return (
+          <McpStatusLine
+            dot="bg-destructive"
+            text={status.error ?? t("settingsE.mcp.connectors.status.failed")}
+          />
+        );
+      case "pending":
+      case "disabled":
+        return (
+          <McpStatusLine
+            dot="bg-muted-foreground/40"
+            text={t(`settingsE.mcp.connectors.status.${status.status}`)}
+          />
+        );
+    }
+  }
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<{ id: string; config?: McpServerConfig } | null>(null);
@@ -148,12 +243,23 @@ function McpEnvironmentSettings({
             <Button size="xs" variant="ghost" disabled={!canEdit || busy} onClick={loadImports}>
               {t("settingsE.mcp.s7")}
             </Button>
+            {canCheck && hasServers && (
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={refreshing}
+                onClick={() => refreshStatuses(Object.keys(settings.mcpServers) as McpServerId[])}
+              >
+                {t("settingsE.mcp.status.refresh")}
+              </Button>
+            )}
           </div>
         }
       >
         <p className="px-4 py-3 text-sm text-muted-foreground">{t("settingsE.mcp.s2")}</p>
         {!canEdit && <p role="status">{t("settingsE.mcp.s3")}</p>}
         {!localAllowed && <p role="status">{t("settingsE.mcp.s4")}</p>}
+        {checkFailed && <p role="alert">{t("settingsE.mcp.status.listFailed")}</p>}
         {Object.keys(settings.mcpServers).length === 0 && (
           <div className="grid justify-items-start gap-3 px-4 py-5">
             <p className="text-sm text-muted-foreground">{t("settingsE.mcp.empty")}</p>
@@ -176,6 +282,7 @@ function McpEnvironmentSettings({
               key={id}
               title={config.name ?? id}
               description={`${id} · ${config.transport.type} · ${config.transport.type === "stdio" ? [config.transport.command, ...config.transport.args].join(" ") : config.transport.url}`}
+              status={statusLine(id)}
               control={
                 <div className="flex items-center gap-2">
                   {projectIds.length ? (
@@ -369,7 +476,11 @@ function McpEnvironmentSettings({
               setError(t("settingsE.mcp.idTaken"));
               return;
             }
-            if (await save({ mcpServers: { [id]: config } })) setEditing(null);
+            if (await save({ mcpServers: { [id]: config } })) {
+              setEditing(null);
+              // A changed secret keeps its reference, so the config alone would not show it.
+              if (canCheck && config.enabled) void refreshStatuses([decodeMcpId(id)]);
+            }
           }}
         />
       )}
@@ -435,6 +546,17 @@ function McpEnvironmentSettings({
         </Dialog>
       )}
     </SettingsPageContainer>
+  );
+}
+
+function McpStatusLine({ dot, text }: { dot: string; text: string }) {
+  return (
+    <span className="flex items-start gap-1.5">
+      <span className="flex h-4 items-center">
+        <ConnectionStatusDot dotClassName={dot} />
+      </span>
+      <span className="line-clamp-3 whitespace-pre-wrap break-words">{text}</span>
+    </span>
   );
 }
 

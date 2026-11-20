@@ -70,6 +70,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.peerLinksAnswerRequest]: "peerLinks",
   [WS_METHODS.mcpServersListImportable]: "server",
   [WS_METHODS.mcpServersImport]: "server",
+  [WS_METHODS.mcpServersStatus]: "server",
   [WS_METHODS.mcpConnectorsList]: "provider",
   [WS_METHODS.mcpConnectorsAuthorize]: "provider",
   [WS_METHODS.mcpConnectorsSubmitCallback]: "provider",

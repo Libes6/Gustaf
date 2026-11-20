@@ -48,6 +48,11 @@ export const settingsEMessages = {
     "settingsE.mcp.connectors.status.pending": "Connecting",
     "settingsE.mcp.connectors.status.disabled": "Turned off",
     "settingsE.mcp.connectors.status.authorizing": "Waiting for sign-in",
+    "settingsE.mcp.status.checking": "Checking…",
+    "settingsE.mcp.status.refresh": "Refresh",
+    "settingsE.mcp.status.tools": "Tools: {tools}",
+    "settingsE.mcp.status.toolsAndResources": "Tools: {tools}, resources: {resources}",
+    "settingsE.mcp.status.listFailed": "Could not check the MCP servers.",
     "settingsE.mcp.s2":
       "Servers belong to this environment. Changes apply to new provider sessions.",
     "settingsE.mcp.s3": "Requires settings:write and providers:manage.",
@@ -664,6 +669,11 @@ export const settingsEMessages = {
     "settingsE.mcp.connectors.status.pending": "Подключается",
     "settingsE.mcp.connectors.status.disabled": "Выключен",
     "settingsE.mcp.connectors.status.authorizing": "Ждём входа",
+    "settingsE.mcp.status.checking": "Проверяем…",
+    "settingsE.mcp.status.refresh": "Обновить",
+    "settingsE.mcp.status.tools": "Инструментов: {tools}",
+    "settingsE.mcp.status.toolsAndResources": "Инструментов: {tools}, ресурсов: {resources}",
+    "settingsE.mcp.status.listFailed": "Не удалось проверить серверы MCP.",
     "settingsE.mcp.s2":
       "Серверы принадлежат этому окружению. Изменения применяются к новым сессиям.",
     "settingsE.mcp.s3": "Нужны права settings:write и providers:manage.",
