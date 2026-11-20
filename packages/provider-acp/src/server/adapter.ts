@@ -339,6 +339,8 @@ export interface AcpAdapterV2Flavor {
   readonly rejectsStdioMcpServers?: boolean;
   /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
   readonly abortsOnFailedMcpServer?: boolean;
+  /** The agent's own CLI loads another MCP list, so a thread names the user servers Gustaf sent. */
+  readonly namesSentMcpServers?: boolean;
   /** See `ProviderAdapterV2.failedMcpServerOf`. */
   readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
   /**
@@ -1864,8 +1866,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           itemIdentityVersion = thread.nativeMetadata?.itemIdentityVersion;
         };
         const terminalEnvironmentBySessionId = new Map<string, NodeJS.ProcessEnv>();
-        // The user MCP servers last reported as left out, so each change is named once.
-        let reportedSkippedMcpServers = "";
+        // The user MCP servers last reported as sent or left out, so each change is named once.
+        let reportedMcpServers = "";
         interface PendingTerminalEnvironment {
           readonly environment: NodeJS.ProcessEnv | undefined;
           readonly claimUnknownSession: boolean;
@@ -8558,13 +8560,19 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               }
               return;
             }
-            const skippedMcpServers =
-              (yield* mcpSessions.read(context.input.threadId))?.skippedUserServers ?? [];
+            const mcpSession = yield* mcpSessions.read(context.input.threadId);
+            const skippedMcpServers = mcpSession?.skippedUserServers ?? [];
+            const sentMcpServers =
+              flavor.namesSentMcpServers === true
+                ? (mcpSession?.userServers ?? []).map((server) => server.id).join(", ")
+                : "";
+            const sentLine =
+              sentMcpServers === "" ? "" : `Gustaf sent MCP servers: ${sentMcpServers}.`;
             const skippedKey = skippedMcpServers
               .map(({ id, reason }) => `- ${id}: ${reason}`)
               .join("\n");
-            if (skippedKey !== reportedSkippedMcpServers) {
-              reportedSkippedMcpServers = skippedKey;
+            if (`${sentLine}\n${skippedKey}` !== reportedMcpServers) {
+              reportedMcpServers = `${sentLine}\n${skippedKey}`;
               if (skippedMcpServers.length > 0) {
                 yield* runtimeCallbackPermit.withPermit(
                   emitNotice(context, {
@@ -8572,9 +8580,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                       skippedMcpServers.length === 1
                         ? `MCP server ${skippedMcpServers[0]!.id} was left out`
                         : `${skippedMcpServers.length} MCP servers were left out`,
-                    description: `${skippedKey}\n\nFix or turn them off in Settings → MCP.`,
+                    description: `${skippedKey}\n\nFix or turn them off in Settings → MCP.${sentLine === "" ? "" : `\n\n${sentLine}`}`,
                   }),
                 );
+              } else if (sentLine !== "") {
+                yield* runtimeCallbackPermit.withPermit(emitNotice(context, { title: sentLine }));
               }
             }
             // `backgroundReattach` re-sends the prompt; each send gets its own outcome watch.

@@ -798,6 +798,9 @@ describe("AntigravityAdapterV2 t3-code results", () => {
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer token",
         browserToolsAvailable: false,
+        userServers: [
+          { type: "http", id: "figma", url: "https://mcp.figma.test/mcp", headers: {} },
+        ],
         skippedUserServers: [{ id: "spline", reason: "Command not found: spline" }],
       });
       const now = yield* DateTime.now;
@@ -938,7 +941,7 @@ describe("AntigravityAdapterV2 t3-code results", () => {
             : [],
         ),
         [
-          "MCP server spline was left out\n\n- spline: Command not found: spline\n\nFix or turn them off in Settings → MCP.",
+          "MCP server spline was left out\n\n- spline: Command not found: spline\n\nFix or turn them off in Settings → MCP.\n\nGustaf sent MCP servers: figma.",
         ],
       );
     }).pipe(Effect.provide(layerSession), Effect.scoped),

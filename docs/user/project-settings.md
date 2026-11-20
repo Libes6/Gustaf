@@ -288,7 +288,7 @@ download its package.
 A local server whose command does not exist on the environment is left out of
 every agent's sessions. Antigravity refuses to answer at all while one of its
 servers fails to start, so it also leaves out servers whose last check failed or
-needs a sign-in. An Antigravity thread names the servers it left out, and a turn
+needs a sign-in. An Antigravity thread names the servers Gustaf sent it and those it left out, and a turn
 it refused over a server fails with that server's name and marks the server as
 failed here until you select **Refresh**.
 
