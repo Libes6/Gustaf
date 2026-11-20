@@ -369,11 +369,10 @@ const make = Effect.gen(function* () {
     return server.transport.url;
   });
 
+  // Always this machine, even when the server listens on a LAN or tailnet address: the code comes
+  // back over plain http. Another device pastes the address it landed on instead.
   const redirectUri = () => {
-    const host =
-      config.host === undefined || config.host === "0.0.0.0" || config.host === "::"
-        ? "127.0.0.1"
-        : (loopbackBindAddress(config.host) ?? config.host);
+    const host = loopbackBindAddress(config.host) ?? "127.0.0.1";
     const hostname = host.includes(":") ? `[${host}]` : host;
     return `http://${hostname}:${config.port}${SIGN_IN_CALLBACK_PATH}`;
   };

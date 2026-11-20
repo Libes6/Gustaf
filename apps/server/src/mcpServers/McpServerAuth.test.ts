@@ -113,13 +113,17 @@ const jamSettings = decodeSettings({
   mcpServers: { jam: { enabled: true, transport: { type: "http", url: serverUrl } } },
 });
 
-const setup = (
-  settingsLayer: Layer.Layer<ServerSettings.ServerSettingsService> = ServerSettings.layerTest(
-    jamSettings,
-  ).pipe(Layer.orDie),
-  onRemove: (name: string) => Effect.Effect<void> = () => Effect.void,
-  routes: Record<string, () => Response> = {},
-) => {
+const setup = ({
+  settingsLayer = ServerSettings.layerTest(jamSettings).pipe(Layer.orDie),
+  onRemove = () => Effect.void,
+  routes = {},
+  host,
+}: {
+  readonly settingsLayer?: Layer.Layer<ServerSettings.ServerSettingsService>;
+  readonly onRemove?: (name: string) => Effect.Effect<void>;
+  readonly routes?: Record<string, () => Response>;
+  readonly host?: string;
+} = {}) => {
   const secrets = new Map<string, Uint8Array>();
   const fake = fakeAuthorizationServer(routes);
   const layer = McpServerAuth.layer.pipe(
@@ -134,7 +138,7 @@ const setup = (
       Layer.effect(
         ServerConfig.ServerConfig,
         Effect.gen(function* () {
-          return { ...(yield* ServerConfig.ServerConfig), port: 3773 };
+          return { ...(yield* ServerConfig.ServerConfig), port: 3773, host };
         }),
       ).pipe(
         Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mcp-server-auth-test-" })),
@@ -147,62 +151,66 @@ const setup = (
   return { secrets, fake, layer };
 };
 
-it.effect("signs in through discovered metadata with PKCE and refreshes before expiry", () => {
-  const { secrets, fake, layer } = setup();
-  return Effect.gen(function* () {
-    const auth = yield* McpServerAuth.McpServerAuth;
-    const started = yield* auth.signIn({ id });
-    const authUrl = new URL(started.authUrl);
-    assert.strictEqual(started.redirectUri, redirectUri);
-    assert.strictEqual(`${authUrl.origin}${authUrl.pathname}`, "https://auth.jam.test/authorize");
-    assert.deepEqual(
-      Object.fromEntries(
-        [
-          "response_type",
-          "client_id",
-          "redirect_uri",
-          "code_challenge_method",
-          "resource",
-          "scope",
-        ].map((key) => [key, authUrl.searchParams.get(key)]),
-      ),
-      {
-        response_type: "code",
-        client_id: "gustaf-client",
-        redirect_uri: redirectUri,
-        code_challenge_method: "S256",
-        resource: serverUrl,
-        scope: "mcp:read",
-      },
-    );
-    fake.setChallenge(authUrl.searchParams.get("code_challenge"));
-    const callback = `${redirectUri}?code=code-1&state=${authUrl.searchParams.get("state")}`;
+it.effect.each([undefined, "100.64.0.7"])(
+  "signs in through discovered metadata with PKCE and refreshes before expiry (host %s)",
+  (host) => {
+    // The code comes back over plain http, so it never leaves this machine.
+    const { secrets, fake, layer } = setup({ host });
+    return Effect.gen(function* () {
+      const auth = yield* McpServerAuth.McpServerAuth;
+      const started = yield* auth.signIn({ id });
+      const authUrl = new URL(started.authUrl);
+      assert.strictEqual(started.redirectUri, redirectUri);
+      assert.strictEqual(`${authUrl.origin}${authUrl.pathname}`, "https://auth.jam.test/authorize");
+      assert.deepEqual(
+        Object.fromEntries(
+          [
+            "response_type",
+            "client_id",
+            "redirect_uri",
+            "code_challenge_method",
+            "resource",
+            "scope",
+          ].map((key) => [key, authUrl.searchParams.get(key)]),
+        ),
+        {
+          response_type: "code",
+          client_id: "gustaf-client",
+          redirect_uri: redirectUri,
+          code_challenge_method: "S256",
+          resource: serverUrl,
+          scope: "mcp:read",
+        },
+      );
+      fake.setChallenge(authUrl.searchParams.get("code_challenge"));
+      const callback = `${redirectUri}?code=code-1&state=${authUrl.searchParams.get("state")}`;
 
-    assert.strictEqual(yield* auth.revision(id), 0);
-    assert.deepEqual(yield* auth.completeSignIn({ callbackUrl: callback }), { id });
-    assert.strictEqual(yield* auth.revision(id), 1);
-    assert.isTrue(yield* auth.isSignedIn(id, serverUrl));
-    assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-1");
-    // A token never follows a server whose URL was edited.
-    assert.isUndefined(yield* auth.accessToken(id, "https://elsewhere.test/mcp"));
-    // The state is spent: the same address cannot sign in twice.
-    assert.strictEqual(
-      (yield* auth.completeSignIn({ callbackUrl: callback }).pipe(Effect.flip))._tag,
-      "McpServerAuthError",
-    );
+      assert.strictEqual(yield* auth.revision(id), 0);
+      assert.deepEqual(yield* auth.completeSignIn({ callbackUrl: callback }), { id });
+      assert.strictEqual(yield* auth.revision(id), 1);
+      assert.isTrue(yield* auth.isSignedIn(id, serverUrl));
+      assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-1");
+      // A token never follows a server whose URL was edited.
+      assert.isUndefined(yield* auth.accessToken(id, "https://elsewhere.test/mcp"));
+      // The state is spent: the same address cannot sign in twice.
+      assert.strictEqual(
+        (yield* auth.completeSignIn({ callbackUrl: callback }).pipe(Effect.flip))._tag,
+        "McpServerAuthError",
+      );
 
-    yield* TestClock.adjust("3570 seconds");
-    assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-2");
-    assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-2");
-    assert.strictEqual(
-      fake.calls.filter((call) => call === "POST https://auth.jam.test/token").length,
-      2,
-    );
-    const stored = JSON.parse(new TextDecoder().decode([...secrets.values()][0]));
-    assert.strictEqual(stored.refreshToken, "refresh-1");
-    assert.strictEqual(stored.accessToken, "access-2");
-  }).pipe(Effect.provide(layer));
-});
+      yield* TestClock.adjust("3570 seconds");
+      assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-2");
+      assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-2");
+      assert.strictEqual(
+        fake.calls.filter((call) => call === "POST https://auth.jam.test/token").length,
+        2,
+      );
+      const stored = JSON.parse(new TextDecoder().decode([...secrets.values()][0]));
+      assert.strictEqual(stored.refreshToken, "refresh-1");
+      assert.strictEqual(stored.accessToken, "access-2");
+    }).pipe(Effect.provide(layer));
+  },
+);
 
 it.effect("signing out deletes the stored token", () => {
   const { secrets, fake, layer } = setup();
@@ -227,13 +235,13 @@ it.effect("removing a server from settings deletes its sign-in", () =>
   Effect.gen(function* () {
     const changes = yield* Queue.unbounded<ServerSettingsSchema>();
     const removed = yield* Deferred.make<string>();
-    const { secrets, fake, layer } = setup(
-      Layer.mock(ServerSettings.ServerSettingsService)({
+    const { secrets, fake, layer } = setup({
+      settingsLayer: Layer.mock(ServerSettings.ServerSettingsService)({
         getSettings: Effect.succeed(jamSettings),
         subscribeChanges: Effect.succeed(Stream.fromQueue(changes)),
       }),
-      (name) => Deferred.succeed(removed, name).pipe(Effect.asVoid),
-    );
+      onRemove: (name) => Deferred.succeed(removed, name).pipe(Effect.asVoid),
+    });
     yield* Effect.gen(function* () {
       const auth = yield* McpServerAuth.McpServerAuth;
       const authUrl = new URL((yield* auth.signIn({ id })).authUrl);
@@ -297,15 +305,14 @@ it.effect.each([
     detail: "https",
   },
 ])("refuses to sign in through $name", ({ url, routes, detail }) => {
-  const { secrets, fake, layer } = setup(
-    ServerSettings.layerTest(
+  const { secrets, fake, layer } = setup({
+    settingsLayer: ServerSettings.layerTest(
       decodeSettings({
         mcpServers: { jam: { enabled: true, transport: { type: "http", url } } },
       }),
     ).pipe(Layer.orDie),
-    undefined,
     routes,
-  );
+  });
   return Effect.gen(function* () {
     const auth = yield* McpServerAuth.McpServerAuth;
     const error = yield* auth.signIn({ id }).pipe(Effect.flip);
