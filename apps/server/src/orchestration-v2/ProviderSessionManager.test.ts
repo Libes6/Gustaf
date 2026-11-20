@@ -2627,7 +2627,10 @@ it.effect(
         message: "figma did not start.",
         retryable: false,
       });
-      const markedFailed = yield* Deferred.make<{ name: string; error: string }>();
+      const markedFailed =
+        yield* Deferred.make<
+          Parameters<McpServerChecks.McpServerChecks["Service"]["markFailed"]>[0]
+        >();
       const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
         resolveForThread: (request) =>
           Ref.update(requests, (current) => [...current, request]).pipe(
@@ -2688,8 +2691,9 @@ it.effect(
           threadDisposition: "reusable",
         });
         assert.deepEqual(yield* Deferred.await(markedFailed), {
-          name: "figma",
+          id: McpServerId.make("figma"),
           error: serverFailure.message,
+          needsAuth: true,
         });
 
         // An attach has no runtime policy, so the cwd falls back to the project checkout.
@@ -2729,12 +2733,11 @@ it.effect(
             nativeMcpSources: native,
             abortsOnFailedMcpServer: true,
             failedMcpServerOf: (failure) =>
-              failure.code === "MCP_SERVER_FAILED" ? "figma" : undefined,
+              failure.code === "MCP_SERVER_FAILED" ? { id: "figma", needsAuth: true } : undefined,
             mcpUserServersLayer,
             mcpServerChecksLayer: Layer.mock(McpServerChecks.McpServerChecks)({
               knownUnusable: Effect.succeed(unusable),
-              markFailed: (name, error) =>
-                Deferred.succeed(markedFailed, { name, error }).pipe(Effect.asVoid),
+              markFailed: (input) => Deferred.succeed(markedFailed, input).pipe(Effect.asVoid),
             }),
             projectServiceLayer: Layer.mock(ProjectService.ProjectService)({
               getById: (requestedProjectId) =>
@@ -2776,8 +2779,8 @@ const userMcpScenario = Effect.fnUntraced(function* () {
   });
   const mcpServerChecksLayer = Layer.mock(McpServerChecks.McpServerChecks)({
     knownUnusable: Ref.get(unusable),
-    markFailed: (name, error) =>
-      Ref.update(unusable, (current) => new Map(current).set(McpServerId.make(name), error)),
+    markFailed: ({ id, error }) =>
+      Ref.update(unusable, (current) => new Map(current).set(id, error)),
   });
   return { enabled, unusable, mcpUserServersLayer, mcpServerChecksLayer };
 });
@@ -2934,9 +2937,9 @@ it.effect(
             abortsOnFailedMcpServer: true,
             failedMcpServerOf: (failure) =>
               failure.code === "MCP_SERVER_FAILED"
-                ? "jam"
+                ? { id: "jam", needsAuth: false }
                 : failure.code === "OTHER_SERVER_FAILED"
-                  ? "spline"
+                  ? { id: "spline", needsAuth: false }
                   : undefined,
             mcpUserServersLayer: scenario.mcpUserServersLayer,
             mcpServerChecksLayer: scenario.mcpServerChecksLayer,

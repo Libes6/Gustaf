@@ -197,8 +197,12 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
 
       // An agent that could not start it marks it failed; nothing is checked until a refresh.
       const requestsBefore = requests.length;
-      yield* checks.markFailed("not-configured", "ignored");
-      yield* checks.markFailed("jam", "Antigravity could not start it.");
+      yield* checks.markFailed({
+        id: McpServerId.make("not-configured"),
+        error: "ignored",
+        needsAuth: false,
+      });
+      yield* checks.markFailed({ id, error: "Antigravity could not start it.", needsAuth: false });
       assert.deepEqual((yield* checks.list({})).servers, [
         { id, status: "failed", error: "Antigravity could not start it." },
       ]);
@@ -265,7 +269,11 @@ it.effect("a check in the home folder never keeps a thread-folder server out of 
       assert.deepEqual([...(yield* checks.knownUnusable).keys()], [pinned]);
 
       // A session that could not start it in the thread's folder is another matter.
-      yield* checks.markFailed(project, "Antigravity could not start it.");
+      yield* checks.markFailed({
+        id: project,
+        error: "Antigravity could not start it.",
+        needsAuth: false,
+      });
       assert.deepEqual([...(yield* checks.knownUnusable).keys()], [pinned, project]);
     }).pipe(
       Effect.provide(
@@ -278,4 +286,40 @@ it.effect("a check in the home folder never keeps a thread-folder server out of 
       ),
     );
   }),
+);
+
+it.effect(
+  "a session refused for sign-in keeps the sign-in button, and never overrides a running check",
+  () =>
+    Effect.gen(function* () {
+      const id = McpServerId.make("jam");
+      const silent = McpServerId.make("silent");
+      yield* Effect.gen(function* () {
+        const checks = yield* McpServerChecks.McpServerChecks;
+        yield* checks.markFailed({ id, error: "Antigravity: HTTP 401.", needsAuth: true });
+        // A stdio server cannot be signed in to, so it stays failed.
+        yield* checks.markFailed({ id: silent, error: "Unauthorized.", needsAuth: true });
+        const listed = yield* checks.list({ refresh: [silent] }).pipe(Effect.forkChild);
+        yield* checks.markFailed({ id: silent, error: "Antigravity failed.", needsAuth: false });
+        yield* TestClock.adjust("15 seconds");
+        assert.deepEqual((yield* Fiber.join(listed)).servers, [
+          { id, status: "needs-auth", error: "Antigravity: HTTP 401." },
+          { id: silent, status: "failed", error: "No answer in 15 seconds." },
+        ]);
+        assert.deepEqual((yield* checks.list({})).servers[1], {
+          id: silent,
+          status: "failed",
+          error: "No answer in 15 seconds.",
+        });
+      }).pipe(
+        Effect.provide(
+          layer({
+            mcpServers: {
+              jam: { enabled: true, transport: { type: "http", url: "https://mcp.jam.test/mcp" } },
+              silent: node("setInterval(() => {}, 1000)"),
+            },
+          }),
+        ),
+      );
+    }),
 );

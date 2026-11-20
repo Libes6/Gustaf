@@ -18,7 +18,7 @@ const HARNESS_ERROR = /(?:^|⚠\uFE0F?\s*)(Error \d{3}, Message: [\s\S]*)$/;
 const FLAGGED_HARNESS_ERROR = /⚠\uFE0F?\s*(Error \d{3}, Message: [\s\S]*)$/;
 // The harness's whole answer when an MCP server in the session did not start (agy 1.4.5).
 const MCP_SERVER_FAILED =
-  /^The MCP server '([^']+)' failed to initialize: [\s\S]*?Fix the MCP server, or remove it from your configuration and start a new session, to continue\.\s*$/;
+  /^The MCP server '([^']+)' failed to initialize: ([\s\S]*?)Fix the MCP server, or remove it from your configuration and start a new session, to continue\.\s*$/;
 // Longer than any harness refusal; past it the reply is the model's.
 const MAX_REFUSAL_CHARS = 4_096;
 
@@ -74,11 +74,9 @@ export function makeAntigravityPromptGuard(): (
       firstMessage += update.content.text;
       if (firstMessage.length > MAX_REFUSAL_CHARS) firstMessage = undefined;
     }
-    const mcpServer =
-      firstMessage === undefined
-        ? undefined
-        : MCP_SERVER_FAILED.exec(firstMessage.trimStart())?.[1];
-    if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer);
+    const refusal =
+      firstMessage === undefined ? null : MCP_SERVER_FAILED.exec(firstMessage.trimStart());
+    if (refusal !== null) return antigravityMcpServerFailure(refusal[1]!, refusal[2]!);
     const harnessError = (trimmed ? FLAGGED_HARNESS_ERROR : HARNESS_ERROR).exec(
       recent.trimStart(),
     )?.[1];

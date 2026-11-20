@@ -91,6 +91,6 @@ it("stops when the harness refuses the session over an MCP server, not on a quot
   assert.equal(failure?.code, "ANTIGRAVITY_MCP_SERVER_FAILED");
   assert.include(failure?.message, '"computer-use"');
   assert.include(failure?.message, "Settings → MCP");
-  assert.equal(antigravityFailedMcpServer(failure!), "computer-use");
+  assert.deepEqual(antigravityFailedMcpServer(failure!), { id: "computer-use", needsAuth: false });
   assert.isUndefined(antigravityFailedMcpServer({ ...failure!, code: "OTHER" }));
 });

@@ -3,6 +3,7 @@ import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   isOrchestrationV2WorkActive,
+  McpServerId,
   ModelSelection,
   OrchestrationV2DomainEvent,
   OrchestrationV2ProviderSession,
@@ -590,10 +591,16 @@ export const layerWithOptions = (
             .pipe(Effect.orElseSucceed(() => undefined));
           const server = adapter?.failedMcpServerOf?.(failure);
           const opened = entry.openedWithUserMcpServers;
-          if (server === undefined || opened === undefined || !opened.serverIds.has(server)) return;
+          if (server === undefined || opened === undefined || !opened.serverIds.has(server.id)) {
+            return;
+          }
           // A sign-in since open changed what the server gets; the next turn reopens with it instead.
           if (!(yield* userMcpServersCurrent(entry, opened))) return;
-          yield* mcpServerChecks.value.markFailed(server, failure.message);
+          yield* mcpServerChecks.value.markFailed({
+            id: McpServerId.make(server.id),
+            error: failure.message,
+            needsAuth: server.needsAuth,
+          });
         },
       );
       const mcpPrepareLock = yield* KeyedLock.make<ThreadId>();

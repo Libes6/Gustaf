@@ -123,7 +123,7 @@ function turnFailure(
   const limit = antigravityLimitFailure(text, now);
   if (limit !== undefined) return limit;
   const mcpServer = MCP_LOAD_FAILED.exec(text)?.[1];
-  if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer);
+  if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer, text);
   if (text.includes("The stream was interrupted")) {
     return makeProviderFailure({
       class: "transport_error",
@@ -178,22 +178,39 @@ export function antigravityLimitFailure(
 }
 
 const MCP_SERVER_FAILED_CODE = "ANTIGRAVITY_MCP_SERVER_FAILED";
+const MCP_SERVER_NEEDS_AUTH_CODE = "ANTIGRAVITY_MCP_SERVER_NEEDS_AUTH";
 const MCP_SERVER_FAILED_MESSAGE = /^Antigravity could not start the MCP server "([^"]+)"/;
+const UNAUTHORIZED = /\b401\b|unauthori[sz]ed/i;
 
-/** agy refuses every turn, without asking the model, while one of its MCP servers fails to start. */
-export const antigravityMcpServerFailure = (server: string) =>
-  makeProviderFailure({
-    class: "provider_error",
-    code: MCP_SERVER_FAILED_CODE,
-    message: `Antigravity could not start the MCP server "${server}" and refuses every turn while it is in the session. Fix the server or turn it off for Antigravity in Settings → MCP, then send the message again.`,
-    retryable: false,
-  });
+/**
+ * agy refuses every turn, without asking the model, while one of its MCP servers fails to start.
+ * `reason` is the harness's own text; a server that refused without sign-in needs one.
+ */
+export const antigravityMcpServerFailure = (server: string, reason: string) =>
+  UNAUTHORIZED.test(reason)
+    ? makeProviderFailure({
+        class: "provider_error",
+        code: MCP_SERVER_NEEDS_AUTH_CODE,
+        message: `Antigravity could not start the MCP server "${server}" because it needs sign-in, and refuses every turn while it is in the session. Sign in to it or turn it off for Antigravity in Settings → MCP, then send the message again.`,
+        retryable: false,
+      })
+    : makeProviderFailure({
+        class: "provider_error",
+        code: MCP_SERVER_FAILED_CODE,
+        message: `Antigravity could not start the MCP server "${server}" and refuses every turn while it is in the session. Fix the server or turn it off for Antigravity in Settings → MCP, then send the message again.`,
+        retryable: false,
+      });
 
 /** The server an `antigravityMcpServerFailure` names. */
-export const antigravityFailedMcpServer = (failure: OrchestrationV2ProviderFailure) =>
-  failure.code === MCP_SERVER_FAILED_CODE
-    ? MCP_SERVER_FAILED_MESSAGE.exec(failure.message)?.[1]
-    : undefined;
+export const antigravityFailedMcpServer = (failure: OrchestrationV2ProviderFailure) => {
+  if (failure.code !== MCP_SERVER_FAILED_CODE && failure.code !== MCP_SERVER_NEEDS_AUTH_CODE) {
+    return undefined;
+  }
+  const id = MCP_SERVER_FAILED_MESSAGE.exec(failure.message)?.[1];
+  return id === undefined
+    ? undefined
+    : { id, needsAuth: failure.code === MCP_SERVER_NEEDS_AUTH_CODE };
+};
 
 function unfinishedToolsFailure(
   result: EffectAcpSchema.PromptResponse,

@@ -7,7 +7,10 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { watchAntigravityPromptOutcome } from "./AntigravityTurnOutcome.ts";
+import {
+  antigravityFailedMcpServer,
+  watchAntigravityPromptOutcome,
+} from "./AntigravityTurnOutcome.ts";
 
 const USER_INPUT = 14;
 const PLANNER_RESPONSE = 15;
@@ -206,8 +209,20 @@ describe("watchAntigravityPromptOutcome", () => {
           [USER_INPUT, input],
           [ERROR_MESSAGE, MCP_LOAD_ERROR],
         ]),
-        { class: "provider_error", code: "ANTIGRAVITY_MCP_SERVER_FAILED", retryable: false },
+        { class: "provider_error", code: "ANTIGRAVITY_MCP_SERVER_NEEDS_AUTH", retryable: false },
       );
+      const spawnFailed = yield* turn([
+        [USER_INPUT, input],
+        [
+          ERROR_MESSAGE,
+          errorPayload("failed to construct executor: MCP load failed for spline: spawn ENOENT"),
+        ],
+      ]);
+      assert.deepInclude(spawnFailed, { code: "ANTIGRAVITY_MCP_SERVER_FAILED" });
+      assert.deepEqual(antigravityFailedMcpServer(spawnFailed!), {
+        id: "spline",
+        needsAuth: false,
+      });
       // A completed tool keeps its usage, and the turn still fails.
       assert.equal(
         (yield* turn(

@@ -58,10 +58,15 @@ export class McpServerChecks extends Context.Service<
      */
     readonly knownUnusable: Effect.Effect<ReadonlyMap<McpServerId, string>>;
     /**
-     * Records a server an agent could not start as failed, without checking it, so the next
-     * session leaves it out and the section shows why until the next check.
+     * Records a server an agent could not start as failed, or as needing sign-in when an http
+     * server refused it, without checking it, so the next session leaves it out and the section
+     * shows why until the next check. A check of its current config already running decides.
      */
-    readonly markFailed: (name: string, error: string) => Effect.Effect<void>;
+    readonly markFailed: (input: {
+      readonly id: McpServerId;
+      readonly error: string;
+      readonly needsAuth: boolean;
+    }) => Effect.Effect<void>;
   }
 >()("t3/mcpServers/McpServerChecks") {}
 
@@ -507,20 +512,31 @@ const make = Effect.gen(function* () {
     return unusable;
   }).pipe(Effect.withSpan("McpServerChecks.knownUnusable"));
 
-  const markFailed = Effect.fn("McpServerChecks.markFailed")(function* (
-    name: string,
-    error: string,
-  ) {
+  const markFailed = Effect.fn("McpServerChecks.markFailed")(function* ({
+    id,
+    error,
+    needsAuth,
+  }: {
+    readonly id: McpServerId;
+    readonly error: string;
+    readonly needsAuth: boolean;
+  }) {
     const current = yield* settings.getSettings.pipe(Effect.option);
-    if (Option.isNone(current) || !Object.hasOwn(current.value.mcpServers, name)) return;
-    const id = name as McpServerId;
+    const server = Option.isSome(current) ? current.value.mcpServers[id] : undefined;
+    if (server === undefined) return;
+    const fingerprint = yield* fingerprintOf(id, server);
+    const running = checks.get(id);
+    if (
+      running !== undefined &&
+      running.fingerprint === fingerprint &&
+      !Deferred.isDoneUnsafe(running.result)
+    ) {
+      return;
+    }
+    const status = needsAuth && server.transport.type === "http" ? "needs-auth" : "failed";
     const result = yield* Deferred.make<McpServerStatus>();
-    yield* Deferred.succeed(result, { id, status: "failed", error });
-    checks.set(id, {
-      fingerprint: yield* fingerprintOf(id, current.value.mcpServers[id]!),
-      result,
-      fromSession: true,
-    });
+    yield* Deferred.succeed(result, { id, status, error });
+    checks.set(id, { fingerprint, result, fromSession: true });
   });
 
   return McpServerChecks.of({ list, knownUnusable, markFailed });

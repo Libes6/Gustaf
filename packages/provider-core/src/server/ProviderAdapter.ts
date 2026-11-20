@@ -762,6 +762,8 @@ export class ProviderAdapterV2 extends Context.Service<
      */
     readonly abortsOnFailedMcpServer?: boolean;
     /** The user MCP server a turn failure names as the one that did not start. */
-    readonly failedMcpServerOf?: (failure: OrchestrationV2ProviderFailure) => string | undefined;
+    readonly failedMcpServerOf?: (
+      failure: OrchestrationV2ProviderFailure,
+    ) => { readonly id: string; readonly needsAuth: boolean } | undefined;
   }
 >()("@t3tools/provider-core/server/ProviderAdapter/ProviderAdapterV2") {}
