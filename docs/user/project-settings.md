@@ -302,6 +302,18 @@ approval.
 
 Pi, OpenCode 1.x and external OpenCode servers are not supported.
 
+### Signing in to an http server
+
+When an http server needs a sign-in, select **Sign in** next to it on web or
+desktop and finish in the browser. Gustaf keeps the sign-in on the environment
+and sends it to every agent, renewing it before it expires; a header named
+`Authorization` that you set yourself takes its place. If the browser runs on
+another device than the environment, the page it lands on cannot load: copy that
+page's address into the field Gustaf shows and select **Finish**. Threads started
+before signing in get the server in their next session. **Sign out** removes the
+sign-in. Gustaf can sign in only where the server lets apps register themselves
+(OAuth dynamic client registration); otherwise add its token as a header.
+
 ### Signing in to Claude Code connectors
 
 Claude Code also loads servers by itself: claude.ai connectors such as Figma, and

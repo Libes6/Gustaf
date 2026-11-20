@@ -78,6 +78,7 @@ import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import * as SecretResolver from "./secrets/SecretResolver.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
+import * as McpServerAuth from "./mcpServers/McpServerAuth.ts";
 import * as McpServerChecks from "./mcpServers/McpServerChecks.ts";
 import * as McpUserServers from "./mcpServers/McpUserServers.ts";
 import * as NativeMcpConfigs from "./mcpServers/import/NativeMcpConfigs.ts";
@@ -713,7 +714,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       McpServerChecks.layer.pipe(Layer.provideMerge(McpUserServers.layer)),
       McpServerImport.layer,
       McpConnectors.layer,
-    ).pipe(Layer.provide(NativeMcpConfigs.layer)),
+    ).pipe(Layer.provide(NativeMcpConfigs.layer), Layer.provideMerge(McpServerAuth.layer)),
   ),
   Layer.provideMerge(SecretResolver.layer),
   Layer.provideMerge(layerServerSettings),
@@ -823,6 +824,7 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerOtlpTracesProxyRoute,
     ServerHttp.layerAssetRoute,
     ServerHttp.layerAttachmentUploadRoute,
+    McpServerAuth.callbackRouteLayer,
     DeviceHubProxy.layer,
     ServerBrowserStream.routeLayer,
     ServerHttp.layerStaticAndDevRoute,

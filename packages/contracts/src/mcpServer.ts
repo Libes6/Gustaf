@@ -278,6 +278,8 @@ export const McpServerStatus = Schema.Struct({
   resourceCount: Schema.optionalKey(Schema.Number),
   /** Why it failed: the server's first stderr lines, or the error. */
   error: Schema.optionalKey(Schema.String),
+  /** Gustaf holds a sign-in for this http server and sends its token to every provider. */
+  signedIn: Schema.optionalKey(Schema.Boolean),
 });
 export type McpServerStatus = typeof McpServerStatus.Type;
 
@@ -292,5 +294,39 @@ export class McpServerStatusError extends Schema.TaggedError<McpServerStatusErro
 ) {
   override get message(): string {
     return "The MCP servers could not be read.";
+  }
+}
+
+export const McpServerSignInInput = Schema.Struct({ id: McpServerId });
+export type McpServerSignInInput = typeof McpServerSignInInput.Type;
+
+export const McpServerSignInResult = Schema.Struct({
+  authUrl: Schema.String,
+  /**
+   * The authorization server returns the browser to this environment's loopback address. A
+   * browser on another device cannot reach it, so the client offers to paste the address it
+   * landed on.
+   */
+  redirectUri: Schema.String,
+});
+export type McpServerSignInResult = typeof McpServerSignInResult.Type;
+
+export const McpServerSignInCallbackInput = Schema.Struct({
+  callbackUrl: TrimmedNonEmptyString,
+});
+export type McpServerSignInCallbackInput = typeof McpServerSignInCallbackInput.Type;
+
+export const McpServerSignInCallbackResult = Schema.Struct({ id: McpServerId });
+export type McpServerSignInCallbackResult = typeof McpServerSignInCallbackResult.Type;
+
+export const McpServerSignOutInput = Schema.Struct({ id: McpServerId });
+export type McpServerSignOutInput = typeof McpServerSignOutInput.Type;
+
+export class McpServerAuthError extends Schema.TaggedError<McpServerAuthError>()(
+  "McpServerAuthError",
+  { detail: Schema.String },
+) {
+  override get message(): string {
+    return this.detail;
   }
 }

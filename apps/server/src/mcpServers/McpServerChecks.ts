@@ -31,6 +31,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { McpServerAuth } from "./McpServerAuth.ts";
 import * as McpUserServers from "./McpUserServers.ts";
 
 const CHECK_TIMEOUT = Duration.seconds(15);
@@ -167,6 +168,7 @@ const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const userServers = yield* McpUserServers.McpUserServers;
   const policy = yield* ManagedPolicy.ManagedPolicy;
+  const auth = yield* McpServerAuth;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const httpClient = yield* HttpClient.HttpClient;
   const serviceScope = yield* Effect.scope;
@@ -344,19 +346,13 @@ const make = Effect.gen(function* () {
     } satisfies JsonRpc;
   });
 
-  const check = Effect.fn("McpServerChecks.check")(function* (
+  const attempt = Effect.fnUntraced(function* (
     id: McpServerId,
     server: McpServerConfig,
+    cwd: string,
+    refreshToken: boolean,
   ) {
-    yield* Effect.annotateCurrentSpan({
-      "mcp_server.id": id,
-      "mcp_server.transport": server.transport.type,
-    });
-    const resolved = yield* userServers.resolveServer({
-      id,
-      server,
-      cwd: yield* HostProcess.HomeDirectory,
-    });
+    const resolved = yield* userServers.resolveServer({ id, server, cwd, refreshToken });
     if ("unusable" in resolved) {
       return { id, status: "failed", error: resolved.unusable } satisfies McpServerStatus;
     }
@@ -392,12 +388,34 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const check = Effect.fn("McpServerChecks.check")(function* (
+    id: McpServerId,
+    server: McpServerConfig,
+  ) {
+    yield* Effect.annotateCurrentSpan({
+      "mcp_server.id": id,
+      "mcp_server.transport": server.transport.type,
+    });
+    const cwd = yield* HostProcess.HomeDirectory;
+    const signedIn =
+      server.transport.type === "http" && (yield* auth.isSignedIn(id, server.transport.url));
+    const first = yield* attempt(id, server, cwd, false);
+    // A rejected token may only have expired early; one refresh decides.
+    const status =
+      signedIn && first.status === "needs-auth" ? yield* attempt(id, server, cwd, true) : first;
+    return signedIn ? { ...status, signedIn } : status;
+  });
+
+  // Signing in or out changes what the server is sent, so it is checked again.
+  const fingerprintOf = (id: McpServerId, server: McpServerConfig) =>
+    auth.revision(id).pipe(Effect.map((revision) => JSON.stringify([server.transport, revision])));
+
   const statusOf = Effect.fnUntraced(function* (
     id: McpServerId,
     server: McpServerConfig,
     refresh: boolean,
   ) {
-    const fingerprint = JSON.stringify(server.transport);
+    const fingerprint = yield* fingerprintOf(id, server);
     const cached = checks.get(id);
     // A refresh joins a check that is still running instead of starting a second process.
     if (
@@ -446,7 +464,7 @@ const make = Effect.gen(function* () {
     if (Option.isNone(current)) return unusable;
     for (const [id, { fingerprint, result }] of checks) {
       const server = current.value.mcpServers[id];
-      if (server === undefined || JSON.stringify(server.transport) !== fingerprint) continue;
+      if (server === undefined || (yield* fingerprintOf(id, server)) !== fingerprint) continue;
       const done = yield* Deferred.poll(result);
       if (Option.isNone(done)) continue;
       const status = yield* done.value.pipe(Effect.option);

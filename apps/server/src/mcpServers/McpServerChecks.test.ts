@@ -12,6 +12,7 @@ import { FetchHttpClient } from "effect/http";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { McpServerAuth } from "./McpServerAuth.ts";
 import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
 import * as McpServerChecks from "./McpServerChecks.ts";
 import * as McpUserServers from "./McpUserServers.ts";
@@ -46,7 +47,13 @@ const list = (settings: unknown) =>
     return yield* checks.list({});
   }).pipe(Effect.provide(layer(settings)));
 
-const layer = (settings: unknown) =>
+const signedOut = Layer.mock(McpServerAuth)({
+  accessToken: () => Effect.undefined,
+  isSignedIn: () => Effect.succeed(false),
+  revision: () => Effect.succeed(0),
+});
+
+const layer = (settings: unknown, auth = signedOut) =>
   McpServerChecks.layer.pipe(
     Layer.provideMerge(McpUserServers.layer),
     Layer.provide([
@@ -60,6 +67,7 @@ const layer = (settings: unknown) =>
       Layer.succeed(NativeMcpConfigs, {
         list: () => Effect.succeed({ servers: [], errors: [] }),
       }),
+      auth,
       NodeServices.layer,
       FetchHttpClient.layer,
     ]),
@@ -108,14 +116,32 @@ it.effect("reports a server that cannot start with its stderr or the spawn error
   }),
 );
 
-it.effect("asks for sign-in on HTTP 401, and checks again only on refresh", () =>
+it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after signing in", () =>
   Effect.gen(function* () {
-    let requests = 0;
+    const requests: Array<string> = [];
+    // Answers MCP only with the token a sign-in gives; anything else is HTTP 401.
     const url = yield* Effect.acquireRelease(
       Effect.callback<NodeHttp.Server>((resume) => {
-        const server = NodeHttp.createServer((_request, response) => {
-          requests += 1;
-          response.writeHead(401, { "www-authenticate": 'Bearer realm="mcp"' }).end();
+        const server = NodeHttp.createServer((request, response) => {
+          requests.push(request.headers.authorization ?? "none");
+          if (request.headers.authorization !== "Bearer fresh-token") {
+            response.writeHead(401, { "www-authenticate": 'Bearer realm="mcp"' }).end();
+            return;
+          }
+          let body = "";
+          request.on("data", (chunk: Buffer) => (body += chunk.toString()));
+          request.on("end", () => {
+            if (request.method !== "POST") return void response.writeHead(200).end();
+            const message = JSON.parse(body) as { id?: number; method: string };
+            if (message.id === undefined) return void response.writeHead(202).end();
+            const result =
+              message.method === "initialize"
+                ? { protocolVersion: "2025-06-18", capabilities: { tools: {} } }
+                : { tools: [{ name: "get_issue", inputSchema: {} }] };
+            response
+              .writeHead(200, { "content-type": "application/json" })
+              .end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+          });
         });
         server.listen(0, "127.0.0.1", () => resume(Effect.succeed(server)));
       }),
@@ -130,6 +156,14 @@ it.effect("asks for sign-in on HTTP 401, and checks again only on refresh", () =
       }),
     );
     const id = McpServerId.make("jam");
+    let signedIn = false;
+    // The stored token has expired early; only a forced refresh yields one the server takes.
+    const auth = Layer.mock(McpServerAuth)({
+      accessToken: (_id, _url, options) =>
+        Effect.succeed(signedIn ? (options?.force ? "fresh-token" : "stale-token") : undefined),
+      isSignedIn: () => Effect.succeed(signedIn),
+      revision: () => Effect.succeed(signedIn ? 1 : 0),
+    });
     yield* Effect.gen(function* () {
       const checks = yield* McpServerChecks.McpServerChecks;
       assert.strictEqual((yield* checks.knownUnusable).size, 0);
@@ -142,12 +176,25 @@ it.effect("asks for sign-in on HTTP 401, and checks again only on refresh", () =
         new Map([[id, "Needs sign-in (last check in Settings → MCP)."]]),
       );
       yield* checks.list({});
-      assert.strictEqual(requests, 1);
+      assert.strictEqual(requests.length, 1);
       yield* checks.list({ refresh: [id] });
-      assert.strictEqual(requests, 2);
+      assert.strictEqual(requests.length, 2);
+
+      signedIn = true;
+      assert.strictEqual((yield* checks.knownUnusable).size, 0);
+      assert.deepEqual((yield* checks.list({})).servers, [
+        {
+          id,
+          status: "connected",
+          tools: [{ name: "get_issue" }],
+          resourceCount: 0,
+          signedIn: true,
+        },
+      ]);
+      assert.deepEqual(requests.slice(2, 4), ["Bearer stale-token", "Bearer fresh-token"]);
     }).pipe(
       Effect.provide(
-        layer({ mcpServers: { jam: { enabled: true, transport: { type: "http", url } } } }),
+        layer({ mcpServers: { jam: { enabled: true, transport: { type: "http", url } } } }, auth),
       ),
     );
   }).pipe(Effect.scoped),

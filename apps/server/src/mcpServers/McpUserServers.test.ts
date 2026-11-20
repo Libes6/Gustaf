@@ -16,6 +16,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
+import { McpServerAuth } from "./McpServerAuth.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
 import type { NativeMcpServer } from "./import/nativeMcp.ts";
@@ -49,6 +50,8 @@ const resolve = (
     /** Defaults to every command existing except names under `/missing`. */
     readonly executables?: SpawnExecutableResolver;
     readonly unusable?: ReadonlyMap<McpServerId, string>;
+    /** Access tokens of servers signed in through Gustaf. */
+    readonly tokens?: Readonly<Record<string, string>>;
     readonly native?: {
       readonly sources: NativeMcpSources;
       readonly servers: ReadonlyArray<NativeMcpServer>;
@@ -78,6 +81,9 @@ const resolve = (
           }),
           Layer.succeed(NativeMcpConfigs, {
             list: () => Effect.succeed({ servers: options.native?.servers ?? [], errors: [] }),
+          }),
+          Layer.mock(McpServerAuth)({
+            accessToken: (id) => Effect.succeed(options.tokens?.[id]),
           }),
         ]),
       ),
@@ -174,29 +180,42 @@ it.effect("runs stdio servers in the thread's directory unless pinned, with the 
   }),
 );
 
-it.effect("reads secret references, and leaves out a server whose secret cannot be read", () =>
-  Effect.gen(function* () {
-    const { servers, skipped } = yield* resolve(
-      {
-        mcpServers: {
-          linear: http(true, { Authorization: vault("op://linear"), "X-Team": "core" }),
-          figma: stdio(true, { env: { FIGMA_TOKEN: vault("op://missing") } }),
+it.effect(
+  "reads secret references and sign-ins, and leaves out a server whose secret cannot be read",
+  () =>
+    Effect.gen(function* () {
+      const { servers, skipped } = yield* resolve(
+        {
+          mcpServers: {
+            linear: http(true, { Authorization: vault("op://linear"), "X-Team": "core" }),
+            jam: http(true, { "X-Team": "core" }),
+            figma: stdio(true, { env: { FIGMA_TOKEN: vault("op://missing") } }),
+          },
         },
-      },
-      { secrets: { "op://linear": "Bearer linear-token" } },
-    );
-    assert.deepEqual(servers, [
-      {
-        type: "http",
-        id: McpServerId.make("linear"),
-        url: "https://mcp.example.test/mcp",
-        headers: { Authorization: "Bearer linear-token", "X-Team": "core" },
-      },
-    ]);
-    assert.deepEqual(skipped, [
-      { id: McpServerId.make("figma"), reason: "The secret for FIGMA_TOKEN cannot be read." },
-    ]);
-  }),
+        {
+          secrets: { "op://linear": "Bearer linear-token" },
+          // The user's own Authorization header wins over a Gustaf sign-in.
+          tokens: { linear: "signed-in-linear", jam: "jam-token" },
+        },
+      );
+      assert.deepEqual(servers, [
+        {
+          type: "http",
+          id: McpServerId.make("linear"),
+          url: "https://mcp.example.test/mcp",
+          headers: { Authorization: "Bearer linear-token", "X-Team": "core" },
+        },
+        {
+          type: "http",
+          id: McpServerId.make("jam"),
+          url: "https://mcp.example.test/mcp",
+          headers: { "X-Team": "core", Authorization: "Bearer jam-token" },
+        },
+      ]);
+      assert.deepEqual(skipped, [
+        { id: McpServerId.make("figma"), reason: "The secret for FIGMA_TOKEN cannot be read." },
+      ]);
+    }),
 );
 
 it.effect("keeps local servers out of sessions when the policy forbids them", () =>

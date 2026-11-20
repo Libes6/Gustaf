@@ -476,18 +476,21 @@ it.effect("denies manual cleanup before the handler without settings permission"
   }).pipe(Effect.scoped),
 );
 
-it.effect("guards MCP import and server checks with the grants they need", () =>
+it.effect("guards MCP import, server checks and sign-in with the grants they need", () =>
   Effect.gen(function* () {
-    type McpTag =
-      | typeof WS_METHODS.mcpServersListImportable
-      | typeof WS_METHODS.mcpServersImport
-      | typeof WS_METHODS.mcpServersStatus;
+    const mcpTags = [
+      WS_METHODS.mcpServersListImportable,
+      WS_METHODS.mcpServersImport,
+      WS_METHODS.mcpServersStatus,
+      WS_METHODS.mcpServersSignIn,
+      WS_METHODS.mcpServersSubmitSignInCallback,
+      WS_METHODS.mcpServersSignOut,
+    ] as const;
+    type McpTag = (typeof mcpTags)[number];
     const group = WsRpcGroup.omit(
       ...[...WsRpcGroup.requests.keys()].filter(
         (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, McpTag> =>
-          tag !== WS_METHODS.mcpServersListImportable &&
-          tag !== WS_METHODS.mcpServersImport &&
-          tag !== WS_METHODS.mcpServersStatus,
+          !(mcpTags as ReadonlyArray<string>).includes(tag),
       ),
     );
     let handled = 0;
@@ -513,6 +516,23 @@ it.effect("guards MCP import and server checks with the grants they need", () =>
                 return { servers: [] };
               }),
             ),
+            group.toLayerHandler(WS_METHODS.mcpServersSignIn, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { authUrl: "https://auth.test/authorize", redirectUri: "http://127.0.0.1" };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersSubmitSignInCallback, ({ callbackUrl }) =>
+              Effect.sync(() => {
+                handled += 1;
+                return { id: McpServerId.make(new URL(callbackUrl).hostname) };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersSignOut, () =>
+              Effect.sync(() => {
+                handled += 1;
+              }),
+            ),
             RpcAuthorization.layer(scopes),
           ),
         ),
@@ -530,12 +550,28 @@ it.effect("guards MCP import and server checks with the grants they need", () =>
     ).toMatchObject({ requiredPermission: AuthSettingsWriteScope });
 
     yield* providersOnly[WS_METHODS.mcpServersStatus]({});
-    expect(handled).toBe(1);
+    const jam = McpServerId.make("jam");
+    yield* providersOnly[WS_METHODS.mcpServersSignIn]({ id: jam });
+    yield* providersOnly[WS_METHODS.mcpServersSubmitSignInCallback]({ callbackUrl: "http://jam/" });
+    yield* providersOnly[WS_METHODS.mcpServersSignOut]({ id: jam });
+    expect(handled).toBe(4);
 
     const settingsOnly = yield* call([AuthSettingsWriteScope]);
-    expect(yield* settingsOnly[WS_METHODS.mcpServersStatus]({}).pipe(Effect.flip)).toMatchObject({
-      requiredPermission: AuthProvidersManageScope,
-    });
+    const providersRequired = { requiredPermission: AuthProvidersManageScope };
+    expect(yield* settingsOnly[WS_METHODS.mcpServersStatus]({}).pipe(Effect.flip)).toMatchObject(
+      providersRequired,
+    );
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSignIn]({ id: jam }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSubmitSignInCallback]({
+        callbackUrl: "http://jam/",
+      }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSignOut]({ id: jam }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
     expect(
       yield* settingsOnly[WS_METHODS.mcpServersImport]({ entries: [entry("http")] }).pipe(
         Effect.flip,
@@ -545,12 +581,12 @@ it.effect("guards MCP import and server checks with the grants they need", () =>
     const settingsAndProviders = yield* call([AuthSettingsWriteScope, AuthProvidersManageScope]);
     yield* settingsAndProviders[WS_METHODS.mcpServersListImportable]({});
     yield* settingsAndProviders[WS_METHODS.mcpServersImport]({ entries: [entry("http")] });
-    expect(handled).toBe(3);
+    expect(handled).toBe(6);
     expect(
       yield* settingsAndProviders[WS_METHODS.mcpServersImport]({
         entries: [entry("http"), entry("stdio")],
       }).pipe(Effect.flip),
     ).toMatchObject({ requiredPermission: AuthTerminalOperateScope });
-    expect(handled).toBe(3);
+    expect(handled).toBe(6);
   }).pipe(Effect.scoped),
 );

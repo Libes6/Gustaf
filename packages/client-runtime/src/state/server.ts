@@ -1217,6 +1217,18 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:mcp-status",
       tag: WS_METHODS.mcpServersStatus,
     }),
+    signInMcpServer: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:server-sign-in",
+      tag: WS_METHODS.mcpServersSignIn,
+    }),
+    submitMcpServerSignInCallback: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:server-sign-in-callback",
+      tag: WS_METHODS.mcpServersSubmitSignInCallback,
+    }),
+    signOutMcpServer: createEnvironmentRpcCommand(runtime, {
+      label: "mcp:server-sign-out",
+      tag: WS_METHODS.mcpServersSignOut,
+    }),
     mcpListConnectors: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:mcp-connectors",
       tag: WS_METHODS.mcpConnectorsList,

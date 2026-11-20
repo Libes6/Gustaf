@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
+import { McpServerAuth } from "./McpServerAuth.ts";
 import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
 import {
   commandInDirectory,
@@ -63,6 +64,8 @@ export class McpUserServers extends Context.Service<
       readonly id: McpServerId;
       readonly server: McpServerConfig;
       readonly cwd: string;
+      /** Refreshes a Gustaf sign-in's token first, for a server that just refused it. */
+      readonly refreshToken?: boolean;
     }) => Effect.Effect<ResolvedMcpServer | { readonly unusable: string }>;
   }
 >()("t3/mcpServers/McpUserServers") {}
@@ -78,6 +81,7 @@ const withSecrets = Effect.fnUntraced(function* (
   server: McpServerConfig,
   cwd: string,
   literal: (value: SettingsSecretValue) => string | undefined,
+  bearer: string | undefined,
 ): Effect.fn.Return<ResolvedMcpServer | { readonly unusable: string }> {
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(slotsOf(server))) {
@@ -87,7 +91,12 @@ const withSecrets = Effect.fnUntraced(function* (
   }
   const { transport } = server;
   if (transport.type === "http") {
-    return { type: "http", id, url: transport.url, headers: values };
+    return {
+      type: "http",
+      id,
+      url: transport.url,
+      headers: bearer === undefined ? values : { ...values, Authorization: `Bearer ${bearer}` },
+    };
   }
   const platform = yield* HostProcess.Platform;
   const hostEnvironment = yield* HostProcess.Environment;
@@ -123,6 +132,14 @@ const make = Effect.gen(function* () {
   const secrets = yield* SecretResolver.SecretResolver;
   const policy = yield* ManagedPolicy.ManagedPolicy;
   const nativeConfigs = yield* NativeMcpConfigs;
+  const auth = yield* McpServerAuth;
+
+  // The token of a server signed in through Gustaf, unless the user set their own header.
+  const bearerFor = (id: McpServerId, { transport }: McpServerConfig, force = false) =>
+    transport.type !== "http" ||
+    Object.keys(transport.headers).some((key) => key.toLowerCase() === "authorization")
+      ? Effect.undefined
+      : auth.accessToken(id, transport.url, { force });
 
   const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
     native: NativeMcpSources,
@@ -196,7 +213,7 @@ const make = Effect.gen(function* () {
       const known = input.unusable?.get(id);
       const result =
         known === undefined
-          ? yield* withSecrets(id, server, input.cwd, literal)
+          ? yield* withSecrets(id, server, input.cwd, literal, yield* bearerFor(id, server))
           : { unusable: known };
       if ("unusable" in result) {
         yield* Effect.logWarning("MCP server left out of a session: it cannot start", {
@@ -216,14 +233,20 @@ const make = Effect.gen(function* () {
     readonly id: McpServerId;
     readonly server: McpServerConfig;
     readonly cwd: string;
+    readonly refreshToken?: boolean;
   }) {
     const references = Object.values(slotsOf(input.server)).filter(isSecretReference);
     const read = references.length === 0 ? [] : yield* secrets.read(references);
     const secretFor = new Map<SecretReference, string | undefined>(
       references.map((reference, index) => [reference, read[index]]),
     );
-    return yield* withSecrets(input.id, input.server, input.cwd, (value) =>
-      isSecretReference(value) ? secretFor.get(value)?.trim() || undefined : value,
+    const bearer = yield* bearerFor(input.id, input.server, input.refreshToken === true);
+    return yield* withSecrets(
+      input.id,
+      input.server,
+      input.cwd,
+      (value) => (isSecretReference(value) ? secretFor.get(value)?.trim() || undefined : value),
+      bearer,
     );
   });
 
