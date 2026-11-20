@@ -1,19 +1,42 @@
-import { McpServerConfig, ProviderDriverKind } from "@t3tools/contracts";
+import { McpServerConfig, McpServerId, ProviderDriverKind } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  currentMcpStatus,
   groupMcpTools,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
+  recordMcpStatuses,
   setMcpToolsEnabled,
   withDisabledTools,
 } from "./McpSettings.logic";
 
-const config = Schema.decodeSync(McpServerConfig)({
+const decodeConfig = Schema.decodeSync(McpServerConfig);
+const config = decodeConfig({
   enabled: true,
   transport: { type: "http", url: "https://mcp.example.test/mcp" },
+});
+
+describe("MCP server statuses", () => {
+  it("shows the answer to a check started after an edit for the edited config", () => {
+    const id = McpServerId.make("figma");
+    const edited = decodeConfig({
+      enabled: true,
+      transport: { type: "http", url: "https://mcp.example.test/v2/mcp" },
+    });
+    const before = { [id]: config };
+    const answer = [{ id, status: "connected" as const, tools: [] }];
+
+    // The edit's save resolves before settings re-render, so the check carries the edited configs.
+    const checked = recordMcpStatuses(new Map(), { ...before, [id]: edited }, answer);
+    expect(currentMcpStatus(checked, id, edited)?.status).toBe("connected");
+    // Filed under the pre-edit configs, the row would wait on "Checking…" for good.
+    expect(currentMcpStatus(recordMcpStatuses(new Map(), before, answer), id, edited)).toBe(
+      undefined,
+    );
+  });
 });
 
 describe("MCP tool switches", () => {

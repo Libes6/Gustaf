@@ -1,6 +1,7 @@
 import {
   MCP_TOOL_FILTER_DRIVERS,
   type McpServerConfig,
+  type McpServerStatus,
   type McpServerToolSummary,
   type ProviderDriverKind,
 } from "@t3tools/contracts";
@@ -12,6 +13,35 @@ export function mcpStatusKey(config: McpServerConfig | undefined): string {
   if (config === undefined) return "";
   const { disabledTools: _disabledTools, ...checked } = config;
   return JSON.stringify(checked);
+}
+
+export type McpCheckedStatuses = ReadonlyMap<string, { status: McpServerStatus; config: string }>;
+
+/**
+ * Records each answer under the configs the check was asked with. A check started right after an
+ * edit must pass the edited configs: settings from before the save would file the answer under the
+ * old config, and the row would wait for a check that already came back.
+ */
+export function recordMcpStatuses(
+  previous: McpCheckedStatuses,
+  configs: Readonly<Record<string, McpServerConfig>>,
+  statuses: ReadonlyArray<McpServerStatus>,
+): McpCheckedStatuses {
+  const next = new Map(previous);
+  for (const status of statuses) {
+    next.set(status.id, { status, config: mcpStatusKey(configs[status.id]) });
+  }
+  return next;
+}
+
+/** The last answer for a server, if it was given for the config the server has now. */
+export function currentMcpStatus(
+  checked: McpCheckedStatuses,
+  id: string,
+  config: McpServerConfig | undefined,
+): McpServerStatus | undefined {
+  const entry = checked.get(id);
+  return entry?.config === mcpStatusKey(config) ? entry.status : undefined;
 }
 
 /** Read-only tools first, as `annotations.readOnlyHint` declares; a tool without the hint writes. */

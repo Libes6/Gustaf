@@ -44,12 +44,15 @@ import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { McpConnectorsSection } from "./McpConnectorsSection";
 import {
+  currentMcpStatus,
   groupMcpTools,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
+  recordMcpStatuses,
   setMcpToolsEnabled,
   withDisabledTools,
+  type McpCheckedStatuses,
   type McpToolGroupMode,
 } from "./McpSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -109,9 +112,7 @@ function McpEnvironmentSettings({
   const canCheck = useAtomValue(serverEnvironment.mcpServerStatus.permissionAtom(environmentId));
   const checkServers = useAtomCommand(serverEnvironment.mcpServerStatus, { reportFailure: false });
   // Each answer with the config it was asked for, so an edited server shows as checking.
-  const [checked, setChecked] = useState<
-    ReadonlyMap<string, { status: McpServerStatus; config: string }>
-  >(new Map());
+  const [checked, setChecked] = useState<McpCheckedStatuses>(new Map());
   const [refreshing, setRefreshing] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
   const serversKey = JSON.stringify(
@@ -124,13 +125,7 @@ function McpEnvironmentSettings({
   ) {
     setCheckFailed(result._tag !== "Success");
     if (result._tag !== "Success") return;
-    setChecked((previous) => {
-      const next = new Map(previous);
-      for (const status of result.value.servers) {
-        next.set(status.id, { status, config: mcpStatusKey(configs[status.id]) });
-      }
-      return next;
-    });
+    setChecked((previous) => recordMcpStatuses(previous, configs, result.value.servers));
   }
   const checkCurrent = useEffectEvent((isCurrent: () => boolean) => {
     const configs = settings.mcpServers;
@@ -148,11 +143,15 @@ function McpEnvironmentSettings({
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A server's config changing is what asks for a new check.
   }, [canCheck, environmentId, hasServers, serversKey]);
-  async function refreshStatuses(ids: readonly McpServerId[]) {
+  /** `configs` must be what the environment holds now; after a save, the settings here lag. */
+  async function refreshStatuses(
+    ids: readonly McpServerId[],
+    configs?: typeof settings.mcpServers,
+  ) {
     setRefreshing(true);
     const result = await checkServers({ environmentId, input: { refresh: ids } });
     setRefreshing(false);
-    applyCheck(settings.mcpServers, result);
+    applyCheck(configs ?? settings.mcpServers, result);
     return result;
   }
   const signIn = useAtomCommand(serverEnvironment.signInMcpServer);
@@ -207,8 +206,7 @@ function McpEnvironmentSettings({
     return () => window.removeEventListener("focus", onFocus);
   }, [awaitingId]);
   function currentStatus(id: McpServerId) {
-    const entry = checked.get(id);
-    return entry?.config === mcpStatusKey(settings.mcpServers[id]) ? entry.status : undefined;
+    return currentMcpStatus(checked, id, settings.mcpServers[id]);
   }
   function signInControl(id: McpServerId) {
     const status = currentStatus(id);
@@ -648,7 +646,10 @@ function McpEnvironmentSettings({
             if (await save({ mcpServers: { [id]: config } })) {
               setEditing(null);
               // A changed secret keeps its reference, so the config alone would not show it.
-              if (canCheck && config.enabled) void refreshStatuses([decodeMcpId(id)]);
+              if (canCheck && config.enabled) {
+                const mcpId = decodeMcpId(id);
+                void refreshStatuses([mcpId], { ...settings.mcpServers, [mcpId]: config });
+              }
             }
           }}
         />
