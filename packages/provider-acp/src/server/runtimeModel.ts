@@ -1095,6 +1095,13 @@ export function extractMcpToolCallIdentity(
   if (meta?.is_mcp_tool_call === true && server.length > 0 && tool.length > 0) {
     return { server, tool };
   }
+  // Antigravity titles the call "<server>_<tool>" and names both in `_meta.mcp`.
+  const metaMcp = isRecord(meta?.mcp) ? meta.mcp : undefined;
+  const metaMcpServer = typeof metaMcp?.server === "string" ? metaMcp.server.trim() : "";
+  const metaMcpTool = typeof metaMcp?.tool === "string" ? metaMcp.tool.trim() : "";
+  if (metaMcpServer.length > 0 && metaMcpTool.length > 0) {
+    return { server: metaMcpServer, tool: metaMcpTool };
+  }
   // Kiro names the server in `_meta.kiro.serverName` and the call in `rawInput.tool_id`
   // ("<server>::<tool>"), with the tool's own input under `rawInput.arguments`.
   const kiroServer = isRecord(meta?.kiro) ? meta.kiro.serverName : undefined;
