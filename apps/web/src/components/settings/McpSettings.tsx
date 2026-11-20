@@ -948,6 +948,7 @@ function McpEditor({
     .filter((provider) => provider.installed)
     .map((provider) => provider.driver);
   const agentChoices = [...new Set([...installedDrivers, ...(agents ?? [])])];
+  const noAgents = agents !== null && agents.length === 0;
 
   async function submit() {
     setError("");
@@ -1005,7 +1006,7 @@ function McpEditor({
             className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!busy) void submit();
+              if (!busy && !noAgents) void submit();
             }}
           >
             <div className="grid gap-1.5">
@@ -1106,6 +1107,9 @@ function McpEditor({
                     {driverName(driver)}
                   </label>
                 ))}
+              {noAgents && (
+                <p className="text-xs text-muted-foreground">{t("settingsE.mcp.agentsPick")}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>{type === "stdio" ? t("settingsE.mcp.s32") : t("settingsE.mcp.s33")}</Label>
@@ -1216,7 +1220,11 @@ function McpEditor({
             type="submit"
             form="mcp-server-form"
             disabled={
-              busy || !name.trim() || !address.trim() || (type === "stdio" && !localAllowed)
+              busy ||
+              !name.trim() ||
+              !address.trim() ||
+              noAgents ||
+              (type === "stdio" && !localAllowed)
             }
           >
             {editing.id ? t("settingsE.mcp.s37") : t("settingsE.mcp.s5")}

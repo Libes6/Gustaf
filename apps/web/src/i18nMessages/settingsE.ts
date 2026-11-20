@@ -15,6 +15,8 @@ export const settingsEMessages = {
     "settingsE.mcp.agentsAll": "All agents",
     "settingsE.mcp.agentsSelected": "Selected agents",
     "settingsE.mcp.agentsNone": "No agents",
+    "settingsE.mcp.agentsPick":
+      "Select at least one agent. To keep the server from every agent, turn it off instead.",
     "settingsE.mcp.agentsOnly": "Only {names}",
     "settingsE.mcp.importAgents":
       "A server imported from an agent's config goes to that agent only; change it in Edit.",
@@ -667,6 +669,8 @@ export const settingsEMessages = {
     "settingsE.mcp.agentsAll": "Все агенты",
     "settingsE.mcp.agentsSelected": "Выбранные агенты",
     "settingsE.mcp.agentsNone": "Ни одному агенту",
+    "settingsE.mcp.agentsPick":
+      "Отметьте хотя бы одного агента. Чтобы сервер не получал никто, выключите его.",
     "settingsE.mcp.agentsOnly": "Только {names}",
     "settingsE.mcp.importAgents":
       "Сервер из настроек агента получает только этот агент; изменить можно в «Изменить».",
