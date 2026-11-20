@@ -97,6 +97,7 @@ const ProtectedResource = Schema.Struct({
   scopes_supported: Schema.optional(Schema.Array(Schema.String)),
 });
 const AuthorizationServer = Schema.Struct({
+  issuer: Schema.optional(Schema.String),
   authorization_endpoint: Schema.String,
   token_endpoint: Schema.String,
   registration_endpoint: Schema.optional(Schema.String),
@@ -158,6 +159,35 @@ const protectedResourceMetadataUrls = (serverUrl: string, fromChallenge: string 
     `${url.origin}/.well-known/oauth-protected-resource`,
   ];
 };
+
+/** OAuth addresses carry codes and tokens, so they must be https unless they stay on this machine. */
+const isSecureEndpoint = (value: string) => {
+  if (!URL.canParse(value)) return false;
+  const url = new URL(value);
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && loopbackBindAddress(url.hostname) !== undefined)
+  );
+};
+
+/**
+ * RFC 9728 §3.3: resource metadata must describe the server it was fetched for. As the MCP SDK
+ * does, the named resource may be the server's URL or a path above it on the same origin.
+ */
+const coversServer = (resource: string, serverUrl: string) => {
+  if (!URL.canParse(resource)) return false;
+  const named = new URL(resource);
+  const server = new URL(serverUrl);
+  const withSlash = (path: string) => (path.endsWith("/") ? path : `${path}/`);
+  return (
+    named.origin === server.origin &&
+    withSlash(server.pathname).startsWith(withSlash(named.pathname))
+  );
+};
+
+// RFC 8414 §3.3; a trailing slash is the only difference tolerated.
+const sameIssuer = (left: string, right: string) =>
+  left.replace(/\/+$/, "") === right.replace(/\/+$/, "");
 
 const callbackPage = (title: string, body: string) =>
   HttpServerResponse.html(
@@ -373,14 +403,25 @@ const make = Effect.gen(function* () {
       serverUrl,
       challengeParam(challenge, "resource_metadata"),
     )) {
+      if (!isSecureEndpoint(url)) continue;
       const found = yield* getJson(decodeProtectedResource, url);
       if (Option.isSome(found)) {
         resource = found.value;
         break;
       }
     }
+    if (resource?.resource !== undefined && !coversServer(resource.resource, serverUrl)) {
+      return yield* authError(
+        "The server's sign-in metadata names another resource, so Gustaf did not sign in. Check the server's URL.",
+      );
+    }
     // Servers on the 2025-03-26 spec have no resource metadata and authorize on their own origin.
     const issuer = resource?.authorization_servers?.[0] ?? new URL(serverUrl).origin;
+    if (!isSecureEndpoint(issuer)) {
+      return yield* authError(
+        "The authorization server's address is not https, so Gustaf did not sign in.",
+      );
+    }
     let metadata: typeof AuthorizationServer.Type | undefined;
     for (const url of authorizationServerMetadataUrls(issuer)) {
       const found = yield* getJson(decodeAuthorizationServer, url);
@@ -388,6 +429,11 @@ const make = Effect.gen(function* () {
         metadata = found.value;
         break;
       }
+    }
+    if (metadata?.issuer !== undefined && !sameIssuer(metadata.issuer, issuer)) {
+      return yield* authError(
+        "The authorization server's metadata names another issuer, so Gustaf did not sign in.",
+      );
     }
     if (metadata === undefined) {
       if (resource === undefined && probe.status !== 401) {
@@ -400,10 +446,16 @@ const make = Effect.gen(function* () {
         registration_endpoint: `${origin}/register`,
       };
     }
-    // The client opens this address in a browser.
-    const endpoint = metadata.authorization_endpoint;
-    if (!URL.canParse(endpoint) || !/^https?:$/.test(new URL(endpoint).protocol)) {
-      return yield* authError("The authorization server sent an invalid sign-in address.");
+    // The client opens the authorization address in a browser; the others get codes and tokens.
+    const endpoints = [
+      metadata.authorization_endpoint,
+      metadata.token_endpoint,
+      ...(metadata.registration_endpoint === undefined ? [] : [metadata.registration_endpoint]),
+    ];
+    if (!endpoints.every(isSecureEndpoint)) {
+      return yield* authError(
+        "The authorization server sent an address that is not https, so Gustaf did not sign in.",
+      );
     }
     const methods = metadata.code_challenge_methods_supported;
     if (methods !== undefined && !methods.includes("S256")) {

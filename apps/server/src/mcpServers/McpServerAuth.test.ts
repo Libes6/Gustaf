@@ -35,16 +35,21 @@ const bodyText = (body: unknown) =>
  * A server that refuses without a token and points at its authorization server through the
  * challenge, as `jam` does; the authorization server registers clients and checks PKCE.
  */
-const fakeAuthorizationServer = () => {
+const fakeAuthorizationServer = (routes: Record<string, () => Response> = {}) => {
   const calls: Array<string> = [];
   let challenge: string | undefined;
   const client = HttpClient.make((request) => {
     const url = new URL(request.url);
-    calls.push(`${request.method} ${url.origin}${url.pathname}`);
+    const route = `${request.method} ${url.origin}${url.pathname}`;
+    calls.push(route);
     const json = (value: unknown, status = 200) =>
       Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(value, { status })));
     const form = new URLSearchParams(bodyText(request.body));
-    switch (`${request.method} ${url.origin}${url.pathname}`) {
+    const override = routes[route];
+    if (override !== undefined) {
+      return Effect.succeed(HttpClientResponse.fromWeb(request, override()));
+    }
+    switch (route) {
       case `POST ${serverUrl}`:
         return Effect.succeed(
           HttpClientResponse.fromWeb(
@@ -113,9 +118,10 @@ const setup = (
     jamSettings,
   ).pipe(Layer.orDie),
   onRemove: (name: string) => Effect.Effect<void> = () => Effect.void,
+  routes: Record<string, () => Response> = {},
 ) => {
   const secrets = new Map<string, Uint8Array>();
-  const fake = fakeAuthorizationServer();
+  const fake = fakeAuthorizationServer(routes);
   const layer = McpServerAuth.layer.pipe(
     Layer.provide([
       settingsLayer,
@@ -243,3 +249,68 @@ it.effect("removing a server from settings deletes its sign-in", () =>
     }).pipe(Effect.provide(layer));
   }),
 );
+
+const challenging = (metadataUrl: string) => () =>
+  new Response(null, {
+    status: 401,
+    headers: { "www-authenticate": `Bearer resource_metadata="${metadataUrl}"` },
+  });
+
+it.effect.each([
+  {
+    name: "metadata naming another server's resource",
+    url: "https://evil.test/mcp",
+    routes: {
+      "POST https://evil.test/mcp": challenging(
+        "https://evil.test/.well-known/oauth-protected-resource/mcp",
+      ),
+      "GET https://evil.test/.well-known/oauth-protected-resource/mcp": () =>
+        Response.json({ resource: serverUrl, authorization_servers: ["https://auth.jam.test"] }),
+    },
+    detail: "another resource",
+  },
+  {
+    name: "authorization server metadata naming another issuer",
+    url: serverUrl,
+    routes: {
+      "GET https://auth.jam.test/.well-known/oauth-authorization-server": () =>
+        Response.json({
+          issuer: "https://auth.evil.test",
+          authorization_endpoint: "https://auth.jam.test/authorize",
+          token_endpoint: "https://auth.jam.test/token",
+          registration_endpoint: "https://auth.jam.test/register",
+        }),
+    },
+    detail: "another issuer",
+  },
+  {
+    name: "a token endpoint without https",
+    url: serverUrl,
+    routes: {
+      "GET https://auth.jam.test/.well-known/oauth-authorization-server": () =>
+        Response.json({
+          authorization_endpoint: "https://auth.jam.test/authorize",
+          token_endpoint: "http://auth.jam.test/token",
+          registration_endpoint: "https://auth.jam.test/register",
+        }),
+    },
+    detail: "https",
+  },
+])("refuses to sign in through $name", ({ url, routes, detail }) => {
+  const { secrets, fake, layer } = setup(
+    ServerSettings.layerTest(
+      decodeSettings({
+        mcpServers: { jam: { enabled: true, transport: { type: "http", url } } },
+      }),
+    ).pipe(Layer.orDie),
+    undefined,
+    routes,
+  );
+  return Effect.gen(function* () {
+    const auth = yield* McpServerAuth.McpServerAuth;
+    const error = yield* auth.signIn({ id }).pipe(Effect.flip);
+    assert.include(error.detail, detail);
+    assert.notInclude(fake.calls, "POST https://auth.jam.test/register");
+    assert.strictEqual(secrets.size, 0);
+  }).pipe(Effect.provide(layer));
+});
