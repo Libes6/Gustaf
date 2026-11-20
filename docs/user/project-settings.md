@@ -279,6 +279,12 @@ configuration or import it from a native agent config. Review imported commands
 before enabling them. A server a provider already loads from its native config
 is not started a second time.
 
+Each enabled server shows whether it works: how many tools it offers, that it
+needs a sign-in, or the error it stopped with. Gustaf checks when you open the
+section and after you change a server, and keeps the answer until you select
+**Refresh**. A check starts local servers briefly, so a `npx` server may first
+download its package.
+
 Enable servers for the whole environment or override their enabled state for a
 project. Mobile Settings lists each environment's servers and lets you switch
 them on or off for that environment; use web or desktop to add or edit them.

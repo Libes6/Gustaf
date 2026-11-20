@@ -130,6 +130,7 @@ import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as SubscriptionService from "./subscriptions/SubscriptionService.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
+import * as McpServerChecks from "./mcpServers/McpServerChecks.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
 import * as GuestShareService from "./guest/GuestShareService.ts";
 import {
@@ -1455,6 +1456,7 @@ export const layerWsRpc = (
       const subscriptions = yield* SubscriptionService.SubscriptionService;
       const mcpServerImport = yield* McpServerImport.McpServerImport;
       const mcpConnectors = yield* McpConnectors.McpConnectors;
+      const mcpServerChecks = yield* McpServerChecks.McpServerChecks;
       const secretRequests = yield* SecretRequests.SecretRequests;
       const guestShares = yield* GuestShareService.GuestShareService;
       const pullRequests = yield* PullRequestService.PullRequestService;
@@ -2404,6 +2406,7 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.mcpServersListImportable]: (input) => mcpServerImport.list(input),
         [WS_METHODS.mcpServersImport]: (input) => mcpServerImport.importServers(input),
+        [WS_METHODS.mcpServersStatus]: (input) => mcpServerChecks.list(input),
         [WS_METHODS.mcpConnectorsList]: (input) => mcpConnectors.list(input),
         [WS_METHODS.mcpConnectorsAuthorize]: (input) => mcpConnectors.authorize(input),
         [WS_METHODS.mcpConnectorsSubmitCallback]: (input) => mcpConnectors.submitCallback(input),

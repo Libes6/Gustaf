@@ -43,10 +43,63 @@ export class McpUserServers extends Context.Service<
        */
       readonly native?: NativeMcpSources;
     }) => Effect.Effect<ReadonlyArray<ResolvedMcpServer>>;
+    /** One server as a session would get it; the key of a secret that cannot be read otherwise. */
+    readonly resolveServer: (input: {
+      readonly id: McpServerId;
+      readonly server: McpServerConfig;
+      readonly cwd: string;
+    }) => Effect.Effect<ResolvedMcpServer | { readonly unreadableKey: string }>;
   }
 >()("t3/mcpServers/McpUserServers") {}
 
 const WINDOWS_SHIM = /\.(?:cmd|bat)$/i;
+
+const slotsOf = ({ transport }: McpServerConfig) =>
+  transport.type === "stdio" ? transport.env : transport.headers;
+
+// Runs once per server inside the traced resolve calls below.
+const withSecrets = Effect.fnUntraced(function* (
+  id: McpServerId,
+  server: McpServerConfig,
+  cwd: string,
+  literal: (value: SettingsSecretValue) => string | undefined,
+): Effect.fn.Return<ResolvedMcpServer | { readonly unreadableKey: string }> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(slotsOf(server))) {
+    const secret = literal(value);
+    if (secret === undefined) return { unreadableKey: key };
+    values[key] = secret;
+  }
+  const { transport } = server;
+  if (transport.type === "http") {
+    return { type: "http", id, url: transport.url, headers: values };
+  }
+  const platform = yield* HostProcess.Platform;
+  const hostEnvironment = yield* HostProcess.Environment;
+  const resolveExecutable = yield* SpawnExecutableResolution;
+  const isPathKey = (key: string) =>
+    platform === "win32" ? key.toUpperCase() === "PATH" : key === "PATH";
+  const hostPathKey = Object.keys(hostEnvironment).find(isPathKey);
+  // Providers spawn without a login shell, so the server needs the PATH the server hydrated.
+  const env =
+    hostPathKey === undefined || Object.keys(values).some(isPathKey)
+      ? values
+      : { [hostPathKey]: hostEnvironment[hostPathKey] ?? "", ...values };
+  // Node and most provider runtimes cannot spawn npm's `.cmd` shims by their bare name.
+  const executable =
+    platform === "win32"
+      ? resolveExecutable(transport.command, platform, { ...hostEnvironment, ...env })
+      : undefined;
+  return {
+    type: "stdio",
+    id,
+    command:
+      executable !== undefined && WINDOWS_SHIM.test(executable) ? executable : transport.command,
+    args: transport.args,
+    env,
+    cwd: transport.cwd === "thread" ? cwd : transport.cwd,
+  };
+});
 
 const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
@@ -106,8 +159,6 @@ const make = Effect.gen(function* () {
       if (enabled.length === 0) return [];
     }
 
-    const slotsOf = ({ transport }: McpServerConfig) =>
-      transport.type === "stdio" ? transport.env : transport.headers;
     const references = enabled.flatMap(([, server]) =>
       Object.values(slotsOf(server)).filter(isSecretReference),
     );
@@ -118,63 +169,37 @@ const make = Effect.gen(function* () {
     const literal = (value: SettingsSecretValue) =>
       isSecretReference(value) ? secretFor.get(value)?.trim() || undefined : value;
 
-    const platform = yield* HostProcess.Platform;
-    const hostEnvironment = yield* HostProcess.Environment;
-    const resolveExecutable = yield* SpawnExecutableResolution;
-    const isPathKey = (key: string) =>
-      platform === "win32" ? key.toUpperCase() === "PATH" : key === "PATH";
-    const hostPathKey = Object.keys(hostEnvironment).find(isPathKey);
-
     const resolved: Array<ResolvedMcpServer> = [];
     for (const [id, server] of enabled) {
-      const values: Record<string, string> = {};
-      let unreadable: string | undefined;
-      for (const [key, value] of Object.entries(slotsOf(server))) {
-        const secret = literal(value);
-        if (secret === undefined) {
-          unreadable = key;
-          break;
-        }
-        values[key] = secret;
-      }
-      if (unreadable !== undefined) {
+      const result = yield* withSecrets(id, server, input.cwd, literal);
+      if ("unreadableKey" in result) {
         yield* Effect.logWarning("MCP server left out of a session: its secret cannot be read", {
           mcpServerId: id,
-          key: unreadable,
+          key: result.unreadableKey,
         });
         continue;
       }
-      const { transport } = server;
-      if (transport.type === "http") {
-        resolved.push({ type: "http", id, url: transport.url, headers: values });
-        continue;
-      }
-      // Providers spawn without a login shell, so the server needs the PATH the server hydrated.
-      const env =
-        hostPathKey === undefined || Object.keys(values).some(isPathKey)
-          ? values
-          : { [hostPathKey]: hostEnvironment[hostPathKey] ?? "", ...values };
-      // Node and most provider runtimes cannot spawn npm's `.cmd` shims by their bare name.
-      const executable =
-        platform === "win32"
-          ? resolveExecutable(transport.command, platform, { ...hostEnvironment, ...env })
-          : undefined;
-      resolved.push({
-        type: "stdio",
-        id,
-        command:
-          executable !== undefined && WINDOWS_SHIM.test(executable)
-            ? executable
-            : transport.command,
-        args: transport.args,
-        env,
-        cwd: transport.cwd === "thread" ? input.cwd : transport.cwd,
-      });
+      resolved.push(result);
     }
     return resolved;
   });
 
-  return McpUserServers.of({ resolveForThread });
+  const resolveServer = Effect.fn("McpUserServers.resolveServer")(function* (input: {
+    readonly id: McpServerId;
+    readonly server: McpServerConfig;
+    readonly cwd: string;
+  }) {
+    const references = Object.values(slotsOf(input.server)).filter(isSecretReference);
+    const read = references.length === 0 ? [] : yield* secrets.read(references);
+    const secretFor = new Map<SecretReference, string | undefined>(
+      references.map((reference, index) => [reference, read[index]]),
+    );
+    return yield* withSecrets(input.id, input.server, input.cwd, (value) =>
+      isSecretReference(value) ? secretFor.get(value)?.trim() || undefined : value,
+    );
+  });
+
+  return McpUserServers.of({ resolveForThread, resolveServer });
 });
 
 export const layer = Layer.effect(McpUserServers, make);

@@ -93,6 +93,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.computerUseAllowThread]: AuthOrchestrationOperateScope,
   [WS_METHODS.computerUseOpenPermissionSettings]: AuthOrchestrationOperateScope,
   [WS_METHODS.computerUseStop]: AuthOrchestrationOperateScope,
+  // Checking starts each configured local server, as listing Claude's own servers does.
+  [WS_METHODS.mcpServersStatus]: AuthProvidersManageScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

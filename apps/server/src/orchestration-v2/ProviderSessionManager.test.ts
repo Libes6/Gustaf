@@ -2599,7 +2599,7 @@ it.effect(
       const requests = yield* Ref.make<
         ReadonlyArray<Parameters<McpUserServers.McpUserServers["Service"]["resolveForThread"]>[0]>
       >([]);
-      const mcpUserServersLayer = Layer.succeed(McpUserServers.McpUserServers, {
+      const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
         resolveForThread: (request) =>
           Ref.update(requests, (current) => [...current, request]).pipe(
             Effect.andThen(Ref.get(enabled)),

@@ -78,6 +78,7 @@ import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import * as SecretResolver from "./secrets/SecretResolver.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
+import * as McpServerChecks from "./mcpServers/McpServerChecks.ts";
 import * as McpUserServers from "./mcpServers/McpUserServers.ts";
 import * as NativeMcpConfigs from "./mcpServers/import/NativeMcpConfigs.ts";
 import * as ProviderInstanceRegistryHydration from "./provider/ProviderInstanceRegistryHydration.ts";
@@ -708,9 +709,11 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
   Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
   Layer.provideMerge(
-    Layer.mergeAll(McpUserServers.layer, McpServerImport.layer, McpConnectors.layer).pipe(
-      Layer.provide(NativeMcpConfigs.layer),
-    ),
+    Layer.mergeAll(
+      McpServerChecks.layer.pipe(Layer.provideMerge(McpUserServers.layer)),
+      McpServerImport.layer,
+      McpConnectors.layer,
+    ).pipe(Layer.provide(NativeMcpConfigs.layer)),
   ),
   Layer.provideMerge(SecretResolver.layer),
   Layer.provideMerge(layerServerSettings),
