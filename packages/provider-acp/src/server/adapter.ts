@@ -339,6 +339,8 @@ export interface AcpAdapterV2Flavor {
   readonly rejectsStdioMcpServers?: boolean;
   /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
   readonly abortsOnFailedMcpServer?: boolean;
+  /** See `ProviderAdapterV2.failedMcpServerOf`. */
+  readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
   /**
    * Tool updates carry the model's own one-line description of an MCP call in place of its
    * result, so `t3-code` items show the result the server kept instead.
@@ -1817,6 +1819,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
     instanceId: options.instanceId,
     driver,
     ...(flavor.abortsOnFailedMcpServer === true ? { abortsOnFailedMcpServer: true } : {}),
+    ...(flavor.failedMcpServerOf === undefined
+      ? {}
+      : { failedMcpServerOf: flavor.failedMcpServerOf }),
     getCapabilities: Effect.fn("AcpAdapter.getCapabilities")(function () {
       return Effect.succeed(flavor.capabilities);
     }),

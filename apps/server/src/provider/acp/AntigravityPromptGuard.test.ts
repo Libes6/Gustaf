@@ -2,6 +2,7 @@ import { assert, it } from "@effect/vitest";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
 import { makeAntigravityPromptGuard } from "./AntigravityPromptGuard.ts";
+import { antigravityFailedMcpServer } from "./AntigravityTurnOutcome.ts";
 
 const NOTICE = "The stream was interrupted. Please continue the task you were working on.";
 
@@ -63,4 +64,6 @@ it("stops when the harness refuses the session over an MCP server, not on a quot
   assert.equal(failure?.code, "ANTIGRAVITY_MCP_SERVER_FAILED");
   assert.include(failure?.message, '"computer-use"');
   assert.include(failure?.message, "Settings → MCP");
+  assert.equal(antigravityFailedMcpServer(failure!), "computer-use");
+  assert.isUndefined(antigravityFailedMcpServer({ ...failure!, code: "OTHER" }));
 });

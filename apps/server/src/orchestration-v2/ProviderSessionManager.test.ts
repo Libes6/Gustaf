@@ -19,6 +19,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   type ProviderSessionId,
+  ProviderThreadId,
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
@@ -467,6 +468,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly scopeCloseReached?: Deferred.Deferred<void>;
     readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
     readonly abortsOnFailedMcpServer?: boolean;
+    readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
   } = {},
 ) {
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -492,6 +494,9 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     ...(options.abortsOnFailedMcpServer === undefined
       ? {}
       : { abortsOnFailedMcpServer: options.abortsOnFailedMcpServer }),
+    ...(options.failedMcpServerOf === undefined
+      ? {}
+      : { failedMcpServerOf: options.failedMcpServerOf }),
     getCapabilities: () => Effect.succeed(options.capabilities ?? CodexCapabilities),
     planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
     openSession: (input) =>
@@ -646,6 +651,7 @@ function layerTest(input: {
   readonly mcpServerChecksLayer?: Layer.Layer<McpServerChecks.McpServerChecks>;
   readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
   readonly abortsOnFailedMcpServer?: boolean;
+  readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -695,6 +701,9 @@ function layerTest(input: {
       ...(input.abortsOnFailedMcpServer === undefined
         ? {}
         : { abortsOnFailedMcpServer: input.abortsOnFailedMcpServer }),
+      ...(input.failedMcpServerOf === undefined
+        ? {}
+        : { failedMcpServerOf: input.failedMcpServerOf }),
     }).pipe(Effect.map(ProviderAdapterRegistry.layerSingle)),
   );
   const layerConfiguredMcpRegistry =
@@ -2612,6 +2621,13 @@ it.effect(
       >([]);
       const jam = McpServerId.make("jam");
       const unusable = new Map([[jam, "Needs sign-in."]]);
+      const serverFailure = makeProviderFailure({
+        class: "provider_error",
+        code: "MCP_SERVER_FAILED",
+        message: "figma did not start.",
+        retryable: false,
+      });
+      const markedFailed = yield* Deferred.make<{ name: string; error: string }>();
       const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
         resolveForThread: (request) =>
           Ref.update(requests, (current) => [...current, request]).pipe(
@@ -2655,6 +2671,27 @@ it.effect(
         assert.deepEqual(opened?.userServers, [{ ...figma, id: McpServerId.make("figma") }]);
         assert.deepEqual(opened?.skippedUserServers, [{ id: jam, reason: "Needs sign-in." }]);
 
+        // A turn the agent refused over a server marks that server failed.
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(sessionId));
+        yield* Queue.offer(queue!, {
+          type: "turn.terminal",
+          driver: CODEX_DRIVER,
+          providerThreadId: ProviderThreadId.make("native-user-mcp-owner"),
+          providerTurnId: idAllocator.derive.providerTurn({
+            driver: CODEX_DRIVER,
+            nativeTurnId: "native-turn-user-mcp",
+          }),
+          runOrdinal: 1,
+          failureItemOrdinal: 1,
+          status: "failed",
+          failure: serverFailure,
+          threadDisposition: "reusable",
+        });
+        assert.deepEqual(yield* Deferred.await(markedFailed), {
+          name: "figma",
+          error: serverFailure.message,
+        });
+
         // An attach has no runtime policy, so the cwd falls back to the project checkout.
         yield* manager.open({
           threadId: joiner,
@@ -2689,9 +2726,13 @@ it.effect(
             mcpConfigs,
             nativeMcpSources: native,
             abortsOnFailedMcpServer: true,
+            failedMcpServerOf: (failure) =>
+              failure.code === "MCP_SERVER_FAILED" ? "figma" : undefined,
             mcpUserServersLayer,
             mcpServerChecksLayer: Layer.mock(McpServerChecks.McpServerChecks)({
               knownUnusable: Effect.succeed(unusable),
+              markFailed: (name, error) =>
+                Deferred.succeed(markedFailed, { name, error }).pipe(Effect.asVoid),
             }),
             projectServiceLayer: Layer.mock(ProjectService.ProjectService)({
               getById: (requestedProjectId) =>

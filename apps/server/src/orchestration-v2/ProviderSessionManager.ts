@@ -7,6 +7,7 @@ import {
   OrchestrationV2DomainEvent,
   OrchestrationV2ProviderSession,
   type OrchestrationV2PromptSuggestion,
+  type OrchestrationV2ProviderFailure,
   type OrchestrationV2ProviderThread,
   OrchestrationV2RuntimeRequest,
   ProviderInstanceId,
@@ -517,6 +518,22 @@ export const layerWithOptions = (
       };
       const isMcpCredentialReserved = (threadId: ThreadId, mcpCredentialId: string) =>
         (mcpCredentialReservations.get(mcpReservationKey(threadId, mcpCredentialId)) ?? 0) > 0;
+      /** A turn that failed over a user MCP server marks it failed, so the next session leaves it out. */
+      const markFailedMcpServer = Effect.fn("ProviderSessionManagerV2.markFailedMcpServer")(
+        function* (
+          providerInstanceId: ProviderInstanceId,
+          failure: OrchestrationV2ProviderFailure,
+        ) {
+          if (Option.isNone(mcpServerChecks)) return;
+          const adapter = yield* registry
+            .get(providerInstanceId)
+            .pipe(Effect.orElseSucceed(() => undefined));
+          const server = adapter?.failedMcpServerOf?.(failure);
+          if (server !== undefined)
+            yield* mcpServerChecks.value.markFailed(server, failure.message);
+        },
+      );
+
       /** The user MCP servers for a thread's session, minus those its provider loads natively. */
       const resolveUserServers = Effect.fn("ProviderSessionManagerV2.resolveUserServers")(
         function* (threadId: ThreadId, providerInstanceId: ProviderInstanceId, cwd: string | null) {
@@ -2736,6 +2753,9 @@ export const layerWithOptions = (
                         );
                     }).pipe(entry.requestEventPermit.withPermits(1));
                     return;
+                  }
+                  if (event.type === "turn.terminal" && event.failure !== null) {
+                    yield* markFailedMcpServer(entry.runtime.instanceId, event.failure);
                   }
                   yield* publishToSubscribers(entry.eventSubscribers, { type: "event", event });
                   yield* releaseLiveOutput;

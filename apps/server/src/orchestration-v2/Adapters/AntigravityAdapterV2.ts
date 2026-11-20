@@ -37,7 +37,10 @@ import {
 import { watchAntigravityBackgroundWake } from "../../provider/acp/AntigravityBackgroundWake.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
 import { makeAntigravityPromptGuard } from "../../provider/acp/AntigravityPromptGuard.ts";
-import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
+import {
+  antigravityFailedMcpServer,
+  watchAntigravityPromptOutcome,
+} from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
   antigravityApprovalOptions,
   antigravityBackgroundWorkHoldsTurn,
@@ -264,6 +267,7 @@ export function makeAntigravityAcpAdapterFlavor(
     mcpOverHttp: true,
     // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
     abortsOnFailedMcpServer: true,
+    failedMcpServerOf: antigravityFailedMcpServer,
     replacesMcpResults: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     makeRuntime,

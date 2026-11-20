@@ -192,6 +192,20 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
         },
       ]);
       assert.deepEqual(requests.slice(2, 4), ["Bearer stale-token", "Bearer fresh-token"]);
+
+      // An agent that could not start it marks it failed; nothing is checked until a refresh.
+      const requestsBefore = requests.length;
+      yield* checks.markFailed("not-configured", "ignored");
+      yield* checks.markFailed("jam", "Antigravity could not start it.");
+      assert.deepEqual((yield* checks.list({})).servers, [
+        { id, status: "failed", error: "Antigravity could not start it." },
+      ]);
+      assert.deepEqual(
+        yield* checks.knownUnusable,
+        new Map([[id, "Failed its last check in Settings → MCP: Antigravity could not start it."]]),
+      );
+      assert.strictEqual(requests.length, requestsBefore);
+      assert.strictEqual((yield* checks.list({ refresh: [id] })).servers[0]?.status, "connected");
     }).pipe(
       Effect.provide(
         layer({ mcpServers: { jam: { enabled: true, transport: { type: "http", url } } } }, auth),

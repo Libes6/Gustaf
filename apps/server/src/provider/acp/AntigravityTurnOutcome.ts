@@ -177,14 +177,23 @@ export function antigravityLimitFailure(
   });
 }
 
+const MCP_SERVER_FAILED_CODE = "ANTIGRAVITY_MCP_SERVER_FAILED";
+const MCP_SERVER_FAILED_MESSAGE = /^Antigravity could not start the MCP server "([^"]+)"/;
+
 /** agy refuses every turn, without asking the model, while one of its MCP servers fails to start. */
 export const antigravityMcpServerFailure = (server: string) =>
   makeProviderFailure({
     class: "provider_error",
-    code: "ANTIGRAVITY_MCP_SERVER_FAILED",
+    code: MCP_SERVER_FAILED_CODE,
     message: `Antigravity could not start the MCP server "${server}" and refuses every turn while it is in the session. Fix the server or turn it off for Antigravity in Settings → MCP, then send the message again.`,
     retryable: false,
   });
+
+/** The server an `antigravityMcpServerFailure` names. */
+export const antigravityFailedMcpServer = (failure: OrchestrationV2ProviderFailure) =>
+  failure.code === MCP_SERVER_FAILED_CODE
+    ? MCP_SERVER_FAILED_MESSAGE.exec(failure.message)?.[1]
+    : undefined;
 
 function unfinishedToolsFailure(
   result: EffectAcpSchema.PromptResponse,
