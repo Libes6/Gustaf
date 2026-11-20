@@ -264,6 +264,7 @@ export function makeAntigravityAcpAdapterFlavor(
     mcpOverHttp: true,
     // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
     abortsOnFailedMcpServer: true,
+    replacesMcpResults: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     makeRuntime,
     buildPrompt: ({

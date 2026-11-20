@@ -339,6 +339,11 @@ export interface AcpAdapterV2Flavor {
   readonly rejectsStdioMcpServers?: boolean;
   /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
   readonly abortsOnFailedMcpServer?: boolean;
+  /**
+   * Tool updates carry the model's own one-line description of an MCP call in place of its
+   * result, so `t3-code` items show the result the server kept instead.
+   */
+  readonly replacesMcpResults?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -4236,11 +4241,43 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             const toolName = `${mcpIdentity.server}.${mcpIdentity.tool}`;
             const input =
               mcpIdentity.input ?? unknownRecord(rawInputRecord?.arguments) ?? rawInputRecord ?? {};
-            let output = rawOutput === undefined ? undefined : acpMcpToolCallOutput(rawOutput);
-            const isHtmlRender = resolveT3McpToolId(toolName) === HTML_RENDER_TOOL_NAME;
+            const t3ToolId = resolveT3McpToolId(toolName);
+            const isHtmlRender = t3ToolId === HTML_RENDER_TOOL_NAME;
+            let mcpRawOutput = rawOutput;
+            if (
+              flavor.replacesMcpResults === true &&
+              t3ToolId !== null &&
+              !isHtmlRender &&
+              (status === "completed" || status === "failed")
+            ) {
+              const kept = yield* mcpSessions.takeToolResult(
+                context.input.threadId,
+                t3ToolId,
+                input,
+              );
+              // A repeated completion carries the description again.
+              const recovered =
+                kept === undefined
+                  ? previous?.data.rawOutput !== undefined &&
+                    unknownRecord(previous.data.rawOutput)?.result !== undefined &&
+                    unknownRecord(rawOutput)?.result === undefined
+                    ? previous.data.rawOutput
+                    : undefined
+                  : { result: kept.result };
+              if (recovered !== undefined) {
+                mcpRawOutput = recovered;
+                context.tools.set(toolCall.toolCallId, {
+                  ...toolCall,
+                  data: { ...toolCall.data, rawOutput: recovered },
+                });
+              }
+            }
+            const mcpRawOutputRecord = unknownRecord(mcpRawOutput);
+            let output =
+              mcpRawOutput === undefined ? undefined : acpMcpToolCallOutput(mcpRawOutput);
             const isError =
               compactDynamicToolOutput(output)?.isError === true ||
-              compactDynamicToolOutput(rawOutputRecord?.result)?.isError === true;
+              compactDynamicToolOutput(mcpRawOutputRecord?.result)?.isError === true;
             if (
               isHtmlRender &&
               (status === "failed" || (status === "completed" && isError)) &&
@@ -4280,7 +4317,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 serverName: mcpIdentity.server,
                 toolName: mcpIdentity.tool,
                 source: unknownRecord(
-                  (unknownRecord(rawOutputRecord?.result) ?? rawOutputRecord)?._meta,
+                  (unknownRecord(mcpRawOutputRecord?.result) ?? mcpRawOutputRecord)?._meta,
                 )?.source,
               }),
               type: "dynamic_tool",
@@ -8072,6 +8109,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         ) {
           const prompt: Array<EffectAcpSchema.ContentBlock> = [];
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          if (mcpSession !== undefined && flavor.replacesMcpResults === true) {
+            yield* mcpSessions.keepToolResults(turnInput.threadId);
+          }
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
             hasT3Mcp: mcpSession !== undefined,

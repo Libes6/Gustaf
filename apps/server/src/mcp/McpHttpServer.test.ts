@@ -17,6 +17,7 @@ import {
   RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
+import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -58,6 +59,7 @@ const environmentId = EnvironmentId.make("environment-mcp-test");
 const threadId = ThreadId.make("thread-mcp-test");
 const alternateTabId = PreviewTabId.make("tab-mcp-alternate");
 const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const encodeCallToolResult = Schema.encodeSync(McpSchema.CallToolResult);
 const invocation = {
   environmentId,
   requestNamespace: "provider-session-mcp-test",
@@ -576,6 +578,29 @@ it.effect("checks each preview_act action against that action's own input", () =
       expect(inputs.at(-2)).toEqual({ selector: "#name", text: "Ada" });
     }),
   ).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("keeps a tool's result for a thread whose provider asked for results", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const sessions = yield* McpProviderSessions.McpProviderSessions;
+      yield* serveSnapshots("mcp-kept-result-client", {});
+      const click = { action: "click", locator: "text=Send" };
+
+      yield* callTool("preview_act", click);
+      expect(yield* sessions.takeToolResult(threadId, "preview_act", click)).toBeUndefined();
+
+      yield* sessions.keepToolResults(threadId);
+      const result = yield* callTool("preview_act", click);
+      expect(
+        yield* sessions.takeToolResult(threadId, "preview_act", {
+          locator: "text=Send",
+          action: "click",
+        }),
+      ).toEqual({ result: encodeCallToolResult(result) });
+      expect(yield* sessions.takeToolResult(threadId, "preview_act", click)).toBeUndefined();
+    }),
+  ).pipe(Effect.provide(layerTest.pipe(Layer.provideMerge(McpProviderSessions.layer)))),
 );
 
 it.effect("decodes null optional arguments the way it decodes omitted ones", () => {
