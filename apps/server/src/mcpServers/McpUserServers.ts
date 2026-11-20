@@ -72,6 +72,11 @@ export class McpUserServers extends Context.Service<
 
 const WINDOWS_SHIM = /\.(?:cmd|bat)$/i;
 
+/** An http server is sent a Gustaf sign-in's token unless the user set their own header. */
+export const usesGustafSignIn = ({ transport }: McpServerConfig) =>
+  transport.type === "http" &&
+  !Object.keys(transport.headers).some((key) => key.toLowerCase() === "authorization");
+
 const slotsOf = ({ transport }: McpServerConfig) =>
   transport.type === "stdio" ? transport.env : transport.headers;
 
@@ -140,12 +145,10 @@ const make = Effect.gen(function* () {
   const nativeConfigs = yield* NativeMcpConfigs;
   const auth = yield* McpServerAuth;
 
-  // The token of a server signed in through Gustaf, unless the user set their own header.
-  const bearerFor = (id: McpServerId, { transport }: McpServerConfig, force = false) =>
-    transport.type !== "http" ||
-    Object.keys(transport.headers).some((key) => key.toLowerCase() === "authorization")
-      ? Effect.undefined
-      : auth.accessToken(id, transport.url, { force });
+  const bearerFor = (id: McpServerId, server: McpServerConfig, force = false) =>
+    server.transport.type === "http" && usesGustafSignIn(server)
+      ? auth.accessToken(id, server.transport.url, { force })
+      : Effect.undefined;
 
   const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
     native: NativeMcpSources,

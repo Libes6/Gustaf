@@ -421,7 +421,9 @@ const make = Effect.gen(function* () {
     });
     const cwd = yield* HostProcess.HomeDirectory;
     const signedIn =
-      server.transport.type === "http" && (yield* auth.isSignedIn(id, server.transport.url));
+      server.transport.type === "http" &&
+      McpUserServers.usesGustafSignIn(server) &&
+      (yield* auth.isSignedIn(id, server.transport.url));
     const first = yield* attempt(id, server, cwd, false);
     // A rejected token may only have expired early; one refresh decides.
     const status =

@@ -323,3 +323,42 @@ it.effect(
       );
     }),
 );
+
+it.effect("a server with the user's own Authorization header is not shown as signed in", () =>
+  Effect.gen(function* () {
+    const tokenRequests: Array<boolean> = [];
+    const signedIn = Layer.mock(McpServerAuth)({
+      accessToken: (_id, _url, options) =>
+        Effect.sync(() => void tokenRequests.push(options?.force === true)).pipe(
+          Effect.as("gustaf-token"),
+        ),
+      isSignedIn: () => Effect.succeed(true),
+      revision: () => Effect.succeed(1),
+    });
+    const { servers } = yield* Effect.gen(function* () {
+      const checks = yield* McpServerChecks.McpServerChecks;
+      return yield* checks.list({});
+    }).pipe(
+      Effect.provide(
+        layer(
+          {
+            mcpServers: {
+              jam: {
+                enabled: true,
+                transport: {
+                  type: "http",
+                  url: "http://127.0.0.1:1/mcp",
+                  headers: { authorization: "Bearer own" },
+                },
+              },
+            },
+          },
+          signedIn,
+        ),
+      ),
+    );
+    assert.strictEqual(servers[0]?.status, "failed");
+    assert.notProperty(servers[0], "signedIn");
+    assert.deepEqual(tokenRequests, []);
+  }),
+);
